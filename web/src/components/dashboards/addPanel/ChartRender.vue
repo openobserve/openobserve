@@ -864,6 +864,32 @@ export default defineComponent({
           });
       };
 
+        /**
+                 * Retrieves the unit value for the given value based on the configuration unit.
+                 *
+                 * @param {any} value - The value to be converted to a unit value.
+                 * @return {string} - The converted unit value.
+                 */
+        const getUnitValue = (value: any) => {
+            switch (props.data.config?.unit) {
+                case "bytes": {
+                    const units = ["B", "KB", "MB", "GB", "TB"];
+                    for (let unit of units) {
+                        if (value < 1024) {
+                            return `${parseFloat(value).toFixed(2)}${unit}`;
+                        }
+                        value /= 1024;
+                    }
+                    return `${parseFloat(value).toFixed(2)}PB`;
+                }
+                case "custom": {
+                    return `${value}${props.data.config.unit_custom}`
+                }
+                default:
+                    return value;
+            }
+        }
+
       const renderPromQlBasedChart = () => {
         switch (props.data.type){
             case 'bar':
@@ -885,7 +911,30 @@ export default defineComponent({
                                 ...getPropsByChartTypeForTraces()
                             }
                         })
-        
+                            // Calculate the maximum value size from the 'y' values in the 'traces' array
+                            const maxValueSize = traces.reduce((max: any, it: any) => Math.max(max, Math.max(...it.y)), 0);
+
+                            // Calculate the minimum value size from the 'y' values in the 'traces' array
+                            const minValueSize = traces.reduce((min: any, it: any) => Math.min(min, Math.min(...it.y)), Infinity);
+
+                            // Initialize empty arrays to hold tick values and tick text
+                            let yTickVals = [];
+                            let yTickText = [];
+
+                            // Calculate the interval size for 5 equally spaced ticks
+                            let intervalSize = (maxValueSize - minValueSize) / 4;
+
+                            // If the data doesn't vary much, use a percentage of the max value as the interval size
+                            if (intervalSize === 0) {
+                                intervalSize = maxValueSize * 0.2;
+                            }
+
+                            // Generate tick values and tick text for the y-axis
+                            for (let i = 0; i <= 4; i++) {
+                                let val = minValueSize + intervalSize * i;
+                                yTickVals.push(minValueSize + intervalSize * i);
+                                yTickText.push(getUnitValue(val));
+                            }
                         // result = result.map((it: any) => moment(it + "Z").toISOString(true))
         
                         const layout: any = {
@@ -970,7 +1019,30 @@ export default defineComponent({
                                 ...getPropsByChartTypeForTraces()
                             }
                         })
-                        
+                        // Calculate the maximum value size from the 'y' values in the 'traces' array
+                            const maxValueSize = traces.reduce((max: any, it: any) => Math.max(max, Math.max(...it.y)), 0);
+
+                            // Calculate the minimum value size from the 'y' values in the 'traces' array
+                            const minValueSize = traces.reduce((min: any, it: any) => Math.min(min, Math.min(...it.y)), Infinity);
+
+                            // Initialize empty arrays to hold tick values and tick text
+                            let yTickVals = [];
+                            let yTickText = [];
+
+                            // Calculate the interval size for 5 equally spaced ticks
+                            let intervalSize = (maxValueSize - minValueSize) / 4;
+
+                            // If the data doesn't vary much, use a percentage of the max value as the interval size
+                            if (intervalSize === 0) {
+                                intervalSize = maxValueSize * 0.2;
+                            }
+
+                            // Generate tick values and tick text for the y-axis
+                            for (let i = 0; i <= 4; i++) {
+                                let val = minValueSize + intervalSize * i;
+                                yTickVals.push(minValueSize + intervalSize * i);
+                                yTickText.push(getUnitValue(val));
+                            }
 
                         // result = result.map((it: any) => moment(it + "Z").toISOString(true))
 
@@ -1467,8 +1539,6 @@ export default defineComponent({
       };
         const getPropsByChartTypeForLayoutForPromQL = () => {
             //   console.log("data with tick",xAxisDataWithTicks);
-
-
             switch (props.data.type) {
                 case "bar": {
                     const trace = {

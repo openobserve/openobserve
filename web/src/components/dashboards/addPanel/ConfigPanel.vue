@@ -27,6 +27,14 @@
         </div>
       </template>
     </q-input>
+     <q-select v-if="promqlMode" outlined
+        v-model="dashboardPanelData.data.config.unit" :options="unitOptions" dense
+        label="Unit" class="showLabelOnTop" stack-label emit-value
+        :display-value="`${dashboardPanelData.data.config.unit ?? 'Default'}`">
+      </q-select>
+      <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
+      <q-input v-if="promqlMode && dashboardPanelData.data.config.unit == 'custom'" v-model="dashboardPanelData.data.config.unit_custom" label="Custom unit" color="input-border"
+        bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label filled dense label-slot/>
   </div>
 </template>
 
@@ -53,13 +61,31 @@ export default defineComponent({
         value: 'bottom'
       },
     ]
+    const unitOptions = [
+      {
+        label: 'Default',
+        value: null
+      },
+      {
+        label: 'Bytes',
+        value: 'bytes'
+      },
+      // {
+      //   label: 'Bits',
+      //   value: 'bits'
+      // },
+      {
+        label: 'Custom',
+        value: 'custom'
+      },
+    ]
     return {
       dashboardPanelData,
       promqlMode,
 
       // legends position options
       legendsPositionOptions,
-
+      unitOptions
     };
   }
 });
