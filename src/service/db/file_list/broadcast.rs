@@ -14,16 +14,18 @@
 
 use once_cell::sync::Lazy;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
 use crate::common::infra::cluster::{self, get_cached_nodes, get_internal_grpc_token};
-use crate::common::infra::config::{RwHashMap, CONFIG};
+use crate::common::infra::config::CONFIG;
 use crate::common::meta::common::FileKey;
 use crate::handler::grpc::cluster_rpc;
 
-static EVENTS: Lazy<RwHashMap<String, Arc<mpsc::UnboundedSender<Vec<FileKey>>>>> =
-    Lazy::new(Default::default);
+static EVENTS: Lazy<RwLock<ahash::AHashMap<String, EventChannel>>> =
+    Lazy::new(|| RwLock::new(ahash::AHashMap::new()));
+
+type EventChannel = Arc<mpsc::UnboundedSender<Vec<FileKey>>>;
 
 /// send an event to broadcast, will create a new channel for each nodes
 pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
@@ -35,6 +37,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
     })
     .unwrap();
     let local_node_uuid = cluster::LOCAL_NODE_UUID.clone();
+    let mut events = EVENTS.write().await;
     for node in nodes {
         if node.uuid.eq(&local_node_uuid) {
             continue;
@@ -47,7 +50,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
         let mut ok = false;
         for _i in 0..5 {
             let node = node.clone();
-            let channel = EVENTS.entry(node_id.clone()).or_insert_with(|| {
+            let channel = events.entry(node_id.clone()).or_insert_with(|| {
                 let (tx, mut rx) = mpsc::unbounded_channel();
                 tokio::task::spawn(async move {
                     let node_id = node.uuid.clone();
@@ -63,7 +66,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
             });
             tokio::task::yield_now().await;
             if let Err(e) = channel.clone().send(items.to_vec()) {
-                EVENTS.remove(&node_id);
+                events.remove(&node_id);
                 log::error!(
                     "[broadcast] send event to node[{}] failed: {}, retrying...",
                     node_id,
@@ -95,7 +98,7 @@ async fn send_to_node(
         loop {
             match cluster::get_node_by_uuid(&node.uuid) {
                 None => {
-                    EVENTS.remove(&node.uuid);
+                    EVENTS.write().await.remove(&node.uuid);
                     return Ok(());
                 }
                 Some(v) => {
@@ -141,7 +144,7 @@ async fn send_to_node(
                 Some(v) => v,
                 None => {
                     log::info!("[broadcast] node[{}] channel closed", &node.uuid);
-                    EVENTS.remove(&node.uuid);
+                    EVENTS.write().await.remove(&node.uuid);
                     return Ok(());
                 }
             };
@@ -164,7 +167,7 @@ async fn send_to_node(
                     Ok(_) => break,
                     Err(e) => {
                         if cluster::get_node_by_uuid(&node.uuid).is_none() {
-                            EVENTS.remove(&node.uuid);
+                            EVENTS.write().await.remove(&node.uuid);
                             return Ok(());
                         }
                         log::error!("[broadcast] to node[{}] error: {}", &node.uuid, e);
