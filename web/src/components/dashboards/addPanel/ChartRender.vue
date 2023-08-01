@@ -885,8 +885,9 @@ export default defineComponent({
                 case "custom": {
                     return `${value}${props.data.config.unit_custom}`
                 }
-                default:
+                case "default":{
                     return value;
+                }
             }
         }
 
@@ -937,7 +938,9 @@ export default defineComponent({
                                 yTickText.push(getUnitValue(val));
                             }
                         // result = result.map((it: any) => moment(it + "Z").toISOString(true))
-        
+                            const yAxisTickOptions = !props.data.config?.unit
+                                ? {} : {tickvals: yTickVals, ticktext: yTickText}
+
                         const layout: any = {
                             title: false,
                             showlegend: props.data.config?.show_legends,
@@ -949,15 +952,14 @@ export default defineComponent({
                             },
                             margin: {
                                 autoexpand: true,
-                                l:100,
+                                l:150,
                                 r:50,
                                 t:50,
                                 b:50
                             },
                             yaxis: {
                                 autorange: true,
-                                tickvals: yTickVals,
-                                ticktext: yTickText,
+                                ...yAxisTickOptions,
                             },
                             ...getPropsByChartTypeForLayoutForPromQL(),
                             ...getThemeLayoutOptions()
@@ -1039,10 +1041,10 @@ export default defineComponent({
                             },
                             margin: {
                                 autoexpand: true,
-                                l: 50,
-                                r: 50,
-                                t: 50,
-                                b: 50
+                                l: 0,
+                                r: 0,
+                                t: 0,
+                                b: 0
                             },
                             ...getPropsByChartTypeForLayoutForPromQL(),
                             ...getThemeLayoutOptions()
