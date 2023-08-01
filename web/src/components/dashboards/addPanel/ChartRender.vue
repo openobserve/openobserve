@@ -906,7 +906,7 @@ export default defineComponent({
                                 name: getPromqlLegendName(metric.metric, props.data.config.promql_legend),
                                 x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
                                 y: values.map((value: any) => value[1]),
-                                hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>",
+                                hovertemplate: "%{x} <br>%{fullData.name}: %{y:.2f}<extra></extra>",
                                 stackgroup: props.data.type == 'area-stacked' ? 'one' : '',
                                 ...getPropsByChartTypeForTraces()
                             }
