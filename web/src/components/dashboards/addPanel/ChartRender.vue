@@ -952,12 +952,9 @@ export default defineComponent({
                             },
                             margin: {
                                 autoexpand: true,
-                                l:150,
-                                r:50,
-                                t:50,
-                                b:50
                             },
                             yaxis: {
+                                automargin: true,
                                 autorange: true,
                                 ...yAxisTickOptions,
                             },
