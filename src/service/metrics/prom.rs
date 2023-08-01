@@ -117,14 +117,14 @@ pub async fn remote_write(
         // get labels
         let mut replica_label = String::new();
 
-        let labels: prom::FxIndexMap<String, String> = event
+        let mut labels: prom::FxIndexMap<String, String> = event
             .labels
             .drain(..)
             .map(|label| (label.name, label.value))
             .collect();
 
         let metric_name = match labels.get(NAME_LABEL) {
-            Some(v) => v,
+            Some(v) => v.clone(),
             None => continue,
         };
 
