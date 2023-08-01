@@ -212,6 +212,13 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
+      {
+        name: "status",
+        field: "status",
+        label: t("user.status"),
+        align: "left",
+        sortable: true,
+      },
     ]);
     const userEmail: any = ref("");
     const options = [t("user.admin"), t("user.member")];
@@ -258,6 +265,7 @@ export default defineComponent({
               ),
               org_member_id: data.org_member_id,
               isLoggedinUser: store.state.userInfo.email == data.email,
+              status: data.status,
             };
           });
 

@@ -349,6 +349,7 @@ export default defineComponent({
       ) {
         loadLogsData();
       }
+      refreshHistogramChart();
     });
 
     onBeforeMount(() => {
