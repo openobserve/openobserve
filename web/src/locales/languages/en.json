@@ -264,7 +264,7 @@
     "search": "Search Dashboard",
     "name": "Name",
     "typeDesc": "Description",
-    "createdashboard": "Add Dashboard",
+    "createdashboard": "New Dashboard",
     "updatedashboard": "Update a dashboard",
     "nameHolder": "Enter Name of dashboard",
     "typeHolder": "Describe the dashboard if you like",
