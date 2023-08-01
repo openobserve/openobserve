@@ -813,7 +813,7 @@ async fn prom_ha_handler(
         .or_default();
     if !replica_list.contains(replica_label) {
         replica_list.push(replica_label.to_owned());
-        let _ = db::metrics::set_prom_cluster_info(&cluster_name, &replica_list).await;
+        let _ = db::metrics::set_prom_cluster_info(cluster_name, &replica_list).await;
     }
 
     _accept_record
