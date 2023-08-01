@@ -912,6 +912,9 @@ export default defineComponent({
                 case "default":{
                     return value;
                 }
+                default:{
+                    return value;
+                }
             }
         }
 
@@ -976,6 +979,9 @@ export default defineComponent({
                             },
                             margin: {
                                 autoexpand: true,
+                                r: 50,
+                                b: 50,
+                                t: 30
                             },
                             yaxis: {
                                 automargin: true,
@@ -1123,7 +1129,9 @@ export default defineComponent({
                 }
                 break;
             }
-
+            default:{
+                return []
+            }
         
         // const trace = {
         //                   name: props.data.fields?.y.find((it: any) => it.alias == key).label,
