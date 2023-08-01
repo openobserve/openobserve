@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use dashmap::DashMap;
+use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -22,10 +22,8 @@ use crate::common::infra::config::{RwHashMap, CONFIG};
 use crate::common::meta::common::FileKey;
 use crate::handler::grpc::cluster_rpc;
 
-lazy_static! {
-    pub static ref EVENTS: RwHashMap<String, Arc<mpsc::UnboundedSender<Vec<FileKey>>>> =
-        DashMap::default();
-}
+static EVENTS: Lazy<RwHashMap<String, Arc<mpsc::UnboundedSender<Vec<FileKey>>>>> =
+    Lazy::new(Default::default);
 
 /// send an event to broadcast, will create a new channel for each nodes
 pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
@@ -41,7 +39,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
         if node.uuid.eq(&local_node_uuid) {
             continue;
         }
-        if cluster::is_router(&node.role) {
+        if !cluster::is_querier(&node.role) && !cluster::is_compactor(&node.role) {
             continue;
         }
         let node_id = node.uuid.clone();
@@ -49,28 +47,39 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
         let mut ok = false;
         for _i in 0..5 {
             let node = node.clone();
-            let events = EVENTS.entry(node_id.clone()).or_insert_with(|| {
+            let channel = EVENTS.entry(node_id.clone()).or_insert_with(|| {
                 let (tx, mut rx) = mpsc::unbounded_channel();
                 tokio::task::spawn(async move {
                     let node_id = node.uuid.clone();
                     if let Err(e) = send_to_node(node, &mut rx).await {
-                        log::error!("send event to node[{}] channel closed: {}", &node_id, e);
+                        log::error!(
+                            "[broadcast] send event to node[{}] channel closed: {}",
+                            &node_id,
+                            e
+                        );
                     }
                 });
                 Arc::new(tx)
             });
-            if let Err(e) = events.clone().send(items.to_vec()) {
+            tokio::task::yield_now().await;
+            if let Err(e) = channel.clone().send(items.to_vec()) {
                 EVENTS.remove(&node_id);
-                log::error!("send event to node[{}] failed: {}, retrying...", node_id, e);
+                log::error!(
+                    "[broadcast] send event to node[{}] failed: {}, retrying...",
+                    node_id,
+                    e
+                );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                tokio::task::yield_now().await;
                 continue;
             }
             ok = true;
             break;
         }
         if !ok {
-            log::error!("send event to node[{}] failed, dropping event", node_id);
+            log::error!(
+                "[broadcast] send event to node[{}] failed, dropping event",
+                node_id
+            );
         }
     }
 
@@ -85,7 +94,10 @@ async fn send_to_node(
         // waiting for the node to be online
         loop {
             match cluster::get_node_by_uuid(&node.uuid) {
-                None => return Ok(()),
+                None => {
+                    EVENTS.remove(&node.uuid);
+                    return Ok(());
+                }
                 Some(v) => {
                     if v.status == cluster::NodeStatus::Online {
                         break;
@@ -93,14 +105,26 @@ async fn send_to_node(
                 }
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            tokio::task::yield_now().await;
         }
         // connect to the node
-        let token: MetadataValue<_> = get_internal_grpc_token().parse()?;
-        let channel = Channel::from_shared(node.grpc_addr)
+        let token: MetadataValue<_> = match get_internal_grpc_token().parse() {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[broadcast] parse internal grpc token failed: {}", e);
+                continue;
+            }
+        };
+        let channel = match Channel::from_shared(node.grpc_addr.clone())
             .unwrap()
             .connect()
-            .await?;
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[broadcast] connect to node[{}] failed: {}", &node.uuid, e);
+                continue;
+            }
+        };
 
         let mut client = cluster_rpc::event_client::EventClient::with_interceptor(
             channel,
@@ -113,22 +137,39 @@ async fn send_to_node(
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
         loop {
-            let items = rx.recv().await.unwrap();
+            let items = match rx.recv().await {
+                Some(v) => v,
+                None => {
+                    log::info!("[broadcast] node[{}] channel closed", &node.uuid);
+                    EVENTS.remove(&node.uuid);
+                    return Ok(());
+                }
+            };
             // log::info!("broadcast to node[{}] -> {:?}", &node.uuid, items);
             let mut req_query = cluster_rpc::FileList::default();
             for item in items.iter() {
                 req_query.items.push(cluster_rpc::FileKey::from(item));
             }
-            for _ in 0..3 {
+            let mut ttl = 1;
+            loop {
+                if ttl > 3600 {
+                    log::error!(
+                        "[broadcast] to node[{}] timeout, dropping event, already retried for 1 hour",
+                        &node.uuid
+                    );
+                    break;
+                }
                 let request = tonic::Request::new(req_query.clone());
                 match client.send_file_list(request).await {
                     Ok(_) => break,
                     Err(e) => {
                         if cluster::get_node_by_uuid(&node.uuid).is_none() {
+                            EVENTS.remove(&node.uuid);
                             return Ok(());
                         }
-                        log::error!("broadcast to node[{}] error: {}", &node.uuid, e);
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        log::error!("[broadcast] to node[{}] error: {}", &node.uuid, e);
+                        tokio::time::sleep(tokio::time::Duration::from_secs(ttl)).await;
+                        ttl *= 2;
                         continue;
                     }
                 }
