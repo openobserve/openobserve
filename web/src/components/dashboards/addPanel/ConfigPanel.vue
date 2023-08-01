@@ -72,7 +72,11 @@ export default defineComponent({
       },
       {
         label: 'Seconds (s)',
-        value: 'time'
+        value: 'seconds'
+      },
+      {
+        label: 'Bytes/Second',
+        value: 'bps'
       },
       {
         label: 'Custom',

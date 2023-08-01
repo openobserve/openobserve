@@ -885,9 +885,7 @@ export default defineComponent({
                 case "custom": {
                     return `${value}${props.data.config.unit_custom}`
                 }
-                case "time": {
-                    console.log("Inside time", value);
-                    
+                case "seconds": {
                     const units = [
                         { unit: "ms", divisor: 0.001 },
                         { unit: "s", divisor: 1 },
@@ -904,10 +902,18 @@ export default defineComponent({
                             }
                         }
 
-                        console.log("value: ", value);
-                        
                         // If the value is too large to fit in any unit, return the original seconds
                         return value + " s";
+                }
+                case "bps": {
+                    const units = ["B", "KB", "MB", "GB", "TB"];
+                    for (let unit of units) {
+                        if (value < 1024) {
+                            return `${parseFloat(value).toFixed(2)}${unit}/s`;
+                        }
+                        value /= 1024;
+                    }
+                    return `${parseFloat(value).toFixed(2)}PB/s`;
                 }
                 case "default":{
                     return value;
