@@ -17,8 +17,9 @@ use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
-use crate::common::infra::config::RwHashMap;
-use crate::common::meta::{common::FileMeta, StreamType};
+use crate::common::infra::config::{RwHashMap, CONFIG};
+use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
+use crate::service::{db, stream};
 
 static FILES: Lazy<RwHashMap<String, RwHashMap<String, Vec<String>>>> = Lazy::new(DashMap::default);
 static DATA: Lazy<RwHashMap<String, FileMeta>> = Lazy::new(DashMap::default);
@@ -120,7 +121,7 @@ fn scan_prefix(
     Ok(items)
 }
 
-pub fn get_file_list(
+pub async fn get_file_list(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -132,6 +133,19 @@ pub fn get_file_list(
         let time_min = Utc.timestamp_nanos(time_min * 1000);
         let time_max = Utc.timestamp_nanos(time_max * 1000);
         if time_min + Duration::hours(48) >= time_max {
+            // Handle partiton time level
+            let schema = db::schema::get(org_id, stream_name, stream_type).await?;
+            let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
+            let partition_time_level = stream_settings.partition_time_level.unwrap_or(
+                if stream_type == StreamType::Metrics {
+                    PartitionTimeLevel::from(CONFIG.limit.metric_file_max_retention.as_str())
+                } else {
+                    PartitionTimeLevel::default()
+                },
+            );
+            if let PartitionTimeLevel::Daily = partition_time_level {
+                keys.push(time_min.format("%Y/%m/%d/00/").to_string());
+            }
             // less than 48 hours, generate keys by hours
             let mut time_min = Utc
                 .with_ymd_and_hms(
@@ -334,10 +348,10 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_file_list() {
-        let ret = get_file_list("default", "olympics", StreamType::Logs, 0, 0);
+        let ret = get_file_list("default", "olympics", StreamType::Logs, 0, 0).await;
         assert!(ret.is_ok());
 
-        let ret = get_file_list("default", "olympics", StreamType::Logs, 1678613530133899, 0);
+        let ret = get_file_list("default", "olympics", StreamType::Logs, 1678613530133899, 0).await;
         assert!(ret.is_ok());
 
         let ret = scan_prefix("default", "olympics", StreamType::Logs, "");

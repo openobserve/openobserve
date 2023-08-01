@@ -27,9 +27,10 @@ use crate::common::infra::{
 use crate::common::json;
 use crate::common::meta::{
     common::{FileKey, FileMeta},
+    stream::PartitionTimeLevel,
     StreamType,
 };
-use crate::service::{db, file_list, search::datafusion};
+use crate::service::{db, file_list, search::datafusion, stream};
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -54,14 +55,12 @@ pub async fn merge_by_stream(
 
     // get schema
     let mut schema = db::schema::get(org_id, stream_name, stream_type).await?;
-    let schema_metadata = std::mem::take(&mut schema.metadata);
+    let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
+    let stream_created = stream::stream_created(&schema).unwrap_or_default();
+    std::mem::take(&mut schema.metadata);
     let schema = Arc::new(schema);
     if offset == 0 {
-        offset = schema_metadata
-            .get("created_at")
-            .unwrap_or(&String::from("0"))
-            .parse::<i64>()
-            .unwrap();
+        offset = stream_created
     }
     if offset == 0 {
         return Ok(()); // no data
@@ -82,15 +81,12 @@ pub async fn merge_by_stream(
 
     // check offset
     let time_now: DateTime<Utc> = Utc::now();
+    let tn_year = time_now.year();
+    let tn_month = time_now.month();
+    let tn_day = time_now.day();
+    let tn_hour = time_now.hour();
     let time_now_hour = Utc
-        .with_ymd_and_hms(
-            time_now.year(),
-            time_now.month(),
-            time_now.day(),
-            time_now.hour(),
-            0,
-            0,
-        )
+        .with_ymd_and_hms(tn_year, tn_month, tn_day, tn_hour, 0, 0)
         .unwrap()
         .timestamp_micros();
     // if offset is future, just wait
@@ -110,13 +106,37 @@ pub async fn merge_by_stream(
     }
 
     // get current hour all files
+    let partition_time_level =
+        stream_settings
+            .partition_time_level
+            .unwrap_or(if stream_type == StreamType::Metrics {
+                PartitionTimeLevel::from(CONFIG.limit.metric_file_max_retention.as_str())
+            } else {
+                PartitionTimeLevel::default()
+            });
+    let (partition_offset_start, partition_offset_end) = match partition_time_level {
+        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => (
+            offset_time_hour,
+            offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
+                - Duration::seconds(1).num_microseconds().unwrap(),
+        ),
+        PartitionTimeLevel::Daily => (
+            Utc.with_ymd_and_hms(tn_year, tn_month, tn_day, 0, 0, 0)
+                .unwrap()
+                .timestamp_micros(),
+            Utc.with_ymd_and_hms(tn_year, tn_month, tn_day, 0, 0, 0)
+                .unwrap()
+                .timestamp_micros()
+                + Duration::days(1).num_microseconds().unwrap()
+                - Duration::seconds(1).num_microseconds().unwrap(),
+        ),
+    };
     let files = match file_list::get_file_list(
         org_id,
         stream_name,
         stream_type,
-        offset_time_hour,
-        offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
-            - Duration::seconds(1).num_microseconds().unwrap(),
+        partition_offset_start,
+        partition_offset_end,
     )
     .await
     {

@@ -185,14 +185,10 @@ impl Manager {
             }
         };
 
-        let desired_size = if stream_type.eq(&StreamType::Metrics) {
-            (CONFIG.limit.max_file_size_on_disk * CONFIG.limit.metric_file_size_multiplier) as i64
-        } else {
-            CONFIG.limit.max_file_size_on_disk as i64
-        };
-
         // check size & ttl
-        if file.size() >= (desired_size) || file.expired() <= chrono::Utc::now().timestamp() {
+        if file.size() >= (CONFIG.limit.max_file_size_on_disk).try_into().unwrap()
+            || file.expired() <= chrono::Utc::now().timestamp()
+        {
             self.data
                 .get(thread_id)
                 .unwrap()
@@ -336,8 +332,9 @@ impl RwFile {
             (Some(RwLock::new(f)), None)
         };
 
-        let ttl = if let Some(level) = partition_time_level {
-            chrono::Utc::now().timestamp() + level.duration()
+        let level_duration = partition_time_level.unwrap_or_default().duration();
+        let ttl = if level_duration > 0 {
+            chrono::Utc::now().timestamp() + level_duration
         } else {
             chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64
         };

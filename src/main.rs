@@ -26,7 +26,7 @@ use std::{
     net::SocketAddr,
     str::FromStr,
     sync::{
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicU16, Ordering},
         Arc,
     },
 };
@@ -37,7 +37,7 @@ use openobserve::{
     common::infra::{
         cluster,
         config::{CONFIG, USERS, VERSION},
-        metrics, wal,
+        ider, metrics, wal,
     },
     common::meta,
     common::migration,
@@ -109,6 +109,7 @@ async fn main() -> Result<(), anyhow::Error> {
     cluster::register_and_keepalive()
         .await
         .expect("cluster init failed");
+    let _ = ider::generate();
     job::init().await.expect("job init failed");
 
     // gRPC server
@@ -126,7 +127,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let prometheus = metrics::create_prometheus_handler();
 
     // HTTP server
-    let thread_id = Arc::new(AtomicU8::new(0));
+    let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
         format!("[::]:{}", CONFIG.http.port).parse()?
     } else {

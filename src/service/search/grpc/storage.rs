@@ -224,7 +224,7 @@ pub async fn search(
 #[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<FileKey>, Error> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let mut file_list = match file_list::get_file_list(
+    let file_list = match file_list::get_file_list(
         &sql.org_id,
         &sql.stream_name,
         stream_type,
@@ -242,19 +242,14 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
         }
     };
 
-    if CONFIG.common.use_dynamo_meta_store && file_list.len() > 256 {
-        // because match_source need fetch file meta again, so add an limit
-        file_list.sort_by(|a, b| a.key.cmp(&b.key));
-        Ok(file_list)
-    } else {
-        let mut files = Vec::with_capacity(file_list.len());
-        for file in file_list {
-            if sql.match_source(&file, false, false, stream_type).await {
-                files.push(file.clone());
-            }
+    let mut files = Vec::with_capacity(file_list.len());
+    for file in file_list {
+        if sql.match_source(&file, false, false, stream_type).await {
+            files.push(file.to_owned());
         }
-        Ok(files)
     }
+    files.sort_by(|a, b| a.key.cmp(&b.key));
+    Ok(files)
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_parquet_files", skip_all)]

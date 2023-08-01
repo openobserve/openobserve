@@ -20,10 +20,7 @@ use crate::common::infra::db::Event;
 use crate::common::json;
 use crate::common::meta::prom::ClusterLeader;
 
-pub async fn set_prom_cluster_info(
-    cluster: &str,
-    members: &[String],
-) -> Result<(), anyhow::Error> {
+pub async fn set_prom_cluster_info(cluster: &str, members: &[String]) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/metrics_members/{cluster}");
     Ok(db.put(&key, Bytes::from(members.join(","))).await?)

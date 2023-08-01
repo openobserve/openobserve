@@ -201,7 +201,7 @@ pub async fn remote_write(
             .await;
 
             let mut partition_keys: Vec<String> = vec![];
-            let mut time_key = PartitionTimeLevel::Hourly;
+            let mut time_key = PartitionTimeLevel::default();
 
             if stream_schema.has_partition_keys {
                 if !stream_partitioning_map.contains_key(&metric_name) {
@@ -212,11 +212,15 @@ pub async fn remote_write(
                     .await;
                     stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
                     partition_keys = partition_det.partition_keys;
-                    time_key = partition_det.partition_time_level;
+                    time_key = partition_det
+                        .partition_time_level
+                        .unwrap_or(CONFIG.limit.metric_file_max_retention.as_str().into());
                 } else {
                     let partition_det = stream_partitioning_map.get(&metric_name).unwrap();
                     partition_keys = partition_det.partition_keys.clone();
-                    time_key = partition_det.partition_time_level;
+                    time_key = partition_det
+                        .partition_time_level
+                        .unwrap_or(CONFIG.limit.metric_file_max_retention.as_str().into());
                 }
             }
 
@@ -345,7 +349,7 @@ pub async fn remote_write(
         let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
             details.partition_time_level
         } else {
-            CONFIG.limit.metric_file_max_retention.as_str().into()
+            Some(CONFIG.limit.metric_file_max_retention.as_str().into())
         };
 
         let mut req_stats = write_file(
@@ -357,7 +361,7 @@ pub async fn remote_write(
                 stream_name: &stream_name,
                 stream_type: StreamType::Metrics,
             },
-            Some(time_level),
+            time_level,
         );
 
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();

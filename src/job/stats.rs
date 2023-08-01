@@ -21,8 +21,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) {
         return Ok(());
     }
-    // should run it every 5 minutes
-    let mut interval = time::interval(time::Duration::from_secs(300));
+    // should run it every 10 minutes
+    let mut interval = time::interval(time::Duration::from_secs(600));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;

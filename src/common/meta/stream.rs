@@ -111,12 +111,12 @@ pub struct StreamSchema {
     pub schema: Schema,
 }
 
-#[derive(Clone, Debug, Deserialize, Default, ToSchema)]
+#[derive(Clone, Debug, Deserialize, ToSchema, Default)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub partition_keys: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_empty")]
+    #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
@@ -187,26 +187,21 @@ impl From<&str> for StreamSettings {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum PartitionTimeLevel {
+    #[default]
+    Unset,
     Hourly,
     Daily,
-    Monthly,
-}
-
-impl Default for PartitionTimeLevel {
-    fn default() -> Self {
-        CONFIG.limit.metric_file_max_retention.as_str().into()
-    }
 }
 
 impl PartitionTimeLevel {
     pub fn duration(self) -> i64 {
         match self {
+            PartitionTimeLevel::Unset => 0,
             PartitionTimeLevel::Hourly => 3600000,
             PartitionTimeLevel::Daily => 86400000,
-            PartitionTimeLevel::Monthly => 86400000, // TODO check if needs to be changed returning daily for now
         }
     }
 }
@@ -214,10 +209,10 @@ impl PartitionTimeLevel {
 impl From<&str> for PartitionTimeLevel {
     fn from(data: &str) -> Self {
         match data.to_lowercase().as_str() {
+            "unset" => PartitionTimeLevel::Unset,
             "hourly" => PartitionTimeLevel::Hourly,
             "daily" => PartitionTimeLevel::Daily,
-            "monthly" => PartitionTimeLevel::Monthly,
-            _ => PartitionTimeLevel::Hourly,
+            _ => PartitionTimeLevel::Unset,
         }
     }
 }
@@ -225,9 +220,9 @@ impl From<&str> for PartitionTimeLevel {
 impl std::fmt::Display for PartitionTimeLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            PartitionTimeLevel::Unset => write!(f, "unset"),
             PartitionTimeLevel::Hourly => write!(f, "hourly"),
             PartitionTimeLevel::Daily => write!(f, "daily"),
-            PartitionTimeLevel::Monthly => write!(f, "monthly"),
         }
     }
 }
@@ -280,7 +275,7 @@ impl ScanStats {
 #[serde(rename_all = "lowercase")]
 pub struct PartitioningDetails {
     pub partition_keys: Vec<String>,
-    pub partition_time_level: PartitionTimeLevel,
+    pub partition_time_level: Option<PartitionTimeLevel>,
 }
 
 #[cfg(test)]
