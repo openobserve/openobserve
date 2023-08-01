@@ -49,7 +49,9 @@ const getDefaultDashboardPanelData = () => (
         description: "",
         show_legends: true,
         legends_position: null,
-        promql_legend: ""
+        promql_legend: "",
+        unit: null,
+        unit_custom: null
       },
       queryType: "sql",
       query: "",
