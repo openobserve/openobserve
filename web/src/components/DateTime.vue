@@ -488,6 +488,15 @@ export default defineComponent({
             selectedDate.value.to + " " + selectedTime.value.endTime
           );
         }
+
+        if (
+          start.toString() === "Invalid Date" &&
+          end.toString() === "Invalid Date"
+        ) {
+          start = selectedDate.value + " " + selectedTime.value.startTime;
+          end = selectedDate.value + " " + selectedTime.value.endTime;
+        }
+
         const rVal = {
           startTime: new Date(start).getTime() * 1000,
           endTime: new Date(end).getTime() * 1000,
@@ -502,7 +511,14 @@ export default defineComponent({
         return `Past ${relativeValue.value} ${getPeriodLabel.value}`;
       } else {
         if (selectedDate.value != null) {
-          return `${selectedDate.value.from} ${selectedTime.value.startTime} - ${selectedDate.value.to} ${selectedTime.value.endTime}`;
+          // Here as if multiple dates is selected we get object with from and to keys
+          // If single date is selected we get string with date value
+          // So have added check for from and to
+          if (selectedDate.value?.from && selectedDate.value?.to) {
+            return `${selectedDate.value.from} ${selectedTime.value.startTime} - ${selectedDate.value.to} ${selectedTime.value.endTime}`;
+          } else {
+            return `${selectedDate.value} ${selectedTime.value.startTime} - ${selectedDate.value} ${selectedTime.value.endTime}`;
+          }
         } else {
           const todayDate = new Date().toLocaleDateString("en-ZA");
           return `${todayDate} ${selectedTime.value.startTime} - ${todayDate} ${selectedTime.value.endTime}`;

@@ -24,6 +24,7 @@ import {
   useLocalLogFilterField,
   b64EncodeUnicode,
   b64DecodeUnicode,
+  formatSizeFromMB,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -584,7 +585,10 @@ const useLogs = () => {
               extractFields();
 
               if (!isPagination) generateHistogramData();
-              else updateHistogramTitle();
+              else {
+                searchObj.data.histogram.chartParams.title =
+                  getHistogramTitle();
+              }
 
               //update grid columns
               updateGridColumns();
@@ -770,19 +774,18 @@ const useLogs = () => {
     }
   };
 
-  function updateHistogramTitle() {
+  function getHistogramTitle() {
     const title =
       "Showing " +
-      searchObj.data.queryResults.hits.length +
+      searchObj.data.queryResults.hits.length.toLocaleString() +
       " out of " +
       searchObj.data.queryResults.total.toLocaleString() +
       " hits in " +
       searchObj.data.queryResults.took +
       " ms. (Scan Size: " +
-      searchObj.data.queryResults.scan_size +
-      "MB)";
-
-    searchObj.data.histogram.chartParams.title = title;
+      formatSizeFromMB(searchObj.data.queryResults.scan_size) +
+      ")";
+    return title;
   }
 
   function generateHistogramData() {
@@ -806,16 +809,7 @@ const useLogs = () => {
       }
 
       const chartParams = {
-        title:
-          "Showing " +
-          searchObj.data.queryResults.hits.length +
-          " out of " +
-          searchObj.data.queryResults.total.toLocaleString() +
-          " hits in " +
-          searchObj.data.queryResults.took +
-          " ms. (Scan Size: " +
-          searchObj.data.queryResults.scan_size +
-          "MB)",
+        title: getHistogramTitle(),
         unparsed_x_data: unparsed_x_data,
       };
       searchObj.data.histogram = { xData, yData, chartParams };
