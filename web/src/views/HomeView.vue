@@ -15,7 +15,11 @@
 
 <template>
   <q-page class="q-pa-lg">
-    <div v-if="!no_data_ingest" class="q-pa-md row items-start q-gutter-md" style="margin: 0 auto; justify-content: center;">
+    <div
+      v-if="!no_data_ingest"
+      class="q-pa-md row items-start q-gutter-md"
+      style="margin: 0 auto; justify-content: center"
+    >
       <q-card class="my-card">
         <q-card-section align="center" flat bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
@@ -79,7 +83,11 @@
       </q-card>
     </div>
 
-    <div v-if="no_data_ingest" class="q-pa-md row items-start q-gutter-md" style="margin: 0 auto; justify-content: center;">
+    <div
+      v-if="no_data_ingest"
+      class="q-pa-md row items-start q-gutter-md"
+      style="margin: 0 auto; justify-content: center"
+    >
       <q-card class="my-card">
         <q-card-section align="center" flat bordered class="my-card">
           <div class="text-h6">{{ t("home.noData") }}</div>
@@ -97,7 +105,6 @@
             >{{ t("home.findIngestion") }}
           </q-btn>
         </q-card-actions>
-        
       </q-card>
 
       <q-card v-if="isCloud === 'true'" class="my-card">
@@ -111,7 +118,10 @@
     </div>
     <div class="row justify-center items-center">
       <video width="400" height="225" controls>
-        <source src="https://videos.openobserve.ai/OpenObserve_Introduction.mp4" type="video/mp4">
+        <source
+          src="https://videos.openobserve.ai/OpenObserve_Introduction.mp4"
+          type="video/mp4"
+        />
         Your browser does not support the video tag.
       </video>
     </div>
@@ -125,6 +135,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
 import config from "../aws-exports";
+import { formatSizeFromMB } from "@/utils/zincutils";
 export default defineComponent({
   name: "PageHome",
 
@@ -194,7 +205,7 @@ export default defineComponent({
           }
           summary.value = {
             streams_count: res.data.streams.length,
-            ingested_data: sum.toFixed(2) + " MB",
+            ingested_data: formatSizeFromMB(sum.toFixed(2)),
             ingest_fns: ingest_fns,
             query_fns: query_fns,
             rt_alerts: rt_alerts,
@@ -252,7 +263,7 @@ export default defineComponent({
   align-items: center;
 }
 
-.my-card{
+.my-card {
   background-color: rgba(0, 0, 0, 0.045);
 }
 </style>
