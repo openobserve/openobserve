@@ -953,6 +953,11 @@ export default defineComponent({
                                 t:50,
                                 b:50
                             },
+                            yaxis: {
+                                autorange: true,
+                                tickvals: yTickVals,
+                                ticktext: yTickText,
+                            },
                             ...getPropsByChartTypeForLayoutForPromQL(),
                             ...getThemeLayoutOptions()
                         };
@@ -1061,6 +1066,11 @@ export default defineComponent({
                                 r: 50,
                                 t: 50,
                                 b: 50
+                            },
+                            yaxis: {
+                                autorange: true,
+                                tickvals: yTickVals,
+                                ticktext: yTickText,
                             },
                             ...getPropsByChartTypeForLayoutForPromQL(),
                             ...getThemeLayoutOptions()
