@@ -20,32 +20,30 @@ use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use std::collections::HashMap;
 
-use crate::common::meta::functions::StreamTransform;
-use crate::common::meta::stream::{PartitioningDetails, StreamParams};
-use crate::common::meta::usage::UsageType;
+use crate::common::infra::{
+    cache::stats,
+    cluster,
+    config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+    errors::{Error, Result},
+    metrics,
+};
 use crate::common::meta::{
     self,
     alert::{Alert, Trigger},
+    functions::StreamTransform,
     prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+    stream::{PartitioningDetails, StreamParams},
+    usage::UsageType,
     StreamType,
 };
-use crate::common::{
-    infra::{
-        cache::stats,
-        cluster,
-        config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        errors::{Error, Result},
-        metrics,
-    },
-    meta::stream::PartitionTimeLevel,
-};
 use crate::common::{json, time::parse_i64_to_timestamp_micros};
-use crate::service::usage::report_usage_stats;
 use crate::service::{
     db,
     ingestion::{chk_schema_by_record, write_file},
     schema::{set_schema_metadata, stream_schema_exists},
     search as search_service,
+    stream::unwrap_partition_time_level,
+    usage::report_usage_stats,
 };
 
 pub(crate) mod prometheus {
@@ -192,37 +190,20 @@ pub async fn remote_write(
             }
 
             // get partition keys
-            let stream_schema = stream_schema_exists(
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                &mut metric_schema_map,
-            )
-            .await;
-
-            let mut partition_keys: Vec<String> = vec![];
-            let mut time_key = PartitionTimeLevel::default();
-
-            if stream_schema.has_partition_keys {
-                if !stream_partitioning_map.contains_key(&metric_name) {
-                    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                        &metric_name,
-                        &metric_schema_map,
-                    )
-                    .await;
-                    stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
-                    partition_keys = partition_det.partition_keys;
-                    time_key = partition_det
-                        .partition_time_level
-                        .unwrap_or(CONFIG.limit.metric_file_max_retention.as_str().into());
-                } else {
-                    let partition_det = stream_partitioning_map.get(&metric_name).unwrap();
-                    partition_keys = partition_det.partition_keys.clone();
-                    time_key = partition_det
-                        .partition_time_level
-                        .unwrap_or(CONFIG.limit.metric_file_max_retention.as_str().into());
-                }
+            if !stream_partitioning_map.contains_key(&metric_name) {
+                let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                    &metric_name,
+                    &metric_schema_map,
+                )
+                .await;
+                stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
             }
+            let partition_det = stream_partitioning_map.get(&metric_name).unwrap();
+            let partition_keys = partition_det.partition_keys.clone();
+            let partition_time_level = unwrap_partition_time_level(
+                partition_det.partition_time_level,
+                StreamType::Metrics,
+            );
 
             // Start get stream alerts
             let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
@@ -279,7 +260,7 @@ pub async fn remote_write(
             let hour_key = crate::service::ingestion::get_wal_time_key(
                 timestamp,
                 &partition_keys,
-                time_key,
+                partition_time_level,
                 value.as_object().unwrap(),
                 None,
             );
