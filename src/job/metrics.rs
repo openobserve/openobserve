@@ -15,8 +15,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     load_query_cache_limit_bytes().await?;
     load_ingest_wal_used_bytes().await?;
 
-    // update metrics every 30 minutes
-    let mut interval = time::interval(time::Duration::from_secs(1800));
+    // update metrics every 60 seconds
+    let mut interval = time::interval(time::Duration::from_secs(60));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
