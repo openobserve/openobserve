@@ -85,7 +85,7 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
 #[tracing::instrument(skip(sql),fields(org_id = sql.org_id,stream_name = sql.stream_name))]
 async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<FileKey> {
     let (time_min, time_max) = get_times(sql, stream_type).await;
-    let mut file_list = match file_list::get_file_list(
+    let file_list = match file_list::get_file_list(
         &sql.org_id,
         &sql.stream_name,
         stream_type,
@@ -97,20 +97,15 @@ async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<FileKey> 
         Ok(file_list) => file_list,
         Err(_) => vec![],
     };
-    if CONFIG.common.use_dynamo_meta_store && file_list.len() > 256 {
-        // because match_source need fetch file meta again, so add an limit
-        file_list.sort_by(|a, b| a.key.cmp(&b.key));
-        file_list
-    } else {
-        let mut files = Vec::with_capacity(file_list.len());
-        for file in file_list {
-            if sql.match_source(&file, false, false, stream_type).await {
-                files.push(file.to_owned());
-            }
+
+    let mut files = Vec::with_capacity(file_list.len());
+    for file in file_list {
+        if sql.match_source(&file, false, false, stream_type).await {
+            files.push(file.to_owned());
         }
-        files.sort_by(|a, b| a.key.cmp(&b.key));
-        files
     }
+    files.sort_by(|a, b| a.key.cmp(&b.key));
+    files
 }
 
 #[tracing::instrument(

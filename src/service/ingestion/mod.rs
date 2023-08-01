@@ -12,38 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{db, triggers};
-use crate::common::flatten;
-use crate::common::infra::wal::get_or_create;
-use crate::common::meta::stream::{PartitionTimeLevel, PartitioningDetails, StreamParams};
 use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
 use datafusion::arrow::json::reader::infer_json_schema;
-use std::collections::BTreeMap;
-use std::io::BufReader;
+use std::{collections::BTreeMap, io::BufReader};
 use vector_enrichment::TableRegistry;
-use vrl::compiler::runtime::Runtime;
-use vrl::compiler::{CompilationResult, TargetValueRef};
+use vrl::compiler::{runtime::Runtime, CompilationResult, TargetValueRef};
 use vrl::prelude::state;
 
-use crate::common::functions::get_vrl_compiler_config;
-use crate::common::{
-    json::{self, Map, Value},
-    notification::send_notification,
+use crate::common::infra::{
+    config::{CONFIG, STREAM_ALERTS, STREAM_FUNCTIONS},
+    metrics,
+    wal::get_or_create,
 };
-
-use crate::common::infra::config::STREAM_FUNCTIONS;
-use crate::common::infra::config::{CONFIG, STREAM_ALERTS};
-use crate::common::infra::metrics;
-
-use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
-use crate::common::meta::usage::RequestStats;
 use crate::common::meta::{
     alert::{Alert, Trigger},
+    functions::{StreamTransform, VRLRuntimeConfig},
+    stream::{PartitionTimeLevel, PartitioningDetails, StreamParams},
+    usage::RequestStats,
     StreamType,
 };
+use crate::common::{
+    flatten,
+    functions::get_vrl_compiler_config,
+    json::{Map, Value},
+    notification::send_notification,
+};
+use crate::service::{db, stream::stream_settings, triggers};
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
@@ -123,40 +120,16 @@ pub async fn get_stream_partition_keys(
     stream_name: &str,
     stream_schema_map: &AHashMap<String, Schema>,
 ) -> PartitioningDetails {
-    let mut partitioning_details = PartitioningDetails::default();
-
-    let mut keys: Vec<String> = vec![];
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema,
-        None => return partitioning_details,
+        None => return PartitioningDetails::default(),
     };
 
-    let stream_settings = match schema.metadata().get("settings") {
-        Some(value) => value,
-        None => return partitioning_details,
-    };
-
-    let settings: Value = json::from_slice(stream_settings.as_bytes()).unwrap();
-    let part_keys = match settings.get("partition_keys") {
-        Some(value) => value,
-        None => return partitioning_details,
-    };
-
-    let time_level: PartitionTimeLevel = match settings.get("partition_time_level") {
-        Some(value) => json::from_value(value.clone()).unwrap(),
-        None => return partitioning_details,
-    };
-
-    let mut v: Vec<_> = part_keys.as_object().unwrap().into_iter().collect();
-    v.sort_by(|a, b| a.0.cmp(b.0));
-    for (_, value) in v {
-        keys.push(value.as_str().unwrap().to_string());
+    let stream_settings = stream_settings(schema).unwrap_or_default();
+    PartitioningDetails {
+        partition_keys: stream_settings.partition_keys,
+        partition_time_level: stream_settings.partition_time_level,
     }
-
-    partitioning_details.partition_keys = keys;
-    partitioning_details.partition_time_level = time_level;
-
-    partitioning_details
 }
 
 pub async fn get_stream_alerts<'a>(
@@ -217,19 +190,14 @@ pub fn get_wal_time_key(
     suffix: Option<&str>,
 ) -> String {
     // get time file name
-
     let mut time_key = match time_level {
-        PartitionTimeLevel::Hourly => Utc
+        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => Utc
             .timestamp_nanos(timestamp * 1000)
             .format("%Y_%m_%d_%H")
             .to_string(),
         PartitionTimeLevel::Daily => Utc
             .timestamp_nanos(timestamp * 1000)
             .format("%Y_%m_%d_00")
-            .to_string(),
-        PartitionTimeLevel::Monthly => Utc
-            .timestamp_nanos(timestamp * 1000)
-            .format("%Y_%m_01_00")
             .to_string(),
     };
     if let Some(s) = suffix {

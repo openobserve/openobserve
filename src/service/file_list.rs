@@ -41,7 +41,8 @@ pub async fn get_file_list(
         )
         .await
     } else {
-        let files = file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max)?;
+        let files =
+            file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max).await?;
         let mut file_sizes = Vec::with_capacity(files.len());
         for file in files {
             let meta = get_file_meta(&file).await?;
