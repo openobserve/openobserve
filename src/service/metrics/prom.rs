@@ -116,29 +116,28 @@ pub async fn remote_write(
     for mut event in request.timeseries {
         // get labels
         let mut replica_label = String::new();
-        let metric_name = match labels_value(&event.labels, NAME_LABEL) {
-            Some(v) => v,
-            None => continue,
-        };
-        if !has_entry {
-            if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_replica_label) {
-                replica_label = v;
-            };
-            if cluster_name.is_empty() {
-                if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_cluster_label) {
-                    cluster_name = format!("{}/{}", org_id, v);
-                }
-            }
-        }
-        let labels: prom::FxIndexMap<String, String> = event
+
+        let mut labels: prom::FxIndexMap<String, String> = event
             .labels
             .drain(..)
-            .filter(|label| {
-                label.name != CONFIG.prom.ha_replica_label
-                    && label.name != CONFIG.prom.ha_cluster_label
-            })
             .map(|label| (label.name, label.value))
             .collect();
+
+        let metric_name = match labels.get(NAME_LABEL) {
+            Some(v) => v.clone(),
+            None => continue,
+        };
+
+        let replica_label_value = labels.remove(&CONFIG.prom.ha_replica_label);
+        let cluster_name_value = labels.remove(&CONFIG.prom.ha_cluster_label);
+        if !has_entry {
+            if replica_label_value.is_some() {
+                replica_label = replica_label_value.unwrap();
+            }
+            if cluster_name.is_empty() && cluster_name_value.is_some() {
+                cluster_name = format!("{}/{}", org_id, cluster_name_value.unwrap());
+            }
+        }
 
         let buf = metric_data_map.entry(metric_name.to_owned()).or_default();
 
@@ -178,8 +177,8 @@ pub async fn remote_write(
                 }
                 accept_record = prom_ha_handler(
                     has_entry,
-                    cluster_name.clone(),
-                    replica_label.clone(),
+                    &cluster_name,
+                    &replica_label,
                     last_received,
                     election_interval,
                 )
@@ -767,26 +766,26 @@ fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
 
 async fn prom_ha_handler(
     has_entry: bool,
-    cluster_name: String,
-    replica_label: String,
+    cluster_name: &String,
+    replica_label: &String,
     last_received: i64,
     election_interval: i64,
 ) -> bool {
     let mut _accept_record = false;
     let curr_ts = Utc::now().timestamp_micros();
     if !has_entry {
-        METRIC_CLUSTER_MAP.insert(cluster_name.clone(), vec![]);
-        log::info!("Making {} leader for {} ", replica_label, cluster_name,);
+        METRIC_CLUSTER_MAP.insert(cluster_name.to_owned(), vec![]);
+        log::info!("Making {} leader for {} ", replica_label, cluster_name);
         METRIC_CLUSTER_LEADER.insert(
-            cluster_name.clone(),
+            cluster_name.to_owned(),
             prom::ClusterLeader {
-                name: replica_label.clone(),
+                name: replica_label.to_owned(),
                 last_received: curr_ts,
             },
         );
         _accept_record = true;
     } else {
-        let mut leader = METRIC_CLUSTER_LEADER.get_mut(&cluster_name).unwrap();
+        let mut leader = METRIC_CLUSTER_LEADER.get_mut(cluster_name).unwrap();
         if replica_label.eq(&leader.name) {
             _accept_record = true;
             leader.last_received = curr_ts;
@@ -800,7 +799,7 @@ async fn prom_ha_handler(
                 &leader.name,
                 Utc.timestamp_nanos(last_received * 1000)
             );
-            leader.name = replica_label.clone();
+            leader.name = replica_label.to_owned();
             leader.last_received = curr_ts;
             _accept_record = true;
         } else {
@@ -812,26 +811,14 @@ async fn prom_ha_handler(
             _accept_record = false;
         }
     }
-    let mut replica_list = vec![];
-    if METRIC_CLUSTER_MAP.contains_key(&cluster_name) {
-        replica_list = METRIC_CLUSTER_MAP.get_mut(&cluster_name).unwrap().to_vec();
-        if !replica_list.contains(&replica_label) {
-            replica_list.push(replica_label);
-            METRIC_CLUSTER_MAP.insert(cluster_name.clone(), replica_list.clone());
-            let _ = db::metrics::set_prom_cluster_info(&cluster_name, &replica_list).await;
-        }
-    } else {
-        replica_list.push(replica_label);
-        METRIC_CLUSTER_MAP.insert(cluster_name.clone(), replica_list.clone());
-        let _ = db::metrics::set_prom_cluster_info(&cluster_name, &replica_list).await;
+
+    let mut replica_list = METRIC_CLUSTER_MAP
+        .entry(cluster_name.to_owned())
+        .or_default();
+    if !replica_list.contains(replica_label) {
+        replica_list.push(replica_label.to_owned());
+        let _ = db::metrics::set_prom_cluster_info(cluster_name, &replica_list).await;
     }
 
     _accept_record
-}
-
-fn labels_value(labels: &[prometheus::Label], name: &str) -> Option<String> {
-    labels
-        .binary_search_by_key(&name, |label| label.name.as_str())
-        .ok()
-        .map(|index| labels[index].value.clone())
 }
