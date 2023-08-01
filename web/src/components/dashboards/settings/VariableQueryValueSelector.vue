@@ -13,8 +13,8 @@ import { useSelectAutoComplete } from '../../../composables/useSelectAutocomplet
 
 export default defineComponent({
     name: 'VariableQueryValueSelector',
-    props: ["modalValue", "variableItem"],
-    emits: ["update:modalValue"],
+    props: ["modelValue", "variableItem"],
+    emits: ["update:modelValue"],
     setup(props: any, { emit }) {
         
         //get v-model value for selected value  using props
@@ -32,7 +32,7 @@ export default defineComponent({
 
         // update selected value
         watch(selectedValue, () => {
-            emit("update:modalValue", selectedValue.value)
+            emit("update:modelValue", selectedValue.value)
         })
 
         return {
