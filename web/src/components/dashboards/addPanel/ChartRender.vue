@@ -906,7 +906,8 @@ export default defineComponent({
                                 name: getPromqlLegendName(metric.metric, props.data.config.promql_legend),
                                 x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
                                 y: values.map((value: any) => value[1]),
-                                hovertemplate: "%{x} <br>%{fullData.name}: %{y:.2f}<extra></extra>",
+                                hovertext: values.map((value: any) => getUnitValue(value[1])),
+                                hovertemplate: "%{x} <br>%{fullData.name}: %{hovertext}<extra></extra>",
                                 stackgroup: props.data.type == 'area-stacked' ? 'one' : '',
                                 ...getPropsByChartTypeForTraces()
                             }
@@ -948,7 +949,7 @@ export default defineComponent({
                             },
                             margin: {
                                 autoexpand: true,
-                                l:50,
+                                l:100,
                                 r:50,
                                 t:50,
                                 b:50
@@ -1024,30 +1025,6 @@ export default defineComponent({
                                 ...getPropsByChartTypeForTraces()
                             }
                         })
-                        // Calculate the maximum value size from the 'y' values in the 'traces' array
-                            const maxValueSize = traces.reduce((max: any, it: any) => Math.max(max, Math.max(...it.y)), 0);
-
-                            // Calculate the minimum value size from the 'y' values in the 'traces' array
-                            const minValueSize = traces.reduce((min: any, it: any) => Math.min(min, Math.min(...it.y)), Infinity);
-
-                            // Initialize empty arrays to hold tick values and tick text
-                            let yTickVals = [];
-                            let yTickText = [];
-
-                            // Calculate the interval size for 5 equally spaced ticks
-                            let intervalSize = (maxValueSize - minValueSize) / 4;
-
-                            // If the data doesn't vary much, use a percentage of the max value as the interval size
-                            if (intervalSize === 0) {
-                                intervalSize = maxValueSize * 0.2;
-                            }
-
-                            // Generate tick values and tick text for the y-axis
-                            for (let i = 0; i <= 4; i++) {
-                                let val = minValueSize + intervalSize * i;
-                                yTickVals.push(minValueSize + intervalSize * i);
-                                yTickText.push(getUnitValue(val));
-                            }
 
                         // result = result.map((it: any) => moment(it + "Z").toISOString(true))
 
@@ -1066,11 +1043,6 @@ export default defineComponent({
                                 r: 50,
                                 t: 50,
                                 b: 50
-                            },
-                            yaxis: {
-                                autorange: true,
-                                tickvals: yTickVals,
-                                ticktext: yTickText,
                             },
                             ...getPropsByChartTypeForLayoutForPromQL(),
                             ...getThemeLayoutOptions()
