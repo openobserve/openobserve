@@ -1355,6 +1355,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "constant_time_eq",
  "digest",
+ "rayon",
 ]
 
 [[package]]
