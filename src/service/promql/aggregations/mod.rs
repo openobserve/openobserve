@@ -83,7 +83,7 @@ pub fn labels_to_include(
     actual_labels
         .iter()
         .flat_map(|label| {
-            if include_labels.contains(&label.name) && label.name != NAME_LABEL {
+            if include_labels.contains(&label.name) {
                 Some(label.clone())
             } else {
                 None
