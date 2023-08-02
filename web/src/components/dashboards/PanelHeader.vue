@@ -15,7 +15,7 @@
 
 <template>
   <div>
-    <q-bar :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'" style="border-top-left-radius: 3px; border-top-right-radius: 3px;">
+    <q-bar :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'" dense class="q-px-xs" style="border-top-left-radius: 3px; border-top-right-radius: 3px;">
     <q-icon v-if="draggable" name="drag_indicator" />
       <div :title="renderTitle" class="plotlycontainer">
         {{ renderTitle }}
