@@ -21,11 +21,7 @@ use std::{
 };
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::infra::{
-    cluster,
-    config::{CONFIG, FILE_EXT_PARQUET},
-    metrics, storage, wal,
-};
+use crate::common::infra::{cluster, config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
 use crate::common::{file::scan_files, json, utils::populate_file_meta};
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
@@ -107,25 +103,10 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             continue;
         }
 
-        let mut partitions = file_name.split('_').collect::<Vec<&str>>();
-        partitions.retain(|&x| x.contains('='));
-        let mut partition_key = String::from("");
-        for key in partitions {
-            let key = key.replace('.', "_");
-            partition_key.push_str(&key);
-            partition_key.push('/');
-        }
-
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
-            let ret = upload_file(
-                &org_id,
-                &stream_name,
-                stream_type,
-                &local_file,
-                partition_key,
-            )
-            .await;
+            let ret =
+                upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
             drop(permit);
             match ret {
                 Err(e) => log::error!("[JOB] Error while uploading disk file to storage {}", e),
@@ -179,7 +160,7 @@ async fn upload_file(
     stream_name: &str,
     stream_type: StreamType,
     path_str: &str,
-    partition_key: String,
+    file_name: &str,
 ) -> Result<(String, FileMeta, StreamType), anyhow::Error> {
     let mut file = fs::File::open(path_str).unwrap();
     let file_meta = file.metadata().unwrap();
@@ -292,24 +273,12 @@ async fn upload_file(
     )
     .await;
 
-    let new_file = storage::generate_partioned_file_key(
-        org_id,
-        stream_name,
-        stream_type,
-        file_meta.min_ts,
-        FILE_EXT_PARQUET,
-    );
-
-    let new_file_key = if partition_key.eq("") {
-        format!("files/{}{}", new_file.0, new_file.1)
-    } else {
-        format!("files/{}{}{}", new_file.0, partition_key, new_file.1)
-    };
-
-    match storage::put(&new_file_key, bytes::Bytes::from(buf_parquet)).await {
+    let new_file_name =
+        super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
+    match storage::put(&new_file_name, bytes::Bytes::from(buf_parquet)).await {
         Ok(_output) => {
-            log::info!("[JOB] disk file upload succeeded: {}", new_file_key);
-            Ok((new_file_key, file_meta, stream_type))
+            log::info!("[JOB] disk file upload succeeded: {}", new_file_name);
+            Ok((new_file_name, file_meta, stream_type))
         }
         Err(err) => {
             log::error!("[JOB] disk file upload error: {:?}", err);

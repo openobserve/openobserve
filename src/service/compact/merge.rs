@@ -107,13 +107,7 @@ pub async fn merge_by_stream(
 
     // get current hour all files
     let partition_time_level =
-        stream_settings
-            .partition_time_level
-            .unwrap_or(if stream_type == StreamType::Metrics {
-                PartitionTimeLevel::from(CONFIG.limit.metric_file_max_retention.as_str())
-            } else {
-                PartitionTimeLevel::default()
-            });
+        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
     let (partition_offset_start, partition_offset_end) = match partition_time_level {
         PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => (
             offset_time_hour,

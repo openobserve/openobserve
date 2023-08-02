@@ -298,6 +298,22 @@ pub fn stream_settings(schema: &Schema) -> Option<StreamSettings> {
         .map(|v| StreamSettings::from(v.as_str()))
 }
 
+pub fn unwrap_partition_time_level(
+    level: Option<PartitionTimeLevel>,
+    stream_type: StreamType,
+) -> PartitionTimeLevel {
+    match level {
+        Some(l) => l,
+        None => {
+            if stream_type == StreamType::Metrics {
+                PartitionTimeLevel::from(CONFIG.limit.metric_file_max_retention.as_str())
+            } else {
+                PartitionTimeLevel::default()
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

@@ -169,14 +169,8 @@ pub async fn query(
             .unwrap();
         let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
         let partition_time_level =
-            stream_settings
-                .partition_time_level
-                .unwrap_or(if stream_type == StreamType::Metrics {
-                    PartitionTimeLevel::from(CONFIG.limit.metric_file_max_retention.as_str())
-                } else {
-                    PartitionTimeLevel::default()
-                });
-        if let PartitionTimeLevel::Daily = partition_time_level {
+            stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        if partition_time_level == PartitionTimeLevel::Daily {
             (
                 t1.format("%Y/%m/%d/00/").to_string(),
                 t2.format("%Y/%m/%d/%H/").to_string(),
