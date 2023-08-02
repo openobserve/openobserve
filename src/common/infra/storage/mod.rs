@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{TimeZone, Utc};
 use futures::{StreamExt, TryStreamExt};
 use object_store::ObjectStore;
 use once_cell::sync::Lazy;
 
 use super::{config::CONFIG, metrics};
-use crate::common::infra::ider;
-use crate::common::meta::StreamType;
 use crate::common::utils::is_local_disk_storage;
 
 pub mod local;
@@ -104,41 +101,5 @@ pub fn format_key(key: &str) -> String {
         format!("{}{}", CONFIG.s3.bucket_prefix, key)
     } else {
         key.to_string()
-    }
-}
-
-pub fn generate_partioned_file_key(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    min_ts: i64,
-    extn: &str,
-) -> (std::string::String, std::string::String) {
-    let id = ider::generate();
-    let time = Utc.timestamp_nanos(min_ts * 1000);
-
-    let prefix = time.format("%Y/%m/%d/%H").to_string();
-    (
-        format!("{org_id}/{stream_type}/{stream_name}/{prefix}/"),
-        format!("{id}{extn}"),
-    )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::common::infra::config::FILE_EXT_PARQUET;
-
-    #[test]
-    fn test_generate_partioned_file_key() {
-        let file_key = generate_partioned_file_key(
-            "org",
-            "stream_name",
-            StreamType::Logs,
-            1665580243211047,
-            FILE_EXT_PARQUET,
-        );
-        assert_eq!(file_key.0.as_str(), "org/logs/stream_name/2022/10/12/13/");
-        assert!(file_key.1.as_str().contains(".parquet"));
     }
 }
