@@ -176,7 +176,7 @@ export default defineComponent({
       });
 
       // [START] variables management
-      let currentDependentVariablesData = props.variablesData?.values || []
+      let currentDependentVariablesData = props.variablesData?.values ? JSON.parse(JSON.stringify(props.variablesData?.values)) : []
 
       // check when the variables data changes
       // 1. get the dependent variables

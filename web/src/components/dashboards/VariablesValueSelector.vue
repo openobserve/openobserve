@@ -60,8 +60,13 @@ export default defineComponent({
             getVariablesData();
         });
         watch(() => variablesData, () => {
-            emit("variablesData", variablesData);
+            emitVariablesData();
         }, { deep: true });
+
+        const emitVariablesData = () => {
+            emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
+        };
+
         const getVariablesData = async () => {
             console.log('getVariablesData: started'); 
             console.log("getVariablesData: props.selectedTimeDate", JSON.stringify(props.selectedTimeDate));
@@ -75,7 +80,7 @@ export default defineComponent({
                 variablesData.isVariablesLoading = false;
                 // console.log('getVariablesData: emitting blank values', JSON.stringify(variablesData));
                 console.log("getVariablesData: emitting: 1: ", JSON.stringify(variablesData, null, 2));
-                emit("variablesData", variablesData);
+                emitVariablesData();
                 return;
             }
             console.log("getVariablesData: fetching values");
@@ -126,7 +131,7 @@ export default defineComponent({
                                 }
                                 variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
                                 console.log("getVariablesData: emitting: 3: ", JSON.stringify(variablesData, null, 2));
-                                emit("variablesData", variablesData);
+                                emitVariablesData();
                                 return obj;
                             }
                             else {
@@ -166,7 +171,7 @@ export default defineComponent({
 
             variablesData.isVariablesLoading = false;
             console.log("getVariablesData: emitting: 2: ", JSON.stringify(variablesData, null, 2));
-            emit("variablesData", variablesData);
+            emitVariablesData();
             
             Promise.all(promise)
                 .then(() => {
@@ -176,7 +181,7 @@ export default defineComponent({
                 })
                 .catch(() => {
                     variablesData.isVariablesLoading = false;
-                    emit("variablesData", variablesData);
+                    emitVariablesData();
                 });
             // emit("variablesData", variablesData);
             // variablesData.values = await Promise.all(promise || []);
