@@ -410,17 +410,12 @@ export default defineComponent({
                 (it: any) => !it.isLoading
                 );
 
-                console.log("Dependent Available Variables:", dependentAvailableVariables);
-
                 if (dependentAvailableVariables.length === dependentVariables.length) {
-                    console.log("All dependent variables are available.");
                     return true;
                 } else {
-                    console.log("Some dependent variables are still loading.");
                     return false;
                 }
             } else {
-                console.log("No dependent variables.");
                 return true;
             }
         };
@@ -445,10 +440,6 @@ export default defineComponent({
 
         // Chart Related Functions
         const fetchQueryData = async () => {
-            console.log('fetchQueryData: started');
-            console.log('fetchQueryData: props.variablesData', JSON.stringify(props.variablesData));
-            console.log('fetchQueryData: props.data', JSON.stringify(props.data));
-            console.log("fetchQueryData", isQueryDependentOnTheVariables(), canRunQueryBasedOnVariables());
             // If the current query is dependent and the the data is not available for the variables, then don't run the query
             if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
                 return;

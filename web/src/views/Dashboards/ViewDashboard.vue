@@ -145,9 +145,7 @@ export default defineComponent({
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
-      console.log("ViewDashboard: data", JSON.stringify(data));
       Object.assign(variablesData,data)
-      console.log("ViewDashboard: variablesData", JSON.stringify(variablesData));
     }
 
     onActivated(async () => {
