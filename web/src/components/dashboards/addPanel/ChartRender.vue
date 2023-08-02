@@ -936,14 +936,14 @@ export default defineComponent({
                         unit: 'PB/s'
                     }
                 }
-                case "percent(0.0-1.0)":{
+                case "percent-1":{
                     return {
                         value: `${parseFloat(value)* 100}`,
                         unit: '%'
                     }
                     // `${parseFloat(value) * 100}`;
                 }
-                case "percent(0-100)":{
+                case "percent":{
                     return {
                         value: `${parseFloat(value)}`,
                         unit: '%'

@@ -80,11 +80,11 @@ export default defineComponent({
       },
         {
         label: 'Percent (0.0-1.0)',
-        value: 'percent(0.0-1.0)'
+        value: 'percent-1'
       },
       {
         label: 'Percent (0-100)',
-        value: 'percent(0-100)'
+        value: 'percent'
       },
       {
         label: 'Custom',
