@@ -10,4 +10,10 @@ pub struct Stats {
     pub original_size: f64,
     #[serde(default)]
     pub _timestamp: i64,
+    #[serde(default)]
+    pub min_ts: i64,
+    #[serde(default)]
+    pub max_ts: i64,
+    #[serde(default)]
+    pub compressed_size: Option<f64>,
 }

@@ -235,8 +235,8 @@ pub struct Common {
     pub use_dynamo_meta_store: bool,
     #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
     pub dynamo_file_list_table: String,
-    #[env_config(name = "ZO_REPORT_FILE_MOVE_MODE", default = false)]
-    pub is_cloud_deployment: bool,
+    #[env_config(name = "ZO_REPORT_COMPRESSED_SIZE", default = false)]
+    pub report_compressed_size: bool,
     pub usage_org: String,
 }
 

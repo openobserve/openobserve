@@ -27,7 +27,7 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::usage::report_usage_stats;
+use crate::service::usage::report_request_usage_stats;
 use crate::service::{db, ingestion::write_file, logs::StreamMeta, schema::stream_schema_exists};
 
 pub async fn ingest(
@@ -196,7 +196,7 @@ pub async fn ingest(
 
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage
-    report_usage_stats(
+    report_request_usage_stats(
         req_stats,
         org_id,
         stream_name,

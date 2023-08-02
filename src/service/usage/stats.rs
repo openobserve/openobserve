@@ -13,11 +13,16 @@ use crate::common::{
     meta::{self, search::Request},
 };
 use crate::service::db;
+use crate::service::search as SearchService;
 
 pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
 pub async fn publish_stats() -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache();
+    let mut orgs = db::schema::list_organizations_from_cache();
+
+    orgs.retain(|org: &String| org != &CONFIG.common.usage_org);
+
+    println!("orgs: {:?}", orgs);
 
     for org_id in orgs {
         // get the working node for the organization
@@ -40,8 +45,14 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         drop(locker);
         let current_ts = chrono::Utc::now().timestamp_micros();
 
+        let sql = if CONFIG.common.report_compressed_size {
+            format!("SELECT sum(num_records) as records ,sum(size) as original_size, org_id , stream_type  ,stream_name ,min(min_ts) as min_ts , max(max_ts) as max_ts, sum(compressed_size) as compressed_size  FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' and org_id = \'{}\' group by  org_id , stream_type ,stream_name",UsageEvent::Ingestion, org_id)
+        } else {
+            format!("SELECT sum(num_records) as records ,sum(size) as original_size, org_id , stream_type  ,stream_name FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' and org_id = \'{}\' group by  org_id , stream_type ,stream_name",UsageEvent::Ingestion, org_id)
+        };
+
         let query = meta::search::Query {
-            sql: format!("SELECT sum(num_records) as records ,sum(size) as original_size, org_id , stream_type  ,stream_name FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' group by  org_id , stream_type ,stream_name",UsageEvent::Ingestion),
+            sql,
             sql_mode: "full".to_owned(),
             size: 100000000,
             ..Default::default()
@@ -53,14 +64,11 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             encoding: meta::search::RequestEncoding::Empty,
         };
         // do search
-        match get_stats_from_usage(req).await {
-            Ok(response) => {
-                //let res = response.json::<meta::search::Response>().await?;
-                let temp = response.bytes().await?;
-                let res: meta::search::Response = json::from_slice(&temp)?;
-
+        match SearchService::search(&CONFIG.common.usage_org, meta::StreamType::Logs, &req).await {
+            Ok(res) => {
                 if !res.hits.is_empty() {
-                    match report_stats(res.hits, last_query_ts, current_ts).await {
+                    println!("res: {:?}", res.hits);
+                    match report_stats(res.hits, &org_id, last_query_ts, current_ts).await {
                         Ok(_) => {
                             log::info!("report stats success");
                             set_last_stats_offset(
@@ -90,28 +98,18 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn get_stats_from_usage(
-    req: meta::search::Request,
-) -> std::result::Result<reqwest::Response, reqwest::Error> {
-    let usage_url = if CONFIG.common.usage_ep.ends_with('/') {
-        format!("{}_search?type=logs", CONFIG.common.usage_ep)
+async fn get_last_stats(
+    org_id: &str,
+    stats_ts: i64,
+) -> std::result::Result<Vec<json::Value>, anyhow::Error> {
+    let sql = if CONFIG.common.report_compressed_size {
+        format!("SELECT records ,original_size, org_id , stream_type ,stream_name ,min_ts , max_ts, compressed_size FROM \"{STATS_STREAM}\" where _timestamp ={stats_ts} and org_id = \'{org_id}\'")
     } else {
-        format!("{}/_search?type=logs", CONFIG.common.usage_ep)
+        format!("SELECT records ,original_size, org_id , stream_type ,stream_name ,min_ts , max_ts FROM \"{STATS_STREAM}\" where _timestamp ={stats_ts} and org_id = \'{org_id}\'")
     };
-    let url = url::Url::parse(&usage_url).unwrap();
-    let cl = Arc::clone(&CLIENT);
 
-    cl.post(url)
-        .header("Content-Type", "application/json")
-        .header(reqwest::header::AUTHORIZATION, &CONFIG.common.usage_auth)
-        .json(&req)
-        .send()
-        .await
-}
-
-async fn get_last_stats(stats_ts: i64) -> std::result::Result<Vec<json::Value>, reqwest::Error> {
     let query = meta::search::Query {
-        sql: format!("SELECT records ,original_size, org_id , stream_type ,stream_name FROM \"{STATS_STREAM}\" where _timestamp ={stats_ts}") ,
+        sql,
         sql_mode: "full".to_owned(),
         size: 100000000,
         ..Default::default()
@@ -122,38 +120,20 @@ async fn get_last_stats(stats_ts: i64) -> std::result::Result<Vec<json::Value>, 
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
     };
-    let usage_url = if CONFIG.common.usage_ep.ends_with('/') {
-        format!("{}_search?type=logs", CONFIG.common.usage_ep)
-    } else {
-        format!("{}/_search?type=logs", CONFIG.common.usage_ep)
-    };
-    let url = url::Url::parse(&usage_url).unwrap();
-    let cl = Arc::clone(&CLIENT);
-
-    match cl
-        .post(url)
-        .header("Content-Type", "application/json")
-        .header(reqwest::header::AUTHORIZATION, &CONFIG.common.usage_auth)
-        .json(&req)
-        .send()
-        .await
-    {
-        Ok(response) => {
-            let temp = response.bytes().await?;
-            let res: meta::search::Response = json::from_slice(&temp).unwrap();
-            Ok(res.hits)
-        }
-        Err(_) => todo!(),
+    match SearchService::search(&CONFIG.common.usage_org, meta::StreamType::Logs, &req).await {
+        Ok(res) => Ok(res.hits),
+        Err(err) => Err(err.into()),
     }
 }
 
 async fn report_stats(
     report_data: Vec<json::Value>,
+    org_id: &str,
     last_query_ts: i64,
     curr_ts: i64,
 ) -> Result<(), anyhow::Error> {
     //get existing stats
-    let existing_stats = get_last_stats(last_query_ts).await?;
+    let existing_stats = get_last_stats(org_id, last_query_ts).await?;
 
     let mut report_data_map = to_map(report_data);
 
@@ -164,6 +144,29 @@ async fn report_stats(
                 value.records += existing_value.records;
                 value.original_size += existing_value.original_size;
                 value._timestamp = curr_ts;
+
+                if !CONFIG.common.report_compressed_size {
+                    if value.min_ts == 0 && existing_value.min_ts != 0 {
+                        value.min_ts = existing_value.min_ts;
+                    } else {
+                        value.min_ts = curr_ts;
+                    }
+                    value.max_ts = curr_ts;
+                } else {
+                    if existing_value.min_ts != 0 && value.min_ts > existing_value.min_ts {
+                        value.min_ts = existing_value.min_ts;
+                    }
+                    if value.max_ts < existing_value.max_ts {
+                        value.max_ts = existing_value.max_ts;
+                    }
+
+                    if value.compressed_size.is_some() && existing_value.compressed_size.is_some() {
+                        value.compressed_size = Some(
+                            value.compressed_size.unwrap()
+                                + existing_value.compressed_size.unwrap(),
+                        );
+                    }
+                }
             } else {
                 value._timestamp = curr_ts;
             }
@@ -176,7 +179,9 @@ async fn report_stats(
         report_data_map.values().collect()
     } else {
         for (_, value) in report_data_map.iter_mut() {
-            value._timestamp = curr_ts
+            value._timestamp = curr_ts;
+            value.min_ts = curr_ts;
+            value.max_ts = curr_ts;
         }
         report_data_map.values().collect()
     };

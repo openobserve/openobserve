@@ -37,6 +37,7 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{json, time::parse_i64_to_timestamp_micros};
+use crate::service::usage::report_request_usage_stats;
 use crate::service::{
     db,
     ingestion::{chk_schema_by_record, write_file},
@@ -347,7 +348,7 @@ pub async fn remote_write(
 
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
         req_stats.response_time += time;
-        report_usage_stats(
+        report_request_usage_stats(
             req_stats,
             org_id,
             &stream_name,

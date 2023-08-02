@@ -28,10 +28,9 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{flatten, json, time};
-use crate::service::{
-    db, ingestion::get_wal_time_key, ingestion::write_file, stream::unwrap_partition_time_level,
-    usage::report_usage_stats,
-};
+use crate::service::ingestion::get_wal_time_key;
+use crate::service::usage::report_request_usage_stats;
+use crate::service::{db, ingestion::write_file};
 
 pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
@@ -256,7 +255,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         );
         req_stats.response_time = time;
 
-        report_usage_stats(
+        report_request_usage_stats(
             req_stats,
             org_id,
             &stream_name,

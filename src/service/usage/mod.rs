@@ -19,7 +19,7 @@ pub mod stats;
 pub static USAGE_DATA: Lazy<Arc<RwLock<Vec<UsageData>>>> =
     Lazy::new(|| Arc::new(RwLock::new(vec![])));
 
-pub async fn report_usage_stats(
+pub async fn report_request_usage_stats(
     stats: RequestStats,
     org_id: &str,
     stream_name: &str,
@@ -71,7 +71,9 @@ pub async fn report_usage_stats(
         });
     };
 
-    if CONFIG.common.is_cloud_deployment || event != UsageEvent::Ingestion {
+    if !CONFIG.common.report_compressed_size
+        || (CONFIG.common.report_compressed_size && event != UsageEvent::Ingestion)
+    {
         usage.push(UsageData {
             event,
             day: now.day(),
@@ -97,7 +99,7 @@ pub async fn report_usage_stats(
     }
 }
 
-pub async fn report_ingestion_stats(
+pub async fn report_compression_stats(
     stats: RequestStats,
     org_id: &str,
     stream_name: &str,
