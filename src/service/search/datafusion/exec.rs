@@ -33,6 +33,7 @@ use datafusion::{
         context::SessionConfig,
         runtime_env::{RuntimeConfig, RuntimeEnv},
     },
+    logical_expr::expr::Alias,
     prelude::{cast, col, lit, Expr, SessionContext},
     scalar::ScalarValue,
 };
@@ -136,10 +137,10 @@ pub async fn sql(
                     continue;
                 }
                 exprs.push(match rules.get(field.name()) {
-                    Some(rule) => Expr::Alias(
-                        Box::new(cast(col(field.name()), rule.clone())),
+                    Some(rule) => Expr::Alias(Alias::new(
+                        cast(col(field.name()), rule.clone()),
                         field.name().to_string(),
-                    ),
+                    )),
                     None => col(field.name()),
                 });
             }
@@ -251,10 +252,10 @@ async fn exec_query(
                 continue;
             }
             exprs.push(match rules.get(field.name()) {
-                Some(rule) => Expr::Alias(
-                    Box::new(cast(col(field.name()), rule.clone())),
+                Some(rule) => Expr::Alias(Alias::new(
+                    cast(col(field.name()), rule.clone()),
                     field.name().to_string(),
-                ),
+                )),
                 None => col(field.name()),
             });
         }
@@ -811,10 +812,10 @@ pub async fn convert_parquet_file(
                 continue;
             }
             exprs.push(match rules.get(field.name()) {
-                Some(rule) => Expr::Alias(
-                    Box::new(cast(col(field.name()), rule.clone())),
+                Some(rule) => Expr::Alias(Alias::new(
+                    cast(col(field.name()), rule.clone()),
                     field.name().to_string(),
-                ),
+                )),
                 None => col(field.name()),
             });
         }
