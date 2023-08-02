@@ -915,6 +915,14 @@ export default defineComponent({
                     }
                     return `${parseFloat(value).toFixed(2)}PB/s`;
                 }
+                case "percent(0.0-1.0)":{
+                    console.log(value);
+                    
+                    return `${parseFloat(value) * 100}`;
+                }
+                case "percent(0-100)":{
+                    return `${parseFloat(value)}`;
+                }
                 case "default":{
                     return value;
                 }
@@ -1055,7 +1063,8 @@ export default defineComponent({
                     case 'matrix': {
                         const traces = searchQueryData.data?.result?.map((metric: any) => {
                             const values = metric.values.sort((a: any, b: any) => a[0] - b[0])
-                            const value = values[values.length-1][1]
+                            const value = getUnitValue(values[values.length-1][1])
+                            console.log("value",getUnitValue(value));
                             
                             return {
                                 value,
@@ -1271,6 +1280,7 @@ export default defineComponent({
                   return {
                       type: "indicator",
                       mode: "number",
+                      number: { suffix : ['percent(0.0-1.0)', 'percent(0-100)'].includes(props.data.config.unit) ? "%" :'' },
                   };
               case "h-stacked":
                   return {
