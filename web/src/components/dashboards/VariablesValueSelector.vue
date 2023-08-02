@@ -10,8 +10,8 @@
  limitations under the License. 
 -->
 <template>
-  <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
-    <div v-for="item in variablesData.values" class="q-mr-lg q-mt-sm">
+  <div v-if="variablesData.values?.length > 0" :key="variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
+    <div v-for="item in variablesData.values" :key="item.name" class="q-mr-lg q-mt-sm">
       <div v-if="item.type == 'query_values'">
           <VariableQueryValueSelector v-model="item.value" :variableItem="item" />
       </div>
@@ -73,8 +73,8 @@ export default defineComponent({
                 
                 variablesData.values = [];
                 variablesData.isVariablesLoading = false;
-                console.log('getVariablesData: emitting blank values', JSON.stringify(variablesData));
-                
+                // console.log('getVariablesData: emitting blank values', JSON.stringify(variablesData));
+                console.log("getVariablesData: emitting: 1: ", JSON.stringify(variablesData, null, 2));
                 emit("variablesData", variablesData);
                 return;
             }
@@ -83,10 +83,15 @@ export default defineComponent({
             // get old variable values
             const oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
             // continue as we have variables
+            
+            // reset the values
+            variablesData.values = []
+            variablesData.isVariablesLoading = false;
+
             const promise = props.variablesConfig?.list?.map((it: any) => {
                 console.log("getVariablesData: it", );
                 
-                const obj: any = { name: it.name, label: it.label, type: it.type, value: "", isLoading: true };
+                const obj: any = { name: it.name, label: it.label, type: it.type, value: "", isLoading: it.type == "query_values" ? true : false };
                 variablesData.values.push(obj);
                 variablesData.isVariablesLoading = true;
 
@@ -120,7 +125,8 @@ export default defineComponent({
                                     obj.value = obj.options[0] || "";
                                 }
                                 variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
-                                    emit("variablesData", variablesData);
+                                console.log("getVariablesData: emitting: 3: ", JSON.stringify(variablesData, null, 2));
+                                emit("variablesData", variablesData);
                                 return obj;
                             }
                             else {
@@ -158,16 +164,15 @@ export default defineComponent({
                 }
             });
 
-            // variablesData.isVariablesLoading = false;
-            // emit("variablesData", variablesData);
-            console.log("getVariablesData: emitted valuessss", JSON.stringify(variablesData));
+            variablesData.isVariablesLoading = false;
+            console.log("getVariablesData: emitting: 2: ", JSON.stringify(variablesData, null, 2));
+            emit("variablesData", variablesData);
             
-             Promise.all(promise)
+            Promise.all(promise)
                 .then(() => {
                     console.log("getVariablesData: inside then");
                     variablesData.isVariablesLoading = false;
-                    emit("variablesData", variablesData);
-                    console.log("getVariablesData: emitting values", JSON.stringify(variablesData));
+                    console.log("getVariablesData: emitting: 4: ", JSON.stringify(variablesData, null, 2));
                 })
                 .catch(() => {
                     variablesData.isVariablesLoading = false;
