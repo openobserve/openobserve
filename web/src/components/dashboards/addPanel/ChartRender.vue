@@ -1101,12 +1101,11 @@ export default defineComponent({
                     case 'matrix': {
                         const traces = searchQueryData.data?.result?.map((metric: any) => {
                             const values = metric.values.sort((a: any, b: any) => a[0] - b[0])
-                            const value = getUnitValue(values[values.length-1][1]).value
-                            console.log("value",getUnitValue(value));
+                            const unitValue = getUnitValue(values[values.length-1][1])
                             
                             return {
-                                value,
-                                number: { suffix : getUnitValue(values[values.length-1][1]).unit },
+                                value: unitValue.value,
+                                number: { suffix : unitValue.unit, valueformat: '.2f'},
                                 ...getPropsByChartTypeForTraces()
                             }
                         })
