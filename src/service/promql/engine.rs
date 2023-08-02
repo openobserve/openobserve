@@ -136,17 +136,11 @@ impl Engine {
                     (Value::Float(left), Value::Vector(right)) => {
                         binaries::vector_scalar_bin_op(expr, &right, left, true).await?
                     }
-                    (Value::None, _) | (_, Value::None) => {
-                        return Err(DataFusionError::NotImplemented(format!(
-                            "No data found for the operation lhs: {:?} rhs: {:?}",
-                            &lhs, &rhs
-                        )))
-                    }
                     _ => {
-                        return Err(DataFusionError::NotImplemented(format!(
-                            "Unsupported binary operation between two operands. {:?} {:?}",
-                            &lhs, &rhs
-                        )))
+                        log::info!(
+                            "[PromExpr::Binary] either lhs or rhs vector is found to be empty"
+                        );
+                        Value::Vector(vec![])
                     }
                 }
             }

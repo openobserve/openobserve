@@ -545,8 +545,8 @@ pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> Sign
         .iter()
         .filter(|item| !exclude_names.contains(&item.name.as_str()))
         .for_each(|item| {
-            hasher.update(item.name.as_bytes());
-            hasher.update(item.value.as_bytes());
+            hasher.update_rayon(item.name.as_bytes());
+            hasher.update_rayon(item.value.as_bytes());
         });
     Signature(hasher.finalize().into())
 }

@@ -2,9 +2,12 @@ use std::sync::Arc;
 
 use ahash::{HashMap, HashSet};
 
-use crate::service::promql::{
-    binaries::scalar_binary_operations,
-    value::{signature, InstantValue, Label, LabelsExt, Sample, Signature, Value},
+use crate::{
+    common::meta::prom::NAME_LABEL,
+    service::promql::{
+        binaries::scalar_binary_operations,
+        value::{signature, InstantValue, Label, LabelsExt, Sample, Signature, Value},
+    },
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{token, BinaryExpr, VectorMatchCardinality};
@@ -221,6 +224,7 @@ fn vector_arithmatic_operators(
             labels_to_include_set.sort();
         } else {
             labels_to_exclude_set = modifier.matching.as_ref().unwrap().labels().labels.clone();
+            labels_to_exclude_set.push(NAME_LABEL.to_string());
             labels_to_exclude_set.sort();
         }
     }
