@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::{RwLock};
 use ahash::AHashMap as HashMap;
 use async_recursion::async_recursion;
 use datafusion::{
@@ -39,14 +40,14 @@ use crate::common::{infra::config::CONFIG, meta::prom::NAME_LABEL};
 use crate::service::promql::{aggregations, binaries, functions, micros, value::*};
 
 pub struct Engine {
-    ctx: Arc<super::exec::Query>,
+    ctx: Arc<RwLock<super::exec::Query>>,
     /// The time boundaries for the evaluation.
     time: i64,
     result_type: Option<String>,
 }
 
 impl Engine {
-    pub fn new(ctx: Arc<super::exec::Query>, time: i64) -> Self {
+    pub fn new(ctx: Arc<RwLock<super::exec::Query>>, time: i64) -> Self {
         Self {
             ctx,
             time,
@@ -61,6 +62,9 @@ impl Engine {
 
     #[async_recursion]
     pub async fn exec_expr(&mut self, prom_expr: &PromExpr) -> Result<Value> {
+        println!("*************************************");
+        println!("**************{:?}*****************", prom_expr);
+        println!("*************************************");
         Ok(match &prom_expr {
             PromExpr::Aggregate(AggregateExpr {
                 op,
@@ -146,6 +150,49 @@ impl Engine {
             }
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
             PromExpr::Subquery(expr) => {
+                // pub expr: Box<Expr>,
+                // pub offset: Option<Offset>,
+                // pub at: Option<AtModifier>,
+                // pub range: Duration,
+                // /// Default is the global evaluation interval.
+                // pub step: Option<Duration>,
+
+                // pub org_id: String,
+                // pub table_provider: Arc<Box<dyn TableProvider>>,
+                // /// The time boundaries for the evaluation. If start equals end an instant
+                // /// is evaluated.
+                // pub start: i64,
+                // pub end: i64,
+                // /// Time between two evaluated instants for the range [start:end].
+                // pub interval: i64,
+                // /// Default look back from sample search.
+                // pub lookback_delta: i64,
+                // /// key — metric name; value — time series data
+                // pub data_cache: Arc<RwLock<HashMap<String, Value>>>,
+                // pub scan_stats: Arc<RwLock<ScanStats>>,
+
+                // Tacklet offset for the
+                let mut ctx = self.ctx.write().unwrap();
+                let mut offset_modifier = 0;
+                if let Some(offset) = expr.offset.clone() {
+                    match offset {
+                        Offset::Pos(off) => {
+                            offset_modifier = micros(off);
+                        }
+                        Offset::Neg(off) => {
+                            offset_modifier = -micros(off);
+                        }
+                    }
+                }
+                self.time = self.time + offset_modifier;
+                if let Some(step) = expr.step {
+                    if step.as_secs() != 0 {
+                        ctx.interval = micros(step);
+                    } else {
+                        ctx.interval = micros(expr.range);
+                    }
+                };
+
                 let val = self.exec_expr(&expr.expr).await?;
                 let time_window = Some(TimeWindow::new(self.time, expr.range));
                 let matrix = match val{

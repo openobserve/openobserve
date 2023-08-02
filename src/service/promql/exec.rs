@@ -20,7 +20,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 use tokio::sync::RwLock;
-
+use std::sync::Mutex;
 use crate::common::meta::stream::ScanStats;
 use crate::service::promql::{
     micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK,
@@ -73,7 +73,7 @@ impl Query {
             self.lookback_delta = micros(stmt.lookback_delta);
         }
 
-        let ctx = Arc::new(self.clone());
+        let ctx = Arc::new(Mutex::new(self.clone()));
         let expr = Arc::new(stmt.expr);
         let mut result_type: Option<String> = None;
 
