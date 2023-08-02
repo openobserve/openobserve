@@ -865,11 +865,11 @@ export default defineComponent({
       };
 
         /**
-                 * Retrieves the unit value for the given value based on the configuration unit.
-                 *
-                 * @param {any} value - The value to be converted to a unit value.
-                 * @return {string} - The converted unit value.
-                 */
+         * Retrieves the unit value for the given value based on the configuration unit.
+         *
+         * @param {any} value - The value to be converted to a unit value.
+         * @return {string} - The converted unit value.
+         */
         const getUnitValue = (value: any) => {
             switch (props.data.config?.unit) {
                 case "bytes": {
@@ -938,14 +938,14 @@ export default defineComponent({
                 }
                 case "percent-1":{
                     return {
-                        value: `${parseFloat(value)* 100}`,
+                        value: `${(parseFloat(value)  * 100).toFixed(2)}`,
                         unit: '%'
                     }
                     // `${parseFloat(value) * 100}`;
                 }
                 case "percent":{
                     return {
-                        value: `${parseFloat(value)}`,
+                        value: `${parseFloat(value).toFixed(2)}`,
                         unit: '%'
                     }
                     // ${parseFloat(value)}`;
@@ -1101,12 +1101,11 @@ export default defineComponent({
                     case 'matrix': {
                         const traces = searchQueryData.data?.result?.map((metric: any) => {
                             const values = metric.values.sort((a: any, b: any) => a[0] - b[0])
-                            const value = getUnitValue(values[values.length-1][1]).value
-                            console.log("value",getUnitValue(value));
+                            const unitValue = getUnitValue(values[values.length-1][1])
                             
                             return {
-                                value,
-                                number: { suffix : getUnitValue(values[values.length-1][1]).unit },
+                                value: unitValue.value,
+                                number: { suffix : unitValue.unit, valueformat: '.2f'},
                                 ...getPropsByChartTypeForTraces()
                             }
                         })
