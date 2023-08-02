@@ -336,6 +336,9 @@ mod tests {
         let ret = set_file_to_cache(file, meta);
         assert!(ret.is_ok());
 
+        let res = get_file_from_cache(file);
+        assert!(res.is_ok());
+
         let ret = del_file_from_cache(file);
         assert!(ret.is_ok());
 
