@@ -63,18 +63,33 @@ export default defineComponent({
             emit("variablesData", variablesData);
         }, { deep: true });
         const getVariablesData = async () => {
+            console.log('getVariablesData: started'); 
+            console.log("getVariablesData: props.selectedTimeDate", JSON.stringify(props.selectedTimeDate));
+            console.log("getVariablesData: props.variablesConfig", JSON.stringify(props.variablesConfig));
+                       
             // do we have variables & date?
             if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
+                console.log("getVariablesData: inside if");
+                
                 variablesData.values = [];
                 variablesData.isVariablesLoading = false;
+                console.log('getVariablesData: emitting blank values', JSON.stringify(variablesData));
+                
                 emit("variablesData", variablesData);
                 return;
             }
+            console.log("getVariablesData: fetching values");
+            
             // get old variable values
             const oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
             // continue as we have variables
             const promise = props.variablesConfig?.list?.map((it: any) => {
-                const obj: any = { name: it.name, label: it.label, type: it.type, value: "", isLoading: false };
+                console.log("getVariablesData: it", );
+                
+                const obj: any = { name: it.name, label: it.label, type: it.type, value: "", isLoading: true };
+                variablesData.values.push(obj);
+                variablesData.isVariablesLoading = true;
+
                 switch (it.type) {
                     case "query_values": {
                         obj.isLoading = true;
@@ -104,6 +119,8 @@ export default defineComponent({
                                 else {
                                     obj.value = obj.options[0] || "";
                                 }
+                                variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
+                                    emit("variablesData", variablesData);
                                 return obj;
                             }
                             else {
@@ -140,9 +157,27 @@ export default defineComponent({
                         return obj;
                 }
             });
-            variablesData.values = await Promise.all(promise || []);
-            variablesData.isVariablesLoading = false;
-            emit("variablesData", variablesData);
+
+            // variablesData.isVariablesLoading = false;
+            // emit("variablesData", variablesData);
+            console.log("getVariablesData: emitted valuessss", JSON.stringify(variablesData));
+            
+             Promise.all(promise)
+                .then(() => {
+                    console.log("getVariablesData: inside then");
+                    variablesData.isVariablesLoading = false;
+                    emit("variablesData", variablesData);
+                    console.log("getVariablesData: emitting values", JSON.stringify(variablesData));
+                })
+                .catch(() => {
+                    variablesData.isVariablesLoading = false;
+                    emit("variablesData", variablesData);
+                });
+            // emit("variablesData", variablesData);
+            // variablesData.values = await Promise.all(promise || []);
+            // variablesData.isVariablesLoading = false;
+            // console.log("getVariablesData: emitting values");
+            // emit("variablesData", variablesData);
         };
         return {
             props,
