@@ -80,6 +80,11 @@ pub fn list(path: &str) -> Result<Vec<File>> {
         .collect::<Vec<File>>())
 }
 
+pub fn empty(path: &str) -> bool {
+    let path = format_key(path);
+    FILES.iter().all(|x| x.key().starts_with(&path))
+}
+
 pub fn get(path: &str) -> Result<Bytes> {
     let path = format_key(path);
     match DATA.get(&path) {
@@ -188,5 +193,14 @@ mod tests {
         assert_eq!(get("/hello5").unwrap(), data);
         let size = stats().unwrap();
         assert!(size >= 157);
+    }
+
+    #[test]
+    fn test_empty() {
+        let data = Bytes::from("hello world");
+        set("/hello6/a", data.clone()).unwrap();
+        assert!(!list("/hello6").unwrap().is_empty());
+        delete("/hello6/a", true).unwrap();
+        assert!(list("/hello6").unwrap().is_empty());
     }
 }

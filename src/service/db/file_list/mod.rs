@@ -57,6 +57,9 @@ pub async fn progress(
                     );
                 }
             }
+            if old_data.is_err() {
+                return Ok(()); // not exists, skip decrease stats
+            };
             match cache::stats::decr_stream_stats(key, data) {
                 Ok(_) => {}
                 Err(e) => {
