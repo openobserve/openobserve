@@ -43,7 +43,7 @@
     <q-separator></q-separator>
     <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables" :selectedTimeDate="currentTimeObj" 
       @variablesData="variablesDataUpdated"/>
-    <div class="displayDiv" v-if="!(variablesData.isVariablesLoading)">
+    <div class="displayDiv">
       <grid-layout v-if="currentDashboardData.data.panels?.length > 0" v-model:layout.sync="currentDashboardData.data.layouts" :col-num="12" :row-height="30"
         :is-draggable="draggable" :is-resizable="draggable" :vertical-compact="true" :autoSize="true"
         :restore-on-drag="true" :use-css-transforms="true">

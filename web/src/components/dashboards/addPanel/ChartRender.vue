@@ -176,7 +176,7 @@ export default defineComponent({
       });
 
       // [START] variables management
-      let currentDependentVariablesData = props.variablesData?.values || []
+      let currentDependentVariablesData = props.variablesData?.values ? JSON.parse(JSON.stringify(props.variablesData?.values)) : []
 
       // check when the variables data changes
       // 1. get the dependent variables
@@ -409,16 +409,16 @@ export default defineComponent({
             const dependentAvailableVariables = dependentVariables.filter(
                 (it: any) => !it.isLoading
                 );
-           
-            if (dependentAvailableVariables.length == dependentVariables.length) {
-                return true;
+
+                if (dependentAvailableVariables.length === dependentVariables.length) {
+                    return true;
+                } else {
+                    return false;
+                }
             } else {
-                return false;
+                return true;
             }
-        } else {
-            return true;
-        }
-      };
+        };
 
     const replaceQueryValue = (query: any) => {
         if(currentDependentVariablesData?.length){
@@ -426,7 +426,7 @@ export default defineComponent({
             currentDependentVariablesData?.forEach((variable:any) => {
                 const variableName = `$${variable.name}`;
                 const variableValue = variable.value;
-                query = query.replace(variableName, variableValue);
+                query = query.replaceAll(variableName, variableValue);
             });
             return query;
         }else{
@@ -438,13 +438,13 @@ export default defineComponent({
       // if width is 12, tick length is 10
       const getTickLength = () => props.width - 2
 
-      // Chart Related Functions
-      const fetchQueryData = async () => {
-          // If the current query is dependent and the the data is not available for the variables, then don't run the query
-          if(isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
-            return;
-          }
-          isDirty.value = false
+        // Chart Related Functions
+        const fetchQueryData = async () => {
+            // If the current query is dependent and the the data is not available for the variables, then don't run the query
+            if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
+                return;
+            }
+            isDirty.value = false
 
           // continue if it is not dependent on the variables or dependent variables' values are available
           let queryData = props.data.query;
@@ -1124,8 +1124,8 @@ export default defineComponent({
                             },
                             margin: {
                                 autoexpand: true,
-                                l: 0,
-                                r: 0,
+                                l: 10,
+                                r: 10,
                                 t: 0,
                                 b: 0
                             },

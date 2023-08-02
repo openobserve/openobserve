@@ -10,8 +10,8 @@
  limitations under the License. 
 -->
 <template>
-  <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
-    <div v-for="item in variablesData.values" class="q-mr-lg q-mt-sm">
+  <div v-if="variablesData.values?.length > 0" :key="variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
+    <div v-for="item in variablesData.values" :key="item.name" class="q-mr-lg q-mt-sm">
       <div v-if="item.type == 'query_values'">
           <VariableQueryValueSelector v-model="item.value" :variableItem="item" />
       </div>
@@ -60,21 +60,37 @@ export default defineComponent({
             getVariablesData();
         });
         watch(() => variablesData, () => {
-            emit("variablesData", variablesData);
+            emitVariablesData();
         }, { deep: true });
+
+        const emitVariablesData = () => {
+            emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
+        };
+
         const getVariablesData = async () => {
             // do we have variables & date?
             if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
+                
                 variablesData.values = [];
                 variablesData.isVariablesLoading = false;
-                emit("variablesData", variablesData);
+                emitVariablesData();
                 return;
             }
+            
             // get old variable values
             const oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
             // continue as we have variables
+            
+            // reset the values
+            variablesData.values = []
+            variablesData.isVariablesLoading = false;
+
             const promise = props.variablesConfig?.list?.map((it: any) => {
-                const obj: any = { name: it.name, label: it.label, type: it.type, value: "", isLoading: false };
+                
+                const obj: any = { name: it.name, label: it.label, type: it.type, value: "", isLoading: it.type == "query_values" ? true : false };
+                variablesData.values.push(obj);
+                variablesData.isVariablesLoading = true;
+
                 switch (it.type) {
                     case "query_values": {
                         obj.isLoading = true;
@@ -104,6 +120,8 @@ export default defineComponent({
                                 else {
                                     obj.value = obj.options[0] || "";
                                 }
+                                variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
+                                emitVariablesData();
                                 return obj;
                             }
                             else {
@@ -140,9 +158,18 @@ export default defineComponent({
                         return obj;
                 }
             });
-            variablesData.values = await Promise.all(promise || []);
+
             variablesData.isVariablesLoading = false;
-            emit("variablesData", variablesData);
+            emitVariablesData();
+            
+            Promise.all(promise)
+                .then(() => {
+                    variablesData.isVariablesLoading = false;
+                })
+                .catch(() => {
+                    variablesData.isVariablesLoading = false;
+                    emitVariablesData();
+                });
         };
         return {
             props,
