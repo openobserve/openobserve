@@ -40,7 +40,6 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    log::info!("Load file_list [{prefix}] begin");
     let files = storage::list(&prefix).await?;
     log::info!("Load file_list [{prefix}] gets {} files", files.len());
     if files.is_empty() {
@@ -97,8 +96,6 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     // clean deleted files
     super::DELETED_FILES.clear();
     super::DELETED_FILES.shrink_to_fit();
-    log::info!("Load file_list [{prefix}] clean done");
-
     Ok(())
 }
 
