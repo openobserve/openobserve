@@ -20,17 +20,18 @@ use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
 use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::stream::{PartitioningDetails, StreamParams};
-use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
     prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+    stream::{PartitioningDetails, StreamParams},
+    usage::UsageType,
     StreamType,
 };
 use crate::common::{flatten, json, time};
-use crate::service::ingestion::get_wal_time_key;
-use crate::service::usage::report_usage_stats;
-use crate::service::{db, ingestion::write_file};
+use crate::service::{
+    db, ingestion::get_wal_time_key, ingestion::write_file, stream::unwrap_partition_time_level,
+    usage::report_usage_stats,
+};
 
 pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
@@ -190,9 +191,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             stream_schema_map.insert(stream_name.clone(), schema);
         }
 
-        let partition_keys: Vec<String>;
-        let time_key;
-
         if !stream_partitioning_map.contains_key(&stream_name) {
             let partition_det = crate::service::ingestion::get_stream_partition_keys(
                 &stream_name,
@@ -200,19 +198,18 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             )
             .await;
             stream_partitioning_map.insert(stream_name.to_string(), partition_det.clone());
-            partition_keys = partition_det.partition_keys;
-            time_key = partition_det.partition_time_level;
-        } else {
-            let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
-            partition_keys = partition_det.partition_keys.clone();
-            time_key = partition_det.partition_time_level;
         }
+
+        let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
+        let partition_keys = partition_det.partition_keys.clone();
+        let partition_time_level =
+            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
         let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
         let hour_key = get_wal_time_key(
             timestamp,
             &partition_keys,
-            time_key.unwrap_or(CONFIG.limit.metric_file_max_retention.as_str().into()),
+            partition_time_level,
             record,
             None,
         );

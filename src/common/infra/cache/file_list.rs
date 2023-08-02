@@ -17,7 +17,7 @@ use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
-use crate::common::infra::config::{RwHashMap, CONFIG};
+use crate::common::infra::config::RwHashMap;
 use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
 use crate::service::{db, stream};
 
@@ -136,14 +136,11 @@ pub async fn get_file_list(
             // Handle partiton time level
             let schema = db::schema::get(org_id, stream_name, stream_type).await?;
             let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
-            let partition_time_level = stream_settings.partition_time_level.unwrap_or(
-                if stream_type == StreamType::Metrics {
-                    PartitionTimeLevel::from(CONFIG.limit.metric_file_max_retention.as_str())
-                } else {
-                    PartitionTimeLevel::default()
-                },
+            let partition_time_level = stream::unwrap_partition_time_level(
+                stream_settings.partition_time_level,
+                stream_type,
             );
-            if let PartitionTimeLevel::Daily = partition_time_level {
+            if partition_time_level == PartitionTimeLevel::Daily {
                 keys.push(time_min.format("%Y/%m/%d/00/").to_string());
             }
             // less than 48 hours, generate keys by hours
