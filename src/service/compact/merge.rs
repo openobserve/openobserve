@@ -304,6 +304,12 @@ async fn merge_files(
         };
         tmp_dir.set(&file.key, data)?;
     }
+    if !deleted_files.is_empty() {
+        new_file_list.retain(|f| !deleted_files.contains(&f.key));
+    }
+    if new_file_list.len() <= 1 {
+        return Ok((String::from(""), FileMeta::default(), Vec::new()));
+    }
 
     // convert the file to the latest version of schema
     let schema_versions = db::schema::get_versions(org_id, stream_name, stream_type).await?;
@@ -311,9 +317,6 @@ async fn merge_files(
     let schema_latest_id = schema_versions.len() - 1;
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
-            if deleted_files.contains(&file.key) {
-                continue;
-            }
             // get the schema version of the file
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
