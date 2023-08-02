@@ -876,14 +876,23 @@ export default defineComponent({
                     const units = ["B", "KB", "MB", "GB", "TB"];
                     for (let unit of units) {
                         if (value < 1024) {
-                            return `${parseFloat(value).toFixed(2)}${unit}`;
+                            return {
+                                value: `${parseFloat(value).toFixed(2)}`,
+                                unit: `${unit}`
+                            }
                         }
                         value /= 1024;
                     }
-                    return `${parseFloat(value).toFixed(2)}PB`;
+                    return {
+                        value:`${parseFloat(value).toFixed(2)}`,
+                        unit: 'PB'
+                    };
                 }
                 case "custom": {
-                    return `${value}${props.data.config.unit_custom ?? ''}`
+                    return {
+                        value: `${value}`,
+                        unit: `${props.data.config.unit_custom ?? ''}`
+                    }
                 }
                 case "seconds": {
                     const units = [
@@ -898,30 +907,67 @@ export default defineComponent({
                         for (const unitInfo of units) {
                             const unitValue = value ? value / unitInfo.divisor : 0 ;
                             if (unitValue >= 1 && unitValue < 1000) {
-                                return unitValue.toFixed(2) + unitInfo.unit;
+                                return {
+                                    value: unitValue.toFixed(2),
+                                    unit: unitInfo.unit
+                                }
                             }
                         }
 
                         // If the value is too large to fit in any unit, return the original seconds
-                        return value + " s";
+                        return {
+                            value: value,
+                            unit: 's'
+                        }
                 }
                 case "bps": {
                     const units = ["B", "KB", "MB", "GB", "TB"];
                     for (let unit of units) {
                         if (value < 1024) {
-                            return `${parseFloat(value).toFixed(2)}${unit}/s`;
+                            return {
+                                value: `${parseFloat(value).toFixed(2)}`,
+                                unit: `${unit}/s`
+                            }
                         }
                         value /= 1024;
                     }
-                    return `${parseFloat(value).toFixed(2)}PB/s`;
+                    return {
+                        value:`${parseFloat(value).toFixed(2)}`,
+                        unit: 'PB/s'
+                    }
+                }
+                case "percent-1":{
+                    return {
+                        value: `${parseFloat(value)* 100}`,
+                        unit: '%'
+                    }
+                    // `${parseFloat(value) * 100}`;
+                }
+                case "percent":{
+                    return {
+                        value: `${parseFloat(value)}`,
+                        unit: '%'
+                    }
+                    // ${parseFloat(value)}`;
                 }
                 case "default":{
-                    return value;
+                    return {
+                        value: value,
+                        unit: ''
+                    }
                 }
                 default:{
-                    return value;
+                    return {
+                        value: value,
+                        unit: ''
+                    }
+                    
                 }
             }
+        }
+
+        const formatUnitValue = (obj:any) => {
+            return `${obj.value}${obj.unit}`
         }
 
       const renderPromQlBasedChart = () => {
@@ -940,7 +986,7 @@ export default defineComponent({
                                 name: getPromqlLegendName(metric.metric, props.data.config.promql_legend),
                                 x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
                                 y: values.map((value: any) => value[1]),
-                                hovertext: values.map((value: any) => getUnitValue(value[1])),
+                                hovertext: values.map((value: any) => formatUnitValue(getUnitValue(value[1]))),
                                 hovertemplate: "%{x} <br>%{fullData.name}: %{hovertext}<extra></extra>",
                                 stackgroup: props.data.type == 'area-stacked' ? 'one' : '',
                                 ...getPropsByChartTypeForTraces()
@@ -970,7 +1016,7 @@ export default defineComponent({
                             for (let i = 0; i <= 4; i++) {
                                 let val = minValueSize + intervalSize * i;
                                 yTickVals.push(minValueSize + intervalSize * i);
-                                yTickText.push(getUnitValue(val));
+                                yTickText.push(formatUnitValue(getUnitValue(val)));
                             }
                         // result = result.map((it: any) => moment(it + "Z").toISOString(true))
                             const yAxisTickOptions = !props.data.config?.unit
@@ -1055,10 +1101,12 @@ export default defineComponent({
                     case 'matrix': {
                         const traces = searchQueryData.data?.result?.map((metric: any) => {
                             const values = metric.values.sort((a: any, b: any) => a[0] - b[0])
-                            const value = values[values.length-1][1]
+                            const value = getUnitValue(values[values.length-1][1]).value
+                            console.log("value",getUnitValue(value));
                             
                             return {
                                 value,
+                                number: { suffix : getUnitValue(values[values.length-1][1]).unit },
                                 ...getPropsByChartTypeForTraces()
                             }
                         })
@@ -1133,7 +1181,7 @@ export default defineComponent({
                         });
 
                         break;
-                }
+                    }
                 }
                 break;
             }
@@ -1270,7 +1318,7 @@ export default defineComponent({
               case "metric":
                   return {
                       type: "indicator",
-                      mode: "number",
+                      mode: "number"
                   };
               case "h-stacked":
                   return {
