@@ -162,6 +162,7 @@ pub async fn search(
                 response_time: time,
                 size: res.scan_size as f64,
                 request_body: Some(req.query.sql),
+                ..Default::default()
             };
             let num_fn = req.query.query_fn.is_some() as u16;
             report_usage_stats(
@@ -451,6 +452,7 @@ pub async fn around(
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
+        ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
     report_usage_stats(
@@ -651,6 +653,7 @@ pub async fn values(
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
+        ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
     report_usage_stats(

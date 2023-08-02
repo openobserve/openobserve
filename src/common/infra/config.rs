@@ -229,14 +229,15 @@ pub struct Common {
     pub usage_ep: String,
     #[env_config(name = "ZO_USAGE_AUTH", default = "")]
     pub usage_auth: String,
-    #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 200)]
+    #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
     #[env_config(name = "ZO_DYNAMO_META_STORE_ENABLED", default = false)]
     pub use_dynamo_meta_store: bool,
     #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
     pub dynamo_file_list_table: String,
-    #[env_config(name = "ZO_IS_CLOUD_DEPLOYMENT", default = false)]
+    #[env_config(name = "ZO_REPORT_FILE_MOVE_MODE", default = false)]
     pub is_cloud_deployment: bool,
+    pub usage_org: String,
 }
 
 #[derive(EnvConfig)]
@@ -497,6 +498,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && (cfg.common.usage_ep.is_empty() || cfg.common.usage_auth.is_empty())
     {
         return Err(anyhow::anyhow!("Please specify url/auth to report usage."));
+    } else {
+        let ep = cfg
+            .common
+            .usage_ep
+            .strip_suffix('/')
+            .unwrap_or(&cfg.common.usage_ep);
+        cfg.common.usage_org = ep.split('/').last().unwrap_or("").to_owned();
     }
 
     Ok(())

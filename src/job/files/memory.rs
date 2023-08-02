@@ -20,6 +20,7 @@ use tokio::{sync::Semaphore, task, time};
 use crate::common::infra::{cluster, config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
 use crate::common::{json, utils::populate_file_meta};
+use crate::service::usage::report_ingestion_stats;
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -98,6 +99,13 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                                 metrics::INGEST_WAL_USED_BYTES
                                     .with_label_values(&[columns[1], columns[3], columns[2]])
                                     .sub(meta.original_size as i64);
+                                report_ingestion_stats(
+                                    meta.into(),
+                                    &org_id,
+                                    &stream_name,
+                                    stream_type,
+                                )
+                                .await;
                             }
                         }
                         Err(e) => log::error!(

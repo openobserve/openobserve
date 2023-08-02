@@ -5,7 +5,7 @@ use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::common::meta::usage::USAGE_STREAM;
+use crate::common::meta::usage::{STATS_STREAM, USAGE_STREAM};
 use crate::common::{
     infra::{config::CONFIG, metrics},
     meta::{
@@ -33,31 +33,21 @@ pub async fn report_usage_stats(
     metrics::INGEST_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(stats.size as u64);
+    let event: UsageEvent = event.into();
 
-    if !CONFIG.common.usage_enabled || CONFIG.common.is_cloud_deployment {
+    if !CONFIG.common.usage_enabled {
         return;
     }
+    if CONFIG.common.usage_org.eq(org_id)
+        && (stream_name.eq(STATS_STREAM) || stream_name.eq(USAGE_STREAM))
+    {
+        return;
+    }
+
     let request_body = stats.request_body.unwrap_or(event.to_string());
     let now = Utc::now();
-    let mut usage = vec![UsageData {
-        event: event.into(),
-        day: now.day(),
-        hour: now.hour(),
-        month: now.month(),
-        year: now.year(),
-        org_id: org_id.to_owned(),
-        request_body: request_body.to_owned(),
-        size: stats.size,
-        unit: "MB".to_owned(),
-        user_email: "".to_owned(),
-        response_time: stats.response_time,
-        num_records: stats.records,
-        stream_type,
-        stream_name: stream_name.to_owned(),
-        min_ts: None,
-        max_ts: None,
-        compressed_size: None,
-    }];
+
+    let mut usage = vec![];
 
     if num_functions > 0 {
         usage.push(UsageData {
@@ -67,7 +57,7 @@ pub async fn report_usage_stats(
             month: now.month(),
             year: now.year(),
             org_id: org_id.to_owned(),
-            request_body,
+            request_body: request_body.to_owned(),
             size: stats.size,
             unit: "MB".to_owned(),
             user_email: "".to_owned(),
@@ -78,9 +68,73 @@ pub async fn report_usage_stats(
             min_ts: None,
             max_ts: None,
             compressed_size: None,
-        })
+        });
+    };
+
+    if CONFIG.common.is_cloud_deployment || event != UsageEvent::Ingestion {
+        usage.push(UsageData {
+            event,
+            day: now.day(),
+            hour: now.hour(),
+            month: now.month(),
+            year: now.year(),
+            org_id: org_id.to_owned(),
+            request_body: request_body.to_owned(),
+            size: stats.size,
+            unit: "MB".to_owned(),
+            user_email: "".to_owned(),
+            response_time: stats.response_time,
+            num_records: stats.records,
+            stream_type,
+            stream_name: stream_name.to_owned(),
+            min_ts: None,
+            max_ts: None,
+            compressed_size: None,
+        });
+    };
+    if !usage.is_empty() {
+        publish_usage(usage).await;
     }
-    publish_usage(usage).await;
+}
+
+pub async fn report_ingestion_stats(
+    stats: RequestStats,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) {
+    if !CONFIG.common.usage_enabled {
+        return;
+    }
+    if CONFIG.common.usage_org.eq(org_id)
+        && (stream_name.eq(STATS_STREAM) || stream_name.eq(USAGE_STREAM))
+    {
+        return;
+    }
+    let now = Utc::now();
+    let usage = vec![UsageData {
+        event: UsageEvent::Ingestion,
+        day: now.day(),
+        hour: now.hour(),
+        month: now.month(),
+        year: now.year(),
+        org_id: org_id.to_owned(),
+        request_body: "".to_owned(),
+        size: stats.size,
+        unit: "MB".to_owned(),
+        user_email: "".to_owned(),
+        response_time: 0.0,
+        num_records: stats.records,
+        stream_type,
+        stream_name: stream_name.to_owned(),
+        min_ts: stats.min_ts,
+        max_ts: stats.max_ts,
+        compressed_size: stats.compressed_size,
+    }];
+
+    if !usage.is_empty() {
+        publish_usage(usage).await;
+    }
 }
 
 pub async fn publish_usage(mut usage: Vec<UsageData>) {

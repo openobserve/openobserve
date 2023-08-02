@@ -25,6 +25,14 @@ use crate::common::infra::{cluster, config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
 use crate::common::{file::scan_files, json, utils::populate_file_meta};
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
+use crate::{
+    common::infra::{
+        cluster,
+        config::{CONFIG, FILE_EXT_PARQUET},
+        metrics, storage, wal,
+    },
+    service::usage::report_ingestion_stats,
+};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -123,6 +131,14 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                                                 columns[1], columns[3], columns[2],
                                             ])
                                             .sub(meta.original_size as i64);
+
+                                        report_ingestion_stats(
+                                            meta.into(),
+                                            &org_id,
+                                            &stream_name,
+                                            stream_type,
+                                        )
+                                        .await;
                                     }
                                 }
                                 Err(e) => {

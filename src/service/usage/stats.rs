@@ -241,11 +241,6 @@ pub async fn set_last_stats_offset(
     Ok(())
 }
 
-fn _get_org_from_ep(usage_ep: String) -> String {
-    let ep = usage_ep.strip_suffix('/').unwrap_or(&usage_ep);
-    ep.split('/').last().unwrap_or("").to_owned()
-}
-
 fn to_map(data: Vec<json::Value>) -> HashMap<String, Stats> {
     let mut map = HashMap::new();
     for item in data {
@@ -257,18 +252,4 @@ fn to_map(data: Vec<json::Value>) -> HashMap<String, Stats> {
         map.insert(key, stats);
     }
     map
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[actix_web::test]
-    async fn test_get_org_from_ep() {
-        let res = _get_org_from_ep("http://localhost:5080/api/default/".to_string());
-        assert_eq!(res, "default");
-
-        let res = _get_org_from_ep("http://localhost:5080/api/default".to_string());
-        assert_eq!(res, "default");
-    }
 }
