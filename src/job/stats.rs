@@ -22,7 +22,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
     // should run it every 10 minutes
-    let mut interval = time::interval(time::Duration::from_secs(30));
+    let mut interval = time::interval(time::Duration::from_secs(600));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
