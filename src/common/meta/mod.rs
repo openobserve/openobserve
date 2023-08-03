@@ -26,7 +26,6 @@ pub mod prom;
 pub mod search;
 pub mod service;
 pub mod sql;
-pub mod stats;
 pub mod stream;
 pub mod syslog;
 pub mod telemetry;

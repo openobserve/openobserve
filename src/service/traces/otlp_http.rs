@@ -35,7 +35,7 @@ use crate::service::{
     ingestion::{format_stream_name, get_partition_key_record, write_file},
     logs::get_value,
     schema::{add_stream_schema, stream_schema_exists},
-    usage::report_usage_stats,
+    usage::report_request_usage_stats,
 };
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
@@ -379,7 +379,7 @@ pub async fn traces_json(
     );
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage
-    report_usage_stats(
+    report_request_usage_stats(
         req_stats,
         org_id,
         traces_stream_name,

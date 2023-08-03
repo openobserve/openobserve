@@ -225,16 +225,16 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
-    #[env_config(name = "ZO_USAGE_ENDPOINT", default = "")]
-    pub usage_ep: String,
-    #[env_config(name = "ZO_USAGE_AUTH", default = "")]
-    pub usage_auth: String,
-    #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 200)]
+    #[env_config(name = "ZO_USAGE_ORG", default = "_meta")]
+    pub usage_org: String,
+    #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
     #[env_config(name = "ZO_DYNAMO_META_STORE_ENABLED", default = false)]
     pub use_dynamo_meta_store: bool,
     #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
     pub dynamo_file_list_table: String,
+    #[env_config(name = "ZO_REPORT_COMPRESSED_SIZE", default = false)]
+    pub report_compressed_size: bool,
 }
 
 #[derive(EnvConfig)]
@@ -490,11 +490,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Data retention is not allowed to be less than 3 days."
         ));
-    }
-    if cfg.common.usage_enabled
-        && (cfg.common.usage_ep.is_empty() || cfg.common.usage_auth.is_empty())
-    {
-        return Err(anyhow::anyhow!("Please specify url/auth to report usage."));
     }
 
     Ok(())

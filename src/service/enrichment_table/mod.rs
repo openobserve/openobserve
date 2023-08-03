@@ -39,7 +39,7 @@ use super::{
     db,
     ingestion::{chk_schema_by_record, write_file},
     schema::stream_schema_exists,
-    usage::report_usage_stats,
+    usage::report_request_usage_stats,
 };
 
 pub async fn save_enrichment_data(
@@ -161,7 +161,7 @@ pub async fn save_enrichment_data(
     );
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage
-    report_usage_stats(
+    report_request_usage_stats(
         req_stats,
         org_id,
         stream_name,
