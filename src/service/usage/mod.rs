@@ -73,9 +73,7 @@ pub async fn report_request_usage_stats(
         });
     };
 
-    if !CONFIG.common.report_compressed_size
-        || (CONFIG.common.report_compressed_size && event != UsageEvent::Ingestion)
-    {
+    if !CONFIG.common.report_compressed_size || event != UsageEvent::Ingestion {
         usage.push(UsageData {
             event,
             day: now.day(),
