@@ -181,7 +181,7 @@ export const usePanelDataLoader = (
       currentDependentVariablesData.value?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
         const variableValue = variable.value;
-        query = query.replace(variableName, variableValue);
+        query = query.replaceAll(variableName, variableValue);
       });
     }
     return query;
