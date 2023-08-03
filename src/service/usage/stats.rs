@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::common::infra::cluster::{get_node_by_uuid, LOCAL_NODE_UUID};
 use crate::common::infra::dist_lock;
 use crate::common::json;
-use crate::common::meta::stats::Stats;
+use crate::common::meta::usage::Stats;
 use crate::common::meta::usage::{UsageEvent, STATS_STREAM, USAGE_STREAM};
 use crate::common::{
     infra::config::CONFIG,
