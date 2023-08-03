@@ -2,6 +2,7 @@ import { onMounted, reactive, ref } from "vue";
 import Plotly from "plotly.js";
 import { getThemeLayoutOptions } from "@/utils/Dashboard/getThemeLayoutOptions";
 import moment from "moment";
+import { QueryMiddleWare } from "@/utils/Dashboard/QueryMiddleWare";
 
 export const convertPromQLData = (
   panelSchema: any,
@@ -273,9 +274,14 @@ export const convertPromQLData = (
     }
   };
   console.log("props", props);
-  console.log("convertPromQLData: searchQueryData", searchQueryDataTemp);
+  console.log("convertPromQLData: searchQueryData", searchQueryData);
+  console.log("convertPromQLData: searchQueryData.data", searchQueryData.data);
 
   const traces = searchQueryData.data.map((it: any, index: number) => {
+    console.log("inside convertPromQLData");
+    console.log("convertPromQLData: it", it);
+    console.log("convertPromQLData: traces", JSON.stringify(traces));
+
     switch (props.data.type) {
       case "bar":
       case "line":
@@ -288,6 +294,7 @@ export const convertPromQLData = (
               const values = metric.values.sort(
                 (a: any, b: any) => a[0] - b[0]
               );
+              console.log("convertPromQLData: values:", values);
               return {
                 name: getPromqlLegendName(
                   metric.metric,
@@ -370,8 +377,20 @@ export const convertPromQLData = (
               ...getPropsByChartTypeForLayoutForPromQL(),
               ...getThemeLayoutOptions(store),
             };
-            console.log("layout", layout);
-              // return { traces: traces.flat(), layout };
+            console.log("traces:", traces);
+            console.log("maxValueSize:", maxValueSize);
+            console.log("minValueSize:", minValueSize);
+            console.log("yTickVals:", yTickVals);
+            console.log("yTickText:", yTickText);
+            console.log("layout:", layout);
+            console.log("traces:", traces);
+
+            // let data = { traces: traces.flat(), layout };
+
+            // data = QueryMiddleWare(data);
+
+            // return data;
+            return { traces: traces.flat(), layout };
           }
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
