@@ -44,6 +44,15 @@ pub trait LabelsExt {
     /// Return the value of the label associated with this name of the label.
     fn get_value(&self, name: &str) -> String;
 
+    /// Set a new label -> value to this label
+    fn set(&mut self, name: &str, value: &str);
+
+    /// Get the values
+    fn values(&self) -> Vec<String>;
+
+    /// Get the keys
+    fn keys(&self) -> Vec<String>;
+
     /// Without label, drops the given label name from the output.
     fn without_label(&self, name: &str) -> Labels;
 
@@ -60,9 +69,6 @@ pub trait LabelsExt {
 
     /// Sort the labels by name
     fn sort(&mut self);
-
-    /// Set a new label -> value to this label
-    fn set(&mut self, name: &str, value: &str);
 }
 
 impl LabelsExt for Labels {
@@ -83,6 +89,13 @@ impl LabelsExt for Labels {
             .map(|l| l.value.to_string())
             .take(1)
             .collect()
+    }
+
+    fn set(&mut self, name: &str, value: &str) {
+        self.push(Arc::new(Label {
+            name: name.to_string(),
+            value: value.to_string(),
+        }))
     }
 
     fn signature(&self) -> Signature {
@@ -117,11 +130,12 @@ impl LabelsExt for Labels {
         self.sort_by(|a, b| a.name.cmp(&b.name))
     }
 
-    fn set(&mut self, name: &str, value: &str) {
-        self.push(Arc::new(Label {
-            name: name.to_string(),
-            value: value.to_string(),
-        }))
+    fn values(&self) -> Vec<String> {
+        self.iter().map(|label| label.value.clone()).collect()
+    }
+
+    fn keys(&self) -> Vec<String> {
+        self.iter().map(|label| label.name.clone()).collect()
     }
 }
 
@@ -557,8 +571,7 @@ mod tests {
     use expect_test::expect;
     use float_cmp::approx_eq;
 
-    #[test]
-    fn test_signature_without_labels() {
+    fn generate_test_labels() -> Labels {
         let mut labels: Labels = Default::default();
         labels.push(Arc::new(Label {
             name: "a".to_owned(),
@@ -576,6 +589,11 @@ mod tests {
             name: "d".to_owned(),
             value: "4".to_owned(),
         }));
+        labels
+    }
+    #[test]
+    fn test_signature_without_labels() {
+        let labels: Labels = generate_test_labels();
 
         let sig = signature(&labels);
         expect![[r#"
@@ -666,28 +684,64 @@ mod tests {
 
     #[test]
     fn test_get_value() {
-        let mut labels: Labels = Default::default();
-        labels.push(Arc::new(Label {
-            name: "a".to_owned(),
-            value: "1".to_owned(),
-        }));
-        labels.push(Arc::new(Label {
-            name: "b".to_owned(),
-            value: "2".to_owned(),
-        }));
-        labels.push(Arc::new(Label {
-            name: "c".to_owned(),
-            value: "3".to_owned(),
-        }));
-        labels.push(Arc::new(Label {
-            name: "d".to_owned(),
-            value: "4".to_owned(),
-        }));
+        let labels: Labels = generate_test_labels();
 
         let value = labels.get_value("a");
         assert!(value == "1");
 
         let value = labels.get_value("non-existant-label");
         assert!(value == "");
+    }
+
+    #[test]
+    fn test_keep() {
+        let labels: Labels = generate_test_labels();
+
+        let labels_to_include = vec!["a".into(), "b".into()];
+        let expected = vec![
+            Arc::new(Label::new("a", "1")),
+            Arc::new(Label::new("b", "2")),
+        ];
+        let output = labels.keep(&labels_to_include);
+
+        use std::iter::zip;
+        for (expect, got) in zip(expected, output.clone()) {
+            assert_eq!(expect.name, got.name, "{:?}", &output);
+        }
+    }
+
+    #[test]
+    fn test_delete() {
+        let labels: Labels = generate_test_labels();
+
+        let labels_to_exclude = vec!["a".into(), "b".into()];
+        let expected = vec![
+            Arc::new(Label::new("c", "3")),
+            Arc::new(Label::new("d", "4")),
+        ];
+        let output = labels.delete(&labels_to_exclude);
+
+        use std::iter::zip;
+        for (expect, got) in zip(expected, output.clone()) {
+            assert_eq!(expect.name, got.name, "{:?}", &output);
+        }
+    }
+
+    #[test]
+    fn test_keep_delete_empty() {
+        let labels: Labels = generate_test_labels();
+
+        let labels_to_exclude = vec![];
+        let expected = labels.clone();
+        let output_deleted = labels.delete(&labels_to_exclude);
+        let output_kept = labels.delete(&labels_to_exclude);
+
+        use std::iter::zip;
+        for (expect, got) in zip(expected.clone(), output_deleted.clone()) {
+            assert_eq!(expect.name, got.name, "{:?}", &output_deleted);
+        }
+        for (expect, got) in zip(expected, output_kept.clone()) {
+            assert_eq!(expect.name, got.name, "{:?}", &output_kept);
+        }
     }
 }

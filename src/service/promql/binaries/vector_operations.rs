@@ -213,8 +213,9 @@ fn vector_arithmatic_operators(
     let return_bool = expr.return_bool();
     let comparison_operator = expr.op.is_comparison_operator();
 
+    // These are here so that we can generate signatures based on these labels.
     let mut labels_to_include_set = vec![];
-    let mut labels_to_exclude_set = vec![];
+    let mut labels_to_exclude_set = vec![NAME_LABEL.to_string()];
 
     let is_matching_on = expr.is_matching_on();
     if is_matching_on {
@@ -223,8 +224,8 @@ fn vector_arithmatic_operators(
             labels_to_include_set = modifier.matching.as_ref().unwrap().labels().labels.clone();
             labels_to_include_set.sort();
         } else {
-            labels_to_exclude_set = modifier.matching.as_ref().unwrap().labels().labels.clone();
-            labels_to_exclude_set.push(NAME_LABEL.to_string());
+            let excluded_labels = modifier.matching.as_ref().unwrap().labels().labels.clone();
+            labels_to_exclude_set.extend(excluded_labels);
             labels_to_exclude_set.sort();
         }
     }
@@ -252,11 +253,9 @@ fn vector_arithmatic_operators(
         .par_iter()
         .flat_map(|instant| {
             let left_sig = labels_to_compare(&instant.labels).signature();
-            if rhs_sig.contains_key(&left_sig) {
-                Some((instant, rhs_sig.get(&left_sig).unwrap()))
-            } else {
-                None
-            }
+            rhs_sig
+                .get(&left_sig)
+                .map(|rhs_instant| (instant, rhs_instant))
         })
         .flat_map(|(lhs_instant, rhs_instant)| {
             scalar_binary_operations(
@@ -268,8 +267,7 @@ fn vector_arithmatic_operators(
             )
             .ok()
             .map(|value| {
-                let mut labels = if return_bool || DROP_METRIC_VECTOR_BIN_OP.contains(&expr.op.id())
-                {
+                let mut labels = if return_bool || DROP_METRIC_VECTOR_BIN_OP.contains(&operator) {
                     lhs_instant.labels.without_metric_name()
                 } else {
                     lhs_instant.labels.clone()
@@ -285,10 +283,7 @@ fn vector_arithmatic_operators(
                         for ln in group_labels.labels.iter() {
                             let value = rhs_instant.labels.get_value(ln);
                             if !value.is_empty() {
-                                labels.push(Arc::new(Label {
-                                    name: ln.clone(),
-                                    value,
-                                }));
+                                labels.set(ln, &value);
                             }
                         }
                     }
