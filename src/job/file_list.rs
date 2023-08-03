@@ -138,7 +138,7 @@ async fn run_sync_s3_to_cache() -> Result<(), anyhow::Error> {
     }
 
     let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.compact.sync_to_db_interval,
+        CONFIG.limit.sync_s3_to_cache_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {
