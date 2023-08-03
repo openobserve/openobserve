@@ -274,6 +274,8 @@ pub struct Limit {
     pub http_worker_num: usize,
     #[env_config(name = "ZO_METRIC_FILE_MAX_RETENTION", default = "daily")]
     pub metric_file_max_retention: String,
+    #[env_config(name = "ZO_SYNC_S3_TO_CACHE_INTERVAL", default = 60)] // seconds
+    pub sync_s3_to_cache_interval: u64,
 }
 
 #[derive(EnvConfig)]

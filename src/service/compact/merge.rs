@@ -461,7 +461,7 @@ async fn write_file_list_s3(
             continue;
         }
         // send broadcast to other nodes
-        if let Err(e) = db::file_list::broadcast::send(events,None).await {
+        if let Err(e) = db::file_list::broadcast::send(events, None).await {
             log::error!("[COMPACT] send broadcast failed, retrying: {}", e);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
