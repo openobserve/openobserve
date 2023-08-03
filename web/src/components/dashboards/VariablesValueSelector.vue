@@ -11,7 +11,7 @@
 -->
 <template>
   <div v-if="variablesData.values?.length > 0" :key="variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
-    <div v-for="item in variablesData.values" :key="item.name" class="q-mr-lg q-mt-sm">
+    <div v-for="item in variablesData.values" :key="item.name + item.value + item.type + item.options?.length + item.isLoading" class="q-mr-lg q-mt-sm">
       <div v-if="item.type == 'query_values'">
           <VariableQueryValueSelector v-model="item.value" :variableItem="item" />
       </div>
@@ -85,7 +85,7 @@ export default defineComponent({
             variablesData.values = []
             variablesData.isVariablesLoading = false;
 
-            const promise = props.variablesConfig?.list?.map((it: any) => {
+            const promise = props.variablesConfig?.list?.map((it: any, index: any) => {
                 
                 const obj: any = { name: it.name, label: it.label, type: it.type, value: "", isLoading: it.type == "query_values" ? true : false };
                 variablesData.values.push(obj);
@@ -121,6 +121,10 @@ export default defineComponent({
                                     obj.value = obj.options[0] || "";
                                 }
                                 variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
+                                
+                                // triggers rerendering in the current component
+                                variablesData.values[index] = JSON.parse(JSON.stringify(obj))
+                                
                                 emitVariablesData();
                                 return obj;
                             }
@@ -128,7 +132,7 @@ export default defineComponent({
                                 return obj;
                             }
                         })
-                            .catch((err: any) => {
+                        .catch((err: any) => {
                             return obj;
                         });
                     }
