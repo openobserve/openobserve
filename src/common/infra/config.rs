@@ -274,8 +274,6 @@ pub struct Limit {
     pub http_worker_num: usize,
     #[env_config(name = "ZO_METRIC_FILE_MAX_RETENTION", default = "daily")]
     pub metric_file_max_retention: String,
-    #[env_config(name = "ZO_SYNC_S3_TO_CACHE_INTERVAL", default = 600)] // seconds
-    pub sync_s3_to_cache_interval: u64,
 }
 
 #[derive(EnvConfig)]
@@ -400,6 +398,8 @@ pub struct S3 {
     pub feature_http2_only: bool,
     #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
+    #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
+    pub sync_to_cache_interval: u64,
 }
 
 #[derive(Debug, EnvConfig)]
