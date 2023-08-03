@@ -26,7 +26,7 @@ pub async fn report_request_usage_stats(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    event: UsageType,
+    usage_type: UsageType,
     num_functions: u16,
 ) {
     metrics::INGEST_RECORDS
@@ -35,7 +35,7 @@ pub async fn report_request_usage_stats(
     metrics::INGEST_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(stats.size as u64);
-    let event: UsageEvent = event.into();
+    let event: UsageEvent = usage_type.into();
 
     if !CONFIG.common.usage_enabled {
         return;
@@ -46,7 +46,7 @@ pub async fn report_request_usage_stats(
         return;
     }
 
-    let request_body = stats.request_body.unwrap_or(event.to_string());
+    let request_body = usage_type.to_string();
     let now = Utc::now();
 
     let mut usage = vec![];
