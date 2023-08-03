@@ -3,12 +3,13 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Chan
 
 use crate::common::infra::cluster;
 use crate::common::infra::config::CONFIG;
-use crate::handler::grpc::cluster_rpc;
+use crate::handler::grpc::cluster_rpc::{self, UsageResponse};
 
-pub async fn ingest(dest_org_id: &str, req: cluster_rpc::UsageRequest) -> Result<(), Error> {
-    // get nodes from cluster
+pub async fn ingest(
+    dest_org_id: &str,
+    req: cluster_rpc::UsageRequest,
+) -> Result<UsageResponse, Error> {
     let mut nodes = cluster::get_cached_online_ingester_nodes().unwrap();
-    // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
 
@@ -52,7 +53,7 @@ pub async fn ingest(dest_org_id: &str, req: cluster_rpc::UsageRequest) -> Result
     client = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    let _: cluster_rpc::EmptyResponse = match client.report_usage(req).await {
+    let res: cluster_rpc::UsageResponse = match client.report_usage(req).await {
         Ok(res) => res.into_inner(),
         Err(err) => {
             log::error!("ingest->grpc: node: {}, ingest err: {:?}", node.id, err);
@@ -62,5 +63,5 @@ pub async fn ingest(dest_org_id: &str, req: cluster_rpc::UsageRequest) -> Result
             return Err(Error::msg("ingest node error"));
         }
     };
-    Ok(())
+    Ok(res)
 }

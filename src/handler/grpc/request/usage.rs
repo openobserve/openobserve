@@ -1,19 +1,20 @@
+use async_trait::async_trait;
 use tonic::{Request, Response, Status};
 
 use crate::{
     common::{infra::config::CONFIG, json},
-    handler::grpc::cluster_rpc::{usage_server::Usage, EmptyResponse, UsageRequest},
+    handler::grpc::cluster_rpc::{usage_server::Usage, UsageRequest, UsageResponse},
 };
 
 #[derive(Debug, Default)]
 pub struct UsageServerImpl;
 
-#[tonic::async_trait]
+#[async_trait]
 impl Usage for UsageServerImpl {
     async fn report_usage(
         &self,
         request: Request<UsageRequest>,
-    ) -> Result<Response<EmptyResponse>, Status> {
+    ) -> Result<Response<UsageResponse>, Status> {
         log::info!("UsageServer: report_usage");
         let metadata = request.metadata().clone();
         let req = request.into_inner();
@@ -32,18 +33,29 @@ impl Usage for UsageServerImpl {
                 )
                 .await;
 
-                if resp.is_ok() {
-                    let reply = EmptyResponse {};
-                    Ok(Response::new(reply))
-                } else {
-                    log::error!("UsageDataList: Err");
-                    let reply = EmptyResponse {};
-                    Ok(Response::new(reply))
+                match resp {
+                    Ok(_) => {
+                        let reply = UsageResponse {
+                            status_code: 200,
+                            message: "OK".to_string(),
+                        };
+                        Ok(Response::new(reply))
+                    }
+                    Err(err) => {
+                        let reply = UsageResponse {
+                            status_code: 500,
+                            message: err.to_string(),
+                        };
+                        Ok(Response::new(reply))
+                    }
                 }
             }
             None => {
                 log::error!("UsageDataList: Err");
-                let reply = EmptyResponse {};
+                let reply = UsageResponse {
+                    status_code: 400,
+                    message: "empty request body".to_string(),
+                };
                 Ok(Response::new(reply))
             }
         }

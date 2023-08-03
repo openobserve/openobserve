@@ -22,16 +22,13 @@ pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
 pub async fn publish_stats() -> Result<(), anyhow::Error> {
     let mut orgs = db::schema::list_organizations_from_cache();
-
     orgs.retain(|org: &String| org != &CONFIG.common.usage_org);
-
-    println!("orgs: {:?}", orgs);
 
     for org_id in orgs {
         // get the working node for the organization
         let (_offset, node) = get_last_stats_offset(&org_id).await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::error!("[STATS] organization {org_id} is being calculated by {node}");
+            log::error!("[STATS] for organization {org_id} are being calculated by {node}");
             continue;
         }
 
@@ -40,7 +37,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
 
         let (last_query_ts, node) = get_last_stats_offset(&org_id).await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::error!("[STATS] organization {org_id} is being calculated by {node}");
+            log::error!("[STATS] for organization {org_id} are being calculated by {node}");
             continue;
         }
         // release lock
@@ -70,7 +67,6 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         match SearchService::search(&CONFIG.common.usage_org, meta::StreamType::Logs, &req).await {
             Ok(res) => {
                 if !res.hits.is_empty() {
-                    println!("res: {:?}", res.hits);
                     match report_stats(res.hits, &org_id, last_query_ts, current_ts).await {
                         Ok(_) => {
                             log::info!("report stats success");
@@ -82,19 +78,20 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
                             .await?;
                         }
                         Err(err) => {
-                            log::error!("report stats error: {:?}", err);
+                            log::error!("report stats error: {:?} for {}", err, &org_id);
                         }
                     }
                 } else {
                     log::info!(
-                        "no stats between time: {} and {}",
+                        "no stats between time: {} and {} for {}",
                         last_query_ts,
-                        current_ts
+                        current_ts,
+                        &org_id
                     );
                 }
             }
             Err(err) => {
-                log::error!("calculate stats error: {:?}", err);
+                log::error!("calculate stats error: {:?} for {}", err, &org_id);
             }
         }
     }
@@ -199,8 +196,10 @@ async fn report_stats(
         stream_name: STATS_STREAM.to_owned(),
     };
 
-    let _ = ingestion_service::ingest(&CONFIG.common.usage_org, req).await;
-    Ok(())
+    match ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+        Ok(_) => Ok(()),
+        Err(err) => Err(err),
+    }
 }
 
 async fn get_last_stats_offset(org_id: &str) -> (i64, String) {

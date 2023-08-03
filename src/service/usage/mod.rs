@@ -144,11 +144,11 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
     usages.append(&mut usage);
 
     if usages.len() >= CONFIG.common.usage_batch_size {
-        let curr_usage = std::mem::take(&mut *usages);
+        let mut curr_usage = std::mem::take(&mut *usages);
 
         let mut groups: AHashMap<GroupKey, AggregatedData> = AHashMap::new();
 
-        for usage_data in curr_usage {
+        for usage_data in &curr_usage {
             let key = GroupKey {
                 stream_name: usage_data.stream_name.clone(),
                 org_id: usage_data.org_id.clone(),
@@ -186,6 +186,13 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
             stream_name: USAGE_STREAM.to_owned(),
         };
 
-        let _ = ingestion_service::ingest(&CONFIG.common.usage_org, req).await;
+        match ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Error in ingesting usage data {:?}", err);
+                // on error in ingesting usage data, push back the data
+                usages.append(&mut curr_usage);
+            }
+        }
     }
 }
