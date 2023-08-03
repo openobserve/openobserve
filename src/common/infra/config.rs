@@ -39,9 +39,14 @@ pub type RwHashSet<K> = DashSet<K, ahash::RandomState>;
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
-pub static HAS_FUNCTIONS: bool = true;
-pub static FILE_EXT_JSON: &str = ".json";
-pub static FILE_EXT_PARQUET: &str = ".parquet";
+
+pub const HAS_FUNCTIONS: bool = true;
+pub const FILE_EXT_JSON: &str = ".json";
+pub const FILE_EXT_PARQUET: &str = ".parquet";
+
+pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
+pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
+pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
@@ -618,11 +623,11 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 pub fn get_parquet_compression() -> parquet::basic::Compression {
     match CONFIG.common.parquet_compression.to_lowercase().as_str() {
         "snappy" => parquet::basic::Compression::SNAPPY,
-        "gzip" => parquet::basic::Compression::GZIP(parquet::basic::GzipLevel::default()),
-        "brotli" => parquet::basic::Compression::BROTLI(parquet::basic::BrotliLevel::default()),
+        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
+        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
         "lz4" => parquet::basic::Compression::LZ4_RAW,
-        "zstd" => parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap()),
-        _ => parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap()),
+        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
+        _ => parquet::basic::Compression::ZSTD(Default::default()),
     }
 }
 

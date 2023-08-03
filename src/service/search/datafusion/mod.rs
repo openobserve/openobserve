@@ -16,7 +16,10 @@ use datafusion::arrow::datatypes::Schema;
 use parquet::{arrow::ArrowWriter, file::properties::WriterProperties, format::SortingColumn};
 use std::sync::Arc;
 
-use crate::common::infra::config::{get_parquet_compression, CONFIG};
+use crate::common::infra::config::{
+    get_parquet_compression, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
+    PARQUET_PAGE_SIZE,
+};
 use crate::common::meta::functions::ZoFunction;
 
 mod date_format_udf;
@@ -71,9 +74,9 @@ pub fn new_writer<'a>(
     let sort_column_id = schema.index_of(&CONFIG.common.column_timestamp).unwrap();
     let writer_props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
-        .set_write_batch_size(8192)
-        .set_data_page_size_limit(1024 * 512)
-        .set_max_row_group_size(1024 * 1024 * 256)
+        .set_write_batch_size(PARQUET_BATCH_SIZE)
+        .set_data_page_size_limit(PARQUET_PAGE_SIZE)
+        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE)
         .set_sorting_columns(Some(
             [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),
         ))

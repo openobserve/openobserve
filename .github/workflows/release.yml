@@ -122,13 +122,13 @@ jobs:
         run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
 
       - name: Run cargo build
-        run: cargo build ${{ matrix.features }} --release --target ${{ matrix.arch }}
+        run: cargo build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
 
       - name: Calculate checksum and rename binary
         if: contains(matrix.arch, 'windows') == false
         shell: bash
         run: |
-          cd target/${{ matrix.arch }}/release
+          cd target/${{ matrix.arch }}/release-prod
           chmod +x openobserve
           tar -zcvf ${{ matrix.file_name }}.tar.gz openobserve
           echo $(shasum -a 256 ${{ matrix.file_name }}.tar.gz | cut -f1 -d' ') > ${{ matrix.file_name }}.tar.gz.sha256sum
@@ -137,7 +137,7 @@ jobs:
         if: contains(matrix.arch, 'windows')
         shell: bash
         run: |
-          cd target/${{ matrix.arch }}/release
+          cd target/${{ matrix.arch }}/release-prod
           7z a -tzip ${{ matrix.file_name }}.zip openobserve.exe
           certutil.exe -hashfile ${{ matrix.file_name }}.zip sha256|head -n 2|tail -n 1 > ${{ matrix.file_name }}.zip.sha256sum
 
@@ -145,13 +145,13 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.file_name }}
-          path: target/${{ matrix.arch }}/release/${{ matrix.file_name }}${{ matrix.file_ext }}
+          path: target/${{ matrix.arch }}/release-prod/${{ matrix.file_name }}${{ matrix.file_ext }}
 
       - name: Upload checksum of artifacts
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.file_name }}.sha256sum
-          path: target/${{ matrix.arch }}/release/${{ matrix.file_name }}${{ matrix.file_ext }}.sha256sum
+          path: target/${{ matrix.arch }}/release-prod/${{ matrix.file_name }}${{ matrix.file_ext }}.sha256sum
   release:
     name: Release artifacts
     needs: [build]

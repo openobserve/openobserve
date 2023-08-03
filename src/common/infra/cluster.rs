@@ -370,7 +370,7 @@ async fn watch_node_list() -> Result<()> {
                         "cluster->node: broadcast local file_list to new node [{:?}]",
                         item_value.name
                     );
-                    db::file_list::local::broadcast_cache().await.unwrap();
+                    db::file_list::local::broadcast_cache(Some(item_key)).await.unwrap();
                 }
             }
             Event::Delete(ev) => {
