@@ -120,13 +120,9 @@ async fn send_to_node(
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
         // connect to the node
-        let token: MetadataValue<_> = match get_internal_grpc_token().parse() {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("[broadcast] parse internal grpc token failed: {}", e);
-                continue;
-            }
-        };
+        let token: MetadataValue<_> = get_internal_grpc_token()
+            .parse()
+            .expect("parse internal grpc token faile");
         let channel = match Channel::from_shared(node.grpc_addr.clone())
             .unwrap()
             .connect()
@@ -135,6 +131,7 @@ async fn send_to_node(
             Ok(v) => v,
             Err(e) => {
                 log::error!("[broadcast] connect to node[{}] failed: {}", &node.uuid, e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
         };
