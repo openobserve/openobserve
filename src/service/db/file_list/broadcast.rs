@@ -52,6 +52,9 @@ pub async fn send(items: &[FileKey], node_uuid: Option<&str>) -> Result<(), anyh
         if node.uuid.eq(&local_node_uuid) {
             continue;
         }
+        if !cluster::is_querier(&node.role) && !cluster::is_compactor(&node.role) {
+            continue;
+        }
         let node_id = node.uuid.clone();
         // retry 5 times
         let mut ok = false;
