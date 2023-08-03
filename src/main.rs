@@ -46,10 +46,8 @@ use openobserve::{
         grpc::{
             auth::check_auth,
             cluster_rpc::{
-                event_server::EventServer,
-                metrics_server::MetricsServer,
-                search_server::SearchServer,
-                usage_server::{Usage, UsageServer},
+                event_server::EventServer, metrics_server::MetricsServer,
+                search_server::SearchServer, usage_server::UsageServer,
             },
             request::{
                 event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer,

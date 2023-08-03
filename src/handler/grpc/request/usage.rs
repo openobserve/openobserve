@@ -28,7 +28,7 @@ impl Usage for UsageServerImpl {
                     report_to_org_id.unwrap().to_str().unwrap(),
                     &report_to_stream,
                     in_data,
-                    0 as usize,
+                    0_usize,
                 )
                 .await;
 

@@ -1,7 +1,6 @@
 use ahash::AHashMap;
 use chrono::{Datelike, Timelike, Utc};
 use once_cell::sync::Lazy;
-use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -147,7 +146,6 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
     usages.append(&mut usage);
 
     if usages.len() >= CONFIG.common.usage_batch_size {
-        let cl = Arc::new(Client::builder().build().unwrap());
         let curr_usage = std::mem::take(&mut *usages);
 
         let mut groups: AHashMap<GroupKey, AggregatedData> = AHashMap::new();
@@ -190,23 +188,6 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
             stream_name: USAGE_STREAM.to_owned(),
         };
 
-        let _ = ingestion_service::ingest(&USAGE_STREAM, req).await;
-
-        /*  let usage_url = if CONFIG.common.usage_ep.ends_with('/') {
-            format!("{}{USAGE_STREAM}/_json", CONFIG.common.usage_ep)
-        } else {
-            format!("{}/{USAGE_STREAM}/_json", CONFIG.common.usage_ep)
-        };
-        let url = url::Url::parse(&usage_url).unwrap();
-        let cl = Arc::clone(&cl);
-        tokio::task::spawn(async move {
-            let _ = cl
-                .post(url)
-                .header("Content-Type", "application/json")
-                .header(reqwest::header::AUTHORIZATION, &CONFIG.common.usage_auth)
-                .json(&report_data)
-                .send()
-                .await;
-        }); */
+        let _ = ingestion_service::ingest(&CONFIG.common.usage_org, req).await;
     }
 }

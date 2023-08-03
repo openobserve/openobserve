@@ -1,5 +1,4 @@
 use anyhow::Error;
-use rand::{seq::SliceRandom, thread_rng};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
 use crate::common::infra::cluster;
@@ -60,7 +59,7 @@ pub async fn ingest(dest_org_id: &str, req: cluster_rpc::UsageRequest) -> Result
             if err.code() == tonic::Code::Internal {
                 return Err(err.into());
             }
-            return Err(Error::msg(("ingest node error")));
+            return Err(Error::msg("ingest node error"));
         }
     };
     Ok(())

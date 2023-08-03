@@ -12,8 +12,11 @@ use crate::common::{
     infra::config::CONFIG,
     meta::{self, search::Request},
 };
+use crate::handler::grpc::cluster_rpc::UsageDataList;
 use crate::service::db;
 use crate::service::search as SearchService;
+
+use super::ingestion_service;
 
 pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
@@ -137,7 +140,7 @@ async fn report_stats(
 
     let mut report_data_map = to_map(report_data);
 
-    let final_data: Vec<&Stats> = if !existing_stats.is_empty() {
+    let curr_data: Vec<&Stats> = if !existing_stats.is_empty() {
         let mut existing_stats_map = to_map(existing_stats);
         for (key, value) in report_data_map.iter_mut() {
             if let Some(existing_value) = existing_stats_map.remove(key) {
@@ -186,31 +189,18 @@ async fn report_stats(
         report_data_map.values().collect()
     };
 
-    let stats_url = if CONFIG.common.usage_ep.ends_with('/') {
-        format!("{}{STATS_STREAM}/_json", CONFIG.common.usage_ep)
-    } else {
-        format!("{}/{STATS_STREAM}/_json", CONFIG.common.usage_ep)
-    };
-    let url = url::Url::parse(&stats_url).unwrap();
-    let cl = Arc::clone(&CLIENT);
+    let report_data: Vec<json::Value> = curr_data
+        .iter()
+        .map(|s| serde_json::to_value(s).unwrap())
+        .collect();
 
-    match cl
-        .post(url)
-        .header("Content-Type", "application/json")
-        .header(reqwest::header::AUTHORIZATION, &CONFIG.common.usage_auth)
-        .json(&final_data)
-        .send()
-        .await
-    {
-        Ok(_) => {
-            log::info!("report stats success");
-            Ok(())
-        }
-        Err(err) => {
-            log::error!("report stats error: {:?}", err);
-            Err(err.into())
-        }
-    }
+    let req = crate::handler::grpc::cluster_rpc::UsageRequest {
+        usage_list: Some(UsageDataList::from(report_data)),
+        stream_name: STATS_STREAM.to_owned(),
+    };
+
+    let _ = ingestion_service::ingest(&CONFIG.common.usage_org, req).await;
+    Ok(())
 }
 
 async fn get_last_stats_offset(org_id: &str) -> (i64, String) {

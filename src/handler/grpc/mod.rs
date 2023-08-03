@@ -229,7 +229,11 @@ impl From<&cluster_rpc::ScanStats> for meta::stream::ScanStats {
 
 impl From<cluster_rpc::UsageDataList> for Vec<crate::common::json::Value> {
     fn from(usages: cluster_rpc::UsageDataList) -> Self {
-        usages.items.into_iter().map(|u| u.into()).collect()
+        usages
+            .items
+            .into_iter()
+            .map(|u| crate::common::json::from_str(&u).unwrap())
+            .collect()
     }
 }
 
