@@ -143,14 +143,8 @@ async fn run_sync_s3_to_cache() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        let ret = db::file_list::remote::cache_latest_hour().await;
-        if ret.is_err() {
-            log::error!(
-                "[JOB] File_list sync s3 to cache error: {}",
-                ret.err().unwrap()
-            );
-        } else {
-            log::info!("[JOB] File_list sync s3 to cache done");
+        if let Err(e) = db::file_list::remote::cache_latest_hour().await {
+            log::error!("[JOB] File_list sync s3 to cache error: {}", e);
         }
     }
 }
