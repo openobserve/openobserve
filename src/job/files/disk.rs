@@ -24,15 +24,8 @@ use tokio::{sync::Semaphore, task, time};
 use crate::common::infra::{cluster, config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
 use crate::common::{file::scan_files, json, utils::populate_file_meta};
+use crate::service::usage::report_compression_stats;
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
-use crate::{
-    common::infra::{
-        cluster,
-        config::{CONFIG, FILE_EXT_PARQUET},
-        metrics, storage, wal,
-    },
-    service::usage::report_compression_stats,
-};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {

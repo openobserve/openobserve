@@ -44,7 +44,6 @@ use crate::service::{
     schema::{set_schema_metadata, stream_schema_exists},
     search as search_service,
     stream::unwrap_partition_time_level,
-    usage::report_usage_stats,
 };
 
 pub(crate) mod prometheus {

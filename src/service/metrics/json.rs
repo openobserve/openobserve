@@ -29,6 +29,7 @@ use crate::common::meta::{
 };
 use crate::common::{flatten, json, time};
 use crate::service::ingestion::get_wal_time_key;
+use crate::service::stream::unwrap_partition_time_level;
 use crate::service::usage::report_request_usage_stats;
 use crate::service::{db, ingestion::write_file};
 
