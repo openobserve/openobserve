@@ -8,56 +8,15 @@ package cluster;
 
 import "cluster/common.proto";
 
-enum UsageEvent {
-    INGESTION_EVENT = 0;
-    SEARCH_EVENT = 1;
-    FUNCTIONS_EVENT = 2;
-    OTHER_EVENT = 3;
-}
-
-enum UsageType {   
-    BULK = 0;
-    JSON = 1;
-    MULTI = 2;
-    TRACES_INGESTION = 3;
-    METRICS_INGESTION = 4;
-    SEARCH = 5;
-    METRIC_SEARCH = 6;
-    SEARCH_AROUND = 7;
-    SEARCH_TOP_N_VALUES = 8;
-    FUNCTIONS = 9;
-    RETENTION = 10;
-    KINESIS_FIREHOSE = 11;
-    GCP_SUBSCRIPTION = 12;
-    JSON_METRICS = 13;
-    SYSLOG = 14;
-    ENRICHMENT_TABLE = 15;   
-}
-
-message UsageData {
-    UsageEvent event = 1;
-    uint32 day = 2;
-    uint32 hour = 3;
-    uint32 month = 4;
-    int32 year = 5;
-    string org_id = 6;
-    string request_body = 7;
-    double size = 8;
-    string unit = 9;
-    string user_email = 10;
-    double response_time = 11;
-    string stream_type = 12;
-    uint64 num_records = 13;
-    string stream_name = 14;
-    double compressed_size = 15; 
-    int64 min_ts = 16; 
-    int64 max_ts = 17; 
-}
-
 message UsageDataList {
-    repeated UsageData items = 1;
+    repeated string items = 1;
+}
+
+message UsageRequest {
+    UsageDataList usage_list = 1;
+    string stream_name = 2;    
 }
 
 service Usage {
-    rpc ReportUsage (UsageDataList) returns (EmptyResponse) {}
+    rpc ReportUsage (UsageRequest) returns (EmptyResponse) {}
 }

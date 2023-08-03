@@ -5,6 +5,7 @@ use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::common::json;
 use crate::common::meta::usage::{STATS_STREAM, USAGE_STREAM};
 use crate::common::{
     infra::{config::CONFIG, metrics},
@@ -13,7 +14,9 @@ use crate::common::{
         StreamType,
     },
 };
+use crate::handler::grpc::cluster_rpc::UsageDataList;
 
+pub mod ingestion_service;
 pub mod stats;
 
 pub static USAGE_DATA: Lazy<Arc<RwLock<Vec<UsageData>>>> =
@@ -179,10 +182,17 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
         for (_, data) in groups {
             let mut usage_data = data.usage_data;
             usage_data.response_time /= data.count as f64;
-            report_data.push(usage_data);
+            report_data.push(json::to_value(usage_data).unwrap());
         }
 
-        let usage_url = if CONFIG.common.usage_ep.ends_with('/') {
+        let req = crate::handler::grpc::cluster_rpc::UsageRequest {
+            usage_list: Some(UsageDataList::from(report_data)),
+            stream_name: USAGE_STREAM.to_owned(),
+        };
+
+        let _ = ingestion_service::ingest(&USAGE_STREAM, req).await;
+
+        /*  let usage_url = if CONFIG.common.usage_ep.ends_with('/') {
             format!("{}{USAGE_STREAM}/_json", CONFIG.common.usage_ep)
         } else {
             format!("{}/{USAGE_STREAM}/_json", CONFIG.common.usage_ep)
@@ -197,6 +207,6 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
                 .json(&report_data)
                 .send()
                 .await;
-        });
+        }); */
     }
 }

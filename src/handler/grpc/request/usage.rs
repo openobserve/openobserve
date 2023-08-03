@@ -1,18 +1,51 @@
 use tonic::{Request, Response, Status};
 
-use crate::handler::grpc::cluster_rpc::{usage_server::Usage, EmptyResponse, UsageDataList};
+use crate::{
+    common::{infra::config::CONFIG, json},
+    handler::grpc::cluster_rpc::{usage_server::Usage, EmptyResponse, UsageRequest},
+};
 
 #[derive(Debug, Default)]
-pub struct UsageServer;
+pub struct UsageServerImpl;
 
 #[tonic::async_trait]
-impl Usage for UsageServer {
+impl Usage for UsageServerImpl {
     async fn report_usage(
         &self,
-        request: Request<UsageDataList>,
+        request: Request<UsageRequest>,
     ) -> Result<Response<EmptyResponse>, Status> {
-        println!("Received UsageDataList: {:?}", request.into_inner());
-        let reply = EmptyResponse {};
-        Ok(Response::new(reply))
+        log::info!("UsageServer: report_usage");
+        let metadata = request.metadata().clone();
+        let req = request.into_inner();
+        let report_to_stream = req.stream_name;
+        let report_to_org_id = metadata.get(&CONFIG.grpc.org_header_key);
+
+        match req.usage_list {
+            Some(data) => {
+                log::info!("UsageServer: report_usage received data");
+                let in_data: Vec<json::Value> = data.into();
+                let resp = crate::service::logs::json_wo_fn::ingest(
+                    report_to_org_id.unwrap().to_str().unwrap(),
+                    &report_to_stream,
+                    in_data,
+                    0 as usize,
+                )
+                .await;
+
+                if resp.is_ok() {
+                    let reply = EmptyResponse {};
+                    Ok(Response::new(reply))
+                } else {
+                    log::error!("UsageDataList: Err");
+                    let reply = EmptyResponse {};
+                    Ok(Response::new(reply))
+                }
+            }
+            None => {
+                log::error!("UsageDataList: Err");
+                let reply = EmptyResponse {};
+                Ok(Response::new(reply))
+            }
+        }
     }
 }
