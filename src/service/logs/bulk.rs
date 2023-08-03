@@ -33,7 +33,7 @@ use crate::common::meta::{
     },
     StreamType,
 };
-use crate::service::usage::report_usage_stats;
+use crate::service::usage::report_request_usage_stats;
 use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
 
 pub const TRANSFORM_FAILED: &str = "document_failed_transform";
@@ -306,7 +306,7 @@ pub async fn ingest(
         req_stats.response_time += time;
         //metric + data usage
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
-        report_usage_stats(
+        report_request_usage_stats(
             req_stats,
             org_id,
             &stream_name,

@@ -47,9 +47,12 @@ use openobserve::{
             auth::check_auth,
             cluster_rpc::{
                 event_server::EventServer, metrics_server::MetricsServer,
-                search_server::SearchServer,
+                search_server::SearchServer, usage_server::UsageServer,
             },
-            request::{event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer},
+            request::{
+                event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer,
+                usage::UsageServerImpl,
+            },
         },
         http::router::*,
     },
@@ -214,6 +217,9 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
     let metrics_svc = MetricsServer::new(Querier)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
+    let usage_svc = UsageServer::new(UsageServerImpl)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
     let tracer = TraceServer::default();
     let trace_svc = TraceServiceServer::new(tracer);
 
@@ -225,6 +231,7 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
             .add_service(search_svc)
             .add_service(metrics_svc)
             .add_service(trace_svc)
+            .add_service(usage_svc)
             .serve(gaddr)
             .await
             .expect("gRPC server init failed");
