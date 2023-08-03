@@ -28,7 +28,7 @@
           Import Dashboard from exported JSON file
         </div>
         <div style="width: 400px;">
-          <q-file filled bottom-slots v-model="jsonFile" label="Drop your file here" accept=".json">
+          <q-file filled bottom-slots v-model="jsonFile" label="Drop your file here" accept=".json" multiple>
             <template v-slot:prepend>
               <q-icon name="cloud_upload" @click.stop.prevent />
             </template>
@@ -104,14 +104,19 @@ export default defineComponent({
     const $q = useQuasar();
 
     const importFile = async () => {
-      var reader = new FileReader();
-      reader.onload = function (reader) {
-        importDashboardFromJSON(reader.result)
-          .then(() => {
-            jsonFile.value = null
-          })
-      };
-      reader.readAsText(jsonFile.value)
+      console.log("===",jsonFile.value);
+      
+      jsonFile.value.map((it:any)=>{
+        let reader = new FileReader();
+        reader.onload = function (readerResult) {
+          importDashboardFromJSON(readerResult.target.result)
+            .then(() => {
+              jsonFile.value = null
+            })
+        };
+        reader.readAsText(it)
+        })
+     
     }
 
     const importDashboardFromJSON = (jsonObj: any) => {
