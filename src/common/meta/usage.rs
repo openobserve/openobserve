@@ -1,4 +1,4 @@
-use super::StreamType;
+use super::{common::FileMeta, StreamType};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -21,6 +21,12 @@ pub struct UsageData {
     pub stream_type: StreamType,
     pub num_records: u64,
     pub stream_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compressed_size: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_ts: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_ts: Option<i64>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -144,6 +150,12 @@ pub struct RequestStats {
     pub response_time: f64,
     #[serde(default)]
     pub request_body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compressed_size: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_ts: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_ts: Option<i64>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -152,6 +164,40 @@ impl Default for RequestStats {
             records: 0,
             response_time: 0.0,
             request_body: None,
+            compressed_size: None,
+            min_ts: None,
+            max_ts: None,
         }
     }
+}
+
+impl From<FileMeta> for RequestStats {
+    fn from(meta: FileMeta) -> RequestStats {
+        RequestStats {
+            size: meta.original_size as f64 / (1024.0 * 1024.0),
+            records: meta.records,
+            response_time: 0.0,
+            request_body: None,
+            compressed_size: Some(meta.compressed_size as f64 / (1024.0 * 1024.0)),
+            min_ts: Some(meta.min_ts),
+            max_ts: Some(meta.max_ts),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Stats {
+    pub records: i64,
+    pub stream_type: StreamType,
+    pub org_id: String,
+    pub stream_name: String,
+    pub original_size: f64,
+    #[serde(default)]
+    pub _timestamp: i64,
+    #[serde(default)]
+    pub min_ts: i64,
+    #[serde(default)]
+    pub max_ts: i64,
+    #[serde(default)]
+    pub compressed_size: Option<f64>,
 }

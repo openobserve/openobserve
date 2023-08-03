@@ -112,7 +112,12 @@ export const getLogoutURL = () => {
 
 export const getDecodedAccessToken = (token: string) => {
   try {
-    return JSON.parse(atob(token.split(".")[1]));
+    const decodedString = b64DecodeUnicode(token.split(".")[1]);
+    if (typeof decodedString == "string") {
+      return JSON.parse(decodedString);
+    } else {
+      return "";
+    }
   } catch (e) {
     console.log("error decoding token");
   }

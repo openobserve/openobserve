@@ -189,6 +189,27 @@ impl From<&cluster_rpc::ScanStats> for meta::stream::ScanStats {
     }
 }
 
+impl From<cluster_rpc::UsageDataList> for Vec<crate::common::json::Value> {
+    fn from(usages: cluster_rpc::UsageDataList) -> Self {
+        usages
+            .items
+            .into_iter()
+            .map(|u| crate::common::json::from_str(&u).unwrap())
+            .collect()
+    }
+}
+
+impl From<Vec<crate::common::json::Value>> for cluster_rpc::UsageDataList {
+    fn from(usages: Vec<crate::common::json::Value>) -> Self {
+        cluster_rpc::UsageDataList {
+            items: usages
+                .into_iter()
+                .map(|u| crate::common::json::to_string(&u).unwrap())
+                .collect(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
