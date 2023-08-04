@@ -89,7 +89,7 @@
 
       <span class="q-pl-xs">
         <span
-          :class="store.state.theme === 'dark' ? 'text-red-4' : 'text-red-10'"
+          :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'"
           >{{ key }}:</span
         ><span class="q-pl-xs"
           ><template v-if="index < Object.keys(value).length - 1"
