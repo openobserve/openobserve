@@ -28,6 +28,9 @@ profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 [profile.release]
 debug = false
 strip = true
+
+[profile.release-prod]
+inherits = "release"
 codegen-units = 1
 lto = "thin"
 

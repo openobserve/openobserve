@@ -30,40 +30,9 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
         meta,
         deleted,
     };
-    if !CONFIG.common.use_dynamo_meta_store {
-        let mut write_buf = json::to_vec(&file_data)?;
-        write_buf.push(b'\n');
-        let hour_key = if meta.min_ts > 0 {
-            Utc.timestamp_nanos(meta.min_ts * 1000)
-                .format("%Y_%m_%d_%H")
-                .to_string()
-        } else {
-            let columns = key.split('/').collect::<Vec<&str>>();
-            if columns[0] != "files" || columns.len() < 9 {
-                return Ok(());
-            }
-            format!(
-                "{}_{}_{}_{}",
-                columns[4], columns[5], columns[6], columns[7]
-            )
-        };
-        let file = wal::get_or_create(
-            0,
-            StreamParams {
-                org_id: "",
-                stream_name: "",
-                stream_type: StreamType::Filelist,
-            },
-            None,
-            &hour_key,
-            false,
-        );
-        file.write(write_buf.as_ref());
 
-        super::progress(key, meta, deleted, true).await?;
-        tokio::task::spawn(async move { super::broadcast::send(&[file_data]).await });
-        tokio::task::yield_now().await;
-    } else {
+    // dynamodb mode
+    if CONFIG.common.use_dynamo_meta_store {
         // retry 5 times
         for _ in 0..10 {
             if let Err(e) = super::dynamo_db::write_file(&file_data).await {
@@ -73,7 +42,45 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
                 break;
             }
         }
+        return Ok(());
     }
+
+    // local mode
+    let mut write_buf = json::to_vec(&file_data)?;
+    write_buf.push(b'\n');
+    let hour_key = if meta.min_ts > 0 {
+        Utc.timestamp_nanos(meta.min_ts * 1000)
+            .format("%Y_%m_%d_%H")
+            .to_string()
+    } else {
+        let columns = key.split('/').collect::<Vec<&str>>();
+        if columns[0] != "files" || columns.len() < 9 {
+            return Ok(());
+        }
+        format!(
+            "{}_{}_{}_{}",
+            columns[4], columns[5], columns[6], columns[7]
+        )
+    };
+    let file = wal::get_or_create(
+        0,
+        StreamParams {
+            org_id: "",
+            stream_name: "",
+            stream_type: StreamType::Filelist,
+        },
+        None,
+        &hour_key,
+        false,
+    );
+    file.write(write_buf.as_ref());
+
+    super::progress(key, meta, deleted, true).await?;
+    if !CONFIG.common.local_mode {
+        tokio::task::spawn(async move { super::broadcast::send(&[file_data], None).await });
+        tokio::task::yield_now().await;
+    }
+
     Ok(())
 }
 
@@ -122,13 +129,13 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 #[inline]
-pub async fn broadcast_cache() -> Result<(), anyhow::Error> {
+pub async fn broadcast_cache(node_uuid: Option<&str>) -> Result<(), anyhow::Error> {
     let files = get_all().await?;
     if files.is_empty() {
         return Ok(());
     }
     for chunk in files.chunks(100) {
-        if let Err(e) = super::broadcast::send(chunk).await {
+        if let Err(e) = super::broadcast::send(chunk, node_uuid).await {
             log::error!("broadcast cached file list failed: {}", e);
         }
     }

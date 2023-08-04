@@ -48,8 +48,6 @@ fn main() -> Result<()> {
         .type_attribute("MetricsQueryResponse", "#[derive(serde::Serialize)]")
         .type_attribute("ScanStats", "#[derive(Eq)]")
         .type_attribute("ScanStats", "#[derive(serde::Serialize)]")
-        .type_attribute("UsageData", "#[derive(serde::Serialize)]")
-        .type_attribute("UsageDataList", "#[derive(serde::Serialize)]")
         .compile(
             &[
                 "proto/cluster/common.proto",

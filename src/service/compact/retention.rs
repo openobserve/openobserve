@@ -337,7 +337,7 @@ async fn write_file_list_s3(
                 continue;
             }
             // send broadcast to other nodes
-            if let Err(e) = db::file_list::broadcast::send(&events).await {
+            if let Err(e) = db::file_list::broadcast::send(&events, None).await {
                 log::error!(
                     "[COMPACT] delete_from_file_list send broadcast failed, retrying: {}",
                     e

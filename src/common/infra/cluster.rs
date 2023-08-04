@@ -261,6 +261,11 @@ pub async fn set_online() -> Result<()> {
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let _resp = client.put(key, val, Some(opt)).await?;
 
+    // if local node is ingester, broadcast local file_list to the cluster
+    if is_ingester(&LOCAL_NODE_ROLE) {
+        db::file_list::local::broadcast_cache(None).await.unwrap();
+    }
+
     Ok(())
 }
 
@@ -370,7 +375,9 @@ async fn watch_node_list() -> Result<()> {
                         "cluster->node: broadcast local file_list to new node [{:?}]",
                         item_value.name
                     );
-                    db::file_list::local::broadcast_cache().await.unwrap();
+                    db::file_list::local::broadcast_cache(Some(item_key))
+                        .await
+                        .unwrap();
                 }
             }
             Event::Delete(ev) => {
