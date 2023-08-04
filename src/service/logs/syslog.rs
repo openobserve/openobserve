@@ -19,23 +19,21 @@ use datafusion::arrow::datatypes::Schema;
 use std::net::SocketAddr;
 use syslog_loose::{Message, ProcId, Protocol};
 
+use crate::common::infra::{
+    cluster,
+    config::{CONFIG, SYSLOG_ROUTES},
+    metrics,
+};
 use crate::common::meta::{
     alert::{Alert, Trigger},
     http::HttpResponse as MetaHttpResponse,
     ingestion::{IngestionResponse, StreamSchemaChk, StreamStatus},
+    stream::StreamParams,
     syslog::SyslogRoute,
     StreamType,
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, SYSLOG_ROUTES},
-        metrics,
-    },
-    meta::stream::StreamParams,
-};
-use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
+use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
 
 use super::StreamMeta;
 
@@ -60,7 +58,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
 
-    let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
+    let stream_name = &format_stream_name(in_stream_name);
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(

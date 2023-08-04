@@ -19,16 +19,18 @@ use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
 use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::stream::StreamParams;
-use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{IngestionResponse, StreamStatus},
+    stream::StreamParams,
+    usage::UsageType,
     StreamType,
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::usage::report_request_usage_stats;
-use crate::service::{db, ingestion::write_file, logs::StreamMeta, schema::stream_schema_exists};
+use crate::service::{
+    db, format_stream_name, ingestion::write_file, logs::StreamMeta, schema::stream_schema_exists,
+    usage::report_request_usage_stats,
+};
 
 pub async fn ingest(
     org_id: &str,
@@ -37,7 +39,7 @@ pub async fn ingest(
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
-    let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
+    let stream_name = &format_stream_name(in_stream_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));

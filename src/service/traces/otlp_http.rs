@@ -31,8 +31,8 @@ use crate::common::meta::{
 };
 use crate::common::{flatten, json};
 use crate::service::{
-    db,
-    ingestion::{format_stream_name, get_partition_key_record, write_file},
+    db, format_partition_key, format_stream_name,
+    ingestion::write_file,
     logs::get_value,
     schema::{add_stream_schema, stream_schema_exists},
     usage::report_request_usage_stats,
@@ -346,8 +346,7 @@ pub async fn traces_json(
                     if partition_keys.is_empty() {
                         let partition_key =
                             format!("service_name={}", format_stream_name(&service_name));
-                        hour_key
-                            .push_str(&format!("_{}", get_partition_key_record(&partition_key)));
+                        hour_key.push_str(&format!("_{}", format_partition_key(&partition_key)));
                     }
 
                     let hour_buf = data_buf.entry(hour_key.clone()).or_default();

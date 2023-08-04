@@ -19,22 +19,21 @@ use flate2::read::GzDecoder;
 use std::io::Read;
 
 use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::stream::StreamParams;
-use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{
         AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest, StreamStatus,
     },
+    stream::StreamParams,
+    usage::UsageType,
     StreamType,
 };
-use crate::service::{db, ingestion::write_file};
-use crate::{
-    common::{
-        flatten, json,
-        time::{parse_i64_to_timestamp_micros, parse_timestamp_micro_from_value},
-    },
-    service::usage::report_request_usage_stats,
+use crate::common::{
+    flatten, json,
+    time::{parse_i64_to_timestamp_micros, parse_timestamp_micro_from_value},
+};
+use crate::service::{
+    db, format_stream_name, ingestion::write_file, usage::report_request_usage_stats,
 };
 
 use super::StreamMeta;
@@ -46,7 +45,7 @@ pub async fn process(
     thread_id: usize,
 ) -> Result<KinesisFHIngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
-    let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
+    let stream_name = &format_stream_name(in_stream_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
