@@ -46,6 +46,8 @@
         </div>
       </q-form>
       <q-separator class="q-my-sm" />
+      <!-- {{ getUploadedFile(jsonFile,getFileResult) }} -->
+
       <q-form @submit="onSubmit">
         <div class="q-my-md">
           Import Dashboard from URL
@@ -102,10 +104,23 @@ export default defineComponent({
     const url = ref('')
     const jsonStr = ref('')
     const $q = useQuasar();
+    const getFileResult = ref()
+
+    const getUploadedFile = (fileData, promiseArray) => {
+      return fileData.map((it:any, index:number)=>{
+        return {
+          fileName: it.name,
+          status: promiseArray[index].status,
+          value: promiseArray[index].value
+        }
+      })
+
+    }
+  //  console.log("-----upload file-----",getUploadedFile(jsonFile.value ,getFileResult.value));
+   
 
     const importFile = async () => {
       console.log("===",jsonFile.value);
-      
       
       const data = jsonFile?.value?.map((it:any, index) => {
         return new Promise((resolve, reject) => {
@@ -132,72 +147,33 @@ export default defineComponent({
         })
       })
       console.log("data=", data);
-      
+
       Promise.allSettled(data)
       .then((results) => {
         console.log("results", results);
+        getFileResult.value = results
+       
         const allFulfilledValues = results
           .filter(r => r.status === 'fulfilled')
           .map(r => r.value);
+          
+       
         console.log("allFulfilledValues",allFulfilledValues);
       });
      
     }
 
     const importDashboardFromJSON = (jsonObj: any) => {
-      console.log("---", jsonObj);
+      const data = typeof jsonObj == 'string' ? JSON.parse(jsonObj) : typeof jsonObj == 'object' ? jsonObj : jsonObj
 
-      // get the dashboard
-      // const dismiss = $q.notify({
-      //   spinner: true,
-      //   message: "Please wait...",
-      //   timeout: 2000,
-      // });
+      //set owner name and creator name to import dashboard
+      data.owner = store.state.userInfo.name
+      data.created = new Date().toISOString()
 
-      // try {
-        const data = typeof jsonObj == 'string' ? JSON.parse(jsonObj) : typeof jsonObj == 'object' ? jsonObj : jsonObj
-
-        console.log("try: data", data);
-
-        //set owner name and creator name to import dashboard
-        data.owner = store.state.userInfo.name
-        data.created = new Date().toISOString()
-
-        return dashboardService.create(
-          store.state.selectedOrganization.identifier,
-          data
-        )
-        // .then((res: { data: any }) => {
-          // dismiss();
-          // $q.notify({
-          //   type: "positive",
-          //   message: `Dashboard Imported Successfully`,
-          // });
-        // })
-          // .then(() => {
-          //   return getAllDashboards(store)
-          // }).then(() => {
-          //   router.push('/dashboards')
-          // })
-          // .catch((err: any) => {
-          //   console.log(err)
-          //   $q.notify({
-          //     type: "negative",
-          //     message: err?.response?.data["error"] ? JSON.stringify(err?.response?.data["error"]) : 'Dashboard import failed',
-          //   });
-          //   dismiss();
-          // }).finally(() => {
-          //   dismiss();
-          // });
-      // } catch (error) {
-      //   console.log(error);
-
-      //   $q.notify({
-      //     type: "negative",
-      //     message: 'Invalid JSON format',
-      //   });
-      //   dismiss();
-      // }
+      return dashboardService.create(
+        store.state.selectedOrganization.identifier,
+        data
+      )
     }
     const importFromUrl = async () => {
       const dismiss = $q.notify({
@@ -236,7 +212,6 @@ export default defineComponent({
           dismiss();
         });
       } catch (error) {
-        console.log(error);
 
         $q.notify({
           type: "negative",
@@ -247,10 +222,10 @@ export default defineComponent({
     }
     const importFromJsonStr = async () => {
       const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait...",
-          timeout: 2000,
-        });
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
 
       try {
         // get the dashboard
@@ -287,6 +262,23 @@ export default defineComponent({
       }
     }
 
+    // const refreshDashboardList = async () => {
+    //   const dismiss = $q.notify({
+    //     spinner: true,
+    //     message: "Please wait...",
+    //     timeout: 2000,
+    //   });
+
+    //   dismiss();
+    //   $q.notify({
+    //     type: "positive",
+    //     message: `Dashboard Imported Successfully`,
+    //   });
+
+    //   await getAllDashboards(store)
+    //   router.push('/dashboards')
+    // }
+
     // back button to render dashboard List page
     const goBack = () => {
       jsonFile.value = ''
@@ -308,7 +300,9 @@ export default defineComponent({
       importFromUrl,
       url,
       jsonStr,
-      importFromJsonStr
+      importFromJsonStr,
+      getUploadedFile,
+      getFileResult
     }
   }
 })
