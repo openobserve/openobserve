@@ -23,20 +23,18 @@ use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 use std::io::Error;
 
-use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse, StreamType};
-use crate::common::{
-    infra::{
-        cache::stats,
-        cluster,
-        config::{CONFIG, STREAM_SCHEMAS},
-    },
-    meta::stream::StreamParams,
+use crate::common::infra::{
+    cache::stats,
+    cluster,
+    config::{CONFIG, STREAM_SCHEMAS},
+};
+use crate::common::meta::{
+    self, http::HttpResponse as MetaHttpResponse, stream::StreamParams, StreamType,
 };
 use crate::common::{json, meta::usage::UsageType};
-
-use super::{
+use crate::service::{
     compact::retention,
-    db,
+    db, format_stream_name,
     ingestion::{chk_schema_by_record, write_file},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
@@ -51,7 +49,7 @@ pub async fn save_enrichment_data(
     let start = std::time::Instant::now();
     let mut hour_key = String::new();
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    let stream_name = &crate::service::ingestion::format_stream_name(table_name);
+    let stream_name = &format_stream_name(table_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(

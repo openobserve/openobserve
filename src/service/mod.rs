@@ -37,9 +37,23 @@ pub mod triggers;
 pub mod usage;
 pub mod users;
 
-// generate partition key for query
-pub fn get_partition_key_query(s: &str) -> String {
-    let mut s = s.replace(['/', '.'], "_");
-    s.truncate(100);
-    s
+const MAX_KEY_LENGTH: usize = 100;
+
+// format partition key
+pub fn format_partition_key(input: &str) -> String {
+    let mut output = String::with_capacity(std::cmp::min(input.len(), MAX_KEY_LENGTH));
+    for c in input.chars() {
+        if output.len() > MAX_KEY_LENGTH {
+            break;
+        }
+        if c.is_alphanumeric() || c == '=' || c == '-' {
+            output.push(c);
+        }
+    }
+    output
+}
+
+// format straeam name
+pub fn format_stream_name(stream_name: &str) -> String {
+    stream_name.replace('/', "_").replace('=', "-")
 }

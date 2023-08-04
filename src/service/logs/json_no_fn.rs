@@ -26,7 +26,7 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
+use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
 
 pub async fn ingest(
     org_id: &str,
@@ -35,7 +35,7 @@ pub async fn ingest(
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
-    let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
+    let stream_name = &format_stream_name(in_stream_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
