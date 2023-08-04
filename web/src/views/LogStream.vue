@@ -77,32 +77,64 @@
       </template>
 
       <template #top="scope">
-        <div class="q-table__title" data-test="log-stream-title-text">
-          {{ t("logStream.header") }}
+        <div class="flex justify-between items-center full-width">
+          <div class="q-table__title" data-test="log-stream-title-text">
+            {{ t("logStream.header") }}
+          </div>
+          <div class="flex items-start">
+            <div class="flex justify-between items-end q-px-md">
+              <div
+                style="
+                  border: 1px solid #cacaca;
+                  padding: 4px;
+                  border-radius: 2px;
+                "
+              >
+                <template
+                  v-for="visual in streamFilterValues"
+                  :key="visual.value"
+                >
+                  <q-btn
+                    :color="
+                      visual.value === selectedStreamType ? 'primary' : ''
+                    "
+                    :flat="visual.value === selectedStreamType ? false : true"
+                    dense
+                    emit-value
+                    no-caps
+                    class="visual-selection-btn"
+                    style="height: 30px; padding: 4px 12px"
+                    @click="onChangeStreamFilter(visual.value)"
+                  >
+                    {{ visual.label }}</q-btn
+                  >
+                </template>
+              </div>
+            </div>
+            <q-input
+              v-model="filterQuery"
+              borderless
+              filled
+              dense
+              class="q-ml-auto q-mb-xs no-border"
+              :placeholder="t('logStream.search')"
+            >
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+            <q-btn
+              data-test="log-stream-refresh-stats-btn"
+              class="q-ml-md q-mb-xs text-bold no-border"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              icon="refresh"
+              :label="t(`logStream.refreshStats`)"
+              @click="getLogStream"
+            />
+          </div>
         </div>
-        <q-input
-          v-model="filterQuery"
-          borderless
-          filled
-          dense
-          class="q-ml-auto q-mb-xs no-border"
-          :placeholder="t('logStream.search')"
-        >
-          <template #prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
-        <q-btn
-          data-test="log-stream-refresh-stats-btn"
-          class="q-ml-md q-mb-xs text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          icon="refresh"
-          :label="t(`logStream.refreshStats`)"
-          @click="getLogStream"
-        />
-
         <QTablePagination
           data-test="log-stream-table-pagination"
           :scope="scope"
@@ -162,7 +194,13 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
+import {
+  defineComponent,
+  ref,
+  onActivated,
+  onBeforeMount,
+  type Ref,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -180,6 +218,7 @@ import {
 } from "../utils/zincutils";
 import config from "@/aws-exports";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -190,7 +229,7 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const router = useRouter();
-    const logStream = ref([]);
+    const logStream: Ref<any[]> = ref([]);
     const showIndexSchemaDialog = ref(false);
     const confirmDelete = ref<boolean>(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
@@ -199,6 +238,15 @@ export default defineComponent({
     const orgData: any = ref(store.state.selectedOrganization);
     const qTable: any = ref(null);
     const previousOrgIdentifier = ref("");
+    const filterQuery = ref("");
+    const duplicateStreamList = ref([]);
+    const selectedStreamType = ref("all");
+    const streamFilterValues = [
+      { label: "All", value: "all" },
+      { label: "Logs", value: "logs" },
+      { label: "Metrics", value: "metrics" },
+      { label: "Traces", value: "traces" },
+    ];
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -262,9 +310,7 @@ export default defineComponent({
     let deleteStreamType = "";
 
     onBeforeMount(() => {
-      console.log(router.currentRoute.value.name);
       if (router.currentRoute.value.name === "streamExplorer") {
-        console.log("route to stream explorer");
         router.push({
           name: "streamExplorer",
           query: {
@@ -312,6 +358,8 @@ export default defineComponent({
                 stream_type: data.stream_type,
               };
             });
+
+            duplicateStreamList.value = cloneDeep(logStream.value);
 
             logStream.value.forEach((element: any) => {
               if (element.name == router.currentRoute.value.query.dialog) {
@@ -436,6 +484,30 @@ export default defineComponent({
       });
     };
 
+    const filterData = (rows: any, terms: any) => {
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (
+          (selectedStreamType.value === rows[i]["stream_type"] ||
+            selectedStreamType.value === "all") &&
+          (rows[i]["name"].toLowerCase().includes(terms) ||
+            rows[i]["stream_type"].toLowerCase().includes(terms))
+        ) {
+          filtered.push(rows[i]);
+        }
+      }
+      return filtered;
+    };
+
+    const onChangeStreamFilter = (value: string) => {
+      selectedStreamType.value = value;
+      logStream.value = filterData(
+        cloneDeep(duplicateStreamList.value),
+        filterQuery.value.toLowerCase()
+      );
+    };
+
     return {
       t,
       qTable,
@@ -460,23 +532,14 @@ export default defineComponent({
       showIndexSchemaDialog,
       changeMaxRecordToReturn,
       outlinedDelete,
-      filterQuery: ref(""),
-      filterData(rows: any, terms: any) {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) ||
-            rows[i]["stream_type"].toLowerCase().includes(terms)
-          ) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterQuery,
+      filterData,
       getImageURL,
       verifyOrganizationStatus,
       exploreStream,
+      selectedStreamType,
+      streamFilterValues,
+      onChangeStreamFilter,
     };
   },
 });
