@@ -44,7 +44,7 @@ const billings = {
     return http().get(`/api/${org_identifier}/billings/change_payment_detail/${hosted_page_id}`);
   },
   list_invoice_history: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/billings/list_invoices`);
+    return http().get(`/api/${org_identifier}/billings/invoices`);
   },
   get_data_usage: (org_identifier: string, usage_date: string) => {
     return http().get(`/api/${org_identifier}/billings/data_usage/${usage_date}`)
