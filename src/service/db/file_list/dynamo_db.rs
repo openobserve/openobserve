@@ -20,7 +20,9 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::collections::HashMap;
 use tokio_stream::StreamExt;
 
-use crate::common::infra::{config::CONFIG, db::dynamo_db::DYNAMO_DB_CLIENT};
+use crate::common::infra::{
+    cache::file_list::parse_file_key_columns, config::CONFIG, db::dynamo_db::DYNAMO_DB_CLIENT,
+};
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     stream::PartitionTimeLevel,
@@ -29,20 +31,17 @@ use crate::common::meta::{
 use crate::service::{db, stream};
 
 pub async fn write_file(file_key: &FileKey) -> Result<(), anyhow::Error> {
-    let file_columns = file_key.key.splitn(5, '/').collect::<Vec<&str>>();
+    let (stream_key, date_key, file_name) = parse_file_key_columns(&file_key.key)?;
     match DYNAMO_DB_CLIENT
         .get()
         .await
         .put_item()
         .table_name(&CONFIG.common.dynamo_file_list_table)
+        .item("stream", AttributeValue::S(stream_key))
         .item(
-            "stream",
-            AttributeValue::S(format!(
-                "{}/{}/{}",
-                file_columns[1], file_columns[2], file_columns[3]
-            )),
+            "file",
+            AttributeValue::S(format!("{}/{}", date_key, file_name)),
         )
-        .item("file", AttributeValue::S(file_columns[4].to_owned()))
         .item("deleted", AttributeValue::Bool(file_key.deleted))
         .item(
             "min_ts",

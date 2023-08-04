@@ -28,7 +28,7 @@ const FILE_LIST_MEM_SIZE: usize = std::mem::size_of::<AHashMap<String, Vec<Strin
 const FILE_META_MEM_SIZE: usize = std::mem::size_of::<FileMeta>();
 
 pub fn set_file_to_cache(key: &str, val: FileMeta) -> Result<(), anyhow::Error> {
-    let (stream_key, date_key, file_name) = parse_key_columns(key)?;
+    let (stream_key, date_key, file_name) = parse_file_key_columns(key)?;
     let stream_filelist = FILES.entry(stream_key).or_insert_with(DashMap::default);
     let mut date_filelist = stream_filelist.entry(date_key).or_insert_with(Vec::new);
     date_filelist.push(file_name);
@@ -38,7 +38,7 @@ pub fn set_file_to_cache(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
 
 pub fn del_file_from_cache(key: &str) -> Result<(), anyhow::Error> {
     DATA.remove(key);
-    let (stream_key, date_key, file_name) = parse_key_columns(key)?;
+    let (stream_key, date_key, file_name) = parse_file_key_columns(key)?;
     let stream_filelist = match FILES.get_mut(&stream_key) {
         Some(v) => v,
         None => return Ok(()),
@@ -229,15 +229,12 @@ pub fn get_all_stream(org_id: &str, stream_type: StreamType) -> Result<Vec<Strin
     Ok(streams)
 }
 
-/// parse key to get stream_key, date_key, file_name
-fn parse_key_columns(key: &str) -> Result<(String, String, String), anyhow::Error> {
+/// parse file key to get stream_key, date_key, file_name
+pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), anyhow::Error> {
     // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.splitn(9, '/').collect::<Vec<&str>>();
     if columns.len() < 9 {
-        return Err(anyhow::anyhow!(
-            "[set_file_to_cache] Invalid file path: {}",
-            key
-        ));
+        return Err(anyhow::anyhow!("[file_list] Invalid file path: {}", key));
     }
     let _ = columns[0].to_string();
     let org_id = columns[1].to_string();
