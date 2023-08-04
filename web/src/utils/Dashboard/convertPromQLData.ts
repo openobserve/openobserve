@@ -294,7 +294,7 @@ export const convertPromQLData = (
               const values = metric.values.sort(
                 (a: any, b: any) => a[0] - b[0]
               );
-              console.log("convertPromQLData: values:", values);
+              // console.log("convertPromQLData: values:", values);
               return {
                 name: getPromqlLegendName(
                   metric.metric,
@@ -312,6 +312,43 @@ export const convertPromQLData = (
                 stackgroup: props.data.type == "area-stacked" ? "one" : "",
                 ...getPropsByChartTypeForTraces(),
               };
+              // Calculate the maximum value size from the 'y' values in the 'traces' array
+              // const maxValueSize =
+              //   props.data.type == "area-stacked"
+              //     ? traces.reduce((sum: any, it: any) => sum + Math.max(...it.y), 0)
+              //     : traces.reduce(
+              //         (max: any, it: any) => Math.max(max, Math.max(...it.y)),
+              //         0
+              //       );
+
+              // // Calculate the minimum value size from the 'y' values in the 'traces' array
+              // const minValueSize = traces.reduce(
+              //   (min: any, it: any) => Math.min(min, Math.min(...it.y)),
+              //   Infinity
+              // );
+
+              // // Initialize empty arrays to hold tick values and tick text
+              // let yTickVals = [];
+              // let yTickText = [];
+
+              // // Calculate the interval size for 5 equally spaced ticks
+              // let intervalSize = (maxValueSize - minValueSize) / 4;
+
+              // // If the data doesn't vary much, use a percentage of the max value as the interval size
+              // if (intervalSize === 0) {
+              //   intervalSize = maxValueSize * 0.2;
+              // }
+
+              // // Generate tick values and tick text for the y-axis
+              // for (let i = 0; i <= 4; i++) {
+              //   let val = minValueSize + intervalSize * i;
+              //   yTickVals.push(minValueSize + intervalSize * i);
+              //   yTickText.push(formatUnitValue(getUnitValue(val)));
+              // }
+              // // result = result.map((it: any) => moment(it + "Z").toISOString(true))
+              // const yAxisTickOptions = !props.data.config?.unit
+              //   ? {}
+              //   : { tickvals: yTickVals, ticktext: yTickText };
             });
             return traces;
           }
@@ -431,43 +468,6 @@ export const convertPromQLData = (
       // }
     }
   });
-  // Calculate the maximum value size from the 'y' values in the 'traces' array
-  // const maxValueSize =
-  //   props.data.type == "area-stacked"
-  //     ? traces.reduce((sum: any, it: any) => sum + Math.max(...it.y), 0)
-  //     : traces.reduce(
-  //         (max: any, it: any) => Math.max(max, Math.max(...it.y)),
-  //         0
-  //       );
-
-  // // Calculate the minimum value size from the 'y' values in the 'traces' array
-  // const minValueSize = traces.reduce(
-  //   (min: any, it: any) => Math.min(min, Math.min(...it.y)),
-  //   Infinity
-  // );
-
-  // // Initialize empty arrays to hold tick values and tick text
-  // let yTickVals = [];
-  // let yTickText = [];
-
-  // // Calculate the interval size for 5 equally spaced ticks
-  // let intervalSize = (maxValueSize - minValueSize) / 4;
-
-  // // If the data doesn't vary much, use a percentage of the max value as the interval size
-  // if (intervalSize === 0) {
-  //   intervalSize = maxValueSize * 0.2;
-  // }
-
-  // // Generate tick values and tick text for the y-axis
-  // for (let i = 0; i <= 4; i++) {
-  //   let val = minValueSize + intervalSize * i;
-  //   yTickVals.push(minValueSize + intervalSize * i);
-  //   yTickText.push(formatUnitValue(getUnitValue(val)));
-  // }
-  // // result = result.map((it: any) => moment(it + "Z").toISOString(true))
-  // const yAxisTickOptions = !props.data.config?.unit
-  //   ? {}
-  //   : { tickvals: yTickVals, ticktext: yTickText };
 
   const layout: any = {
     title: false,
