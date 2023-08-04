@@ -24,7 +24,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
     // should run it every 10 minutes
     let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.limit.calculate_stats_interval * 60,
+        CONFIG.limit.calculate_stats_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {
