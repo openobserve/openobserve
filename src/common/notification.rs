@@ -145,6 +145,7 @@ mod tests {
                 size: 0,
                 start_time: 0,
                 end_time: 0,
+                sort_by: None,
                 sql_mode: "full".to_string(),
                 query_type: "logs".to_string(),
                 track_total_hits: false,

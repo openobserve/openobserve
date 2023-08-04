@@ -76,6 +76,8 @@ pub struct Query {
     #[serde(default)]
     pub end_time: i64,
     #[serde(default)]
+    pub sort_by: Option<String>,
+    #[serde(default)]
     pub sql_mode: String,
     #[serde(default)]
     pub query_type: String,
@@ -101,6 +103,7 @@ impl Default for Query {
             size: 10,
             start_time: 0,
             end_time: 0,
+            sort_by: None,
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
