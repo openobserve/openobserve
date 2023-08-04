@@ -40,7 +40,7 @@ use crate::common::{
     json::{Map, Value},
     notification::send_notification,
 };
-use crate::service::{db, stream::stream_settings, triggers};
+use crate::service::{db, format_partition_key, stream::stream_settings, triggers};
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
@@ -174,7 +174,7 @@ pub fn get_hour_key(
                 } else {
                     format!("{}={}", key, v)
                 };
-                hour_key.push_str(&format!("_{}", get_partition_key_record(&val)));
+                hour_key.push_str(&format!("_{}", format_partition_key(&val)));
             }
             None => continue,
         };
@@ -214,22 +214,12 @@ pub fn get_wal_time_key(
                 } else {
                     format!("{}={}", key, v)
                 };
-                time_key.push_str(&format!("_{}", get_partition_key_record(&val)));
+                time_key.push_str(&format!("_{}", format_partition_key(&val)));
             }
             None => continue,
         };
     }
     time_key
-}
-
-// generate partition key for record
-pub fn get_partition_key_record(s: &str) -> String {
-    let s = s.replace(['/', '_'], ".");
-    if s.len() > 100 {
-        s[0..100].to_string()
-    } else {
-        s
-    }
 }
 
 pub async fn send_ingest_notification(trigger: Trigger, alert: Alert) {
@@ -292,10 +282,6 @@ pub fn apply_stream_transform<'a>(
         }
     }
     flatten::flatten(&value)
-}
-
-pub fn format_stream_name(stream_name: &str) -> String {
-    stream_name.replace('/', "_").replace('=', "-")
 }
 
 pub async fn chk_schema_by_record(
@@ -434,11 +420,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_partition_key_record() {
-        assert_eq!(
-            get_partition_key_record("default/olympics"),
-            "default.olympics"
-        );
+    fn test_format_partition_key() {
+        assert_eq!(format_partition_key("default/olympics"), "default.olympics");
     }
     #[test]
     fn test_get_hour_key() {
