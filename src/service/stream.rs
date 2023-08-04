@@ -14,10 +14,13 @@
 
 use actix_web::{http, http::StatusCode, HttpResponse};
 use datafusion::arrow::datatypes::Schema;
+use std::collections::HashMap;
 use std::io::Error;
 
 use crate::common::infra::config::CONFIG;
 use crate::common::infra::{cache::stats, config::STREAM_SCHEMAS};
+use crate::common::meta;
+use crate::common::meta::usage::Stats;
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
     prom,
@@ -25,15 +28,13 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS, utils::is_local_disk_storage};
-use crate::service::db;
+use crate::service::{db, search as SearchService};
 
 use super::metrics::get_prom_metadata_from_schema;
 
-const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
 
-#[tracing::instrument]
 pub async fn get_stream(
     org_id: &str,
     stream_name: &str,
@@ -42,7 +43,16 @@ pub async fn get_stream(
     let schema = db::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap();
-    let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
+    let in_stats = get_stream_stats(org_id, Some(stream_type), Some(stream_name.to_string()))
+        .await
+        .unwrap_or_default();
+    let mut stats = match in_stats.is_empty() {
+        true => StreamStats::default(),
+        false => *in_stats
+            .get(format!("{}/{}", stream_name, stream_type).as_str())
+            .unwrap(),
+    };
+
     stats = transform_stats(&mut stats);
     if schema != Schema::empty() {
         let stream = stream_res(stream_name, stream_type, schema, Some(stats));
@@ -64,12 +74,16 @@ pub async fn get_streams(
         .await
         .unwrap();
     let mut indices_res = Vec::with_capacity(indices.len());
+
+    // get all steam stats
+    let all_stats = get_stream_stats(org_id, stream_type, None)
+        .await
+        .unwrap_or_default();
+
     for stream_loc in indices {
-        let mut stats = stats::get_stream_stats(
-            org_id,
-            stream_loc.stream_name.as_str(),
-            stream_loc.stream_type,
-        );
+        let mut stats = *all_stats
+            .get(format!("{}/{}", stream_loc.stream_name, stream_loc.stream_type).as_str())
+            .unwrap_or(&StreamStats::default());
         if stats.eq(&StreamStats::default()) {
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
@@ -274,8 +288,6 @@ pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, any
 }
 
 fn transform_stats(stats: &mut StreamStats) -> StreamStats {
-    stats.storage_size /= SIZE_IN_MB;
-    stats.compressed_size /= SIZE_IN_MB;
     stats.storage_size = (stats.storage_size * 100.0).round() / 100.0;
     stats.compressed_size = (stats.compressed_size * 100.0).round() / 100.0;
     *stats
@@ -311,6 +323,59 @@ pub fn unwrap_partition_time_level(
                 PartitionTimeLevel::default()
             }
         }
+    }
+}
+
+async fn get_stream_stats(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<String>,
+) -> Result<HashMap<String, StreamStats>, anyhow::Error> {
+    let mut sql = if CONFIG.common.usage_report_compressed_size {
+        format!("select min(min_ts) as min_ts  , max(max_ts) as max_ts , max(compressed_size) as compressed_size , max(original_size) as original_size , max(records) as records ,stream_name , org_id , stream_type from  \"stats\" where org_id='{org_id}' ")
+    } else {
+        format!("select min(min_ts) as min_ts  , max(max_ts) as max_ts , max(original_size) as original_size , max(records) as records ,stream_name , org_id , stream_type from  \"stats\" where org_id='{org_id}'")
+    };
+
+    sql = match stream_type {
+        Some(stream_type) => {
+            format!("{sql } and stream_type='{stream_type}' ")
+        }
+        None => sql,
+    };
+
+    sql = match stream_name {
+        Some(stream_name) => format!("{sql} and stream_name='{stream_name}' "),
+        None => sql,
+    };
+
+    // group by stream_name , org_id , stream_type
+
+    let query = meta::search::Query {
+        sql: format!("{sql} group by stream_name , org_id , stream_type"),
+        sql_mode: "full".to_owned(),
+        size: 100000000,
+        ..Default::default()
+    };
+
+    let req: meta::search::Request = meta::search::Request {
+        query,
+        aggs: HashMap::new(),
+        encoding: meta::search::RequestEncoding::Empty,
+    };
+    match SearchService::search(&CONFIG.common.usage_org, meta::StreamType::Logs, &req).await {
+        Ok(res) => {
+            let mut all_stats = HashMap::new();
+            for item in res.hits {
+                let stats: Stats = json::from_value(item).unwrap();
+                all_stats.insert(
+                    format!("{}/{}", stats.stream_name, stats.stream_type),
+                    stats.into(),
+                );
+            }
+            Ok(all_stats)
+        }
+        Err(err) => Err(err.into()),
     }
 }
 
