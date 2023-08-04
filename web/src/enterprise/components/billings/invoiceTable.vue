@@ -153,6 +153,7 @@ export default defineComponent({
         store.state.selectedOrganization.identifier
       )
         .then((res) => {
+          dismiss();
           const invoiceList = res.data.data;
           if (invoiceList.length > 0) {
             resultTotal.value = invoiceList.length;
@@ -172,9 +173,9 @@ export default defineComponent({
               };
             });
           }
-          dismiss();
         })
         .catch((e) => {
+          dismiss();
           $q.notify({
             type: "negative",
             message: e.message,
