@@ -280,7 +280,6 @@ export const convertPromQLData = (
   const traces = searchQueryData.data.map((it: any, index: number) => {
     console.log("inside convertPromQLData");
     console.log("convertPromQLData: it", it);
-    console.log("convertPromQLData: traces", JSON.stringify(traces));
 
     switch (props.data.type) {
       case "bar":
@@ -288,6 +287,7 @@ export const convertPromQLData = (
       case "area":
       case "scatter":
       case "area-stacked": {
+        console.log("convertPromQLData: itt", it);
         switch (it.resultType) {
           case "matrix": {
             const traces = it?.result?.map((metric: any) => {
@@ -313,84 +313,7 @@ export const convertPromQLData = (
                 ...getPropsByChartTypeForTraces(),
               };
             });
-            // Calculate the maximum value size from the 'y' values in the 'traces' array
-            const maxValueSize =
-              props.data.type == "area-stacked"
-                ? traces.reduce(
-                    (sum: any, it: any) => sum + Math.max(...it.y),
-                    0
-                  )
-                : traces.reduce(
-                    (max: any, it: any) => Math.max(max, Math.max(...it.y)),
-                    0
-                  );
-
-            // Calculate the minimum value size from the 'y' values in the 'traces' array
-            const minValueSize = traces.reduce(
-              (min: any, it: any) => Math.min(min, Math.min(...it.y)),
-              Infinity
-            );
-
-            // Initialize empty arrays to hold tick values and tick text
-            let yTickVals = [];
-            let yTickText = [];
-
-            // Calculate the interval size for 5 equally spaced ticks
-            let intervalSize = (maxValueSize - minValueSize) / 4;
-
-            // If the data doesn't vary much, use a percentage of the max value as the interval size
-            if (intervalSize === 0) {
-              intervalSize = maxValueSize * 0.2;
-            }
-
-            // Generate tick values and tick text for the y-axis
-            for (let i = 0; i <= 4; i++) {
-              let val = minValueSize + intervalSize * i;
-              yTickVals.push(minValueSize + intervalSize * i);
-              yTickText.push(formatUnitValue(getUnitValue(val)));
-            }
-            // result = result.map((it: any) => moment(it + "Z").toISOString(true))
-            const yAxisTickOptions = !props.data.config?.unit
-              ? {}
-              : { tickvals: yTickVals, ticktext: yTickText };
-
-            const layout: any = {
-              title: false,
-              showlegend: props.data.config?.show_legends,
-              autosize: true,
-              legend: {
-                // bgcolor: "#f7f7f7",
-                orientation: getLegendPosition("promql"),
-                itemclick: false,
-              },
-              margin: {
-                autoexpand: true,
-                r: 50,
-                b: 50,
-                t: 30,
-              },
-              yaxis: {
-                automargin: true,
-                autorange: true,
-                ...yAxisTickOptions,
-              },
-              ...getPropsByChartTypeForLayoutForPromQL(),
-              ...getThemeLayoutOptions(store),
-            };
-            console.log("traces:", traces);
-            console.log("maxValueSize:", maxValueSize);
-            console.log("minValueSize:", minValueSize);
-            console.log("yTickVals:", yTickVals);
-            console.log("yTickText:", yTickText);
-            console.log("layout:", layout);
-            console.log("traces:", traces);
-
-            // let data = { traces: traces.flat(), layout };
-
-            // data = QueryMiddleWare(data);
-
-            // return data;
-            return { traces: traces.flat(), layout };
+            return traces;
           }
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
@@ -405,106 +328,176 @@ export const convertPromQLData = (
                 y: values.map((value: any) => value[1]),
               };
             });
-            const layout: any = {
-              title: false,
-              showlegend: props.data.config?.show_legends,
-              autosize: true,
-              legend: {
-                // bgcolor: "#f7f7f7",
-                orientation: getLegendPosition("promql"),
-                itemclick: false,
-              },
-              margin: {
-                l: props.data.type == "pie" ? 60 : 32,
-                r: props.data.type == "pie" ? 60 : 16,
-                t: 38,
-                b: 32,
-              },
-              ...getThemeLayoutOptions(store),
-            };
-            return { traces: traces.flat(), layout };
-            break;
+            // const layout: any = {
+            //   title: false,
+            //   showlegend: props.data.config?.show_legends,
+            //   autosize: true,
+            //   legend: {
+            //     // bgcolor: "#f7f7f7",
+            //     orientation: getLegendPosition("promql"),
+            //     itemclick: false,
+            //   },
+            //   margin: {
+            //     l: props.data.type == "pie" ? 60 : 32,
+            //     r: props.data.type == "pie" ? 60 : 16,
+            //     t: 38,
+            //     b: 32,
+            //   },
+            //   ...getThemeLayoutOptions(store),
+            // };
+            // return { layout };
+            // break;
           }
         }
       }
-      case "metric": {
-        switch (it.resultType) {
-          case "matrix": {
-            const traces = it?.result?.map((metric: any) => {
-              const values = metric.values.sort(
-                (a: any, b: any) => a[0] - b[0]
-              );
-              const unitValue = getUnitValue(values[values.length - 1][1]);
+      // case "metric": {
+      //   switch (it.resultType) {
+      //     case "matrix": {
+      //       const traces = it?.result?.map((metric: any) => {
+      //         const values = metric.values.sort(
+      //           (a: any, b: any) => a[0] - b[0]
+      //         );
+      //         const unitValue = getUnitValue(values[values.length - 1][1]);
 
-              return {
-                value: unitValue.value,
-                number: { suffix: unitValue.unit, valueformat: ".2f" },
-                ...getPropsByChartTypeForTraces(),
-              };
-            });
+      //         return {
+      //           value: unitValue.value,
+      //           number: { suffix: unitValue.unit, valueformat: ".2f" },
+      //           ...getPropsByChartTypeForTraces(),
+      //         };
+      //       });
+      //       return  traces ;
 
-            // result = result.map((it: any) => moment(it + "Z").toISOString(true))
+      //       // result = result.map((it: any) => moment(it + "Z").toISOString(true))
 
-            const layout: any = {
-              title: false,
-              showlegend: props.data.config?.show_legends,
-              autosize: true,
-              legend: {
-                // bgcolor: "#f7f7f7",
-                orientation: getLegendPosition("promql"),
-                itemclick: false,
-              },
-              margin: {
-                autoexpand: true,
-                l: 10,
-                r: 10,
-                t: 0,
-                b: 0,
-              },
-              ...getPropsByChartTypeForLayoutForPromQL(),
-              ...getThemeLayoutOptions(store),
-            };
-            break;
-          }
-          case "vector": {
-            const traces = it?.result?.map((metric: any) => {
-              const values = [metric.value];
+      //       const layout: any = {
+      //         title: false,
+      //         showlegend: props.data.config?.show_legends,
+      //         autosize: true,
+      //         legend: {
+      //           // bgcolor: "#f7f7f7",
+      //           orientation: getLegendPosition("promql"),
+      //           itemclick: false,
+      //         },
+      //         margin: {
+      //           autoexpand: true,
+      //           l: 10,
+      //           r: 10,
+      //           t: 0,
+      //           b: 0,
+      //         },
+      //         ...getPropsByChartTypeForLayoutForPromQL(),
+      //         ...getThemeLayoutOptions(store),
+      //       };
+      //       break;
+      //     }
+      //     case "vector": {
+      //       const traces = it?.result?.map((metric: any) => {
+      //         const values = [metric.value];
 
-              // console.log('vector',values);
+      //         // console.log('vector',values);
 
-              return {
-                name: JSON.stringify(metric.metric),
-                value: metric?.value?.length > 1 ? metric.value[1] : "",
-                ...getPropsByChartTypeForTraces(),
-              };
-            });
+      //         return {
+      //           name: JSON.stringify(metric.metric),
+      //           value: metric?.value?.length > 1 ? metric.value[1] : "",
+      //           ...getPropsByChartTypeForTraces(),
+      //         };
+      //       });
 
-            const layout: any = {
-              title: false,
-              showlegend: props.data.config?.show_legends,
-              autosize: true,
-              legend: {
-                // bgcolor: "#f7f7f7",
-                orientation: getLegendPosition("promql"),
-                itemclick: false,
-              },
-              margin: {
-                l: props.data.type == "pie" ? 60 : 32,
-                r: props.data.type == "pie" ? 60 : 16,
-                t: 38,
-                b: 32,
-              },
-              ...getPropsByChartTypeForLayoutForPromQL(),
-              ...getThemeLayoutOptions(store),
-            };
-            break;
-          }
-        }
-        break;
-      }
-      default: {
-        return [];
-      }
+      //       const layout: any = {
+      //         title: false,
+      //         showlegend: props.data.config?.show_legends,
+      //         autosize: true,
+      //         legend: {
+      //           // bgcolor: "#f7f7f7",
+      //           orientation: getLegendPosition("promql"),
+      //           itemclick: false,
+      //         },
+      //         margin: {
+      //           l: props.data.type == "pie" ? 60 : 32,
+      //           r: props.data.type == "pie" ? 60 : 16,
+      //           t: 38,
+      //           b: 32,
+      //         },
+      //         ...getPropsByChartTypeForLayoutForPromQL(),
+      //         ...getThemeLayoutOptions(store),
+      //       };
+      //       break;
+      //     }
+      //   }
+      //   break;
+      // }
+      // default: {
+      //   return [];
+      // }
     }
   });
+  // Calculate the maximum value size from the 'y' values in the 'traces' array
+  // const maxValueSize =
+  //   props.data.type == "area-stacked"
+  //     ? traces.reduce((sum: any, it: any) => sum + Math.max(...it.y), 0)
+  //     : traces.reduce(
+  //         (max: any, it: any) => Math.max(max, Math.max(...it.y)),
+  //         0
+  //       );
+
+  // // Calculate the minimum value size from the 'y' values in the 'traces' array
+  // const minValueSize = traces.reduce(
+  //   (min: any, it: any) => Math.min(min, Math.min(...it.y)),
+  //   Infinity
+  // );
+
+  // // Initialize empty arrays to hold tick values and tick text
+  // let yTickVals = [];
+  // let yTickText = [];
+
+  // // Calculate the interval size for 5 equally spaced ticks
+  // let intervalSize = (maxValueSize - minValueSize) / 4;
+
+  // // If the data doesn't vary much, use a percentage of the max value as the interval size
+  // if (intervalSize === 0) {
+  //   intervalSize = maxValueSize * 0.2;
+  // }
+
+  // // Generate tick values and tick text for the y-axis
+  // for (let i = 0; i <= 4; i++) {
+  //   let val = minValueSize + intervalSize * i;
+  //   yTickVals.push(minValueSize + intervalSize * i);
+  //   yTickText.push(formatUnitValue(getUnitValue(val)));
+  // }
+  // // result = result.map((it: any) => moment(it + "Z").toISOString(true))
+  // const yAxisTickOptions = !props.data.config?.unit
+  //   ? {}
+  //   : { tickvals: yTickVals, ticktext: yTickText };
+
+  const layout: any = {
+    title: false,
+    showlegend: props.data.config?.show_legends,
+    autosize: true,
+    legend: {
+      // bgcolor: "#f7f7f7",
+      orientation: getLegendPosition("promql"),
+      itemclick: false,
+    },
+    margin: {
+      autoexpand: true,
+      r: 50,
+      b: 50,
+      t: 30,
+    },
+    yaxis: {
+      automargin: true,
+      autorange: true,
+      // ...yAxisTickOptions,
+    },
+    ...getPropsByChartTypeForLayoutForPromQL(),
+    ...getThemeLayoutOptions(store),
+  };
+  // console.log("maxValueSize:", maxValueSize);
+  // console.log("minValueSize:", minValueSize);
+  // console.log("yTickVals:", yTickVals);
+  // console.log("yTickText:", yTickText);
+  console.log("layout:", layout);
+  console.log("traces:", traces);
+
+  return { traces: traces.flat(), layout };
 }
