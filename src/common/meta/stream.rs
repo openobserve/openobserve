@@ -21,6 +21,8 @@ use utoipa::ToSchema;
 
 use crate::common::{infra::config::CONFIG, json, meta::StreamType};
 
+use super::usage::Stats;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
     pub name: String,
@@ -101,6 +103,20 @@ impl From<StreamStats> for Vec<u8> {
 impl From<StreamStats> for String {
     fn from(data: StreamStats) -> Self {
         json::to_string(&data).unwrap()
+    }
+}
+
+impl From<Stats> for StreamStats {
+    fn from(meta: Stats) -> StreamStats {
+        StreamStats {
+            created_at: 0,
+            doc_time_min: meta.min_ts,
+            doc_time_max: meta.max_ts,
+            doc_num: meta.records as u64,
+            file_num: 0,
+            storage_size: meta.original_size,
+            compressed_size: meta.compressed_size.unwrap_or_default(),
+        }
     }
 }
 

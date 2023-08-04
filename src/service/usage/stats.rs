@@ -96,6 +96,14 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             }
         }
     }
+    // set cache expiry
+    /*  let expiry_ts = chrono::Utc::now()
+        + chrono::Duration::minutes(
+            (CONFIG.limit.calculate_stats_interval - 2)
+                .try_into()
+                .unwrap(),
+        );
+    set_cache_expiry(expiry_ts.timestamp_micros()).await; */
     Ok(())
 }
 
@@ -233,6 +241,13 @@ pub async fn set_last_stats_offset(
     };
     let key = format!("/stats/last_updated/org/{org_id}");
     db.put(&key, val.into()).await?;
+    Ok(())
+}
+
+pub async fn _set_cache_expiry(offset: i64) -> Result<(), anyhow::Error> {
+    let db = &crate::common::infra::db::DEFAULT;
+    let key = format!("/stats/cache_expiry");
+    db.put(&key, offset.to_string().into()).await?;
     Ok(())
 }
 
