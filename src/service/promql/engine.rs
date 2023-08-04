@@ -249,6 +249,7 @@ impl Engine {
         }
 
         let metrics_name = selector.name.as_ref().expect("Missing selector name");
+
         let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
         if !cache_exists {
             self.selector_load_data(&selector, None).await?;
