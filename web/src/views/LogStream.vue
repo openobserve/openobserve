@@ -239,7 +239,7 @@ export default defineComponent({
     const qTable: any = ref(null);
     const previousOrgIdentifier = ref("");
     const filterQuery = ref("");
-    const duplicateStreamList = ref([]);
+    const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("all");
     const streamFilterValues = [
       { label: "All", value: "all" },
