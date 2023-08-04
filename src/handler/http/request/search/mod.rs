@@ -313,7 +313,7 @@ pub async fn around(
             sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
-            start_time: around_key - Duration::seconds(300).num_microseconds().unwrap(),
+            start_time: around_key - Duration::seconds(900).num_microseconds().unwrap(),
             end_time: around_key,
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
@@ -362,11 +362,14 @@ pub async fn around(
     // search backward
     let req = meta::search::Request {
         query: meta::search::Query {
-            sql: around_sql.clone(),
+            sql: around_sql.clone().replace(
+                &format!(" ORDER BY {} DESC", CONFIG.common.column_timestamp),
+                &format!(" ORDER BY {} ASC", CONFIG.common.column_timestamp),
+            ),
             from: 0,
             size: around_size / 2,
             start_time: around_key,
-            end_time: around_key + Duration::seconds(300).num_microseconds().unwrap(),
+            end_time: around_key + Duration::seconds(900).num_microseconds().unwrap(),
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,

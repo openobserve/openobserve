@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{TimeZone, Utc};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use crate::common::infra::{config::CONFIG, wal};
+use crate::common::infra::{cache::file_list::parse_file_key_columns, config::CONFIG, wal};
 use crate::common::meta::stream::StreamParams;
 use crate::common::meta::{
     common::{FileKey, FileMeta},
@@ -25,6 +24,7 @@ use crate::common::meta::{
 use crate::common::{file::scan_files, json};
 
 pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {
+    let (_stream_key, date_key, _file_name) = parse_file_key_columns(key)?;
     let file_data = FileKey {
         key: key.to_string(),
         meta,
@@ -34,7 +34,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     // dynamodb mode
     if CONFIG.common.use_dynamo_meta_store {
         // retry 5 times
-        for _ in 0..10 {
+        for _ in 0..5 {
             if let Err(e) = super::dynamo_db::write_file(&file_data).await {
                 log::error!("[FILE_LIST] Error saving file to dynamo, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
@@ -48,20 +48,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     // local mode
     let mut write_buf = json::to_vec(&file_data)?;
     write_buf.push(b'\n');
-    let hour_key = if meta.min_ts > 0 {
-        Utc.timestamp_nanos(meta.min_ts * 1000)
-            .format("%Y_%m_%d_%H")
-            .to_string()
-    } else {
-        let columns = key.split('/').collect::<Vec<&str>>();
-        if columns[0] != "files" || columns.len() < 9 {
-            return Ok(());
-        }
-        format!(
-            "{}_{}_{}_{}",
-            columns[4], columns[5], columns[6], columns[7]
-        )
-    };
+    let hour_key = date_key.replace('/', "_");
     let file = wal::get_or_create(
         0,
         StreamParams {
