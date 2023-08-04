@@ -73,7 +73,7 @@ pub async fn report_request_usage_stats(
         });
     };
 
-    if !CONFIG.common.report_compressed_size || event != UsageEvent::Ingestion {
+    if !CONFIG.common.usage_report_compressed_size || event != UsageEvent::Ingestion {
         usage.push(UsageData {
             event,
             day: now.day(),
@@ -142,57 +142,59 @@ pub async fn report_compression_stats(
 pub async fn publish_usage(mut usage: Vec<UsageData>) {
     let mut usages = USAGE_DATA.write().await;
     usages.append(&mut usage);
+    if usages.len() < CONFIG.common.usage_batch_size {
+        return;
+    }
 
-    if usages.len() >= CONFIG.common.usage_batch_size {
-        let mut curr_usage = std::mem::take(&mut *usages);
+    let curr_usages = std::mem::take(&mut *usages);
+    // release the write lock
+    drop(usages);
 
-        let mut groups: AHashMap<GroupKey, AggregatedData> = AHashMap::new();
-
-        for usage_data in &curr_usage {
-            let key = GroupKey {
-                stream_name: usage_data.stream_name.clone(),
-                org_id: usage_data.org_id.clone(),
-                stream_type: usage_data.stream_type,
-                day: usage_data.day,
-                hour: usage_data.hour,
-                event: usage_data.event,
-            };
-
-            let is_new = groups.contains_key(&key);
-
-            let entry = groups.entry(key).or_insert_with(|| AggregatedData {
-                count: 1,
-                usage_data: usage_data.clone(),
-            });
-            if !is_new {
-                continue;
-            } else {
-                entry.usage_data.num_records += usage_data.num_records;
-                entry.usage_data.size += usage_data.size;
-                entry.usage_data.response_time += usage_data.response_time;
-                entry.count += 1;
-            }
-        }
-
-        let mut report_data = vec![];
-        for (_, data) in groups {
-            let mut usage_data = data.usage_data;
-            usage_data.response_time /= data.count as f64;
-            report_data.push(json::to_value(usage_data).unwrap());
-        }
-
-        let req = crate::handler::grpc::cluster_rpc::UsageRequest {
-            usage_list: Some(UsageDataList::from(report_data)),
-            stream_name: USAGE_STREAM.to_owned(),
+    let mut groups: AHashMap<GroupKey, AggregatedData> = AHashMap::new();
+    for usage_data in &curr_usages {
+        let key = GroupKey {
+            stream_name: usage_data.stream_name.clone(),
+            org_id: usage_data.org_id.clone(),
+            stream_type: usage_data.stream_type,
+            day: usage_data.day,
+            hour: usage_data.hour,
+            event: usage_data.event,
         };
 
-        match ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
-            Ok(_) => {}
-            Err(err) => {
-                log::error!("Error in ingesting usage data {:?}", err);
-                // on error in ingesting usage data, push back the data
-                usages.append(&mut curr_usage);
-            }
+        let is_new = groups.contains_key(&key);
+
+        let entry = groups.entry(key).or_insert_with(|| AggregatedData {
+            count: 1,
+            usage_data: usage_data.clone(),
+        });
+        if !is_new {
+            continue;
+        } else {
+            entry.usage_data.num_records += usage_data.num_records;
+            entry.usage_data.size += usage_data.size;
+            entry.usage_data.response_time += usage_data.response_time;
+            entry.count += 1;
         }
+    }
+
+    let mut report_data = vec![];
+    for (_, data) in groups {
+        let mut usage_data = data.usage_data;
+        usage_data.response_time /= data.count as f64;
+        report_data.push(json::to_value(usage_data).unwrap());
+    }
+
+    // report usage data
+    let req = crate::handler::grpc::cluster_rpc::UsageRequest {
+        usage_list: Some(UsageDataList::from(report_data)),
+        stream_name: USAGE_STREAM.to_owned(),
+    };
+    if let Err(e) = ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+        log::error!("Error in ingesting usage data {:?}", e);
+        // on error in ingesting usage data, push back the data
+        let mut usages = USAGE_DATA.write().await;
+        let mut curr_usages = curr_usages.clone();
+        usages.append(&mut curr_usages);
+        drop(usages);
     }
 }
