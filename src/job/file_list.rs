@@ -16,13 +16,17 @@ use std::{fs, path::Path};
 use tokio::time;
 
 use crate::common::file::scan_files;
-use crate::common::infra::cluster;
-use crate::common::infra::config::CONFIG;
-use crate::common::infra::storage;
-use crate::common::infra::wal;
+use crate::common::infra::{cluster, config::CONFIG, storage, wal};
 use crate::common::meta::StreamType;
+use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
+    tokio::task::spawn(async move { run_move_file_to_s3().await });
+    tokio::task::spawn(async move { run_sync_s3_to_cache().await });
+    Ok(())
+}
+
+pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(()); // not an ingester, no need to init job
     }
@@ -122,6 +126,23 @@ async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error
         Err(err) => {
             log::error!("[JOB] File_list upload error: {:?}", err);
             Err(anyhow::anyhow!(err))
+        }
+    }
+}
+
+async fn run_sync_s3_to_cache() -> Result<(), anyhow::Error> {
+    if !cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
+        && !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
+    {
+        return Ok(()); // only querier or compactor need to sync
+    }
+
+    let mut interval = time::interval(time::Duration::from_secs(CONFIG.s3.sync_to_cache_interval));
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        if let Err(e) = db::file_list::remote::cache_latest_hour().await {
+            log::error!("[JOB] File_list sync s3 to cache error: {}", e);
         }
     }
 }

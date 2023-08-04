@@ -3,18 +3,19 @@ use reqwest::Client;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::common::infra::cluster::{get_node_by_uuid, LOCAL_NODE_UUID};
-use crate::common::infra::dist_lock;
-use crate::common::json;
-use crate::common::meta::usage::Stats;
-use crate::common::meta::usage::{UsageEvent, STATS_STREAM, USAGE_STREAM};
-use crate::common::{
-    infra::config::CONFIG,
-    meta::{self, search::Request},
+use crate::common::infra::{
+    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+    config::CONFIG,
+    dist_lock,
 };
-use crate::handler::grpc::cluster_rpc::UsageDataList;
-use crate::service::db;
-use crate::service::search as SearchService;
+use crate::common::json;
+use crate::common::meta::{
+    self,
+    search::Request,
+    usage::{Stats, UsageEvent, STATS_STREAM, USAGE_STREAM},
+};
+use crate::handler::grpc::cluster_rpc;
+use crate::service::{db, search as SearchService};
 
 use super::ingestion_service;
 
@@ -45,7 +46,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         drop(locker);
         let current_ts = chrono::Utc::now().timestamp_micros();
 
-        let sql = if CONFIG.common.report_compressed_size {
+        let sql = if CONFIG.common.usage_report_compressed_size {
             format!("SELECT sum(num_records) as records ,sum(size) as original_size, org_id , stream_type  ,stream_name ,min(min_ts) as min_ts , max(max_ts) as max_ts, sum(compressed_size) as compressed_size  FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' and org_id = \'{}\' group by  org_id , stream_type ,stream_name",UsageEvent::Ingestion, org_id)
         } else {
             format!("SELECT sum(num_records) as records ,sum(size) as original_size, org_id , stream_type  ,stream_name FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' and org_id = \'{}\' group by  org_id , stream_type ,stream_name",UsageEvent::Ingestion, org_id)
@@ -102,7 +103,7 @@ async fn get_last_stats(
     org_id: &str,
     stats_ts: i64,
 ) -> std::result::Result<Vec<json::Value>, anyhow::Error> {
-    let sql = if CONFIG.common.report_compressed_size {
+    let sql = if CONFIG.common.usage_report_compressed_size {
         format!("SELECT records ,original_size, org_id , stream_type ,stream_name ,min_ts , max_ts, compressed_size FROM \"{STATS_STREAM}\" where _timestamp ={stats_ts} and org_id = \'{org_id}\'")
     } else {
         format!("SELECT records ,original_size, org_id , stream_type ,stream_name ,min_ts , max_ts FROM \"{STATS_STREAM}\" where _timestamp ={stats_ts} and org_id = \'{org_id}\'")
@@ -145,7 +146,7 @@ async fn report_stats(
                 value.original_size += existing_value.original_size;
                 value._timestamp = curr_ts;
 
-                if !CONFIG.common.report_compressed_size {
+                if !CONFIG.common.usage_report_compressed_size {
                     if value.min_ts == 0 && existing_value.min_ts != 0 {
                         value.min_ts = existing_value.min_ts;
                     } else {
@@ -191,9 +192,9 @@ async fn report_stats(
         .map(|s| serde_json::to_value(s).unwrap())
         .collect();
 
-    let req = crate::handler::grpc::cluster_rpc::UsageRequest {
-        usage_list: Some(UsageDataList::from(report_data)),
+    let req = cluster_rpc::UsageRequest {
         stream_name: STATS_STREAM.to_owned(),
+        data: Some(cluster_rpc::UsageData::from(report_data)),
     };
 
     match ingestion_service::ingest(&CONFIG.common.usage_org, req).await {

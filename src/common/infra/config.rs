@@ -39,9 +39,14 @@ pub type RwHashSet<K> = DashSet<K, ahash::RandomState>;
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
-pub static HAS_FUNCTIONS: bool = true;
-pub static FILE_EXT_JSON: &str = ".json";
-pub static FILE_EXT_PARQUET: &str = ".parquet";
+
+pub const HAS_FUNCTIONS: bool = true;
+pub const FILE_EXT_JSON: &str = ".json";
+pub const FILE_EXT_PARQUET: &str = ".parquet";
+
+pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
+pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
+pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
@@ -225,6 +230,8 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
+    #[env_config(name = "ZO_USAGE_REPORTING_COMPRESSED_SIZE", default = false)]
+    pub usage_report_compressed_size: bool,
     #[env_config(name = "ZO_USAGE_ORG", default = "_meta")]
     pub usage_org: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
@@ -233,8 +240,6 @@ pub struct Common {
     pub use_dynamo_meta_store: bool,
     #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
     pub dynamo_file_list_table: String,
-    #[env_config(name = "ZO_REPORT_COMPRESSED_SIZE", default = false)]
-    pub report_compressed_size: bool,
 }
 
 #[derive(EnvConfig)]
@@ -393,6 +398,8 @@ pub struct S3 {
     pub feature_http2_only: bool,
     #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
+    #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
+    pub sync_to_cache_interval: u64,
 }
 
 #[derive(Debug, EnvConfig)]
@@ -613,11 +620,11 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 pub fn get_parquet_compression() -> parquet::basic::Compression {
     match CONFIG.common.parquet_compression.to_lowercase().as_str() {
         "snappy" => parquet::basic::Compression::SNAPPY,
-        "gzip" => parquet::basic::Compression::GZIP(parquet::basic::GzipLevel::default()),
-        "brotli" => parquet::basic::Compression::BROTLI(parquet::basic::BrotliLevel::default()),
+        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
+        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
         "lz4" => parquet::basic::Compression::LZ4_RAW,
-        "zstd" => parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap()),
-        _ => parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap()),
+        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
+        _ => parquet::basic::Compression::ZSTD(Default::default()),
     }
 }
 

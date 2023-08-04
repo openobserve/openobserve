@@ -19,6 +19,7 @@ use datafusion::{
         json as arrowJson,
         record_batch::RecordBatch,
     },
+    config::ConfigOptions,
     datasource::{
         file_format::{
             file_type::{FileType, GetExt},
@@ -37,26 +38,25 @@ use datafusion::{
     prelude::{cast, col, lit, Expr, SessionContext},
     scalar::ScalarValue,
 };
+use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
 use std::sync::Arc;
 
-use super::storage::{file_list, StorageType};
-
-use super::transform_udf::get_all_transform;
-
-use crate::common::json;
+use crate::common::infra::{
+    cache::tmpfs,
+    config::{CONFIG, PARQUET_BATCH_SIZE},
+};
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     search::Session as SearchSession,
     sql,
 };
-use crate::common::{
-    flatten,
-    infra::{cache::tmpfs, config::CONFIG},
-};
+use crate::common::{flatten, json};
 use crate::service::search::sql::Sql;
-use once_cell::sync::Lazy;
+
+use super::storage::{file_list, StorageType};
+use super::transform_udf::get_all_transform;
 
 const AGGREGATE_UDF_LIST: [&str; 6] = ["min", "max", "count", "avg", "sum", "array_agg"];
 
@@ -848,9 +848,7 @@ pub async fn merge_parquet_files(
     let start = std::time::Instant::now();
     // query data
     let runtime_env = create_runtime_env()?;
-    let session_config = SessionConfig::new()
-        .with_information_schema(false)
-        .with_batch_size(8192);
+    let session_config = create_session_config();
     let ctx = SessionContext::with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
@@ -913,6 +911,18 @@ pub async fn merge_parquet_files(
     Ok(file_meta)
 }
 
+pub fn create_session_config() -> SessionConfig {
+    // Enable parquet predicate pushdown optimization
+    let mut options = ConfigOptions::new();
+    options.execution.parquet.pushdown_filters = true;
+    options.execution.parquet.reorder_filters = true;
+    options.optimizer.repartition_sorts = true;
+
+    SessionConfig::from(options)
+        .with_batch_size(PARQUET_BATCH_SIZE)
+        .with_information_schema(true)
+}
+
 pub fn create_runtime_env() -> Result<RuntimeEnv> {
     let object_store_registry = DefaultObjectStoreRegistry::new();
 
@@ -935,9 +945,7 @@ pub fn create_runtime_env() -> Result<RuntimeEnv> {
 
 pub fn prepare_datafusion_context() -> Result<SessionContext, DataFusionError> {
     let runtime_env = create_runtime_env()?;
-    let session_config = SessionConfig::new()
-        .with_batch_size(8192)
-        .set_bool("datafusion.execution.parquet.pushdown_filters", true);
+    let session_config = create_session_config();
     Ok(SessionContext::with_config_rt(
         session_config,
         Arc::new(runtime_env),

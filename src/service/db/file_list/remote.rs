@@ -33,10 +33,10 @@ pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
 pub static LOADED_ALL_FILES: atomic::AtomicBool = atomic::AtomicBool::new(false);
 
-pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
+pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     let prefix = format!("file_list/{prefix}");
     let mut rw = LOADED_FILES.write().await;
-    if rw.contains(&prefix) {
+    if !force && rw.contains(&prefix) {
         return Ok(());
     }
 
@@ -155,7 +155,7 @@ pub async fn cache_time_range(time_min: i64, mut time_max: i64) -> Result<(), an
     while cur_time <= time_max {
         let offset_time: DateTime<Utc> = Utc.timestamp_nanos(cur_time * 1000);
         let file_list_prefix = offset_time.format("%Y/%m/%d/%H/").to_string();
-        cache(&file_list_prefix).await?;
+        cache(&file_list_prefix, false).await?;
         cur_time += Duration::hours(1).num_microseconds().unwrap();
     }
     Ok(())
@@ -187,9 +187,23 @@ pub async fn cache_all() -> Result<(), anyhow::Error> {
         prefixes.insert(key);
     }
     for prefix in prefixes {
-        cache(&prefix).await?;
+        cache(&prefix, false).await?;
     }
     LOADED_ALL_FILES.store(true, atomic::Ordering::Relaxed);
+    Ok(())
+}
+
+pub async fn cache_latest_hour() -> Result<(), anyhow::Error> {
+    // for hourly
+    let prefix = Utc::now().format("%Y/%m/%d/%H/").to_string();
+    cache(&prefix, true).await?;
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+    // for daily
+    let prefix = Utc::now().format("%Y/%m/%d/00/").to_string();
+    cache(&prefix, true).await?;
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
     Ok(())
 }
 
