@@ -185,9 +185,10 @@ pub async fn merge_by_stream(
                     deleted: true,
                 });
             }
+            events.sort_by(|a, b| a.key.cmp(&b.key));
 
             // send file list to storage
-            match write_file_list(offset_time, &events).await {
+            match write_file_list(&events).await {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("[COMPACT] write file list failed: {}", e);
@@ -402,24 +403,22 @@ async fn merge_files(
     }
 }
 
-async fn write_file_list(offset: DateTime<Utc>, events: &[FileKey]) -> Result<(), anyhow::Error> {
+async fn write_file_list(events: &[FileKey]) -> Result<(), anyhow::Error> {
+    if events.is_empty() {
+        return Ok(());
+    }
     if CONFIG.common.use_dynamo_meta_store {
         write_file_list_dynamo(events).await
     } else {
-        write_file_list_s3(offset, events).await
+        write_file_list_s3(events).await
     }
 }
 
-async fn write_file_list_s3(
-    offset: DateTime<Utc>,
-    events: &[FileKey],
-) -> Result<(), anyhow::Error> {
+async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
+    let (_stream_key, date_key, _file_name) =
+        cache::file_list::parse_file_key_columns(&events.first().unwrap().key)?;
     // upload the new file_list to storage
-    let new_file_list_key = format!(
-        "file_list/{}/{}.json.zst",
-        offset.format("%Y/%m/%d/%H"),
-        ider::generate()
-    );
+    let new_file_list_key = format!("file_list/{}/{}.json.zst", date_key, ider::generate());
     let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
     for file in events.iter() {
         let mut write_buf = json::to_vec(&file)?;
