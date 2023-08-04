@@ -18,8 +18,8 @@ use crate::handler::grpc::cluster_rpc::UsageDataList;
 pub mod ingestion_service;
 pub mod stats;
 
-pub static USAGE_DATA: Lazy<Arc<RwLock<Vec<UsageData>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(vec![])));
+pub static USAGE_DATA: Lazy<Arc<RwLock<AHashMap<GroupKey, AggregatedData>>>> =
+    Lazy::new(|| Arc::new(RwLock::new(AHashMap::new())));
 
 pub async fn report_request_usage_stats(
     stats: RequestStats,
@@ -95,7 +95,7 @@ pub async fn report_request_usage_stats(
         });
     };
     if !usage.is_empty() {
-        publish_usage(usage).await;
+        let _ = publish_usage(usage).await;
     }
 }
 
@@ -105,7 +105,7 @@ pub async fn report_compression_stats(
     stream_name: &str,
     stream_type: StreamType,
 ) {
-    if !CONFIG.common.usage_enabled {
+    if !CONFIG.common.usage_enabled || !CONFIG.common.report_compressed_size {
         return;
     }
     if CONFIG.common.usage_org.eq(org_id)
@@ -135,64 +135,56 @@ pub async fn report_compression_stats(
     }];
 
     if !usage.is_empty() {
-        publish_usage(usage).await;
+        let _ = publish_usage(usage).await;
     }
 }
 
-pub async fn publish_usage(mut usage: Vec<UsageData>) {
+pub async fn publish_usage(usage: Vec<UsageData>) -> Result<(), Box<dyn std::error::Error>> {
     let mut usages = USAGE_DATA.write().await;
-    usages.append(&mut usage);
-
-    if usages.len() >= CONFIG.common.usage_batch_size {
-        let mut curr_usage = std::mem::take(&mut *usages);
-
-        let mut groups: AHashMap<GroupKey, AggregatedData> = AHashMap::new();
-
-        for usage_data in &curr_usage {
-            let key = GroupKey {
-                stream_name: usage_data.stream_name.clone(),
-                org_id: usage_data.org_id.clone(),
-                stream_type: usage_data.stream_type,
-                day: usage_data.day,
-                hour: usage_data.hour,
-                event: usage_data.event,
-            };
-
-            let is_new = groups.contains_key(&key);
-
-            let entry = groups.entry(key).or_insert_with(|| AggregatedData {
-                count: 1,
-                usage_data: usage_data.clone(),
-            });
-            if !is_new {
-                continue;
-            } else {
-                entry.usage_data.num_records += usage_data.num_records;
-                entry.usage_data.size += usage_data.size;
-                entry.usage_data.response_time += usage_data.response_time;
-                entry.count += 1;
-            }
-        }
-
-        let mut report_data = vec![];
-        for (_, data) in groups {
-            let mut usage_data = data.usage_data;
-            usage_data.response_time /= data.count as f64;
-            report_data.push(json::to_value(usage_data).unwrap());
-        }
-
-        let req = crate::handler::grpc::cluster_rpc::UsageRequest {
-            usage_list: Some(UsageDataList::from(report_data)),
-            stream_name: USAGE_STREAM.to_owned(),
+    for usage_data in usage {
+        let key = GroupKey {
+            stream_name: usage_data.stream_name.clone(),
+            org_id: usage_data.org_id.clone(),
+            stream_type: usage_data.stream_type,
+            day: usage_data.day,
+            hour: usage_data.hour,
+            event: usage_data.event,
         };
 
-        match ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
-            Ok(_) => {}
-            Err(err) => {
-                log::error!("Error in ingesting usage data {:?}", err);
-                // on error in ingesting usage data, push back the data
-                usages.append(&mut curr_usage);
-            }
-        }
+        let entry = usages.entry(key).or_insert_with(|| AggregatedData {
+            count: 0,
+            usage_data: usage_data.clone(),
+        });
+
+        entry.usage_data.num_records += usage_data.num_records;
+        entry.usage_data.size += usage_data.size;
+        entry.usage_data.response_time += usage_data.response_time;
+        entry.count += 1;
     }
+
+    let curr_usage = if usages.len() >= CONFIG.common.usage_batch_size {
+        std::mem::take(&mut *usages)
+    } else {
+        return Ok(());
+    };
+
+    let mut report_data = vec![];
+    for (_, data) in &curr_usage {
+        let mut usage_data = data.usage_data.clone();
+        usage_data.response_time /= data.count as f64;
+        report_data.push(json::to_value(usage_data)?);
+    }
+
+    let req = crate::handler::grpc::cluster_rpc::UsageRequest {
+        usage_list: Some(UsageDataList::from(report_data)),
+        stream_name: USAGE_STREAM.to_owned(),
+    };
+
+    if let Err(err) = ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+        log::error!("Error in ingesting usage data {:?}", err);
+        //*usages = curr_usage; // If ingestion fails, restore the usage data
+        return Err(err.into());
+    }
+
+    Ok(())
 }
