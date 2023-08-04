@@ -25,10 +25,16 @@
     <template #body-cell-actions="props">
       <q-td :props="props">
         <q-btn
+          :href="props.row.pdf"
+          target="_blank"
+          :title="t('billing.downloadInvoice')"
+          class="q-ml-xs"
+          padding="sm"
+          unelevated
           size="sm"
           round
           flat
-          :icon="'img:' + getImageURL('images/common/download.svg')"
+          icon="download"
         />
       </q-td>
     </template>
@@ -47,7 +53,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onMounted, ref } from "@vue/runtime-core";
+import { computed, defineComponent, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
@@ -77,13 +83,6 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "generated_at",
-        field: "generated_at",
-        label: t("billing.generatedAt"),
-        align: "left",
-        sortable: true,
-      },
-      {
         name: "amount",
         field: "amount",
         label: t("billing.amount"),
@@ -91,23 +90,23 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "amount_paid",
-        field: "amount_paid",
+        name: "paid",
+        field: "paid",
         label: t("billing.amountPaid"),
         align: "left",
         sortable: true,
       },
       {
-        name: "amount_due",
-        field: "amount_due",
-        label: t("billing.amountDue"),
+        name: "start_date",
+        field: "start_date",
+        label: t("billing.invoiceStartDate"),
         align: "left",
         sortable: true,
       },
       {
-        name: "due_date",
-        field: "due_date",
-        label: t("billing.dueDate"),
+        name: "end_date",
+        field: "end_date",
+        label: t("billing.invoiceEndDate"),
         align: "left",
         sortable: true,
       },
@@ -118,12 +117,12 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      // {
-      //   name: "actions",
-      //   field: "actions",
-      //   label: t("billing.action"),
-      //   align: "center",
-      // },
+      {
+        name: "actions",
+        field: "actions",
+        label: t("billing.action"),
+        align: "center",
+      },
     ]);
     const resultTotal = ref<number>(0);
     const invoiceHistory = ref([]);
@@ -154,26 +153,22 @@ export default defineComponent({
         store.state.selectedOrganization.identifier
       )
         .then((res) => {
-          const invoiceList = res.data.data.list;
+          const invoiceList = res.data.data;
           if (invoiceList.length > 0) {
             resultTotal.value = invoiceList.length;
-            invoiceHistory.value = invoiceList.map(({ invoice }) => {
-              const invoiceDate = date.formatDate(
-                Math.floor(invoice.generated_at * 1000),
-                "DD MMM, YYYY"
-              );
-              const dueDate = date.formatDate(
-                Math.floor(invoice.due_date * 1000),
-                "DD MMM, YYYY"
-              );
+            invoiceHistory.value = invoiceList.map((invoice, index) => {
               return {
-                id: invoice.id,
-                generated_at: invoiceDate,
-                amount: invoice.total,
+                id: ++index,
+                start_date: invoice.period_start,
+                end_date: invoice.period_end,
+                paid: invoice.paid ? "Yes" : "No",
+                amount: invoice.total + " " + invoice.currency.toUpperCase(),
                 amount_paid: invoice.amount_paid,
                 amount_due: invoice.amount_due,
-                due_date: dueDate,
+                attempt_count: invoice.attempt_count,
                 status: invoice.status,
+                pdf: invoice.invoice_pdf,
+                action: "Download",
               };
             });
           }
