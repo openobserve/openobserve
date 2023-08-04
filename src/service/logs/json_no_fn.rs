@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::http;
+use actix_web::{http, web};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
@@ -31,7 +31,7 @@ use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
 pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
-    data: Vec<json::Value>,
+    body: web::Bytes,
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
@@ -81,10 +81,10 @@ pub async fn ingest(
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    //let reader: Vec<json::Value> = json::from_slice(&body)?;
-    for item in data {
+    let reader: Vec<json::Value> = json::from_slice(&body)?;
+    for item in reader.iter() {
         //JSON Flattening
-        let mut value = flatten::flatten(&item)?;
+        let mut value = flatten::flatten(item)?;
 
         // get json object
         let local_val = value.as_object_mut().unwrap();
@@ -178,8 +178,6 @@ pub async fn ingest(
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
-
-    //metric + data usage
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),

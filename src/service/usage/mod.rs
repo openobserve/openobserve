@@ -13,7 +13,7 @@ use crate::common::{
         StreamType,
     },
 };
-use crate::handler::grpc::cluster_rpc::UsageDataList;
+use crate::handler::grpc::cluster_rpc;
 
 pub mod ingestion_service;
 pub mod stats;
@@ -185,9 +185,9 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
     }
 
     // report usage data
-    let req = crate::handler::grpc::cluster_rpc::UsageRequest {
-        usage_list: Some(UsageDataList::from(report_data)),
+    let req = cluster_rpc::UsageRequest {
         stream_name: USAGE_STREAM.to_owned(),
+        data: Some(cluster_rpc::UsageData::from(report_data)),
     };
     if let Err(e) = ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
         log::error!("Error in ingesting usage data {:?}", e);

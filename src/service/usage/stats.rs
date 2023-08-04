@@ -3,18 +3,19 @@ use reqwest::Client;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::common::infra::cluster::{get_node_by_uuid, LOCAL_NODE_UUID};
-use crate::common::infra::dist_lock;
-use crate::common::json;
-use crate::common::meta::usage::Stats;
-use crate::common::meta::usage::{UsageEvent, STATS_STREAM, USAGE_STREAM};
-use crate::common::{
-    infra::config::CONFIG,
-    meta::{self, search::Request},
+use crate::common::infra::{
+    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+    config::CONFIG,
+    dist_lock,
 };
-use crate::handler::grpc::cluster_rpc::UsageDataList;
-use crate::service::db;
-use crate::service::search as SearchService;
+use crate::common::json;
+use crate::common::meta::{
+    self,
+    search::Request,
+    usage::{Stats, UsageEvent, STATS_STREAM, USAGE_STREAM},
+};
+use crate::handler::grpc::cluster_rpc;
+use crate::service::{db, search as SearchService};
 
 use super::ingestion_service;
 
@@ -191,9 +192,9 @@ async fn report_stats(
         .map(|s| serde_json::to_value(s).unwrap())
         .collect();
 
-    let req = crate::handler::grpc::cluster_rpc::UsageRequest {
-        usage_list: Some(UsageDataList::from(report_data)),
+    let req = cluster_rpc::UsageRequest {
         stream_name: STATS_STREAM.to_owned(),
+        data: Some(cluster_rpc::UsageData::from(report_data)),
     };
 
     match ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
