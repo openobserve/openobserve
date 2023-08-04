@@ -106,16 +106,41 @@ export default defineComponent({
     const importFile = async () => {
       console.log("===",jsonFile.value);
       
-      jsonFile.value.map((it:any)=>{
-        let reader = new FileReader();
-        reader.onload = function (readerResult) {
-          importDashboardFromJSON(readerResult.target.result)
-            .then(() => {
-              jsonFile.value = null
-            })
-        };
-        reader.readAsText(it)
+      
+      const data = jsonFile?.value?.map((it:any, index) => {
+        return new Promise((resolve, reject) => {
+          let reader = new FileReader();
+          reader.onload = function (readerResult) {
+            try{
+              importDashboardFromJSON(readerResult.target.result)
+              .then((res) => {
+                console.log("jsonFile.value=",index+" : "+jsonFile.value);
+                
+                jsonFile.value = null
+                resolve(res)
+              }).catch((e)=>{
+                console.log("e=",index+" : "+e);
+                
+                reject(e)
+              })
+            } catch(e) {
+              reject(e)
+
+            }
+          };
+          reader.readAsText(it)
         })
+      })
+      console.log("data=", data);
+      
+      Promise.allSettled(data)
+      .then((results) => {
+        console.log("results", results);
+        const allFulfilledValues = results
+          .filter(r => r.status === 'fulfilled')
+          .map(r => r.value);
+        console.log("allFulfilledValues",allFulfilledValues);
+      });
      
     }
 
@@ -123,13 +148,13 @@ export default defineComponent({
       console.log("---", jsonObj);
 
       // get the dashboard
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
+      // const dismiss = $q.notify({
+      //   spinner: true,
+      //   message: "Please wait...",
+      //   timeout: 2000,
+      // });
 
-      try {
+      // try {
         const data = typeof jsonObj == 'string' ? JSON.parse(jsonObj) : typeof jsonObj == 'object' ? jsonObj : jsonObj
 
         console.log("try: data", data);
@@ -141,28 +166,75 @@ export default defineComponent({
         return dashboardService.create(
           store.state.selectedOrganization.identifier,
           data
-        ).then((res: { data: any }) => {
+        )
+        // .then((res: { data: any }) => {
+          // dismiss();
+          // $q.notify({
+          //   type: "positive",
+          //   message: `Dashboard Imported Successfully`,
+          // });
+        // })
+          // .then(() => {
+          //   return getAllDashboards(store)
+          // }).then(() => {
+          //   router.push('/dashboards')
+          // })
+          // .catch((err: any) => {
+          //   console.log(err)
+          //   $q.notify({
+          //     type: "negative",
+          //     message: err?.response?.data["error"] ? JSON.stringify(err?.response?.data["error"]) : 'Dashboard import failed',
+          //   });
+          //   dismiss();
+          // }).finally(() => {
+          //   dismiss();
+          // });
+      // } catch (error) {
+      //   console.log(error);
+
+      //   $q.notify({
+      //     type: "negative",
+      //     message: 'Invalid JSON format',
+      //   });
+      //   dismiss();
+      // }
+    }
+    const importFromUrl = async () => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
+
+      try {
+        // get the dashboard
+        const urlData = url.value ? url.value : ''
+
+        const res = await axios.get(urlData);
+        console.log("res=", res);
+        importDashboardFromJSON(res.data)
+        .then((res) => {
+          url.value = ''
           dismiss();
           $q.notify({
             type: "positive",
             message: `Dashboard Imported Successfully`,
           });
         })
-          .then(() => {
-            return getAllDashboards(store)
-          }).then(() => {
-            router.push('/dashboards')
-          })
-          .catch((err: any) => {
-            console.log(err)
-            $q.notify({
-              type: "negative",
-              message: err?.response?.data["error"] ? JSON.stringify(err?.response?.data["error"]) : 'Dashboard import failed',
-            });
-            dismiss();
-          }).finally(() => {
-            dismiss();
+        .then(() => {
+          return getAllDashboards(store)
+        }).then(() => {
+          router.push('/dashboards')
+        }).catch((err: any) => {
+          console.log(err)
+          $q.notify({
+            type: "negative",
+            message: err?.response?.data["error"] ? JSON.stringify(err?.response?.data["error"]) : 'Dashboard import failed',
           });
+          dismiss();
+        }).finally(() => {
+          dismiss();
+        });
       } catch (error) {
         console.log(error);
 
@@ -173,25 +245,53 @@ export default defineComponent({
         dismiss();
       }
     }
-    const importFromUrl = async () => {
-      // get the dashboard
-      const urlData = url.value ? url.value : ''
-
-      const res = await axios.get(urlData);
-      console.log("res=", res);
-      importDashboardFromJSON(res.data).then(() => {
-        url.value = ''
-      })
-    }
     const importFromJsonStr = async () => {
-      // get the dashboard
-      importDashboardFromJSON(jsonStr.value).then(() => {
-        jsonStr.value = ''
-      })
+      const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait...",
+          timeout: 2000,
+        });
+
+      try {
+        // get the dashboard
+        importDashboardFromJSON(jsonStr.value)
+        .then((res) => {
+          jsonStr.value = ''
+          dismiss();
+          $q.notify({
+            type: "positive",
+            message: `Dashboard Imported Successfully`,
+          });
+        }).then(() => {
+          return getAllDashboards(store)
+        }).then(() => {
+          router.push('/dashboards')
+        }).catch((err: any) => {
+          console.log(err)
+          $q.notify({
+            type: "negative",
+            message: err?.response?.data["error"] ? JSON.stringify(err?.response?.data["error"]) : 'Dashboard import failed',
+          });
+          dismiss();
+        }).finally(() => {
+          dismiss();
+        });
+      } catch (error) {
+        console.log(error);
+
+        $q.notify({
+          type: "negative",
+          message: 'Invalid JSON format',
+        });
+        dismiss();
+      }
     }
 
     // back button to render dashboard List page
     const goBack = () => {
+      jsonFile.value = ''
+      url.value = ''
+      jsonStr.value = ''
       return router.push("/dashboards");
     };
 
