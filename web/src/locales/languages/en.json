@@ -392,7 +392,10 @@
     "manageCards": "Manage Cards",
     "subscriptionCheckout": "Subscription checkout",
     "everythingDeveloperPlan": "Everything in Developer Plan, plus:",
-    "messageDataNotFound": "Data not found"
+    "messageDataNotFound": "Data not found",
+    "invoiceStartDate": "Invoice Start Date",
+    "invoiceEndDate": "Invoice End Date",
+    "downloadInvoice": "Download Invoice"
   },
   "message": {
     "ServerInternalError": "Error: Something wrong went. Internal server error.",
