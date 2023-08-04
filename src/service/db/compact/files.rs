@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
 use crate::common::{infra::config::RwHashMap, meta::StreamType};
 
-static CACHES: Lazy<RwHashMap<String, i64>> = Lazy::new(DashMap::default);
+static CACHES: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/compact/files/{org_id}/{stream_type}/{stream_name}")

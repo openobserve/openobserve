@@ -13,14 +13,13 @@
 // limitations under the License.
 
 use chrono::{TimeZone, Utc};
-use dashmap::DashMap;
 use object_store::ObjectMeta;
 use once_cell::sync::Lazy;
 
 use crate::common::infra::config::RwHashMap;
 use crate::common::meta::common::FileKey;
 
-pub static FILES: Lazy<RwHashMap<String, Vec<ObjectMeta>>> = Lazy::new(DashMap::default);
+pub static FILES: Lazy<RwHashMap<String, Vec<ObjectMeta>>> = Lazy::new(Default::default);
 
 pub fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     let data = match FILES.get(session_id) {

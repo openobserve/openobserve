@@ -49,7 +49,7 @@ pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
-pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
+pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
@@ -62,31 +62,31 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
 });
 
 // global cache variables
-pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(DashMap::default);
-pub static STREAM_SCHEMAS: Lazy<RwHashMap<String, Vec<Schema>>> = Lazy::new(DashMap::default);
+pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
+pub static STREAM_SCHEMAS: Lazy<RwHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);
 pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
-    Lazy::new(DashMap::default);
-pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
-pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
-pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
-pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
-pub static METRIC_CLUSTER_MAP: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(DashMap::default);
+    Lazy::new(Default::default);
+pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(Default::default);
+pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(Default::default);
+pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(Default::default);
+pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
+pub static METRIC_CLUSTER_MAP: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(Default::default);
 pub static METRIC_CLUSTER_LEADER: Lazy<RwHashMap<String, ClusterLeader>> =
-    Lazy::new(DashMap::default);
-pub static STREAM_ALERTS: Lazy<RwHashMap<String, AlertList>> = Lazy::new(DashMap::default);
-pub static TRIGGERS: Lazy<RwHashMap<String, Trigger>> = Lazy::new(DashMap::default);
-pub static TRIGGERS_IN_PROCESS: Lazy<RwHashMap<String, TriggerTimer>> = Lazy::new(DashMap::default);
+    Lazy::new(Default::default);
+pub static STREAM_ALERTS: Lazy<RwHashMap<String, AlertList>> = Lazy::new(Default::default);
+pub static TRIGGERS: Lazy<RwHashMap<String, Trigger>> = Lazy::new(Default::default);
+pub static TRIGGERS_IN_PROCESS: Lazy<RwHashMap<String, TriggerTimer>> = Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, DestinationTemplate>> =
-    Lazy::new(DashMap::default);
+    Lazy::new(Default::default);
 pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, AlertDestination>> =
-    Lazy::new(DashMap::default);
-pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(DashMap::default);
+    Lazy::new(Default::default);
+pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
-pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(DashMap::default);
+pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
 pub static LOCAL_SCHEMA_LOCKER: Lazy<RwHashMap<String, tokio::sync::RwLock<bool>>> =
-    Lazy::new(|| Arc::new(DashMap::default)());
+    Lazy::new(|| Arc::new(Default::default)());
 
 #[derive(EnvConfig)]
 pub struct Config {
@@ -183,6 +183,8 @@ pub struct Common {
     pub data_wal_dir: String,
     #[env_config(name = "ZO_DATA_STREAM_DIR", default = "")] // ./data/openobserve/stream/
     pub data_stream_dir: String,
+    #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
+    pub data_cache_dir: String,
     #[env_config(name = "ZO_BASE_URI", default = "")]
     pub base_uri: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
@@ -522,6 +524,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_stream_dir.ends_with('/') {
         cfg.common.data_stream_dir = format!("{}/", cfg.common.data_stream_dir);
+    }
+    if cfg.common.data_cache_dir.is_empty() {
+        cfg.common.data_cache_dir = format!("{}cache/", cfg.common.data_dir);
+    }
+    if !cfg.common.data_cache_dir.ends_with('/') {
+        cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
     }
     if cfg.common.base_uri.ends_with('/') {
         cfg.common.base_uri = cfg.common.base_uri.trim_end_matches('/').to_string();

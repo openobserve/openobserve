@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-
 use aws_sdk_dynamodb::types::AttributeValue;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::common::infra::cache::file_list::parse_file_key_columns;
 use crate::common::json;
@@ -28,6 +27,14 @@ pub struct FileKey {
 }
 
 impl FileKey {
+    pub fn new(key: &str, meta: FileMeta, deleted: bool) -> Self {
+        Self {
+            key: key.to_string(),
+            meta,
+            deleted,
+        }
+    }
+
     pub fn from_file_name(file: &str) -> Self {
         Self {
             key: file.to_string(),
@@ -141,6 +148,72 @@ impl From<&HashMap<String, AttributeValue>> for FileKey {
             }
         }
         item
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct FileRecord {
+    pub stream: String,
+    pub date: String,
+    pub file: String,
+    pub deleted: bool,
+    pub min_ts: i64, // microseconds
+    pub max_ts: i64, // microseconds
+    pub records: u64,
+    pub original_size: u64,
+    pub compressed_size: u64,
+}
+
+impl FileRecord {
+    pub fn new(file: &str, meta: &FileMeta, deleted: bool) -> Self {
+        let (stream_key, date_key, file_name) = parse_file_key_columns(file).unwrap();
+        Self {
+            stream: stream_key,
+            date: date_key,
+            file: file_name,
+            deleted,
+            min_ts: meta.min_ts,
+            max_ts: meta.max_ts,
+            records: meta.records,
+            original_size: meta.original_size,
+            compressed_size: meta.compressed_size,
+        }
+    }
+}
+
+impl From<&FileKey> for FileRecord {
+    fn from(file_key: &FileKey) -> Self {
+        let (stream_key, date_key, file_name) = parse_file_key_columns(&file_key.key).unwrap();
+        Self {
+            stream: stream_key,
+            date: date_key,
+            file: file_name,
+            deleted: file_key.deleted,
+            min_ts: file_key.meta.min_ts,
+            max_ts: file_key.meta.max_ts,
+            records: file_key.meta.records,
+            original_size: file_key.meta.original_size,
+            compressed_size: file_key.meta.compressed_size,
+        }
+    }
+}
+
+impl From<&FileRecord> for FileKey {
+    fn from(file_record: &FileRecord) -> Self {
+        Self {
+            key: format!(
+                "files/{}/{}/{}",
+                file_record.stream, file_record.date, file_record.file
+            ),
+            deleted: file_record.deleted,
+            meta: FileMeta {
+                min_ts: file_record.min_ts,
+                max_ts: file_record.max_ts,
+                records: file_record.records,
+                original_size: file_record.original_size,
+                compressed_size: file_record.compressed_size,
+            },
+        }
     }
 }
 

@@ -16,20 +16,16 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 
 use crate::common::infra::{cache::file_list::parse_file_key_columns, config::CONFIG, wal};
-use crate::common::meta::stream::StreamParams;
 use crate::common::meta::{
-    common::{FileKey, FileMeta},
+    common::{FileKey, FileMeta, FileRecord},
+    stream::StreamParams,
     StreamType,
 };
 use crate::common::{file::scan_files, json};
 
 pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {
     let (_stream_key, date_key, _file_name) = parse_file_key_columns(key)?;
-    let file_data = FileKey {
-        key: key.to_string(),
-        meta,
-        deleted,
-    };
+    let file_data = FileKey::new(key, meta, deleted);
 
     // dynamodb mode
     if CONFIG.common.use_dynamo_meta_store {
@@ -46,7 +42,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     }
 
     // local mode
-    let mut write_buf = json::to_vec(&file_data)?;
+    let mut write_buf = json::to_vec(&FileRecord::from(&file_data))?;
     write_buf.push(b'\n');
     let hour_key = date_key.replace('/', "_");
     let file = wal::get_or_create(

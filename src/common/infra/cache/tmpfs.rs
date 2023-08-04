@@ -14,15 +14,14 @@
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use uuid::Uuid;
 
 use crate::common::infra::config::RwHashMap;
 use crate::common::infra::errors::*;
 
-static FILES: Lazy<RwHashMap<String, File>> = Lazy::new(DashMap::default);
-static DATA: Lazy<RwHashMap<String, Bytes>> = Lazy::new(DashMap::default);
+static FILES: Lazy<RwHashMap<String, File>> = Lazy::new(Default::default);
+static DATA: Lazy<RwHashMap<String, Bytes>> = Lazy::new(Default::default);
 
 const STRING_SIZE: usize = std::mem::size_of::<String>();
 const BYTES_SIZE: usize = std::mem::size_of::<bytes::Bytes>();

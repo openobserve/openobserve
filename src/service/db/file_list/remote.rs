@@ -24,6 +24,7 @@ use std::{
 use tokio::sync::RwLock;
 
 use crate::common::{
+    file::put_file_contents,
     infra::{config::CONFIG, storage},
     json,
     meta::common::FileKey,
@@ -109,38 +110,42 @@ async fn process_file(file: &str) -> Result<ProcessStats, anyhow::Error> {
             return Ok(stats);
         }
     };
+    let file_path = format!("{}file_list/remote/{}", CONFIG.common.data_cache_dir, file);
+    std::fs::create_dir_all(std::path::Path::new(&file_path).parent().unwrap())?;
+    put_file_contents(&file_path, &data)?;
     stats.download_time = start.elapsed().as_millis() as usize;
 
-    // uncompress file
-    let uncompress = zstd::decode_all(data.reader())?;
-    stats.uncompress_time = start.elapsed().as_millis() as usize - stats.download_time;
-    let uncompress_reader = BufReader::new(uncompress.reader());
-    // parse file list
-    for line in uncompress_reader.lines() {
-        let line = line?;
-        if line.is_empty() {
-            continue;
-        }
-        stats.file_count += 1;
-        let item: FileKey = json::from_slice(line.as_bytes())?;
-        // check backlist
-        if !super::BLOCKED_ORGS.is_empty() {
-            let columns = item.key.split('/').collect::<Vec<&str>>();
-            let org_id = columns.get(1).unwrap_or(&"");
-            if super::BLOCKED_ORGS.contains(org_id) {
-                // log::error!("Load file_list skip blacklist org: {}", org_id);
-                continue;
-            }
-        }
-        // check deleted files
-        if item.deleted {
-            super::DELETED_FILES.insert(item.key, item.meta.to_owned());
-            continue;
-        }
-        super::progress(&item.key, item.meta, item.deleted, false).await?;
-    }
-    stats.caching_time =
-        start.elapsed().as_millis() as usize - stats.uncompress_time - stats.download_time;
+    // // uncompress file
+    // let uncompress = zstd::decode_all(data.reader())?;
+    // stats.uncompress_time = start.elapsed().as_millis() as usize - stats.download_time;
+    // let uncompress_reader = BufReader::new(uncompress.reader());
+    // // parse file list
+    // for line in uncompress_reader.lines() {
+    //     let line = line?;
+    //     if line.is_empty() {
+    //         continue;
+    //     }
+    //     stats.file_count += 1;
+    //     let item: FileKey = json::from_slice(line.as_bytes())?;
+    //     // check backlist
+    //     if !super::BLOCKED_ORGS.is_empty() {
+    //         let columns = item.key.split('/').collect::<Vec<&str>>();
+    //         let org_id = columns.get(1).unwrap_or(&"");
+    //         if super::BLOCKED_ORGS.contains(org_id) {
+    //             // log::error!("Load file_list skip blacklist org: {}", org_id);
+    //             continue;
+    //         }
+    //     }
+    //     // check deleted files
+    //     if item.deleted {
+    //         super::DELETED_FILES.insert(item.key, item.meta.to_owned());
+    //         continue;
+    //     }
+    //     super::progress(&item.key, item.meta, item.deleted, false).await?;
+    // }
+    // stats.caching_time =
+    //     start.elapsed().as_millis() as usize - stats.uncompress_time - stats.download_time;
+
     Ok(stats)
 }
 
