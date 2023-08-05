@@ -156,12 +156,12 @@ pub struct FileRecord {
     pub stream: String,
     pub date: String,
     pub file: String,
-    pub deleted: bool,
     pub min_ts: i64, // microseconds
     pub max_ts: i64, // microseconds
     pub records: u64,
     pub original_size: u64,
     pub compressed_size: u64,
+    pub deleted: bool,
 }
 
 impl FileRecord {
@@ -171,12 +171,12 @@ impl FileRecord {
             stream: stream_key,
             date: date_key,
             file: file_name,
-            deleted,
             min_ts: meta.min_ts,
             max_ts: meta.max_ts,
             records: meta.records,
             original_size: meta.original_size,
             compressed_size: meta.compressed_size,
+            deleted,
         }
     }
 }
@@ -188,12 +188,12 @@ impl From<&FileKey> for FileRecord {
             stream: stream_key,
             date: date_key,
             file: file_name,
-            deleted: file_key.deleted,
             min_ts: file_key.meta.min_ts,
             max_ts: file_key.meta.max_ts,
             records: file_key.meta.records,
             original_size: file_key.meta.original_size,
             compressed_size: file_key.meta.compressed_size,
+            deleted: file_key.deleted,
         }
     }
 }

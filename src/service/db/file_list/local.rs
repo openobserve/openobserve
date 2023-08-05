@@ -82,7 +82,7 @@ pub async fn get_all() -> Result<Vec<FileKey>, anyhow::Error> {
             if line.is_empty() {
                 continue;
             }
-            let item: FileKey = match json::from_slice(line.as_bytes()) {
+            let item: FileRecord = match json::from_slice(line.as_bytes()) {
                 Ok(item) => item,
                 Err(err) => {
                     panic!(
@@ -91,7 +91,7 @@ pub async fn get_all() -> Result<Vec<FileKey>, anyhow::Error> {
                     );
                 }
             };
-            result.push(item);
+            result.push((&item).into());
         }
     }
     Ok(result)

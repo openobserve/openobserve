@@ -12,13 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{fs, path::Path};
+use datafusion::arrow::json::ReaderBuilder;
+use std::{fs, io::BufReader, path::Path};
 use tokio::time;
 
-use crate::common::file::scan_files;
-use crate::common::infra::{cluster, config::CONFIG, storage, wal};
 use crate::common::meta::StreamType;
 use crate::service::db;
+use crate::{common::file::scan_files, service::search::datafusion::new_writer};
+use crate::{
+    common::infra::{cluster, config::CONFIG, storage, wal},
+    service::db::file_list::get_sample_table_schema,
+};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { run_move_file_to_s3().await });
@@ -96,7 +100,7 @@ async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
 }
 
 async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error> {
-    let mut file = fs::File::open(path_str).unwrap();
+    let file = fs::File::open(path_str).unwrap();
     let file_meta = file.metadata().unwrap();
     let file_size = file_meta.len();
     log::info!("[JOB] File_list upload begin: local: {}", path_str);
@@ -107,17 +111,27 @@ async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error
         return Err(anyhow::anyhow!("File_list is empty: {}", path_str));
     }
 
-    let mut encoder = zstd::Encoder::new(Vec::new(), 3)?;
-    std::io::copy(&mut file, &mut encoder)?;
-    let compressed_bytes = encoder.finish().unwrap();
+    let schema = get_sample_table_schema();
+    let mut buf_parquet = Vec::new();
+    let mut writer = new_writer(&mut buf_parquet, &schema, Some("date"));
+    let json_reader = BufReader::new(&file);
+    let json = ReaderBuilder::new(schema.clone())
+        .build(json_reader)
+        .unwrap();
+    for batch in json {
+        let batch_write = batch.unwrap();
+        writer.write(&batch_write).expect("Write batch succeeded");
+    }
+    writer.close().unwrap();
 
-    let file_columns = file_key.split('_').collect::<Vec<&str>>();
+    let file_columns = file_key.splitn(2, '_').collect::<Vec<&str>>();
     let new_file_key = format!(
-        "file_list/{}/{}/{}/{}/{}.zst",
-        file_columns[1], file_columns[2], file_columns[3], file_columns[4], file_columns[5]
+        "file_list/{}",
+        file_columns[1]
+            .replace('_', "/")
+            .replace(".json", ".praquet")
     );
-
-    let result = storage::put(&new_file_key, bytes::Bytes::from(compressed_bytes)).await;
+    let result = storage::put(&new_file_key, bytes::Bytes::from(buf_parquet)).await;
     match result {
         Ok(_output) => {
             log::info!("[JOB] File_list upload succeeded: {}", new_file_key);

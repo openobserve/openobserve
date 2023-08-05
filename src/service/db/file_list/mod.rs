@@ -13,7 +13,9 @@
 // limitations under the License.
 
 use dashmap::DashMap;
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use once_cell::sync::Lazy;
+use std::sync::Arc;
 
 use crate::common::infra::{
     cache, cluster,
@@ -106,4 +108,18 @@ pub async fn progress(
     }
 
     Ok(())
+}
+
+pub fn get_sample_table_schema() -> Arc<Schema> {
+    Arc::new(Schema::new(vec![
+        Field::new("stream", DataType::Utf8, false), // org/stream_type/stram_name
+        Field::new("date", DataType::Utf8, false),   // 2023/08/01/15
+        Field::new("file", DataType::Utf8, false),   // 7068342949293207552.parquet
+        Field::new("min_ts", DataType::Int64, false),
+        Field::new("max_ts", DataType::Int64, false),
+        Field::new("records", DataType::UInt64, false),
+        Field::new("original_size", DataType::UInt64, false),
+        Field::new("compressed_size", DataType::UInt64, false),
+        Field::new("deleted", DataType::Boolean, false),
+    ]))
 }
