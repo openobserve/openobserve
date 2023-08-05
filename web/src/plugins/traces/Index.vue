@@ -170,7 +170,7 @@ import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
 import useTraces from "@/composables/useTraces";
 import { deepKeys, byString } from "@/utils/json";
-import { Parser } from "node-sql-parser";
+import { Parser } from "node-sql-parser/build/mysql";
 
 import streamService from "@/services/stream";
 import searchService from "@/services/search";

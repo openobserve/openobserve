@@ -18,7 +18,7 @@
 </template>
 
 <script lang="ts">
-import Plotly from "plotly.js";
+import Plotly from "plotly.js-dist-min";
 import { useStore } from "vuex";
 import { defineComponent, onMounted, onUpdated, ref, watch } from "vue";
 

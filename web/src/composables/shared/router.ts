@@ -16,29 +16,29 @@ import Home from "@/views/HomeView.vue";
 import Tickets from "@/views/TicketsView.vue";
 import Users from "@/views/User.vue";
 import About from "@/views/About.vue";
-import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
-import AddPanel from "@/views/Dashboards/addPanel/AddPanel.vue";
+const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
+const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 import MemberSubscription from "@/views/MemberSubscription.vue";
-import Search from "@/views/Search.vue";
-import AppMetrics from "@/views/AppMetrics.vue";
-import AppTraces from "@/views/AppTraces.vue";
-import LogStream from "@/views/LogStream.vue";
-import StreamExplorer from "@/views/StreamExplorer.vue";
+const Search = () => import("@/views/Search.vue");
+const AppMetrics = () => import("@/views/AppMetrics.vue");
+const AppTraces = () => import("@/views/AppTraces.vue");
+const LogStream = () => import("@/views/LogStream.vue");
+const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 import {
   FunctionList,
   AssociatedStreamFunction,
   EnrichmentTableList,
 } from "../../components/functions/index";
-import Alerts from "@/views/AppAlerts.vue";
+const Alerts = () => import("@/views/AppAlerts.vue");
 import Error404 from "@/views/Error404.vue";
-import Dashboards from "@/views/Dashboards/Dashboards.vue";
-import {
-  AlertList,
-  TemplateList,
-  DestinationList,
-} from "@/components/alerts/index";
+const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
+const AlertList = () => import("@/components/alerts/AlertList.vue");
+const TemplateList = () => import("@/components/alerts/TemplateList.vue");
+const DestinationList = () => import("@/components/alerts/DestinationList.vue");
+
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
-import Functions from "../../views/Functions.vue";
+const Functions = () => import("@/views/Functions.vue");
+
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
 const useRoutes = () => {
@@ -140,7 +140,7 @@ const useRoutes = () => {
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuardPendingSubscriptions(to, from, next);
-      }
+      },
     },
     {
       path: "/dashboards/import",
@@ -199,17 +199,17 @@ const useRoutes = () => {
         {
           path: "functions",
           name: "functionList",
-          component: FunctionList,
+          component: () => FunctionList,
         },
         {
           path: "stream-association",
           name: "streamFunctions",
-          component: AssociatedStreamFunction,
+          component: () => AssociatedStreamFunction,
         },
         {
           path: "enrichment-tables",
           name: "enrichmentTables",
-          component: EnrichmentTableList,
+          component: () => EnrichmentTableList,
         },
       ],
     },

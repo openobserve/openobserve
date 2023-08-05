@@ -55,7 +55,7 @@ import { defineComponent, ref, watch, reactive, toRaw, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import { Parser } from "node-sql-parser";
+import { Parser } from "node-sql-parser/build/mysql";
 
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import QueryEditor from "./QueryEditor.vue";
