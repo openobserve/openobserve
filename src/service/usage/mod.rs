@@ -105,7 +105,7 @@ pub async fn report_compression_stats(
     stream_name: &str,
     stream_type: StreamType,
 ) {
-    if !CONFIG.common.usage_enabled {
+    if !CONFIG.common.usage_enabled || !CONFIG.common.usage_report_compressed_size {
         return;
     }
     if CONFIG.common.usage_org.eq(org_id)
