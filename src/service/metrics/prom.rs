@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use crate::common::infra::{
     cache::stats,
     cluster,
-    config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+    config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
     errors::{Error, Result},
     metrics,
 };
@@ -115,7 +115,7 @@ pub async fn remote_write(
         // get labels
         let mut replica_label = String::new();
 
-        let mut labels: prom::FxIndexMap<String, String> = event
+        let mut labels: FxIndexMap<String, String> = event
             .labels
             .drain(..)
             .map(|label| (label.name, label.value))
