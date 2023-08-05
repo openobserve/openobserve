@@ -33,6 +33,8 @@ use crate::common::meta::syslog::SyslogRoute;
 use crate::common::meta::user::User;
 use crate::service::enrichment::StreamTable;
 
+pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
+pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
 pub type RwHashMap<K, V> = DashMap<K, V, ahash::RandomState>;
 pub type RwHashSet<K> = DashSet<K, ahash::RandomState>;
 

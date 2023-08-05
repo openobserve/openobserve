@@ -21,14 +21,12 @@ use serde::{
 };
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
+use crate::common::infra::config::FxIndexMap;
 use crate::common::meta::prom::NAME_LABEL;
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
 static RE_VALID_LABEL_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*$").unwrap());
-
-// See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
-type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 
 pub type Labels = Vec<Arc<Label>>;
 
