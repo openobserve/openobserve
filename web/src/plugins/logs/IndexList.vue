@@ -314,7 +314,7 @@ import {
   formatLargeNumber,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
-import { Parser } from "node-sql-parser";
+import { Parser } from "node-sql-parser/build/mysql";
 import {
   outlinedAdd,
   outlinedVisibility,

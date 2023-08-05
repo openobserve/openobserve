@@ -18,7 +18,7 @@ import { reactive, ref, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
-import { Parser } from "node-sql-parser";
+import { Parser } from "node-sql-parser/build/mysql";
 
 import {
   useLocalLogFilterField,

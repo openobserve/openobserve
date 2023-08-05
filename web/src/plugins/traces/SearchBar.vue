@@ -90,7 +90,7 @@ import useTraces from "@/composables/useTraces";
 import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
-import { Parser } from "node-sql-parser";
+import { Parser } from "node-sql-parser/build/mysql";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
