@@ -14,24 +14,26 @@
 
 use ahash::AHashMap;
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
-use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
-use crate::common::infra::config::RwHashMap;
+use crate::common::infra::config::{FxIndexSet, RwHashMap};
 use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
 use crate::service::{db, stream};
 
-static FILES: Lazy<RwHashMap<String, RwHashMap<String, Vec<String>>>> = Lazy::new(DashMap::default);
-static DATA: Lazy<RwHashMap<String, FileMeta>> = Lazy::new(DashMap::default);
+static FILES: Lazy<RwHashMap<String, RwHashMap<String, FxIndexSet<String>>>> =
+    Lazy::new(Default::default);
+static DATA: Lazy<RwHashMap<String, FileMeta>> = Lazy::new(Default::default);
 
 const FILE_LIST_MEM_SIZE: usize = std::mem::size_of::<AHashMap<String, Vec<String>>>();
 const FILE_META_MEM_SIZE: usize = std::mem::size_of::<FileMeta>();
 
 pub fn set_file_to_cache(key: &str, val: FileMeta) -> Result<(), anyhow::Error> {
     let (stream_key, date_key, file_name) = parse_file_key_columns(key)?;
-    let stream_filelist = FILES.entry(stream_key).or_insert_with(DashMap::default);
-    let mut date_filelist = stream_filelist.entry(date_key).or_insert_with(Vec::new);
-    date_filelist.push(file_name);
+    let stream_filelist = FILES.entry(stream_key).or_insert_with(Default::default);
+    let mut date_filelist = stream_filelist
+        .entry(date_key)
+        .or_insert_with(Default::default);
+    date_filelist.insert(file_name);
     DATA.insert(key.to_string(), val);
     Ok(())
 }
