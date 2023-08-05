@@ -94,7 +94,7 @@
           stack-label
           style="border: 1px solid #dbdbdb; border-radius: 5px"
           @keyup="editorUpdate"
-          class=" showLabelOnTop"
+          class="showLabelOnTop"
           resize
         ></div>
 
@@ -129,14 +129,13 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed } from "vue";
+import "monaco-editor/esm/vs/editor/editor.all.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
-
-import streamService from "../../services/stream";
-import { update } from "plotly.js";
 import segment from "../../services/segment_analytics";
 
 const defaultValue: any = () => {
@@ -213,7 +212,7 @@ export default defineComponent({
         minimap: {
           enabled: false,
         },
-        theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
+        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
       });
 
       editorobj.onKeyUp((e: any) => {

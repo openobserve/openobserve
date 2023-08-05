@@ -63,7 +63,7 @@
               :label="t('alerts.sql')"
               stack-label
               style="border: 1px solid #dbdbdb; border-radius: 5px"
-              class=" showLabelOnTop"
+              class="showLabelOnTop"
               resize
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
@@ -148,12 +148,14 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
+
+import "monaco-editor/esm/vs/editor/editor.all.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import { copyToClipboard, useQuasar } from "quasar";
 import type { TemplateData, Template } from "@/ts/interfaces/index";
-import type { DomEvent } from "@vue/test-utils/dist/constants/dom-events";
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 const { t } = useI18n();
@@ -233,7 +235,7 @@ onMounted(async () => {
     minimap: {
       enabled: false,
     },
-    theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
+    theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
     automaticLayout: true,
     suggestOnTriggerCharacters: false,
   });
@@ -338,7 +340,7 @@ const copyTemplateBody = (text: any) => {
   font-size: 10px;
 }
 
-.add-template{
-  background: rgba(0,0,0,0.07);
+.add-template {
+  background: rgba(0, 0, 0, 0.07);
 }
 </style>

@@ -24,7 +24,9 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch } from "vue";
-import * as monaco from "monaco-editor";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
+import "monaco-editor/esm/vs/language/css/monaco.contribution";
+
 import { useStore } from "vuex";
 import { getPath } from "@/utils/zincutils";
 

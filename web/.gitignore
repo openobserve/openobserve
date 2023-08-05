@@ -27,3 +27,6 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+# Ignoring rollup visualizer code build stats file
+stats.html

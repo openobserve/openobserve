@@ -211,7 +211,8 @@ import SearchBar from "./SearchBar.vue";
 import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
 import useLogs from "@/composables/useLogs";
-import { Parser } from "node-sql-parser";
+import { deepKeys, byString } from "@/utils/json";
+import { Parser } from "node-sql-parser/build/mysql";
 
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";

@@ -321,15 +321,19 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch, type Ref } from "vue";
-import * as monaco from "monaco-editor";
+
+import "monaco-editor/esm/vs/editor/editor.all.js";
+import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
+import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+
 import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import streamService from "../../services/stream";
-import { Parser } from "node-sql-parser";
+import { Parser } from "node-sql-parser/build/mysql";
 import segment from "../../services/segment_analytics";
-import { cloneDeep } from "lodash-es";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -413,10 +417,8 @@ export default defineComponent({
     const updateCondtions = (e: any) => {
       const ast = parser.astify(e.target.value);
       sqlAST.value = ast;
-
       // If sqlAST.value.columns is not type of array then return
       if (!Array.isArray(sqlAST.value.columns)) return;
-
       sqlAST.value.columns.forEach(function (item: any, index: any) {
         let val;
         if (item["as"] === undefined || item["as"] === null) {
@@ -435,8 +437,8 @@ export default defineComponent({
     let parser = new Parser();
     onMounted(async () => {
       monaco.editor.defineTheme("myCustomTheme", {
-        base: "vs", // can also be vs-dark or hc-black
-        inherit: true, // can also be false to completely replace the builtin rules
+        base: "vs",
+        inherit: true,
         rules: [
           {
             token: "comment",
@@ -528,10 +530,8 @@ export default defineComponent({
       });
       return filteredOptions;
     };
-
     const updateStreams = (resetStream = true) => {
       if (resetStream) formData.value.stream_name = "";
-
       if (streams.value[formData.value.stream_type]) {
         schemaList.value = streams.value[formData.value.stream_type];
         indexOptions.value = streams.value[formData.value.stream_type].map(
@@ -541,7 +541,6 @@ export default defineComponent({
         );
         return;
       }
-
       isFetchingStreams.value = true;
       return streamService
         .nameList(
@@ -563,7 +562,6 @@ export default defineComponent({
     const filterConditions = (val: string, update: any) => {
       filteredColumns.value = filterColumns(triggerCols.value, val, update);
     };
-
     const filterStreams = (val: string, update: any) => {
       filteredStreams.value = filterColumns(indexOptions.value, val, update);
     };

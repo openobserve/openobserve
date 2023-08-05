@@ -18,7 +18,7 @@
 </template>
 
 <script lang="ts">
-import Plotly from "plotly.js";
+import Plotly from "plotly.js-dist-min";
 import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
 import { defineComponent, onMounted, onUpdated, ref, watch } from "vue";
@@ -53,7 +53,8 @@ export default defineComponent({
     const getThemeLayoutOptions = () => ({
       paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
       plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-      font: {size:12,
+      font: {
+        size: 12,
         color: store.state.theme === "dark" ? "#fff" : "#181a1b",
       },
     });
