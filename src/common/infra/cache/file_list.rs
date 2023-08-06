@@ -49,7 +49,7 @@ pub fn del_file_from_cache(key: &str) -> Result<(), anyhow::Error> {
         Some(v) => v,
         None => return Ok(()),
     };
-    date_filelist.retain(|f| file_name.ne(f));
+    date_filelist.remove(&file_name);
     Ok(())
 }
 

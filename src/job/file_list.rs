@@ -22,7 +22,9 @@ use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { run_move_file_to_s3().await });
-    tokio::task::spawn(async move { run_sync_s3_to_cache().await });
+    if !CONFIG.common.local_mode {
+        tokio::task::spawn(async move { run_sync_s3_to_cache().await });
+    }
     Ok(())
 }
 
