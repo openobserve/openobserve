@@ -265,7 +265,9 @@ export default defineComponent({
       editorObj.addCommand(
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
         function () {
-          emit("run-query");
+          setTimeout(() => {
+            emit("run-query");
+          }, 300);
         },
         "ctrlenter"
       );
