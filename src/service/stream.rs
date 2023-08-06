@@ -34,6 +34,7 @@ use super::metrics::get_prom_metadata_from_schema;
 
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
+const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 
 pub async fn get_stream(
     org_id: &str,
@@ -43,14 +44,19 @@ pub async fn get_stream(
     let schema = db::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap();
-    let in_stats = get_stream_stats(org_id, Some(stream_type), Some(stream_name.to_string()))
-        .await
-        .unwrap_or_default();
-    let mut stats = match in_stats.is_empty() {
-        true => StreamStats::default(),
-        false => *in_stats
-            .get(format!("{}/{}", stream_name, stream_type).as_str())
-            .unwrap(),
+
+    let mut stats = if CONFIG.common.local_mode {
+        stats::get_stream_stats(org_id, stream_name, stream_type)
+    } else {
+        let in_stats = get_stream_stats(org_id, Some(stream_type), Some(stream_name.to_string()))
+            .await
+            .unwrap_or_default();
+        match in_stats.is_empty() {
+            true => StreamStats::default(),
+            false => *in_stats
+                .get(format!("{}/{}", stream_name, stream_type).as_str())
+                .unwrap(),
+        }
     };
 
     stats = transform_stats(&mut stats);
@@ -76,14 +82,26 @@ pub async fn get_streams(
     let mut indices_res = Vec::with_capacity(indices.len());
 
     // get all steam stats
-    let all_stats = get_stream_stats(org_id, stream_type, None)
-        .await
-        .unwrap_or_default();
+    let all_stats = if !CONFIG.common.local_mode {
+        get_stream_stats(org_id, stream_type, None)
+            .await
+            .unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
 
     for stream_loc in indices {
-        let mut stats = *all_stats
-            .get(format!("{}/{}", stream_loc.stream_name, stream_loc.stream_type).as_str())
-            .unwrap_or(&StreamStats::default());
+        let mut stats = if CONFIG.common.local_mode {
+            stats::get_stream_stats(
+                org_id,
+                stream_loc.stream_name.as_str(),
+                stream_loc.stream_type,
+            )
+        } else {
+            *all_stats
+                .get(format!("{}/{}", stream_loc.stream_name, stream_loc.stream_type).as_str())
+                .unwrap_or(&StreamStats::default())
+        };
         if stats.eq(&StreamStats::default()) {
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
@@ -288,6 +306,10 @@ pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, any
 }
 
 fn transform_stats(stats: &mut StreamStats) -> StreamStats {
+    if CONFIG.common.local_mode {
+        stats.storage_size /= SIZE_IN_MB;
+        stats.compressed_size /= SIZE_IN_MB;
+    }
     stats.storage_size = (stats.storage_size * 100.0).round() / 100.0;
     stats.compressed_size = (stats.compressed_size * 100.0).round() / 100.0;
     *stats
