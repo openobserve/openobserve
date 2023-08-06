@@ -263,7 +263,9 @@ pub async fn set_online() -> Result<()> {
 
     // if local node is ingester, broadcast local file_list to the cluster
     if is_ingester(&LOCAL_NODE_ROLE) {
-        db::file_list::local::broadcast_cache(None).await.unwrap();
+        tokio::task::spawn(async move {
+            let _ = db::file_list::local::broadcast_cache(None).await;
+        });
     }
 
     Ok(())

@@ -42,6 +42,6 @@ pub fn generate_storage_file_name(
     if partition_key.eq("") {
         format!("files/{stream_key}/{file_date}/{file_name}")
     } else {
-        format!("files/{stream_key}/{file_date}/{partition_key}/{file_name}")
+        format!("files/{stream_key}/{file_date}/{partition_key}{file_name}")
     }
 }
