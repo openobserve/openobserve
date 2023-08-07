@@ -4,7 +4,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch } from "vue";
-import Plotly from "plotly.js";
+import Plotly from "plotly.js-dist-min";
 
 export default defineComponent({
   name: "ChartRenderer",

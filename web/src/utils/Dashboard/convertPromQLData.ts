@@ -365,6 +365,7 @@ export const convertPromQLData = (
                 y: values.map((value: any) => value[1]),
               };
             });
+            return traces;
             // const layout: any = {
             //   title: false,
             //   showlegend: props.data.config?.show_legends,
@@ -387,88 +388,87 @@ export const convertPromQLData = (
           }
         }
       }
-      // case "metric": {
-      //   switch (it.resultType) {
-      //     case "matrix": {
-      //       const traces = it?.result?.map((metric: any) => {
-      //         const values = metric.values.sort(
-      //           (a: any, b: any) => a[0] - b[0]
-      //         );
-      //         const unitValue = getUnitValue(values[values.length - 1][1]);
+      case "metric": {
+        switch (it.resultType) {
+          case "matrix": {
+            const traces = it?.result?.map((metric: any) => {
+              const values = metric.values.sort(
+                (a: any, b: any) => a[0] - b[0]
+              );
+              const unitValue = getUnitValue(values[values.length - 1][1]);
 
-      //         return {
-      //           value: unitValue.value,
-      //           number: { suffix: unitValue.unit, valueformat: ".2f" },
-      //           ...getPropsByChartTypeForTraces(),
-      //         };
-      //       });
-      //       return  traces ;
+              return {
+                value: unitValue.value,
+                number: { suffix: unitValue.unit, valueformat: ".2f" },
+                ...getPropsByChartTypeForTraces(),
+              };
+            });
+            return traces;
 
-      //       // result = result.map((it: any) => moment(it + "Z").toISOString(true))
+            //       // result = result.map((it: any) => moment(it + "Z").toISOString(true))
 
-      //       const layout: any = {
-      //         title: false,
-      //         showlegend: props.data.config?.show_legends,
-      //         autosize: true,
-      //         legend: {
-      //           // bgcolor: "#f7f7f7",
-      //           orientation: getLegendPosition("promql"),
-      //           itemclick: false,
-      //         },
-      //         margin: {
-      //           autoexpand: true,
-      //           l: 10,
-      //           r: 10,
-      //           t: 0,
-      //           b: 0,
-      //         },
-      //         ...getPropsByChartTypeForLayoutForPromQL(),
-      //         ...getThemeLayoutOptions(store),
-      //       };
-      //       break;
-      //     }
-      //     case "vector": {
-      //       const traces = it?.result?.map((metric: any) => {
-      //         const values = [metric.value];
+            //       const layout: any = {
+            //         title: false,
+            //         showlegend: props.data.config?.show_legends,
+            //         autosize: true,
+            //         legend: {
+            //           // bgcolor: "#f7f7f7",
+            //           orientation: getLegendPosition("promql"),
+            //           itemclick: false,
+            //         },
+            //         margin: {
+            //           autoexpand: true,
+            //           l: 10,
+            //           r: 10,
+            //           t: 0,
+            //           b: 0,
+            //         },
+            //         ...getPropsByChartTypeForLayoutForPromQL(),
+            //         ...getThemeLayoutOptions(store),
+            //       };
+            //       break;
+          }
+          case "vector": {
+            const traces = it?.result?.map((metric: any) => {
+              const values = [metric.value];
 
-      //         // console.log('vector',values);
+              // console.log('vector',values);
 
-      //         return {
-      //           name: JSON.stringify(metric.metric),
-      //           value: metric?.value?.length > 1 ? metric.value[1] : "",
-      //           ...getPropsByChartTypeForTraces(),
-      //         };
-      //       });
-
-      //       const layout: any = {
-      //         title: false,
-      //         showlegend: props.data.config?.show_legends,
-      //         autosize: true,
-      //         legend: {
-      //           // bgcolor: "#f7f7f7",
-      //           orientation: getLegendPosition("promql"),
-      //           itemclick: false,
-      //         },
-      //         margin: {
-      //           l: props.data.type == "pie" ? 60 : 32,
-      //           r: props.data.type == "pie" ? 60 : 16,
-      //           t: 38,
-      //           b: 32,
-      //         },
-      //         ...getPropsByChartTypeForLayoutForPromQL(),
-      //         ...getThemeLayoutOptions(store),
-      //       };
-      //       break;
-      //     }
-      //   }
-      //   break;
-      // }
-      // default: {
-      //   return [];
-      // }
+              return {
+                name: JSON.stringify(metric.metric),
+                value: metric?.value?.length > 1 ? metric.value[1] : "",
+                ...getPropsByChartTypeForTraces(),
+              };
+            });
+            return traces;
+            //       const layout: any = {
+            //         title: false,
+            //         showlegend: props.data.config?.show_legends,
+            //         autosize: true,
+            //         legend: {
+            //           // bgcolor: "#f7f7f7",
+            //           orientation: getLegendPosition("promql"),
+            //           itemclick: false,
+            //         },
+            //         margin: {
+            //           l: props.data.type == "pie" ? 60 : 32,
+            //           r: props.data.type == "pie" ? 60 : 16,
+            //           t: 38,
+            //           b: 32,
+            //         },
+            //         ...getPropsByChartTypeForLayoutForPromQL(),
+            //         ...getThemeLayoutOptions(store),
+            //       };
+            //       break;
+          }
+        }
+        break;
+      }
+      default: {
+        return [];
+      }
     }
   });
-
   const layout: any = {
     title: false,
     showlegend: props.data.config?.show_legends,
@@ -500,4 +500,4 @@ export const convertPromQLData = (
   console.log("traces:", traces);
 
   return { traces: traces.flat(), layout };
-}
+};
