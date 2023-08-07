@@ -22,14 +22,14 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard},
 };
 
-use crate::common::meta::StreamType;
-use crate::common::{file::get_file_contents, meta::stream::StreamParams};
-use crate::common::{
-    infra::{
-        config::{CONFIG, FILE_EXT_JSON},
-        ider, metrics,
-    },
-    meta::stream::PartitionTimeLevel,
+use crate::common::file::get_file_contents;
+use crate::common::infra::{
+    config::{CONFIG, FILE_EXT_JSON},
+    ider, metrics,
+};
+use crate::common::meta::{
+    stream::{PartitionTimeLevel, StreamParams},
+    StreamType,
 };
 
 // MANAGER for manage using WAL files, in use, should not move to s3
@@ -186,7 +186,7 @@ impl Manager {
         };
 
         // check size & ttl
-        if file.size() >= (CONFIG.limit.max_file_size_on_disk).try_into().unwrap()
+        if file.size() >= (CONFIG.limit.max_file_size_on_disk as i64)
             || file.expired() <= chrono::Utc::now().timestamp()
         {
             self.data
@@ -216,11 +216,6 @@ impl Manager {
         let stream_type = stream.stream_type;
 
         let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
-        let mut data = self.data.get(thread_id).unwrap().write().unwrap();
-        if let Some(f) = data.get(&full_key) {
-            return f.clone();
-        }
-
         let file = Arc::new(RwFile::new(
             thread_id,
             stream,
@@ -228,6 +223,7 @@ impl Manager {
             key,
             use_cache,
         ));
+        let mut data = self.data.get(thread_id).unwrap().write().unwrap();
         if !stream_type.eq(&StreamType::EnrichmentTables) {
             data.insert(full_key, file.clone());
         };
