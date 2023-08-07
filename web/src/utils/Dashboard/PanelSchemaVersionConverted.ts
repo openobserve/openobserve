@@ -1,8 +1,8 @@
 export const PanelSchemaVersionConverted = {
   transformSchema,
 };
-function transformSchema(data: any, version: any) {
-  switch (version) {
+function transformSchema(data: any) {
+  switch (data.version) {
     case 1:
       data = {
         id: data.id,
@@ -27,11 +27,21 @@ function transformSchema(data: any, version: any) {
           },
         ],
       };
+
+    case 2:
+      data = {
+        ...data,
+        config: {
+          title: data.config.title,
+          description: data.config.description,
+        },
+      };
   }
 
   return data;
 }
 const dataV1 = {
+  version: 1,
   id: "123",
   type: "bar",
   fields: {
@@ -56,6 +66,7 @@ const dataV1 = {
 };
 
 const dataV2 = {
+  version: 2,
   id: "456",
   type: "bar",
   config: {
@@ -85,8 +96,33 @@ const dataV2 = {
   ],
 };
 
-const version1 = 1;
+const dataV3 = {
+  version: 3,
+  id: "456",
+  type: "bar",
+  config: {
+    title: "",
+    description: "",
+  },
+  queryType: "sql",
+  queries: [
+    {
+      query: "",
+      customQuery: false,
+      fields: {
+        stream: "",
+        stream_type: "logs",
+        x: [],
+        y: [],
+        filter: [],
+      },
+      config: {
+        promql_legend: "",
+      },
+    },
+  ],
+};
 
-const transformedDataV1 = transformSchema(dataV1, version1);
-
-console.log("transformedDataV1", transformedDataV1);
+console.log("transformedDataV1", transformSchema(dataV1));
+console.log("transformedDataV2", transformSchema(dataV2));
+console.log("transformedDataV3", transformSchema(dataV3));
