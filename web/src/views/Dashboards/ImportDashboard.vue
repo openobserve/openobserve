@@ -135,6 +135,7 @@ export default defineComponent({
       filesImportResults.value = []
     });
 
+    //import dashboard from the json
     const importDashboardFromJSON = async (jsonObj: any) => {
       const data = typeof jsonObj == 'string' ? JSON.parse(jsonObj) : typeof jsonObj == 'object' ? jsonObj : jsonObj
 
@@ -148,17 +149,7 @@ export default defineComponent({
       )
     }
 
-    // ----------------------------------------------------------------------------
-
-    //   return fileData.map((it:any, index:number)=>{
-    //     return {
-    //       fileName: it.name,
-    //       status: promiseArray[index].status,
-    //       value: promiseArray[index].value
-    //     }
-    //   })
-    // }
-
+    // import multiple files
     const importFiles = async () => {
       isLoading.value = ImportType.FILES
 
@@ -182,11 +173,9 @@ export default defineComponent({
           reader.readAsText(it)
         })
       })
-      // console.log("data=", data);
 
       Promise.allSettled(data)
         .then(async (results) => {
-          // console.log("results", results);
           filesImportResults.value = results
 
           const allFulfilledValues = results
@@ -218,6 +207,7 @@ export default defineComponent({
 
     }
 
+    // reset and refresh the value based on selected type 
     const resetAndRefresh = async (type) => {
       switch (type) {
         case ImportType.FILES:
@@ -243,6 +233,7 @@ export default defineComponent({
       })
     }
 
+    //import dashboard from url
     const importFromUrl = async () => {
       isLoading.value = ImportType.URL
       try {
@@ -250,7 +241,6 @@ export default defineComponent({
         const urlData = url.value ? url.value : ''
 
         const res = await axios.get(urlData);
-        // console.log("res=", res);
         await importDashboardFromJSON(res.data)
           .then((res) => {
             resetAndRefresh(ImportType.URL);
@@ -271,6 +261,7 @@ export default defineComponent({
       }
     }
 
+    // import dashboard from json string
     const importFromJsonStr = async () => {
       isLoading.value = ImportType.JSON_STRING
       try {
