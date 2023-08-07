@@ -312,44 +312,47 @@ export const convertPromQLData = (
                 stackgroup: props.data.type == "area-stacked" ? "one" : "",
                 ...getPropsByChartTypeForTraces(),
               };
-              // Calculate the maximum value size from the 'y' values in the 'traces' array
-              // const maxValueSize =
-              //   props.data.type == "area-stacked"
-              //     ? traces.reduce((sum: any, it: any) => sum + Math.max(...it.y), 0)
-              //     : traces.reduce(
-              //         (max: any, it: any) => Math.max(max, Math.max(...it.y)),
-              //         0
-              //       );
-
-              // // Calculate the minimum value size from the 'y' values in the 'traces' array
-              // const minValueSize = traces.reduce(
-              //   (min: any, it: any) => Math.min(min, Math.min(...it.y)),
-              //   Infinity
-              // );
-
-              // // Initialize empty arrays to hold tick values and tick text
-              // let yTickVals = [];
-              // let yTickText = [];
-
-              // // Calculate the interval size for 5 equally spaced ticks
-              // let intervalSize = (maxValueSize - minValueSize) / 4;
-
-              // // If the data doesn't vary much, use a percentage of the max value as the interval size
-              // if (intervalSize === 0) {
-              //   intervalSize = maxValueSize * 0.2;
-              // }
-
-              // // Generate tick values and tick text for the y-axis
-              // for (let i = 0; i <= 4; i++) {
-              //   let val = minValueSize + intervalSize * i;
-              //   yTickVals.push(minValueSize + intervalSize * i);
-              //   yTickText.push(formatUnitValue(getUnitValue(val)));
-              // }
-              // // result = result.map((it: any) => moment(it + "Z").toISOString(true))
-              // const yAxisTickOptions = !props.data.config?.unit
-              //   ? {}
-              //   : { tickvals: yTickVals, ticktext: yTickText };
             });
+            // Calculate the maximum value size from the 'y' values in the 'traces' array
+            const maxValueSize =
+              props.data.type == "area-stacked"
+                ? traces.reduce(
+                    (sum: any, it: any) => sum + Math.max(...it.y),
+                    0
+                  )
+                : traces.reduce(
+                    (max: any, it: any) => Math.max(max, Math.max(...it.y)),
+                    0
+                  );
+
+            // Calculate the minimum value size from the 'y' values in the 'traces' array
+            const minValueSize = traces.reduce(
+              (min: any, it: any) => Math.min(min, Math.min(...it.y)),
+              Infinity
+            );
+
+            // Initialize empty arrays to hold tick values and tick text
+            let yTickVals = [];
+            let yTickText = [];
+
+            // Calculate the interval size for 5 equally spaced ticks
+            let intervalSize = (maxValueSize - minValueSize) / 4;
+
+            // If the data doesn't vary much, use a percentage of the max value as the interval size
+            if (intervalSize === 0) {
+              intervalSize = maxValueSize * 0.2;
+            }
+
+            // Generate tick values and tick text for the y-axis
+            for (let i = 0; i <= 4; i++) {
+              let val = minValueSize + intervalSize * i;
+              yTickVals.push(minValueSize + intervalSize * i);
+              yTickText.push(formatUnitValue(getUnitValue(val)));
+            }
+            // result = result.map((it: any) => moment(it + "Z").toISOString(true))
+            const yAxisTickOptions = !props.data.config?.unit
+              ? {}
+              : { tickvals: yTickVals, ticktext: yTickText };
             return traces;
           }
           case "vector": {
@@ -366,25 +369,6 @@ export const convertPromQLData = (
               };
             });
             return traces;
-            // const layout: any = {
-            //   title: false,
-            //   showlegend: props.data.config?.show_legends,
-            //   autosize: true,
-            //   legend: {
-            //     // bgcolor: "#f7f7f7",
-            //     orientation: getLegendPosition("promql"),
-            //     itemclick: false,
-            //   },
-            //   margin: {
-            //     l: props.data.type == "pie" ? 60 : 32,
-            //     r: props.data.type == "pie" ? 60 : 16,
-            //     t: 38,
-            //     b: 32,
-            //   },
-            //   ...getThemeLayoutOptions(store),
-            // };
-            // return { layout };
-            // break;
           }
         }
       }
@@ -404,29 +388,6 @@ export const convertPromQLData = (
               };
             });
             return traces;
-
-            //       // result = result.map((it: any) => moment(it + "Z").toISOString(true))
-
-            //       const layout: any = {
-            //         title: false,
-            //         showlegend: props.data.config?.show_legends,
-            //         autosize: true,
-            //         legend: {
-            //           // bgcolor: "#f7f7f7",
-            //           orientation: getLegendPosition("promql"),
-            //           itemclick: false,
-            //         },
-            //         margin: {
-            //           autoexpand: true,
-            //           l: 10,
-            //           r: 10,
-            //           t: 0,
-            //           b: 0,
-            //         },
-            //         ...getPropsByChartTypeForLayoutForPromQL(),
-            //         ...getThemeLayoutOptions(store),
-            //       };
-            //       break;
           }
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
@@ -441,25 +402,6 @@ export const convertPromQLData = (
               };
             });
             return traces;
-            //       const layout: any = {
-            //         title: false,
-            //         showlegend: props.data.config?.show_legends,
-            //         autosize: true,
-            //         legend: {
-            //           // bgcolor: "#f7f7f7",
-            //           orientation: getLegendPosition("promql"),
-            //           itemclick: false,
-            //         },
-            //         margin: {
-            //           l: props.data.type == "pie" ? 60 : 32,
-            //           r: props.data.type == "pie" ? 60 : 16,
-            //           t: 38,
-            //           b: 32,
-            //         },
-            //         ...getPropsByChartTypeForLayoutForPromQL(),
-            //         ...getThemeLayoutOptions(store),
-            //       };
-            //       break;
           }
         }
         break;
@@ -469,29 +411,56 @@ export const convertPromQLData = (
       }
     }
   });
-  const layout: any = {
-    title: false,
-    showlegend: props.data.config?.show_legends,
-    autosize: true,
-    legend: {
-      // bgcolor: "#f7f7f7",
-      orientation: getLegendPosition("promql"),
-      itemclick: false,
-    },
-    margin: {
-      autoexpand: true,
-      r: 50,
-      b: 50,
-      t: 30,
-    },
-    yaxis: {
-      automargin: true,
-      autorange: true,
-      // ...yAxisTickOptions,
-    },
-    ...getPropsByChartTypeForLayoutForPromQL(),
-    ...getThemeLayoutOptions(store),
-  };
+  let layout: any;
+  switch (props.data.type) {
+    case "metric":
+      layout = {
+      title: false,
+      showlegend: props.data.config?.show_legends,
+      autosize: true,
+      legend: {
+        // bgcolor: "#f7f7f7",
+        orientation: getLegendPosition("promql"),
+        itemclick: false,
+      },
+      margin: {
+        autoexpand: true,
+        l: 10,
+        r: 10,
+        t: 0,
+        b: 0,
+      },
+      ...getPropsByChartTypeForLayoutForPromQL(),
+      ...getThemeLayoutOptions(store),
+    };
+    break;
+
+    default:
+      layout = {
+      title: false,
+      showlegend: props.data.config?.show_legends,
+      autosize: true,
+      legend: {
+        // bgcolor: "#f7f7f7",
+        orientation: getLegendPosition("promql"),
+        itemclick: false,
+      },
+      margin: {
+        autoexpand: true,
+        r: 50,
+        b: 50,
+        t: 30,
+      },
+      yaxis: {
+        automargin: true,
+        autorange: true,
+        ...yAxisTickOptions,
+      },
+      ...getPropsByChartTypeForLayoutForPromQL(),
+      ...getThemeLayoutOptions(store),
+    }
+        break;
+    }
   // console.log("maxValueSize:", maxValueSize);
   // console.log("minValueSize:", minValueSize);
   // console.log("yTickVals:", yTickVals);
