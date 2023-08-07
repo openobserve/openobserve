@@ -149,7 +149,7 @@ import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 
 export default defineComponent({
-  name: "FunctionList",
+  name: "functionList",
   components: { QTablePagination, AddFunction, NoData, ConfirmDialog },
   emits: [
     "updated:fields",
@@ -464,7 +464,7 @@ export default defineComponent({
     //   );
     //   if (
     //     (newVal != oldVal || this.jsTransforms.value == undefined) &&
-    //     this.router.currentRoute.value.name == "functions"
+    //     this.router.currentRoute.value.name == "AppFunctions"
     //   ) {
     //     this.resultTotal = 0;
     //     this.jsTransforms = [];
