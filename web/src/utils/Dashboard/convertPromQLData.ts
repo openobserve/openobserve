@@ -1,8 +1,6 @@
 import { onMounted, reactive, ref } from "vue";
-import Plotly from "plotly.js";
-import { getThemeLayoutOptions } from "@/utils/Dashboard/getThemeLayoutOptions";
+import { getThemeLayoutOptions } from "@/utils/dashboard/getThemeLayoutOptions";
 import moment from "moment";
-import { QueryMiddleWare } from "@/utils/Dashboard/QueryMiddleWare";
 
 export const convertPromQLData = (
   panelSchema: any,
@@ -313,46 +311,8 @@ export const convertPromQLData = (
                 ...getPropsByChartTypeForTraces(),
               };
             });
-            // Calculate the maximum value size from the 'y' values in the 'traces' array
-            const maxValueSize =
-              props.data.type == "area-stacked"
-                ? traces.reduce(
-                    (sum: any, it: any) => sum + Math.max(...it.y),
-                    0
-                  )
-                : traces.reduce(
-                    (max: any, it: any) => Math.max(max, Math.max(...it.y)),
-                    0
-                  );
-
-            // Calculate the minimum value size from the 'y' values in the 'traces' array
-            const minValueSize = traces.reduce(
-              (min: any, it: any) => Math.min(min, Math.min(...it.y)),
-              Infinity
-            );
-
-            // Initialize empty arrays to hold tick values and tick text
-            let yTickVals = [];
-            let yTickText = [];
-
-            // Calculate the interval size for 5 equally spaced ticks
-            let intervalSize = (maxValueSize - minValueSize) / 4;
-
-            // If the data doesn't vary much, use a percentage of the max value as the interval size
-            if (intervalSize === 0) {
-              intervalSize = maxValueSize * 0.2;
-            }
-
-            // Generate tick values and tick text for the y-axis
-            for (let i = 0; i <= 4; i++) {
-              let val = minValueSize + intervalSize * i;
-              yTickVals.push(minValueSize + intervalSize * i);
-              yTickText.push(formatUnitValue(getUnitValue(val)));
-            }
-            // result = result.map((it: any) => moment(it + "Z").toISOString(true))
-            const yAxisTickOptions = !props.data.config?.unit
-              ? {}
-              : { tickvals: yTickVals, ticktext: yTickText };
+            console.log("promQLLLLL traces", traces);
+            
             return traces;
           }
           case "vector": {
@@ -411,6 +371,56 @@ export const convertPromQLData = (
       }
     }
   });
+
+  let tracess = traces.flat();
+  console.log("tracess", tracess);
+  
+  // Calculate the maximum value size from the 'y' values in the 'traces' array
+  const maxValueSize =
+    props.data.type == "area-stacked"
+      ? tracess.reduce((sum: any, it: any) => sum + Math.max(...it.y), 0)
+      : tracess.reduce(
+          (max: any, it: any) => Math.max(max, Math.max(...it.y)),
+          0
+        );
+
+  // Calculate the minimum value size from the 'y' values in the 'traces' array
+  const minValueSize = tracess.reduce(
+    (min: any, it: any) => Math.min(min, Math.min(...it.y)),
+    Infinity
+  );
+
+  // Initialize empty arrays to hold tick values and tick text
+  let yTickVals = [];
+  let yTickText = [];
+
+  // Calculate the interval size for 5 equally spaced ticks
+  let intervalSize = (maxValueSize - minValueSize) / 4;
+
+  // If the data doesn't vary much, use a percentage of the max value as the interval size
+  if (intervalSize === 0) {
+    intervalSize = maxValueSize * 0.2;
+  }
+
+  // Generate tick values and tick text for the y-axis
+  for (let i = 0; i <= 4; i++) {
+    let val = minValueSize + intervalSize * i;
+    yTickVals.push(minValueSize + intervalSize * i);
+    yTickText.push(formatUnitValue(getUnitValue(val)));
+  }
+  // result = result.map((it: any) => moment(it + "Z").toISOString(true))
+  const yAxisTickOptions = !props.data.config?.unit
+    ? {}
+    : { tickvals: yTickVals, ticktext: yTickText };
+
+
+  console.log("maxValueSize:", maxValueSize);
+  console.log("minValueSize:", minValueSize);
+  console.log("yTickVals:", yTickVals);
+  console.log("yTickText:", yTickText);
+  console.log("yAxisTickOptions:", yAxisTickOptions);
+  
+
   let layout: any;
   switch (props.data.type) {
     case "metric":
@@ -461,10 +471,6 @@ export const convertPromQLData = (
     }
         break;
     }
-  // console.log("maxValueSize:", maxValueSize);
-  // console.log("minValueSize:", minValueSize);
-  // console.log("yTickVals:", yTickVals);
-  // console.log("yTickText:", yTickText);
   console.log("layout:", layout);
   console.log("traces:", traces);
 

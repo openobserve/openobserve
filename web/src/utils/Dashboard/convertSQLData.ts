@@ -1,4 +1,4 @@
-import { getThemeLayoutOptions } from "@/utils/Dashboard/getThemeLayoutOptions";
+import { getThemeLayoutOptions } from "@/utils/dashboard/getThemeLayoutOptions";
 
 export const convertSQLData = (
   panelSchema: any,
