@@ -33,8 +33,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        let leaders = METRIC_CLUSTER_LEADER.clone();
-        for item in leaders.iter() {
+        for item in METRIC_CLUSTER_LEADER.clone().iter() {
             let result = db::metrics::set_prom_cluster_leader(item.key(), item.value()).await;
             match result {
                 Ok(_) => {

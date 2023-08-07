@@ -148,6 +148,7 @@ pub fn get_stream_stats_len() -> usize {
 #[inline]
 pub fn get_stream_stats_in_memory_size() -> usize {
     STATS
+        .clone()
         .iter()
         .map(|v| v.key().len() + STREAM_STATS_MEM_SIZE)
         .sum()
