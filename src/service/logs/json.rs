@@ -136,7 +136,6 @@ pub async fn ingest(
 
         if iii == 0 {
             println!("i am here 8");
-            iii = 1;
         }
 
         // get json object
@@ -171,7 +170,6 @@ pub async fn ingest(
 
         if iii == 0 {
             println!("i am here 9");
-            iii = 1;
         }
 
         let local_trigger = super::add_valid_record(
@@ -194,8 +192,8 @@ pub async fn ingest(
 
         if iii == 0 {
             println!("i am here 10");
-            iii = 1;
         }
+        iii = 1;
     }
 
     // write to file
