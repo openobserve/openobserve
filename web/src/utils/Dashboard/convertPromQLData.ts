@@ -374,7 +374,13 @@ export const convertPromQLData = (
 
   let tracess = traces.flat();
   console.log("tracess", tracess);
-  
+  tracess.filter((it:any) => {
+    //if NAN then remove
+    if (isNaN(it.y)) {
+      return false
+    }
+  });
+
   // Calculate the maximum value size from the 'y' values in the 'traces' array
   const maxValueSize =
     props.data.type == "area-stacked"
