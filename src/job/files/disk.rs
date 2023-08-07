@@ -125,13 +125,13 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                                             ])
                                             .sub(meta.original_size as i64);
 
-                                        report_compression_stats(
+                                        /*  report_compression_stats(
                                             meta.into(),
                                             &org_id,
                                             &stream_name,
                                             stream_type,
                                         )
-                                        .await;
+                                        .await; */
                                     }
                                 }
                                 Err(e) => {
