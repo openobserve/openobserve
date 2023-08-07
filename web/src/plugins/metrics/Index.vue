@@ -358,6 +358,7 @@ export default defineComponent({
         loadPageData(true);
         refreshData();
       }
+      dashboardPanelData.data.type = "line";
       dashboardPanelData.data.queryType = "promql";
       dashboardPanelData.data.fields.stream_type = "metrics";
       dashboardPanelData.data.customQuery = true;
