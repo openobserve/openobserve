@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::common::infra::{
-    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+    cluster::{get_node_by_uuid, is_compactor, LOCAL_NODE_UUID},
     config::CONFIG,
     dist_lock,
 };
@@ -22,6 +22,12 @@ use super::ingestion_service;
 pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
 pub async fn publish_stats() -> Result<(), anyhow::Error> {
+    if !is_compactor(&crate::common::infra::cluster::LOCAL_NODE_ROLE)
+        || !CONFIG.common.usage_enabled
+    {
+        return Ok(());
+    }
+
     let mut orgs = db::schema::list_organizations_from_cache();
     orgs.retain(|org: &String| org != &CONFIG.common.usage_org);
 
