@@ -160,8 +160,6 @@ export default defineComponent({
     // }
 
     const importFiles = async () => {
-      console.log("===", jsonFiles.value);
-
       isLoading.value = ImportType.FILES
 
       const data = jsonFiles?.value?.map((it: any, index: number) => {
@@ -171,13 +169,9 @@ export default defineComponent({
             try {
               importDashboardFromJSON(readerResult.target.result)
                 .then((res) => {
-                  console.log("jsonFiles.value=", index + " : " + jsonFiles.value);
-
                   jsonFiles.value = null
                   resolve({ file: it.name, result: res })
                 }).catch((e) => {
-                  console.log("e=", index + " : " + e);
-
                   reject({ file: it.name, error: e })
                 })
             } catch (e) {
@@ -188,11 +182,11 @@ export default defineComponent({
           reader.readAsText(it)
         })
       })
-      console.log("data=", data);
+      // console.log("data=", data);
 
       Promise.allSettled(data)
         .then(async (results) => {
-          console.log("results", results);
+          // console.log("results", results);
           filesImportResults.value = results
 
           const allFulfilledValues = results
@@ -203,7 +197,6 @@ export default defineComponent({
           }
 
           if(allFulfilledValues){
-            console.log("------",allFulfilledValues);
             
             $q.notify({
               type: "positive",
@@ -212,7 +205,6 @@ export default defineComponent({
           }
 
           if(results.length-allFulfilledValues){
-            console.log("----",results.length-allFulfilledValues);
             
             $q.notify({
               type: "negative",
@@ -222,7 +214,6 @@ export default defineComponent({
           
 
           isLoading.value = false
-          console.log("allFulfilledValues", allFulfilledValues);
         });
 
     }
@@ -259,7 +250,7 @@ export default defineComponent({
         const urlData = url.value ? url.value : ''
 
         const res = await axios.get(urlData);
-        console.log("res=", res);
+        // console.log("res=", res);
         await importDashboardFromJSON(res.data)
           .then((res) => {
             resetAndRefresh(ImportType.URL);
