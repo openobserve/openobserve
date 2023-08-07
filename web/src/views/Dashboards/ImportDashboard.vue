@@ -41,10 +41,10 @@
             </template>
           </q-file>
           <div>
-            <div v-if="filesImportResults.length">
+            <div v-if="filesImportResults.length" class="q-py-sm">
               <div v-for="importResult in filesImportResults">
                 <span v-if="importResult.status == 'rejected'" class="text-red">
-                  {{ importResult?.reason?.file }} : {{ importResult?.reason?.error }}
+                  <code style="background-color: #f2f1f1; padding: 3px;">{{ importResult?.reason?.file }}</code> : {{ importResult?.reason?.error }}
                 </span>
               </div>
             </div>
@@ -202,12 +202,24 @@ export default defineComponent({
             await resetAndRefresh(ImportType.FILES);
           }
 
-          console.log("----",);
+          if(allFulfilledValues){
+            console.log("------",allFulfilledValues);
+            
+            $q.notify({
+              type: "positive",
+              message: `${allFulfilledValues} Dashboard(s) Imported Successfully.`,
+            });
+          }
+
+          if(results.length-allFulfilledValues){
+            console.log("----",results.length-allFulfilledValues);
+            
+            $q.notify({
+              type: "negative",
+              message: `${results.length-allFulfilledValues} Dashboard(s) Failed to Import.`,
+            });
+          }
           
-          $q.notify({
-            type: "positive",
-            message: `${allFulfilledValues} Dashboard(s) Imported Successfully and ${results.length-allFulfilledValues} Dashboard(s) Failed to Import`,
-          });
 
           isLoading.value = false
           console.log("allFulfilledValues", allFulfilledValues);
@@ -241,6 +253,7 @@ export default defineComponent({
     }
 
     const importFromUrl = async () => {
+      isLoading.value = ImportType.URL
       try {
         // get the dashboard
         const urlData = url.value ? url.value : ''
@@ -268,7 +281,7 @@ export default defineComponent({
     }
 
     const importFromJsonStr = async () => {
-
+      isLoading.value = ImportType.JSON_STRING
       try {
         // get the dashboard
         await importDashboardFromJSON(jsonStr.value)
