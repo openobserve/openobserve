@@ -28,36 +28,45 @@
           Import Dashboard from exported JSON file
         </div>
         <div style="width: 400px;">
-          <q-file filled bottom-slots v-model="jsonFile" label="Drop your file here" accept=".json" multiple>
+          <q-file filled bottom-slots v-model="jsonFiles" label="Drop your file here" accept=".json" multiple
+            :disable="!!isLoading">
             <template v-slot:prepend>
               <q-icon name="cloud_upload" @click.stop.prevent />
             </template>
             <template v-slot:append>
-              <q-icon name="close" @click.stop.prevent="jsonFile = null" class="cursor-pointer" />
+              <q-icon name="close" @click.stop.prevent="jsonFiles = null" class="cursor-pointer" />
             </template>
             <template v-slot:hint>
               .json files only
             </template>
           </q-file>
           <div>
-            <q-btn :disable="!jsonFile" :label="t('dashboard.import')" class="q-my-md text-bold no-border"
-              color="secondary" padding="sm xl" type="submit" no-caps @click="importFile()" />
+            <div v-if="filesImportResults.length">
+              <div v-for="importResult in filesImportResults">
+                <span v-if="importResult.status == 'rejected'" class="text-red">
+                  {{ importResult?.reason?.file }} : {{ importResult?.reason?.error }}
+                </span>
+              </div>
+            </div>
+            <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.FILES" :label="t('dashboard.import')"
+              class="q-my-md text-bold no-border" color="secondary" padding="sm xl" type="submit" no-caps
+              @click="importFiles()" />
           </div>
         </div>
       </q-form>
       <q-separator class="q-my-sm" />
-      <!-- {{ getUploadedFile(jsonFile,getFileResult) }} -->
 
       <q-form @submit="onSubmit">
         <div class="q-my-md">
           Import Dashboard from URL
         </div>
         <div class="flex" style="width: 400px;">
-          <q-input v-model="url" style="width:275px;" label="Add your url" color="input-border" bg-color="input-bg" stack-label filled dense
-            label-slot />
+          <q-input v-model="url" style="width:275px;" label="Add your url" color="input-border" bg-color="input-bg"
+            stack-label filled dense label-slot :disable="!!isLoading" />
           <div>
-            <q-btn :disable="!url" class="text-bold no-border q-ml-md" :label="t('dashboard.import')"
-              color="secondary" type="submit" no-caps @click="importFromUrl()" padding="sm xl" />
+            <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.URL" class="text-bold no-border q-ml-md"
+              :label="t('dashboard.import')" color="secondary" type="submit" no-caps @click="importFromUrl()"
+              padding="sm xl" />
           </div>
         </div>
       </q-form>
@@ -67,11 +76,13 @@
           Import Dashboard from JSON
         </div>
         <div style="width: 400px;" class="flex">
-          <q-input v-model="jsonStr" style="width: 400px;" label="JSON Object" color="input-border" dense filled type="textarea" />
+          <q-input :disable="!!isLoading" v-model="jsonStr" style="width: 400px;" label="JSON Object" color="input-border"
+            dense filled type="textarea" />
         </div>
         <div class="q-my-md">
-          <q-btn :disable="!jsonStr" class="text-bold no-border q-mr-md" :label="t('dashboard.import')"
-            color="secondary" type="submit" padding="sm xl" no-caps @click="importFromJsonStr()" />
+          <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.JSON_STRING" class="text-bold no-border q-mr-md"
+            :label="t('dashboard.import')" color="secondary" type="submit" padding="sm xl" no-caps
+            @click="importFromJsonStr()" />
           <q-btn v-close-popup class="text-bold" :label="t('function.cancel')" text-color="light-text" padding="sm xl"
             no-caps @click="goBack()" />
         </div>
@@ -84,7 +95,7 @@
 </template>
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { getAllDashboards } from "../../utils/commons.ts";
 import { useStore } from "vuex";
@@ -100,70 +111,31 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore()
     const router = useRouter()
-    const jsonFile = ref<any>()
+    const $q = useQuasar();
+
+    // hold the values of 3 supported import types
+    const jsonFiles = ref<any>()
     const url = ref('')
     const jsonStr = ref('')
-    const $q = useQuasar();
-    const getFileResult = ref()
 
-    const getUploadedFile = (fileData, promiseArray) => {
-      return fileData.map((it:any, index:number)=>{
-        return {
-          fileName: it.name,
-          status: promiseArray[index].status,
-          value: promiseArray[index].value
-        }
-      })
+    // holds the value of the loading for any of the import type
+    const isLoading = ref(false)
 
-    }
-  //  console.log("-----upload file-----",getUploadedFile(jsonFile.value ,getFileResult.value));
-   
-
-    const importFile = async () => {
-      console.log("===",jsonFile.value);
-      
-      const data = jsonFile?.value?.map((it:any, index) => {
-        return new Promise((resolve, reject) => {
-          let reader = new FileReader();
-          reader.onload = function (readerResult) {
-            try{
-              importDashboardFromJSON(readerResult.target.result)
-              .then((res) => {
-                console.log("jsonFile.value=",index+" : "+jsonFile.value);
-                
-                jsonFile.value = null
-                resolve(res)
-              }).catch((e)=>{
-                console.log("e=",index+" : "+e);
-                
-                reject(e)
-              })
-            } catch(e) {
-              reject(e)
-
-            }
-          };
-          reader.readAsText(it)
-        })
-      })
-      console.log("data=", data);
-
-      Promise.allSettled(data)
-      .then((results) => {
-        console.log("results", results);
-        getFileResult.value = results
-       
-        const allFulfilledValues = results
-          .filter(r => r.status === 'fulfilled')
-          .map(r => r.value);
-          
-       
-        console.log("allFulfilledValues",allFulfilledValues);
-      });
-     
+    // import type values
+    const ImportType = {
+      FILES: 'files',
+      URL: 'url',
+      JSON_STRING: 'json_string',
     }
 
-    const importDashboardFromJSON = (jsonObj: any) => {
+    // store the results of the import (for files)
+    const filesImportResults = ref([])
+
+    onMounted(() => {
+      filesImportResults.value = []
+    });
+
+    const importDashboardFromJSON = async (jsonObj: any) => {
       const data = typeof jsonObj == 'string' ? JSON.parse(jsonObj) : typeof jsonObj == 'object' ? jsonObj : jsonObj
 
       //set owner name and creator name to import dashboard
@@ -175,115 +147,156 @@ export default defineComponent({
         data
       )
     }
-    const importFromUrl = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
 
+    // ----------------------------------------------------------------------------
+
+    //   return fileData.map((it:any, index:number)=>{
+    //     return {
+    //       fileName: it.name,
+    //       status: promiseArray[index].status,
+    //       value: promiseArray[index].value
+    //     }
+    //   })
+    // }
+
+    const importFiles = async () => {
+      console.log("===", jsonFiles.value);
+
+      isLoading.value = ImportType.FILES
+
+      const data = jsonFiles?.value?.map((it: any, index: number) => {
+        return new Promise((resolve, reject) => {
+          let reader = new FileReader();
+          reader.onload = function (readerResult) {
+            try {
+              importDashboardFromJSON(readerResult.target.result)
+                .then((res) => {
+                  console.log("jsonFiles.value=", index + " : " + jsonFiles.value);
+
+                  jsonFiles.value = null
+                  resolve({ file: it.name, result: res })
+                }).catch((e) => {
+                  console.log("e=", index + " : " + e);
+
+                  reject({ file: it.name, error: e })
+                })
+            } catch (e) {
+              reject({ file: it.name, error: 'Error reading file' })
+
+            }
+          };
+          reader.readAsText(it)
+        })
+      })
+      console.log("data=", data);
+
+      Promise.allSettled(data)
+        .then(async (results) => {
+          console.log("results", results);
+          filesImportResults.value = results
+
+          const allFulfilledValues = results
+            .filter(r => r.status === 'fulfilled')?.length
+
+          if (results.length == allFulfilledValues.length) {
+            await resetAndRefresh(ImportType.FILES);
+          }
+
+          console.log("----",);
+          
+          $q.notify({
+            type: "positive",
+            message: `${allFulfilledValues} Dashboard(s) Imported Successfully and ${results.length-allFulfilledValues} Dashboard(s) Failed to Import`,
+          });
+
+          isLoading.value = false
+          console.log("allFulfilledValues", allFulfilledValues);
+        });
+
+    }
+
+    const resetAndRefresh = async (type) => {
+      switch (type) {
+        case ImportType.FILES:
+          jsonFiles.value = null
+          isLoading.value = false
+          break
+        case ImportType.URL:
+          url.value = ''
+          isLoading.value = false
+          break
+        case ImportType.JSON_STRING:
+          jsonStr.value = ''
+          isLoading.value = false
+          break
+        default:
+          break
+      }
+
+      return getAllDashboards(store).then(() => {
+        return getAllDashboards(store)
+      }).then(() => {
+        router.push('/dashboards')
+      })
+    }
+
+    const importFromUrl = async () => {
       try {
         // get the dashboard
         const urlData = url.value ? url.value : ''
 
         const res = await axios.get(urlData);
         console.log("res=", res);
-        importDashboardFromJSON(res.data)
-        .then((res) => {
-          url.value = ''
-          dismiss();
-          $q.notify({
-            type: "positive",
-            message: `Dashboard Imported Successfully`,
-          });
-        })
-        .then(() => {
-          return getAllDashboards(store)
-        }).then(() => {
-          router.push('/dashboards')
-        }).catch((err: any) => {
-          console.log(err)
-          $q.notify({
-            type: "negative",
-            message: err?.response?.data["error"] ? JSON.stringify(err?.response?.data["error"]) : 'Dashboard import failed',
-          });
-          dismiss();
-        }).finally(() => {
-          dismiss();
-        });
+        await importDashboardFromJSON(res.data)
+          .then((res) => {
+            resetAndRefresh(ImportType.URL);
+            filesImportResults.value = []
+            $q.notify({
+              type: "positive",
+              message: `Dashboard Imported Successfully`,
+            });
+          })
       } catch (error) {
-
         $q.notify({
           type: "negative",
           message: 'Invalid JSON format',
         });
-        dismiss();
+        
+      } finally {
+        isLoading.value = false
       }
     }
+
     const importFromJsonStr = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
 
       try {
         // get the dashboard
-        importDashboardFromJSON(jsonStr.value)
-        .then((res) => {
-          jsonStr.value = ''
-          dismiss();
-          $q.notify({
-            type: "positive",
-            message: `Dashboard Imported Successfully`,
-          });
-        }).then(() => {
-          return getAllDashboards(store)
-        }).then(() => {
-          router.push('/dashboards')
-        }).catch((err: any) => {
-          console.log(err)
-          $q.notify({
-            type: "negative",
-            message: err?.response?.data["error"] ? JSON.stringify(err?.response?.data["error"]) : 'Dashboard import failed',
-          });
-          dismiss();
-        }).finally(() => {
-          dismiss();
-        });
+        await importDashboardFromJSON(jsonStr.value)
+          .then((res) => {
+            resetAndRefresh(ImportType.JSON_STRING);
+            filesImportResults.value = []
+            $q.notify({
+                type: "positive",
+                message: `Dashboard Imported Successfully`,
+            });
+          })
       } catch (error) {
-        console.log(error);
-
         $q.notify({
           type: "negative",
           message: 'Invalid JSON format',
         });
-        dismiss();
+       
+      } finally {
+        isLoading.value = false
       }
     }
 
-    // const refreshDashboardList = async () => {
-    //   const dismiss = $q.notify({
-    //     spinner: true,
-    //     message: "Please wait...",
-    //     timeout: 2000,
-    //   });
-
-    //   dismiss();
-    //   $q.notify({
-    //     type: "positive",
-    //     message: `Dashboard Imported Successfully`,
-    //   });
-
-    //   await getAllDashboards(store)
-    //   router.push('/dashboards')
-    // }
-
     // back button to render dashboard List page
     const goBack = () => {
-      jsonFile.value = ''
+      jsonFiles.value = ''
       url.value = ''
       jsonStr.value = ''
+      filesImportResults.value = []
       return router.push("/dashboards");
     };
 
@@ -295,14 +308,15 @@ export default defineComponent({
       t,
       goBack,
       onSubmit,
-      importFile,
-      jsonFile,
+      importFiles,
+      jsonFiles,
       importFromUrl,
       url,
       jsonStr,
       importFromJsonStr,
-      getUploadedFile,
-      getFileResult
+      isLoading,
+      ImportType,
+      filesImportResults
     }
   }
 })
