@@ -367,6 +367,8 @@ export default defineComponent({
               }
             });
 
+            onChangeStreamFilter(selectedStreamType.value);
+
             dismiss();
           })
           .catch((err) => {
@@ -506,6 +508,7 @@ export default defineComponent({
         cloneDeep(duplicateStreamList.value),
         filterQuery.value.toLowerCase()
       );
+      resultTotal.value = logStream.value.length;
     };
 
     return {
