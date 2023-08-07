@@ -1,49 +1,36 @@
-export const QueryMiddleWare = {
+export const PanelSchemaVersionConverted = {
   transformSchema,
-}
+};
 function transformSchema(data: any, version: any) {
-  if (version === 1) {
-    const { id, type, fields, config, queryType, query, customQuery } = data;
-    return {
-      id,
-      type,
-      fields,
-      config,
-      queryType,
-      query,
-      customQuery,
-    };
-  } else if (version === 2) {
-    const { id, type, config, queries } = data;
-    const { queryType, query, customQuery, fields, promql_legend } = queries[0];
-    return {
-      id,
-      type,
-      config,
-      fields,
-      queryType,
-      query,
-      customQuery,
-      promql_legend,
-    };
-  } else if (version === 3) {
-    const { id, type, config, queries } = data;
-    const { queryType, query, customQuery, fields, promql_legend } = queries[0];
-    return {
-      id,
-      type,
-      config,
-      fields,
-      queryType,
-      query,
-      customQuery,
-      promql_legend,
-    };
-  } else {
-    return data;
+  switch (version) {
+    case 1:
+      data = {
+        id: data.id,
+        type: data.type,
+        config: {
+          title: data.config.title,
+          description: data.config.description,
+          show_legends: data.config.show_legends,
+          legends_position: data.config.legends_position,
+          unit: data.config.unit,
+          unit_custom: data.config.unit_custom,
+        },
+        queryType: data.queryType,
+        queries: [
+          {
+            query: data.query,
+            customQuery: data.customQuery,
+            fields: data.fields,
+            config: {
+              promql_legend: data.config.promql_legend,
+            },
+          },
+        ],
+      };
   }
-}
 
+  return data;
+}
 const dataV1 = {
   id: "123",
   type: "bar",
@@ -99,10 +86,7 @@ const dataV2 = {
 };
 
 const version1 = 1;
-const version2 = 2;
 
 const transformedDataV1 = transformSchema(dataV1, version1);
-const transformedDataV2 = transformSchema(dataV2, version2);
 
 console.log("transformedDataV1", transformedDataV1);
-console.log("transformedDataV2", transformedDataV2);
