@@ -61,7 +61,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
-          label="FluentBit"
+          label="FluentBit (Recommended)"
           content-class="tab_content"
         />
         <q-route-tab
@@ -255,7 +255,7 @@ export default defineComponent({
       router,
       config,
       rowData,
-      splitterModel: ref(200),
+      splitterModel: ref(250),
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       copyToClipboardFn,
