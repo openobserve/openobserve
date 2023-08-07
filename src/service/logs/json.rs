@@ -41,8 +41,6 @@ pub async fn ingest(
     let start = std::time::Instant::now();
     let stream_name = &format_stream_name(in_stream_name);
 
-    println!("i am here 1");
-
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
     }
@@ -56,8 +54,6 @@ pub async fn ingest(
         return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
 
-    println!("i am here 2");
-
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
@@ -69,8 +65,6 @@ pub async fn ingest(
 
     let mut trigger: Option<Trigger> = None;
 
-    println!("i am here 3");
-
     // Start Register Transforms for stream
 
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
@@ -80,8 +74,6 @@ pub async fn ingest(
     );
     // End Register Transforms for stream
 
-    println!("i am here 4");
-
     let stream_schema = stream_schema_exists(
         org_id,
         stream_name,
@@ -89,8 +81,6 @@ pub async fn ingest(
         &mut stream_schema_map,
     )
     .await;
-
-    println!("i am here 5");
 
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
@@ -100,20 +90,13 @@ pub async fn ingest(
         partition_keys = partition_det.partition_keys;
     }
 
-    println!("i am here 6");
-
     // Start get stream alerts
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
 
-    println!("i am here 7");
-
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
     let reader: Vec<json::Value> = json::from_slice(&body)?;
-
-    // debug
-    let mut iii = 0;
     for item in reader.iter() {
         //JSON Flattening
         let mut value = flatten::flatten(item)?;
@@ -133,10 +116,6 @@ pub async fn ingest(
             continue;
         }
         // End row based transform
-
-        if iii == 0 {
-            println!("i am here 8");
-        }
 
         // get json object
         let local_val = value.as_object_mut().unwrap();
@@ -168,10 +147,6 @@ pub async fn ingest(
             json::Value::Number(timestamp.into()),
         );
 
-        if iii == 0 {
-            println!("i am here 9");
-        }
-
         let local_trigger = super::add_valid_record(
             StreamMeta {
                 org_id: org_id.to_string(),
@@ -189,11 +164,6 @@ pub async fn ingest(
         if local_trigger.is_some() {
             trigger = Some(local_trigger.unwrap());
         }
-
-        if iii == 0 {
-            println!("i am here 10");
-        }
-        iii = 1;
     }
 
     // write to file
@@ -217,12 +187,8 @@ pub async fn ingest(
         ));
     }
 
-    println!("i am here 11");
-
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
-
-    println!("i am here 12");
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -244,8 +210,6 @@ pub async fn ingest(
         ])
         .inc();
 
-    println!("i am here 13");
-
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage
     report_request_usage_stats(
@@ -257,8 +221,6 @@ pub async fn ingest(
         local_trans.len() as u16,
     )
     .await;
-
-    println!("i am here 14");
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),

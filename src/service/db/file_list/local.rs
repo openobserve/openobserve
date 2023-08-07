@@ -63,10 +63,10 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     file.write(write_buf.as_ref());
 
     super::progress(key, meta, deleted, true).await?;
-    if !CONFIG.common.local_mode {
-        tokio::task::spawn(async move { super::broadcast::send(&[file_data], None).await });
-        tokio::task::yield_now().await;
-    }
+    // if !CONFIG.common.local_mode {
+    //     tokio::task::spawn(async move { super::broadcast::send(&[file_data], None).await });
+    //     tokio::task::yield_now().await;
+    // }
 
     Ok(())
 }
