@@ -73,7 +73,7 @@ fn create_user_df(
 pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::ScalarUDF> {
     let mut udf;
     let mut udf_list = Vec::new();
-    for transform in QUERY_FUNCTIONS.iter() {
+    for transform in QUERY_FUNCTIONS.clone().iter() {
         let key = transform.key();
         //do not register ingest_time transforms
         if key.contains(org_id) {

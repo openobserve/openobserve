@@ -47,6 +47,7 @@ pub async fn set(session_id: &str, files: &[FileKey]) {
 
 pub fn clear(session_id: &str) {
     let keys = FILES
+        .clone()
         .iter()
         .filter(|x| x.key().starts_with(session_id))
         .map(|x| x.key().clone())
