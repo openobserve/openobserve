@@ -29,6 +29,7 @@ export default defineComponent({
     const downloadDashboard = async () => {
       // get the dashboard
       const dashboard = await getDashboard(store, props.dashboardId)
+      dashboard.owner = ''
 
       // prepare json and download via a click
       const data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dashboard));
