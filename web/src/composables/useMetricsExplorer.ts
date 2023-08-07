@@ -35,10 +35,10 @@ const colors = [
 const getDefaultDashboardPanelData = () => ({
   data: {
     id: "",
-    type: "bar",
+    type: "line",
     fields: {
       stream: "",
-      stream_type: "logs",
+      stream_type: "metrics",
       x: <any>[],
       y: <any>[],
       filter: <any>[],
@@ -48,9 +48,9 @@ const getDefaultDashboardPanelData = () => ({
       description: "",
       show_legends: true,
     },
-    queryType: "sql",
+    queryType: "promql",
     query: "",
-    customQuery: false,
+    customQuery: true,
   },
   layout: {
     splitter: 20,
