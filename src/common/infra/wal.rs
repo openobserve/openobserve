@@ -210,7 +210,6 @@ impl Manager {
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
-        println!("create:  {} for {:?}", key, stream);
         let org_id = stream.org_id;
         let stream_name = stream.stream_name;
         let stream_type = stream.stream_type;
@@ -238,7 +237,6 @@ impl Manager {
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
-        println!("get_or_create:  {} for {:?}", key, stream);
         if let Some(file) = self.get(
             thread_id,
             stream.org_id,
@@ -307,7 +305,6 @@ impl RwFile {
         key: &str,
         use_cache: bool,
     ) -> RwFile {
-        println!("RwFile new: {} for {:?}", key, stream);
         let mut dir_path = format!(
             "{}files/{}/{}/{}/",
             &CONFIG.common.data_wal_dir, stream.org_id, stream.stream_type, stream.stream_name
