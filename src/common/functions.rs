@@ -8,6 +8,7 @@ pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
     let org_key = &format!("{}/", org_id);
 
     crate::common::infra::config::QUERY_FUNCTIONS
+        .clone()
         .iter()
         .filter_map(|transform| {
             let key = transform.key();

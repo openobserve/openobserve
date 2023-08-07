@@ -294,6 +294,7 @@ pub fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
     }
     Some(
         NODES
+            .clone()
             .iter()
             .filter_map(|node| cond(&node).then(|| node.clone()))
             .collect(),
