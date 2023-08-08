@@ -669,7 +669,7 @@ export default defineComponent({
         } else {
           const needle = val.toLowerCase();
           functionOptions.value = searchObj.data.transforms.filter(
-            (v) => v.name.toLowerCase().indexOf(needle) > -1
+            (v) => v.name?.toLowerCase().indexOf(needle) > -1
           );
         }
       });
