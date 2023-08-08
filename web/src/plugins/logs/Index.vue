@@ -248,7 +248,7 @@ export default defineComponent({
         });
       }
     },
-    getMoreData() {
+    async getMoreData() {
       if (
         this.searchObj.meta.sqlMode == false &&
         this.searchObj.meta.refreshInterval == 0 &&
@@ -266,9 +266,10 @@ export default defineComponent({
             150 -
           1;
 
-        this.getQueryData(true).then(() => {
-          this.refreshHistogramChart();
-        });
+        console.log("get more data started");
+        await this.getQueryData(true);
+        console.log("get more data completed");
+        this.refreshHistogramChart();
 
         if (config.isCloud == "true") {
           segment.track("Button Click", {
@@ -386,35 +387,39 @@ export default defineComponent({
         return;
       }
 
-      if (sqlMode) {
-        let selectFields = "";
-        let whereClause = "";
-        let currentQuery = searchObj.data.query;
-        currentQuery = currentQuery.split("|");
-        if (currentQuery.length > 1) {
-          selectFields = "," + currentQuery[0].trim();
-          if (currentQuery[1].trim() != "") {
-            whereClause = "WHERE " + currentQuery[1].trim();
+      try {
+        if (sqlMode) {
+          let selectFields = "";
+          let whereClause = "";
+          let currentQuery = searchObj.data.query;
+          currentQuery = currentQuery.split("|");
+          if (currentQuery.length > 1) {
+            selectFields = "," + currentQuery[0].trim();
+            if (currentQuery[1].trim() != "") {
+              whereClause = "WHERE " + currentQuery[1].trim();
+            }
+          } else if (currentQuery[0].trim() != "") {
+            if (currentQuery[0].trim() != "") {
+              whereClause = "WHERE " + currentQuery[0].trim();
+            }
           }
-        } else if (currentQuery[0].trim() != "") {
-          if (currentQuery[0].trim() != "") {
-            whereClause = "WHERE " + currentQuery[0].trim();
-          }
+          searchObj.data.query =
+            `SELECT *${selectFields} FROM "` +
+            searchObj.data.stream.selectedStream.value +
+            `" ` +
+            whereClause;
+
+          searchObj.data.editorValue = searchObj.data.query;
+
+          searchBarRef.value.udpateQuery();
+
+          searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
+        } else {
+          searchObj.data.query = "";
+          searchBarRef.value.udpateQuery();
         }
-        searchObj.data.query =
-          `SELECT *${selectFields} FROM "` +
-          searchObj.data.stream.selectedStream.value +
-          `" ` +
-          whereClause;
-
-        searchObj.data.editorValue = searchObj.data.query;
-
-        searchBarRef.value.udpateQuery();
-
-        searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
-      } else {
-        searchObj.data.query = "";
-        searchBarRef.value.udpateQuery();
+      } catch (e) {
+        console.log("Logs : Error in setQuery");
       }
     };
 

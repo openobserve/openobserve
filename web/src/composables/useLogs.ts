@@ -949,9 +949,9 @@ const useLogs = () => {
       router.currentRoute.value.name == "logs"
     ) {
       clearInterval(refreshIntervalID);
-      refreshIntervalID = setInterval(() => {
+      refreshIntervalID = setInterval(async () => {
         searchObj.loading = true;
-        getQueryData();
+        await getQueryData();
       }, searchObj.meta.refreshInterval * 1000);
       $q.notify({
         message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
