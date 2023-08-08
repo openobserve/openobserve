@@ -70,11 +70,12 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             .replace('\\', "/");
         let columns = file_path.split('/').collect::<Vec<&str>>();
         if columns.len() != 5 {
+            log::error!("invalid file path: {}", file_path);
             continue;
         }
-        let _ = columns[0].to_string();
+        // let _ = columns[0].to_string(); // files
         let org_id = columns[1].to_string();
-        let stream_type: StreamType = StreamType::from(columns[2]);
+        let stream_type = StreamType::from(columns[2]);
         let stream_name = columns[3].to_string();
         let file_name = columns[4].to_string();
 

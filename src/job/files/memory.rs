@@ -29,6 +29,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(()); // not an ingester, no need to init job
     }
 
+    if !CONFIG.common.wal_memory_mode_enabled {
+        return Ok(());
+    }
+
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
     interval.tick().await; // trigger the first run
     loop {
