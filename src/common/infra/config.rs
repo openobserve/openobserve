@@ -278,6 +278,8 @@ pub struct Limit {
     pub metric_file_max_retention: String,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // in seconds
     pub calculate_stats_interval: u64,
+    #[env_config(name = "ZO_FILE_PUSH_CHUNK_SIZE", default = 200)]
+    pub files_push_chunk_size: usize,
 }
 
 #[derive(EnvConfig)]

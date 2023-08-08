@@ -56,110 +56,121 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     let pattern = format!("{}/files/*/*/*/*.json", &CONFIG.common.data_wal_dir);
     let files = scan_files(&pattern);
 
-    // use multiple threads to upload files
-    let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
-    for file in files {
-        let local_file = file.to_owned();
-        let local_path = Path::new(&file).canonicalize().unwrap();
-        let file_path = local_path
-            .strip_prefix(&data_dir)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .replace('\\', "/");
-        let columns = file_path.split('/').collect::<Vec<&str>>();
-        if columns.len() != 5 {
-            continue;
-        }
-        let _ = columns[0].to_string();
-        let org_id = columns[1].to_string();
-        let stream_type: StreamType = StreamType::from(columns[2]);
-        let stream_name = columns[3].to_string();
-        let file_name = columns[4].to_string();
-
-        // check the file is using for write
-        if wal::check_in_use(&org_id, &stream_name, stream_type, &file_name) {
-            // println!("file is using for write, skip, {}", file_name);
-            continue;
-        }
-        log::info!("[JOB] convert disk file: {}", file);
-
-        // check if we are allowed to ingest or just delete the file
-        if db::compact::retention::is_deleting_stream(&org_id, &stream_name, stream_type, None) {
-            log::info!(
-                "[JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
-                &org_id,
-                stream_type,
-                &stream_name,
-                file
-            );
-            if let Err(e) = fs::remove_file(&local_file) {
-                log::error!(
-                    "[JOB] Failed to remove disk file from disk: {}, {}",
-                    local_file,
-                    e
-                );
+    log::info!(
+        "[JOB] move_files_to_storage total files to be moved are: {}",
+        files.len()
+    );
+    for chunk in files.chunks(CONFIG.limit.files_push_chunk_size) {
+        // use multiple threads to upload files
+        let mut tasks = Vec::new();
+        let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+        for file in chunk {
+            let local_file = file.to_owned();
+            let local_path = Path::new(&file).canonicalize().unwrap();
+            let file_path = local_path
+                .strip_prefix(&data_dir)
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .replace('\\', "/");
+            let columns = file_path.split('/').collect::<Vec<&str>>();
+            if columns.len() != 5 {
+                continue;
             }
-            continue;
-        }
+            let _ = columns[0].to_string();
+            let org_id = columns[1].to_string();
+            let stream_type: StreamType = StreamType::from(columns[2]);
+            let stream_name = columns[3].to_string();
+            let file_name = columns[4].to_string();
 
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
-            let ret =
-                upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
-            drop(permit);
-            match ret {
-                Err(e) => log::error!("[JOB] Error while uploading disk file to storage {}", e),
-                Ok((key, meta, _stream_type)) => {
-                    match db::file_list::local::set(&key, meta, false).await {
-                        Ok(_) => {
-                            match fs::remove_file(&local_file) {
-                                Ok(_) => {
-                                    // metrics
-                                    let columns = key.split('/').collect::<Vec<&str>>();
-                                    if columns[0] == "files" {
-                                        metrics::INGEST_WAL_USED_BYTES
-                                            .with_label_values(&[
-                                                columns[1], columns[3], columns[2],
-                                            ])
-                                            .sub(meta.original_size as i64);
+            // check the file is using for write
+            if wal::check_in_use(&org_id, &stream_name, stream_type, &file_name) {
+                // println!("file is using for write, skip, {}", file_name);
+                continue;
+            }
+            log::info!("[JOB] convert disk file: {}", file);
 
-                                        report_compression_stats(
-                                            meta.into(),
-                                            &org_id,
-                                            &stream_name,
-                                            stream_type,
+            // check if we are allowed to ingest or just delete the file
+            if db::compact::retention::is_deleting_stream(&org_id, &stream_name, stream_type, None)
+            {
+                log::info!(
+                    "[JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    file
+                );
+                if let Err(e) = fs::remove_file(&local_file) {
+                    log::error!(
+                        "[JOB] Failed to remove disk file from disk: {}, {}",
+                        local_file,
+                        e
+                    );
+                }
+                continue;
+            }
+
+            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
+                let ret =
+                    upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
+                drop(permit);
+                match ret {
+                    Err(e) => log::error!("[JOB] Error while uploading disk file to storage {}", e),
+                    Ok((key, meta, _stream_type)) => {
+                        match db::file_list::local::set(&key, meta, false).await {
+                            Ok(_) => {
+                                match fs::remove_file(&local_file) {
+                                    Ok(_) => {
+                                        // metrics
+                                        let columns = key.split('/').collect::<Vec<&str>>();
+                                        if columns[0] == "files" {
+                                            metrics::INGEST_WAL_USED_BYTES
+                                                .with_label_values(&[
+                                                    columns[1], columns[3], columns[2],
+                                                ])
+                                                .sub(meta.original_size as i64);
+
+                                            report_compression_stats(
+                                                meta.into(),
+                                                &org_id,
+                                                &stream_name,
+                                                stream_type,
+                                            )
+                                            .await;
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!(
+                                            "[JOB] Failed to remove disk file from disk: {}, {}",
+                                            local_file,
+                                            e.to_string()
                                         )
-                                        .await;
                                     }
                                 }
-                                Err(e) => {
-                                    log::error!(
-                                        "[JOB] Failed to remove disk file from disk: {}, {}",
-                                        local_file,
-                                        e.to_string()
-                                    )
-                                }
                             }
+                            Err(e) => log::error!(
+                                "[JOB] Failed write disk file meta:{}, error: {}",
+                                local_file,
+                                e.to_string()
+                            ),
                         }
-                        Err(e) => log::error!(
-                            "[JOB] Failed write disk file meta:{}, error: {}",
-                            local_file,
-                            e.to_string()
-                        ),
                     }
-                }
-            };
-            Ok(())
-        });
-        tasks.push(task);
-    }
+                };
+                Ok(())
+            });
+            tasks.push(task);
+            log::info!(
+                "[JOB] move_files_to_storage total number of tasks {}",
+                tasks.len()
+            );
+        }
 
-    for task in tasks {
-        if let Err(e) = task.await {
-            log::error!("[JOB] Error while uploading disk file to storage {}", e);
-        };
+        for task in tasks {
+            if let Err(e) = task.await {
+                log::error!("[JOB] Error while uploading disk file to storage {}", e);
+            };
+        }
     }
     Ok(())
 }
