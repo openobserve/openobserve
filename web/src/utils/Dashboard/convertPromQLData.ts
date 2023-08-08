@@ -400,7 +400,7 @@ export const convertPromQLData = (
     (min: any, it: any) => { return it.y.reduce((min:any,it:any)=> { if(!isNaN(it)) return Math.min(min,it);
     return min;
    },
-    Infinity
+    maxValueSize
   );
     })
 
