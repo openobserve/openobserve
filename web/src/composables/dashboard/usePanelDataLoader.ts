@@ -140,10 +140,15 @@ export const usePanelDataLoader = (
       [oldConfigs, oldTimerange],
       onInvalidate
     ) => {
+      console.log(panelSchema,"panelSchema");
+      console.log("selectedTimeObj", selectedTimeObj);
       console.log("usePanelDataLoader: schema changed");
-
+      console.log("usePanelDataLoader: query changed",{query:panelSchema.value.query});
+      console.log("onInvalidate", panelSchema.value.queries.length);
+      
+      
       // TODO: check for query OR queries array for promql
-      if (panelSchema.value.query) {
+      if (panelSchema.value.query || panelSchema.value.queries?.length) {
       loadData();
       }
     }
@@ -190,6 +195,8 @@ export const usePanelDataLoader = (
   const processApiError = async (error: any, type: any) => {
     switch (type) {
       case "promql": {
+        console.log("error message for usePanelDataLoader", error);
+        
         const errorDetailValue = error.response?.data?.error || error.message;
         const trimmedErrorMessage =
           errorDetailValue.length > 300
