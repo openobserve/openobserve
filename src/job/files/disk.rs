@@ -56,7 +56,12 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     let pattern = format!("{}/files/*/*/*/*.json", &CONFIG.common.data_wal_dir);
     let files = scan_files(&pattern);
 
-    for chunk in files.chunks(100) {
+    log::info!(
+        "[JOB] move_files_to_storage total files to be moved are: {}",
+        files.len()
+    );
+
+    for chunk in files.chunks(CONFIG.limit.files_push_chunk_size) {
         // use multiple threads to upload files
         let mut tasks = Vec::new();
         let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
