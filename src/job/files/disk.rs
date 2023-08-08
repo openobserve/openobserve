@@ -115,9 +115,11 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 Ok((key, meta, _stream_type)) => {
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
+                            log::error!("[JOB] Trying to remove file {}", &local_file);
                             match fs::remove_file(&local_file) {
                                 Ok(_) => {
                                     // metrics
+                                    log::error!("[JOB] remove file success {}", &local_file);
                                     let columns = key.split('/').collect::<Vec<&str>>();
                                     if columns[0] == "files" {
                                         metrics::INGEST_WAL_USED_BYTES
@@ -155,6 +157,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         });
         tasks.push(task);
     }
+    log::error!("[JOB] move_files_to_storage total tasks {}", tasks.len());
 
     for task in tasks {
         if let Err(e) = task.await {
