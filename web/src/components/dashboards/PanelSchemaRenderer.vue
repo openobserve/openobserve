@@ -1,5 +1,5 @@
 <template>
-  <div style="height: 100%; position: relative;">
+  <div ref="chartPanelRef" style="height: 100%; position: relative;">
     <div v-show="!errorDetail" class="plotlycontainer" style="height: 100%">
       <ChartRenderer v-if="panelSchema.type != 'table'" :data="panelData" />
       <TableRenderer v-else-if="panelSchema.type == 'table'" :data="panelData" />
@@ -41,7 +41,7 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const store = useStore();
-
+    const chartPanelRef = ref(null)
     // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = ref({});
 
@@ -55,10 +55,11 @@ export default defineComponent({
       console.log("PanelSchemaRenderer: new data received from the api, let's convert the data");
       panelData.value = convertPanelData(props.panelSchema, data.value, store);
     });
+    
     const noData = computed(() => {
       console.log("inside no Data computed");  
       if (props.panelSchema?.fields?.stream_type == "metrics" && props.panelSchema?.customQuery && props.panelSchema?.queryType == "promql") {
-        // console.log("inside no Data if");
+        console.log("inside no Data if");
         // console.log("PanelSchemaRenderer: noData:" , data.value[0].result?.length);
         return data.value[0].result?.length ? "" : "No Data"
       } else {
@@ -66,6 +67,7 @@ export default defineComponent({
         return !data.value.length ? "No Data" : ""
       }
     })
+    
     // when the error changes, emit the error
     watch(errorDetail, () => {
       emit("error", errorDetail);
@@ -76,7 +78,8 @@ export default defineComponent({
       loading,
       errorDetail,
       panelData,
-      noData
+      noData,
+      chartPanelRef
     };
   },
 });
