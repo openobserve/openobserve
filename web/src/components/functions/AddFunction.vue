@@ -258,6 +258,7 @@ end`;
         timeout: 2000,
       });
 
+      formData.value.function = editorobj.getValue();
       addJSTransformForm.value.validate().then((valid: any) => {
         if (!valid) {
           return false;
