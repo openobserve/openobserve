@@ -431,7 +431,7 @@ pub fn init() -> Config {
     }
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
-        cfg.limit.file_move_thread_num = cpu_num;
+        cfg.limit.file_move_thread_num = cpu_num / 2;
     }
 
     // check common config
