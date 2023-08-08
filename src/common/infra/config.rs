@@ -213,7 +213,7 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
-    #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
+    #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "http://127.0.0.1:5081/")]
     pub otel_otlp_url: String,
     #[env_config(name = "ZO_TRACING_HEADER_KEY", default = "Authorization")]
     pub tracing_header_key: String,

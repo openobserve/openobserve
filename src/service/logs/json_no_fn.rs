@@ -16,6 +16,7 @@ use actix_web::{http, web};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
+use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
 use super::StreamMeta;
 use crate::common::infra::{cluster, config::CONFIG, metrics};
@@ -183,4 +184,14 @@ pub async fn ingest(
         http::StatusCode::OK.into(),
         vec![stream_status],
     ))
+}
+
+pub async fn handle_logs_request(
+    org_id: &str,
+    thread_id: usize,
+    request: ExportLogsServiceRequest,
+) -> Result<IngestionResponse, anyhow::Error> {
+    let res_logs = request.resource_logs;
+
+    Ok(IngestionResponse::new(http::StatusCode::OK.into(), vec![]))
 }

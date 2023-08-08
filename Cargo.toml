@@ -111,6 +111,7 @@ opentelemetry-otlp = { version = "0.11", features = [
 opentelemetry-proto = { version = "0.1", features = [
   "gen-tonic",
   "traces",
+  "logs",
   "with-serde",
   "build-server",
 ] }
@@ -146,7 +147,7 @@ tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tonic = { version = "0.8", features = ["prost", "gzip"] }
-tracing = { version = "0.1.37", features = ["attributes"] }
+tracing = { version = "0.1.37", features = ["log-always","attributes"] }
 tracing-opentelemetry = "0.18"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.2"
@@ -170,3 +171,5 @@ tonic-build = { version = "0.8", features = ["prost"] }
 datafusion-expr = "28"
 expect-test = "1.4"
 float-cmp = "0.9"
+
+
