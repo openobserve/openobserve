@@ -131,7 +131,12 @@ async fn get_last_stats(
     };
     match SearchService::search(&CONFIG.common.usage_org, meta::StreamType::Logs, &req).await {
         Ok(res) => Ok(res.hits),
-        Err(err) => Err(err.into()),
+        Err(err) => match &err {
+            crate::common::infra::errors::Error::ErrorCode(
+                crate::common::infra::errors::ErrorCodes::SearchStreamNotFound(_),
+            ) => Ok(vec![]),
+            _ => Err(err.into()),
+        },
     }
 }
 
