@@ -107,12 +107,15 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     log::info!("Starting OpenObserve {}", VERSION);
 
-    // init jobs
     // it must be initialized before the server starts
     cluster::register_and_keepalive()
         .await
         .expect("cluster init failed");
-    let _ = ider::generate();
+    // init ider
+    ider::init();
+    // init wal
+    wal::init();
+    // init job
     job::init().await.expect("job init failed");
 
     // gRPC server

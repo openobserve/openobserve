@@ -19,7 +19,7 @@ use once_cell::sync::Lazy;
 use std::{
     fs::{File, OpenOptions},
     io::Write,
-    sync::{Arc, RwLock, RwLockReadGuard},
+    sync::{Arc, RwLock},
 };
 
 use crate::common::file::get_file_contents;
@@ -60,6 +60,11 @@ pub struct RwFile {
     expired: i64,
 }
 
+pub fn init() {
+    _ = MANAGER.data.len();
+    _ = MEMORY_FILES.list().len();
+}
+
 pub fn get_or_create(
     thread_id: usize,
     stream: StreamParams,
@@ -89,7 +94,6 @@ pub fn get_search_in_memory_files(
     }
 
     let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
-
     Ok(chain(
         // read usesing files in use
         MANAGER.data.iter().flat_map(|data| {
@@ -110,17 +114,21 @@ pub fn get_search_in_memory_files(
                         None
                     }
                 })
-                .collect::<Vec<Vec<u8>>>() // removing `collect()` would have been
-                                           // even better but can't, due to `data`
-                                           // getting borrowed beyond its lifetime
+                .collect::<Vec<Vec<u8>>>()
         }),
-        MEMORY_FILES.list().iter().filter_map(|(file, data)| {
-            if file.starts_with(&prefix) {
-                Some(data.to_vec())
-            } else {
-                None
-            }
-        }),
+        MEMORY_FILES
+            .data
+            .clone()
+            .read()
+            .unwrap()
+            .iter()
+            .filter_map(|(file, data)| {
+                if file.starts_with(&prefix) {
+                    Some(data.to_vec())
+                } else {
+                    None
+                }
+            }),
     )
     .collect())
 }
@@ -173,6 +181,7 @@ impl Manager {
         let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
         let file = match self
             .data
+            .clone()
             .get(thread_id)
             .unwrap()
             .read()
@@ -190,6 +199,7 @@ impl Manager {
             || file.expired() <= chrono::Utc::now().timestamp()
         {
             self.data
+                .clone()
                 .get(thread_id)
                 .unwrap()
                 .write()
@@ -222,7 +232,8 @@ impl Manager {
             key,
             use_cache,
         ));
-        let mut data = self.data.get(thread_id).unwrap().write().unwrap();
+        let cache = self.data.clone();
+        let mut data = cache.get(thread_id).unwrap().write().unwrap();
         if !stream_type.eq(&StreamType::EnrichmentTables) {
             data.insert(full_key, file.clone());
         };
@@ -282,16 +293,19 @@ impl MemoryFiles {
         }
     }
 
-    pub fn list(&self) -> RwLockReadGuard<'_, HashMap<String, Bytes>> {
-        self.data.read().unwrap()
+    pub fn list(&self) -> HashMap<String, Bytes> {
+        let data = self.data.clone();
+        let reader = data.read().unwrap();
+        reader.clone()
     }
 
     pub fn insert(&self, file_name: String, data: Bytes) {
-        self.data.write().unwrap().insert(file_name, data);
+        self.data.clone().write().unwrap().insert(file_name, data);
     }
 
     pub fn remove(&self, file_name: &str) {
-        let mut data = self.data.write().unwrap();
+        let cache = self.data.clone();
+        let mut data = cache.write().unwrap();
         data.remove(file_name);
         data.shrink_to_fit();
     }
