@@ -24,9 +24,6 @@ use crate::common::meta::{
 use crate::common::{file::scan_files, json};
 
 pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {
-    if true {
-        return Ok(());
-    }
     let (_stream_key, date_key, _file_name) = parse_file_key_columns(key)?;
     let file_data = FileKey {
         key: key.to_string(),
