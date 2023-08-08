@@ -26,15 +26,6 @@ export function PanelSchemaVersionConverted(data: any) {
           },
         ],
       };
-
-  //   case 2:
-  //     data = {
-  //       ...data,
-  //       config: {
-  //         title: data.config.title,
-  //         description: data.config.description,
-  //       },
-  //     };
   }
 
   return data;
@@ -95,33 +86,3 @@ export function PanelSchemaVersionConverted(data: any) {
 //   ],
 // };
 
-// const dataV3 = {
-//   version: 3,
-//   id: "456",
-//   type: "bar",
-//   config: {
-//     title: "",
-//     description: "",
-//   },
-//   queryType: "sql",
-//   queries: [
-//     {
-//       query: "",
-//       customQuery: false,
-//       fields: {
-//         stream: "",
-//         stream_type: "logs",
-//         x: [],
-//         y: [],
-//         filter: [],
-//       },
-//       config: {
-//         promql_legend: "",
-//       },
-//     },
-//   ],
-// };
-
-// console.log("transformedDataV1", transformSchema(dataV1));
-// console.log("transformedDataV2", transformSchema(dataV2));
-// console.log("transformedDataV3", transformSchema(dataV3));
