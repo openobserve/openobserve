@@ -18,6 +18,7 @@ import dashboardService from "../services/dashboards";
 import { toRaw } from "vue";
 import { date } from "quasar";
 import moment from "moment";
+import { PanelSchemaVersionConverted } from "./dashboard/PanelSchemaVersionConverted";
 
 export const modifySQLQuery = (
   currentTimeObj: any,
@@ -372,7 +373,12 @@ export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
     await getAllDashboards(store);
   }
   const currentDashboard = findDashboard(dashboardId, store);
-  return currentDashboard.panels?.find((it: any) => it.id == panelId);
+  console.log("commons: currentDashboard", currentDashboard);
+  
+  const paneldata = currentDashboard.panels?.find((it: any) => it.id == panelId);
+  console.log("commons: paneldata", paneldata);
+  
+  return PanelSchemaVersionConverted(paneldata);
 };
 
 export const getPanelId = () => {

@@ -1,10 +1,9 @@
-export const PanelSchemaVersionConverted = {
-  transformSchema,
-};
-function transformSchema(data: any) {
+export function PanelSchemaVersionConverted(data: any) {
+  if(!data.version)data={...data,version:1};
   switch (data.version) {
     case 1:
       data = {
+        version:2,
         id: data.id,
         type: data.type,
         config: {
@@ -28,101 +27,101 @@ function transformSchema(data: any) {
         ],
       };
 
-    case 2:
-      data = {
-        ...data,
-        config: {
-          title: data.config.title,
-          description: data.config.description,
-        },
-      };
+  //   case 2:
+  //     data = {
+  //       ...data,
+  //       config: {
+  //         title: data.config.title,
+  //         description: data.config.description,
+  //       },
+  //     };
   }
 
   return data;
 }
-const dataV1 = {
-  version: 1,
-  id: "123",
-  type: "bar",
-  fields: {
-    stream: "",
-    stream_type: "logs",
-    x: [],
-    y: [],
-    filter: [],
-  },
-  config: {
-    title: "",
-    description: "",
-    show_legends: true,
-    legends_position: null,
-    promql_legend: "",
-    unit: null,
-    unit_custom: null,
-  },
-  queryType: "sql",
-  query: "",
-  customQuery: false,
-};
+// const dataV1 = {
+//   version: 1,
+//   id: "123",
+//   type: "bar",
+//   fields: {
+//     stream: "",
+//     stream_type: "logs",
+//     x: [],
+//     y: [],
+//     filter: [],
+//   },
+//   config: {
+//     title: "",
+//     description: "",
+//     show_legends: true,
+//     legends_position: null,
+//     promql_legend: "",
+//     unit: null,
+//     unit_custom: null,
+//   },
+//   queryType: "sql",
+//   query: "",
+//   customQuery: false,
+// };
 
-const dataV2 = {
-  version: 2,
-  id: "456",
-  type: "bar",
-  config: {
-    title: "",
-    description: "",
-    show_legends: true,
-    legends_position: null,
-    unit: null,
-    unit_custom: null,
-  },
-  queryType: "sql",
-  queries: [
-    {
-      query: "",
-      customQuery: false,
-      fields: {
-        stream: "",
-        stream_type: "logs",
-        x: [],
-        y: [],
-        filter: [],
-      },
-      config: {
-        promql_legend: "",
-      },
-    },
-  ],
-};
+// const dataV2 = {
+//   version: 2,
+//   id: "456",
+//   type: "bar",
+//   config: {
+//     title: "",
+//     description: "",
+//     show_legends: true,
+//     legends_position: null,
+//     unit: null,
+//     unit_custom: null,
+//   },
+//   queryType: "sql",
+//   queries: [
+//     {
+//       query: "",
+//       customQuery: false,
+//       fields: {
+//         stream: "",
+//         stream_type: "logs",
+//         x: [],
+//         y: [],
+//         filter: [],
+//       },
+//       config: {
+//         promql_legend: "",
+//       },
+//     },
+//   ],
+// };
 
-const dataV3 = {
-  version: 3,
-  id: "456",
-  type: "bar",
-  config: {
-    title: "",
-    description: "",
-  },
-  queryType: "sql",
-  queries: [
-    {
-      query: "",
-      customQuery: false,
-      fields: {
-        stream: "",
-        stream_type: "logs",
-        x: [],
-        y: [],
-        filter: [],
-      },
-      config: {
-        promql_legend: "",
-      },
-    },
-  ],
-};
+// const dataV3 = {
+//   version: 3,
+//   id: "456",
+//   type: "bar",
+//   config: {
+//     title: "",
+//     description: "",
+//   },
+//   queryType: "sql",
+//   queries: [
+//     {
+//       query: "",
+//       customQuery: false,
+//       fields: {
+//         stream: "",
+//         stream_type: "logs",
+//         x: [],
+//         y: [],
+//         filter: [],
+//       },
+//       config: {
+//         promql_legend: "",
+//       },
+//     },
+//   ],
+// };
 
-console.log("transformedDataV1", transformSchema(dataV1));
-console.log("transformedDataV2", transformSchema(dataV2));
-console.log("transformedDataV3", transformSchema(dataV3));
+// console.log("transformedDataV1", transformSchema(dataV1));
+// console.log("transformedDataV2", transformSchema(dataV2));
+// console.log("transformedDataV3", transformSchema(dataV3));

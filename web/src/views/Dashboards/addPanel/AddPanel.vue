@@ -180,7 +180,7 @@ export default defineComponent({
           route.query.dashboard,
           route.query.panelId
         );
-        // console.log("panel data", JSON.stringify(panelData, null , 2));
+        console.log("panel data", JSON.stringify(panelData, null , 2));
         Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData)));
         // console.log("dashboard panel data",JSON.stringify(dashboardPanelData.data, null, 2));
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
@@ -472,6 +472,8 @@ export default defineComponent({
           "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 
         dashboardPanelData.data.id = panelId;
+        console.log(dashboardPanelData.data,"dashboardPanelData.data AddPanel");
+        
         await addPanel(
           store,
           dashId,
