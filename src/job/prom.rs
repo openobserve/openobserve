@@ -22,7 +22,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(()); // not an ingester, no need to init job
     }
-    return Ok(());
 
     if !CONFIG.common.metrics_dedup_enabled {
         return Ok(());

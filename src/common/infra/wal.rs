@@ -225,6 +225,11 @@ impl Manager {
         let stream_type = stream.stream_type;
 
         let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
+        let cache = self.data.clone();
+        let mut data = cache.get(thread_id).unwrap().write().unwrap();
+        if let Some(f) = data.get(&full_key) {
+            return f.clone();
+        }
         let file = Arc::new(RwFile::new(
             thread_id,
             stream,
@@ -232,8 +237,6 @@ impl Manager {
             key,
             use_cache,
         ));
-        let cache = self.data.clone();
-        let mut data = cache.get(thread_id).unwrap().write().unwrap();
         if !stream_type.eq(&StreamType::EnrichmentTables) {
             data.insert(full_key, file.clone());
         };

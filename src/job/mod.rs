@@ -142,8 +142,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // ingester run
     tokio::task::spawn(async move { files::disk::run().await });
     tokio::task::spawn(async move { files::memory::run().await });
-    // TODO: remove this once we know what is causing deadlock
-    //tokio::task::spawn(async move { file_list::run().await });
+    tokio::task::spawn(async move { file_list::run().await });
     tokio::task::spawn(async move { prom::run().await });
     tokio::task::spawn(async move { metrics::run().await });
 
