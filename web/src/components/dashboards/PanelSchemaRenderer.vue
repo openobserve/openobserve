@@ -65,10 +65,10 @@ export default defineComponent({
 
     const noData = computed(() => {
       console.log("inside no Data computed");
-      if (props.panelSchema?.fields?.stream_type == "metrics" && props.panelSchema?.customQuery && props.panelSchema?.queryType == "promql") {
+      if ( newPanelSchema.value?.queryType == "promql") {
         console.log("inside no Data if");
         // console.log("PanelSchemaRenderer: noData:" , data.value[0].result?.length);
-        return data.value[0].result?.length ? "" : "No Data"
+        return data.value.every((item) => item.result?.length) ? "" : "No Data"
       } else {
         console.log("inside no Data else");
         return !data.value.length ? "No Data" : ""

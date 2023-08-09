@@ -15,7 +15,8 @@ export const usePanelDataLoader = (
     errorDetail: "",
   });
 
-  let currentDependentVariablesData = ref(variablesData.value?.values || []);
+  let currentDependentVariablesData = variablesData.value?.values ? JSON.parse(JSON.stringify(variablesData.value?.values)) : []
+
   const store = useStore();
   let controller: AbortController | null = null;
 
@@ -27,12 +28,14 @@ export const usePanelDataLoader = (
     state.loading = true;
 
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
+      console.log('usePanelDataLoader: query dependent on ', isQueryDependentOnTheVariables(), !canRunQueryBasedOnVariables());
+      
       return;
     }
 
     console.log("queryDataa", panelSchema);
 
-    const queryData = panelSchema.value.queries[0];
+    const queryData = panelSchema.value.queries[0].query;
     const timestamps = selectedTimeObj.value;
     let startISOTimestamp: any;
     let endISOTimestamp: any;
@@ -64,7 +67,7 @@ export const usePanelDataLoader = (
 
     if (
       // panelSchema.value.queries[0]?.fields.stream_type == "metrics" &&
-      panelSchema.value.customQuery &&
+      // panelSchema.value.customQuery &&
       panelSchema.value.queryType == "promql"
     ) {
       console.log("usePanelDataLoader: ", JSON.stringify(panelSchema));
@@ -108,7 +111,7 @@ export const usePanelDataLoader = (
         .search({
           org_identifier: store.state.selectedOrganization.identifier,
           query: query,
-          page_type: panelSchema.value.fields?.stream_type,
+          page_type: panelSchema.value.queries[0]?.fields?.stream_type,
         })
         .then((res) => {
           // Set searchQueryData.data to the API response hits
@@ -135,7 +138,7 @@ export const usePanelDataLoader = (
   });
 
   watch(
-    [()=>panelSchema.value, selectedTimeObj],
+    ()=>[panelSchema.value, selectedTimeObj],
     async (
       [newConfigs, newTimerange],
       [oldConfigs, oldTimerange],
@@ -162,25 +165,34 @@ export const usePanelDataLoader = (
     return dependentVariables?.length > 0;
   };
 
-  const canRunQueryBasedOnVariables = () => {
-    const dependentVariables = variablesData.value?.values?.filter((it: any) =>
-      (panelSchema?.value?.queries?.map((q: any) => q?.query?.includes(`$${it.name}`)))?.includes(true)
+const canRunQueryBasedOnVariables = () => {
+  console.log(variablesData.value?.values);
+
+  const dependentVariables = variablesData.value?.values?.filter((it: any) =>
+    panelSchema?.value?.queries?.map((q: any) => {
+      const includes = q?.query?.includes(`$${it.name}`);
+      console.log(`Query: ${includes} Includes: `);
+      return includes;
+    })?.includes(true)
+  );
+
+  console.log(dependentVariables);
+
+  if (dependentVariables?.length > 0) {
+    const dependentAvailableVariables = dependentVariables.filter(
+      (it: any) => !it.isLoading
     );
+console.log('dependentAvailableVariables: ',dependentAvailableVariables);
 
-    if (dependentVariables?.length > 0) {
-      const dependentAvailableVariables = dependentVariables.filter(
-        (it: any) => !it.isLoading
-      );
-
-      if (dependentAvailableVariables.length == dependentVariables.length) {
-        return true;
-      } else {
-        return false;
-      }
-    } else {
+    if (dependentAvailableVariables.length === dependentVariables.length) {
       return true;
+    } else {
+      return false;
     }
-  };
+  } else {
+    return true;
+  }
+};
 
   const replaceQueryValue = (query: any) => {
     if (currentDependentVariablesData.value?.length) {
@@ -246,21 +258,21 @@ export const usePanelDataLoader = (
     });
 
     // [START] variables management
-    // let currentDependentVariablesData = props.variablesData?.values ? JSON.parse(JSON.stringify(props.variablesData?.values)) : []
 
     // check when the variables data changes
     // 1. get the dependent variables
     // 2. compare the dependent variables data with the old dependent variables Data
     // 3. if the value of any current variable is changed, call the api
-    watch(() => variablesData?.values, () => {
+    watch(() => variablesData.value?.values, () => {
+      console.log('variables changed, 1');
       // ensure the query is there
       if(!panelSchema.value.queries?.length) {
           return;
       }
 
       // 1. get the dependent variables list
-      const newDependentVariablesData = variablesData?.values?.filter((it: any) =>
-        panelSchema.value.querys?.map((q: any) => q?.query?.includes(`$${it.name}`)).includes(true)
+      const newDependentVariablesData = variablesData.value?.values?.filter((it: any) =>
+        panelSchema.value.queries?.map((q: any) => q?.query?.includes(`$${it.name}`))?.includes(true)
       );
 
       // if no variables, no need to rerun the query

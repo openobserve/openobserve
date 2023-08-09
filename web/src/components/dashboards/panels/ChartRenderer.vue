@@ -20,7 +20,7 @@ export default defineComponent({
 
     onMounted(() => {
       console.log("ChartRenderer: mounted");
-      Plotly.newPlot(plotRef.value, props.data?.traces, props.data?.layout, {
+      Plotly.newPlot(plotRef.value, props.data?.traces || [], props.data?.layout, {
         responsive: true,
         showLink: false,
       });
