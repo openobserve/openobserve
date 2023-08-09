@@ -30,6 +30,7 @@ use crate::common::infra::{cluster, config::CONFIG, wal};
 use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
+    stream::StreamParams,
     traces::{Event, Span, SpanRefType},
     StreamType,
 };
@@ -283,9 +284,11 @@ pub async fn handle_trace_request(
         }
         let file = wal::get_or_create(
             thread_id,
-            org_id,
-            traces_stream_name,
-            StreamType::Traces,
+            StreamParams {
+                org_id,
+                stream_name: traces_stream_name,
+                stream_type: StreamType::Traces,
+            },
             None,
             &key,
             false,

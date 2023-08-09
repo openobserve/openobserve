@@ -193,8 +193,8 @@ pub async fn register() -> Result<()> {
         id: node_id,
         uuid: LOCAL_NODE_UUID.clone(),
         name: CONFIG.common.instance_name.clone(),
-        http_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.http.port),
-        grpc_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.grpc.port),
+        http_addr: format!("http://{}:{}", get_local_http_ip(), CONFIG.http.port),
+        grpc_addr: format!("http://{}:{}", get_local_grpc_ip(), CONFIG.grpc.port),
         role: LOCAL_NODE_ROLE.clone(),
         cpu_num: sys_info::cpu_num().unwrap() as u64,
         status: NodeStatus::Prepare,
@@ -260,6 +260,13 @@ pub async fn set_online() -> Result<()> {
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let _resp = client.put(key, val, Some(opt)).await?;
+
+    // if local node is ingester, broadcast local file_list to the cluster
+    if is_ingester(&LOCAL_NODE_ROLE) {
+        tokio::task::spawn(async move {
+            let _ = db::file_list::local::broadcast_cache(None).await;
+        });
+    }
 
     Ok(())
 }
@@ -370,7 +377,9 @@ async fn watch_node_list() -> Result<()> {
                         "cluster->node: broadcast local file_list to new node [{:?}]",
                         item_value.name
                     );
-                    db::file_list::local::broadcast_cache().await.unwrap();
+                    db::file_list::local::broadcast_cache(Some(item_key))
+                        .await
+                        .unwrap();
                 }
             }
             Event::Delete(ev) => {
@@ -402,6 +411,24 @@ pub fn load_local_mode_node() -> Node {
 #[inline(always)]
 fn load_local_node_uuid() -> String {
     Uuid::new_v4().to_string()
+}
+
+#[inline(always)]
+pub fn get_local_http_ip() -> String {
+    if !CONFIG.http.addr.is_empty() {
+        CONFIG.http.addr.clone()
+    } else {
+        get_local_node_ip()
+    }
+}
+
+#[inline(always)]
+pub fn get_local_grpc_ip() -> String {
+    if !CONFIG.grpc.addr.is_empty() {
+        CONFIG.grpc.addr.clone()
+    } else {
+        get_local_node_ip()
+    }
 }
 
 #[inline(always)]

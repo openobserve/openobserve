@@ -27,7 +27,10 @@ use crate::common::infra::{
     config::{CONFIG, FILE_EXT_JSON},
     ider, metrics,
 };
-use crate::common::meta::{stream::PartitionTimeLevel, StreamType};
+use crate::common::meta::{
+    stream::{PartitionTimeLevel, StreamParams},
+    StreamType,
+};
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
@@ -59,22 +62,12 @@ pub struct RwFile {
 
 pub fn get_or_create(
     thread_id: usize,
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
+    stream: StreamParams,
     partition_time_level: Option<PartitionTimeLevel>,
     key: &str,
     use_cache: bool,
 ) -> Arc<RwFile> {
-    MANAGER.get_or_create(
-        thread_id,
-        org_id,
-        stream_name,
-        stream_type,
-        partition_time_level,
-        key,
-        use_cache,
-    )
+    MANAGER.get_or_create(thread_id, stream, partition_time_level, key, use_cache)
 }
 
 pub fn check_in_use(
@@ -212,13 +205,15 @@ impl Manager {
     pub fn create(
         &self,
         thread_id: usize,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
+        stream: StreamParams,
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
+        let org_id = stream.org_id;
+        let stream_name = stream.stream_name;
+        let stream_type = stream.stream_type;
+
         let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
         let mut data = self.data.get(thread_id).unwrap().write().unwrap();
         if let Some(f) = data.get(&full_key) {
@@ -227,9 +222,7 @@ impl Manager {
 
         let file = Arc::new(RwFile::new(
             thread_id,
-            org_id,
-            stream_name,
-            stream_type,
+            stream,
             partition_time_level,
             key,
             use_cache,
@@ -243,25 +236,21 @@ impl Manager {
     pub fn get_or_create(
         &self,
         thread_id: usize,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
+        stream: StreamParams,
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
-        if let Some(file) = self.get(thread_id, org_id, stream_name, stream_type, key) {
+        if let Some(file) = self.get(
+            thread_id,
+            stream.org_id,
+            stream.stream_name,
+            stream.stream_type,
+            key,
+        ) {
             file
         } else {
-            self.create(
-                thread_id,
-                org_id,
-                stream_name,
-                stream_type,
-                partition_time_level,
-                key,
-                use_cache,
-            )
+            self.create(thread_id, stream, partition_time_level, key, use_cache)
         }
     }
 
@@ -315,16 +304,14 @@ impl MemoryFiles {
 impl RwFile {
     fn new(
         thread_id: usize,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
+        stream: StreamParams,
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
     ) -> RwFile {
         let mut dir_path = format!(
-            "{}files/{org_id}/{stream_type}/{stream_name}/",
-            &CONFIG.common.data_wal_dir
+            "{}files/{}/{}/{}/",
+            &CONFIG.common.data_wal_dir, stream.org_id, stream.stream_type, stream.stream_name
         );
         // Hack for file_list
         let file_list_prefix = "/files//file_list//";
@@ -359,9 +346,9 @@ impl RwFile {
             use_cache,
             file,
             cache,
-            org_id: org_id.to_string(),
-            stream_name: stream_name.to_string(),
-            stream_type,
+            org_id: stream.org_id.to_string(),
+            stream_name: stream.stream_name.to_string(),
+            stream_type: stream.stream_type,
             dir: dir_path,
             name: file_name,
             expired: ttl,
@@ -487,9 +474,11 @@ mod tests {
         let use_cache = false;
         let file = get_or_create(
             thread_id,
-            org_id,
-            stream_name,
-            stream_type,
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type,
+            },
             None,
             key,
             use_cache,
@@ -522,9 +511,11 @@ mod tests {
         let use_cache = false;
         let file = RwFile::new(
             thread_id,
-            org_id,
-            stream_name,
-            stream_type,
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type,
+            },
             None,
             key,
             use_cache,

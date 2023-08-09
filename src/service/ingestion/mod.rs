@@ -30,7 +30,7 @@ use crate::common::infra::{
 use crate::common::meta::{
     alert::{Alert, Trigger},
     functions::{StreamTransform, VRLRuntimeConfig},
-    stream::PartitionTimeLevel,
+    stream::{PartitionTimeLevel, StreamParams},
     usage::RequestStats,
     StreamType,
 };
@@ -332,9 +332,11 @@ pub fn _write_file(
         }
         let file = crate::common::infra::wal::get_or_create(
             thread_id,
-            org_id,
-            stream_name,
-            stream_type,
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type,
+            },
             None,
             &key,
             CONFIG.common.wal_memory_mode_enabled,
@@ -395,9 +397,11 @@ pub fn write_file(
         }
         let file = get_or_create(
             thread_id,
-            org_id,
-            stream_name,
-            stream_type,
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type,
+            },
             partition_time_level,
             &key,
             CONFIG.common.wal_memory_mode_enabled,

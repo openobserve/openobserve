@@ -12,5 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::common::meta::StreamType;
+
 pub mod disk;
 pub mod memory;
+
+pub fn generate_storage_file_name(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    wal_file_name: &str,
+) -> String {
+    let mut file_columns = wal_file_name.split('_').collect::<Vec<&str>>();
+    let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let file_date = format!(
+        "{}/{}/{}/{}",
+        file_columns[1], file_columns[2], file_columns[3], file_columns[4]
+    );
+    let file_name = file_columns.last().unwrap().to_string();
+    let file_name = file_name.replace(".json", ".parquet");
+    file_columns.retain(|&x| x.contains('='));
+    let mut partition_key = String::from("");
+    for key in file_columns {
+        let key = key.replace('.', "_");
+        partition_key.push_str(&key);
+        partition_key.push('/');
+    }
+
+    if partition_key.eq("") {
+        format!("files/{stream_key}/{file_date}/{file_name}")
+    } else {
+        format!("files/{stream_key}/{file_date}/{partition_key}{file_name}")
+    }
+}
