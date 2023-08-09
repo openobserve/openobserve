@@ -24,11 +24,6 @@ const AppMetrics = () => import("@/views/AppMetrics.vue");
 const AppTraces = () => import("@/views/AppTraces.vue");
 const LogStream = () => import("@/views/LogStream.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
-import {
-  FunctionList,
-  AssociatedStreamFunction,
-  EnrichmentTableList,
-} from "../../components/functions/index";
 const Alerts = () => import("@/views/AppAlerts.vue");
 import Error404 from "@/views/Error404.vue";
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
@@ -38,6 +33,9 @@ const DestinationList = () => import("@/components/alerts/DestinationList.vue");
 
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 const Functions = () => import("@/views/Functions.vue");
+const FunctionList = () => import("@/components/functions/FunctionList.vue");
+const AssociatedStreamFunction = () => import("@/components/functions/AssociatedStreamFunction.vue");
+const EnrichmentTableList = () => import("@/components/functions/EnrichmentTableList.vue");
 
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
@@ -199,17 +197,17 @@ const useRoutes = () => {
         {
           path: "functions",
           name: "functionList",
-          component: () => FunctionList,
+          component: FunctionList,
         },
         {
           path: "stream-association",
           name: "streamFunctions",
-          component: () => AssociatedStreamFunction,
+          component: AssociatedStreamFunction,
         },
         {
           path: "enrichment-tables",
           name: "enrichmentTables",
-          component: () => EnrichmentTableList,
+          component: EnrichmentTableList,
         },
       ],
     },
