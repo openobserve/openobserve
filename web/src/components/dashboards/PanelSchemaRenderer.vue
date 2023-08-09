@@ -47,9 +47,8 @@ export default defineComponent({
     const panelData: any = ref({});
     const chartPanelRef = ref(null);
     const {panelSchema, selectedTimeObj, variablesData } = toRefs(props)
-    const newPanelSchema:any={};
+    const newPanelSchema:any=ref(PanelSchemaVersionConverted(panelSchema.value))
 
-    newPanelSchema.value = PanelSchemaVersionConverted(panelSchema.value);
     // calls the apis to get the data based on the panel config
     let { data, loading, errorDetail } = usePanelDataLoader(newPanelSchema, selectedTimeObj, variablesData,chartPanelRef);
 

@@ -9,9 +9,6 @@ export const usePanelDataLoader = (
   chartPanelRef: any
 ) => {
 
-  console.log(panelSchema);
-  
-
   const state = reactive({
     data: [],
     loading: false,
@@ -35,7 +32,7 @@ export const usePanelDataLoader = (
 
     console.log("queryDataa", panelSchema);
 
-    const queryData = panelSchema.value.query;
+    const queryData = panelSchema.value.queries[0];
     const timestamps = selectedTimeObj.value;
     let startISOTimestamp: any;
     let endISOTimestamp: any;
@@ -66,7 +63,7 @@ export const usePanelDataLoader = (
     // console.log("Calling search API");
 
     if (
-      panelSchema.value.fields?.stream_type == "metrics" &&
+      // panelSchema.value.queries[0]?.fields.stream_type == "metrics" &&
       panelSchema.value.customQuery &&
       panelSchema.value.queryType == "promql"
     ) {
@@ -131,6 +128,7 @@ export const usePanelDataLoader = (
 
   onMounted(() => {
     console.log("usePanelDataLoader mounted",);
+
     if (panelSchema.value.queries?.length && isVisible.value && isDirty.value) {
       loadData();
     }
@@ -166,7 +164,7 @@ export const usePanelDataLoader = (
 
   const canRunQueryBasedOnVariables = () => {
     const dependentVariables = variablesData.value?.values?.filter((it: any) =>
-      panelSchema.value.query.includes(`$${it.name}`)
+      (panelSchema?.value?.queries?.map((q: any) => q?.query?.includes(`$${it.name}`)))?.includes(true)
     );
 
     if (dependentVariables?.length > 0) {
@@ -228,14 +226,14 @@ export const usePanelDataLoader = (
   const isDirty: any = ref(true);
   const isVisible: any = ref(false);
 
-  watch(()=>isVisible?.value, async () => {
-    console.log("isvisible changed",isVisible.value);
+  watch(()=>isVisible.value, async () => {
+    console.log("loaddata check",panelSchema.value.queries.length, isVisible.value, isDirty.value);
       if (isVisible.value && isDirty.value) {
         loadData();
       }
   })
-  watch(()=>panelSchema.value.queries, async () => {
-    if (isVisible.value && isDirty.value && (panelSchema.value.query || panelSchema.value.queries?.length)) {   
+  watch(()=>panelSchema?.value?.queries, async () => {
+    if (isVisible.value && isDirty.value && (panelSchema.value.queries?.length)) {   
       loadData();
   }})
 
@@ -256,13 +254,13 @@ export const usePanelDataLoader = (
     // 3. if the value of any current variable is changed, call the api
     watch(() => variablesData?.values, () => {
       // ensure the query is there
-      if(!panelSchema.value.query) {
+      if(!panelSchema.value.queries?.length) {
           return;
       }
 
       // 1. get the dependent variables list
       const newDependentVariablesData = variablesData?.values?.filter((it: any) =>
-        panelSchema.value.query.includes(`$${it.name}`)
+        panelSchema.value.querys?.map((q: any) => q?.query?.includes(`$${it.name}`)).includes(true)
       );
 
       // if no variables, no need to rerun the query
