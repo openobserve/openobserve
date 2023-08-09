@@ -14,7 +14,7 @@ use crate::common::{
 pub static USAGE_DATA: Lazy<Arc<RwLock<Vec<UsageData>>>> =
     Lazy::new(|| Arc::new(RwLock::new(vec![])));
 
-pub async fn report_usage_stats(
+pub async fn report_request_usage_stats(
     stats: RequestStats,
     org_id: &str,
     stream_name: &str,

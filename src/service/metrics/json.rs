@@ -20,18 +20,18 @@ use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
 use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::stream::PartitionTimeLevel;
-use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
     prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+    stream::PartitionTimeLevel,
+    usage::UsageType,
     StreamType,
 };
 use crate::common::{flatten, json, time};
-use crate::service::usage::report_usage_stats;
 use crate::service::{
     db,
     ingestion::{get_hour_key, write_file},
+    usage::report_request_usage_stats,
 };
 
 pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
@@ -42,7 +42,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -68,6 +68,39 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 return Err(anyhow::anyhow!("invalid __type__, need to be string"));
             }
         };
+
+        // check metrics type for Histogram & Summary
+        if metrics_type.to_lowercase() == "histogram" || metrics_type.to_lowercase() == "summary" {
+            if stream_schema_map.get(&stream_name).is_none() {
+                let mut schema = db::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
+                if schema == Schema::empty() {
+                    // create the metadata for the stream
+                    let metadata = Metadata {
+                        metric_family_name: stream_name.clone(),
+                        metric_type: metrics_type.as_str().into(),
+                        help: stream_name.clone().replace('_', " "),
+                        unit: "".to_string(),
+                    };
+                    let mut extra_metadata: HashMap<String, String> = HashMap::new();
+                    extra_metadata.insert(
+                        METADATA_LABEL.to_string(),
+                        json::to_string(&metadata).unwrap(),
+                    );
+                    schema = schema.with_metadata(extra_metadata);
+                    db::schema::set(
+                        org_id,
+                        &stream_name,
+                        StreamType::Metrics,
+                        &schema,
+                        Some(chrono::Utc::now().timestamp_micros()),
+                        false,
+                    )
+                    .await?;
+                }
+                stream_schema_map.insert(stream_name.clone(), schema);
+            }
+            continue;
+        }
 
         // apply functions
         let mut record = json::Value::Object(record.to_owned());
@@ -184,8 +217,10 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             StreamType::Metrics,
             None,
         ) {
-            return Err(anyhow!("stream [{stream_name}] is being deleted"));
+            log::warn!("stream [{stream_name}] is being deleted");
+            continue;
         }
+
         let mut stream_file_name = "".to_string();
         let mut req_stats = write_file(
             stream_data,
@@ -198,7 +233,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         );
         req_stats.response_time = time;
 
-        report_usage_stats(
+        report_request_usage_stats(
             req_stats,
             org_id,
             &stream_name,

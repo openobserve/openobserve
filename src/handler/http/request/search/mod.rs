@@ -29,7 +29,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::common::meta::usage::{RequestStats, UsageType};
 use crate::common::meta::{self, StreamType};
 use crate::service::search as SearchService;
-use crate::service::usage::report_usage_stats;
+use crate::service::usage::report_request_usage_stats;
 
 /** SearchStreamData*/
 #[utoipa::path(
@@ -165,7 +165,7 @@ pub async fn search(
                 ..Default::default()
             };
             let num_fn = req.query.query_fn.is_some() as u16;
-            report_usage_stats(
+            report_request_usage_stats(
                 req_stats,
                 &org_id,
                 "", // TODO see if we can steam name
@@ -454,7 +454,7 @@ pub async fn around(
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
-    report_usage_stats(
+    report_request_usage_stats(
         req_stats,
         &org_id,
         &stream_name,
@@ -656,7 +656,7 @@ pub async fn values(
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
-    report_usage_stats(
+    report_request_usage_stats(
         req_stats,
         &org_id,
         &stream_name,

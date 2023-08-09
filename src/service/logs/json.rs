@@ -26,7 +26,7 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::usage::report_usage_stats;
+use crate::service::usage::report_request_usage_stats;
 use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
 
 pub async fn ingest(
@@ -43,7 +43,7 @@ pub async fn ingest(
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
     // check if we are allowed to ingest
@@ -205,7 +205,7 @@ pub async fn ingest(
 
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage
-    report_usage_stats(
+    report_request_usage_stats(
         req_stats,
         org_id,
         stream_name,

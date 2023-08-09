@@ -64,7 +64,7 @@ pub async fn handle_trace_request(
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
-            "Quota exceeded for this organisation".to_string(),
+            "Quota exceeded for this organization".to_string(),
         )));
     }
 

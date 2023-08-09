@@ -33,7 +33,7 @@ use crate::{
         flatten, json,
         time::{parse_i64_to_timestamp_micros, parse_timestamp_micro_from_value},
     },
-    service::usage::report_usage_stats,
+    service::usage::report_request_usage_stats,
 };
 
 use super::StreamMeta;
@@ -258,7 +258,7 @@ pub async fn process(
 
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage
-    report_usage_stats(
+    report_request_usage_stats(
         req_stats,
         org_id,
         stream_name,

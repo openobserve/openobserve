@@ -30,9 +30,9 @@ pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Metric {
+pub struct Metric<'a> {
     #[serde(flatten)]
-    pub labels: FxIndexMap<String, String>,
+    pub labels: &'a FxIndexMap<String, String>,
     pub value: f64,
 }
 

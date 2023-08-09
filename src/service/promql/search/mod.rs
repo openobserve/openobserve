@@ -42,7 +42,7 @@ use crate::{
 use crate::{
     common::meta::{stream::ScanStats, usage::RequestStats},
     handler::grpc::cluster_rpc,
-    service::usage::report_usage_stats,
+    service::usage::report_request_usage_stats,
 };
 
 pub mod grpc;
@@ -266,7 +266,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         request_body: Some(req.query.unwrap().query),
     };
 
-    report_usage_stats(
+    report_request_usage_stats(
         req_stats,
         &req.org_id,
         "", // TODO see if we can add metric name

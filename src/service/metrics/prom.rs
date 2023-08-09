@@ -23,25 +23,25 @@ use std::collections::HashMap;
 use crate::common::infra::{
     cache::stats,
     cluster,
-    config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+    config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
     errors::{Error, Result},
     metrics,
 };
-use crate::common::meta::functions::StreamTransform;
-use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     self,
     alert::{Alert, Trigger},
+    functions::StreamTransform,
     prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+    usage::UsageType,
     StreamType,
 };
 use crate::common::{json, time::parse_i64_to_timestamp_micros};
-use crate::service::usage::report_usage_stats;
 use crate::service::{
     db,
     ingestion::{chk_schema_by_record, write_file},
     schema::{set_schema_metadata, stream_schema_exists},
     search as search_service,
+    usage::report_request_usage_stats,
 };
 
 pub(crate) mod prometheus {
@@ -59,7 +59,7 @@ pub async fn remote_write(
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
     let mut min_ts =
@@ -108,34 +108,33 @@ pub async fn remote_write(
 
     // parse timeseries
     let mut first_line = true;
-    for event in request.timeseries {
+    for mut event in request.timeseries {
         // get labels
         let mut replica_label = String::new();
-        let metric_name = match labels_value(&event.labels, NAME_LABEL) {
-            Some(v) => v,
-            None => continue,
-        };
-        if !has_entry {
-            if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_replica_label) {
-                replica_label = v;
-            };
-            if cluster_name.is_empty() {
-                if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_cluster_label) {
-                    cluster_name = format!("{}/{}", org_id, v);
-                }
-            }
-        }
-        let labels: prom::FxIndexMap<String, String> = event
+
+        let mut labels: FxIndexMap<String, String> = event
             .labels
-            .iter()
-            .filter(|label| {
-                label.name != CONFIG.prom.ha_replica_label
-                    && label.name != CONFIG.prom.ha_cluster_label
-            })
-            .map(|label| (label.name.clone(), label.value.clone()))
+            .drain(..)
+            .map(|label| (label.name, label.value))
             .collect();
 
-        let buf = metric_data_map.entry(metric_name.clone()).or_default();
+        let metric_name = match labels.get(NAME_LABEL) {
+            Some(v) => v.clone(),
+            None => continue,
+        };
+
+        let replica_label_value = labels.remove(&CONFIG.prom.ha_replica_label);
+        let cluster_name_value = labels.remove(&CONFIG.prom.ha_cluster_label);
+        if !has_entry {
+            if replica_label_value.is_some() {
+                replica_label = replica_label_value.unwrap();
+            }
+            if cluster_name.is_empty() && cluster_name_value.is_some() {
+                cluster_name = format!("{}/{}", org_id, cluster_name_value.unwrap());
+            }
+        }
+
+        let buf = metric_data_map.entry(metric_name.to_owned()).or_default();
 
         // parse samples
         for sample in event.samples {
@@ -152,7 +151,7 @@ pub async fn remote_write(
                 continue;
             }
             let metric = prom::Metric {
-                labels: labels.clone(),
+                labels: &labels,
                 value: sample_val,
             };
 
@@ -173,8 +172,8 @@ pub async fn remote_write(
                 }
                 accept_record = prom_ha_handler(
                     has_entry,
-                    cluster_name.clone(),
-                    replica_label.clone(),
+                    &cluster_name,
+                    &replica_label,
                     last_received,
                     election_interval,
                 )
@@ -205,19 +204,13 @@ pub async fn remote_write(
             }
 
             // Start get stream alerts
-            let key = format!(
-                "{}/{}/{}",
-                &org_id,
-                StreamType::Metrics,
-                metric_name.clone()
-            );
+            let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
             crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
             // End get stream alert
 
             let mut runtime = crate::service::ingestion::init_functions_runtime();
 
             // Start Register Transforms for stream
-
             let (local_trans, stream_vrl_map) =
                 crate::service::ingestion::register_stream_transforms(
                     org_id,
@@ -313,6 +306,11 @@ pub async fn remote_write(
 
     let time = start.elapsed().as_secs_f64();
     for (stream_name, stream_data) in metric_data_map {
+        // stream_data could be empty if metric value is nan, check it
+        if stream_data.is_empty() {
+            continue;
+        }
+
         // write to file
         let mut stream_file_name = "".to_string();
 
@@ -323,7 +321,8 @@ pub async fn remote_write(
             StreamType::Metrics,
             None,
         ) {
-            return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
+            log::warn!("stream [{stream_name}] is being deleted");
+            continue;
         }
 
         let mut req_stats = write_file(
@@ -338,7 +337,7 @@ pub async fn remote_write(
 
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
         req_stats.response_time += time;
-        report_usage_stats(
+        report_request_usage_stats(
             req_stats,
             org_id,
             &stream_name,
@@ -434,9 +433,35 @@ pub(crate) async fn get_metadata(
                 "failed to get metrics' stream schemas: {error}"
             )))
         }
-        Ok(stream_schemas) => {
+        Ok(mut stream_schemas) => {
+            stream_schemas.sort_by(|a, b| a.stream_name.cmp(&b.stream_name));
+            let histogram_summary = stream_schemas
+                .iter()
+                .filter_map(|v| match super::get_prom_metadata_from_schema(&v.schema) {
+                    None => None,
+                    Some(v) => {
+                        if v.metric_type == prom::MetricType::Histogram
+                            || v.metric_type == prom::MetricType::Summary
+                        {
+                            Some(v.metric_family_name)
+                        } else {
+                            None
+                        }
+                    }
+                })
+                .collect::<Vec<_>>();
+            let mut histogram_summary_sub = Vec::with_capacity(histogram_summary.len() * 3);
+            for name in histogram_summary.iter() {
+                histogram_summary_sub.push(format!("{}_bucket", name));
+                histogram_summary_sub.push(format!("{}_count", name));
+                histogram_summary_sub.push(format!("{}_sum", name));
+            }
             let metric_names = stream_schemas.into_iter().filter_map(|schema| {
-                get_metadata_object(&schema.schema).map(|meta| (schema.stream_name, vec![meta]))
+                if histogram_summary_sub.contains(&schema.stream_name) {
+                    None
+                } else {
+                    get_metadata_object(&schema.schema).map(|meta| (schema.stream_name, vec![meta]))
+                }
             });
             Ok(match req.limit {
                 None => metric_names.collect(),
@@ -609,7 +634,7 @@ pub(crate) async fn get_label_values(
         // This special case doesn't require any SQL to be executed. All we have
         // to do is to collect stream names that satisfy selection criteria
         // (i.e., `selector` and `start`/`end`) and return them.
-        let stream_schemas = db::schema::list(org_id, Some(stream_type), false)
+        let stream_schemas = db::schema::list(org_id, Some(stream_type), true)
             .await
             .unwrap_or_default();
         let mut label_values = Vec::with_capacity(stream_schemas.len());
@@ -621,9 +646,24 @@ pub(crate) async fn get_label_values(
                     continue;
                 }
             }
-            let stats = stats::get_stream_stats(org_id, &schema.stream_name, stream_type);
+            let stats = match super::get_prom_metadata_from_schema(&schema.schema) {
+                None => stats::get_stream_stats(org_id, &schema.stream_name, stream_type),
+                Some(metadata) => {
+                    if metadata.metric_type == prom::MetricType::Histogram
+                        || metadata.metric_type == prom::MetricType::Summary
+                    {
+                        stats::get_stream_stats(
+                            org_id,
+                            &format!("{}_sum", schema.stream_name),
+                            stream_type,
+                        )
+                    } else {
+                        stats::get_stream_stats(org_id, &schema.stream_name, stream_type)
+                    }
+                }
+            };
             if stats.time_range_intersects(start, end) {
-                label_values.push(schema.stream_name.clone())
+                label_values.push(schema.stream_name)
             }
         }
         label_values.sort();
@@ -697,32 +737,26 @@ fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
 
 async fn prom_ha_handler(
     has_entry: bool,
-    cluster_name: String,
-    replica_label: String,
+    cluster_name: &String,
+    replica_label: &String,
     last_received: i64,
     election_interval: i64,
 ) -> bool {
     let mut _accept_record = false;
     let curr_ts = Utc::now().timestamp_micros();
     if !has_entry {
-        METRIC_CLUSTER_MAP.insert(cluster_name.clone(), vec![]);
-        log::info!(
-            "Making {} leader for {} ",
-            replica_label.clone(),
-            cluster_name.clone(),
-        );
+        METRIC_CLUSTER_MAP.insert(cluster_name.to_owned(), vec![]);
+        log::info!("Making {} leader for {} ", replica_label, cluster_name);
         METRIC_CLUSTER_LEADER.insert(
-            cluster_name.clone(),
+            cluster_name.to_owned(),
             prom::ClusterLeader {
-                name: replica_label.clone(),
+                name: replica_label.to_owned(),
                 last_received: curr_ts,
             },
         );
         _accept_record = true;
     } else {
-        let mut leader = METRIC_CLUSTER_LEADER
-            .get_mut(&cluster_name.clone())
-            .unwrap();
+        let mut leader = METRIC_CLUSTER_LEADER.get_mut(cluster_name).unwrap();
         if replica_label.eq(&leader.name) {
             _accept_record = true;
             leader.last_received = curr_ts;
@@ -731,12 +765,12 @@ async fn prom_ha_handler(
             //elect new leader as didnt receive data for last 30 secs
             log::info!(
                 "Electing {} new leader for {} as last received data from {} at {} ",
-                replica_label.clone(),
+                replica_label,
                 cluster_name,
                 &leader.name,
                 Utc.timestamp_nanos(last_received * 1000)
             );
-            leader.name = replica_label.clone();
+            leader.name = replica_label.to_owned();
             leader.last_received = curr_ts;
             _accept_record = true;
         } else {
@@ -748,26 +782,14 @@ async fn prom_ha_handler(
             _accept_record = false;
         }
     }
-    let mut replica_list = vec![];
-    if METRIC_CLUSTER_MAP.contains_key(&cluster_name) {
-        replica_list = METRIC_CLUSTER_MAP.get_mut(&cluster_name).unwrap().to_vec();
-        if !replica_list.contains(&replica_label.clone()) {
-            replica_list.push(replica_label.clone());
-            METRIC_CLUSTER_MAP.insert(cluster_name.clone(), replica_list.clone());
-            let _ = db::metrics::set_prom_cluster_info(&cluster_name, replica_list.to_vec()).await;
-        }
-    } else {
-        replica_list.push(replica_label.clone());
-        METRIC_CLUSTER_MAP.insert(cluster_name.clone(), replica_list.clone());
-        let _ = db::metrics::set_prom_cluster_info(&cluster_name, replica_list.to_vec()).await;
+
+    let mut replica_list = METRIC_CLUSTER_MAP
+        .entry(cluster_name.to_owned())
+        .or_default();
+    if !replica_list.contains(replica_label) {
+        replica_list.push(replica_label.to_owned());
+        let _ = db::metrics::set_prom_cluster_info(cluster_name, replica_list.to_vec()).await;
     }
 
     _accept_record
-}
-
-fn labels_value(labels: &[prometheus::Label], name: &str) -> Option<String> {
-    labels
-        .binary_search_by_key(&name, |label| label.name.as_str())
-        .ok()
-        .map(|index| labels[index].value.clone())
 }
