@@ -27,7 +27,7 @@
     <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
       <div v-if="promqlMode"  class="q-py-md showLabelOnTop">Query
-    <q-tabs v-model="dashboardPanelData.data.config.promql_legend" narrow-indicator dense>
+    <q-tabs v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.promql_legend" narrow-indicator dense>
       <q-tab no-caps v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
         :label="'Query ' + (index + 1)">
       </q-tab>
@@ -36,7 +36,7 @@
     <!-- </q-input> -->
    <div class="space"></div>
 
-    <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
+    <q-input v-if="promqlMode" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot>
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
@@ -60,7 +60,7 @@ import { defineComponent } from 'vue';
 export default defineComponent({
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData()
-console.log(dashboardPanelData.data.config.promql_legend,"legend position");
+console.log(dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.promql_legend,"legend position");
 
     // options for legends position
     const legendsPositionOptions = [
