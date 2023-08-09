@@ -64,9 +64,9 @@ impl Engine {
 
     #[async_recursion]
     pub async fn exec_expr(&mut self, prom_expr: &PromExpr) -> Result<Value> {
-        // println!("*************************************");
-        // println!("**************{:?}*****************", prom_expr);
-        // println!("*************************************");
+        println!("*************************************");
+        println!("**************{:?}*****************", prom_expr);
+        println!("*************************************");
         Ok(match &prom_expr {
             PromExpr::Aggregate(AggregateExpr {
                 op,
@@ -633,6 +633,9 @@ impl Engine {
             "time",
             "year",
         ]);
+
+        println!("***************************************** THE ARGS ARE {:?}", args);
+        println!("***************************************** THE ARGS LEN ARE {:?}", args.len());
         let input = match functions_without_args.contains(func.name) {
             true => match args.len() {
                 0 => {
