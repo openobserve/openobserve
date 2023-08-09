@@ -342,7 +342,8 @@ export default defineComponent({
       if (
         // eslint-disable-next-line no-prototype-builtins
         searchObj.data.histogram.hasOwnProperty("xData") &&
-        searchObj.data.histogram.xData.length > 0
+        searchObj.data.histogram.xData.length > 0 &&
+        plotChart.value?.reDraw
       ) {
         plotChart.value.reDraw(
           searchObj.data.histogram.xData,
