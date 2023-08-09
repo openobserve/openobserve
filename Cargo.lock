@@ -4017,6 +4017,7 @@ dependencies = [
  "aws-sdk-dynamodb",
  "base64 0.21.2",
  "blake3",
+ "byteorder",
  "bytes",
  "chrono",
  "clap 4.3.19",

@@ -55,33 +55,3 @@ pub fn clear(session_id: &str) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::common::meta::common::FileKey;
-
-    #[actix_web::test]
-    async fn test_storage_file_list() {
-        let meta = crate::common::meta::common::FileMeta {
-            min_ts: 100,
-            max_ts: 200,
-            records: 10000,
-            original_size: 1024,
-            compressed_size: 1,
-        };
-        let file_name = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
-        let file_key = FileKey {
-            key: file_name.to_string(),
-            meta: meta.clone(),
-            deleted: false,
-        };
-        crate::common::infra::cache::file_list::set_file_to_cache(file_name, meta).unwrap();
-        let session_id = "1234";
-        set(session_id, &[file_key]).await;
-
-        let get_resp = get(session_id);
-        assert!(get_resp.unwrap().len() > 0);
-
-        clear(session_id);
-    }
-}

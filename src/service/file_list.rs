@@ -15,7 +15,7 @@
 use std::io::Write;
 
 use crate::common;
-use crate::common::infra::{cache::file_list, config::CONFIG, ider, storage};
+use crate::common::infra::{config::CONFIG, file_list, ider, storage};
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     stream::ScanStats,
@@ -24,7 +24,7 @@ use crate::common::meta::{
 use crate::service::db;
 
 #[inline]
-pub async fn get_file_list(
+pub async fn query(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -41,14 +41,19 @@ pub async fn get_file_list(
         )
         .await
     } else {
-        let files =
-            file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max).await?;
+        let files = file_list::query(
+            org_id,
+            stream_type,
+            stream_name,
+            common::meta::stream::PartitionTimeLevel::Hourly,
+            (time_min, time_max),
+        )
+        .await?;
         let mut file_sizes = Vec::with_capacity(files.len());
         for file in files {
-            let meta = get_file_meta(&file).await?;
             file_sizes.push(FileKey {
-                key: file,
-                meta,
+                key: file.0,
+                meta: file.1,
                 deleted: false,
             });
         }
@@ -61,7 +66,7 @@ pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
     if CONFIG.common.use_dynamo_meta_store {
         db::file_list::dynamo_db::get_file_meta(file).await
     } else {
-        file_list::get_file_from_cache(file)
+        Ok(file_list::get(file).await?)
     }
 }
 

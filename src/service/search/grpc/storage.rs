@@ -224,7 +224,7 @@ pub async fn search(
 #[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<FileKey>, Error> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let file_list = match file_list::get_file_list(
+    let file_list = match file_list::query(
         &sql.org_id,
         &sql.stream_name,
         stream_type,

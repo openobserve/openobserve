@@ -161,6 +161,7 @@ vrl = { git = "https://github.com/zinclabs/vrl", rev = "2bbe6728fc0a9d0c20b6ee86
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.12"
+byteorder = "1.4.3"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

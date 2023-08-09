@@ -11,9 +11,3 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-// local mode:
-// -- do nothing
-
-// cluster mode:
-// -- load file_list db from s3 to local db

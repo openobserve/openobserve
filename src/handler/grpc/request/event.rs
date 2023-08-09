@@ -69,9 +69,6 @@ impl Event for Eventer {
             .with_label_values(&["/event/send_file_list", "200", "", "", ""])
             .inc();
 
-        // after delete, we need to shrink the file list
-        cache::file_list::shrink_to_fit();
-
         Ok(Response::new(EmptyResponse {}))
     }
 }
