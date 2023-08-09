@@ -33,46 +33,41 @@ const colors = [
 ]
 
 const getDefaultDashboardPanelData = () => ({
-  data: {
-    version:2,
-    id: "",
-    type: "bar",
-    fields: {
-      stream: "",
-      stream_type: "logs",
-      x: <any>[],
-      y: <any>[],
-      filter: <any>[],
-    },
-    config: {
-      title: "",
-      description: "",
-      show_legends: true,
-      legends_position: null,
-      promql_legend: "",
-      unit: null,
-      unit_custom: null
-    },
-    queries: [
-      {
-        query:
-          'histogram_quantile(0.95, sum(irate(zo_grpc_response_time_bucket{namespace="ziox-alpha1"}[5m])) by (le, exported_endpoint))',
-        promql_legend: "q1-{exported_endpoint}",
+    data: {
+      version: 2,
+      id: "",
+      type: "bar",
+      config: {
+        title: "",
+        description: "",
+        show_legends: true,
+        legends_position: null,
+        unit: null,
+        unit_custom: null,
       },
-      {
-        query:
-          'histogram_quantile(0.98, sum(irate(zo_grpc_response_time_bucket{namespace="ziox-alpha1"}[5m])) by (le, exported_endpoint))',
-        promql_legend: "q2-{exported_endpoint}",
-      },
-    ],
       queryType: "sql",
-      query: "a",
-      customQuery: false
+      queries: [
+        {
+          query: "",
+          customQuery: false,
+          fields: {
+            stream: "",
+            stream_type: "logs",
+            x: [],
+            y: [],
+            filter: [],
+          },
+          config: {
+            promql_legend: "",
+          },
+        },
+      ],
     },
     layout: {
       splitter: 20,
       showQueryBar: false,
-      isConfigPanelOpen: false
+      isConfigPanelOpen: false,
+      currentQueryIndex: 0
     },
     meta: {
       parsedQuery: "",
@@ -112,19 +107,19 @@ const useDashboardPanelData = () => {
     return name.replace(/[\_\-\s\.]/g,' ').split(' ').map(string => string.charAt(0).toUpperCase() + string.slice(1)).filter(it => it).join(' ')
   }
 
-  const promqlMode = computed(() => dashboardPanelData.data.fields.stream_type == "metrics" && dashboardPanelData.data.customQuery && dashboardPanelData.data.queryType == "promql")
+  const promqlMode = computed(() => dashboardPanelData.data.queryType == "promql")
 
   const isAddXAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
       case 'pie':
       case 'donut':
-        return dashboardPanelData.data.fields.x.length >= 1
+        return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length >= 1
       case 'metric':
-        return dashboardPanelData.data.fields.x.length >= 0
+        return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length >= 0
       case 'table':
         return false
       default:
-        return dashboardPanelData.data.fields.x.length >= 2;
+        return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length >= 2;
     }
   })
 
@@ -132,21 +127,21 @@ const useDashboardPanelData = () => {
     switch (dashboardPanelData.data.type) {
       case 'pie':
       case 'donut':
-        return dashboardPanelData.data.fields.y.length >= 1
+        return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length >= 1
       case 'metric':
-        return dashboardPanelData.data.fields.y.length >= 1
+        return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length >= 1
       case 'area-stacked':
       case 'stacked':
       case 'h-stacked':
-        return dashboardPanelData.data.fields.y.length >= 1
+        return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length >= 1
       default:
         return false;
     }
   })
 
   const addXAxisItem = (row: any) => {
-    if(!dashboardPanelData.data.fields.x) {
-      dashboardPanelData.data.fields.x = []
+    if(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x) {
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x = []
     }
 
     if(isAddXAxisNotAllowed.value){
@@ -154,32 +149,31 @@ const useDashboardPanelData = () => {
     }
 
     // check for existing field
-    if(!dashboardPanelData.data.fields.x.find((it:any) => it.column == row.name)) {
-      dashboardPanelData.data.fields.x.push({
-        label: !dashboardPanelData.data.customQuery ? generateLabelFromName(row.name) : row.name,
-        alias: !dashboardPanelData.data.customQuery ? 'x_axis_' + (dashboardPanelData.data.fields.x.length + 1) : row.name,
+    if(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.find((it:any) => it.column == row.name)) {
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.push({
+        label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ? generateLabelFromName(row.name) : row.name,
+        alias: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ? 'x_axis_' + (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length + 1) : row.name,
         column: row.name,
         color: null,
         aggregationFunction: (row.name == store.state.zoConfig.timestamp_column) ? 'histogram' : null
       })
     }
-
     updateArrayAlias()
   }
 
   const addYAxisItem = (row: any) => {
-    if(!dashboardPanelData.data.fields.y) {
-      dashboardPanelData.data.fields.y = []
+    if(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y) {
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y = []
     }
 
     if(isAddYAxisNotAllowed.value){
       return;
     }
 
-    if(!dashboardPanelData.data.fields.y.find((it:any) => it.column == row.name)) {
-      dashboardPanelData.data.fields.y.push({
-        label: !dashboardPanelData.data.customQuery ? generateLabelFromName(row.name) : row.name,
-        alias: !dashboardPanelData.data.customQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : row.name,
+    if(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.find((it:any) => it.column == row.name)) {
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.push({
+        label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ? generateLabelFromName(row.name) : row.name,
+        alias: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ? 'y_axis_' + (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length + 1) : row.name,
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: 'count'
@@ -190,7 +184,7 @@ const useDashboardPanelData = () => {
 
   // get new color value based on existing color from the chart
   const getNewColorValue = () => {
-   const YAxisColor = dashboardPanelData.data.fields.y.map((it: any)=> it.color)
+   const YAxisColor = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.map((it: any)=> it.color)
    let newColor = colors.filter((el:any) => !YAxisColor.includes(el));
     if(!newColor.length){
       newColor = colors
@@ -200,46 +194,45 @@ const useDashboardPanelData = () => {
 
   // update X or Y axis aliases when new value pushes into the X and Y axes arrays
   const updateArrayAlias = () => {
-    dashboardPanelData.data.fields.x.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.customQuery ? 'x_axis_' + (index + 1) : it.column )
-    dashboardPanelData.data.fields.y.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.customQuery ? 'y_axis_' + (index + 1) : it.column )
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ? 'x_axis_' + (index + 1) : it.column )
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ? 'y_axis_' + (index + 1) : it.column )
   }
 
-
   const removeXAxisItem = (name: string) => {
-    const index = dashboardPanelData.data.fields.x.findIndex((it:any) => it.column == name)
+    const index = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.findIndex((it:any) => it.column == name)
     if(index >= 0) {
-      dashboardPanelData.data.fields.x.splice(index, 1)
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.splice(index, 1)
     }
   }
 
   const removeYAxisItem = (name: string) => {
-    const index = dashboardPanelData.data.fields.y.findIndex((it:any) => it.column == name)
+    const index = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.findIndex((it:any) => it.column == name)
     if(index >= 0) {
-      dashboardPanelData.data.fields.y.splice(index, 1)
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.splice(index, 1)
     }
   }
 
   const removeFilterItem = (name: string) => {
-    const index = dashboardPanelData.data.fields.filter.findIndex((it:any) => it.column == name)
+    const index = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.findIndex((it:any) => it.column == name)
     if(index >= 0) {
-      dashboardPanelData.data.fields.filter.splice(index, 1)
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.splice(index, 1)
     }
   }
 
   const addFilteredItem = (name: string) => {
     // console.log("name=", name);
-    if (!dashboardPanelData.data.fields.filter) {
-      dashboardPanelData.data.fields.filter = [];
+    if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter) {
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter = [];
     }
 
     if (
-      !dashboardPanelData.data.fields.filter.find(
+      !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.find(
         (it: any) => it.column == name
       )
     ) {
       // console.log("data");
 
-      dashboardPanelData.data.fields.filter.push({
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.push({
         type: "list",
         values: [],
         column: name,
@@ -261,12 +254,12 @@ const useDashboardPanelData = () => {
     StreamService
       .fieldValues({
         org_identifier: store.state.selectedOrganization.identifier,
-        stream_name: dashboardPanelData.data.fields.stream,
+        stream_name: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
         start_time:  new Date(dashboardPanelData.meta.dateTime["start_time"].toISOString()).getTime() * 1000,
         end_time:  new Date(dashboardPanelData.meta.dateTime["end_time"].toISOString()).getTime() * 1000,
         fields: [name],
         size: 10,
-        type: dashboardPanelData.data.fields.stream_type
+        type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type
       })
       .then((res:any) => {
         dashboardPanelData.meta.filterValue.push({
@@ -287,25 +280,25 @@ const useDashboardPanelData = () => {
   }
 
   const removeXYFilters = () => {
-    if (promqlMode.value || dashboardPanelData.data.customQuery == false) {
-      dashboardPanelData.data.fields.x.splice(0, dashboardPanelData.data.fields.x.length);
-      dashboardPanelData.data.fields.y.splice(0, dashboardPanelData.data.fields.y.length);
-      dashboardPanelData.data.fields.filter.splice(0, dashboardPanelData.data.fields.filter.length);
+    if (promqlMode.value || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery == false) {
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.splice(0,dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length);
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.splice(0,dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length);
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.splice(0,dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.length);
     }
   }
 
   // This function updates the x and y fields of a custom query in the dashboard panel data
   const updateXYFieldsForCustomQueryMode = () => {
     // Check if the custom query is enabled and PromQL mode is disabled
-    if (!promqlMode.value && dashboardPanelData.data.customQuery == true) {
+    if (!promqlMode.value &&dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery == true) {
       // Loop through each custom query field in the dashboard panel data's stream meta
       dashboardPanelData.meta.stream.customQueryFields.forEach((it: any, index: number) => {
         // Determine if the current field is an x or y field
-        const currentFieldType = index < dashboardPanelData.data.fields.x.length ? "x" : "y";
+        const currentFieldType = index < dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length ? "x" : "y";
         // Get the current field based on its index and whether it's an x or y field
-        const field = index < dashboardPanelData.data.fields.x.length
-            ? dashboardPanelData.data.fields.x[index]
-            : dashboardPanelData.data.fields.y[index - dashboardPanelData.data.fields.x.length];
+        const field = index < dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length
+            ? dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index]
+            : dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index -dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length];
         // Get the name of the current custom query field
         const { name } = it;
 
@@ -342,21 +335,21 @@ const useDashboardPanelData = () => {
       // Check if there is only one changed field
       if (changedIndex.length == 1) {
         const oldName = oldArray[changedIndex[0]]?.name;
-        let fieldIndex = dashboardPanelData.data.fields.x.findIndex((it: any) => it.alias == oldName);
+        let fieldIndex = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.findIndex((it: any) => it.alias == oldName);
         // Check if the field is in the x fields array
         if (fieldIndex >= 0) {
           const newName = newArray[changedIndex[0]]?.name;
-          const field = dashboardPanelData.data.fields.x[fieldIndex];
+          const field =dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[fieldIndex];
 
           // Update the field alias and column to the new name
           field.alias = newName;
           field.column = newName;
         } else {
           // Check if the field is in the y fields array
-          fieldIndex = dashboardPanelData.data.fields.y.findIndex((it: any) => it.alias == oldName);
+          fieldIndex = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.findIndex((it: any) => it.alias == oldName);
           if (fieldIndex >= 0) {
             const newName = newArray[changedIndex[0]]?.name;
-            const field = dashboardPanelData.data.fields.y[fieldIndex];
+            const field =dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[fieldIndex];
 
             // Update the field alias and column to the new name
             field.alias = newName;
