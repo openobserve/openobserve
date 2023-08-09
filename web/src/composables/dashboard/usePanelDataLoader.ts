@@ -1,11 +1,12 @@
-import { ref, watch, reactive, toRefs, onMounted } from "vue";
+import { ref, watch, reactive, toRefs, onMounted, onUnmounted } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 
 export const usePanelDataLoader = (
   panelSchema: any,
   selectedTimeObj: any,
-  variablesData: any
+  variablesData: any,
+  chartPanelRef: any
 ) => {
 
   console.log(panelSchema);
@@ -17,20 +18,22 @@ export const usePanelDataLoader = (
     errorDetail: "",
   });
 
-  const currentDependentVariablesData = ref(variablesData.value?.values || []);
+  let currentDependentVariablesData = ref(variablesData.value?.values || []);
   const store = useStore();
   let controller: AbortController | null = null;
 
   const loadData = async () => {
     console.log("loadData");
-
+    
+    isDirty.value = false;
     const controller = new AbortController();
     state.loading = true;
 
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
       return;
     }
-    // console.log("queryDataa", panelSchema.value.query);
+
+    console.log("queryDataa", panelSchema);
 
     const queryData = panelSchema.value.query;
     const timestamps = selectedTimeObj.value;
@@ -127,14 +130,14 @@ export const usePanelDataLoader = (
   };
 
   onMounted(() => {
-    console.log("usePanelDataLoader mounted");
-    if (panelSchema.value.query) {
+    console.log("usePanelDataLoader mounted",);
+    if (panelSchema.value.queries?.length && isVisible.value && isDirty.value) {
       loadData();
     }
   });
 
   watch(
-    [panelSchema, selectedTimeObj],
+    [()=>panelSchema.value, selectedTimeObj],
     async (
       [newConfigs, newTimerange],
       [oldConfigs, oldTimerange],
@@ -148,7 +151,7 @@ export const usePanelDataLoader = (
       
       
       // TODO: check for query OR queries array for promql
-      if (panelSchema.value.query || panelSchema.value.queries?.length) {
+      if (isVisible.value && isDirty.value && panelSchema.value.queries?.length) {   
       loadData();
       }
     }
@@ -156,7 +159,7 @@ export const usePanelDataLoader = (
 
   const isQueryDependentOnTheVariables = () => {
     const dependentVariables = variablesData.value?.values?.filter((it: any) =>
-      panelSchema.value.query.includes(`$${it.name}`)
+      (panelSchema?.value?.queries?.map((q: any) => q?.query?.includes(`$${it.name}`)))?.includes(true)
     );
     return dependentVariables?.length > 0;
   };
@@ -219,6 +222,80 @@ export const usePanelDataLoader = (
         break;
     }
   };
+
+
+  let observer: any = null;
+  const isDirty: any = ref(true);
+  const isVisible: any = ref(false);
+
+  watch(()=>isVisible?.value, async () => {
+    console.log("isvisible changed",isVisible.value);
+      if (isVisible.value && isDirty.value) {
+        loadData();
+      }
+  })
+  watch(()=>panelSchema.value.queries, async () => {
+    if (isVisible.value && isDirty.value && (panelSchema.value.query || panelSchema.value.queries?.length)) {   
+      loadData();
+  }})
+
+  
+  // remove intersection observer
+  onUnmounted(() => {
+      if (observer) {
+          observer.disconnect();
+      }
+    });
+
+    // [START] variables management
+    // let currentDependentVariablesData = props.variablesData?.values ? JSON.parse(JSON.stringify(props.variablesData?.values)) : []
+
+    // check when the variables data changes
+    // 1. get the dependent variables
+    // 2. compare the dependent variables data with the old dependent variables Data
+    // 3. if the value of any current variable is changed, call the api
+    watch(() => variablesData?.values, () => {
+      // ensure the query is there
+      if(!panelSchema.value.query) {
+          return;
+      }
+
+      // 1. get the dependent variables list
+      const newDependentVariablesData = variablesData?.values?.filter((it: any) =>
+        panelSchema.value.query.includes(`$${it.name}`)
+      );
+
+      // if no variables, no need to rerun the query
+      if(!newDependentVariablesData?.length) {
+          return;
+      }
+
+      // 2. compare with the previously saved variable values, the variables data is an array of objects with name and value
+      const isAllValuesSame = newDependentVariablesData.every((it: any) => {
+          const oldValue = currentDependentVariablesData.find((it2: any) => it2.name == it.name);
+          return it.value == oldValue?.value;
+      });
+
+      if(!isAllValuesSame) {
+          currentDependentVariablesData = JSON.parse(JSON.stringify(newDependentVariablesData));
+          isDirty.value = true;
+          if(isVisible.value)loadData();
+      }
+  }, { deep: true });
+
+  const handleIntersection = (entries:any) => {
+      isVisible.value = entries[0].isIntersecting;
+    }
+
+  onMounted(async () => {
+        observer = new IntersectionObserver(handleIntersection, {
+          root: null,
+          rootMargin: '0px',
+          threshold: 0.1 // Adjust as needed
+        });
+        observer.observe(chartPanelRef.value);
+  });
+
   return {
     ...toRefs(state),
     loadData,

@@ -377,8 +377,8 @@ export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
   
   const paneldata = currentDashboard.panels?.find((it: any) => it.id == panelId);
   console.log("commons: paneldata", paneldata);
-  
-  return PanelSchemaVersionConverted(paneldata);
+  return paneldata;
+  // return PanelSchemaVersionConverted(paneldata);
 };
 
 export const getPanelId = () => {

@@ -1,5 +1,5 @@
 <template>
-  <div  style="height: 100%; position: relative;">
+  <div ref="chartPanelRef"  style="height: 100%; position: relative;">
     <div v-show="!errorDetail" class="plotlycontainer" style="height: 100%">
       <ChartRenderer v-if="panelSchema.type != 'table'" :data="panelData" />
       <TableRenderer v-else-if="panelSchema.type == 'table'" :data="panelData" />
@@ -22,6 +22,7 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
+import {PanelSchemaVersionConverted} from "./../../utils/dashboard/PanelSchemaVersionConverted"
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: { ChartRenderer, TableRenderer },
@@ -44,11 +45,13 @@ export default defineComponent({
 
     // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = ref({});
+    const chartPanelRef = ref(null);
+    const {panelSchema, selectedTimeObj, variablesData } = toRefs(props)
+    const newPanelSchema:any={};
 
-    const { panelSchema, selectedTimeObj, variablesData } = toRefs(props)
-
+    newPanelSchema.value = PanelSchemaVersionConverted(panelSchema.value);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail } = usePanelDataLoader(panelSchema, selectedTimeObj, variablesData);
+    let { data, loading, errorDetail } = usePanelDataLoader(newPanelSchema, selectedTimeObj, variablesData,chartPanelRef);
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(data, async () => {
@@ -56,6 +59,10 @@ export default defineComponent({
       console.log("PanelSchemaRenderer: data: ", data.value);
       panelData.value = convertPanelData(props.panelSchema, data.value, store);
     });
+
+    watch(()=>panelSchema?.value,async()=>{
+      newPanelSchema.value = PanelSchemaVersionConverted(panelSchema.value);
+    })
 
     const noData = computed(() => {
       console.log("inside no Data computed");
@@ -73,103 +80,9 @@ export default defineComponent({
     watch(errorDetail, () => {
       emit("error", errorDetail);
     })
-
-    const chartPanelRef = ref(null)
-    let observer: any = null;
-    const isDirty: any = ref(true);
-    const isVisible: any = ref(false);
-
-    watch(() => isVisible.value, async () => {
-        if (isVisible.value && isDirty.value) {
-          const newData = usePanelDataLoader(panelSchema, selectedTimeObj, variablesData);
-          data = newData.data;
-          loading = newData.loading;
-          errorDetail = newData.errorDetail;
-        }
-    })
-
-    // remove intersection observer
-    onUnmounted(() => {
-        if (observer) {
-            observer.disconnect();
-        }
-      });
-
-      // [START] variables management
-      let currentDependentVariablesData = props.variablesData?.values ? JSON.parse(JSON.stringify(props.variablesData?.values)) : []
-
-      // check when the variables data changes
-      // 1. get the dependent variables
-      // 2. compare the dependent variables data with the old dependent variables Data
-      // 3. if the value of any current variable is changed, call the api
-      watch(() => props.variablesData?.values, () => {
-        // ensure the query is there
-        if(!data?.query) {
-            return;
-        }
-
-        // 1. get the dependent variables list
-        const newDependentVariablesData = props?.variablesData?.values?.filter((it: any) =>
-            data?.query.includes(`$${it.name}`)
-        );
-
-        // if no variables, no need to rerun the query
-        if(!newDependentVariablesData?.length) {
-            return;
-        }
-
-        // 2. compare with the previously saved variable values, the variables data is an array of objects with name and value
-        const isAllValuesSame = newDependentVariablesData.every((it: any) => {
-            const oldValue = currentDependentVariablesData.find((it2: any) => it2.name == it.name);
-            return it.value == oldValue?.value;
-        });
-
-        if(!isAllValuesSame) {
-            currentDependentVariablesData = JSON.parse(JSON.stringify(newDependentVariablesData));
-            isDirty.value = true;
-            if(isVisible.value) {
-              const newData = usePanelDataLoader(panelSchema, selectedTimeObj, variablesData);
-              data = newData.data;
-              loading = newData.loading;
-              errorDetail = newData.errorDetail;   
-           }
-        }
-    }, { deep: true });
-
-    const handleIntersection = (entries:any) => {
-        isVisible.value = entries[0].isIntersecting;
-      }
-
-    onMounted(async () => {
-          observer = new IntersectionObserver(handleIntersection, {
-            root: null,
-            rootMargin: '0px',
-            threshold: 0.1 // Adjust as needed
-          });
-
-          observer.observe(chartPanelRef.value);
-
-    });
-
-    watch(
-          () => [data, props.selectedTimeDate],
-          async () => {
-              isDirty.value = true
-              
-              if (data.query) {
-                  // load the data if visible
-                  if(isVisible.value){
-                    const newData = usePanelDataLoader(panelSchema, selectedTimeObj, variablesData);
-                    data = newData.data;
-                    loading = newData.loading;
-                    errorDetail = newData.errorDetail;
-                  }
-              } 
-          },
-          { deep: true }
-      );
-
+    
     return {
+      chartPanelRef,
       data,
       loading,
       errorDetail,
