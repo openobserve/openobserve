@@ -25,8 +25,8 @@
       />
     </div>
     <PanelSchemaRenderer
-      :panelSchema=props.data
-      :selectedTimeObj=props.selectedTimeDate
+      :panelSchema="props.data"
+      :selectedTimeObj="props.selectedTimeDate"
       :width="props.width"
       :height="props.height"
       :variablesData="props.variablesData"
