@@ -4,7 +4,7 @@
       <ChartRenderer v-if="panelSchema.type != 'table'" :data="panelData" />
       <TableRenderer v-else-if="panelSchema.type == 'table'" :data="panelData" />
     </div>
-    <!-- <div v-if="!errorDetail" class="noData">{{ noData }}</div> -->
+    <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div v-if="errorDetail" class="errorMessage">
       <q-icon size="md" name="warning" />
       <div style="height: 80%; width: 100%;">{{ errorDetail }}</div>
@@ -16,7 +16,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, watch, ref, onMounted, watchEffect, toRef, toRefs, onUnmounted, nextTick } from "vue";
+import { defineComponent, watch, ref, onMounted, watchEffect, toRef, toRefs, onUnmounted, nextTick, computed } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
@@ -56,6 +56,18 @@ export default defineComponent({
       console.log("PanelSchemaRenderer: data: ", data.value);
       panelData.value = convertPanelData(props.panelSchema, data.value, store);
     });
+
+    const noData = computed(() => {
+      console.log("inside no Data computed");
+      if (props.panelSchema?.fields?.stream_type == "metrics" && props.panelSchema?.customQuery && props.panelSchema?.queryType == "promql") {
+        console.log("inside no Data if");
+        // console.log("PanelSchemaRenderer: noData:" , data.value[0].result?.length);
+        return data.value[0].result?.length ? "" : "No Data"
+      } else {
+        console.log("inside no Data else");
+        return !data.value.length ? "No Data" : ""
+      }
+    })
 
     // when the error changes, emit the error
     watch(errorDetail, () => {
@@ -162,6 +174,7 @@ export default defineComponent({
       loading,
       errorDetail,
       panelData,
+      noData,
     };
   },
 });
@@ -177,5 +190,12 @@ export default defineComponent({
   text-align: center;
   color: rgba(255, 0, 0, 0.8);
   text-overflow: ellipsis;
+}
+
+.noData{
+    position: absolute; 
+    top:20%;
+    width:100%;
+    text-align:center;
 }
 </style>
