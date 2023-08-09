@@ -333,6 +333,7 @@ pub async fn remote_write(
             &stream_name,
             &mut stream_file_name,
             StreamType::Metrics,
+            Some(meta::stream::PartitionTimeLevel::Daily),
         );
 
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
@@ -689,7 +690,7 @@ fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
             // `match[]` argument does not contain a metric name.
             // Check if there is `__name__` among the matchers,
             // e.g. `match[]={__name__="zo_response_code",method="GET"}`
-            selector.matchers.find_matcher(NAME_LABEL)
+            selector.matchers.find_matcher_value(NAME_LABEL)
         }
     }
 }

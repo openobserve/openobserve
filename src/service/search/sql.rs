@@ -23,12 +23,15 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::common::infra::{
-    config::CONFIG,
-    errors::{Error, ErrorCodes},
-};
 use crate::common::meta::{sql::Sql as MetaSql, stream::StreamParams, StreamType};
 use crate::common::str::find;
+use crate::common::{
+    infra::{
+        config::CONFIG,
+        errors::{Error, ErrorCodes},
+    },
+    meta::common::FileKey,
+};
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, search::match_source, stream::get_stream_setting_fts_fields};
 
@@ -97,7 +100,7 @@ impl Display for SqlMode {
 }
 
 impl Sql {
-    #[tracing::instrument(name = "service:search:sql:new", skip(req))]
+    #[tracing::instrument(name = "service:search:sql:new", skip(req), fields(org_id = req.org_id))]
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
         let req_query = req.query.as_ref().unwrap();
         let mut req_time_range = (req_query.start_time, req_query.end_time);
@@ -306,10 +309,15 @@ impl Sql {
                 meta.limit = SQL_DEFAULT_FULL_MODE_LIMIT;
             }
             origin_sql = if meta.order_by.is_empty() && !sql_mode.eq(&SqlMode::Full) {
+                let sort_by = if req_query.sort_by.is_empty() {
+                    format!("{} DESC", CONFIG.common.column_timestamp)
+                } else {
+                    req_query.sort_by.clone()
+                };
                 format!(
-                    "{} ORDER BY {} DESC LIMIT {}",
+                    "{} ORDER BY {} LIMIT {}",
                     origin_sql,
-                    CONFIG.common.column_timestamp,
+                    sort_by,
                     meta.offset + meta.limit
                 )
             } else {
@@ -592,17 +600,17 @@ impl Sql {
             }
         }
 
-        log::info!(
-            "sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
-            sql.stream_name,
-            sql.meta.fields,
-            sql.meta.quick_text,
-            sql.fulltext,
-            sql.meta.time_range,
-            sql.meta.order_by,
-            sql.meta.offset,
-            sql.meta.limit,
-        );
+        // log::info!(
+        //     "sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
+        //     sql.stream_name,
+        //     sql.meta.fields,
+        //     sql.meta.quick_text,
+        //     sql.fulltext,
+        //     sql.meta.time_range,
+        //     sql.meta.order_by,
+        //     sql.meta.offset,
+        //     sql.meta.limit,
+        // );
 
         Ok(sql)
     }
@@ -610,7 +618,7 @@ impl Sql {
     /// match a source is a valid file or not
     pub async fn match_source(
         &self,
-        source: &str,
+        source: &FileKey,
         match_min_ts_only: bool,
         is_wal: bool,
         stream_type: StreamType,
@@ -633,6 +641,7 @@ impl Sql {
             is_wal,
             match_min_ts_only,
         )
+        .await
     }
 }
 
@@ -786,6 +795,7 @@ mod tests {
             query_type: "logs".to_owned(),
             start_time: 1667978895416,
             end_time: 1667978900217,
+            sort_by: None,
             track_total_hits: false,
             query_context: None,
             uses_zo_fn: false,
@@ -869,6 +879,7 @@ mod tests {
                 query_type: "logs".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
+                sort_by: None,
                 track_total_hits: true,
                 query_context: None,
                 uses_zo_fn: false,
@@ -955,6 +966,7 @@ mod tests {
                 query_type: "logs".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
+                sort_by: None,
                 track_total_hits: true,
                 query_context: None,
                 uses_zo_fn: false,

@@ -33,15 +33,22 @@ use crate::common::meta::syslog::SyslogRoute;
 use crate::common::meta::user::User;
 use crate::service::enrichment::StreamTable;
 
+pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
+pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
 pub type RwHashMap<K, V> = DashMap<K, V, ahash::RandomState>;
 pub type RwHashSet<K> = DashSet<K, ahash::RandomState>;
 
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
-pub static HAS_FUNCTIONS: bool = true;
-pub static FILE_EXT_JSON: &str = ".json";
-pub static FILE_EXT_PARQUET: &str = ".parquet";
+
+pub const HAS_FUNCTIONS: bool = true;
+pub const FILE_EXT_JSON: &str = ".json";
+pub const FILE_EXT_PARQUET: &str = ".parquet";
+
+pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
+pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
+pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
@@ -125,6 +132,8 @@ pub struct Auth {
 pub struct Http {
     #[env_config(name = "ZO_HTTP_PORT", default = 5080)]
     pub port: u16,
+    #[env_config(name = "ZO_HTTP_ADDR", default = "")]
+    pub addr: String,
     #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
 }
@@ -133,6 +142,8 @@ pub struct Http {
 pub struct Grpc {
     #[env_config(name = "ZO_GRPC_PORT", default = 5081)]
     pub port: u16,
+    #[env_config(name = "ZO_GRPC_ADDR", default = "")]
+    pub addr: String,
     #[env_config(name = "ZO_GRPC_TIMEOUT", default = 600)]
     pub timeout: u64,
     #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "zinc-org-id")]
@@ -217,14 +228,20 @@ pub struct Common {
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
     pub print_key_config: bool,
-    #[env_config(name = "USAGE_REPORTING_ENABLED", default = false)]
+    #[env_config(name = "ZO_PRINT_KEY_SQL", default = false)]
+    pub print_key_sql: bool,
+    #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
-    #[env_config(name = "USAGE_ENDPOINT", default = "")]
-    pub usage_url: String,
-    #[env_config(name = "USAGE_AUTH", default = "")]
-    pub usage_auth: String,
-    #[env_config(name = "USAGE_BATCH_SIZE", default = 5)]
+    #[env_config(name = "ZO_USAGE_REPORTING_COMPRESSED_SIZE", default = false)]
+    pub usage_report_compressed_size: bool,
+    #[env_config(name = "ZO_USAGE_ORG", default = "_meta")]
+    pub usage_org: String,
+    #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
+    #[env_config(name = "ZO_DYNAMO_META_STORE_ENABLED", default = false)]
+    pub use_dynamo_meta_store: bool,
+    #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
+    pub dynamo_file_list_table: String,
 }
 
 #[derive(EnvConfig)]
@@ -257,6 +274,10 @@ pub struct Limit {
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
     pub http_worker_num: usize,
+    #[env_config(name = "ZO_METRIC_FILE_MAX_RETENTION", default = "daily")]
+    pub metric_file_max_retention: String,
+    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // in seconds
+    pub calculate_stats_interval: u64,
 }
 
 #[derive(EnvConfig)]
@@ -268,6 +289,8 @@ pub struct Compact {
     pub fake_mode: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
     pub interval: u64,
+    #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 1800)] // seconds
+    pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
     pub max_file_size: u64,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // in days
@@ -339,7 +362,7 @@ pub struct Etcd {
     pub key_file: String,
     #[env_config(name = "ZO_ETCD_DOMAIN_NAME", default = "")]
     pub domain_name: String,
-    #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 10000)]
+    #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
 }
 
@@ -379,6 +402,8 @@ pub struct S3 {
     pub feature_http2_only: bool,
     #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
+    #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
+    pub sync_to_cache_interval: u64,
 }
 
 #[derive(Debug, EnvConfig)]
@@ -591,6 +616,7 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.s3.provider.eq("swift") {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
+    cfg.common.dynamo_file_list_table = format!("{}-file-list", cfg.s3.bucket_name);
     Ok(())
 }
 
@@ -598,11 +624,11 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 pub fn get_parquet_compression() -> parquet::basic::Compression {
     match CONFIG.common.parquet_compression.to_lowercase().as_str() {
         "snappy" => parquet::basic::Compression::SNAPPY,
-        "gzip" => parquet::basic::Compression::GZIP(parquet::basic::GzipLevel::default()),
-        "brotli" => parquet::basic::Compression::BROTLI(parquet::basic::BrotliLevel::default()),
+        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
+        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
         "lz4" => parquet::basic::Compression::LZ4_RAW,
-        "zstd" => parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap()),
-        _ => parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap()),
+        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
+        _ => parquet::basic::Compression::ZSTD(Default::default()),
     }
 }
 

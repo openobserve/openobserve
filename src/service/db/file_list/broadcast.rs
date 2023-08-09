@@ -17,7 +17,9 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
-use crate::common::infra::cluster::{self, get_cached_nodes, get_internal_grpc_token};
+use crate::common::infra::cluster::{
+    self, get_cached_nodes, get_internal_grpc_token, get_node_by_uuid,
+};
 use crate::common::infra::config::{RwHashMap, CONFIG};
 use crate::common::meta::common::FileKey;
 use crate::handler::grpc::cluster_rpc;
@@ -28,20 +30,28 @@ lazy_static! {
 }
 
 /// send an event to broadcast, will create a new channel for each nodes
-pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
+pub async fn send(items: &[FileKey], node_uuid: Option<&str>) -> Result<(), anyhow::Error> {
     if CONFIG.common.local_mode {
         return Ok(());
     }
-    let nodes = get_cached_nodes(|node| {
-        node.status == cluster::NodeStatus::Prepare || node.status == cluster::NodeStatus::Online
-    })
-    .unwrap();
+    let nodes = if node_uuid.is_none() {
+        get_cached_nodes(|node| {
+            (node.status == cluster::NodeStatus::Prepare
+                || node.status == cluster::NodeStatus::Online)
+                && (cluster::is_querier(&node.role) || cluster::is_compactor(&node.role))
+        })
+        .unwrap()
+    } else {
+        get_node_by_uuid(node_uuid.unwrap())
+            .map(|node| vec![node])
+            .unwrap_or_default()
+    };
     let local_node_uuid = cluster::LOCAL_NODE_UUID.clone();
     for node in nodes {
         if node.uuid.eq(&local_node_uuid) {
             continue;
         }
-        if cluster::is_router(&node.role) {
+        if !cluster::is_querier(&node.role) && !cluster::is_compactor(&node.role) {
             continue;
         }
         let node_id = node.uuid.clone();

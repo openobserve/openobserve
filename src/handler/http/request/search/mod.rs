@@ -162,6 +162,7 @@ pub async fn search(
                 response_time: time,
                 size: res.scan_size as f64,
                 request_body: Some(req.query.sql),
+                ..Default::default()
             };
             let num_fn = req.query.query_fn.is_some() as u16;
             report_usage_stats(
@@ -271,10 +272,7 @@ pub async fn around(
     };
     let query_fn = query.get("query_fn").and_then(|v| base64::decode(v).ok());
 
-    let default_sql = format!(
-        "SELECT * FROM \"{}\" ORDER BY {} DESC",
-        stream_name, CONFIG.common.column_timestamp
-    );
+    let default_sql = format!("SELECT * FROM \"{}\" ", stream_name);
     let around_sql = match query.get("sql") {
         None => default_sql,
         Some(v) => match base64::decode(v) {
@@ -312,8 +310,9 @@ pub async fn around(
             sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
-            start_time: around_key - Duration::seconds(300).num_microseconds().unwrap(),
+            start_time: around_key - Duration::seconds(900).num_microseconds().unwrap(),
             end_time: around_key,
+            sort_by: Some(format!("{} DESC", CONFIG.common.column_timestamp)),
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
@@ -365,7 +364,8 @@ pub async fn around(
             from: 0,
             size: around_size / 2,
             start_time: around_key,
-            end_time: around_key + Duration::seconds(300).num_microseconds().unwrap(),
+            end_time: around_key + Duration::seconds(900).num_microseconds().unwrap(),
+            sort_by: Some(format!("{} ASC", CONFIG.common.column_timestamp)),
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
@@ -451,6 +451,7 @@ pub async fn around(
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
+        ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
     report_usage_stats(
@@ -559,6 +560,7 @@ pub async fn values(
             size: 0,
             start_time,
             end_time,
+            sort_by: None,
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
@@ -651,6 +653,7 @@ pub async fn values(
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
+        ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
     report_usage_stats(

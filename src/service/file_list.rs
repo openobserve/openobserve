@@ -15,7 +15,7 @@
 use std::io::Write;
 
 use crate::common;
-use crate::common::infra::{cache::file_list, ider, storage};
+use crate::common::infra::{cache::file_list, config::CONFIG, ider, storage};
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     stream::ScanStats,
@@ -24,30 +24,55 @@ use crate::common::meta::{
 use crate::service::db;
 
 #[inline]
-pub fn get_file_list(
+pub async fn get_file_list(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     time_min: i64,
     time_max: i64,
-) -> Result<Vec<String>, anyhow::Error> {
-    file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max)
+) -> Result<Vec<FileKey>, anyhow::Error> {
+    if CONFIG.common.use_dynamo_meta_store {
+        db::file_list::dynamo_db::get_stream_file_list(
+            org_id,
+            stream_name,
+            stream_type,
+            time_min,
+            time_max,
+        )
+        .await
+    } else {
+        let files =
+            file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max).await?;
+        let mut file_sizes = Vec::with_capacity(files.len());
+        for file in files {
+            let meta = get_file_meta(&file).await?;
+            file_sizes.push(FileKey {
+                key: file,
+                meta,
+                deleted: false,
+            });
+        }
+        Ok(file_sizes)
+    }
 }
 
 #[inline]
-pub fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
-    file_list::get_file_from_cache(file)
+pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
+    if CONFIG.common.use_dynamo_meta_store {
+        db::file_list::dynamo_db::get_file_meta(file).await
+    } else {
+        file_list::get_file_from_cache(file)
+    }
 }
 
 #[inline]
-pub fn calculate_files_size(files: &[String]) -> Result<ScanStats, anyhow::Error> {
+pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats, anyhow::Error> {
     let mut stats = ScanStats::new();
     stats.files = files.len() as u64;
     for file in files {
-        let resp = get_file_meta(file)?;
-        stats.records += resp.records;
-        stats.original_size += resp.original_size;
-        stats.compressed_size += resp.compressed_size;
+        stats.records += file.meta.records;
+        stats.original_size += file.meta.original_size;
+        stats.compressed_size += file.meta.compressed_size;
     }
     Ok(stats)
 }
@@ -67,6 +92,14 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error
 
 // Delete one parquet file and update the file list
 pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
+    if CONFIG.common.use_dynamo_meta_store {
+        delete_parquet_file_dynamo(key, file_list_only).await
+    } else {
+        delete_parquet_file_s3(key, file_list_only).await
+    }
+}
+
+async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
     let columns = key.split('/').collect::<Vec<&str>>();
     if columns[0] != "files" || columns.len() < 9 {
         return Ok(());
@@ -96,7 +129,18 @@ pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), 
     let compressed_bytes = buf.finish().unwrap();
     storage::put(&new_file_list_key, compressed_bytes.into()).await?;
     db::file_list::progress(key, meta, deleted, false).await?;
-    db::file_list::broadcast::send(&[file_data]).await?;
+    db::file_list::broadcast::send(&[file_data], None).await?;
+
+    // delete the parquet whaterever the file is exists or not
+    if !file_list_only {
+        _ = storage::del(&[key]).await;
+    }
+    Ok(())
+}
+
+async fn delete_parquet_file_dynamo(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
+    // delete from file list in dynamo
+    db::file_list::dynamo_db::batch_delete(&[key.to_string()]).await?;
 
     // delete the parquet whaterever the file is exists or not
     if !file_list_only {
@@ -113,7 +157,8 @@ mod test {
     async fn test_get_file_meta() {
         let res = get_file_meta(
             "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
-        );
+        )
+        .await;
         assert!(res.is_ok());
     }
 }

@@ -12,37 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{db, triggers};
-use crate::common::flatten;
-use crate::common::infra::wal::get_or_create;
 use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
 use datafusion::arrow::json::reader::infer_json_schema;
-use std::collections::BTreeMap;
-use std::io::BufReader;
+use std::{collections::BTreeMap, io::BufReader};
 use vector_enrichment::TableRegistry;
-use vrl::compiler::runtime::Runtime;
-use vrl::compiler::{CompilationResult, TargetValueRef};
+use vrl::compiler::{runtime::Runtime, CompilationResult, TargetValueRef};
 use vrl::prelude::state;
 
-use crate::common::functions::get_vrl_compiler_config;
-use crate::common::{
-    json::{self, Map, Value},
-    notification::send_notification,
+use crate::common::infra::{
+    config::{CONFIG, STREAM_ALERTS, STREAM_FUNCTIONS},
+    metrics,
+    wal::get_or_create,
 };
-
-use crate::common::infra::config::STREAM_FUNCTIONS;
-use crate::common::infra::config::{CONFIG, STREAM_ALERTS};
-use crate::common::infra::metrics;
-
-use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
-use crate::common::meta::usage::RequestStats;
 use crate::common::meta::{
     alert::{Alert, Trigger},
+    functions::{StreamTransform, VRLRuntimeConfig},
+    stream::PartitionTimeLevel,
+    usage::RequestStats,
     StreamType,
 };
+use crate::common::{
+    flatten,
+    functions::get_vrl_compiler_config,
+    json::{Map, Value},
+    notification::send_notification,
+};
+use crate::service::{db, format_partition_key, stream::stream_settings, triggers};
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
@@ -122,29 +120,13 @@ pub async fn get_stream_partition_keys(
     stream_name: &str,
     stream_schema_map: &AHashMap<String, Schema>,
 ) -> Vec<String> {
-    let mut keys: Vec<String> = vec![];
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema,
-        None => return keys,
+        None => return vec![],
     };
 
-    let stream_settings = match schema.metadata().get("settings") {
-        Some(value) => value,
-        None => return keys,
-    };
-
-    let settings: Value = json::from_slice(stream_settings.as_bytes()).unwrap();
-    let part_keys = match settings.get("partition_keys") {
-        Some(value) => value,
-        None => return keys,
-    };
-
-    let mut v: Vec<_> = part_keys.as_object().unwrap().into_iter().collect();
-    v.sort_by(|a, b| a.0.cmp(b.0));
-    for (_, value) in v {
-        keys.push(value.as_str().unwrap().to_string());
-    }
-    keys
+    let stream_settings = stream_settings(schema).unwrap_or_default();
+    stream_settings.partition_keys
 }
 
 pub async fn get_stream_alerts<'a>(
@@ -189,7 +171,7 @@ pub fn get_hour_key(
                 } else {
                     format!("{}={}", key, v)
                 };
-                hour_key.push_str(&format!("_{}", get_partition_key_record(&val)));
+                hour_key.push_str(&format!("_{}", format_partition_key(&val)));
             }
             None => continue,
         };
@@ -197,14 +179,44 @@ pub fn get_hour_key(
     hour_key
 }
 
-// generate partition key for record
-pub fn get_partition_key_record(s: &str) -> String {
-    let s = s.replace(['/', '_'], ".");
-    if s.len() > 100 {
-        s[0..100].to_string()
+pub fn get_wal_time_key(
+    timestamp: i64,
+    partition_keys: &Vec<String>,
+    time_level: PartitionTimeLevel,
+    local_val: &Map<String, Value>,
+    suffix: Option<&str>,
+) -> String {
+    // get time file name
+    let mut time_key = match time_level {
+        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => Utc
+            .timestamp_nanos(timestamp * 1000)
+            .format("%Y_%m_%d_%H")
+            .to_string(),
+        PartitionTimeLevel::Daily => Utc
+            .timestamp_nanos(timestamp * 1000)
+            .format("%Y_%m_%d_00")
+            .to_string(),
+    };
+    if let Some(s) = suffix {
+        time_key.push_str(&format!("_{s}"));
     } else {
-        s
+        time_key.push_str("_keeping");
     }
+
+    for key in partition_keys {
+        match local_val.get(key) {
+            Some(v) => {
+                let val = if v.is_string() {
+                    format!("{}={}", key, v.as_str().unwrap())
+                } else {
+                    format!("{}={}", key, v)
+                };
+                time_key.push_str(&format!("_{}", format_partition_key(&val)));
+            }
+            None => continue,
+        };
+    }
+    time_key
 }
 
 pub async fn send_ingest_notification(trigger: Trigger, alert: Alert) {
@@ -269,10 +281,6 @@ pub fn apply_stream_transform<'a>(
     flatten::flatten(&value)
 }
 
-pub fn format_stream_name(stream_name: &str) -> String {
-    stream_name.replace('/', "_").replace('=', "-")
-}
-
 pub async fn chk_schema_by_record(
     stream_schema_map: &mut AHashMap<String, Schema>,
     org_id: &str,
@@ -327,6 +335,7 @@ pub fn _write_file(
             org_id,
             stream_name,
             stream_type,
+            None,
             &key,
             CONFIG.common.wal_memory_mode_enabled,
         );
@@ -371,6 +380,7 @@ pub fn write_file(
     stream_name: &str,
     stream_file_name: &mut String,
     stream_type: StreamType,
+    partition_time_level: Option<PartitionTimeLevel>,
 ) -> RequestStats {
     let mut write_buf = BytesMut::new();
     let mut req_stats = RequestStats::default();
@@ -388,6 +398,7 @@ pub fn write_file(
             org_id,
             stream_name,
             stream_type,
+            partition_time_level,
             &key,
             CONFIG.common.wal_memory_mode_enabled,
         );
@@ -408,11 +419,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_partition_key_record() {
-        assert_eq!(
-            get_partition_key_record("default/olympics"),
-            "default.olympics"
-        );
+    fn test_format_partition_key() {
+        assert_eq!(format_partition_key("default/olympics"), "default.olympics");
     }
     #[test]
     fn test_get_hour_key() {

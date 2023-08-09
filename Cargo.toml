@@ -16,7 +16,7 @@ keywords = [
 license = "Apache-2.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.5.0"
+version = "0.5.2"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -28,6 +28,9 @@ profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 [profile.release]
 debug = false
 strip = true
+
+[profile.release-prod]
+inherits = "release"
 codegen-units = 1
 lto = "thin"
 
@@ -51,14 +54,14 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
 ahash = { version = "0.8", features = ["serde"] }
 anyhow = "1.0"
 argon2 = { version = "0.4", features = ["alloc", "password-hash"] }
-arrow = { version = "42", features = ["simd", "ipc_compression"] }
-arrow-schema = { version = "42", features = ["serde"] }
 async-trait = "0.1"
 async_once = "0.2"
 async-recursion = "1.0"
 awc = "3.1"
+aws-config = "0.55.3"
+aws-sdk-dynamodb = "0.28.0"
 base64 = "0.21"
-blake3 = "1.4"
+blake3 = { version = "1.4", features = ["rayon"] }
 bytes = "1.4"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.1", default-features = false, features = [
@@ -71,18 +74,21 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { version = "27", features = ["simd"] }
+datafusion = { version = "28", features = ["simd"] }
+arrow = { version = "43", features = ["simd", "ipc_compression"] }
+arrow-schema = { version = "43", features = ["serde"] }
+parquet = { version = "43", features = ["arrow", "async"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
-etcd-client = { version = "0.10", features = ["tls"] }
+etcd-client = { version = "0.11", features = ["tls"] }
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 get_if_addrs = "0.5"
 glob = "0.3"
 hex = "0.4"
 http-auth-basic = "0.3"
-indexmap = { version = "1.9", features = ["serde"] }
+indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"
 itertools = "0.11"
 lazy_static = "1.4"
@@ -109,9 +115,8 @@ opentelemetry-proto = { version = "0.1", features = [
   "build-server",
 ] }
 parking_lot = "0.12"
-parquet = { version = "42", features = ["arrow", "async"] }
 prometheus = "0.13"
-promql-parser = "0.1"
+promql-parser = "0.2"
 prost = "0.11"
 pyroscope = { version = "0.5.6", optional = true }
 pyroscope_pprofrs = { version = "0.2.5", optional = true }
@@ -130,16 +135,18 @@ serde_json = "1"
 simd-json = "0.10.3"
 sled = "0.34"
 snap = "1"
-sqlparser = { version = "0.32", features = ["serde"] }
+sqlparser = { version = "0.35", features = ["serde"] }
 strum = { version = "0.24", features = ["derive"] }
 sys-info = "0.9"
 syslog_loose = "0.18.0"
 thiserror = "1.0"
 time = "0.3"
 tikv-jemallocator = { version = "0.5", optional = true }
+tempfile = "3"
 tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
 tonic = { version = "0.8", features = ["prost", "gzip"] }
-tracing = "0.1"
+tracing = { version = "0.1.37", features = ["attributes"] }
 tracing-opentelemetry = "0.18"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.2"
@@ -160,6 +167,6 @@ prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
-datafusion-expr = "27"
+datafusion-expr = "28"
 expect-test = "1.4"
 float-cmp = "0.9"

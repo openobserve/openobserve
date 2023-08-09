@@ -21,6 +21,7 @@ use tokio::sync::mpsc;
 use super::config::CONFIG;
 use super::errors::Result;
 
+pub mod dynamo_db;
 pub mod etcd;
 pub mod sled;
 

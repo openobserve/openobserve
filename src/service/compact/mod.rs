@@ -16,7 +16,11 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
 
-use crate::common::infra::config::CONFIG;
+use crate::common::infra::{
+    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+    config::CONFIG,
+    dist_lock,
+};
 use crate::common::meta::StreamType;
 use crate::service::db;
 
@@ -126,9 +130,6 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
 /// 11. release cluster lock
 /// 12. compact file list from storage
 pub async fn run_merge() -> Result<(), anyhow::Error> {
-    // get last file_list compact offset
-    let last_file_list_offset = db::compact::file_list::get_offset().await?;
-
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     let orgs = db::schema::list_organizations_from_cache();
     let stream_types = [
@@ -138,6 +139,31 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         StreamType::EnrichmentTables,
     ];
     for org_id in orgs {
+        // get the working node for the organization
+        let (_offset, node) = db::compact::organization::get_offset(&org_id).await;
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+            log::error!("[COMPACT] organization {org_id} is merging by {node}");
+            continue;
+        }
+
+        // before start merging, set current node to lock the organization
+        let lock_key = format!("compact/organization/{org_id}");
+        let mut locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+        // check the working node for the organization again, maybe other node locked it first
+        let (_, node) = db::compact::organization::get_offset(&org_id).await;
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+            log::error!("[COMPACT] organization {org_id} is merging by {node}");
+            dist_lock::unlock(&mut locker).await?;
+            continue;
+        }
+        if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+            db::compact::organization::set_offset(&org_id, 0, Some(&LOCAL_NODE_UUID.clone()))
+                .await?;
+        }
+        // already bind to this node, we can unlock now
+        dist_lock::unlock(&mut locker).await?;
+        drop(locker);
+
         for stream_type in stream_types {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type);
             let mut tasks = Vec::with_capacity(streams.len());
@@ -161,13 +187,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                 let org_id = org_id.clone();
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let task = tokio::task::spawn(async move {
-                    if let Err(e) = merge::merge_by_stream(
-                        last_file_list_offset,
-                        &org_id,
-                        &stream_name,
-                        stream_type,
-                    )
-                    .await
+                    if let Err(e) = merge::merge_by_stream(&org_id, &stream_name, stream_type).await
                     {
                         log::error!(
                             "[COMPACTOR] merge_by_stream [{}:{}:{}] error: {}",
@@ -188,8 +208,11 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     }
 
     // after compact, compact file list from storage
-    if let Err(e) = file_list::run(last_file_list_offset).await {
-        log::error!("[COMPACTOR] merge file list error: {}", e);
+    if !CONFIG.common.use_dynamo_meta_store {
+        let last_file_list_offset = db::compact::file_list::get_offset().await?;
+        if let Err(e) = file_list::run(last_file_list_offset).await {
+            log::error!("[COMPACTOR] merge file list error: {}", e);
+        }
     }
 
     Ok(())

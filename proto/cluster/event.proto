@@ -9,15 +9,5 @@ package cluster;
 import "cluster/common.proto";
 
 service Event {
-  rpc SendFileList (FileList) returns (EmptyResponse) {}
-}
-
-message FileList {
-    repeated FileKey items = 1;
-}
-
-message FileKey {
-    string   key     = 1;
-    FileMeta meta    = 2;
-    bool     deleted = 3;
+    rpc SendFileList (FileList) returns (EmptyResponse) {}
 }

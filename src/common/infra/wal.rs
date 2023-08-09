@@ -27,7 +27,7 @@ use crate::common::infra::{
     config::{CONFIG, FILE_EXT_JSON},
     ider, metrics,
 };
-use crate::common::meta::StreamType;
+use crate::common::meta::{stream::PartitionTimeLevel, StreamType};
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
@@ -62,10 +62,19 @@ pub fn get_or_create(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    partition_time_level: Option<PartitionTimeLevel>,
     key: &str,
     use_cache: bool,
 ) -> Arc<RwFile> {
-    MANAGER.get_or_create(thread_id, org_id, stream_name, stream_type, key, use_cache)
+    MANAGER.get_or_create(
+        thread_id,
+        org_id,
+        stream_name,
+        stream_type,
+        partition_time_level,
+        key,
+        use_cache,
+    )
 }
 
 pub fn check_in_use(
@@ -206,19 +215,25 @@ impl Manager {
         org_id: &str,
         stream_name: &str,
         stream_type: StreamType,
+        partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
         let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
+        let mut data = self.data.get(thread_id).unwrap().write().unwrap();
+        if let Some(f) = data.get(&full_key) {
+            return f.clone();
+        }
+
         let file = Arc::new(RwFile::new(
             thread_id,
             org_id,
             stream_name,
             stream_type,
+            partition_time_level,
             key,
             use_cache,
         ));
-        let mut data = self.data.get(thread_id).unwrap().write().unwrap();
         if !stream_type.eq(&StreamType::EnrichmentTables) {
             data.insert(full_key, file.clone());
         };
@@ -231,13 +246,22 @@ impl Manager {
         org_id: &str,
         stream_name: &str,
         stream_type: StreamType,
+        partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
         if let Some(file) = self.get(thread_id, org_id, stream_name, stream_type, key) {
             file
         } else {
-            self.create(thread_id, org_id, stream_name, stream_type, key, use_cache)
+            self.create(
+                thread_id,
+                org_id,
+                stream_name,
+                stream_type,
+                partition_time_level,
+                key,
+                use_cache,
+            )
         }
     }
 
@@ -294,6 +318,7 @@ impl RwFile {
         org_id: &str,
         stream_name: &str,
         stream_type: StreamType,
+        partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
     ) -> RwFile {
@@ -322,6 +347,14 @@ impl RwFile {
                 .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
             (Some(RwLock::new(f)), None)
         };
+
+        let level_duration = partition_time_level.unwrap_or_default().duration();
+        let ttl = if level_duration > 0 {
+            chrono::Utc::now().timestamp() + level_duration
+        } else {
+            chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64
+        };
+
         RwFile {
             use_cache,
             file,
@@ -331,7 +364,7 @@ impl RwFile {
             stream_type,
             dir: dir_path,
             name: file_name,
-            expired: chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64,
+            expired: ttl,
         }
     }
 
@@ -452,7 +485,15 @@ mod tests {
         let stream_type = StreamType::Logs;
         let key = "test_key";
         let use_cache = false;
-        let file = get_or_create(thread_id, org_id, stream_name, stream_type, key, use_cache);
+        let file = get_or_create(
+            thread_id,
+            org_id,
+            stream_name,
+            stream_type,
+            None,
+            key,
+            use_cache,
+        );
         let data = "test_data".to_string().into_bytes();
         file.write(&data);
         assert_eq!(file.read().unwrap(), data);
@@ -479,7 +520,15 @@ mod tests {
         let stream_type = StreamType::Logs;
         let key = "test_key";
         let use_cache = false;
-        let file = RwFile::new(thread_id, org_id, stream_name, stream_type, key, use_cache);
+        let file = RwFile::new(
+            thread_id,
+            org_id,
+            stream_name,
+            stream_type,
+            None,
+            key,
+            use_cache,
+        );
         let data = "test_data".to_string().into_bytes();
         file.write(&data);
         assert_eq!(file.read().unwrap(), data);

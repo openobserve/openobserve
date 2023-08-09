@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use aws_sdk_dynamodb::types::AttributeValue;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
+use crate::common::infra::cache::file_list::parse_file_key_columns;
 use crate::common::json;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -21,6 +24,16 @@ pub struct FileKey {
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
+}
+
+impl FileKey {
+    pub fn from_file_name(file: &str) -> Self {
+        Self {
+            key: file.to_string(),
+            meta: FileMeta::default(),
+            deleted: false,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -53,6 +66,80 @@ impl From<FileMeta> for String {
 impl From<FileMeta> for bytes::Bytes {
     fn from(value: FileMeta) -> bytes::Bytes {
         json::to_vec(&value).unwrap().into()
+    }
+}
+
+impl From<&FileKey> for HashMap<String, AttributeValue> {
+    fn from(file_key: &FileKey) -> Self {
+        let mut item = HashMap::new();
+        let (stream_key, date_key, file_name) = parse_file_key_columns(&file_key.key).unwrap();
+        item.insert("stream".to_string(), AttributeValue::S(stream_key));
+        item.insert(
+            "file".to_string(),
+            AttributeValue::S(format!("{}/{}", date_key, file_name)),
+        );
+        item.insert(
+            "deleted".to_string(),
+            AttributeValue::Bool(file_key.deleted),
+        );
+        item.insert(
+            "min_ts".to_string(),
+            AttributeValue::N(file_key.meta.min_ts.to_string()),
+        );
+        item.insert(
+            "max_ts".to_string(),
+            AttributeValue::N(file_key.meta.max_ts.to_string()),
+        );
+        item.insert(
+            "records".to_string(),
+            AttributeValue::N(file_key.meta.records.to_string()),
+        );
+        item.insert(
+            "original_size".to_string(),
+            AttributeValue::N(file_key.meta.original_size.to_string()),
+        );
+        item.insert(
+            "compressed_size".to_string(),
+            AttributeValue::N(file_key.meta.compressed_size.to_string()),
+        );
+        item
+    }
+}
+
+impl From<&HashMap<String, AttributeValue>> for FileKey {
+    fn from(data: &HashMap<String, AttributeValue>) -> Self {
+        let mut item = FileKey {
+            key: format!(
+                "files/{}/{}",
+                data.get("stream").unwrap().as_s().unwrap(),
+                data.get("file").unwrap().as_s().unwrap()
+            ),
+            ..Default::default()
+        };
+        for (k, v) in data {
+            match k.as_str() {
+                "deleted" => {
+                    item.deleted = v.as_bool().unwrap().to_owned();
+                }
+                "min_ts" => {
+                    item.meta.min_ts = v.as_n().unwrap().parse::<i64>().unwrap();
+                }
+                "max_ts" => {
+                    item.meta.max_ts = v.as_n().unwrap().parse::<i64>().unwrap();
+                }
+                "records" => {
+                    item.meta.records = v.as_n().unwrap().parse::<u64>().unwrap();
+                }
+                "original_size" => {
+                    item.meta.original_size = v.as_n().unwrap().parse::<u64>().unwrap();
+                }
+                "compressed_size" => {
+                    item.meta.compressed_size = v.as_n().unwrap().parse::<u64>().unwrap();
+                }
+                _ => {}
+            }
+        }
+        item
     }
 }
 

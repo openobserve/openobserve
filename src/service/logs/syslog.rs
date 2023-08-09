@@ -32,7 +32,7 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
+use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
 
 use super::StreamMeta;
 
@@ -57,7 +57,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
 
-    let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
+    let stream_name = &format_stream_name(in_stream_name);
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -182,6 +182,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
         stream_name,
         &mut stream_file_name,
         StreamType::Logs,
+        None,
     );
 
     // only one trigger per request, as it updates etcd

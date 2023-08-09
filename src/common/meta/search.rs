@@ -76,6 +76,8 @@ pub struct Query {
     #[serde(default)]
     pub end_time: i64,
     #[serde(default)]
+    pub sort_by: Option<String>,
+    #[serde(default)]
     pub sql_mode: String,
     #[serde(default)]
     pub query_type: String,
@@ -101,6 +103,7 @@ impl Default for Query {
             size: 10,
             start_time: 0,
             end_time: 0,
+            sort_by: None,
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
@@ -142,19 +145,23 @@ impl Request {
 #[schema(as = SearchResponse)]
 pub struct Response {
     pub took: usize,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub took_detail: Option<ResponseTook>,
     #[schema(value_type = Vec<Object>)]
     pub hits: Vec<json::Value>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[schema(value_type = Object)]
     pub aggs: HashMap<String, Vec<json::Value>>,
     pub total: usize,
     pub from: usize,
     pub size: usize,
+    #[serde(default)]
     #[serde(skip_serializing)]
     pub file_count: usize,
     pub scan_size: usize,
+    #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub response_type: String,
 }

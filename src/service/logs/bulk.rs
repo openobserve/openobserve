@@ -296,6 +296,7 @@ pub async fn ingest(
             &stream_name,
             &mut stream_file_name,
             StreamType::Logs,
+            None,
         );
         req_stats.response_time += time;
         //metric + data usage

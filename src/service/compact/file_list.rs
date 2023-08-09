@@ -101,21 +101,64 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     // check compact is done
     let offsets = db::compact::files::list_offset().await?;
     if offsets.is_empty() {
-        log::info!("[COMPACT] file_list no stream had done compact, just waiting");
         return Ok(()); // no stream
     }
     // compact offset already is next hour, we need fix it, get the latest compact offset
+    let mut is_waiting_streams = false;
     for (key, val) in offsets {
         if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {
             log::info!("[COMPACT] file_list is waiting for stream: {key}, offset: {val}");
-            return Ok(());
+            is_waiting_streams = true;
+            break;
         }
     }
 
-    // output file list
-    log::info!("[COMPACT] file_list is starting merge, offset: {offset}");
+    if is_waiting_streams {
+        // compact zero hour for daily partiton
+        let time_zero_hour = Utc
+            .with_ymd_and_hms(time_now.year(), time_now.month(), time_now.day(), 0, 0, 0)
+            .unwrap()
+            .timestamp_micros();
+        merge_file_list(time_zero_hour).await?;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        // compact last hour, because it just done compaction that generated a lot of small file_list files
+        let time_last_hour = time_now - Duration::hours(1);
+        let time_last_hour = Utc
+            .with_ymd_and_hms(
+                time_last_hour.year(),
+                time_last_hour.month(),
+                time_last_hour.day(),
+                time_last_hour.hour(),
+                0,
+                0,
+            )
+            .unwrap()
+            .timestamp_micros();
+        merge_file_list(time_last_hour).await?;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        // compact current hour, because it continue to generate small file_list files
+        merge_file_list(time_now_hour).await?;
+        // it waiting, no need update offset
+        return Ok(());
+    }
+
+    // compact zero hour for daily partiton
+    let offset_zero_hour = Utc
+        .with_ymd_and_hms(
+            offset_time.year(),
+            offset_time.month(),
+            offset_time.day(),
+            0,
+            0,
+            0,
+        )
+        .unwrap()
+        .timestamp_micros();
+    merge_file_list(offset_zero_hour).await?;
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    // compact offset file list
     merge_file_list(offset).await?;
-    log::info!("[COMPACT] file_list merging is done at offset: {offset}");
 
     // write new sync offset
     offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
@@ -147,7 +190,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
 /// upload new file list into storage
 async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let lock_key = format!("compact/file_list/{offset}");
-    let mut locker = dist_lock::lock(&lock_key).await?;
+    let mut locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
     let node = db::compact::file_list::get_process(offset).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
         log::error!("[COMPACT] list_list offset [{offset}] is merging by {node}");

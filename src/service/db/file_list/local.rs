@@ -45,11 +45,11 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
             columns[4], columns[5], columns[6], columns[7]
         )
     };
-    let file = wal::get_or_create(0, "", "", StreamType::Filelist, &hour_key, false);
+    let file = wal::get_or_create(0, "", "", StreamType::Filelist, None, &hour_key, false);
     file.write(write_buf.as_ref());
 
     super::progress(key, meta, deleted, true).await?;
-    tokio::task::spawn(async move { super::broadcast::send(&[file_data]).await });
+    tokio::task::spawn(async move { super::broadcast::send(&[file_data], None).await });
     Ok(())
 }
 
@@ -104,7 +104,7 @@ pub async fn broadcast_cache() -> Result<(), anyhow::Error> {
         return Ok(());
     }
     for chunk in files.chunks(100) {
-        if let Err(e) = super::broadcast::send(chunk).await {
+        if let Err(e) = super::broadcast::send(chunk, None).await {
             log::error!("broadcast cached file list failed: {}", e);
         }
     }

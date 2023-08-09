@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::Engine;
-use crate::common::meta::prom::NAME_LABEL;
-use crate::service::promql::value::Label;
-use crate::service::promql::value::{signature, Labels, Signature, Value};
 use ahash::AHashMap as HashMap;
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::Expr as PromExpr;
 use promql_parser::parser::LabelModifier;
-use std::collections::HashSet;
 use std::sync::Arc;
+
+use super::Engine;
+use crate::common::meta::prom::NAME_LABEL;
+use crate::service::promql::value::Label;
+use crate::service::promql::value::{signature, Labels, Signature, Value};
 
 mod avg;
 mod bottomk;
@@ -68,7 +68,7 @@ pub(crate) struct TopItem {
 }
 
 pub fn labels_to_include(
-    include_labels: &HashSet<String>,
+    include_labels: &[String],
     actual_labels: &[Arc<Label>],
 ) -> Vec<Arc<Label>> {
     actual_labels
@@ -84,7 +84,7 @@ pub fn labels_to_include(
 }
 
 pub fn labels_to_exclude(
-    exclude_labels: &HashSet<String>,
+    exclude_labels: &[String],
     actual_labels: &[Arc<Label>],
 ) -> Vec<Arc<Label>> {
     actual_labels
@@ -151,7 +151,7 @@ pub(crate) fn eval_arithmetic(
         Some(v) => match v {
             LabelModifier::Include(labels) => {
                 for item in data.iter() {
-                    let sum_labels = labels_to_include(labels, &item.labels);
+                    let sum_labels = labels_to_include(&labels.labels, &item.labels);
                     eval_arithmetic_processor(
                         &mut score_values,
                         f_handler,
@@ -162,7 +162,7 @@ pub(crate) fn eval_arithmetic(
             }
             LabelModifier::Exclude(labels) => {
                 for item in data.iter() {
-                    let sum_labels = labels_to_exclude(labels, &item.labels);
+                    let sum_labels = labels_to_exclude(&labels.labels, &item.labels);
                     eval_arithmetic_processor(
                         &mut score_values,
                         f_handler,
@@ -259,13 +259,13 @@ pub(crate) fn eval_std_dev_var(
         Some(v) => match v {
             LabelModifier::Include(labels) => {
                 for item in data.iter() {
-                    let sum_labels = labels_to_include(labels, &item.labels);
+                    let sum_labels = labels_to_include(&labels.labels, &item.labels);
                     eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
                 }
             }
             LabelModifier::Exclude(labels) => {
                 for item in data.iter() {
-                    let sum_labels = labels_to_exclude(labels, &item.labels);
+                    let sum_labels = labels_to_exclude(&labels.labels, &item.labels);
                     eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
                 }
             }

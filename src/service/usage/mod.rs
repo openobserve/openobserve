@@ -1,6 +1,5 @@
 use chrono::{Datelike, Timelike, Utc};
 use once_cell::sync::Lazy;
-use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -76,19 +75,19 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
     usages.append(&mut usage);
 
     if usages.len() >= CONFIG.common.usage_batch_size {
-        let cl = Arc::new(Client::builder().build().unwrap());
-        let curr_usage = std::mem::take(&mut *usages);
-        let url = url::Url::parse(&CONFIG.common.usage_url).unwrap();
-        let auth = format!("Basic {}", &CONFIG.common.usage_auth);
-        let cl = Arc::clone(&cl);
-        tokio::task::spawn(async move {
-            let _ = cl
-                .post(url)
-                .header("Content-Type", "application/json")
-                .header(reqwest::header::AUTHORIZATION, auth)
-                .json(&curr_usage)
-                .send()
-                .await;
-        });
+        // let cl = Arc::new(Client::builder().build().unwrap());
+        let _curr_usage = std::mem::take(&mut *usages);
+        // let url = url::Url::parse(&CONFIG.common.usage_url).unwrap();
+        // let auth = format!("Basic {}", &CONFIG.common.usage_auth);
+        // let cl = Arc::clone(&cl);
+        // tokio::task::spawn(async move {
+        //     let _ = cl
+        //         .post(url)
+        //         .header("Content-Type", "application/json")
+        //         .header(reqwest::header::AUTHORIZATION, auth)
+        //         .json(&curr_usage)
+        //         .send()
+        //         .await;
+        // });
     }
 }

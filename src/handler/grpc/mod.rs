@@ -34,10 +34,11 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
             size: req.query.size as i32,
             start_time: req.query.start_time,
             end_time: req.query.end_time,
+            sort_by: req.query.sort_by.unwrap_or_default(),
             track_total_hits: req.query.track_total_hits,
-            query_context: req.query.query_context.unwrap_or("".to_string()),
+            query_context: req.query.query_context.unwrap_or_default(),
             uses_zo_fn: req.query.uses_zo_fn,
-            query_fn: req.query.query_fn.unwrap_or("".to_string()),
+            query_fn: req.query.query_fn.unwrap_or_default(),
         };
 
         let job = cluster_rpc::Job {
@@ -93,6 +94,16 @@ impl From<&meta::common::FileKey> for cluster_rpc::FileKey {
         cluster_rpc::FileKey {
             key: req.key.clone(),
             meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
+            deleted: req.deleted,
+        }
+    }
+}
+
+impl From<&cluster_rpc::FileKey> for meta::common::FileKey {
+    fn from(req: &cluster_rpc::FileKey) -> Self {
+        meta::common::FileKey {
+            key: req.key.clone(),
+            meta: meta::common::FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
         }
     }
@@ -211,6 +222,7 @@ mod test {
                 size: 100,
                 start_time: 0,
                 end_time: 0,
+                sort_by: None,
                 track_total_hits: false,
                 query_context: None,
                 uses_zo_fn: false,

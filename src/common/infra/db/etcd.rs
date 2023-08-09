@@ -17,18 +17,17 @@ use async_once::AsyncOnce;
 use async_trait::async_trait;
 use bytes::Bytes;
 use etcd_client::{
-    Compare, CompareOp, DeleteOptions, EventType, GetOptions, SortOrder, SortTarget, TxnOp,
+    Certificate, Compare, CompareOp, DeleteOptions, EventType, GetOptions, Identity, SortOrder,
+    SortTarget, TlsOptions, TxnOp,
 };
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
-use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
-use tokio::time;
-use tonic::transport::{Certificate, ClientTlsConfig, Identity};
+use std::sync::{
+    atomic::{AtomicU8, Ordering},
+    Arc,
+};
+use tokio::{sync::mpsc, task::JoinHandle, time};
 
 use super::{Event, EventData};
-use crate::common::infra::cluster;
-use crate::common::infra::{config::CONFIG, errors::*};
+use crate::common::infra::{cluster, config::CONFIG, errors::*};
 
 /// max operations in txn request
 pub const MAX_OPS_PER_TXN: usize = 120; // etcd hard coded limit is 128
@@ -424,13 +423,14 @@ pub async fn connect_etcd() -> Option<etcd_client::Client> {
         let client_cert = tokio::fs::read(&CONFIG.etcd.cert_file).await.unwrap();
         let client_key = tokio::fs::read(&CONFIG.etcd.key_file).await.unwrap();
         let client_identity = Identity::from_pem(client_cert, client_key);
-        let tls = ClientTlsConfig::new()
+        let tls = TlsOptions::new()
             .domain_name(&CONFIG.etcd.domain_name)
             .ca_certificate(server_root_ca_cert)
             .identity(client_identity);
         opts = opts.with_tls(tls);
     }
-    let client = etcd_client::Client::connect([&CONFIG.etcd.addr], Some(opts))
+    let addrs = CONFIG.etcd.addr.split(',').collect::<Vec<&str>>();
+    let client = etcd_client::Client::connect(addrs, Some(opts))
         .await
         .expect("Etcd connect failed");
 

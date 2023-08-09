@@ -36,7 +36,7 @@ fn mk_key(
 
 // delete data from stream
 // if date_range is empty, delete all data
-// date_range is a tuple of (start, end), eg: (20230102, 20230103)
+// date_range is a tuple of (start, end), eg: (2023-01-02, 2023-01-03)
 pub async fn delete_stream(
     org_id: &str,
     stream_name: &str,

@@ -20,6 +20,7 @@ use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
 use crate::common::infra::{cluster, config::CONFIG, metrics};
+use crate::common::meta::stream::PartitionTimeLevel;
 use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
@@ -193,6 +194,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             &stream_name,
             &mut stream_file_name,
             StreamType::Metrics,
+            Some(PartitionTimeLevel::Daily),
         );
         req_stats.response_time = time;
 

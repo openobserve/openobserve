@@ -19,6 +19,7 @@ use datafusion::{
         json as arrowJson,
         record_batch::RecordBatch,
     },
+    config::ConfigOptions,
     datasource::{
         file_format::{
             file_type::{FileType, GetExt},
@@ -33,22 +34,29 @@ use datafusion::{
         context::SessionConfig,
         runtime_env::{RuntimeConfig, RuntimeEnv},
     },
+    logical_expr::expr::Alias,
     prelude::{cast, col, lit, Expr, SessionContext},
     scalar::ScalarValue,
 };
+use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
 use std::sync::Arc;
 
-use super::storage::{file_list, StorageType};
-
-use super::transform_udf::get_all_transform;
-
-use crate::common::infra::{cache::tmpfs, config::CONFIG};
-use crate::common::json;
-use crate::common::meta::{common::FileMeta, search::Session as SearchSession, sql};
+use crate::common::infra::{
+    cache::tmpfs,
+    config::{CONFIG, PARQUET_BATCH_SIZE},
+};
+use crate::common::meta::{
+    common::{FileKey, FileMeta},
+    search::Session as SearchSession,
+    sql,
+};
+use crate::common::{flatten, json};
 use crate::service::search::sql::Sql;
-use once_cell::sync::Lazy;
+
+use super::storage::{file_list, StorageType};
+use super::transform_udf::get_all_transform;
 
 const AGGREGATE_UDF_LIST: [&str; 6] = ["min", "max", "count", "avg", "sum", "array_agg"];
 
@@ -61,7 +69,7 @@ pub async fn sql(
     schema: Arc<Schema>,
     rules: &HashMap<String, DataType>,
     sql: &Arc<Sql>,
-    files: &[String],
+    files: &[FileKey],
     file_type: FileType,
 ) -> Result<HashMap<String, Vec<RecordBatch>>> {
     if files.is_empty() {
@@ -96,7 +104,9 @@ pub async fn sql(
 
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
-        log::info!("Query agg sql: {}", orig_agg_sql.0);
+        if CONFIG.common.print_key_sql {
+            log::info!("Query agg sql: {}", orig_agg_sql.0);
+        }
 
         let mut agg_sql = orig_agg_sql.0.to_owned();
         if meta_sql.is_ok() {
@@ -127,10 +137,10 @@ pub async fn sql(
                     continue;
                 }
                 exprs.push(match rules.get(field.name()) {
-                    Some(rule) => Expr::Alias(
-                        Box::new(cast(col(field.name()), rule.clone())),
+                    Some(rule) => Expr::Alias(Alias::new(
+                        cast(col(field.name()), rule.clone()),
                         field.name().to_string(),
-                    ),
+                    )),
                     None => col(field.name()),
                 });
             }
@@ -160,7 +170,7 @@ async fn exec_query(
     schema: Arc<Schema>,
     rules: &HashMap<String, DataType>,
     sql: &Arc<Sql>,
-    files: &[String],
+    files: &[FileKey],
     file_type: FileType,
 ) -> Result<Vec<RecordBatch>> {
     let start = std::time::Instant::now();
@@ -216,7 +226,9 @@ async fn exec_query(
     };
 
     // Debug SQL
-    log::info!("Query sql: {}", query);
+    if CONFIG.common.print_key_sql {
+        log::info!("Query sql: {}", query);
+    }
 
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
@@ -240,10 +252,10 @@ async fn exec_query(
                 continue;
             }
             exprs.push(match rules.get(field.name()) {
-                Some(rule) => Expr::Alias(
-                    Box::new(cast(col(field.name()), rule.clone())),
+                Some(rule) => Expr::Alias(Alias::new(
+                    cast(col(field.name()), rule.clone()),
                     field.name().to_string(),
-                ),
+                )),
                 None => col(field.name()),
             });
         }
@@ -346,28 +358,17 @@ async fn get_fast_mode_ctx(
     session: &SearchSession,
     schema: Arc<Schema>,
     sql: &Arc<Sql>,
-    files: &[String],
+    files: &[FileKey],
     file_type: FileType,
 ) -> Result<(SessionContext, Arc<Schema>)> {
-    // sort files by time range
-    let mut files_meta = HashMap::default();
-    files.iter().for_each(|key| {
-        let meta =
-            crate::service::file_list::get_file_meta(key).expect("file meta must have value");
-        files_meta.insert(key, meta);
-    });
     let mut files = files.to_vec();
-    files.sort_by(|a, b| {
-        let a_meta = files_meta.get(a).unwrap();
-        let b_meta = files_meta.get(b).unwrap();
-        a_meta.min_ts.cmp(&b_meta.min_ts)
-    });
+    files.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
 
     let mut loaded_records = 0;
     let mut new_files = Vec::new();
     let needs = sql.meta.limit + sql.meta.offset;
     for i in (0..files.len()).rev() {
-        loaded_records += files_meta.get(&files[i]).unwrap().records as usize;
+        loaded_records += files.get(i).unwrap().meta.records as usize;
         new_files.push(files[i].clone());
         if loaded_records >= needs {
             break;
@@ -418,13 +419,14 @@ pub async fn merge(
         return Ok(batches.to_owned());
     }
 
-    let start = std::time::Instant::now();
+    // let start = std::time::Instant::now();
+
     // write temp file
     let (schema, work_dir) = merge_write_recordbatch(batches)?;
-    log::info!(
-        "merge_write_recordbatch took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
-    );
+    // log::info!(
+    //     "merge_write_recordbatch took {:.3} seconds.",
+    //     start.elapsed().as_secs_f64()
+    // );
     if schema.fields().is_empty() {
         return Ok(vec![]);
     }
@@ -448,10 +450,11 @@ pub async fn merge(
             return Err(e);
         }
     };
-    log::info!(
-        "merge_rewrite_sql took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
-    );
+
+    // log::info!(
+    //     "merge_rewrite_sql took {:.3} seconds.",
+    //     start.elapsed().as_secs_f64()
+    // );
 
     // query data
     let mut ctx = prepare_datafusion_context()?;
@@ -487,7 +490,9 @@ pub async fn merge(
     register_udf(&mut ctx, org_id).await;
 
     // Debug SQL
-    log::info!("Merge sql: {query_sql}");
+    if CONFIG.common.print_key_sql {
+        log::info!("Merge sql: {query_sql}");
+    }
 
     let df = match ctx.sql(&query_sql).await {
         Ok(df) => df,
@@ -513,7 +518,7 @@ pub async fn merge(
     }
     ctx.deregister_table("tbl")?;
 
-    log::info!("Merge took {:.3} seconds.", start.elapsed().as_secs_f64());
+    // log::info!("Merge took {:.3} seconds.", start.elapsed().as_secs_f64());
 
     // clear temp file
     tmpfs::delete(&work_dir, true).unwrap();
@@ -807,10 +812,10 @@ pub async fn convert_parquet_file(
                 continue;
             }
             exprs.push(match rules.get(field.name()) {
-                Some(rule) => Expr::Alias(
-                    Box::new(cast(col(field.name()), rule.clone())),
+                Some(rule) => Expr::Alias(Alias::new(
+                    cast(col(field.name()), rule.clone()),
                     field.name().to_string(),
-                ),
+                )),
                 None => col(field.name()),
             });
         }
@@ -843,9 +848,7 @@ pub async fn merge_parquet_files(
     let start = std::time::Instant::now();
     // query data
     let runtime_env = create_runtime_env()?;
-    let session_config = SessionConfig::new()
-        .with_information_schema(false)
-        .with_batch_size(8192);
+    let session_config = create_session_config();
     let ctx = SessionContext::with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
@@ -908,6 +911,18 @@ pub async fn merge_parquet_files(
     Ok(file_meta)
 }
 
+pub fn create_session_config() -> SessionConfig {
+    // Enable parquet predicate pushdown optimization
+    let mut options = ConfigOptions::new();
+    options.execution.parquet.pushdown_filters = true;
+    options.execution.parquet.reorder_filters = true;
+    options.optimizer.repartition_sorts = true;
+
+    SessionConfig::from(options)
+        .with_batch_size(PARQUET_BATCH_SIZE)
+        .with_information_schema(true)
+}
+
 pub fn create_runtime_env() -> Result<RuntimeEnv> {
     let object_store_registry = DefaultObjectStoreRegistry::new();
 
@@ -930,9 +945,7 @@ pub fn create_runtime_env() -> Result<RuntimeEnv> {
 
 pub fn prepare_datafusion_context() -> Result<SessionContext, DataFusionError> {
     let runtime_env = create_runtime_env()?;
-    let session_config = SessionConfig::new()
-        .with_batch_size(8192)
-        .set_bool("datafusion.execution.parquet.pushdown_filters", true);
+    let session_config = create_session_config();
     Ok(SessionContext::with_config_rt(
         session_config,
         Arc::new(runtime_env),
@@ -959,7 +972,7 @@ pub async fn register_table(
     session: &SearchSession,
     schema: Arc<Schema>,
     table_name: &str,
-    files: &[String],
+    files: &[FileKey],
     file_type: FileType,
 ) -> Result<SessionContext> {
     let ctx = prepare_datafusion_context()?;
@@ -985,10 +998,10 @@ pub async fn register_table(
     };
 
     let prefix = if session.storage_type.eq(&StorageType::FsMemory) {
-        file_list::set(&session.id, files);
+        file_list::set(&session.id, files).await;
         format!("fsm:///{}/", session.id)
     } else if session.storage_type.eq(&StorageType::FsNoCache) {
-        file_list::set(&session.id, files);
+        file_list::set(&session.id, files).await;
         format!("fsn:///{}/", session.id)
     } else if session.storage_type.eq(&StorageType::Tmpfs) {
         format!("tmpfs:///{}/", session.id)
@@ -1048,13 +1061,16 @@ fn apply_query_fn(
                         &program,
                         &json::Value::Object(hit.clone()),
                     );
-                    (!ret_val.is_null()).then_some(ret_val)
+                    (!ret_val.is_null()).then_some(flatten::flatten(&ret_val).unwrap_or(ret_val))
                 })
                 .collect();
 
-            let first_rec = json::to_string(&rows_val.first()).unwrap();
+            /*  let first_rec = json::to_string(&rows_val.first()).unwrap();
             let mut schema_reader = std::io::BufReader::new(first_rec.as_bytes());
-            let inf_schema = arrowJson::reader::infer_json_schema(&mut schema_reader, None)?;
+            let inf_schema = arrowJson::reader::infer_json_schema(&mut schema_reader, None)?; */
+            let value_iter = rows_val.iter().map(Ok);
+            let inf_schema =
+                arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap();
             let mut decoder =
                 arrow::json::ReaderBuilder::new(Arc::new(inf_schema)).build_decoder()?;
 

@@ -30,8 +30,8 @@ use crate::common::meta::{
 };
 use crate::common::{flatten, json};
 use crate::service::{
-    db,
-    ingestion::{format_stream_name, get_partition_key_record, write_file},
+    db, format_partition_key, format_stream_name,
+    ingestion::write_file,
     logs::get_value,
     schema::{add_stream_schema, stream_schema_exists},
     usage::report_usage_stats,
@@ -91,6 +91,7 @@ pub async fn traces_json(
         &mut traces_schema_map,
     )
     .await;
+
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
         partition_keys = crate::service::ingestion::get_stream_partition_keys(
@@ -252,6 +253,10 @@ pub async fn traces_json(
                         trace_id: trace_id.clone(),
                         span_id,
                         span_kind: span.get("kind").unwrap().to_string(),
+                        span_status: span
+                            .get("status")
+                            .unwrap_or(&json::Value::String("UNSET".to_string()))
+                            .to_string(),
                         operation_name: span.get("name").unwrap().as_str().unwrap().to_string(),
                         start_time,
                         end_time,
@@ -339,8 +344,7 @@ pub async fn traces_json(
                     if partition_keys.is_empty() {
                         let partition_key =
                             format!("service_name={}", format_stream_name(&service_name));
-                        hour_key
-                            .push_str(&format!("_{}", get_partition_key_record(&partition_key)));
+                        hour_key.push_str(&format!("_{}", format_partition_key(&partition_key)));
                     }
 
                     let hour_buf = data_buf.entry(hour_key.clone()).or_default();
@@ -366,6 +370,7 @@ pub async fn traces_json(
         traces_stream_name,
         &mut traces_file_name,
         StreamType::Traces,
+        None,
     );
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage

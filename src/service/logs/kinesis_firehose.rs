@@ -27,7 +27,7 @@ use crate::common::meta::{
     },
     StreamType,
 };
-use crate::service::{db, ingestion::write_file};
+use crate::service::{db, format_stream_name, ingestion::write_file};
 use crate::{
     common::{
         flatten, json,
@@ -45,7 +45,7 @@ pub async fn process(
     thread_id: usize,
 ) -> Result<KinesisFHIngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
-    let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
+    let stream_name = &format_stream_name(in_stream_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
@@ -240,6 +240,7 @@ pub async fn process(
         stream_name,
         &mut stream_file_name,
         StreamType::Logs,
+        None,
     );
 
     if stream_file_name.is_empty() {

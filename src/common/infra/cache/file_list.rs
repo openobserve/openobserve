@@ -14,72 +14,42 @@
 
 use ahash::AHashMap;
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
-use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
-use crate::common::infra::config::RwHashMap;
-use crate::common::meta::{common::FileMeta, StreamType};
+use crate::common::infra::config::{FxIndexSet, RwHashMap};
+use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
+use crate::service::{db, stream};
 
-static FILES: Lazy<RwHashMap<String, OrgFilelist>> = Lazy::new(DashMap::default);
-static DATA: Lazy<RwHashMap<String, FileMeta>> = Lazy::new(DashMap::default);
+static FILES: Lazy<RwHashMap<String, RwHashMap<String, FxIndexSet<String>>>> =
+    Lazy::new(Default::default);
+static DATA: Lazy<RwHashMap<String, FileMeta>> = Lazy::new(Default::default);
 
 const FILE_LIST_MEM_SIZE: usize = std::mem::size_of::<AHashMap<String, Vec<String>>>();
 const FILE_META_MEM_SIZE: usize = std::mem::size_of::<FileMeta>();
 
-type OrgFilelist = RwHashMap<String, TypeFilelist>;
-type TypeFilelist = RwHashMap<String, StreamFilelist>;
-type StreamFilelist = RwHashMap<String, YearFilelist>;
-type YearFilelist = RwHashMap<String, MonthFilelist>;
-type MonthFilelist = RwHashMap<String, DayFilelist>;
-type DayFilelist = Vec<String>;
-
-type KeyColumns = (String, String, String, String, String, String, String);
-
 pub fn set_file_to_cache(key: &str, val: FileMeta) -> Result<(), anyhow::Error> {
-    let (org_id, stream_type, stream_name, year, month, day, _hour) = parse_key_columns(key)?;
-    let org_filelist = FILES.entry(org_id).or_insert_with(DashMap::default);
-    let type_filelist = org_filelist
-        .entry(stream_type)
-        .or_insert_with(DashMap::default);
-    let stream_filelist = type_filelist
-        .entry(stream_name)
-        .or_insert_with(DashMap::default);
-    let year_filelist = stream_filelist.entry(year).or_insert_with(DashMap::default);
-    let month_filelist = year_filelist.entry(month).or_insert_with(DashMap::default);
-    let mut day_filelist = month_filelist.entry(day).or_insert_with(Vec::new);
-    day_filelist.push(key.to_string());
+    let (stream_key, date_key, file_name) = parse_file_key_columns(key)?;
+    let stream_filelist = FILES.entry(stream_key).or_insert_with(Default::default);
+    let mut date_filelist = stream_filelist
+        .entry(date_key)
+        .or_insert_with(Default::default);
+    date_filelist.insert(file_name);
     DATA.insert(key.to_string(), val);
     Ok(())
 }
 
 pub fn del_file_from_cache(key: &str) -> Result<(), anyhow::Error> {
     DATA.remove(key);
-    let (org_id, stream_type, stream_name, year, month, day, _hour) = parse_key_columns(key)?;
-    let org_filelist = match FILES.get_mut(&org_id) {
-        Some(org_filelist) => org_filelist,
+    let (stream_key, date_key, file_name) = parse_file_key_columns(key)?;
+    let stream_filelist = match FILES.get_mut(&stream_key) {
+        Some(v) => v,
         None => return Ok(()),
     };
-    let type_filelist = match org_filelist.get_mut(&stream_type) {
-        Some(type_filelist) => type_filelist,
+    let mut date_filelist = match stream_filelist.get_mut(&date_key) {
+        Some(v) => v,
         None => return Ok(()),
     };
-    let stream_filelist = match type_filelist.get_mut(&stream_name) {
-        Some(stream_filelist) => stream_filelist,
-        None => return Ok(()),
-    };
-    let year_filelist = match stream_filelist.get_mut(&year) {
-        Some(year_filelist) => year_filelist,
-        None => return Ok(()),
-    };
-    let month_filelist = match year_filelist.get_mut(&month) {
-        Some(month_filelist) => month_filelist,
-        None => return Ok(()),
-    };
-    let mut day_filelist = match month_filelist.get_mut(&day) {
-        Some(day_filelist) => day_filelist,
-        None => return Ok(()),
-    };
-    day_filelist.retain(|x| x != key);
+    date_filelist.remove(&file_name);
     Ok(())
 }
 
@@ -122,74 +92,38 @@ fn scan_prefix(
     }
 
     let mut items = Vec::new();
-    let org_cache = match FILES.get(org_id) {
-        Some(v) => v,
-        None => return Ok(items),
-    };
-    let type_cache = match org_cache.get(&stream_type) {
-        Some(v) => v,
-        None => return Ok(items),
-    };
-    let stream_cache = match type_cache.get(stream_name) {
+    let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let stream_cache = match FILES.get(&stream_key) {
         Some(v) => v,
         None => return Ok(items),
     };
 
-    if year.is_empty() {
-        for year_cache in stream_cache.iter() {
-            for month_cache in year_cache.iter() {
-                for day_cache in month_cache.iter() {
-                    items.extend(day_cache.iter().map(|x| x.to_string()));
-                }
-            }
-        }
-        return Ok(items);
-    }
-
-    let year_cache = match stream_cache.get(year) {
-        Some(v) => v,
-        None => return Ok(items),
-    };
-    if month.is_empty() {
-        for month_cache in year_cache.iter() {
-            for day_cache in month_cache.iter() {
-                items.extend(day_cache.iter().map(|x| x.to_string()));
-            }
-        }
-        return Ok(items);
-    }
-
-    let month_cache = match year_cache.get(month) {
-        Some(v) => v,
-        None => return Ok(items),
-    };
-    if day.is_empty() {
-        for day_cache in month_cache.iter() {
-            items.extend(day_cache.iter().map(|x| x.to_string()));
-        }
-        return Ok(items);
-    }
-
-    let day_cache = match month_cache.get(day) {
-        Some(v) => v,
-        None => return Ok(items),
-    };
-
-    let prefix = if hour.is_empty() {
-        format!("files/{org_id}/{stream_type}/{stream_name}/{year}/{month}/{day}/")
+    let prefix_key = if year.is_empty() {
+        "".to_string()
+    } else if month.is_empty() {
+        format!("{year}/")
+    } else if day.is_empty() {
+        format!("{year}/{month}/")
+    } else if hour.is_empty() {
+        format!("{year}/{month}/{day}/")
     } else {
-        format!("files/{org_id}/{stream_type}/{stream_name}/{year}/{month}/{day}/{hour}/")
+        format!("{year}/{month}/{day}/{hour}")
     };
-    items.extend(
-        day_cache
-            .iter()
-            .filter(|x| x.starts_with(&prefix))
-            .map(|x| x.to_string()),
-    );
+    for date_cache in stream_cache.iter() {
+        let date_key = date_cache.key();
+        if !prefix_key.is_empty() && !date_cache.key().starts_with(&prefix_key) {
+            continue;
+        }
+        items.extend(
+            date_cache
+                .iter()
+                .map(|f| format!("files/{stream_key}/{date_key}/{f}")),
+        );
+    }
     Ok(items)
 }
 
-pub fn get_file_list(
+pub async fn get_file_list(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -201,6 +135,16 @@ pub fn get_file_list(
         let time_min = Utc.timestamp_nanos(time_min * 1000);
         let time_max = Utc.timestamp_nanos(time_max * 1000);
         if time_min + Duration::hours(48) >= time_max {
+            // Handle partiton time level
+            let schema = db::schema::get(org_id, stream_name, stream_type).await?;
+            let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
+            let partition_time_level = stream::unwrap_partition_time_level(
+                stream_settings.partition_time_level,
+                stream_type,
+            );
+            if partition_time_level == PartitionTimeLevel::Daily {
+                keys.push(time_min.format("%Y/%m/%d/00/").to_string());
+            }
             // less than 48 hours, generate keys by hours
             let mut time_min = Utc
                 .with_ymd_and_hms(
@@ -244,25 +188,13 @@ pub fn get_file_num() -> Result<(usize, usize, usize), anyhow::Error> {
     let files_num = DATA.len();
     let mut mem_size = 0;
     let mut file_list_num = 0;
-    for cache in FILES.iter() {
-        mem_size += cache.key().len();
-        for type_cache in cache.value().iter() {
-            mem_size += type_cache.len();
-            for stream_cache in type_cache.iter() {
-                mem_size += stream_cache.len();
-                for year_cache in stream_cache.iter() {
-                    mem_size += year_cache.len();
-                    for month_cache in year_cache.iter() {
-                        mem_size += month_cache.len();
-                        for day_cache in month_cache.iter() {
-                            mem_size += day_cache.len();
-                            file_list_num += 1;
-                            for key in day_cache.iter() {
-                                mem_size += key.len() * 2; // one is in FILES, one is in DATA
-                            }
-                        }
-                    }
-                }
+    for stream_cache in FILES.iter() {
+        mem_size += stream_cache.key().len();
+        for date_cache in stream_cache.iter() {
+            mem_size += date_cache.key().len();
+            file_list_num += 1;
+            for key in date_cache.iter() {
+                mem_size += key.len() * 2; // one is in FILES, one is in DATA
             }
         }
     }
@@ -277,34 +209,34 @@ pub fn shrink_to_fit() {
 }
 
 pub fn get_all_organization() -> Result<Vec<String>, anyhow::Error> {
-    let mut orgs = Vec::new();
-    for cache in FILES.iter() {
-        orgs.push(cache.key().to_string());
+    let mut orgs = ahash::AHashSet::new();
+    for stream_cache in FILES.iter() {
+        let stream_key = stream_cache.key();
+        let org_id = stream_key.split('/').next().unwrap();
+        orgs.insert(org_id.to_string());
     }
-    Ok(orgs)
+    Ok(orgs.into_iter().collect())
 }
 
 pub fn get_all_stream(org_id: &str, stream_type: StreamType) -> Result<Vec<String>, anyhow::Error> {
-    let org_cache = FILES.get(org_id).unwrap();
-    let type_cache = match org_cache.value().get(&stream_type.to_string()) {
-        Some(cache) => cache,
-        None => return Ok(vec![]),
-    };
-    Ok(type_cache
-        .value()
-        .iter()
-        .map(|x| x.key().to_string())
-        .collect())
+    let mut streams = Vec::new();
+    for stream_cache in FILES.iter() {
+        let stream_key = stream_cache.key();
+        let columns = stream_key.split('/').collect::<Vec<&str>>();
+        if columns.len() >= 3 && columns[0] == org_id && columns[1] == stream_type.to_string() {
+            streams.push(columns[2].to_string());
+        }
+    }
+    streams.sort();
+    Ok(streams)
 }
 
-fn parse_key_columns(key: &str) -> Result<KeyColumns, anyhow::Error> {
+/// parse file key to get stream_key, date_key, file_name
+pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), anyhow::Error> {
     // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
-    let columns = key.split('/').collect::<Vec<&str>>();
+    let columns = key.splitn(9, '/').collect::<Vec<&str>>();
     if columns.len() < 9 {
-        return Err(anyhow::anyhow!(
-            "[set_file_to_cache] Invalid file path: {}",
-            key
-        ));
+        return Err(anyhow::anyhow!("[file_list] Invalid file path: {}", key));
     }
     let _ = columns[0].to_string();
     let org_id = columns[1].to_string();
@@ -314,7 +246,10 @@ fn parse_key_columns(key: &str) -> Result<KeyColumns, anyhow::Error> {
     let month = columns[5].to_string();
     let day = columns[6].to_string();
     let hour = columns[7].to_string();
-    Ok((org_id, stream_type, stream_name, year, month, day, hour))
+    let file_name = columns[8].to_string();
+    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+    let date_key = format!("{year}/{month}/{day}/{hour}");
+    Ok((stream_key, date_key, file_name))
 }
 
 #[cfg(test)]
@@ -400,6 +335,9 @@ mod tests {
         let ret = set_file_to_cache(file, meta);
         assert!(ret.is_ok());
 
+        let res = get_file_from_cache(file);
+        assert!(res.is_ok());
+
         let ret = del_file_from_cache(file);
         assert!(ret.is_ok());
 
@@ -409,10 +347,10 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_file_list() {
-        let ret = get_file_list("default", "olympics", StreamType::Logs, 0, 0);
+        let ret = get_file_list("default", "olympics", StreamType::Logs, 0, 0).await;
         assert!(ret.is_ok());
 
-        let ret = get_file_list("default", "olympics", StreamType::Logs, 1678613530133899, 0);
+        let ret = get_file_list("default", "olympics", StreamType::Logs, 1678613530133899, 0).await;
         assert!(ret.is_ok());
 
         let ret = scan_prefix("default", "olympics", StreamType::Logs, "");

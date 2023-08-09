@@ -20,22 +20,23 @@ message SearchQuery {
     int32              size = 4;
     int64        start_time = 5;
     int64          end_time = 6;
-    bool   track_total_hits = 7;
-    string       query_type = 8;
-    string    query_context = 9;
-    bool        uses_zo_fn = 10;
-    string        query_fn = 11;
+    string          sort_by = 7;
+    bool   track_total_hits = 8;
+    string       query_type = 9;
+    string   query_context = 10;
+    bool        uses_zo_fn = 11;
+    string        query_fn = 12;
 }
 
 // Search request
 message SearchRequest {
-    Job                         job = 1;
-    string                   org_id = 2;
-    string              stream_type = 3;
-    SearchType                stype = 4;
-    SearchQuery               query = 5;
-    repeated string       file_list = 6;
-    repeated SearchAggRequest  aggs = 7;
+    Job                        job = 1;
+    string                  org_id = 2;
+    string             stream_type = 3;
+    SearchType               stype = 4;
+    SearchQuery              query = 5;
+    repeated FileKey     file_list = 6;
+    repeated SearchAggRequest aggs = 7;
 }
 
 // The response message containing the greetings

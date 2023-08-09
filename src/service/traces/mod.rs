@@ -21,6 +21,7 @@ use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
     common::v1::AnyValue,
+    trace::v1::{status::StatusCode, Status},
 };
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
@@ -34,8 +35,7 @@ use crate::common::meta::{
 };
 use crate::common::{flatten, json};
 use crate::service::{
-    db,
-    ingestion::{format_stream_name, get_partition_key_record},
+    db, format_partition_key, format_stream_name,
     schema::{add_stream_schema, stream_schema_exists},
 };
 
@@ -81,6 +81,7 @@ pub async fn handle_trace_request(
         &mut traces_schema_map,
     )
     .await;
+
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
         partition_keys = crate::service::ingestion::get_stream_partition_keys(
@@ -180,6 +181,7 @@ pub async fn handle_trace_request(
                     trace_id: trace_id.clone(),
                     span_id,
                     span_kind: span.kind.to_string(),
+                    span_status: get_span_status(span.status),
                     operation_name: span.name.clone(),
                     start_time,
                     end_time,
@@ -246,7 +248,7 @@ pub async fn handle_trace_request(
                 if partition_keys.is_empty() {
                     let partition_key =
                         format!("service_name={}", format_stream_name(&service_name));
-                    hour_key.push_str(&format!("_{}", get_partition_key_record(&partition_key)));
+                    hour_key.push_str(&format!("_{}", format_partition_key(&partition_key)));
                 }
 
                 let hour_buf = data_buf.entry(hour_key.clone()).or_default();
@@ -284,6 +286,7 @@ pub async fn handle_trace_request(
             org_id,
             traces_stream_name,
             StreamType::Traces,
+            None,
             &key,
             false,
         );
@@ -375,6 +378,17 @@ fn get_val(attr_val: Option<AnyValue>) -> json::Value {
             None => json::Value::Null,
         },
         None => json::Value::Null,
+    }
+}
+
+fn get_span_status(status: Option<Status>) -> String {
+    match status {
+        Some(v) => match v.code() {
+            StatusCode::Ok => "OK".to_string(),
+            StatusCode::Error => "ERROR".to_string(),
+            StatusCode::Unset => "UNSET".to_string(),
+        },
+        None => "".to_string(),
     }
 }
 

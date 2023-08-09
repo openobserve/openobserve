@@ -16,11 +16,12 @@ use actix_web::{http, http::StatusCode, HttpResponse};
 use datafusion::arrow::datatypes::Schema;
 use std::io::Error;
 
+use crate::common::infra::config::CONFIG;
 use crate::common::infra::{cache::stats, config::STREAM_SCHEMAS};
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
     prom,
-    stream::{Stream, StreamProperty, StreamSettings, StreamStats},
+    stream::{PartitionTimeLevel, Stream, StreamProperty, StreamSettings, StreamStats},
     StreamType,
 };
 use crate::common::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS, utils::is_local_disk_storage};
@@ -28,11 +29,10 @@ use crate::service::db;
 
 use super::metrics::get_prom_metadata_from_schema;
 
-const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
+const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 
-#[tracing::instrument]
 pub async fn get_stream(
     org_id: &str,
     stream_name: &str,
@@ -95,54 +95,21 @@ pub fn stream_res(
     schema: Schema,
     stats: Option<StreamStats>,
 ) -> Stream {
-    let fields = schema.fields();
-    let mut meta = schema.metadata().clone();
-    let mut mappings = Vec::new();
-    for field in fields {
-        let stream_prop = StreamProperty {
+    let storage_type = if is_local_disk_storage() { LOCAL } else { S3 };
+    let mappings = schema
+        .fields()
+        .iter()
+        .map(|field| StreamProperty {
             prop_type: field.data_type().to_string(),
             name: field.name().to_string(),
-        };
-        mappings.push(stream_prop);
-    }
-    let created_at: i64 = match meta.get("created_at") {
-        Some(v) => v.parse().unwrap(),
-        None => 0,
-    };
-    meta.remove("created_at");
-    let mut partition_keys = Vec::new();
-    let mut full_text_search_keys = vec![];
-    let stream_settings = meta.get("settings");
-    let mut data_retention = 0;
-    if let Some(value) = stream_settings {
-        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-        let keys = settings.get("partition_keys");
+        })
+        .collect::<Vec<_>>();
 
-        if let Some(value) = keys {
-            let mut v: Vec<_> = value.as_object().unwrap().into_iter().collect();
-            v.sort_by(|a, b| a.0.cmp(b.0));
-            for (_, value) in v {
-                partition_keys.push(value.as_str().unwrap().to_string());
-            }
-        }
-        let fts = settings.get("full_text_search_keys");
-        if let Some(value) = fts {
-            let v: Vec<_> = value.as_array().unwrap().iter().collect();
-            for item in v {
-                full_text_search_keys.push(item.as_str().unwrap().to_string())
-            }
-        }
-        if let Some(v) = settings.get("data_retention") {
-            data_retention = v.as_i64().unwrap();
-        };
-    }
-
-    let storage_type = if is_local_disk_storage() { LOCAL } else { S3 };
     let mut stats = match stats {
         Some(v) => v,
         None => StreamStats::default(),
     };
-    stats.created_at = created_at;
+    stats.created_at = stream_created(&schema).unwrap_or_default();
 
     let metrics_meta = if stream_type == StreamType::Metrics {
         let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(prom::Metadata {
@@ -163,17 +130,22 @@ pub fn stream_res(
         None
     };
 
+    let mut settings = stream_settings(&schema).unwrap_or_default();
+    // special handling for metrics streams
+    if settings.partition_time_level.unwrap_or_default() == PartitionTimeLevel::Unset
+        && stream_type.eq(&StreamType::Metrics)
+    {
+        settings.partition_time_level =
+            Some(CONFIG.limit.metric_file_max_retention.as_str().into());
+    }
+
     Stream {
         name: stream_name.to_string(),
         storage_type: storage_type.to_string(),
         stream_type,
         schema: mappings,
         stats,
-        settings: StreamSettings {
-            partition_keys,
-            full_text_search_keys,
-            data_retention,
-        },
+        settings,
         metrics_meta,
     }
 }
@@ -294,30 +266,53 @@ pub async fn delete_stream(
 }
 
 pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, anyhow::Error> {
-    let mut full_text_search_keys = vec![];
-    let settings = schema.metadata.get("settings");
-    if settings.is_none() {
-        return Ok(full_text_search_keys);
+    match stream_settings(schema) {
+        Some(setting) => Ok(setting.full_text_search_keys),
+        None => Ok(vec![]),
     }
-    let settings = settings.unwrap();
-    let settings: json::Value = json::from_slice(settings.as_bytes()).unwrap();
-    let fts = settings.get("full_text_search_keys");
-    if fts.is_none() {
-        return Ok(full_text_search_keys);
-    }
-    let v: Vec<_> = fts.unwrap().as_array().unwrap().iter().collect();
-    for item in v {
-        full_text_search_keys.push(item.as_str().unwrap().to_string())
-    }
-    Ok(full_text_search_keys)
 }
 
 fn transform_stats(stats: &mut StreamStats) -> StreamStats {
-    stats.storage_size /= SIZE_IN_MB;
-    stats.compressed_size /= SIZE_IN_MB;
+    if CONFIG.common.local_mode {
+        stats.storage_size /= SIZE_IN_MB;
+        stats.compressed_size /= SIZE_IN_MB;
+    }
     stats.storage_size = (stats.storage_size * 100.0).round() / 100.0;
     stats.compressed_size = (stats.compressed_size * 100.0).round() / 100.0;
     *stats
+}
+
+pub fn stream_created(schema: &Schema) -> Option<i64> {
+    schema
+        .metadata()
+        .get("created_at")
+        .map(|v| v.parse().unwrap())
+}
+
+pub fn stream_settings(schema: &Schema) -> Option<StreamSettings> {
+    if schema.metadata().is_empty() {
+        return None;
+    }
+    schema
+        .metadata()
+        .get("settings")
+        .map(|v| StreamSettings::from(v.as_str()))
+}
+
+pub fn unwrap_partition_time_level(
+    level: Option<PartitionTimeLevel>,
+    stream_type: StreamType,
+) -> PartitionTimeLevel {
+    match level {
+        Some(l) => l,
+        None => {
+            if stream_type == StreamType::Metrics {
+                PartitionTimeLevel::from(CONFIG.limit.metric_file_max_retention.as_str())
+            } else {
+                PartitionTimeLevel::default()
+            }
+        }
+    }
 }
 
 #[cfg(test)]
