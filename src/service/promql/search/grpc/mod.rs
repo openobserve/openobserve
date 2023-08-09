@@ -94,9 +94,10 @@ pub async fn search(
             session_id: session_id.to_string(),
             need_wal: req.need_wal,
         },
+        eval_stmt.clone(),
     );
 
-    let (value, result_type, mut scan_stats) = engine.exec(eval_stmt).await?;
+    let (value, result_type, mut scan_stats) = engine.exec().await?;
     let result_type = match result_type {
         Some(v) => v,
         None => value.get_type().to_string(),

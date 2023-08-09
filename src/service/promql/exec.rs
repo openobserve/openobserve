@@ -41,10 +41,24 @@ pub struct Query {
     /// key — metric name; value — time series data
     pub data_cache: Arc<RwLock<HashMap<String, Value>>>,
     pub scan_stats: Arc<RwLock<ScanStats>>,
+    eval_stmt: EvalStmt,
+}
+
+impl std::fmt::Debug for Query {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Query")
+         .field("org_id", &self.org_id)
+         .field("start", &self.start)
+         .field("end", &self.end)
+         .field("interval", &self.interval)
+         .field("lookback_delta", &self.lookback_delta)
+         .field("eval_stmt", &self.eval_stmt)
+         .finish()
+    }
 }
 
 impl Query {
-    pub fn new<P>(org_id: &str, provider: P) -> Self
+    pub fn new<P>(org_id: &str, provider: P, eval_stmt: EvalStmt) -> Self
     where
         P: TableProvider,
     {
@@ -59,11 +73,13 @@ impl Query {
             lookback_delta: five_min,
             data_cache: Arc::new(RwLock::new(HashMap::default())),
             scan_stats: Arc::new(RwLock::new(ScanStats::default())),
+            eval_stmt: eval_stmt,
         }
     }
 
     #[tracing::instrument(name = "promql:engine:exec", skip_all)]
-    pub async fn exec(&mut self, stmt: EvalStmt) -> Result<(Value, Option<String>, ScanStats)> {
+    pub async fn exec(&mut self) -> Result<(Value, Option<String>, ScanStats)> {
+        let stmt = self.eval_stmt.clone();
         self.start = micros_since_epoch(stmt.start);
         self.end = micros_since_epoch(stmt.end);
         if stmt.interval > Duration::ZERO {
@@ -73,7 +89,7 @@ impl Query {
             self.lookback_delta = micros(stmt.lookback_delta);
         }
 
-        let ctx = Arc::new(Mutex::new(self.clone()));
+        // let ctx = Arc::new(self.clone());
         let expr = Arc::new(stmt.expr);
         let mut result_type: Option<String> = None;
 
@@ -82,7 +98,7 @@ impl Query {
             result_type = Some("matrix".to_string());
         } else {
             // Instant query
-            let mut engine = super::Engine::new(ctx.clone(), self.start);
+            let mut engine = super::Engine::new(self.clone(), self.start);
             let expr = expr.clone();
             let (mut value, result_type_exec) = engine.exec(&expr).await?;
             if let Value::Float(val) = value {
@@ -103,7 +119,7 @@ impl Query {
         let nr_steps = ((self.end - self.start) / self.interval) + 1;
         for i in 0..nr_steps {
             let time = self.start + (self.interval * i);
-            let mut engine = super::Engine::new(ctx.clone(), time);
+            let mut engine = super::Engine::new(self.clone(), time);
             let expr = expr.clone();
             // let task = tokio::task::spawn(async move { (time, engine.exec(&expr).await) });
             let task = (time, engine.exec(&expr).await);

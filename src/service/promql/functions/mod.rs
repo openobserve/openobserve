@@ -143,6 +143,10 @@ pub(crate) fn eval_idelta(
     fn_handler: fn(&RangeValue) -> Option<f64>,
     keep_name_label: bool,
 ) -> Result<Value> {
+    println!("************************************* EVAL_IDELTA ******************");
+    println!("************************************* {:?}******************", data.get_type());
+    println!("************************************* {:?}******************", data);
+    println!("************************************* EVAL_IDELTA END ******************");
     let data = match data {
         Value::Matrix(v) => v,
         Value::None => return Ok(Value::None),
@@ -153,6 +157,7 @@ pub(crate) fn eval_idelta(
             )))
         }
     };
+
 
     let mut rate_values = Vec::with_capacity(data.len());
     for metric in data {
