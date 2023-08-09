@@ -20,20 +20,21 @@ use std::io::{BufRead, BufReader};
 
 use super::StreamMeta;
 use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-
-use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
-use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     alert::{Alert, Trigger},
+    functions::{StreamTransform, VRLRuntimeConfig},
     ingestion::{
         BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
         StreamSchemaChk,
     },
+    stream::StreamParams,
+    usage::UsageType,
     StreamType,
 };
-use crate::service::usage::report_request_usage_stats;
-use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
+use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::service::{
+    db, ingestion::write_file, schema::stream_schema_exists, usage::report_request_usage_stats,
+};
 
 pub const TRANSFORM_FAILED: &str = "document_failed_transform";
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
@@ -125,11 +126,12 @@ pub async fn ingest(
                 .await;
                 let mut partition_keys: Vec<String> = vec![];
                 if stream_schema.has_partition_keys {
-                    partition_keys = crate::service::ingestion::get_stream_partition_keys(
+                    let partition_det = crate::service::ingestion::get_stream_partition_keys(
                         &stream_name,
                         &stream_schema_map,
                     )
                     .await;
+                    partition_keys = partition_det.partition_keys;
                 }
                 stream_partition_keys_map
                     .insert(stream_name.clone(), (stream_schema, partition_keys.clone()));
@@ -292,10 +294,12 @@ pub async fn ingest(
         let mut req_stats = write_file(
             stream_data.data,
             thread_id,
-            org_id,
-            &stream_name,
+            StreamParams {
+                org_id,
+                stream_name: &stream_name,
+                stream_type: StreamType::Logs,
+            },
             &mut stream_file_name,
-            StreamType::Logs,
             None,
         );
         req_stats.response_time += time;

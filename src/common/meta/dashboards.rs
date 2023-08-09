@@ -128,6 +128,10 @@ pub struct PanelConfig {
     show_legends: bool,
     legends_position: Option<String>,
     promql_legend: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unit_custom: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -150,12 +154,11 @@ pub struct List {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct QueryData {
-    #[serde(rename = "stream_type")]
     pub stream_type: StreamType,
     pub stream: String,
     pub field: String,
+    pub max_record_size: Option<i64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -172,7 +175,7 @@ mod tests {
     use expect_test::expect;
 
     #[test]
-    fn test_de1() {
+    fn test_dashboard1() {
         let dashboard: Dashboard = json::from_str(r##"{
             "title": "b2",
             "dashboardId": "1501078512",
@@ -300,6 +303,8 @@ mod tests {
                             promql_legend: Some(
                                 "right",
                             ),
+                            unit: None,
+                            unit_custom: None,
                         },
                         query: "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE method IS NOT NULL GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
                         query_type: "",
@@ -325,7 +330,7 @@ mod tests {
     }
 
     #[test]
-    fn test_de2() {
+    fn test_dashboard2() {
         let dashboard: Dashboard = json::from_str(r##"{
             "dashboardId": "7049428968893710336",
             "title": "board1",
@@ -468,6 +473,8 @@ mod tests {
                             show_legends: true,
                             legends_position: None,
                             promql_legend: None,
+                            unit: None,
+                            unit_custom: None,
                         },
                         query: "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE log IS NOT NULL AND stream IN ('stdout', 'stderr') GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
                         query_type: "",

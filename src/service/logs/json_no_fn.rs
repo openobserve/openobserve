@@ -16,21 +16,17 @@ use actix_web::{http, web};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::io::{BufRead, BufReader};
 
+use super::StreamMeta;
 use crate::common::infra::{cluster, config::CONFIG, metrics};
+use crate::common::meta::stream::StreamParams;
 use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{IngestionResponse, StreamStatus},
-    stream::StreamParams,
-    usage::UsageType,
     StreamType,
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::{
-    db, format_stream_name, ingestion::write_file, logs::StreamMeta, schema::stream_schema_exists,
-    usage::report_request_usage_stats,
-};
+use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
 
 pub async fn ingest(
     org_id: &str,
@@ -53,7 +49,6 @@ pub async fn ingest(
     if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
         return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
@@ -61,16 +56,8 @@ pub async fn ingest(
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
+
     let mut trigger: Option<Trigger> = None;
-
-    // Start Register Transforms for stream
-
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
-        org_id,
-        StreamType::Logs,
-        stream_name,
-    );
-    // End Register Transforms for stream
 
     let stream_schema = stream_schema_exists(
         org_id,
@@ -94,34 +81,10 @@ pub async fn ingest(
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    let reader = BufReader::new(body.as_ref());
-    for line in reader.lines() {
-        let line = line?;
-        if line.is_empty() {
-            continue;
-        }
-
-        let mut value: json::Value = json::from_slice(line.as_bytes())?;
-
-        // JSON Flattening
-        value = flatten::flatten(&value)?;
-        // Start row based transform
-
-        if !local_trans.is_empty() {
-            value = crate::service::ingestion::apply_stream_transform(
-                &local_trans,
-                &value,
-                &stream_vrl_map,
-                stream_name,
-                &mut runtime,
-            )?;
-        }
-
-        if value.is_null() || !value.is_object() {
-            stream_status.status.failed += 1; // transform failed or dropped
-            continue;
-        }
-        // End row based transform
+    let reader: Vec<json::Value> = json::from_slice(&body)?;
+    for item in reader.iter() {
+        //JSON Flattening
+        let mut value = flatten::flatten(item)?;
 
         // get json object
         let local_val = value.as_object_mut().unwrap();
@@ -139,8 +102,8 @@ pub async fn ingest(
             None => Utc::now().timestamp_micros(),
         };
         // check ingestion time
-        let earliest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
-        if timestamp < earliest_time.timestamp_micros() {
+        let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+        if timestamp < earlest_time.timestamp_micros() {
             stream_status.status.failed += 1; // to old data, just discard
             stream_status.status.error = super::get_upto_discard_error();
             continue;
@@ -153,7 +116,6 @@ pub async fn ingest(
             json::Value::Number(timestamp.into()),
         );
 
-        // write data
         let local_trigger = super::add_valid_record(
             StreamMeta {
                 org_id: org_id.to_string(),
@@ -175,8 +137,7 @@ pub async fn ingest(
 
     // write to file
     let mut stream_file_name = "".to_string();
-
-    let mut req_stats = write_file(
+    let _ = write_file(
         buf,
         thread_id,
         StreamParams {
@@ -198,30 +159,19 @@ pub async fn ingest(
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
 
-    req_stats.response_time = start.elapsed().as_secs_f64();
-    //metric + data usage
-    report_request_usage_stats(
-        req_stats,
-        org_id,
-        stream_name,
-        StreamType::Logs,
-        UsageType::Multi,
-        local_trans.len() as u16,
-    )
-    .await;
-
+    let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/api/org/ingest/logs/_multi",
+            "/api/org/ingest/logs/_json",
             "200",
             org_id,
             stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
-        .observe(start.elapsed().as_secs_f64());
+        .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/api/org/ingest/logs/_multi",
+            "/api/org/ingest/logs/_json",
             "200",
             org_id,
             stream_name,

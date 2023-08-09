@@ -101,10 +101,12 @@ fn flatten_array(
     depth: u32,
     flattened: &mut Map<String, Value>,
 ) -> Result<(), anyhow::Error> {
-    for (i, obj) in current.iter().enumerate() {
-        let parent_key = format!("{}{}{}", parent_key, KEY_SEPARATOR, i);
-        flatten_value(obj, parent_key, depth + 1, flattened)?;
-    }
+    // for (i, obj) in current.iter().enumerate() {
+    //     let parent_key = format!("{}{}{}", parent_key, KEY_SEPARATOR, i);
+    //     flatten_value(obj, parent_key, depth + 1, flattened)?;
+    // }
+    let v = Value::String(Value::Array(current.to_vec()).to_string());
+    flatten_value(&v, parent_key.to_string(), depth, flattened)?;
     Ok(())
 }
 

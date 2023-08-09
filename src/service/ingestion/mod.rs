@@ -30,7 +30,7 @@ use crate::common::infra::{
 use crate::common::meta::{
     alert::{Alert, Trigger},
     functions::{StreamTransform, VRLRuntimeConfig},
-    stream::{PartitionTimeLevel, StreamParams},
+    stream::{PartitionTimeLevel, PartitioningDetails, StreamParams},
     usage::RequestStats,
     StreamType,
 };
@@ -119,14 +119,17 @@ pub async fn get_stream_transforms<'a>(
 pub async fn get_stream_partition_keys(
     stream_name: &str,
     stream_schema_map: &AHashMap<String, Schema>,
-) -> Vec<String> {
+) -> PartitioningDetails {
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema,
-        None => return vec![],
+        None => return PartitioningDetails::default(),
     };
 
     let stream_settings = stream_settings(schema).unwrap_or_default();
-    stream_settings.partition_keys
+    PartitioningDetails {
+        partition_keys: stream_settings.partition_keys,
+        partition_time_level: stream_settings.partition_time_level,
+    }
 }
 
 pub async fn get_stream_alerts<'a>(
@@ -378,10 +381,8 @@ pub fn init_functions_runtime() -> Runtime {
 pub fn write_file(
     buf: AHashMap<String, Vec<String>>,
     thread_id: usize,
-    org_id: &str,
-    stream_name: &str,
+    stream_params: StreamParams,
     stream_file_name: &mut String,
-    stream_type: StreamType,
     partition_time_level: Option<PartitionTimeLevel>,
 ) -> RequestStats {
     let mut write_buf = BytesMut::new();
@@ -397,11 +398,7 @@ pub fn write_file(
         }
         let file = get_or_create(
             thread_id,
-            StreamParams {
-                org_id,
-                stream_name,
-                stream_type,
-            },
+            stream_params,
             partition_time_level,
             &key,
             CONFIG.common.wal_memory_mode_enabled,
@@ -470,7 +467,10 @@ mod tests {
         let schema = Schema::empty().with_metadata(meta);
         stream_schema_map.insert("olympics".to_string(), schema);
         let keys = get_stream_partition_keys("olympics", &stream_schema_map).await;
-        assert_eq!(keys, vec!["country".to_string(), "sport".to_string()]);
+        assert_eq!(
+            keys.partition_keys,
+            vec!["country".to_string(), "sport".to_string()]
+        );
     }
 
     #[actix_web::test]

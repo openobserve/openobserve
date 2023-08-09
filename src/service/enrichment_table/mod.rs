@@ -28,7 +28,9 @@ use crate::common::infra::{
     cluster,
     config::{CONFIG, STREAM_SCHEMAS},
 };
-use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse, StreamType};
+use crate::common::meta::{
+    self, http::HttpResponse as MetaHttpResponse, stream::StreamParams, StreamType,
+};
 use crate::common::{json, meta::usage::UsageType};
 use crate::service::{
     compact::retention,
@@ -147,10 +149,12 @@ pub async fn save_enrichment_data(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        org_id,
-        stream_name,
+        StreamParams {
+            org_id,
+            stream_name,
+            stream_type: StreamType::EnrichmentTables,
+        },
         &mut stream_file_name,
-        StreamType::EnrichmentTables,
         None,
     );
     req_stats.response_time = start.elapsed().as_secs_f64();

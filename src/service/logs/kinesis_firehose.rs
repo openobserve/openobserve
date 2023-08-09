@@ -18,25 +18,24 @@ use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
 use std::io::Read;
 
+use super::StreamMeta;
 use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{
         AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest, StreamStatus,
     },
+    stream::StreamParams,
+    usage::UsageType,
     StreamType,
 };
-use crate::service::{db, format_stream_name, ingestion::write_file};
-use crate::{
-    common::{
-        flatten, json,
-        time::{parse_i64_to_timestamp_micros, parse_timestamp_micro_from_value},
-    },
-    service::usage::report_request_usage_stats,
+use crate::common::{
+    flatten, json,
+    time::{parse_i64_to_timestamp_micros, parse_timestamp_micro_from_value},
 };
-
-use super::StreamMeta;
+use crate::service::{
+    db, format_stream_name, ingestion::write_file, usage::report_request_usage_stats,
+};
 
 pub async fn process(
     org_id: &str,
@@ -84,10 +83,12 @@ pub async fn process(
     .await;
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
-        partition_keys =
+        let partition_det =
             crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map)
                 .await;
+        partition_keys = partition_det.partition_keys;
     }
+
     // Start get stream alerts
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
@@ -236,10 +237,12 @@ pub async fn process(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        org_id,
-        stream_name,
+        StreamParams {
+            org_id,
+            stream_name,
+            stream_type: StreamType::Logs,
+        },
         &mut stream_file_name,
-        StreamType::Logs,
         None,
     );
 

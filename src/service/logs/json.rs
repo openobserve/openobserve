@@ -19,15 +19,18 @@ use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
 use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{IngestionResponse, StreamStatus},
+    stream::StreamParams,
+    usage::UsageType,
     StreamType,
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::usage::report_request_usage_stats;
-use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
+use crate::service::{
+    db, format_stream_name, ingestion::write_file, schema::stream_schema_exists,
+    usage::report_request_usage_stats,
+};
 
 pub async fn ingest(
     org_id: &str,
@@ -78,11 +81,13 @@ pub async fn ingest(
         &mut stream_schema_map,
     )
     .await;
+
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
-        partition_keys =
+        let partition_det =
             crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map)
                 .await;
+        partition_keys = partition_det.partition_keys;
     }
 
     // Start get stream alerts
@@ -166,10 +171,12 @@ pub async fn ingest(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        org_id,
-        stream_name,
+        StreamParams {
+            org_id,
+            stream_name,
+            stream_type: StreamType::Logs,
+        },
         &mut stream_file_name,
-        StreamType::Logs,
         None,
     );
 

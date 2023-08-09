@@ -264,6 +264,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         size: scan_stats.original_size as f64,
         response_time: op_start.elapsed().as_secs_f64(),
         request_body: Some(req.query.unwrap().query),
+        ..Default::default()
     };
 
     report_request_usage_stats(

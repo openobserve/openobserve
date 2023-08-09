@@ -85,11 +85,12 @@ pub async fn handle_trace_request(
 
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
-        partition_keys = crate::service::ingestion::get_stream_partition_keys(
+        let partition_det = crate::service::ingestion::get_stream_partition_keys(
             traces_stream_name,
             &traces_schema_map,
         )
         .await;
+        partition_keys = partition_det.partition_keys;
     }
 
     // Start get stream alerts

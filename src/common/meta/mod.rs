@@ -33,7 +33,7 @@ pub mod traces;
 pub mod usage;
 pub mod user;
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum StreamType {
     #[default]

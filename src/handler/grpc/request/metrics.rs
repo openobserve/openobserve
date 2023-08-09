@@ -30,7 +30,7 @@ pub struct Querier;
 
 #[tonic::async_trait]
 impl Metrics for Querier {
-    #[tracing::instrument(name = "grpc:metrics:enter", skip_all)]
+    #[tracing::instrument(name = "grpc:metrics:enter", skip_all,fields(org_id = req.get_ref().org_id))]
     async fn query(
         &self,
         req: Request<MetricsQueryRequest>,
@@ -41,7 +41,7 @@ impl Metrics for Querier {
         });
         tracing::Span::current().set_parent(parent_cx);
 
-        let req = req.get_ref();
+        let req: &MetricsQueryRequest = req.get_ref();
         let org_id = &req.org_id;
         let stream_type = meta::StreamType::Metrics.to_string();
         let result = SearchService::grpc::search(req).await.map_err(|err| {
@@ -71,7 +71,7 @@ impl Metrics for Querier {
         Ok(Response::new(result))
     }
 
-    #[tracing::instrument(name = "grpc:metrics:wal_file", skip_all)]
+    #[tracing::instrument(name = "grpc:metrics:wal_file", skip_all,fields(org_id = req.get_ref().org_id,stream_name = req.get_ref().stream_name))]
     async fn wal_file(
         &self,
         req: Request<MetricsWalFileRequest>,

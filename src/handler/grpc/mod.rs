@@ -14,7 +14,7 @@
 
 use uuid::Uuid;
 
-use crate::common::meta;
+use crate::common::{json, meta};
 use crate::service::promql;
 
 pub mod auth;
@@ -186,6 +186,14 @@ impl From<&cluster_rpc::ScanStats> for meta::stream::ScanStats {
             records: req.records,
             original_size: req.original_size,
             compressed_size: req.compressed_size,
+        }
+    }
+}
+
+impl From<Vec<json::Value>> for cluster_rpc::UsageData {
+    fn from(usages: Vec<json::Value>) -> Self {
+        Self {
+            data: json::to_vec(&usages).unwrap(),
         }
     }
 }

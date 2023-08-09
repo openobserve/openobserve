@@ -28,6 +28,7 @@ use crate::service::schema::check_for_schema;
 pub mod bulk;
 pub mod gcs_pub_sub;
 pub mod json;
+pub mod json_no_fn;
 pub mod kinesis_firehose;
 pub mod multi;
 pub mod syslog;

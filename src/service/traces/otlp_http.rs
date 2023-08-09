@@ -24,6 +24,7 @@ use crate::common::infra::{cluster, config::CONFIG};
 use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
+    stream::StreamParams,
     traces::{Event, Span, SpanRefType},
     usage::UsageType,
     StreamType,
@@ -94,11 +95,12 @@ pub async fn traces_json(
 
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
-        partition_keys = crate::service::ingestion::get_stream_partition_keys(
+        let partition_det = crate::service::ingestion::get_stream_partition_keys(
             traces_stream_name,
             &traces_schema_map,
         )
         .await;
+        partition_keys = partition_det.partition_keys;
     }
 
     // Start get stream alerts
@@ -366,10 +368,12 @@ pub async fn traces_json(
     let mut req_stats = write_file(
         data_buf,
         thread_id,
-        org_id,
-        traces_stream_name,
+        StreamParams {
+            org_id,
+            stream_name: traces_stream_name,
+            stream_type: StreamType::Traces,
+        },
         &mut traces_file_name,
-        StreamType::Traces,
         None,
     );
     req_stats.response_time = start.elapsed().as_secs_f64();

@@ -32,6 +32,7 @@ use crate::common::meta::{
     alert::{Alert, Trigger},
     functions::StreamTransform,
     prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+    stream::{PartitioningDetails, StreamParams},
     usage::UsageType,
     StreamType,
 };
@@ -41,6 +42,7 @@ use crate::service::{
     ingestion::{chk_schema_by_record, write_file},
     schema::{set_schema_metadata, stream_schema_exists},
     search as search_service,
+    stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
 };
 
@@ -75,6 +77,7 @@ pub async fn remote_write(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
     let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
+    let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
@@ -187,21 +190,20 @@ pub async fn remote_write(
             }
 
             // get partition keys
-            let stream_schema = stream_schema_exists(
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                &mut metric_schema_map,
-            )
-            .await;
-            let mut partition_keys: Vec<String> = vec![];
-            if stream_schema.has_partition_keys {
-                partition_keys = crate::service::ingestion::get_stream_partition_keys(
+            if !stream_partitioning_map.contains_key(&metric_name) {
+                let partition_det = crate::service::ingestion::get_stream_partition_keys(
                     &metric_name,
                     &metric_schema_map,
                 )
                 .await;
+                stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
             }
+            let partition_det = stream_partitioning_map.get(&metric_name).unwrap();
+            let partition_keys = partition_det.partition_keys.clone();
+            let _partition_time_level = unwrap_partition_time_level(
+                partition_det.partition_time_level,
+                StreamType::Metrics,
+            );
 
             // Start get stream alerts
             let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
@@ -324,15 +326,22 @@ pub async fn remote_write(
             log::warn!("stream [{stream_name}] is being deleted");
             continue;
         }
+        let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
+            details.partition_time_level
+        } else {
+            Some(CONFIG.limit.metric_file_max_retention.as_str().into())
+        };
 
         let mut req_stats = write_file(
             stream_data,
             thread_id,
-            org_id,
-            &stream_name,
+            StreamParams {
+                org_id,
+                stream_name: &stream_name,
+                stream_type: StreamType::Metrics,
+            },
             &mut stream_file_name,
-            StreamType::Metrics,
-            Some(meta::stream::PartitionTimeLevel::Daily),
+            time_level,
         );
 
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();

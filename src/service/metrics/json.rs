@@ -23,14 +23,13 @@ use crate::common::infra::{cluster, config::CONFIG, metrics};
 use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
     prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
-    stream::PartitionTimeLevel,
+    stream::{PartitioningDetails, StreamParams},
     usage::UsageType,
     StreamType,
 };
 use crate::common::{flatten, json, time};
 use crate::service::{
-    db,
-    ingestion::{get_hour_key, write_file},
+    db, ingestion::get_wal_time_key, ingestion::write_file, stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
 };
 
@@ -49,6 +48,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
     let mut stream_data_buf: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
+    let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.iter() {
@@ -191,13 +191,28 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             stream_schema_map.insert(stream_name.clone(), schema);
         }
 
-        // write into buffer
-        let partition_keys =
-            crate::service::ingestion::get_stream_partition_keys(&stream_name, &stream_schema_map)
-                .await;
+        if !stream_partitioning_map.contains_key(&stream_name) {
+            let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                &stream_name,
+                &stream_schema_map,
+            )
+            .await;
+            stream_partitioning_map.insert(stream_name.to_string(), partition_det.clone());
+        }
+
+        let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
+        let partition_keys = partition_det.partition_keys.clone();
+        let partition_time_level =
+            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
         let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
-        let hour_key = get_hour_key(timestamp, &partition_keys, record, None);
+        let hour_key = get_wal_time_key(
+            timestamp,
+            &partition_keys,
+            partition_time_level,
+            record,
+            None,
+        );
         let hour_buf = stream_buf.entry(hour_key).or_default();
         hour_buf.push(record_str);
 
@@ -221,15 +236,23 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             continue;
         }
 
+        let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
+            details.partition_time_level
+        } else {
+            Some(CONFIG.limit.metric_file_max_retention.as_str().into())
+        };
+
         let mut stream_file_name = "".to_string();
         let mut req_stats = write_file(
             stream_data,
             thread_id,
-            org_id,
-            &stream_name,
+            StreamParams {
+                org_id,
+                stream_name: &stream_name,
+                stream_type: StreamType::Metrics,
+            },
             &mut stream_file_name,
-            StreamType::Metrics,
-            Some(PartitionTimeLevel::Daily),
+            time_level,
         );
         req_stats.response_time = time;
 
