@@ -45,7 +45,7 @@ pub async fn get_stream(
         .await
         .unwrap();
 
-    let mut stats = if CONFIG.common.local_mode {
+    let mut stats = if !CONFIG.common.usage_enabled {
         stats::get_stream_stats(org_id, stream_name, stream_type)
     } else {
         let in_stats = get_stream_stats(org_id, Some(stream_type), Some(stream_name.to_string()))
@@ -82,16 +82,16 @@ pub async fn get_streams(
     let mut indices_res = Vec::with_capacity(indices.len());
 
     // get all steam stats
-    let all_stats = if !CONFIG.common.local_mode {
+    let all_stats = if !CONFIG.common.usage_enabled {
+        HashMap::new()
+    } else {
         get_stream_stats(org_id, stream_type, None)
             .await
             .unwrap_or_default()
-    } else {
-        HashMap::new()
     };
 
     for stream_loc in indices {
-        let mut stats = if CONFIG.common.local_mode {
+        let mut stats = if !CONFIG.common.usage_enabled {
             stats::get_stream_stats(
                 org_id,
                 stream_loc.stream_name.as_str(),
@@ -306,7 +306,7 @@ pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, any
 }
 
 fn transform_stats(stats: &mut StreamStats) -> StreamStats {
-    if CONFIG.common.local_mode {
+    if !CONFIG.common.usage_enabled {
         stats.storage_size /= SIZE_IN_MB;
         stats.compressed_size /= SIZE_IN_MB;
     }
