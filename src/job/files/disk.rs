@@ -34,6 +34,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     // create wal dir
     fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
+    fs::create_dir_all(&CONFIG.common.data_cache_dir)?;
 
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
     interval.tick().await; // trigger the first run

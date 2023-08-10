@@ -14,18 +14,26 @@
 
 use async_trait::async_trait;
 
-use crate::common::infra::errors::{Error, Result};
+use crate::common::infra::{
+    config::CONFIG,
+    errors::{Error, Result},
+};
 use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
 
 pub mod dynamo;
 pub mod sled;
+pub mod sqlite;
 
 lazy_static! {
-    static ref DEFAULT: Box<dyn FileList> = default();
+    static ref CLIENT: Box<dyn FileList> = connect();
 }
 
-pub fn default() -> Box<dyn FileList> {
-    Box::<sled::Sled>::default()
+pub fn connect() -> Box<dyn FileList> {
+    match CONFIG.common.file_list_storage.as_str() {
+        "sled" => Box::<sled::SledFileList>::default(),
+        "sqlite" => Box::<sqlite::SqliteFileList>::default(),
+        _ => Box::<sled::SledFileList>::default(),
+    }
 }
 
 #[async_trait]
@@ -51,22 +59,22 @@ pub trait FileList: Sync + 'static {
 
 #[inline]
 pub async fn add(file: &str, meta: &FileMeta) -> Result<()> {
-    DEFAULT.add(file, meta).await
+    CLIENT.add(file, meta).await
 }
 
 #[inline]
 pub async fn remove(file: &str) -> Result<()> {
-    DEFAULT.remove(file).await
+    CLIENT.remove(file).await
 }
 
 #[inline]
 pub async fn get(file: &str) -> Result<FileMeta> {
-    DEFAULT.get(file).await
+    CLIENT.get(file).await
 }
 
 #[inline]
 pub async fn list() -> Result<Vec<(String, FileMeta)>> {
-    DEFAULT.list().await
+    CLIENT.list().await
 }
 
 #[inline]
@@ -77,51 +85,52 @@ pub async fn query(
     time_level: PartitionTimeLevel,
     time_range: (i64, i64),
 ) -> Result<Vec<(String, FileMeta)>> {
-    DEFAULT
+    CLIENT
         .query(org_id, stream_type, stream_name, time_level, time_range)
         .await
 }
 
 #[inline]
 pub async fn contains(file: &str) -> Result<bool> {
-    DEFAULT.contains(file).await
+    CLIENT.contains(file).await
 }
 
 #[inline]
 pub async fn len() -> usize {
-    DEFAULT.len().await
+    CLIENT.len().await
 }
 
 #[inline]
 pub async fn is_empty() -> bool {
-    DEFAULT.is_empty().await
+    CLIENT.is_empty().await
 }
 
 #[inline]
 pub async fn clear() -> Result<()> {
-    DEFAULT.clear().await
+    CLIENT.clear().await
 }
 
 #[inline]
 pub async fn switch_db() -> Result<()> {
-    DEFAULT.switch_db().await
+    CLIENT.switch_db().await
 }
 
 /// parse file key to get stream_key, date_key, file_name
-pub fn parse_file_key_columns(key: &str) -> Result<(String, String)> {
+pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String)> {
     // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
-    let columns = key.splitn(5, '/').collect::<Vec<&str>>();
-    if columns.len() < 5 {
+    let columns = key.splitn(9, '/').collect::<Vec<&str>>();
+    if columns.len() < 9 {
         return Err(Error::Message(format!(
             "[file_list] Invalid file path: {}",
             key
         )));
     }
     // let _ = columns[0].to_string(); // files/
-    let org_id = columns[1].to_string();
-    let stream_type = columns[2].to_string();
-    let stream_name = columns[3].to_string();
-    let file_name = columns[4].to_string();
-    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-    Ok((stream_key, file_name))
+    let stream_key = format!("{}/{}/{}", columns[1], columns[2], columns[3]);
+    let date_key = format!(
+        "{}/{}/{}/{}",
+        columns[4], columns[5], columns[6], columns[7]
+    );
+    let file_name = columns[8].to_string();
+    Ok((stream_key, date_key, file_name))
 }

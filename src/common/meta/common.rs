@@ -93,9 +93,10 @@ impl TryFrom<&[u8]> for FileMeta {
 impl From<&FileKey> for HashMap<String, AttributeValue> {
     fn from(file_key: &FileKey) -> Self {
         let mut item = HashMap::new();
-        let (stream_key, file_name) = parse_file_key_columns(&file_key.key).unwrap();
+        let (stream_key, date_key,file_name) = parse_file_key_columns(&file_key.key).unwrap(); 
+        let file_name = format!("{date_key}/{file_name}");
         item.insert("stream".to_string(), AttributeValue::S(stream_key));
-        item.insert("file".to_string(), AttributeValue::S(file_name.to_string()));
+        item.insert("file".to_string(), AttributeValue::S(file_name));
         item.insert(
             "deleted".to_string(),
             AttributeValue::Bool(file_key.deleted),

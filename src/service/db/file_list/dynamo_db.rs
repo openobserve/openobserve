@@ -31,14 +31,15 @@ use crate::common::meta::{
 use crate::service::{db, stream};
 
 pub async fn write_file(file_key: &FileKey) -> Result<(), anyhow::Error> {
-    let (stream_key, file_name) = parse_file_key_columns(&file_key.key)?;
+    let (stream_key, date_key, file_name) = parse_file_key_columns(&file_key.key)?;
+    let file_name = format!("{date_key}/{file_name}");
     match DYNAMO_DB_CLIENT
         .get()
         .await
         .put_item()
         .table_name(&CONFIG.common.dynamo_file_list_table)
         .item("stream", AttributeValue::S(stream_key))
-        .item("file", AttributeValue::S(file_name.to_string()))
+        .item("file", AttributeValue::S(file_name))
         .item("deleted", AttributeValue::Bool(file_key.deleted))
         .item(
             "min_ts",

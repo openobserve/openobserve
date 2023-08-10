@@ -22,50 +22,53 @@ use crate::common::infra::{
 use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
 
 lazy_static! {
-    static ref SLED_CLIENT: Option<::sled::Db> = connect_sled();
+    static ref CLIENT: ::sled::Db = connect();
 }
 
-pub struct Sled {}
+pub fn connect() -> ::sled::Db {
+    ::sled::open(&format!("{}file_list", CONFIG.common.data_cache_dir))
+        .expect("sled db dir create failed")
+}
 
-impl Sled {
-    pub fn new() -> Sled {
+
+pub struct SledFileList {}
+
+impl SledFileList {
+    pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Default for Sled {
+impl Default for SledFileList {
     fn default() -> Self {
         Self::new()
     }
 }
 
-pub fn connect_sled() -> Option<::sled::Db> {
-    let db = ::sled::open(&format!("{}file_list", CONFIG.common.data_cache_dir))
-        .expect("sled db dir create failed");
-    Some(db)
-}
-
 #[async_trait]
-impl super::FileList for Sled {
+impl super::FileList for SledFileList {
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
-        let (stream_key, file_name) = super::parse_file_key_columns(file)?;
-        let client = SLED_CLIENT.clone().unwrap();
+        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let file_name = format!("{date_key}/{file_name}");
+        let client = CLIENT.clone();
         let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
         bucket.insert::<&str, Vec<u8>>(&file_name, meta.into())?;
         Ok(())
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        let (stream_key, file_name) = super::parse_file_key_columns(file)?;
-        let client = SLED_CLIENT.clone().unwrap();
+        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let file_name = format!("{date_key}/{file_name}");
+        let client = CLIENT.clone();
         let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
         bucket.remove::<&str>(&file_name)?;
         Ok(())
     }
 
     async fn get(&self, file: &str) -> Result<FileMeta> {
-        let (stream_key, file_name) = super::parse_file_key_columns(file)?;
-        let client = SLED_CLIENT.clone().unwrap();
+        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let file_name = format!("{date_key}/{file_name}");
+        let client = CLIENT.clone();
         let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
         match bucket.get::<&str>(&file_name)? {
             Some(bytes) => Ok(FileMeta::try_from(bytes.as_ref())?),
@@ -75,7 +78,7 @@ impl super::FileList for Sled {
 
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
         let mut data = vec![];
-        let client = SLED_CLIENT.clone().unwrap();
+        let client = CLIENT.clone();
         for (_, stream_key, items) in client.export() {
             let stream_key = String::from_utf8(stream_key.to_vec()).unwrap();
             let items = items
@@ -83,7 +86,7 @@ impl super::FileList for Sled {
                 .map(|v| {
                     let file_name = String::from_utf8(v.get(0).unwrap().to_vec()).unwrap();
                     let meta = FileMeta::try_from(v.get(1).unwrap().as_slice()).unwrap();
-                    (format!("{stream_key}/{file_name}"), meta)
+                    (format!("files/{stream_key}/{file_name}"), meta)
                 })
                 .collect::<Vec<_>>();
             data.extend(items);
@@ -101,8 +104,8 @@ impl super::FileList for Sled {
     ) -> Result<Vec<(String, FileMeta)>> {
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let prefixes = generate_prefix(time_level, time_range);
-        let client = SLED_CLIENT.clone().unwrap();
-        let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
+        let client = CLIENT.clone();
+        let bucket = client.open_tree(stream_key.as_bytes()).unwrap(); 
         let mut files = vec![];
         for prefix in prefixes {
             files.extend(
@@ -135,24 +138,25 @@ impl super::FileList for Sled {
     }
 
     async fn contains(&self, file: &str) -> Result<bool> {
-        let (stream_key, file_name) = super::parse_file_key_columns(file)?;
-        let client = SLED_CLIENT.clone().unwrap();
+        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let file_name = format!("{date_key}/{file_name}");
+        let client = CLIENT.clone();
         let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
         Ok(bucket.contains_key::<&str>(&file_name)?)
     }
 
     async fn len(&self) -> usize {
-        let client = SLED_CLIENT.clone().unwrap();
+        let client = CLIENT.clone();
         client.len()
     }
 
     async fn is_empty(&self) -> bool {
-        let client = SLED_CLIENT.clone().unwrap();
+        let client = CLIENT.clone();
         client.is_empty()
     }
 
     async fn clear(&self) -> Result<()> {
-        let client = SLED_CLIENT.clone().unwrap();
+        let client = CLIENT.clone();
         client.clear()?;
         Ok(())
     }

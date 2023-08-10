@@ -40,6 +40,8 @@ pub enum Error {
     WatcherExists(String),
     #[error("StringUTF8Error# {0}")]
     StringUTF8Error(#[from] std::string::FromUtf8Error),
+    #[error("SqlxError# {0}")]
+    SqlxError(#[from] sqlx::Error),
     #[error("Error# {0}")]
     Message(String),
     #[error("ErrorCode# {0}")]

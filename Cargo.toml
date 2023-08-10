@@ -137,6 +137,9 @@ simd-json = "0.10.3"
 sled = "0.34"
 snap = "1"
 sqlparser = { version = "0.35", features = ["serde"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "uuid"] }
+sqlx-core = { version = "0.7", features = ["_rt-tokio", "_tls-rustls", "any", "json", "migrate", "offline", "uuid"] }
+sqlx-sqlite = { version = "0.7", default-features = false, features = ["any", "json", "migrate", "offline", "uuid"] }
 strum = { version = "0.24", features = ["derive"] }
 sys-info = "0.9"
 syslog_loose = "0.18.0"
