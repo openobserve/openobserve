@@ -83,6 +83,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move { telemetry::run().await });
     }
 
+    // check cache dir
+    std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
+    std::fs::create_dir_all(&CONFIG.common.data_cache_dir)?;
+
     // initialize metadata
     tokio::task::spawn(async move { db::functions::watch().await });
     tokio::task::spawn(async move { db::schema::watch().await });

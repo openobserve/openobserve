@@ -39,8 +39,8 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     }
 
     // write into local file_list storage
+    super::progress(key, meta, deleted, true).await?;
     if CONFIG.common.local_mode {
-        super::progress(key, meta, deleted, true).await?;
         return Ok(());
     }
 

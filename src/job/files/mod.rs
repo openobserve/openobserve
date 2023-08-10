@@ -12,17 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::infra::{cluster, config::CONFIG};
+use crate::common::infra::cluster;
 use crate::common::meta::StreamType;
 
 mod disk;
 mod memory;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    // create wal dir
-    std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
-    std::fs::create_dir_all(&CONFIG.common.data_cache_dir)?;
-
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(()); // not an ingester, no need to init job
     }

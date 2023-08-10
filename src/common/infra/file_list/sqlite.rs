@@ -18,7 +18,10 @@ use chrono::{DateTime, Datelike, TimeZone, Utc};
 use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, Pool, Row, Sqlite, SqlitePool};
 use std::str::FromStr;
 
-use crate::common::infra::{config::CONFIG, errors::Result};
+use crate::common::infra::{
+    config::CONFIG,
+    errors::{Error, Result},
+};
 use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
 
 lazy_static! {
@@ -61,7 +64,7 @@ impl Default for SqliteFileList {
 impl super::FileList for SqliteFileList {
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-        sqlx::query(
+        match  sqlx::query(
             r#"
 INSERT INTO file_list (stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
@@ -77,8 +80,15 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
         .bind(meta.original_size as i64)
         .bind(meta.compressed_size as i64)
         .execute(CLIENT.get().await)
-        .await?;
-        Ok(())
+        .await {
+            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
+                  Ok(())
+            } else {
+                  Err(Error::Message(e.to_string()))
+            },
+            Err(e) =>  Err(e.into()),
+            Ok(_) => Ok(()),
+        }
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
