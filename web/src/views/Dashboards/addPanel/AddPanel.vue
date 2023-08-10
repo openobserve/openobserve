@@ -47,7 +47,15 @@
           style="width: 100%; height: 100%;">
           <template #before>
             <div class="col scroll " style="height: calc(100vh - 115px); overflow-y: auto;">
-              <GetFields :editMode="editMode" />
+              <div class="column" style="height: 100%">
+                <div class="col-auto q-pa-sm">
+                <span class="text-weight-bold">{{ t('panel.fields') }}</span>
+                </div>
+                <div class="col" style="width: 100%">
+                <!-- <GetFields :editMode="editMode" /> -->
+                <FieldList :editMode="editMode"/>
+                </div>
+              </div>
             </div>
           </template>
           <template #separator>
@@ -103,7 +111,7 @@ import {
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
 import ConfigPanel from "../../../components/dashboards/addPanel/ConfigPanel.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
-import GetFields from "../../../components/dashboards/addPanel/GetFields.vue";
+import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
 import { useQuasar, date } from "quasar";
 
 import { useI18n } from "vue-i18n";
@@ -129,7 +137,7 @@ export default defineComponent({
   name: "AddPanel",
   components: {
     ChartSelection,
-    GetFields,
+    FieldList,
     DashboardQueryBuilder,
     DateTimePicker,
     ChartRender,

@@ -16,10 +16,10 @@
 <template>
   <div class="column index-menu" :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
     <div class="col-auto">
-      <q-select v-model="dashboardPanelData.data.fields.stream_type" :label="t('dashboard.selectStreamType')"
+      <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type" :label="t('dashboard.selectStreamType')"
         :options="data.streamType" data-cy="index-dropdown" input-debounce="0" behavior="menu" filled borderless dense
         class="q-mb-xs"></q-select>
-      <q-select v-model="dashboardPanelData.data.fields.stream" :label="t('dashboard.selectIndex')"
+      <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream" :label="t('dashboard.selectIndex')"
         :options="filteredStreams" data-cy="index-dropdown" input-debounce="0" behavior="menu" use-input filled borderless
         dense hide-selected fill-input @filter="filterStreamFn">
         <template #no-option>
@@ -55,13 +55,13 @@
           <q-tr :props="props">
             <q-td class="field_list" :props="props" v-mutation="mutationHandler" @dragenter="onDragEnter"
               @dragleave="onDragLeave" @dragover="onDragOver" @drop="onDrop"
-              :style="dashboardPanelData.data.customQuery && props.pageIndex == dashboardPanelData.meta.stream.customQueryFields.length ? 'border: 1px solid black' : ''">
+              :style="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex == dashboardPanelData.meta.stream.customQueryFields.length ? 'border: 1px solid black' : ''">
               <div class="field_overlay" :title="props.row.name">
                 <div class="field_label"
-                  :draggable="!(promqlMode || (dashboardPanelData.data.customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))"
+                  :draggable="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))"
                   @dragstart="onDragStart($event, props.row)">
                   <q-icon name="drag_indicator" color="grey-13"
-                    :class="['q-mr-xs', !(promqlMode || (dashboardPanelData.data.customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length)) ? 'drag_indicator' : 'drag_disabled']"
+                    :class="['q-mr-xs', !(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length)) ? 'drag_indicator' : 'drag_disabled']"
                     v-if="!promqlMode" />
 
                   <q-icon
@@ -70,7 +70,7 @@
                   {{ props.row.name }}
                 </div>
                 <div class="field_icons"
-                  v-if="!(promqlMode || (dashboardPanelData.data.customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))">
+                  v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))">
                   <q-btn padding="sm" :disabled="isAddXAxisNotAllowed" @click="addXAxisItem(props.row)">
                     <div>
                       {{
@@ -140,36 +140,36 @@ export default defineComponent({
 
     // update the selected stream fields list
     watch(
-      () => [data.schemaList, dashboardPanelData.data.fields.stream, dashboardPanelData.data.fields.stream_type],
+      () => [data.schemaList, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type],
       () => {
         // console.log("stream:", dashboardPanelData.data.fields.stream);
 
         const fields: any = data.schemaList.find(
-          (it: any) => it.name == dashboardPanelData.data.fields.stream
+          (it: any) => it.name == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream
         );
         dashboardPanelData.meta.stream.selectedStreamFields =
           fields?.schema || [];
       }
     );
 
-    watch(() => [dashboardPanelData.data.fields.stream_type, dashboardPanelData.meta.stream.streamResults], () => {
+    watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type, dashboardPanelData.meta.stream.streamResults], () => {
 
       if (!props.editMode) {
-        dashboardPanelData.data.fields.stream = ""
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream = ""
       }
 
       data.indexOptions = dashboardPanelData.meta.stream.streamResults
-        .filter((data: any) => data.stream_type == dashboardPanelData.data.fields.stream_type)
+        .filter((data: any) => data.stream_type == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type)
         .map((data: any) => {
           return data.name;
         });
 
       // set the first stream as the selected stream when the api loads the data
       if (!props.editMode &&
-        !dashboardPanelData.data.fields.stream &&
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream &&
         data.indexOptions.length > 0
       ) {
-        dashboardPanelData.data.fields.stream = data.indexOptions[0];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream = data.indexOptions[0];
       }
     })
 
