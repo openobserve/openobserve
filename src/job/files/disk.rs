@@ -21,21 +21,13 @@ use std::{
 };
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::infra::{cluster, config::CONFIG, metrics, storage, wal};
+use crate::common::infra::{config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
 use crate::common::{file::scan_files, json, utils::populate_file_meta};
 use crate::service::usage::report_compression_stats;
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(()); // not an ingester, no need to init job
-    }
-
-    // create wal dir
-    fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
-    fs::create_dir_all(&CONFIG.common.data_cache_dir)?;
-
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
     interval.tick().await; // trigger the first run
     loop {

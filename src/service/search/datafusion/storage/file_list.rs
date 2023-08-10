@@ -54,4 +54,3 @@ pub fn clear(session_id: &str) {
         FILES.remove(&key);
     }
 }
-

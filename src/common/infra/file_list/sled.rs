@@ -26,10 +26,9 @@ lazy_static! {
 }
 
 pub fn connect() -> ::sled::Db {
-    ::sled::open(&format!("{}file_list", CONFIG.common.data_cache_dir))
+    ::sled::open(format!("{}file_list", CONFIG.common.data_cache_dir))
         .expect("sled db dir create failed")
 }
-
 
 pub struct SledFileList {}
 
@@ -105,13 +104,12 @@ impl super::FileList for SledFileList {
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let prefixes = generate_prefix(time_level, time_range);
         let client = CLIENT.clone();
-        let bucket = client.open_tree(stream_key.as_bytes()).unwrap(); 
+        let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
         let mut files = vec![];
         for prefix in prefixes {
             files.extend(
                 bucket
                     .scan_prefix(&prefix)
-                    .into_iter()
                     .filter_map(|v| match v {
                         Err(e) => {
                             log::error!("sled scan prefix error: {}", e);

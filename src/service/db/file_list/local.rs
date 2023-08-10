@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-
-use crate::common::infra::{config::CONFIG, file_list, wal};
+use crate::common::infra::{config::CONFIG, file_list, file_list::parse_file_key_columns, wal};
+use crate::common::json;
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     stream::StreamParams,
     StreamType,
 };
-use crate::common::{file::scan_files, json};
 
 pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {
+    let (_stream_key, date_key, _file_name) = parse_file_key_columns(key)?;
     let file_data = FileKey::new(key, meta, deleted);
 
     // dynamodb mode
@@ -40,16 +38,37 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
         return Ok(());
     }
 
-    super::progress(key, meta, deleted, true).await?;
-    if !CONFIG.common.local_mode {
-        tokio::task::spawn(async move { super::broadcast::send(&[file_data], None).await });
-        tokio::task::yield_now().await;
+    // write into local file_list storage
+    if CONFIG.common.local_mode {
+        super::progress(key, meta, deleted, true).await?;
+        return Ok(());
     }
+
+    // write into local cache for s3
+    let mut write_buf = json::to_vec(&file_data)?;
+    write_buf.push(b'\n');
+    let hour_key = date_key.replace('/', "_");
+    let file = wal::get_or_create(
+        0,
+        StreamParams {
+            org_id: "",
+            stream_name: "",
+            stream_type: StreamType::Filelist,
+        },
+        None,
+        &hour_key,
+        false,
+    );
+    file.write(write_buf.as_ref());
+
+    // notifiy other nodes
+    tokio::task::spawn(async move { super::broadcast::send(&[file_data], None).await });
+    tokio::task::yield_now().await;
 
     Ok(())
 }
 
-pub async fn broadcast_cache(node_uuid: Option<&str>) -> Result<(), anyhow::Error> { 
+pub async fn broadcast_cache(node_uuid: Option<&str>) -> Result<(), anyhow::Error> {
     let files = file_list::list().await?;
     if files.is_empty() {
         return Ok(());
@@ -60,7 +79,7 @@ pub async fn broadcast_cache(node_uuid: Option<&str>) -> Result<(), anyhow::Erro
             .map(|(k, v)| FileKey::new(k, v.to_owned(), false))
             .collect::<Vec<_>>();
         if let Err(e) = super::broadcast::send(&chunk, node_uuid).await {
-            log::error!("broadcast cached file list failed: {}", e);
+            log::error!("[FILE_LIST] broadcast cached file list failed: {}", e);
         }
     }
     Ok(())

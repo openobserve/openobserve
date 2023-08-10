@@ -72,10 +72,10 @@ pub fn new_writer<'a>(
     schema: &'a Arc<Schema>,
     sort_field: Option<&str>,
 ) -> ArrowWriter<&'a mut Vec<u8>> {
-    let sort_column_id = if sort_field.is_none() {
-        schema.index_of(&CONFIG.common.column_timestamp).unwrap()
+    let sort_column_id = if let Some(v) = sort_field {
+        schema.index_of(v).unwrap()
     } else {
-        schema.index_of(sort_field.unwrap()).unwrap()
+        schema.index_of(&CONFIG.common.column_timestamp).unwrap()
     };
     let writer_props = WriterProperties::builder()
         .set_compression(get_parquet_compression())

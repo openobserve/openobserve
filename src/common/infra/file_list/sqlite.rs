@@ -195,11 +195,9 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
     }
 
     async fn len(&self) -> usize {
-        let ret = match sqlx::query(
-            r#"SELECT COUNT(*) as num FROM file_list;"#,
-        )
-        .fetch_one(CLIENT.get().await)
-        .await
+        let ret = match sqlx::query(r#"SELECT COUNT(*) as num FROM file_list;"#)
+            .fetch_one(CLIENT.get().await)
+            .await
         {
             Ok(r) => r,
             Err(e) => {
@@ -218,11 +216,9 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
     }
 
     async fn clear(&self) -> Result<()> {
-        sqlx::query(
-            r#"DELETE FROM file_list;"#,
-        )
-        .execute(CLIENT.get().await)
-        .await?;
+        sqlx::query(r#"DELETE FROM file_list;"#)
+            .execute(CLIENT.get().await)
+            .await?;
         Ok(())
     }
 

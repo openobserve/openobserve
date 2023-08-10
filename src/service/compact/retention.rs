@@ -202,8 +202,7 @@ pub async fn delete_by_date(
         // delete files from s3
         // first fetch file list from local cache
         let files =
-            file_list::query(org_id, stream_name, stream_type, time_range.0, time_range.1)
-                .await?;
+            file_list::query(org_id, stream_name, stream_type, time_range.0, time_range.1).await?;
         match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
@@ -252,8 +251,7 @@ async fn delete_from_file_list(
     time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
     let files =
-        file_list::query(org_id, stream_name, stream_type, time_range.0, time_range.1)
-            .await?;
+        file_list::query(org_id, stream_name, stream_type, time_range.0, time_range.1).await?;
     if files.is_empty() {
         return Ok(());
     }

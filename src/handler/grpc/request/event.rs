@@ -16,7 +16,7 @@ use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::infra::{cache, metrics};
+use crate::common::infra::metrics;
 use crate::common::meta::common::FileMeta;
 use crate::handler::grpc::cluster_rpc::event_server::Event;
 use crate::handler::grpc::cluster_rpc::EmptyResponse;

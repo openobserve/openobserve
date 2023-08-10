@@ -19,19 +19,16 @@ use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::{collections::HashMap, io::Write, sync::Arc};
 
+use crate::common::infra::{
+    cache,
+    config::{CONFIG, FILE_EXT_PARQUET},
+    file_list::parse_file_key_columns,
+    ider, metrics, storage,
+};
 use crate::common::json;
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     StreamType,
-};
-use crate::common::{
-    infra::{
-        cache,
-        config::{CONFIG, FILE_EXT_PARQUET},
-        file_list::parse_file_key_columns,
-        ider, metrics, storage,
-    },
-    meta::stream::PartitionTimeLevel,
 };
 use crate::service::{db, file_list, search::datafusion, stream};
 
@@ -327,7 +324,7 @@ async fn merge_files(
             if schema_ver_id == schema_latest_id {
                 continue;
             }
-            // cacluate the diff between latest schema and current schema
+            // cacluate the diff between latest schema and current schema
             let schema = schema_versions[schema_ver_id]
                 .clone()
                 .with_metadata(HashMap::new());
@@ -416,6 +413,45 @@ async fn write_file_list(events: &[FileKey]) -> Result<(), anyhow::Error> {
 }
 
 async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
+    let (_stream_key, date_key, _file_name) = parse_file_key_columns(&events.first().unwrap().key)?;
+    // upload the new file_list to storage
+    let new_file_list_key = format!("file_list/{}/{}.json.zst", date_key, ider::generate());
+    let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
+    for file in events.iter() {
+        let mut write_buf = json::to_vec(&file)?;
+        write_buf.push(b'\n');
+        buf.write_all(&write_buf)?;
+    }
+    let compressed_bytes = buf.finish().unwrap();
+    storage::put(&new_file_list_key, compressed_bytes.into()).await?;
+
+    // set to local cache & send broadcast
+    // retry 5 times
+    for _ in 0..5 {
+        // set to local cache
+        let mut cache_success = true;
+        for event in events.iter() {
+            if let Err(e) =
+                db::file_list::progress(&event.key, event.meta, event.deleted, false).await
+            {
+                cache_success = false;
+                log::error!("[COMPACT] set local cache failed, retrying: {}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                break;
+            }
+        }
+        if !cache_success {
+            continue;
+        }
+        // send broadcast to other nodes
+        if let Err(e) = db::file_list::broadcast::send(events, None).await {
+            log::error!("[COMPACT] send broadcast failed, retrying: {}", e);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        // broadcast success
+        break;
+    }
     Ok(())
 }
 

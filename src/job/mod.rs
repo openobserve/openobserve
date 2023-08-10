@@ -121,13 +121,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     // cache file list
-    if !CONFIG.common.use_dynamo_meta_store {
-        // db::file_list::local::cache()
-        //     .await
-        //     .expect("file list local cache failed");
-        // db::file_list::remote::cache("", false)
-        //     .await
-        //     .expect("file list remote cache failed");
+    if !CONFIG.common.local_mode && !CONFIG.common.use_dynamo_meta_store {
+        db::file_list::remote::cache("", false)
+            .await
+            .expect("file list remote cache failed");
     }
 
     // Shouldn't serve request until initialization finishes
@@ -140,8 +137,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { alert_manager::run().await });
 
     // ingester run
-    tokio::task::spawn(async move { files::disk::run().await });
-    tokio::task::spawn(async move { files::memory::run().await });
+    tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { file_list::run().await });
     tokio::task::spawn(async move { prom::run().await });
     tokio::task::spawn(async move { metrics::run().await });

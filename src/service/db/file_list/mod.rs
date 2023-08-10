@@ -38,7 +38,7 @@ pub async fn progress(
     data: FileMeta,
     delete: bool,
     download: bool,
-) -> Result<(), anyhow::Error> { 
+) -> Result<(), anyhow::Error> {
     if delete {
         if let Err(e) = file_list::remove(key).await {
             log::error!(

@@ -5,7 +5,7 @@ use tokio::time;
 use crate::common::file::scan_files;
 use crate::common::infra::cache;
 use crate::common::infra::cluster;
-use crate::common::infra::config::{USERS,CONFIG};
+use crate::common::infra::config::{CONFIG, USERS};
 use crate::common::infra::metrics;
 use crate::common::meta::StreamType;
 use crate::service::db;
@@ -125,7 +125,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         .set(orgs.len() as i64);
     for org_id in &orgs {
         for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type);
+            let streams = db::schema::list_streams_from_cache(org_id, stream_type);
             if !streams.is_empty() {
                 metrics::META_NUM_STREAMS
                     .with_label_values(&[org_id.as_str(), stream_type.to_string().as_str()])
