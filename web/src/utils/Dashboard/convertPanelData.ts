@@ -10,7 +10,7 @@ import { convertTableData } from "@/utils/dashboard/convertTableData";
  */
 export const convertPanelData = (panelSchema: any, data: any, store: any) => {
   // based on the panel config, using the switch calling the appropriate converter
-  switch (panelSchema.type) {
+  switch (panelSchema.value.type) {
     case "area":
     case "area-stacked":
     case "bar":
@@ -23,9 +23,9 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
     case "scatter":
     case "metric": {
       if (
-        panelSchema?.fields?.stream_type == "metrics" &&
-        panelSchema?.customQuery &&
-        panelSchema?.queryType == "promql"
+        // panelSchema?.fields?.stream_type == "metrics" &&
+        // panelSchema?.customQuery &&
+        panelSchema?.value?.queryType == "promql"
       ) {
         return convertPromQLData(panelSchema, data, store);
       } else {

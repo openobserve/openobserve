@@ -39,7 +39,7 @@ export const convertPromQLData = (
   };
 
   const getLegendPosition = (type: string) => {
-    const legendPosition = props.data.config?.legends_position;
+    const legendPosition = props.data.value?.config?.legends_position;
 
     switch (legendPosition) {
       case "bottom":
@@ -52,7 +52,7 @@ export const convertPromQLData = (
   };
 
   const getUnitValue = (value: any) => {
-    switch (props.data.config?.unit) {
+    switch (props.data.value.config?.unit) {
       case "bytes": {
         const units = ["B", "KB", "MB", "GB", "TB"];
           for (let unit of units) {
@@ -72,7 +72,7 @@ export const convertPromQLData = (
       case "custom": {
           return {
             value: `${value}`,
-            unit: `${props.data.config.unit_custom ?? ''}`
+            unit: `${props.data.value.config.unit_custom ?? ''}`
           }
       }
       case "seconds": {
@@ -151,7 +151,7 @@ export const convertPromQLData = (
   }
 
   const getPropsByChartTypeForTraces = () => {
-    switch (props.data.type) {
+    switch (props.data.value.type) {
       case "bar":
         return {
           type: "bar",
@@ -210,7 +210,7 @@ export const convertPromQLData = (
 
   const getPropsByChartTypeForLayoutForPromQL = () => {
       //   console.log("data with tick",xAxisDataWithTicks);
-    switch (props.data.type) {
+    switch (props.data.value.type) {
       case "bar": {
         const trace = {
           barmode: "group",
@@ -279,7 +279,7 @@ export const convertPromQLData = (
     console.log("inside convertPromQLData");
     console.log("convertPromQLData: it", it);
 
-    switch (props.data.type) {
+    switch (props.data.value.type) {
       case "bar":
       case "line":
       case "area":
@@ -296,7 +296,7 @@ export const convertPromQLData = (
               return {
                 name: getPromqlLegendName(
                   metric.metric,
-                  props.data.queries[index].promql_legend
+                  props.data.value.queries[index].promql_legend
                 ),
                 x: values.map((value: any) =>
                   moment(value[0] * 1000).toISOString(true)
@@ -307,7 +307,7 @@ export const convertPromQLData = (
                 ),
                 hovertemplate:
                   "%{x} <br>%{fullData.name}: %{hovertext}<extra></extra>",
-                stackgroup: props.data.type == "area-stacked" ? "one" : "",
+                stackgroup: props.data.value.type == "area-stacked" ? "one" : "",
                 ...getPropsByChartTypeForTraces(),
               };
             });
@@ -377,7 +377,7 @@ export const convertPromQLData = (
 
   // Calculate the maximum value size from the 'y' values in the 'traces' array
   const maxValueSize =
-    props.data.type == "area-stacked"
+    props.data.value.type == "area-stacked"
       ? tracess.reduce((sum: any, it: any) => {
           let max = it.y.reduce((max: any, it: any) => {
             if (!isNaN(it)) return Math.max(max, it);
@@ -423,7 +423,7 @@ export const convertPromQLData = (
     yTickText.push(formatUnitValue(getUnitValue(val)));
   }
   // result = result.map((it: any) => moment(it + "Z").toISOString(true))
-  const yAxisTickOptions = !props.data.config?.unit
+  const yAxisTickOptions = !props.data.value.config?.unit
     ? {}
     : { tickvals: yTickVals, ticktext: yTickText };
 
@@ -436,11 +436,11 @@ export const convertPromQLData = (
   
 
   let layout: any;
-  switch (props.data.type) {
+  switch (props.data.value.type) {
     case "metric":
       layout = {
       title: false,
-      showlegend: props.data.config?.show_legends,
+      showlegend: props.data.value.config?.show_legends,
       autosize: true,
       legend: {
         // bgcolor: "#f7f7f7",
@@ -462,7 +462,7 @@ export const convertPromQLData = (
     default:
       layout = {
       title: false,
-      showlegend: props.data.config?.show_legends,
+      showlegend: props.data.value.config?.show_legends,
       autosize: true,
       legend: {
         // bgcolor: "#f7f7f7",

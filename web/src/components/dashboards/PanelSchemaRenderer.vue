@@ -56,7 +56,7 @@ export default defineComponent({
     watch(data, async () => {
       console.log("PanelSchemaRenderer: new data received from the api, let's convert the data");
       console.log("PanelSchemaRenderer: data: ", data.value);
-      panelData.value = convertPanelData(props.panelSchema, data.value, store);
+      panelData.value = convertPanelData(newPanelSchema, data.value, store);
     });
 
     watch(()=>panelSchema?.value,async()=>{
