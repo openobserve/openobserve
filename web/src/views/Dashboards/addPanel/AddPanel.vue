@@ -58,7 +58,7 @@
             <div class="row" style="height: calc(100vh - 115px); overflow-y: auto; ">
               <div class="col">
                 <div class="layout-panel-container col scroll" style="height:100%;">
-                  <Layout />
+                  <DashboardQueryBuilder />
                   <q-separator />
                   <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables"
                     :selectedTimeDate="dashboardPanelData.meta.dateTime" @variablesData="variablesDataUpdated" />
@@ -116,7 +116,7 @@ import {
 } from "../../../utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import Layout from "../../../components/dashboards/addPanel/Layout.vue";
+import DashboardQueryBuilder from "../../../components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePicker from "../../../components/DateTimePicker.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
@@ -130,7 +130,7 @@ export default defineComponent({
   components: {
     ChartSelection,
     GetFields,
-    Layout,
+    DashboardQueryBuilder,
     DateTimePicker,
     ChartRender,
     DashboardErrorsComponent,
