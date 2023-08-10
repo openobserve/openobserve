@@ -9,7 +9,7 @@
             </div>
             <div>
                 <button class="button" :class="selectedButtonType === 'promql' ? 'selected' : ''"
-                    v-show="dashboardPanelData.data.fields.stream_type == 'metrics'" @click="onUpdateButton('promql')">
+                    v-show="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'" @click="onUpdateButton('promql')">
                     {{ t('panel.promQL') }}
                 </button>
             </div>
@@ -59,11 +59,11 @@ export default defineComponent({
             // set a variable to ignore updates for selectedButtonType
             ignoreSelectedButtonTypeUpdate.value = true;
 
-            if (dashboardPanelData.data.customQuery == false && dashboardPanelData.data.queryType == "sql") {
+            if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery == false && dashboardPanelData.data.queryType == "sql") {
                 selectedButtonType.value = "auto"
-            } else if (dashboardPanelData.data.customQuery == true && dashboardPanelData.data.queryType == "sql") {
+            } else if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery == true && dashboardPanelData.data.queryType == "sql") {
                 selectedButtonType.value = "custom-sql"
-            } else if (dashboardPanelData.data.customQuery == true && dashboardPanelData.data.queryType == "promql") {
+            } else if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery == true && dashboardPanelData.data.queryType == "promql") {
                 selectedButtonType.value = "promql"
             } else {
                 selectedButtonType.value = "auto"
@@ -87,7 +87,7 @@ export default defineComponent({
         })
 
         // when the data is loaded, initialize the selectedButtonType
-        watch(() => [dashboardPanelData.data.queryType, dashboardPanelData.data.customQuery], () => {
+        watch(() => [dashboardPanelData.data.queryType, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery], () => {
             initializeSelectedButtonType()
         })
 
@@ -118,8 +118,8 @@ export default defineComponent({
             dashboardPanelData.layout.showQueryBar = true
         };
 
-        watch(() => dashboardPanelData.data.fields.stream_type, () => {
-            if (dashboardPanelData.data.fields.stream_type != 'metrics' && selectedButtonType.value == 'promql'
+        watch(() => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type, () => {
+            if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type != 'metrics' && selectedButtonType.value == 'promql'
             ) {
                 selectedButtonType.value = "auto"
             }
@@ -129,23 +129,23 @@ export default defineComponent({
             window.dispatchEvent(new Event("resize"))
             if (!ignoreSelectedButtonTypeUpdate.value) {
                 if (selectedButtonType.value == "auto") {
-                    dashboardPanelData.data.customQuery = false;
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery = false;
                     dashboardPanelData.data.queryType = "sql";
                 }
                 else if (selectedButtonType.value == "custom-sql") {
-                    dashboardPanelData.data.customQuery = true;
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery = true;
                     dashboardPanelData.data.queryType = "sql";
                 }
                 else if (selectedButtonType.value == "promql") {
-                    dashboardPanelData.data.customQuery = true;
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery = true;
                     dashboardPanelData.data.queryType = "promql";
 
                     // set some defaults for the promql query
-                    dashboardPanelData.data.query = "";
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = "";
                     dashboardPanelData.data.type = 'line';
                 }
                 else {
-                    dashboardPanelData.data.customQuery = false;
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery = false;
                     dashboardPanelData.data.queryType = "sql";
                 }
             }
