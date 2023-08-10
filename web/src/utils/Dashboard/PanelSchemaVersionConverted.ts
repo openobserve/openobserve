@@ -1,5 +1,11 @@
 export function PanelSchemaVersionConverted(data: any) {
-  if(!data.version)data={...data,version:1};
+  if (
+    !data || (typeof data === "object" && Object.keys(data).length === 0)
+  ) {
+    return;
+  }
+  if(!data.version)
+  data = {...data,version:1};
   switch (data.version) {
     case 1:
       data = {
