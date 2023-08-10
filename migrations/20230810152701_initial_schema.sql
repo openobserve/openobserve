@@ -18,5 +18,5 @@ CREATE INDEX IF NOT EXISTS file_list_stream_idx
 CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx
     on file_list (stream, min_ts, max_ts);
 
-CREATE UNIQUE INDEX IF NOT EXISTS file_list_file_idx
+CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx
     on file_list (stream, date, file);
