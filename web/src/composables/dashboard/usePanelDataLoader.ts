@@ -1,4 +1,4 @@
-import { ref, watch, reactive, toRefs, onMounted, onUnmounted } from "vue";
+import { ref, watch, reactive, toRefs, onMounted, onUnmounted, nextTick } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 
@@ -21,7 +21,7 @@ export const usePanelDataLoader = (
   let controller: AbortController | null = null;
 
   const loadData = async () => {
-    console.log("loadData");
+    console.log("loadDataaaaaaaaaa",isVisible.value,isDirty.value);
     
     isDirty.value = false;
     const controller = new AbortController();
@@ -129,27 +129,11 @@ export const usePanelDataLoader = (
     }
   };
 
-  onMounted(() => {
-    console.log("usePanelDataLoader mounted",);
-
-    if (panelSchema.value.queries?.length && isVisible.value && isDirty.value) {
-      loadData();
-    }
-  });
 
   watch(
-    ()=>[panelSchema.value, selectedTimeObj],
-    async (
-      [newConfigs, newTimerange],
-      [oldConfigs, oldTimerange],
-      onInvalidate
-    ) => {
-      console.log(panelSchema,"panelSchema");
-      console.log("selectedTimeObj", selectedTimeObj);
-      console.log("usePanelDataLoader: schema changed");
-      console.log("usePanelDataLoader: query changed",{query:panelSchema.value.query});
-      console.log("onInvalidate", panelSchema.value.queries.length);
-      
+    ()=>[panelSchema?.value, selectedTimeObj?.value],
+    async () => {
+      isDirty.value=true;
       
       // TODO: check for query OR queries array for promql
       if (isVisible.value && isDirty.value && panelSchema.value.queries?.length) {   
@@ -238,17 +222,15 @@ console.log('dependentAvailableVariables: ',dependentAvailableVariables);
   const isDirty: any = ref(true);
   const isVisible: any = ref(false);
 
+ 
+
   watch(()=>isVisible.value, async () => {
-    console.log("loaddata check",panelSchema.value.queries.length, isVisible.value, isDirty.value);
-      if (isVisible.value && isDirty.value) {
+    console.log("loadDataaaaaaaaaa 3",isVisible.value,isDirty.value);
+    
+      if (isVisible.value && isDirty.value && (panelSchema.value.queries?.length)) {
         loadData();
       }
   })
-  watch(()=>panelSchema?.value?.queries, async () => {
-    if (isVisible.value && isDirty.value && (panelSchema.value.queries?.length)) {   
-      loadData();
-  }})
-
   
   // remove intersection observer
   onUnmounted(() => {
@@ -293,18 +275,24 @@ console.log('dependentAvailableVariables: ',dependentAvailableVariables);
       }
   }, { deep: true });
 
-  const handleIntersection = (entries:any) => {
-      isVisible.value = entries[0].isIntersecting;
-    }
 
-  onMounted(async () => {
-        observer = new IntersectionObserver(handleIntersection, {
-          root: null,
-          rootMargin: '0px',
-          threshold: 0.1 // Adjust as needed
-        });
-        observer.observe(chartPanelRef.value);
-  });
+  const handleIntersection = async(entries:any) => { 
+    // console.log("entries",entries.length); 
+    await nextTick();  
+    isVisible.value = entries[0].isIntersecting;
+  }
+  
+onMounted(async () => {       
+      observer = new IntersectionObserver(handleIntersection, {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1 // Adjust as needed
+      });
+      await nextTick();  
+
+      observer.observe(chartPanelRef.value);
+});
+
 
   return {
     ...toRefs(state),
