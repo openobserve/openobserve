@@ -70,7 +70,7 @@
                   </div>
                   <DashboardErrorsComponent :errors="errorData" />
                   <q-separator />
-                  <SearchBar />
+                  <DashboardQueryEditor />
                 </div>
 
               </div>
@@ -117,11 +117,11 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import Layout from "../../../components/dashboards/addPanel/Layout.vue";
-import SearchBar from "../../../components/dashboards/SearchBar.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePicker from "../../../components/DateTimePicker.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue"
+import DashboardQueryEditor from "../../../components/dashboards/addPanel/DashboardQueryEditor.vue"
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 
@@ -131,7 +131,6 @@ export default defineComponent({
     ChartSelection,
     GetFields,
     Layout,
-    SearchBar,
     DateTimePicker,
     ChartRender,
     DashboardErrorsComponent,
@@ -139,6 +138,7 @@ export default defineComponent({
     ConfigPanel,
     VariablesValueSelector,
     PanelSchemaRenderer,
+    DashboardQueryEditor
   },
   setup() {
     // This will be used to copy the chart data to the chart renderer component
