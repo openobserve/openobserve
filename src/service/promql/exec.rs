@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::common::meta::stream::ScanStats;
+use crate::service::promql::{
+    micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK,
+};
 use ahash::AHashMap as HashMap;
 use datafusion::error::Result;
 use promql_parser::parser::EvalStmt;
+use std::sync::Mutex;
 use std::{
     sync::Arc,
     time::{Duration, SystemTime},
 };
 use tokio::sync::RwLock;
-use std::sync::Mutex;
-use crate::common::meta::stream::ScanStats;
-use crate::service::promql::{
-    micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK,
-};
 
 #[derive(Clone)]
 pub struct Query {
@@ -47,13 +47,13 @@ pub struct Query {
 impl std::fmt::Debug for Query {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Query")
-         .field("org_id", &self.org_id)
-         .field("start", &self.start)
-         .field("end", &self.end)
-         .field("interval", &self.interval)
-         .field("lookback_delta", &self.lookback_delta)
-         .field("eval_stmt", &self.eval_stmt)
-         .finish()
+            .field("org_id", &self.org_id)
+            .field("start", &self.start)
+            .field("end", &self.end)
+            .field("interval", &self.interval)
+            .field("lookback_delta", &self.lookback_delta)
+            .field("eval_stmt", &self.eval_stmt)
+            .finish()
     }
 }
 

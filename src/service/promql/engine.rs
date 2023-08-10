@@ -153,77 +153,96 @@ impl Engine {
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
             PromExpr::Subquery(expr) => {
                 // Tacklet offset for the
-                let mut ctx = self.inner_ctx.clone();
-                let mut offset_modifier = 0;
-                if let Some(offset) = expr.offset.clone() {
-                    match offset {
-                        Offset::Pos(off) => {
-                            offset_modifier = micros(off);
-                        }
-                        Offset::Neg(off) => {
-                            offset_modifier = -micros(off);
-                        }
-                    }
-                }
-                let time = self.time + offset_modifier;
-                if let Some(step) = expr.step {
-                    if step.as_secs() != 0 {
-                        ctx.interval = micros(step);
-                    } else {
-                        ctx.interval = micros(expr.range);
-                    }
-                };
-              
-                println!("************ lets see the context everytime *************");
-                println!("************ ctx {:?} *************", ctx);
-                println!("************ original_context {:?} *************", self.inner_ctx);
-                let mut engine = super::Engine::new(ctx.clone(), ctx.start);
-                // let val = engine.exec_expr(&expr.expr).await?;
-                let (val, result_type_exec) = engine.exec(&expr.expr).await?;
-                println!("******************result_type_exec {:?} ********************", result_type_exec);
-                let time_window = Some(TimeWindow::new(time, expr.range));
-                let matrix = match val{
-                    Value::Vector(v) => {
-                        println!("********** LEN OF VECTOR : {:?}", v.len());
-                        v.iter()
-                        .map(|v| {
-                            RangeValue{
-                                labels: v.labels.to_owned(),
-                                samples: vec![v.sample],
-                                time_window: time_window.clone()
-                            }
-                        }
-                        )
-                        .collect()
-                    },
-                    Value::Instant(v) => {
-                        vec![RangeValue{
-                            labels: v.labels.to_owned(),
-                            samples: vec![v.sample],
-                            time_window
-                        }]
-                    },
-                    Value::Range(v) => vec![v],
-                    Value::Matrix(vs) => vs,
-                    Value::Sample(s) => vec![RangeValue{
-                        labels: Labels::default(),
-                        samples: vec![s],
-                        time_window
-                    }],
-                    Value::Float(val) => vec![RangeValue{
-                        labels: Labels::default(),
-                        samples: vec![Sample::new(self.time, val)],
-                        time_window
-                    }],
-                    v => {
-                        return Err(DataFusionError::NotImplemented(format!(
-                            "Unsupported subquery, the return value should have been a matrix but got {:?}",
-                            v.get_type()
-                        )))
-                    }
+                // let mut ctx = self.inner_ctx.clone();
+                // let mut offset_modifier = 0;
+                // if let Some(offset) = expr.offset.clone() {
+                //     match offset {
+                //         Offset::Pos(off) => {
+                //             offset_modifier = micros(off);
+                //         }
+                //         Offset::Neg(off) => {
+                //             offset_modifier = -micros(off);
+                //         }
+                //     }
+                // }
+                // let time = self.time + offset_modifier;
+                // if let Some(step) = expr.step {
+                //     if step.as_secs() != 0 {
+                //         ctx.interval = micros(step);
+                //     } else {
+                //         ctx.interval = micros(expr.range);
+                //     }
+                // };
+
+                // expr.range
+                // step
+
+                // println!("************ lets see the context everytime *************");
+                // println!("************ ctx {:?} *************", ctx);
+                // println!("************ original_context {:?} *************", self.inner_ctx);
+                // let mut engine = super::Engine::new(ctx.clone(), ctx.start);
+                // // let val = engine.exec_expr(&expr.expr).await?;
+                // let (val, result_type_exec) = engine.exec(&expr.expr).await?;
+                // println!("******************result_type_exec {:?} ********************", result_type_exec);
+
+                let val = self.exec_expr(&expr.expr).await?;
+                println!("******************Result {:?} ********************", val);
+                use promql_parser::label::Matchers;
+                use promql_parser::parser::VectorSelector;
+
+                let vs = VectorSelector {
+                    name: Some(String::from("demo_batch_last_success_timestamp_seconds")),
+                    offset: expr.offset.clone(),
+                    at: expr.at.clone(),
+                    matchers: Matchers::empty(),
                 };
 
-                Value::Matrix(matrix)
+                let result = self.eval_matrix_selector(&vs, expr.range).await.unwrap();
+                Value::Matrix(result)
+                // let time_window = Some(TimeWindow::new(self.time, expr.range));
+
+                // let matrix = match val{
+                //     Value::Vector(v) => {
+                //         println!("********** LEN OF VECTOR : {:?}", v.len());
+                //         v.iter()
+                //         .map(|v| {
+                //             RangeValue{
+                //                 labels: v.labels.to_owned(),
+                //                 samples: vec![v.sample],
+                //                 time_window: time_window.clone()
+                //             }
+                //         }
+                //         )
+                //         .collect()
+                //     },
+                //     Value::Instant(v) => {
+                //         vec![RangeValue{
+                //             labels: v.labels.to_owned(),
+                //             samples: vec![v.sample],
+                //             time_window
+                //         }]
+                //     },
+                //     Value::Range(v) => vec![v],
+                //     Value::Matrix(vs) => vs,
+                //     Value::Sample(s) => vec![RangeValue{
+                //         labels: Labels::default(),
+                //         samples: vec![s],
+                //         time_window
+                //     }],
+                //     Value::Float(val) => vec![RangeValue{
+                //         labels: Labels::default(),
+                //         samples: vec![Sample::new(self.time, val)],
+                //         time_window
+                //     }],
+                //     v => {
+                //         return Err(DataFusionError::NotImplemented(format!(
+                //             "Unsupported subquery, the return value should have been a matrix but got {:?}",
+                //             v.get_type()
+                //         )))
+                //     }
+                // };
+
+                // Value::Matrix(matrix)
             }
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
@@ -634,8 +653,14 @@ impl Engine {
             "year",
         ]);
 
-        println!("***************************************** THE ARGS ARE {:?}", args);
-        println!("***************************************** THE ARGS LEN ARE {:?}", args.len());
+        println!(
+            "***************************************** THE ARGS ARE {:?}",
+            args
+        );
+        println!(
+            "***************************************** THE ARGS LEN ARE {:?}",
+            args.len()
+        );
         let input = match functions_without_args.contains(func.name) {
             true => match args.len() {
                 0 => {

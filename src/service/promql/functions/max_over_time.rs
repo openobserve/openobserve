@@ -28,11 +28,9 @@ fn exec(data: &RangeValue) -> Option<f64> {
 
     println!("*************** RAW DATA *********************");
     println!("*********************{:?}", data);
-    Some(
-        data.samples
-            .iter()
-            .map(|s| s.value)
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap(),
-    )
+
+    data.samples
+        .iter()
+        .map(|s| s.value)
+        .max_by(|a, b| a.partial_cmp(b).unwrap())
 }
