@@ -277,8 +277,7 @@ console.log('dependentAvailableVariables: ',dependentAvailableVariables);
 
 
   const handleIntersection = async(entries:any) => { 
-    // console.log("entries",entries.length); 
-    await nextTick();  
+    // console.log("entries",entries[0]); 
     isVisible.value = entries[0].isIntersecting;
   }
   
@@ -288,7 +287,6 @@ onMounted(async () => {
         rootMargin: '0px',
         threshold: 0.1 // Adjust as needed
       });
-      await nextTick();  
 
       observer.observe(chartPanelRef.value);
 });

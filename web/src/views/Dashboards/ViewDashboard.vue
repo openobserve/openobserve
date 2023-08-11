@@ -46,7 +46,7 @@
     <div class="displayDiv">
       <grid-layout v-if="currentDashboardData.data.panels?.length > 0" v-model:layout.sync="currentDashboardData.data.layouts" :col-num="12" :row-height="30"
         :is-draggable="draggable" :is-resizable="draggable" :vertical-compact="true" :autoSize="true"
-        :restore-on-drag="true" :use-css-transforms="true">
+        :restore-on-drag="true" :use-css-transforms="false">
         <grid-item class="plotlyBackground" v-for="item in currentDashboardData.data.panels" :key="item.id"
           :x="getPanelLayout(currentDashboardData.data.layouts, item.id, 'x')" :y="getPanelLayout(currentDashboardData.data.layouts, item.id, 'y')"
           :w="getPanelLayout(currentDashboardData.data.layouts, item.id, 'w')" :h="getPanelLayout(currentDashboardData.data.layouts, item.id, 'h')"
