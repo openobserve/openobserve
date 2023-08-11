@@ -153,39 +153,39 @@ impl Engine {
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
             PromExpr::Subquery(expr) => {
                 // Tacklet offset for the
-                // let mut ctx = self.inner_ctx.clone();
-                // let mut offset_modifier = 0;
-                // if let Some(offset) = expr.offset.clone() {
-                //     match offset {
-                //         Offset::Pos(off) => {
-                //             offset_modifier = micros(off);
-                //         }
-                //         Offset::Neg(off) => {
-                //             offset_modifier = -micros(off);
-                //         }
-                //     }
-                // }
+                let mut ctx = self.inner_ctx.clone();
+                let mut offset_modifier = 0;
+                if let Some(offset) = expr.offset.clone() {
+                    match offset {
+                        Offset::Pos(off) => {
+                            offset_modifier = micros(off);
+                        }
+                        Offset::Neg(off) => {
+                            offset_modifier = -micros(off);
+                        }
+                    }
+                }
                 // let time = self.time + offset_modifier;
-                // if let Some(step) = expr.step {
-                //     if step.as_secs() != 0 {
-                //         ctx.interval = micros(step);
-                //     } else {
-                //         ctx.interval = micros(expr.range);
-                //     }
-                // };
+                if let Some(step) = expr.step {
+                    if step.as_secs() != 0 {
+                        ctx.interval = micros(step);
+                    } else {
+                        ctx.interval = micros(expr.range);
+                    }
+                };
 
                 // expr.range
                 // step
 
-                // println!("************ lets see the context everytime *************");
-                // println!("************ ctx {:?} *************", ctx);
-                // println!("************ original_context {:?} *************", self.inner_ctx);
-                // let mut engine = super::Engine::new(ctx.clone(), ctx.start);
-                // // let val = engine.exec_expr(&expr.expr).await?;
-                // let (val, result_type_exec) = engine.exec(&expr.expr).await?;
-                // println!("******************result_type_exec {:?} ********************", result_type_exec);
+                println!("************ lets see the context everytime *************");
+                println!("************ ctx {:?} *************", ctx);
+                println!("************ original_context {:?} *************", self.inner_ctx);
+                let mut engine = super::Engine::new(ctx.clone(), ctx.start);
+                // let val = engine.exec_expr(&expr.expr).await?;
+                let (val, result_type_exec) = engine.exec(&expr.expr).await?;
+                println!("******************result_type_exec {:?} ********************", result_type_exec);
 
-                let val = self.exec_expr(&expr.expr).await?;
+                // let val = self.exec_expr(&expr.expr).await?;
                 println!("******************Result {:?} ********************", val);
                 use promql_parser::label::Matchers;
                 use promql_parser::parser::VectorSelector;
