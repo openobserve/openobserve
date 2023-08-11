@@ -50,6 +50,8 @@ pub enum Error {
     NotImplemented,
     #[error("Unknown error")]
     Unknown,
+    #[error("DuckDBError# {0}")]
+    DuckDBError(#[from] duckdb::Error),
 }
 
 #[derive(ThisError, Debug)]

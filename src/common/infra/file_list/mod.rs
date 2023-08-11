@@ -38,6 +38,7 @@ pub fn connect() -> Box<dyn FileList> {
         "sled" => Box::<sled::SledFileList>::default(),
         "sqlite" => Box::<sqlite::SqliteFileList>::default(),
         "dynamo" => Box::<dynamo::DynamoFileList>::default(),
+        "duckdb" => Box::<duckdb::DuckDBFileList>::default(),
         _ => Box::<sled::SledFileList>::default(),
     }
 }
