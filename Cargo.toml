@@ -75,7 +75,7 @@ cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
 datafusion = { version = "28", features = ["simd"] }
-duckdb = { version = "0.8.1",features = ["bundled","httpfs","json","parquet","r2d2"] }
+duckdb = { version = "0.8.1", features = ["bundled", "httpfs", "json", "parquet", "r2d2"] }
 arrow = { version = "43", features = ["simd", "ipc_compression"] }
 arrow-schema = { version = "43", features = ["serde"] }
 parquet = { version = "43", features = ["arrow", "async"] }
