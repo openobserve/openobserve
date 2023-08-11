@@ -32,7 +32,8 @@
                   No Options Available
                 </q-item-section>
               </q-item>
-            </template></q-select>
+            </template>
+        </q-select>
       </div>
     </div>
   </div>
@@ -158,14 +159,14 @@ export default defineComponent({
                         return obj;
                     }
                     case "custom": {
-                        obj["options"] = it.options;
+                        obj["options"] = it?.options;
                         let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
                         // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
                         if (oldVariableObjectSelectedValue) {
                             obj.value = oldVariableObjectSelectedValue.value;
                         }
                         else {
-                            obj.value = obj.options[0].value || "";
+                            obj.value = obj.options[0]?.value || "";
                         }
                         return obj;
                         // break;
