@@ -9,7 +9,7 @@ export const convertSQLData = (
   console.log("searchQueryData", searchQueryDataTemp);
   console.log("panelSchema", panelSchema);
   const props = {
-    data: panelSchema,
+    data: panelSchema.value,
     width: 6,
   };
 
@@ -17,23 +17,26 @@ export const convertSQLData = (
     data: searchQueryDataTemp,
   };
 
+  console.log("data after conversion:", props);
+  console.log("data after conversion:", searchQueryData);
+
   //   const store = useStore();
   // const plotRef: any = ref(null);
   // get the x axis key
   const getXAxisKeys = () => {
-    console.log("props.data.fields.x", props.data?.fields?.x);
+    console.log("props.data?.queries[0]?.fields.x", props.data?.queries[0]?.fields?.x);
 
-    return props.data?.fields?.x?.length
-      ? props.data.fields?.x.map((it: any) => it.alias)
+    return props.data?.queries[0]?.fields?.x?.length
+      ? props.data?.queries[0]?.fields?.x.map((it: any) => it.alias)
       : [];
   };
 
   // get the y axis key
   const getYAxisKeys = () => {
-    console.log("props.data.fields.y", props.data?.fields?.y);
+    console.log("props.data?.queries[0]?.fields.y", props.data?.queries[0]?.fields?.y);
 
-    return props.data?.fields?.y?.length
-      ? props.data.fields?.y.map((it: any) => it.alias)
+    return props.data?.queries[0]?.fields?.y?.length
+      ? props.data?.queries[0]?.fields?.y.map((it: any) => it.alias)
       : [];
   };
 
@@ -139,9 +142,9 @@ export const convertSQLData = (
     switch (props.data.type) {
       case "bar": {
         const xaxis: any = {
-          title: props.data.fields?.x[0]?.label,
+          title: props.data?.queries[0]?.fields?.x[0]?.label,
           tickangle:
-            props.data?.fields?.x[0]?.aggregationFunction == "histogram"
+            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
               ? 0
               : -20,
           automargin: true,
@@ -149,14 +152,14 @@ export const convertSQLData = (
 
         const yaxis: any = {
           title:
-            props.data.fields?.y?.length == 1
-              ? props.data.fields.y[0]?.label
+            props.data?.queries[0]?.fields?.y?.length == 1
+              ? props.data?.queries[0]?.fields.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
         };
 
-        if (props.data.fields?.x.length == 1) {
+        if (props.data?.queries[0]?.fields?.x.length == 1) {
           (xaxis["tickmode"] = "array"),
             (xaxis["tickvals"] = xAxisDataWithTicks),
             (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
@@ -171,9 +174,9 @@ export const convertSQLData = (
       }
       case "line": {
         const xaxis: any = {
-          title: props.data.fields?.x[0]?.label,
+          title: props.data?.queries[0]?.fields?.x[0]?.label,
           tickangle:
-            props.data?.fields?.x[0]?.aggregationFunction == "histogram"
+            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
               ? 0
               : -20,
           automargin: true,
@@ -182,14 +185,14 @@ export const convertSQLData = (
 
         const yaxis: any = {
           title:
-            props.data.fields?.y?.length == 1
-              ? props.data.fields?.y[0]?.label
+            props.data?.queries[0]?.fields?.y?.length == 1
+              ? props.data?.queries[0]?.fields?.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
         };
 
-        if (props.data.fields?.x.length == 1) {
+        if (props.data?.queries[0]?.fields?.x.length == 1) {
           (xaxis["tickmode"] = "array"),
             (xaxis["tickvals"] = xAxisDataWithTicks),
             (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
@@ -203,9 +206,9 @@ export const convertSQLData = (
       }
       case "scatter": {
         const xaxis: any = {
-          title: props.data.fields?.x[0]?.label,
+          title: props.data?.queries[0]?.fields?.x[0]?.label,
           tickangle:
-            props.data?.fields?.x[0]?.aggregationFunction == "histogram"
+            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
               ? 0
               : -20,
           automargin: true,
@@ -213,14 +216,14 @@ export const convertSQLData = (
 
         const yaxis: any = {
           title:
-            props.data.fields?.y?.length == 1
-              ? props.data.fields?.y[0]?.label
+            props.data?.queries[0]?.fields?.y?.length == 1
+              ? props.data?.queries[0]?.fields?.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
         };
 
-        if (props.data.fields?.x.length == 1) {
+        if (props.data?.queries[0]?.fields?.x.length == 1) {
           (xaxis["tickmode"] = "array"),
             (xaxis["tickvals"] = xAxisDataWithTicks),
             (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
@@ -236,7 +239,7 @@ export const convertSQLData = (
       case "pie":
         return {
           xaxis: {
-            title: props.data.fields?.x[0]?.label,
+            title: props.data?.queries[0]?.fields?.x[0]?.label,
             tickangle: -20,
             automargin: true,
           },
@@ -245,8 +248,8 @@ export const convertSQLData = (
             tickvals: xAxisDataWithTicks,
             ticktext: textformat(xAxisDataWithTicks),
             title:
-              props.data.fields?.y?.length == 1
-                ? props.data.fields?.y[0]?.label
+              props.data?.queries[0]?.fields?.y?.length == 1
+                ? props.data?.queries[0]?.fields?.y[0]?.label
                 : "",
             automargin: true,
           },
@@ -254,7 +257,7 @@ export const convertSQLData = (
       case "donut":
         return {
           xaxis: {
-            title: props.data.fields?.x[0]?.label,
+            title: props.data?.queries[0]?.fields?.x[0]?.label,
             tickangle: -20,
             automargin: true,
           },
@@ -263,15 +266,15 @@ export const convertSQLData = (
             tickvals: xAxisDataWithTicks,
             ticktext: textformat(xAxisDataWithTicks),
             title:
-              props.data.fields?.y?.length == 1
-                ? props.data.fields?.y[0]?.label
+              props.data?.queries[0]?.fields?.y?.length == 1
+                ? props.data?.queries[0]?.fields?.y[0]?.label
                 : "",
             automargin: true,
           },
         };
       case "h-bar": {
         const xaxis: any = {
-          title: props.data.fields?.y[0]?.label,
+          title: props.data?.queries[0]?.fields?.y[0]?.label,
           tickangle: -20,
           automargin: true,
           fixedrange: true,
@@ -279,13 +282,13 @@ export const convertSQLData = (
 
         const yaxis: any = {
           title:
-            props.data.fields?.x?.length == 1
-              ? props.data.fields?.x[0]?.label
+            props.data?.queries[0]?.fields?.x?.length == 1
+              ? props.data?.queries[0]?.fields?.x[0]?.label
               : "",
           automargin: true,
         };
 
-        if (props.data.fields?.x.length == 1) {
+        if (props.data?.queries[0]?.fields?.x.length == 1) {
           (yaxis["tickmode"] = "array"),
             (yaxis["tickvals"] = xAxisDataWithTicks),
             (yaxis["ticktext"] = textformat(xAxisDataWithTicks));
@@ -301,9 +304,9 @@ export const convertSQLData = (
       }
       case "area": {
         const xaxis: any = {
-          title: props.data.fields?.x[0]?.label,
+          title: props.data?.queries[0]?.fields?.x[0]?.label,
           tickangle:
-            props.data?.fields?.x[0]?.aggregationFunction == "histogram"
+            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
               ? 0
               : -20,
           automargin: true,
@@ -311,14 +314,14 @@ export const convertSQLData = (
 
         const yaxis: any = {
           title:
-            props.data.fields?.y?.length == 1
-              ? props.data.fields?.y[0]?.label
+            props.data?.queries[0]?.fields?.y?.length == 1
+              ? props.data?.queries[0]?.fields?.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
         };
 
-        if (props.data.fields?.x.length == 1) {
+        if (props.data?.queries[0]?.fields?.x.length == 1) {
           (xaxis["tickmode"] = "array"),
             (xaxis["tickvals"] = xAxisDataWithTicks),
             (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
@@ -333,9 +336,9 @@ export const convertSQLData = (
       }
       case "area-stacked": {
         const xaxis: any = {
-          title: props.data.fields?.x[0]?.label,
+          title: props.data?.queries[0]?.fields?.x[0]?.label,
           tickangle:
-            props.data?.fields?.x[0]?.aggregationFunction == "histogram"
+            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
               ? 0
               : -20,
           automargin: true,
@@ -343,8 +346,8 @@ export const convertSQLData = (
 
         const yaxis: any = {
           title:
-            props.data.fields?.y?.length == 1
-              ? props.data.fields?.y[0]?.label
+            props.data?.queries[0]?.fields?.y?.length == 1
+              ? props.data?.queries[0]?.fields?.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
@@ -355,9 +358,9 @@ export const convertSQLData = (
         // format value only for without timestamp
         // stacked chart is alwayes stacked with first field value
         if (
-          props.data.fields?.x.length &&
-          props.data.fields?.x[0].aggregationFunction != "histogram" &&
-          !props.data.fields?.x[0].column !=
+          props.data?.queries[0]?.fields?.x.length &&
+          props.data?.queries[0]?.fields?.x[0].aggregationFunction != "histogram" &&
+          !props.data?.queries[0]?.fields?.x[0].column !=
             store.state.zoConfig.timestamp_column
         ) {
           (xaxis["tickmode"] = "array"),
@@ -375,9 +378,9 @@ export const convertSQLData = (
       }
       case "stacked": {
         const xaxis: any = {
-          title: props.data.fields?.x[0]?.label,
+          title: props.data?.queries[0]?.fields?.x[0]?.label,
           tickangle:
-            props.data?.fields?.x[0]?.aggregationFunction == "histogram"
+            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
               ? 0
               : -20,
           automargin: true,
@@ -385,8 +388,8 @@ export const convertSQLData = (
 
         const yaxis: any = {
           title:
-            props.data.fields?.y?.length == 1
-              ? props.data.fields?.y[0]?.label
+            props.data?.queries[0]?.fields?.y?.length == 1
+              ? props.data?.queries[0]?.fields?.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
@@ -397,9 +400,9 @@ export const convertSQLData = (
         // format value only for without timestamp
         // stacked chart is alwayes stacked with first field value
         if (
-          props.data.fields?.x.length &&
-          props.data.fields?.x[0].aggregationFunction != "histogram" &&
-          !props.data.fields?.x[0].column !=
+          props.data?.queries[0]?.fields?.x.length &&
+          props.data?.queries[0]?.fields?.x[0].aggregationFunction != "histogram" &&
+          !props.data?.queries[0]?.fields?.x[0].column !=
             store.state.zoConfig.timestamp_column
         ) {
           (xaxis["tickmode"] = "array"),
@@ -419,14 +422,14 @@ export const convertSQLData = (
         return {
           barmode: "stack",
           xaxis: {
-            title: props.data.fields?.y[0]?.label,
+            title: props.data?.queries[0]?.fields?.y[0]?.label,
             tickangle: -20,
             automargin: true,
           },
           yaxis: {
             title:
-              props.data.fields?.x?.length == 1
-                ? props.data.fields?.x[0]?.label
+              props.data?.queries[0]?.fields?.x?.length == 1
+                ? props.data?.queries[0]?.fields?.x[0]?.label
                 : "",
             automargin: true,
           },
@@ -443,17 +446,17 @@ export const convertSQLData = (
             tickmode: "array",
             tickvals: xAxisDataWithTicks,
             ticktext: textformat(xAxisDataWithTicks),
-            title: props.data.fields?.x[0]?.label,
+            title: props.data?.queries[0]?.fields?.x[0]?.label,
             tickangle:
-              props.data?.fields?.x[0]?.aggregationFunction == "histogram"
+              props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
                 ? 0
                 : -20,
             automargin: true,
           },
           yaxis: {
             title:
-              props.data.fields?.y?.length == 1
-                ? props.data.fields?.y[0]?.label
+              props.data?.queries[0]?.fields?.y?.length == 1
+                ? props.data?.queries[0]?.fields?.y[0]?.label
                 : "",
             automargin: true,
             fixedrange: true,
@@ -530,12 +533,12 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data.fields?.y.find((it: any) => it.alias == key)?.label,
+          name: props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.label,
           ...getPropsByChartTypeForTraces(),
           showlegend: props.data.config?.show_legends,
           marker: {
             color:
-              props.data.fields?.y.find((it: any) => it.alias == key)?.color ||
+              props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.color ||
               "#5960b2",
             opacity: 0.8,
           },
@@ -564,12 +567,12 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data.fields?.y.find((it: any) => it.alias == key)?.label,
+          name: props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.label,
           ...getPropsByChartTypeForTraces(),
           showlegend: props.data.config?.show_legends,
           marker: {
             color:
-              props.data.fields?.y.find((it: any) => it.alias == key)?.color ||
+              props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.color ||
               "#5960b2",
             opacity: 0.8,
           },
@@ -598,12 +601,12 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data.fields?.y.find((it: any) => it.alias == key)?.label,
+          name: props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.label,
           ...getPropsByChartTypeForTraces(),
           showlegend: props.data.config?.show_legends,
           marker: {
             color:
-              props.data.fields?.y.find((it: any) => it.alias == key)?.color ||
+              props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.color ||
               "#5960b2",
             opacity: 0.8,
           },
@@ -631,12 +634,12 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data.fields?.y.find((it: any) => it.alias == key)?.label,
+          name: props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.label,
           ...getPropsByChartTypeForTraces(),
           showlegend: props.data.config?.show_legends,
           marker: {
             color:
-              props.data.fields?.y.find((it: any) => it.alias == key)?.color ||
+              props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.color ||
               "#5960b2",
             opacity: 0.8,
           },
@@ -706,7 +709,7 @@ export const convertSQLData = (
       traces = stackedXAxisUniqueValue?.map((key: any) => {
         console.log(
           "--inside trace--",
-          props.data.fields?.x.find((it: any) => it.alias == key)
+          props.data?.queries[0]?.fields?.x.find((it: any) => it.alias == key)
         );
 
         const trace = {
@@ -750,7 +753,7 @@ export const convertSQLData = (
       traces = stackedXAxisUniqueValue?.map((key: any) => {
         console.log(
           "--inside trace--",
-          props.data.fields?.x.find((it: any) => it.alias == key)
+          props.data?.queries[0]?.fields?.x.find((it: any) => it.alias == key)
         );
 
         const trace = {
