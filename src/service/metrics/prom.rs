@@ -111,31 +111,34 @@ pub async fn remote_write(
 
     // parse timeseries
     let mut first_line = true;
-    for mut event in request.timeseries {
+    for event in request.timeseries {
         // get labels
         let mut replica_label = String::new();
 
-        let mut labels: FxIndexMap<String, String> = event
-            .labels
-            .drain(..)
-            .map(|label| (label.name, label.value))
-            .collect();
-
-        let metric_name = match labels.get(NAME_LABEL) {
-            Some(v) => v.clone(),
+        let metric_name = match labels_value(&event.labels, NAME_LABEL) {
+            Some(v) => v,
             None => continue,
         };
 
-        let replica_label_value = labels.remove(&CONFIG.prom.ha_replica_label);
-        let cluster_name_value = labels.remove(&CONFIG.prom.ha_cluster_label);
         if !has_entry {
-            if replica_label_value.is_some() {
-                replica_label = replica_label_value.unwrap();
-            }
-            if cluster_name.is_empty() && cluster_name_value.is_some() {
-                cluster_name = format!("{}/{}", org_id, cluster_name_value.unwrap());
+            if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_replica_label) {
+                replica_label = v;
+            };
+            if cluster_name.is_empty() {
+                if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_cluster_label) {
+                    cluster_name = format!("{}/{}", org_id, v);
+                }
             }
         }
+        let labels: FxIndexMap<String, String> = event
+            .labels
+            .iter()
+            .filter(|label| {
+                label.name != CONFIG.prom.ha_replica_label
+                    && label.name != CONFIG.prom.ha_cluster_label
+            })
+            .map(|label| (label.name.clone(), label.value.clone()))
+            .collect();
 
         let buf = metric_data_map.entry(metric_name.to_owned()).or_default();
 
@@ -326,6 +329,7 @@ pub async fn remote_write(
             log::warn!("stream [{stream_name}] is being deleted");
             continue;
         }
+
         let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
             details.partition_time_level
         } else {
@@ -746,8 +750,8 @@ fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
 
 async fn prom_ha_handler(
     has_entry: bool,
-    cluster_name: &String,
-    replica_label: &String,
+    cluster_name: &str,
+    replica_label: &str,
     last_received: i64,
     election_interval: i64,
 ) -> bool {
@@ -795,10 +799,17 @@ async fn prom_ha_handler(
     let mut replica_list = METRIC_CLUSTER_MAP
         .entry(cluster_name.to_owned())
         .or_default();
-    if !replica_list.contains(replica_label) {
+    if !replica_list.contains(&replica_label.to_string()) {
         replica_list.push(replica_label.to_owned());
         let _ = db::metrics::set_prom_cluster_info(cluster_name, replica_list.to_vec()).await;
     }
 
     _accept_record
+}
+
+fn labels_value(labels: &[prometheus::Label], name: &str) -> Option<String> {
+    labels
+        .binary_search_by_key(&name, |label| label.name.as_str())
+        .ok()
+        .map(|index| labels[index].value.clone())
 }

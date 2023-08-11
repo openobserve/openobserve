@@ -191,6 +191,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             stream_schema_map.insert(stream_name.clone(), schema);
         }
 
+        // write into buffer
         if !stream_partitioning_map.contains_key(&stream_name) {
             let partition_det = crate::service::ingestion::get_stream_partition_keys(
                 &stream_name,
