@@ -147,6 +147,14 @@ export default defineComponent({
                             }
                         })
                         .catch((err: any) => {
+                            obj.isLoading = false;
+
+                            variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
+
+                            // triggers rerendering in the current component
+                            variablesData.values[index] = JSON.parse(JSON.stringify(obj))
+
+                            emitVariablesData();
                             return obj;
                         });
                     }
