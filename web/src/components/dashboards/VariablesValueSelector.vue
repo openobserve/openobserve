@@ -24,8 +24,16 @@
           outlined></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
-        <q-select style="min-width: 150px;" outlined dense v-model="item.value" :options="item.options" map-options filled borderless
-          :label="item.label || item.name" option-value="value" option-label="label" emit-value></q-select>
+        <q-select style="min-width: 150px;" outlined dense v-model="item.value" :display-value="item.value ? item.value : '(No Options Available)'" :options="item.options" map-options stack-label filled borderless
+          :label="item.label || item.name" option-value="value" option-label="label" emit-value>
+          <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-italic text-grey">
+                  No Options Available
+                </q-item-section>
+              </q-item>
+            </template>
+        </q-select>
       </div>
     </div>
   </div>
@@ -129,10 +137,24 @@ export default defineComponent({
                                 return obj;
                             }
                             else {
+                                variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
+
+                                // triggers rerendering in the current component
+                                variablesData.values[index] = JSON.parse(JSON.stringify(obj))
+
+                                emitVariablesData();
                                 return obj;
                             }
                         })
                         .catch((err: any) => {
+                            obj.isLoading = false;
+
+                            variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
+
+                            // triggers rerendering in the current component
+                            variablesData.values[index] = JSON.parse(JSON.stringify(obj))
+
+                            emitVariablesData();
                             return obj;
                         });
                     }
@@ -145,14 +167,14 @@ export default defineComponent({
                         return obj;
                     }
                     case "custom": {
-                        obj["options"] = it.options;
+                        obj["options"] = it?.options;
                         let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
                         // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
                         if (oldVariableObjectSelectedValue) {
                             obj.value = oldVariableObjectSelectedValue.value;
                         }
                         else {
-                            obj.value = obj.options[0].value || "";
+                            obj.value = obj.options[0]?.value || "";
                         }
                         return obj;
                         // break;
