@@ -14,7 +14,7 @@
 
 use async_once::AsyncOnce;
 use async_trait::async_trait;
-use chrono::{DateTime, Datelike, TimeZone, Utc};
+use chrono::Utc;
 use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, Pool, Row, Sqlite, SqlitePool};
 use std::str::FromStr;
 
@@ -22,10 +22,14 @@ use crate::common::infra::{
     config::CONFIG,
     errors::{Error, Result},
 };
-use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
+use crate::common::meta::{
+    common::{FileKey, FileMeta},
+    stream::PartitionTimeLevel,
+    StreamType,
+};
 
 lazy_static! {
-    pub static ref CLIENT: AsyncOnce<Pool<Sqlite>> = AsyncOnce::new(async { connect().await });
+    static ref CLIENT: AsyncOnce<Pool<Sqlite>> = AsyncOnce::new(async { connect().await });
 }
 
 async fn connect() -> Pool<Sqlite> {
@@ -106,6 +110,55 @@ DELETE FROM file_list
         Ok(())
     }
 
+    async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
+        let chunks = files.chunks(100);
+        for files in chunks {
+            let mut sqls = Vec::with_capacity(files.len() + 2);
+            sqls.push("INSERT INTO file_list (stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)".to_string());
+            sqls.push(" VALUES ".to_string());
+            let files_num = files.len();
+            let mut i = 0;
+            for file in files {
+                i += 1;
+                let dim = if i == files_num { "; " } else { ", " };
+                let (stream_key, date_key, file_name) = super::parse_file_key_columns(&file.key)?;
+                sqls.push(format!(
+                    " ('{stream_key}', '{date_key}', '{file_name}', false, {}, {}, {}, {}, {}){dim} ",
+                    file.meta.min_ts,
+                    file.meta.max_ts,
+                    file.meta.records,
+                    file.meta.original_size,
+                    file.meta.compressed_size
+                ));
+            }
+            match sqlx::query(&sqls.join("\n"))
+                .execute(CLIENT.get().await)
+                .await
+            {
+                Ok(_) => {}
+                Err(sqlx::Error::Database(e)) => {
+                    if e.is_unique_violation() {
+                        // batch insert got unique error, convert to single insert
+                        for file in files {
+                            self.add(&file.key, &file.meta).await?;
+                        }
+                    } else {
+                        return Err(Error::Message(e.to_string()));
+                    }
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(())
+    }
+
+    async fn batch_remove(&self, files: &[String]) -> Result<()> {
+        for file in files {
+            self.remove(file).await?;
+        }
+        Ok(())
+    }
+
     async fn get(&self, file: &str) -> Result<FileMeta> {
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
         let ret = sqlx::query_as::<_, FileRecord>(
@@ -147,21 +200,21 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        time_level: PartitionTimeLevel,
+        _time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>> {
-        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let (mut time_start, mut time_end) = time_range;
+        let (time_start, mut time_end) = time_range;
+        if time_start == 0 {
+            return Err(Error::Message(
+                "Disallow empty time range query".to_string(),
+            ));
+        }
         if time_end == 0 {
             time_end = Utc::now().timestamp_micros();
         }
-        if time_start > 0 && time_level == PartitionTimeLevel::Daily {
-            let t: DateTime<Utc> = Utc.timestamp_nanos(time_start * 1000);
-            let t = Utc
-                .with_ymd_and_hms(t.year(), t.month(), t.day(), 0, 0, 0)
-                .unwrap();
-            time_start = t.timestamp_micros();
-        }
+
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
         let ret = sqlx::query_as::<_, FileRecord>(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
@@ -229,10 +282,6 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         sqlx::query(r#"DELETE FROM file_list;"#)
             .execute(CLIENT.get().await)
             .await?;
-        Ok(())
-    }
-
-    async fn switch_db(&self) -> Result<()> {
         Ok(())
     }
 }

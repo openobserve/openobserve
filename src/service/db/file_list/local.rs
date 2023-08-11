@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::infra::{config::CONFIG, file_list, file_list::parse_file_key_columns, wal};
+use crate::common::infra::{config::CONFIG, file_list, wal};
 use crate::common::json;
 use crate::common::meta::{
     common::{FileKey, FileMeta},
@@ -21,25 +21,19 @@ use crate::common::meta::{
 };
 
 pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {
-    let (_stream_key, date_key, _file_name) = parse_file_key_columns(key)?;
+    let (_stream_key, date_key, _file_name) = file_list::parse_file_key_columns(key)?;
     let file_data = FileKey::new(key, meta, deleted);
 
-    // dynamodb mode
-    if CONFIG.common.use_dynamo_meta_store {
-        // retry 5 times
-        for _ in 0..5 {
-            if let Err(e) = super::dynamo_db::write_file(&file_data).await {
-                log::error!("[FILE_LIST] Error saving file to dynamo, retrying: {}", e);
-                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-            } else {
-                break;
-            }
+    // write into file_list storage
+    // retry 5 times
+    for _ in 0..5 {
+        if let Err(e) = super::progress(key, meta, deleted, true).await {
+            log::error!("[FILE_LIST] Error saving file to storage, retrying: {}", e);
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        } else {
+            break;
         }
-        return Ok(());
     }
-
-    // write into local file_list storage
-    super::progress(key, meta, deleted, true).await?;
     if CONFIG.common.local_mode {
         return Ok(());
     }

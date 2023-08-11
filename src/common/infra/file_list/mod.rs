@@ -18,8 +18,13 @@ use crate::common::infra::{
     config::CONFIG,
     errors::{Error, Result},
 };
-use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
+use crate::common::meta::{
+    common::{FileKey, FileMeta},
+    stream::PartitionTimeLevel,
+    StreamType,
+};
 
+pub mod duckdb;
 pub mod dynamo;
 pub mod sled;
 pub mod sqlite;
@@ -32,6 +37,7 @@ pub fn connect() -> Box<dyn FileList> {
     match CONFIG.common.file_list_storage.as_str() {
         "sled" => Box::<sled::SledFileList>::default(),
         "sqlite" => Box::<sqlite::SqliteFileList>::default(),
+        "dynamo" => Box::<dynamo::DynamoFileList>::default(),
         _ => Box::<sled::SledFileList>::default(),
     }
 }
@@ -40,6 +46,8 @@ pub fn connect() -> Box<dyn FileList> {
 pub trait FileList: Sync + 'static {
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()>;
     async fn remove(&self, file: &str) -> Result<()>;
+    async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
+    async fn batch_remove(&self, files: &[String]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn list(&self) -> Result<Vec<(String, FileMeta)>>;
     async fn query(
@@ -54,7 +62,6 @@ pub trait FileList: Sync + 'static {
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
     async fn clear(&self) -> Result<()>;
-    async fn switch_db(&self) -> Result<()>;
 }
 
 #[inline]
@@ -65,6 +72,16 @@ pub async fn add(file: &str, meta: &FileMeta) -> Result<()> {
 #[inline]
 pub async fn remove(file: &str) -> Result<()> {
     CLIENT.remove(file).await
+}
+
+#[inline]
+pub async fn batch_add(files: &[FileKey]) -> Result<()> {
+    CLIENT.batch_add(files).await
+}
+
+#[inline]
+pub async fn batch_remove(files: &[String]) -> Result<()> {
+    CLIENT.batch_remove(files).await
 }
 
 #[inline]
@@ -108,11 +125,6 @@ pub async fn is_empty() -> bool {
 #[inline]
 pub async fn clear() -> Result<()> {
     CLIENT.clear().await
-}
-
-#[inline]
-pub async fn switch_db() -> Result<()> {
-    CLIENT.switch_db().await
 }
 
 /// parse file key to get stream_key, date_key, file_name

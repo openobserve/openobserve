@@ -125,7 +125,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     // cache file list
-    if !CONFIG.common.local_mode && !CONFIG.common.use_dynamo_meta_store {
+    if !CONFIG.common.file_list_external {
         db::file_list::remote::cache("", false)
             .await
             .expect("file list remote cache failed");
@@ -156,10 +156,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         syslog_server::run(start_syslog, true)
             .await
             .expect("syslog server run failed");
-    }
-    //create dynamo db table
-    if CONFIG.common.use_dynamo_meta_store {
-        crate::common::infra::db::dynamo_db::create_dynamo_tables().await;
     }
 
     Ok(())

@@ -81,20 +81,18 @@ async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
             continue;
         }
         log::info!("[JOB] convert file_list: {}", file);
-        if !CONFIG.common.use_dynamo_meta_store {
-            match upload_file(&local_file, &file_name).await {
-                Ok(_) => match fs::remove_file(&local_file) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log::error!(
-                            "[JOB] Failed to remove file_list {}: {}",
-                            local_file,
-                            e.to_string()
-                        )
-                    }
-                },
-                Err(e) => log::error!("[JOB] Error while uploading file_list to storage {}", e),
-            }
+        match upload_file(&local_file, &file_name).await {
+            Ok(_) => match fs::remove_file(&local_file) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "[JOB] Failed to remove file_list {}: {}",
+                        local_file,
+                        e.to_string()
+                    )
+                }
+            },
+            Err(e) => log::error!("[JOB] Error while uploading file_list to storage {}", e),
         }
     }
     Ok(())

@@ -173,6 +173,11 @@ pub struct Common {
     pub local_mode_storage: String,
     #[env_config(name = "ZO_FILE_LIST_STORAGE", default = "sled")]
     pub file_list_storage: String,
+    // external storage no need sync file_list to s3
+    #[env_config(name = "ZO_FILE_LIST_EXTERNAL", default = false)]
+    pub file_list_external: bool,
+    #[env_config(name = "ZO_FILE_LIST_DYNAMO_TABLE_NAME", default = "")]
+    pub file_list_dynamo_table_name: String,
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]
@@ -240,10 +245,6 @@ pub struct Common {
     pub usage_org: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
-    #[env_config(name = "ZO_DYNAMO_META_STORE_ENABLED", default = false)]
-    pub use_dynamo_meta_store: bool,
-    #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
-    pub dynamo_file_list_table: String,
 }
 
 #[derive(EnvConfig)]
@@ -458,6 +459,7 @@ pub fn init() -> Config {
     if let Err(e) = check_s3_config(&mut cfg) {
         panic!("s3 config error: {e}");
     }
+
     cfg
 }
 
@@ -493,6 +495,15 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
+
+    // format file list storage
+    if cfg.common.file_list_storage.is_empty() {
+        cfg.common.file_list_storage = "sled".to_string();
+    }
+    cfg.common.file_list_storage = cfg.common.file_list_storage.to_lowercase();
+    if cfg.common.local_mode || cfg.common.file_list_storage.starts_with("dynamo") {
+        cfg.common.file_list_external = true;
+    }
 
     // check compact_max_file_size to MB
     cfg.compact.max_file_size *= 1024 * 1024;
@@ -624,7 +635,11 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.s3.provider.eq("swift") {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
-    cfg.common.dynamo_file_list_table = format!("{}-file-list", cfg.s3.bucket_name);
+
+    if cfg.common.file_list_dynamo_table_name.is_empty() {
+        cfg.common.file_list_dynamo_table_name = format!("{}-file-list", cfg.s3.bucket_name);
+    }
+
     Ok(())
 }
 

@@ -23,7 +23,6 @@ use crate::common::infra::{
 use crate::common::meta::common::FileMeta;
 
 pub mod broadcast;
-pub mod dynamo_db;
 pub mod local;
 pub mod remote;
 

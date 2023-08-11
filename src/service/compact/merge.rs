@@ -22,8 +22,7 @@ use std::{collections::HashMap, io::Write, sync::Arc};
 use crate::common::infra::{
     cache,
     config::{CONFIG, FILE_EXT_PARQUET},
-    file_list::parse_file_key_columns,
-    ider, metrics, storage,
+    file_list as infra_file_list, ider, metrics, storage,
 };
 use crate::common::json;
 use crate::common::meta::{
@@ -405,15 +404,48 @@ async fn write_file_list(events: &[FileKey]) -> Result<(), anyhow::Error> {
     if events.is_empty() {
         return Ok(());
     }
-    if CONFIG.common.use_dynamo_meta_store {
-        write_file_list_dynamo(events).await
+    if CONFIG.common.file_list_external {
+        write_file_list_db_only(events).await
     } else {
         write_file_list_s3(events).await
     }
 }
 
+async fn write_file_list_db_only(events: &[FileKey]) -> Result<(), anyhow::Error> {
+    let put_items = events
+        .iter()
+        .filter(|v| !v.deleted)
+        .map(|v| v.to_owned())
+        .collect::<Vec<_>>();
+    let del_items = events
+        .iter()
+        .filter(|v| v.deleted)
+        .map(|v| v.key.clone())
+        .collect::<Vec<_>>();
+    // set to dynamo db
+    // retry 5 times
+    for _ in 0..5 {
+        if let Err(e) = infra_file_list::batch_add(&put_items).await {
+            log::error!("[COMPACT] batch_write to dynamo db failed, retrying: {}", e);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        if let Err(e) = infra_file_list::batch_remove(&del_items).await {
+            log::error!(
+                "[COMPACT] batch_delete to dynamo db failed, retrying: {}",
+                e
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        break;
+    }
+    Ok(())
+}
+
 async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
-    let (_stream_key, date_key, _file_name) = parse_file_key_columns(&events.first().unwrap().key)?;
+    let (_stream_key, date_key, _file_name) =
+        infra_file_list::parse_file_key_columns(&events.first().unwrap().key)?;
     // upload the new file_list to storage
     let new_file_list_key = format!("file_list/{}/{}.json.zst", date_key, ider::generate());
     let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
@@ -450,38 +482,6 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
             continue;
         }
         // broadcast success
-        break;
-    }
-    Ok(())
-}
-
-async fn write_file_list_dynamo(events: &[FileKey]) -> Result<(), anyhow::Error> {
-    let put_items = events
-        .iter()
-        .filter(|v| !v.deleted)
-        .map(|v| v.to_owned())
-        .collect::<Vec<_>>();
-    let del_items = events
-        .iter()
-        .filter(|v| v.deleted)
-        .map(|v| v.key.clone())
-        .collect::<Vec<_>>();
-    // set to dynamo db
-    // retry 5 times
-    for _ in 0..5 {
-        if let Err(e) = db::file_list::dynamo_db::batch_write(&put_items).await {
-            log::error!("[COMPACT] batch_write to dynamo db failed, retrying: {}", e);
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        if let Err(e) = db::file_list::dynamo_db::batch_delete(&del_items).await {
-            log::error!(
-                "[COMPACT] batch_delete to dynamo db failed, retrying: {}",
-                e
-            );
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
         break;
     }
     Ok(())

@@ -208,7 +208,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     }
 
     // after compact, compact file list from storage
-    if !CONFIG.common.use_dynamo_meta_store {
+    if !CONFIG.common.file_list_external {
         let last_file_list_offset = db::compact::file_list::get_offset().await?;
         if let Err(e) = file_list::run(last_file_list_offset).await {
             log::error!("[COMPACTOR] merge file list error: {}", e);

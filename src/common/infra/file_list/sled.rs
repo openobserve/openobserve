@@ -19,14 +19,18 @@ use crate::common::infra::{
     config::CONFIG,
     errors::{Error, Result},
 };
-use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
+use crate::common::meta::{
+    common::{FileKey, FileMeta},
+    stream::PartitionTimeLevel,
+    StreamType,
+};
 
 lazy_static! {
     static ref CLIENT: ::sled::Db = connect();
 }
 
 pub fn connect() -> ::sled::Db {
-    ::sled::open(format!("{}file_list", CONFIG.common.data_cache_dir))
+    ::sled::open(format!("{}file_list.sled", CONFIG.common.data_cache_dir))
         .expect("sled db dir create failed")
 }
 
@@ -61,6 +65,55 @@ impl super::FileList for SledFileList {
         let client = CLIENT.clone();
         let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
         bucket.remove::<&str>(&file_name)?;
+        Ok(())
+    }
+
+    async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
+        let chunks = files.chunks(100);
+        for files in chunks {
+            let mut groups: ahash::AHashMap<String, Vec<FileKey>> = ahash::AHashMap::default();
+            for file in files.iter() {
+                let (stream_key, date_key, file_name) = super::parse_file_key_columns(&file.key)?;
+                let entry = groups.entry(stream_key).or_default();
+                entry.push(FileKey {
+                    key: format!("{date_key}/{file_name}"),
+                    meta: file.meta,
+                    deleted: file.deleted,
+                });
+            }
+            for (stream_key, files) in groups {
+                let client = CLIENT.clone();
+                let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
+                let mut batch = sled::Batch::default();
+                for file in files {
+                    batch.insert::<&str, Vec<u8>>(&file.key, (&file.meta).into());
+                }
+                bucket.apply_batch(batch)?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn batch_remove(&self, files: &[String]) -> Result<()> {
+        let chunks = files.chunks(100);
+        for files in chunks {
+            let mut groups: ahash::AHashMap<String, Vec<String>> = ahash::AHashMap::default();
+            for file in files.iter() {
+                let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+                let file = format!("{date_key}/{file_name}");
+                let entry = groups.entry(stream_key).or_default();
+                entry.push(file);
+            }
+            for (stream_key, files) in groups {
+                let client = CLIENT.clone();
+                let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
+                let mut batch = sled::Batch::default();
+                for file in files {
+                    batch.remove::<&str>(&file);
+                }
+                bucket.apply_batch(batch)?;
+            }
+        }
         Ok(())
     }
 
@@ -101,8 +154,18 @@ impl super::FileList for SledFileList {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>> {
+        let (time_start, mut time_end) = time_range;
+        if time_start == 0 {
+            return Err(Error::Message(
+                "Disallow empty time range query".to_string(),
+            ));
+        }
+        if time_end == 0 {
+            time_end = Utc::now().timestamp_micros();
+        }
+
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let prefixes = generate_prefix(time_level, time_range);
+        let prefixes = generate_prefix(time_level, (time_start, time_end));
         let client = CLIENT.clone();
         let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
         let mut files = vec![];
@@ -120,8 +183,8 @@ impl super::FileList for SledFileList {
                                 String::from_utf8(key.to_vec()).expect("sled file key parse error");
                             let meta = FileMeta::try_from(value.as_ref())
                                 .expect("sled file meta parse error");
-                            if (meta.min_ts >= time_range.0 && meta.min_ts <= time_range.1)
-                                || (meta.max_ts >= time_range.0 && meta.max_ts <= time_range.1)
+                            if (meta.min_ts >= time_start && meta.min_ts <= time_end)
+                                || (meta.max_ts >= time_start && meta.max_ts <= time_end)
                             {
                                 Some((format!("files/{stream_key}/{file_name}"), meta))
                             } else {
@@ -158,19 +221,11 @@ impl super::FileList for SledFileList {
         client.clear()?;
         Ok(())
     }
-
-    async fn switch_db(&self) -> Result<()> {
-        Ok(())
-    }
 }
 
 fn generate_prefix(time_level: PartitionTimeLevel, time_range: (i64, i64)) -> Vec<String> {
-    let (time_min, time_max) = time_range;
-    if time_min == 0 && time_max == 0 {
-        return vec![];
-    }
-
     let mut keys = Vec::new();
+    let (time_min, time_max) = time_range;
     let time_min = Utc.timestamp_nanos(time_min * 1000);
     let time_max = Utc.timestamp_nanos(time_max * 1000);
     if time_min + Duration::hours(48) >= time_max {

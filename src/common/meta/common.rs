@@ -44,52 +44,6 @@ impl FileKey {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct FileMeta {
-    pub min_ts: i64, // microseconds
-    pub max_ts: i64, // microseconds
-    pub records: u64,
-    pub original_size: u64,
-    pub compressed_size: u64,
-}
-
-impl From<&FileMeta> for Vec<u8> {
-    fn from(value: &FileMeta) -> Vec<u8> {
-        let mut bytes = [0; 40];
-        LittleEndian::write_i64(&mut bytes[0..8], value.min_ts);
-        LittleEndian::write_i64(&mut bytes[8..16], value.max_ts);
-        LittleEndian::write_u64(&mut bytes[16..24], value.records);
-        LittleEndian::write_u64(&mut bytes[24..32], value.original_size);
-        LittleEndian::write_u64(&mut bytes[32..40], value.compressed_size);
-        bytes.to_vec()
-    }
-}
-
-impl TryFrom<&[u8]> for FileMeta {
-    type Error = std::io::Error;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() < 40 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Invalid FileMeta",
-            ));
-        }
-        let min_ts = LittleEndian::read_i64(&value[0..8]);
-        let max_ts = LittleEndian::read_i64(&value[8..16]);
-        let records = LittleEndian::read_u64(&value[16..24]);
-        let original_size = LittleEndian::read_u64(&value[24..32]);
-        let compressed_size = LittleEndian::read_u64(&value[32..40]);
-        Ok(Self {
-            min_ts,
-            max_ts,
-            records,
-            original_size,
-            compressed_size,
-        })
-    }
-}
-
 impl From<&FileKey> for HashMap<String, AttributeValue> {
     fn from(file_key: &FileKey) -> Self {
         let mut item = HashMap::new();
@@ -159,5 +113,51 @@ impl From<&HashMap<String, AttributeValue>> for FileKey {
             }
         }
         item
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct FileMeta {
+    pub min_ts: i64, // microseconds
+    pub max_ts: i64, // microseconds
+    pub records: u64,
+    pub original_size: u64,
+    pub compressed_size: u64,
+}
+
+impl From<&FileMeta> for Vec<u8> {
+    fn from(value: &FileMeta) -> Vec<u8> {
+        let mut bytes = [0; 40];
+        LittleEndian::write_i64(&mut bytes[0..8], value.min_ts);
+        LittleEndian::write_i64(&mut bytes[8..16], value.max_ts);
+        LittleEndian::write_u64(&mut bytes[16..24], value.records);
+        LittleEndian::write_u64(&mut bytes[24..32], value.original_size);
+        LittleEndian::write_u64(&mut bytes[32..40], value.compressed_size);
+        bytes.to_vec()
+    }
+}
+
+impl TryFrom<&[u8]> for FileMeta {
+    type Error = std::io::Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < 40 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid FileMeta",
+            ));
+        }
+        let min_ts = LittleEndian::read_i64(&value[0..8]);
+        let max_ts = LittleEndian::read_i64(&value[8..16]);
+        let records = LittleEndian::read_u64(&value[16..24]);
+        let original_size = LittleEndian::read_u64(&value[24..32]);
+        let compressed_size = LittleEndian::read_u64(&value[32..40]);
+        Ok(Self {
+            min_ts,
+            max_ts,
+            records,
+            original_size,
+            compressed_size,
+        })
     }
 }
