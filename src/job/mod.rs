@@ -125,11 +125,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     // cache file list
-    if !CONFIG.common.file_list_external {
-        db::file_list::remote::cache("", false)
-            .await
-            .expect("file list remote cache failed");
-    }
+    // if !CONFIG.common.file_list_external {
+    db::file_list::remote::cache("", false)
+        .await
+        .expect("file list remote cache failed");
+    // }
 
     // Shouldn't serve request until initialization finishes
     log::info!("Start job");

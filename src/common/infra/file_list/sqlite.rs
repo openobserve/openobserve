@@ -15,7 +15,11 @@
 use async_once::AsyncOnce;
 use async_trait::async_trait;
 use chrono::Utc;
-use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, Pool, Row, Sqlite, SqlitePool};
+use sqlx::{
+    migrate::Migrator,
+    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    Pool, Row, Sqlite,
+};
 use std::str::FromStr;
 
 use crate::common::infra::{
@@ -33,14 +37,18 @@ lazy_static! {
 }
 
 async fn connect() -> Pool<Sqlite> {
-    let opts = SqliteConnectOptions::from_str(&format!(
+    let db_opts = SqliteConnectOptions::from_str(&format!(
         "{}{}",
         CONFIG.common.data_cache_dir, "file_list.sqlite"
     ))
     .expect("sqlite connect options create failed")
     .create_if_missing(true);
 
-    let pool = SqlitePool::connect_with(opts)
+    let pool_opts = SqlitePoolOptions::new();
+    let pool_opts = pool_opts.min_connections(CONFIG.limit.cpu_num as u32);
+    let pool_opts = pool_opts.max_connections(CONFIG.limit.query_thread_num as u32 * 4);
+    let pool = pool_opts
+        .connect_with(db_opts)
         .await
         .expect("sqlite pool create failed");
     let migrator = Migrator::new(std::path::Path::new("./migrations"))
