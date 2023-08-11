@@ -181,7 +181,7 @@ export default defineComponent({
           const allFulfilledValues = results
             .filter(r => r.status === 'fulfilled')?.length
 
-          if (results.length == allFulfilledValues.length) {
+          if (results.length == allFulfilledValues) {
             await resetAndRefresh(ImportType.FILES);
           }
 
