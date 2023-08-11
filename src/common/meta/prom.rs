@@ -16,6 +16,7 @@ use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
+use crate::common::infra::config::FxIndexMap;
 use crate::service::metrics::prom::prometheus as proto;
 
 pub const NAME_LABEL: &str = "__name__";
@@ -25,9 +26,6 @@ pub const VALUE_LABEL: &str = "value";
 pub const LE_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
-
-// See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
-pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Metric<'a> {

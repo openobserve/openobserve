@@ -235,7 +235,7 @@ import { useRouter } from "vue-router";
 
 import MetricList from "./MetricList.vue";
 import useMetrics from "@/composables/useMetrics";
-import { Parser } from "node-sql-parser";
+import { Parser } from "node-sql-parser/build/mysql";
 
 import streamService from "@/services/stream";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
@@ -358,6 +358,7 @@ export default defineComponent({
         loadPageData(true);
         refreshData();
       }
+      dashboardPanelData.data.type = "line";
       dashboardPanelData.data.queryType = "promql";
       dashboardPanelData.data.fields.stream_type = "metrics";
       dashboardPanelData.data.customQuery = true;

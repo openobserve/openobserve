@@ -63,7 +63,7 @@ import {
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
 import queryService from "../../../services/search";
-import Plotly from "plotly.js";
+import Plotly from "plotly.js-dist-min";
 import moment from "moment";
 import { logsErrorMessage } from "@/utils/common";
 import { useI18n } from "vue-i18n";

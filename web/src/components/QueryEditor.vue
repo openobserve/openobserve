@@ -34,7 +34,12 @@ import {
   onActivated,
   watch,
 } from "vue";
-import * as monaco from "monaco-editor";
+
+import "monaco-editor/esm/vs/editor/editor.all.js";
+import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
+import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+
 import { useStore } from "vuex";
 import { debounce } from "quasar";
 
@@ -170,7 +175,9 @@ export default defineComponent({
       editorObj.addCommand(
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
         function () {
-          emit("run-query");
+          setTimeout(() => {
+            emit("run-query");
+          }, 300);
         },
         "ctrlenter"
       );

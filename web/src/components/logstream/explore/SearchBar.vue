@@ -80,20 +80,9 @@ import { defineComponent, ref, onMounted, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
-
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
 import QueryEditor from "@/components/QueryEditor.vue";
-import jsTransformService from "@/services/jstransform";
-
-import { Parser } from "node-sql-parser";
-import segment from "@/services/segment_analytics";
-import config from "@/aws-exports";
-
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import search from "../../services/search";
-import { emit } from "process";
 import type { IDateTime } from "@/ts/interfaces";
 
 const defaultValue: any = () => {
