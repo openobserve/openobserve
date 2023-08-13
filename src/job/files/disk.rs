@@ -108,7 +108,6 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
             let ret =
                 upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
-            drop(permit);
             match ret {
                 Err(e) => log::error!("[JOB] Error while uploading disk file to storage {}", e),
                 Ok((key, meta, _stream_type)) => {
@@ -151,6 +150,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     }
                 }
             };
+            drop(permit);
             Ok(())
         });
         tasks.push(task);
