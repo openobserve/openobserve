@@ -100,7 +100,14 @@ async fn main() -> Result<(), anyhow::Error> {
     } else if CONFIG.common.tracing_enabled {
         enable_tracing()?;
     } else {
-        env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
+        let console_layer = console_subscriber::spawn();
+        tracing_subscriber::registry()
+            // add the console layer to the subscriber
+            .with(console_layer)
+            // add other layers...
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+        // env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
     }
     log::info!("Starting OpenObserve {}", VERSION);
 

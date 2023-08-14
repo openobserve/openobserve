@@ -89,7 +89,7 @@ pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
 
 pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
-    for item in CACHES.clone().iter() {
+    for item in CACHES.iter() {
         let key = item.key().to_string();
         let offset = item.value();
         if *offset > 0 {
