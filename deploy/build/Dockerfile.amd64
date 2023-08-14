@@ -22,6 +22,7 @@ ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 # ENV SCCACHE_LOG=debug
 
 RUN rustc --version && sccache --version
+RUN cargo install --locked tokio-console
 
 WORKDIR /app
 COPY . /app
@@ -39,4 +40,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 RUN update-ca-certificates
 COPY --from=builder /app/target/release/openobserve /
+COPY --from=builder /usr/local/cargo/bin//tokio-console /usr/local/bin/
+RUN mkdir /data && chmod 777 /data
 CMD ["/openobserve"]
