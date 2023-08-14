@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap;
 use tokio::time::{self, Duration};
 
 use crate::common::infra::cluster;
 use crate::common::infra::config::{CONFIG, METRIC_CLUSTER_LEADER};
+use crate::common::meta::prom::ClusterLeader;
 use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -31,14 +33,26 @@ pub async fn run() -> Result<(), anyhow::Error> {
         CONFIG.limit.metrics_leader_push_interval,
     ));
     interval.tick().await; // trigger the first run
+
+    let mut last_leaders: AHashMap<String, ClusterLeader> = AHashMap::new(); // maintain the last state
+
     loop {
         interval.tick().await;
         let leaders = METRIC_CLUSTER_LEADER.clone();
+
+        // only update if there's a change
         for item in leaders.iter() {
+            if last_leaders.contains_key(item.key()) {
+                let last_leader = last_leaders.get(item.key()).unwrap();
+                if item.value().eq(last_leader) {
+                    continue;
+                }
+            }
+
             let result = db::metrics::set_prom_cluster_leader(item.key(), item.value()).await;
             match result {
                 Ok(_) => {
-                    // log::info!("Successfully updated leader to db ")
+                    let _ = last_leaders.insert(item.key().to_string(), item.value().clone());
                 }
                 Err(err) => log::error!("error updating leader to db {}", err),
             }
