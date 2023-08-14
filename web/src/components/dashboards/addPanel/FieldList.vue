@@ -85,6 +85,9 @@
                       }}
                     </div>
                   </q-btn>
+                  <q-btn v-if="dashboardPanelData.data.type == 'heatmap'" padding="sm" :disabled="isAddZAxisNotAllowed" @click="addZAxisItem(props.row)">
+                     <div>+Z</div>
+                    </q-btn>
                   <q-btn padding="sm" @click="addFilteredItem(props.row.name)">
                     <div>+F</div>
                   </q-btn>
@@ -131,7 +134,7 @@ export default defineComponent({
     });
     const filteredStreams = ref([]);
     const $q = useQuasar();
-    const { dashboardPanelData, addXAxisItem, addYAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, promqlMode } =
+    const { dashboardPanelData, addXAxisItem, addYAxisItem, addZAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, isAddZAxisNotAllowed, promqlMode } =
       useDashboardPanelData();
 
     onActivated(() => {
@@ -262,6 +265,7 @@ export default defineComponent({
       filterFieldFn,
       addXAxisItem,
       addYAxisItem,
+      addZAxisItem,
       addFilteredItem,
       data,
       getStreamList,
@@ -270,6 +274,7 @@ export default defineComponent({
       filteredStreams,
       isAddXAxisNotAllowed,
       isAddYAxisNotAllowed,
+      isAddZAxisNotAllowed,
       promqlMode
     };
   },

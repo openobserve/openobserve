@@ -170,6 +170,84 @@
       </div>
     </div>
     <q-separator />
+    <span v-if="dashboardPanelData.data.type === 'heatmap'">
+    <div style="display:flex; flex-direction: row;" class="q-pl-md">
+        <div class="layout-name">{{ dashboardPanelData.data.type == 'heatmap' ? t('panel.zAxis') : '' }}
+          <q-icon name="info_outline" class="q-ml-xs" >
+          <q-tooltip>
+            {{ zAxisHint }}
+          </q-tooltip>
+        </q-icon>
+        </div>
+        <span class="layout-separator">:</span>
+        <div class="axis-container droppable scroll q-py-xs" :class="{
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'z'
+        }"
+          @dragenter="onDragEnter($event, 'z')"
+          @dragleave="onDragLeave($event, 'z')"
+          @dragover="onDragOver($event, 'z')"
+          @drop="onDrop($event, 'z')"
+          v-mutation="handler2">
+          <q-btn-group class="q-mr-sm" v-for="(itemZ, index) in dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z" :key="index">
+            <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm"
+              :label="itemZ.column" class="q-pl-sm">
+              <q-menu class="q-pa-md">
+                  <div>
+                    <div class="row q-mb-sm" style="align-items: center;">
+                      <div v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery" class="q-mr-xs" style="width: 160px">
+                        <q-select
+                          v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[index]
+                              .aggregationFunction
+                            "
+                          :options="triggerOperators"
+                          dense
+                          filled
+                          emit-value
+                          map-options
+                          label="Aggregation"
+                        ></q-select>
+                      </div>
+                      <div class="color-input-wrapper" v-if="!['table', 'pie'].includes(dashboardPanelData.data.type)">
+                        <input
+                          type="color"
+                          v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[index]
+                              .color
+                            "
+                        />
+                      </div>
+                    </div>
+                    <q-input
+                      dense
+                      filled
+                      label="Label"
+                      v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[index]
+                          .label
+                        "
+                      :rules="[val => val.length > 0 || 'Required']"
+                    />
+                  </div>
+              </q-menu>
+            </q-btn>
+            <q-btn
+              size="xs"
+              round
+              flat
+              dense
+              @click="removeZAxisItem(itemZ.column)"
+              icon="close"
+            />
+          </q-btn-group>
+          <div
+            class="text-caption text-weight-bold text-center q-mt-xs"
+            v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.length < 1"
+          >
+            {{ zAxisHint }}
+          </div>
+        </div>
+    </div>
+    </span>
+      <q-separator />
     <div v-if="!(dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType == 'sql')" style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name"> {{ t('panel.filters') }}</div>
       <span class="layout-separator">:</span>
@@ -366,8 +444,10 @@ export default defineComponent({
       dashboardPanelData,
       addXAxisItem,
       addYAxisItem,
+      addZAxisItem,
       removeXAxisItem,
       removeYAxisItem,
+      removeZAxisItem,
       removeFilterItem,
       addFilteredItem,
       promqlMode,
@@ -404,7 +484,9 @@ export default defineComponent({
         addXAxisItem(dragItem)
       }else if(dragItem && area == 'y'){
         addYAxisItem(dragItem)
-      }else if(dragItem && area == 'f'){
+      } else if (dragItem && area == 'z') {
+        addZAxisItem(dragItem)
+      } else if(dragItem && area == 'f'){
         addFilteredItem(dragItem?.name)
       }else{
 
@@ -449,9 +531,10 @@ export default defineComponent({
           return "Add one or more fields here"
         case 'area-stacked':
         case 'stacked':
-        case 'heatmap':
         case 'h-stacked':
           return "Add 2 fields here"
+        case 'heatmap':
+          return "Add 1 field here"
         default:
           return "Add maximum 2 fields here";
       }
@@ -474,6 +557,16 @@ export default defineComponent({
       }
     })
 
+    const zAxisHint = computed((e: any) => {
+      switch (dashboardPanelData.data.type) {
+
+        case 'heatmap':
+          return "Add 1 field here"
+        default:
+          return "Add one or more fields here";
+      }
+    })
+
     return {
       showXAxis,
       t,
@@ -482,6 +575,7 @@ export default defineComponent({
       dashboardPanelData,
       removeXAxisItem,
       removeYAxisItem,
+      removeZAxisItem,
       triggerOperators,
       removeFilterItem,
       pagination: ref({
@@ -502,6 +596,7 @@ export default defineComponent({
       triggerOperatorsWithHistogram,
       xAxisHint,
       yAxisHint,
+      zAxisHint,
       promqlMode
     };
   },

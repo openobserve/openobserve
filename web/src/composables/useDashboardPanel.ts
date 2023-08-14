@@ -55,6 +55,7 @@ const getDefaultDashboardPanelData = () => ({
             stream_type: "logs",
             x: [],
             y: [],
+            z: [],
             filter: [],
           },
           config: {
@@ -113,6 +114,7 @@ const useDashboardPanelData = () => {
     switch (dashboardPanelData.data.type) {
       case 'pie':
       case 'donut':
+      case 'heatmap':
         return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length >= 1
       case 'metric':
         return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length >= 0
@@ -125,19 +127,45 @@ const useDashboardPanelData = () => {
 
   const isAddYAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
-      case 'pie':
-      case 'donut':
-        return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length >= 1
-      case 'metric':
-        return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length >= 1
-      case 'area-stacked':
-      case 'stacked':
-      case 'h-stacked':
-        return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length >= 1
+      case "pie":
+      case "donut":
+        return (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.y.length >= 1
+        );
+      case "metric":
+        return (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.y.length >= 1
+        );
+      case "area-stacked":
+      case "stacked":
+      case "heatmap":
+      case "h-stacked":
+        return (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.y.length >= 1
+        );
       default:
         return false;
     }
   })
+
+  const isAddZAxisNotAllowed = computed((e: any) => {
+    switch (dashboardPanelData.data.type) {
+      case "heatmap":
+        return (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.z.length >= 1
+        );
+      default:
+        return false;
+    }
+  });
 
   const addXAxisItem = (row: any) => {
     if(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x) {
@@ -182,6 +210,51 @@ const useDashboardPanelData = () => {
     updateArrayAlias()
   }
 
+  const addZAxisItem = (row: any) => {
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z = [];
+    }
+
+    if (isAddZAxisNotAllowed.value) {
+      return;
+    }
+
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z.find((it: any) => it.column == row.name)
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z.push({
+        label: !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? generateLabelFromName(row.name)
+          : row.name,
+        alias: !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? "z_axis_" +
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.z.length +
+              1)
+          : row.name,
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: "count",
+      });
+    }
+    updateArrayAlias();
+  };
+
   // get new color value based on existing color from the chart
   const getNewColorValue = () => {
    const YAxisColor = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.map((it: any)=> it.color)
@@ -211,6 +284,17 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.splice(index, 1)
     }
   }
+
+  const removeZAxisItem = (name: string) => {
+    const index = dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.z.findIndex((it: any) => it.column == name);
+    if (index >= 0) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z.splice(index, 1);
+    }
+  };
 
   const removeFilterItem = (name: string) => {
     const index = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.findIndex((it:any) => it.column == name)
@@ -365,8 +449,10 @@ const useDashboardPanelData = () => {
     resetDashboardPanelData,
     addXAxisItem,
     addYAxisItem,
+    addZAxisItem,
     removeXAxisItem,
     removeYAxisItem,
+    removeZAxisItem,
     removeFilterItem,
     addFilteredItem,
     removeXYFilters,
@@ -374,6 +460,7 @@ const useDashboardPanelData = () => {
     updateXYFieldsOnCustomQueryChange,
     isAddXAxisNotAllowed,
     isAddYAxisNotAllowed,
+    isAddZAxisNotAllowed,
     promqlMode,
   };
 };

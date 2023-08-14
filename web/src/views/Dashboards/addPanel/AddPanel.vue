@@ -356,6 +356,21 @@ export default defineComponent({
 
             break;
           }
+          case 'heatmap': {
+             if (dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.y.length == 0) {
+              errors.push("Add at least one field for the Y-Axis")
+            }
+
+            if (dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.x.length == 0) {
+              errors.push(`Add one field for the X-Axis`)
+            }
+
+            if (dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.z.length == 0) {
+              errors.push(`Add one field for the Z-Axis`)
+            }
+
+            break;
+          }
           case 'area-stacked':
           case 'stacked':
           case 'h-stacked': {
