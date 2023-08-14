@@ -28,13 +28,22 @@
                         :label="'Query ' + (index + 1)">
                         <q-icon
                             v-if="index > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)"
-                            name="cancel"
+                            name="close"
                             class="q-ml-sm"
-                            @click="removeQuery(index)"
+                            @click.stop="removeQuery(index)"
                             style="cursor: pointer"
+                            
                         />
                     </q-tab>
                 </q-tabs>
+                <!-- <div v-if="promqlMode" class="query-tabs-container">
+                    <div v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" class="query-tab" :class="{ 'active': index === activeTab }" @click="handleActiveTab(index)">
+                        <div class="tab-label">{{ 'Query ' + (index + 1) }}</div>
+                        <div v-if="index > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)" @click.stop="removeQuery(index)">
+                            <i class="material-icons">cancel</i>
+                        </div>
+                    </div>
+                </div> -->
                 </div>
                 <span v-if="!promqlMode" class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
                 <q-btn v-if="promqlMode" round flat @click="addTab" icon="add" style="margin-right: 10px;"></q-btn>
@@ -95,27 +104,36 @@ export default defineComponent({
         const activeTab = ref(0);
 
         // watch(activeTab, () => {
-        //     console.log('activeTab', typeof activeTab.value);
+        //     console.log('activeTab', activeTab.value);
         // })
 
-        const addTab = () => {
-            dashboardPanelData.data.queries.push({ query: "" });
+        // const handleActiveTab=(index)=>{
+        //     activeTab.value=index;
+        // }
+        
+        const addTab = () => {            
+            const newQuery = {
+                query: "",
+                customQuery: false,
+                fields: {
+                    stream: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
+                    stream_type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type,
+                    x: [],
+                    y: [],
+                    filter: [],
+                },
+            config: {
+                promql_legend: "",
+            },
+        };
+            
+            dashboardPanelData.data.queries.push(newQuery);
             activeTab.value = dashboardPanelData.data.queries.length - 1;
         };
 
-        const removeQuery = (index) => {
-
-            console.log('removeQuery : index', index);
-            console.log('removeQuery : dashboardPanelData.data.queries before splice', JSON.stringify(dashboardPanelData.data.queries));
-            dashboardPanelData.data.queries.splice(index, 1);
-            console.log("removeQuery : dashboardPanelData.data.queries after splice", JSON.stringify(dashboardPanelData.data.queries));
-            
-            if (activeTab.value >= dashboardPanelData.data.queries.length) {
-                console.log('removeQuery : activeTab',  activeTab.value);
-                console.log('removeQuery: dashboardPanelData.data.queries.length', dashboardPanelData.data.queries.length);
-                activeTab.value = dashboardPanelData.data.queries.length - 1;
-                console.log('removeQuery: activeTab after',  activeTab.value);
-            }
+        const removeQuery = async (index) => {
+            if (activeTab.value >= dashboardPanelData.data.queries.length-1) activeTab.value -=1;
+            dashboardPanelData.data.queries.splice(index,1);
         };
 
         const currentQuery = computed({
@@ -367,9 +385,48 @@ export default defineComponent({
     height: 40px !important;
     overflow: hidden;
     cursor: pointer;
-
-    &:hover {
-        background-color: #eaeaeaa5;
-    }
 }
+.q-ml-sm:hover{
+    background-color: #eaeaeaa5;
+    border-radius: 50%;
+}
+
+// .query-tabs-container {
+//   width: 100%;
+//   display: flex;
+//   flex-direction: row;
+//   justify-content: flex-start;
+//   align-items: center;
+// }
+
+// .query-tab {
+//   display: flex;
+//   flex-direction: row;
+//   align-items: center;
+//   margin-right: 10px;
+//   padding: 5px;
+  
+//   &:hover {
+//         background-color: #eaeaeaa5;
+//     }
+// }
+
+// .tab-label {
+//   margin-right: 5px;
+// }
+
+// .remove-button {
+//   cursor: pointer;
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   width: 20px;
+//   height: 20px;
+// }
+
+// .query-tab.active {
+//     border-bottom: 3px solid #000;
+// }
+
+
 </style>
