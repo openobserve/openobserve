@@ -17,8 +17,7 @@ use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use once_cell::sync::Lazy;
 
 use crate::common::infra::config::{FxIndexSet, RwHashMap};
-use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
-use crate::service::{db, stream};
+use crate::common::meta::{common::FileMeta, StreamType};
 
 static FILES: Lazy<RwHashMap<String, RwHashMap<String, FxIndexSet<String>>>> =
     Lazy::new(Default::default);
@@ -136,15 +135,15 @@ pub async fn get_file_list(
         let time_max = Utc.timestamp_nanos(time_max * 1000);
         if time_min + Duration::hours(48) >= time_max {
             // Handle partiton time level
-            let schema = db::schema::get(org_id, stream_name, stream_type).await?;
-            let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
-            let partition_time_level = stream::unwrap_partition_time_level(
-                stream_settings.partition_time_level,
-                stream_type,
-            );
-            if partition_time_level == PartitionTimeLevel::Daily {
-                keys.push(time_min.format("%Y/%m/%d/00/").to_string());
-            }
+            // let schema = db::schema::get(org_id, stream_name, stream_type).await?;
+            // let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
+            // let partition_time_level = stream::unwrap_partition_time_level(
+            //     stream_settings.partition_time_level,
+            //     stream_type,
+            // );
+            // if partition_time_level == PartitionTimeLevel::Daily {
+            //     keys.push(time_min.format("%Y/%m/%d/00/").to_string());
+            // }
             // less than 48 hours, generate keys by hours
             let mut time_min = Utc
                 .with_ymd_and_hms(
