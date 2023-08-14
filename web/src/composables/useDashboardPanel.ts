@@ -99,7 +99,7 @@ const useDashboardPanelData = () => {
   const $q = useQuasar();
 
   const resetDashboardPanelData = () => {
-    Object.assign(dashboardPanelData, getDefaultDashboardPanelData());
+    Object.assign(dashboardPanelData.data, getDefaultDashboardPanelData());
     // console.log("updated...",dashboardPanelData);
   };
 

@@ -136,7 +136,7 @@ export const usePanelDataLoader = (
       isDirty.value=true;
       
       // TODO: check for query OR queries array for promql
-      if (isVisible.value && isDirty.value && panelSchema.value.queries?.length) {   
+      if (isVisible.value && isDirty.value && panelSchema.value.queries?.length && panelSchema.value.queries[0]?.query) {   
       loadData();
       }
     }
