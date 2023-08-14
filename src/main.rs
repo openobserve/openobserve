@@ -26,11 +26,10 @@ use std::{
     net::SocketAddr,
     str::FromStr,
     sync::{
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicU16, Ordering},
         Arc,
     },
 };
-use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
 
@@ -38,7 +37,7 @@ use openobserve::{
     common::infra::{
         cluster,
         config::{CONFIG, USERS, VERSION},
-        metrics, wal,
+        ider, metrics, wal,
     },
     common::meta,
     common::zo_logger::{self, ZoLogger, EVENT_SENDER},
@@ -114,17 +113,13 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // init jobs
     // it must be initialized before the server starts
-    let (tx, rx) = oneshot::channel();
-    tokio::task::spawn(async move {
-        cluster::register_and_keepalive()
-            .await
-            .expect("cluster init failed");
-        job::init().await.expect("job init failed");
-        tx.send(true).unwrap();
-    });
+    cluster::register_and_keepalive()
+        .await
+        .expect("cluster init failed");
+    let _ = ider::generate();
+    job::init().await.expect("job init failed");
 
     // gRPC server
-    rx.await?;
     if !cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
         init_grpc_server()?;
     }
@@ -139,7 +134,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let prometheus = metrics::create_prometheus_handler();
 
     // HTTP server
-    let thread_id = Arc::new(AtomicU8::new(0));
+    let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
         format!("[::]:{}", CONFIG.http.port).parse()?
     } else {
