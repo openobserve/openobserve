@@ -449,6 +449,7 @@ export default defineComponent({
           return "Add one or more fields here"
         case 'area-stacked':
         case 'stacked':
+        case 'heatmap':
         case 'h-stacked':
           return "Add 2 fields here"
         default:
@@ -465,6 +466,7 @@ export default defineComponent({
         case 'metric':
           return "Add 1 values field here"
         case 'stacked':
+        case 'heatmap':
         case 'h-stacked':
           return "Add 1 field here"
         default:

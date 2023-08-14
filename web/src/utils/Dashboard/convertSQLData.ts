@@ -87,6 +87,10 @@ export const convertSQLData = (
         return {
           type: "bar",
         };
+      case "heatmap":
+        return {
+          type: "heatmap",
+        };
       case "area-stacked":
         return {
           mode: "lines",
@@ -418,6 +422,38 @@ export const convertSQLData = (
 
         return layout;
       }
+      case "heatmap":{
+        const xaxis: any = {
+            title: props.data.fields?.x[0]?.label,
+            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+            automargin: true
+        }
+        const yaxis: any = {
+          title:
+            props.data.fields?.y?.length == 1
+              ? props.data.fields.y[0]?.label
+              : "",
+          automargin: true,
+          fixedrange: true,
+          autosize: true,
+          width: 700,
+          height: 700,
+        };
+        //show tickvals and ticktext value when the stacked chart hasn't timestamp
+        // if the first field is timestamp we dont want to show the tickvals
+        // format value only for without timestamp
+        // stacked chart is alwayes stacked with first field value
+        if(props.data.fields?.x.length && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
+            xaxis["tickmode"] = "array",
+            xaxis["tickvals"] = xAxisDataWithTicks,
+            xaxis["ticktext"] = textformat(xAxisDataWithTicks)
+        }
+        const layout = {
+            xaxis: xaxis,
+            yaxis: yaxis
+        }
+        return layout
+        }
       case "h-stacked":
         return {
           barmode: "stack",
@@ -533,13 +569,16 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.label,
+          name: props.data?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label,
           ...getPropsByChartTypeForTraces(),
           showlegend: props.data.config?.show_legends,
           marker: {
             color:
-              props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.color ||
-              "#5960b2",
+              props.data?.queries[0]?.fields?.y.find(
+                (it: any) => it.alias == key
+              )?.color || "#5960b2",
             opacity: 0.8,
           },
           x: xData,
@@ -567,13 +606,16 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.label,
+          name: props.data?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label,
           ...getPropsByChartTypeForTraces(),
           showlegend: props.data.config?.show_legends,
           marker: {
             color:
-              props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.color ||
-              "#5960b2",
+              props.data?.queries[0]?.fields?.y.find(
+                (it: any) => it.alias == key
+              )?.color || "#5960b2",
             opacity: 0.8,
           },
           x: getAxisDataFromKey(key),
@@ -601,13 +643,16 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.label,
+          name: props.data?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label,
           ...getPropsByChartTypeForTraces(),
           showlegend: props.data.config?.show_legends,
           marker: {
             color:
-              props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.color ||
-              "#5960b2",
+              props.data?.queries[0]?.fields?.y.find(
+                (it: any) => it.alias == key
+              )?.color || "#5960b2",
             opacity: 0.8,
           },
           labels: textwrapper(xData),
@@ -634,13 +679,16 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.label,
+          name: props.data?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label,
           ...getPropsByChartTypeForTraces(),
           showlegend: props.data.config?.show_legends,
           marker: {
             color:
-              props.data?.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.color ||
-              "#5960b2",
+              props.data?.queries[0]?.fields?.y.find(
+                (it: any) => it.alias == key
+              )?.color || "#5960b2",
             opacity: 0.8,
           },
           labels: textwrapper(xData),
@@ -735,6 +783,63 @@ export const convertSQLData = (
         };
         return trace;
       });
+      console.log("multiple:- traces", traces);
+      break;
+    }
+    case "heatmap": {
+      // get first x axis key
+      const key0 = xAxisKeys[0];
+      // get the unique value of the first xAxis's key
+      const xAxisZerothPositionUniqueValue = [
+        ...new Set(searchQueryData.data.map((obj: any) => obj[key0])),
+      ].filter((it) => it);
+      console.log(
+        "X axis zeroth position unique values",
+        xAxisZerothPositionUniqueValue
+      );
+
+      // get second x axis key
+      const key1 = xAxisKeys[1];
+      // get the unique value of the second xAxis's key
+      const xAxisFirstPositionUniqueValue = [
+        ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
+      ].filter((it) => it);
+      console.log(
+        "X axis first position unique values",
+        xAxisFirstPositionUniqueValue
+      );
+
+      const yAxisKey0 = yAxisKeys[0];
+      traces = [];
+      const Zvalues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
+        return xAxisZerothPositionUniqueValue.map((zero: any) => {
+          return (
+            searchQueryData.data.find(
+              (it: any) => it[key0] == zero && it[key1] == first
+            )?.[yAxisKey0] || null
+          );
+          // searchQueryData.data.map((it: any) => {
+          //     if(it[key0] == zero && it[key1] == first){
+          //         Zvalue.push(it[yAxisKey0])
+          //     }
+          // })
+          // console.log("Zvalue", Zvalue);
+
+          // Zvalues.push(Zvalue)
+        });
+      });
+      console.log("Zvalues=", Zvalues);
+
+      const trace = {
+        x: xAxisZerothPositionUniqueValue,
+        y: xAxisFirstPositionUniqueValue,
+        z: Zvalues,
+        ...getPropsByChartTypeForTraces(),
+        hoverongaps: false,
+      };
+      console.log("trace:", trace);
+
+      traces.push(trace);
       console.log("multiple:- traces", traces);
       break;
     }

@@ -16,6 +16,7 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
     case "bar":
     case "h-bar":
     case "stacked":
+    case "heatmap":
     case "h-stacked":
     case "line":
     case "pie":
