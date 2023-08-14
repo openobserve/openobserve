@@ -348,7 +348,7 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
-  name: "dashboard-layout",
+  name: "DashboardQueryBuilder",
   components: {},
   setup() {
     const showXAxis = ref(true);

@@ -27,7 +27,7 @@
     <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
       <div v-if="promqlMode"  class="q-py-md showLabelOnTop">Query
-    <q-tabs v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.promql_legend" narrow-indicator dense>
+    <q-tabs v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.promql_legend" narrow-indicator dense inline-label outside-arrows mobile-arrows>
       <q-tab no-caps v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
         :label="'Query ' + (index + 1)">
       </q-tab>

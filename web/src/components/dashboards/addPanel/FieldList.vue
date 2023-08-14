@@ -116,7 +116,7 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import IndexService from "../../../services/index";
 
 export default defineComponent({
-  name: "ComponentSearchIndexSelect",
+  name: "FieldList",
   props: ["selectedXAxisValue", "selectedYAxisValue", 'editMode'],
   emits: ["update:selectedXAxisValue", "update:selectedYAxisValue"],
   setup(props) {

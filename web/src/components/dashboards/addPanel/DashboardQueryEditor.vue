@@ -22,11 +22,20 @@
                         text-color="black" class="q-mr-sm" />
                 </div>
                 <q-space />
-                <q-tabs v-if="promqlMode" v-model="activeTab" narrow-indicator dense>
+                <div style="max-width: 600px">
+                <q-tabs v-if="promqlMode" v-model="activeTab" narrow-indicator dense inline-label outside-arrows mobile-arrows>
                     <q-tab no-caps v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
                         :label="'Query ' + (index + 1)">
+                        <q-icon
+                            v-if="index > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)"
+                            name="cancel"
+                            class="q-ml-sm"
+                            @click="removeQuery(index)"
+                            style="cursor: pointer"
+                        />
                     </q-tab>
                 </q-tabs>
+                </div>
                 <span v-if="!promqlMode" class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
                 <q-btn v-if="promqlMode" round flat @click="addTab" icon="add" style="margin-right: 10px;"></q-btn>
             </div>
@@ -61,7 +70,7 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 
 export default defineComponent({
-    name: "ComponentSearchSearchBar",
+    name: "DashboardQueryEditor",
     components: {
         QueryEditor,
         ConfirmDialog,
@@ -85,13 +94,28 @@ export default defineComponent({
         let streamName = "";
         const activeTab = ref(0);
 
-        watch(activeTab, () => {
-            console.log('activeTab', typeof activeTab.value);
-        })
+        // watch(activeTab, () => {
+        //     console.log('activeTab', typeof activeTab.value);
+        // })
 
         const addTab = () => {
             dashboardPanelData.data.queries.push({ query: "" });
             activeTab.value = dashboardPanelData.data.queries.length - 1;
+        };
+
+        const removeQuery = (index) => {
+
+            console.log('removeQuery : index', index);
+            console.log('removeQuery : dashboardPanelData.data.queries before splice', JSON.stringify(dashboardPanelData.data.queries));
+            dashboardPanelData.data.queries.splice(index, 1);
+            console.log("removeQuery : dashboardPanelData.data.queries after splice", JSON.stringify(dashboardPanelData.data.queries));
+            
+            if (activeTab.value >= dashboardPanelData.data.queries.length) {
+                console.log('removeQuery : activeTab',  activeTab.value);
+                console.log('removeQuery: dashboardPanelData.data.queries.length', dashboardPanelData.data.queries.length);
+                activeTab.value = dashboardPanelData.data.queries.length - 1;
+                console.log('removeQuery: activeTab after',  activeTab.value);
+            }
         };
 
         const currentQuery = computed({
@@ -100,6 +124,7 @@ export default defineComponent({
                 return promqlMode.value ? dashboardPanelData.data.queries[activeTab.value].query : dashboardPanelData.data.queries[0].query
             },
             set: (value) => {
+                console.log('value', value);
                 if (promqlMode.value) {
                     dashboardPanelData.data.queries[activeTab.value].query = value
                 } else {
@@ -329,6 +354,7 @@ export default defineComponent({
             onUpdateToggle,
             activeTab,
             addTab,
+            removeQuery,
             currentQuery
         };
     },
