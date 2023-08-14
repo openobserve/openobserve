@@ -24,7 +24,7 @@
           outlined></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
-        <q-select style="min-width: 150px;" outlined dense v-model="item.value" :display-value="item.value ? item.value : '(No Options Available)'" :options="item.options" map-options stack-label filled borderless
+        <q-select style="min-width: 150px;" outlined dense v-model="item.value" :display-value="item.value ? item.value : !item.isLoading ? '(No Options Available)' : ''" :options="item.options" map-options stack-label filled borderless
           :label="item.label || item.name" option-value="value" option-label="label" emit-value>
           <template v-slot:no-option>
               <q-item>
