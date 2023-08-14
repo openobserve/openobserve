@@ -40,6 +40,18 @@ export const convertSQLData = (
       : [];
   };
 
+  // get the z axis key
+  const getZAxisKeys = () => {
+    console.log(
+      "props.data?.queries[0]?.fields.z",
+      props.data?.queries[0]?.fields?.z
+    );
+
+    return props.data?.queries[0]?.fields?.z?.length
+      ? props.data?.queries[0]?.fields?.z.map((it: any) => it.alias)
+      : [];
+  };
+
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
     console.log("key", key);
@@ -422,12 +434,15 @@ export const convertSQLData = (
 
         return layout;
       }
-      case "heatmap":{
+      case "heatmap": {
         const xaxis: any = {
-            title: props.data.fields?.x[0]?.label,
-            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-            automargin: true
-        }
+          title: props.data.fields?.x[0]?.label,
+          tickangle:
+            props.data?.fields?.x[0]?.aggregationFunction == "histogram"
+              ? 0
+              : -20,
+          automargin: true,
+        };
         const yaxis: any = {
           title:
             props.data.fields?.y?.length == 1
@@ -443,17 +458,22 @@ export const convertSQLData = (
         // if the first field is timestamp we dont want to show the tickvals
         // format value only for without timestamp
         // stacked chart is alwayes stacked with first field value
-        if(props.data.fields?.x.length && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
-            xaxis["tickmode"] = "array",
-            xaxis["tickvals"] = xAxisDataWithTicks,
-            xaxis["ticktext"] = textformat(xAxisDataWithTicks)
+        if (
+          props.data.fields?.x.length &&
+          props.data.fields?.x[0].aggregationFunction != "histogram" &&
+          !props.data.fields?.x[0].column !=
+            store.state.zoConfig.timestamp_column
+        ) {
+          (xaxis["tickmode"] = "array"),
+            (xaxis["tickvals"] = xAxisDataWithTicks),
+            (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
         }
         const layout = {
-            xaxis: xaxis,
-            yaxis: yaxis
-        }
-        return layout
-        }
+          xaxis: xaxis,
+          yaxis: yaxis,
+        };
+        return layout;
+      }
       case "h-stacked":
         return {
           barmode: "stack",
@@ -547,6 +567,8 @@ export const convertSQLData = (
 
   // Step 2: Get the Y-Axis key
   const yAxisKeys = getYAxisKeys();
+
+  const zAxisKeys = getZAxisKeys();
 
   let traces: any;
 
@@ -799,7 +821,7 @@ export const convertSQLData = (
       );
 
       // get second x axis key
-      const key1 = xAxisKeys[1];
+      const key1 = yAxisKeys[0];
       // get the unique value of the second xAxis's key
       const xAxisFirstPositionUniqueValue = [
         ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
@@ -809,7 +831,7 @@ export const convertSQLData = (
         xAxisFirstPositionUniqueValue
       );
 
-      const yAxisKey0 = yAxisKeys[0];
+      const yAxisKey0 = zAxisKeys[0];
       traces = [];
       const Zvalues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
         return xAxisZerothPositionUniqueValue.map((zero: any) => {

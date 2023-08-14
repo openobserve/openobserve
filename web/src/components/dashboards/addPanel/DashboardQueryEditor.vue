@@ -151,6 +151,7 @@ export default defineComponent({
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x,
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z,
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter,
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery
         ], () => {
@@ -167,7 +168,7 @@ export default defineComponent({
                 // STEP 2: Now, continue if we have at least 1 field selected
                 // merge the fields list
                 let query = "SELECT "
-                const fields = [...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x, ...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y]
+                const fields = [...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x, ...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y, ...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z]
                 const filter = [...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.filter]
                 const array = fields.map((field, i) => {
                     let selector = ""
