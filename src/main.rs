@@ -106,6 +106,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .with(console_layer)
             // add other layers...
             .with(tracing_subscriber::fmt::layer())
+            .with(tracing_subscriber::EnvFilter::new(&CONFIG.log.level))
             .init();
         // env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
     }
