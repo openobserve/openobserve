@@ -97,7 +97,7 @@ export default defineComponent({
         const currentQuery = computed({
             get: () => {
                 console.log('query getter accessed');
-                return promqlMode.value ? dashboardPanelData.data.queries[activeTab.value].query : dashboardPanelData.data.query
+                return promqlMode.value ? dashboardPanelData.data.queries[activeTab.value].query : dashboardPanelData.data.queries[0].query
             },
             set: (value) => {
                 if (promqlMode.value) {
