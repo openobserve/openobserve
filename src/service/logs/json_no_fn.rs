@@ -12,21 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, web};
+use crate::{
+    common::meta::{
+        alert::{Alert, Evaluate, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        usage::UsageType,
+    },
+    service::usage::report_request_usage_stats,
+};
+use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
+use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
+use opentelemetry::trace::{SpanId, TraceId};
+use opentelemetry_proto::tonic::collector::logs::v1::{
+    ExportLogsServiceRequest, ExportLogsServiceResponse,
+};
+use prost::Message;
 
 use super::StreamMeta;
 use crate::common::infra::{cluster, config::CONFIG, metrics};
 use crate::common::meta::stream::StreamParams;
 use crate::common::meta::{
-    alert::{Alert, Trigger},
     ingestion::{IngestionResponse, StreamStatus},
     StreamType,
 };
 use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::service::ingestion;
+use crate::service::ingestion::grpc::get_val;
 use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
 
 pub async fn ingest(
@@ -190,8 +204,287 @@ pub async fn handle_logs_request(
     org_id: &str,
     thread_id: usize,
     request: ExportLogsServiceRequest,
-) -> Result<IngestionResponse, anyhow::Error> {
-    let res_logs = request.resource_logs;
+) -> Result<HttpResponse, anyhow::Error> {
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                "not an ingester".to_string(),
+            )),
+        );
+    }
 
-    Ok(IngestionResponse::new(http::StatusCode::OK.into(), vec![]))
+    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            http::StatusCode::FORBIDDEN.into(),
+            "Quota exceeded for this organisation".to_string(),
+        )));
+    }
+    let start = std::time::Instant::now();
+    let stream_name = "default";
+
+    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+
+    let stream_schema = stream_schema_exists(
+        org_id,
+        stream_name,
+        StreamType::Traces,
+        &mut stream_schema_map,
+    )
+    .await;
+
+    let mut partition_keys: Vec<String> = vec![];
+    if stream_schema.has_partition_keys {
+        let partition_det =
+            crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map)
+                .await;
+        partition_keys = partition_det.partition_keys;
+    }
+
+    // Start get stream alerts
+    let key = format!("{}/{}/{}", &org_id, StreamType::Traces, stream_name);
+    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    // End get stream alert
+
+    let mut trigger: Option<Trigger> = None;
+
+    let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
+
+    for resource_logs in &request.resource_logs {
+        for instrumentation_logs in &resource_logs.instrumentation_library_logs {
+            for log_record in &instrumentation_logs.log_records {
+                let mut rec = json::json!({});
+
+                match &resource_logs.resource {
+                    Some(res) => {
+                        for item in &res.attributes {
+                            rec[item.key.as_str()] = get_val(&item.value);
+                        }
+                    }
+                    None => {}
+                }
+                match &instrumentation_logs.instrumentation_library {
+                    Some(lib) => {
+                        rec["instrumentation_library_name"] =
+                            serde_json::Value::String(lib.name.to_owned());
+                        rec["instrumentation_library_version"] =
+                            serde_json::Value::String(lib.version.to_owned());
+                    }
+                    None => {}
+                }
+                rec[CONFIG.common.column_timestamp.clone()] = if log_record.time_unix_nano != 0 {
+                    log_record.time_unix_nano / 1000
+                } else if log_record.observed_time_unix_nano != 0 {
+                    log_record.observed_time_unix_nano / 1000
+                } else {
+                    Utc::now().timestamp_micros() as u64
+                }
+                .into();
+                rec["severity"] = log_record.severity_text.to_owned().into();
+                //rec["name"] = log_record.name.to_owned().into();
+                rec["body"] = get_val(&log_record.body);
+                for item in &log_record.attributes {
+                    rec[item.key.as_str()] = get_val(&item.value);
+                }
+                rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
+                match TraceId::from_bytes(
+                    log_record
+                        .trace_id
+                        .as_slice()
+                        .try_into()
+                        .unwrap_or_default(),
+                ) {
+                    TraceId::INVALID => {}
+                    _ => {
+                        rec["trace_id"] =
+                            TraceId::from_bytes(log_record.trace_id.as_slice().try_into().unwrap())
+                                .to_string()
+                                .into();
+                    }
+                };
+
+                match SpanId::from_bytes(
+                    log_record.span_id.as_slice().try_into().unwrap_or_default(),
+                ) {
+                    SpanId::INVALID => {}
+                    _ => {
+                        rec["span_id"] =
+                            SpanId::from_bytes(log_record.span_id.as_slice().try_into().unwrap())
+                                .to_string()
+                                .into();
+                    }
+                };
+
+                let value_str = json::to_string(&rec).unwrap();
+
+                let timestamp = rec[CONFIG.common.column_timestamp.clone()]
+                    .as_u64()
+                    .unwrap();
+
+                // get hour key
+                let hour_key = ingestion::get_hour_key(
+                    timestamp.try_into().unwrap(),
+                    &partition_keys,
+                    rec.as_object().unwrap(),
+                    None,
+                );
+
+                if !stream_alerts_map.is_empty() {
+                    // Start check for alert trigger
+                    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, stream_name);
+                    if let Some(alerts) = stream_alerts_map.get(&key) {
+                        for alert in alerts {
+                            if alert.is_real_time {
+                                let set_trigger =
+                                    alert.condition.evaluate(rec.as_object().unwrap().clone());
+                                if set_trigger {
+                                    trigger = Some(Trigger {
+                                        timestamp: timestamp.try_into().unwrap(),
+                                        is_valid: true,
+                                        alert_name: alert.name.clone(),
+                                        stream: stream_name.to_string(),
+                                        org: org_id.to_string(),
+                                        stream_type: StreamType::Logs,
+                                        last_sent_at: 0,
+                                        count: 0,
+                                        is_ingest_time: true,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    // End check for alert trigger
+                }
+
+                let hour_buf = data_buf.entry(hour_key.clone()).or_default();
+
+                hour_buf.push(value_str);
+            }
+        }
+    }
+
+    // write to file
+    let mut stream_file_name = "".to_string();
+    let mut req_stats = write_file(
+        data_buf,
+        thread_id,
+        StreamParams {
+            org_id,
+            stream_name,
+            stream_type: StreamType::Logs,
+        },
+        &mut stream_file_name,
+        None,
+    );
+
+    // only one trigger per request, as it updates etcd
+    super::evaluate_trigger(trigger, stream_alerts_map).await;
+
+    let time = start.elapsed().as_secs_f64();
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/api/org/ingest/logs/_json",
+            "200",
+            org_id,
+            stream_name,
+            StreamType::Logs.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/api/org/ingest/logs/_json",
+            "200",
+            org_id,
+            stream_name,
+            StreamType::Logs.to_string().as_str(),
+        ])
+        .inc();
+
+    req_stats.response_time = start.elapsed().as_secs_f64();
+    //metric + data usage
+    report_request_usage_stats(
+        req_stats,
+        org_id,
+        stream_name,
+        StreamType::Logs,
+        UsageType::Json,
+        0,
+    )
+    .await;
+    let res = ExportLogsServiceResponse {};
+    let mut out = BytesMut::with_capacity(res.encoded_len());
+    res.encode(&mut out).expect("Out of memory");
+
+    return Ok(HttpResponse::Ok()
+        .status(http::StatusCode::OK)
+        .content_type("application/x-protobuf")
+        .body(out));
+}
+
+#[cfg(test)]
+pub mod test {
+
+    use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
+    use opentelemetry_proto::tonic::common::v1::any_value::Value::{IntValue, StringValue};
+    use opentelemetry_proto::tonic::common::v1::InstrumentationLibrary;
+    use opentelemetry_proto::tonic::common::v1::KeyValue;
+    use opentelemetry_proto::tonic::logs::v1::InstrumentationLibraryLogs;
+    use opentelemetry_proto::tonic::logs::v1::ResourceLogs;
+    use opentelemetry_proto::tonic::{common::v1::AnyValue, logs::v1::LogRecord};
+
+    #[tokio::test]
+    async fn test_handle_logs_request() {
+        let org_id = "test_org_id";
+        let thread_id = 0;
+
+        let log_rec = LogRecord {
+            time_unix_nano: 1581452773000000789,
+            severity_number: 9,
+            severity_text: "Info".to_string(),
+            //name: "logA".to_string(),
+            body: Some(AnyValue {
+                value: Some(StringValue("This is a log message".to_string())),
+            }),
+            attributes: vec![
+                KeyValue {
+                    key: "app".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(StringValue("server".to_string())),
+                    }),
+                },
+                KeyValue {
+                    key: "instance_num".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(IntValue(1)),
+                    }),
+                },
+            ],
+            dropped_attributes_count: 1,
+            trace_id: "".as_bytes().to_vec(),
+            span_id: "".as_bytes().to_vec(),
+            ..Default::default()
+        };
+
+        let ins = InstrumentationLibraryLogs {
+            instrumentation_library: Some(InstrumentationLibrary {
+                name: "test".to_string(),
+                version: "1.0.0".to_string(),
+            }),
+            log_records: vec![log_rec],
+            ..Default::default()
+        };
+
+        let res_logs = ResourceLogs {
+            instrumentation_library_logs: vec![ins],
+            ..Default::default()
+        };
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![res_logs],
+        };
+
+        let result = super::handle_logs_request(org_id, thread_id, request).await;
+        assert!(result.is_ok());
+    }
 }

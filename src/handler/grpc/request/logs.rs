@@ -2,13 +2,13 @@ use async_trait::async_trait;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
+use tonic::Response;
 use tonic::Status;
-use tonic::{codegen::*, Response};
 
 use crate::common::infra::config::CONFIG;
 
 #[derive(Default)]
-pub struct LogsServer {}
+pub struct LogsServer;
 
 #[async_trait]
 impl LogsService for LogsServer {

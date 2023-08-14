@@ -41,6 +41,7 @@ use crate::common::utils::{
     notification::send_notification,
 };
 use crate::service::{db, format_partition_key, stream::stream_settings, triggers};
+pub mod grpc;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {

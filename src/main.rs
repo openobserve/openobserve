@@ -20,7 +20,10 @@ use opentelemetry::{
     KeyValue,
 };
 use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
+use opentelemetry_proto::tonic::collector::{
+    logs::v1::logs_service_server::LogsServiceServer,
+    trace::v1::trace_service_server::TraceServiceServer,
+};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -50,8 +53,8 @@ use openobserve::{
                 search_server::SearchServer, usage_server::UsageServer,
             },
             request::{
-                event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer,
-                usage::UsageServerImpl,
+                event::Eventer, logs::LogsServer, metrics::Querier, search::Searcher,
+                traces::TraceServer, usage::UsageServerImpl,
             },
         },
         http::router::*,
@@ -229,6 +232,9 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
     let usage_svc = UsageServer::new(UsageServerImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
+    let logs_svc = LogsServiceServer::new(LogsServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
     let tracer = TraceServer::default();
     let trace_svc = TraceServiceServer::new(tracer);
 
@@ -241,6 +247,7 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
             .add_service(metrics_svc)
             .add_service(trace_svc)
             .add_service(usage_svc)
+            .add_service(logs_svc)
             .serve(gaddr)
             .await
             .expect("gRPC server init failed");
