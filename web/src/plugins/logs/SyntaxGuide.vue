@@ -37,8 +37,8 @@
                 <li>
                   For full text search of value 'error' use
                   <span class="bg-highlight"
-                    >match_all('error') in query editor</span
-                  >
+                    >match_all('error')
+                  > in query editor</span
                 </li>
                 <li>
                   For case-insensitive full text search of value 'error' use
