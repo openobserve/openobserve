@@ -167,7 +167,7 @@ pub async fn remote_write(
             }
 
             if first_line && dedup_enabled {
-                match METRIC_CLUSTER_LEADER.get(&cluster_name) {
+                match METRIC_CLUSTER_LEADER.clone().get(&cluster_name) {
                     Some(leader) => {
                         last_received = leader.last_received;
                         has_entry = true;
