@@ -245,6 +245,9 @@ pub struct Common {
 
 #[derive(EnvConfig)]
 pub struct Limit {
+    // no need set by environment
+    pub cpu_num: usize,
+    pub mem_total: usize,
     #[env_config(name = "ZO_JSON_LIMIT", default = 209715200)]
     pub req_json_limit: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
@@ -267,8 +270,6 @@ pub struct Limit {
     pub metrics_leader_election_interval: i64,
     #[env_config(name = "ZO_HEARTBEAT_INTERVAL", default = 30)] // in minutes
     pub hb_interval: i64,
-    // no need set by environment
-    pub cpu_num: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 0)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
@@ -567,6 +568,7 @@ fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     let mem_total = cgroup::get_memory_limit();
+    cfg.limit.mem_total = mem_total;
     if cfg.memory_cache.max_size == 0 {
         cfg.memory_cache.max_size = mem_total / 2; // 50%
     } else {
