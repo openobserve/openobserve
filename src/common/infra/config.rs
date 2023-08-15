@@ -20,17 +20,16 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use reqwest::Client;
 use std::{sync::Arc, time::Duration};
-use sys_info::hostname;
 use vector_enrichment::TableRegistry;
 
-use crate::common::file::get_file_meta;
-use crate::common::meta::alert::{
-    AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer,
+use crate::common::meta::{
+    alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer},
+    functions::{StreamFunctionsList, Transform},
+    prom::ClusterLeader,
+    syslog::SyslogRoute,
+    user::User,
 };
-use crate::common::meta::functions::{StreamFunctionsList, Transform};
-use crate::common::meta::prom::ClusterLeader;
-use crate::common::meta::syslog::SyslogRoute;
-use crate::common::meta::user::User;
+use crate::common::{cgroup, file::get_file_meta};
 use crate::service::enrichment::StreamTable;
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -418,7 +417,7 @@ pub fn init() -> Config {
     dotenv().ok();
     let mut cfg = Config::init().unwrap();
     // set cpu num
-    let cpu_num = sys_info::cpu_num().unwrap() as usize;
+    let cpu_num = cgroup::get_cpu_limit();
     cfg.limit.cpu_num = cpu_num;
     if cfg.limit.http_worker_num == 0 {
         cfg.limit.http_worker_num = cpu_num;
@@ -471,7 +470,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
-        cfg.common.instance_name = hostname().unwrap();
+        cfg.common.instance_name = sys_info::hostname().unwrap();
     }
 
     // HACK for tracing, always disable tracing except ingester and querier
@@ -567,10 +566,9 @@ fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    let mem_total = cgroup::get_memory_limit();
     if cfg.memory_cache.max_size == 0 {
-        // meminfo unit is KB
-        let meminfo = sys_info::mem_info()?;
-        cfg.memory_cache.max_size = meminfo.total as usize * 1024 / 2; // 50%
+        cfg.memory_cache.max_size = mem_total / 2; // 50%
     } else {
         cfg.memory_cache.max_size *= 1024 * 1024;
     }
