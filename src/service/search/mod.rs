@@ -80,7 +80,7 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
     (time_min, time_max)
 }
 
-#[tracing::instrument(skip(sql),fields(org_id = sql.org_id,stream_name = sql.stream_name))]
+#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<FileKey> {
     let (time_min, time_max) = get_times(sql, stream_type).await;
     let file_list = match file_list::get_file_list(

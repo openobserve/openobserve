@@ -20,9 +20,9 @@ use tokio::{sync::Semaphore, task, time};
 use crate::common::infra::{cluster, config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
 use crate::common::{json, utils::populate_file_meta};
-
-use crate::service::usage::report_compression_stats;
-use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
+use crate::service::{
+    db, schema::schema_evolution, search::datafusion::new_writer, usage::report_compression_stats,
+};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -54,7 +54,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         if columns.len() != 5 {
             continue;
         }
-        let _ = columns[0].to_string();
+        // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);
         let stream_name = columns[3].to_string();
@@ -73,6 +73,15 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             );
             wal::MEMORY_FILES.remove(&file);
             continue;
+        }
+
+        let mut partitions = file_name.split('_').collect::<Vec<&str>>();
+        partitions.retain(|&x| x.contains('='));
+        let mut partition_key = String::from("");
+        for key in partitions {
+            let key = key.replace('.', "_");
+            partition_key.push_str(&key);
+            partition_key.push('/');
         }
 
         let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -100,6 +109,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                                 metrics::INGEST_WAL_USED_BYTES
                                     .with_label_values(&[columns[1], columns[3], columns[2]])
                                     .sub(meta.original_size as i64);
+
                                 report_compression_stats(
                                     meta.into(),
                                     &org_id,
