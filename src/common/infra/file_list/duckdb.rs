@@ -41,6 +41,10 @@ pub struct DuckDB {
     pub client: r2d2::Pool<DuckdbConnectionManager>,
 }
 
+pub async fn init() -> Result<()> {
+    Ok(())
+}
+
 impl DuckDB {
     pub async fn connect() -> DuckDB {
         let db_path = format!("{}duckdb", CONFIG.common.data_cache_dir);

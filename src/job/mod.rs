@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::common::infra::config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED};
-use crate::common::infra::{cluster, ider};
+use crate::common::infra::{cluster, file_list as infra_file_list, ider};
 use crate::common::meta::organization::DEFAULT_ORG;
 use crate::common::meta::user::UserRequest;
 use crate::service::{db, users};
@@ -125,6 +125,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     // cache file list
+    infra_file_list::init().await?;
     // if !CONFIG.common.file_list_external {
     db::file_list::remote::cache("", false)
         .await

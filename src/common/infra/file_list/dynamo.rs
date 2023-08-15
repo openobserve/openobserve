@@ -41,6 +41,10 @@ lazy_static! {
     static ref CLIENT: AsyncOnce<Client> = AsyncOnce::new(async { connect().await });
 }
 
+pub async fn init() -> Result<()> {
+    Ok(())
+}
+
 async fn connect() -> Client {
     let client = if CONFIG.common.local_mode {
         let region = Region::new("us-west-2");

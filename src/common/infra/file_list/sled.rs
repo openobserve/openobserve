@@ -29,6 +29,11 @@ lazy_static! {
     static ref CLIENT: ::sled::Db = connect();
 }
 
+pub async fn init() -> Result<()> {
+    _ = CLIENT.clone().is_empty();
+    Ok(())
+}
+
 pub fn connect() -> ::sled::Db {
     ::sled::open(format!("{}file_list.sled", CONFIG.common.data_cache_dir))
         .expect("sled db dir create failed")

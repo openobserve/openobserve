@@ -65,6 +65,16 @@ pub trait FileList: Sync + 'static {
     async fn clear(&self) -> Result<()>;
 }
 
+pub async fn init() -> Result<()> {
+    match CONFIG.common.file_list_storage.as_str() {
+        "sled" => sled::init().await,
+        "sqlite" => sqlite::init().await,
+        "dynamo" => dynamo::init().await,
+        "duckdb" => duckdb::init().await,
+        _ => sled::init().await,
+    }
+}
+
 #[inline]
 pub async fn add(file: &str, meta: &FileMeta) -> Result<()> {
     CLIENT.add(file, meta).await
