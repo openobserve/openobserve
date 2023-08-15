@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap;
 use dashmap::{DashMap, DashSet};
 use datafusion::arrow::datatypes::Schema;
 use dotenv_config::EnvConfig;
@@ -36,6 +37,7 @@ pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
 pub type RwHashMap<K, V> = DashMap<K, V, ahash::RandomState>;
 pub type RwHashSet<K> = DashSet<K, ahash::RandomState>;
+pub type RwAHashMap<K, V> = tokio::sync::RwLock<AHashMap<K, V>>;
 
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -71,9 +73,10 @@ pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashM
 pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
-pub static METRIC_CLUSTER_MAP: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(DashMap::default);
-pub static METRIC_CLUSTER_LEADER: Lazy<RwHashMap<String, ClusterLeader>> =
-    Lazy::new(DashMap::default);
+pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
+pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
 pub static STREAM_ALERTS: Lazy<RwHashMap<String, AlertList>> = Lazy::new(DashMap::default);
 pub static TRIGGERS: Lazy<RwHashMap<String, Trigger>> = Lazy::new(DashMap::default);
 pub static TRIGGERS_IN_PROCESS: Lazy<RwHashMap<String, TriggerTimer>> = Lazy::new(DashMap::default);

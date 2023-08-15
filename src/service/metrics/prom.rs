@@ -22,7 +22,7 @@ use std::collections::HashMap;
 
 use crate::common::infra::{
     cache::stats,
-    cluster,
+    cluster::{self, LOCAL_NODE_UUID},
     config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
     errors::{Error, Result},
     metrics,
@@ -167,7 +167,12 @@ pub async fn remote_write(
             }
 
             if first_line && dedup_enabled {
-                match METRIC_CLUSTER_LEADER.clone().get(&cluster_name) {
+                match METRIC_CLUSTER_LEADER
+                    .clone()
+                    .read()
+                    .await
+                    .get(&cluster_name)
+                {
                     Some(leader) => {
                         last_received = leader.last_received;
                         has_entry = true;
@@ -759,18 +764,23 @@ async fn prom_ha_handler(
     let mut _accept_record = false;
     let curr_ts = Utc::now().timestamp_micros();
     if !has_entry {
-        METRIC_CLUSTER_MAP.insert(cluster_name.to_owned(), vec![]);
+        METRIC_CLUSTER_MAP
+            .write()
+            .await
+            .insert(cluster_name.to_owned(), vec![]);
         log::info!("Making {} leader for {} ", replica_label, cluster_name);
-        METRIC_CLUSTER_LEADER.insert(
+        METRIC_CLUSTER_LEADER.write().await.insert(
             cluster_name.to_owned(),
             prom::ClusterLeader {
                 name: replica_label.to_owned(),
                 last_received: curr_ts,
+                updated_by: LOCAL_NODE_UUID.to_string(),
             },
         );
         _accept_record = true;
     } else {
-        let mut leader = METRIC_CLUSTER_LEADER.get_mut(cluster_name).unwrap();
+        let mut lock = METRIC_CLUSTER_LEADER.write().await;
+        let leader = lock.get_mut(cluster_name).unwrap();
         if replica_label.eq(&leader.name) {
             _accept_record = true;
             leader.last_received = curr_ts;
@@ -797,12 +807,18 @@ async fn prom_ha_handler(
         }
     }
 
-    let mut replica_list = METRIC_CLUSTER_MAP
-        .entry(cluster_name.to_owned())
-        .or_default();
-    if !replica_list.contains(&replica_label.to_string()) {
+    let mut lock = METRIC_CLUSTER_MAP.write().await;
+    let replica_list = lock.entry(cluster_name.to_owned()).or_default();
+    let replica_list_db = if !replica_list.contains(&replica_label.to_string()) {
         replica_list.push(replica_label.to_owned());
-        let _ = db::metrics::set_prom_cluster_info(cluster_name, &replica_list.to_vec()).await;
+        replica_list.clone()
+    } else {
+        vec![]
+    };
+    drop(lock);
+
+    if !replica_list_db.is_empty() {
+        let _ = db::metrics::set_prom_cluster_info(cluster_name, &replica_list_db.to_vec()).await;
     }
 
     _accept_record

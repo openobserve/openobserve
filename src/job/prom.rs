@@ -41,18 +41,19 @@ pub async fn run() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         // only update if there's a change
-        for item in METRIC_CLUSTER_LEADER.clone().iter() {
-            if last_leaders.contains_key(item.key()) {
-                let last_leader = last_leaders.get(item.key()).unwrap();
-                if item.value().eq(last_leader) {
+        let map = METRIC_CLUSTER_LEADER.read().await.clone();
+        for (key, value) in map.iter() {
+            if last_leaders.contains_key(key) {
+                let last_leader = last_leaders.get(key).unwrap();
+                if value.eq(last_leader) {
                     continue;
                 }
             }
 
-            let result = db::metrics::set_prom_cluster_leader(item.key(), item.value()).await;
+            let result = db::metrics::set_prom_cluster_leader(key, value).await;
             match result {
                 Ok(_) => {
-                    let _ = last_leaders.insert(item.key().to_string(), item.value().clone());
+                    let _ = last_leaders.insert(key.to_string(), value.clone());
                 }
                 Err(err) => log::error!("error updating leader to db {}", err),
             }
