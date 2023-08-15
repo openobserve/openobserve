@@ -21,20 +21,13 @@ use std::{
 };
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::infra::{cluster, config::CONFIG, metrics, storage, wal};
+use crate::common::infra::{config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
 use crate::common::{file::scan_files, json, utils::populate_file_meta};
 use crate::service::usage::report_compression_stats;
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(()); // not an ingester, no need to init job
-    }
-
-    // create wal dir
-    fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
-
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
     interval.tick().await; // trigger the first run
     loop {
@@ -108,7 +101,6 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
             let ret =
                 upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
-            drop(permit);
             match ret {
                 Err(e) => log::error!("[JOB] Error while uploading disk file to storage {}", e),
                 Ok((key, meta, _stream_type)) => {
@@ -151,6 +143,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     }
                 }
             };
+            drop(permit);
             Ok(())
         });
         tasks.push(task);

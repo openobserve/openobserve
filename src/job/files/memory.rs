@@ -17,7 +17,7 @@ use datafusion::arrow::json::{reader::infer_json_schema, ReaderBuilder};
 use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::infra::{cluster, config::CONFIG, metrics, storage, wal};
+use crate::common::infra::{config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
 use crate::common::{json, utils::populate_file_meta};
 use crate::service::{
@@ -25,8 +25,8 @@ use crate::service::{
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(()); // not an ingester, no need to init job
+    if !CONFIG.common.wal_memory_mode_enabled {
+        return Ok(());
     }
 
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
@@ -75,15 +75,6 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             continue;
         }
 
-        let mut partitions = file_name.split('_').collect::<Vec<&str>>();
-        partitions.retain(|&x| x.contains('='));
-        let mut partition_key = String::from("");
-        for key in partitions {
-            let key = key.replace('.', "_");
-            partition_key.push_str(&key);
-            partition_key.push('/');
-        }
-
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
             let ret = upload_file(
@@ -95,7 +86,6 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 data,
             )
             .await;
-            drop(permit);
             match ret {
                 Err(e) => log::error!("[JOB] Error while uploading memory file to storage {}", e),
 
@@ -127,6 +117,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     }
                 }
             };
+            drop(permit);
             Ok(())
         });
         tasks.push(task);

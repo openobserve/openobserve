@@ -140,8 +140,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { alert_manager::run().await });
 
     // ingester run
-    tokio::task::spawn(async move { files::disk::run().await });
-    tokio::task::spawn(async move { files::memory::run().await });
+    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?; // create wal dir
+    }
+    tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { file_list::run().await });
     tokio::task::spawn(async move { prom::run().await });
     tokio::task::spawn(async move { metrics::run().await });
