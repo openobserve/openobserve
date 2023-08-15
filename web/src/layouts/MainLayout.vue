@@ -719,7 +719,7 @@ export default defineComponent({
       return this.store.state.organizations;
     },
     changeOrganizationIdentifier() {
-      return this.store.state.selectedOrganization.identifier;
+      return this.store.state.selectedOrganization?.identifier;
     },
     forceFetchOrganization() {
       return this.router.currentRoute.value.query.update_org;

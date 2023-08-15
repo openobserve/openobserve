@@ -246,9 +246,6 @@ export default defineComponent({
       console.log(value);
     },
     createNewValue(inputValue, doneFn) {
-      // Do something with the new value
-      console.log(`New value created: ${inputValue}`);
-
       // Call the doneFn with the new value
       doneFn(inputValue);
     },

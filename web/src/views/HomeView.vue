@@ -238,7 +238,7 @@ export default defineComponent({
   },
   computed: {
     selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
+      return this.store.state.selectedOrganization?.identifier;
     },
   },
   watch: {
