@@ -54,6 +54,9 @@ pub async fn merge_by_stream(
 
     // get schema
     let mut schema = db::schema::get(org_id, stream_name, stream_type).await?;
+    let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
+    let partition_time_level =
+        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
     let stream_created = stream::stream_created(&schema).unwrap_or_default();
     std::mem::take(&mut schema.metadata);
     let schema = Arc::new(schema);
@@ -116,6 +119,7 @@ pub async fn merge_by_stream(
         org_id,
         stream_name,
         stream_type,
+        partition_time_level,
         partition_offset_start,
         partition_offset_end,
     )
