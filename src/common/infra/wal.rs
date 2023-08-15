@@ -60,6 +60,11 @@ pub struct RwFile {
     expired: i64,
 }
 
+pub fn init() {
+    _ = MANAGER.data.len();
+    _ = MEMORY_FILES.list().len();
+}
+
 pub fn get_or_create(
     thread_id: usize,
     stream: StreamParams,

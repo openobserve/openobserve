@@ -86,37 +86,36 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 data,
             )
             .await;
-            match ret {
-                Err(e) => log::error!("[JOB] Error while uploading memory file to storage {}", e),
+            if let Err(e) = ret {
+                log::error!("[JOB] Error while uploading memory file to storage {}", e);
+                drop(permit);
+                return Ok(());
+            }
 
-                Ok((key, meta, _stream_type)) => {
-                    match db::file_list::local::set(&key, meta, false).await {
-                        Ok(_) => {
-                            wal::MEMORY_FILES.remove(&local_file);
-                            // metrics
-                            let columns = key.split('/').collect::<Vec<&str>>();
-                            if columns[0] == "files" {
-                                metrics::INGEST_WAL_USED_BYTES
-                                    .with_label_values(&[columns[1], columns[3], columns[2]])
-                                    .sub(meta.original_size as i64);
+            let (key, meta, _stream_type) = ret.unwrap();
+            let ret = db::file_list::local::set(&key, meta, false).await;
+            if let Err(e) = ret {
+                log::error!(
+                    "[JOB] Failed write memory file meta: {}, error: {}",
+                    local_file,
+                    e.to_string()
+                );
+                drop(permit);
+                return Ok(());
+            }
 
-                                report_compression_stats(
-                                    meta.into(),
-                                    &org_id,
-                                    &stream_name,
-                                    stream_type,
-                                )
-                                .await;
-                            }
-                        }
-                        Err(e) => log::error!(
-                            "[JOB] Failed write memory file meta:{}, error: {}",
-                            local_file,
-                            e.to_string()
-                        ),
-                    }
-                }
-            };
+            // delete files
+            wal::MEMORY_FILES.remove(&local_file);
+
+            // metrics
+            let columns = key.split('/').collect::<Vec<&str>>();
+            if columns[0] == "files" {
+                metrics::INGEST_WAL_USED_BYTES
+                    .with_label_values(&[columns[1], columns[3], columns[2]])
+                    .sub(meta.original_size as i64);
+                report_compression_stats(meta.into(), &org_id, &stream_name, stream_type).await;
+            }
+
             drop(permit);
             Ok(())
         });

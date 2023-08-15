@@ -117,7 +117,11 @@ async fn main() -> Result<(), anyhow::Error> {
     cluster::register_and_keepalive()
         .await
         .expect("cluster init failed");
-    let _ = ider::generate();
+    // init ider
+    ider::init();
+    // init wal
+    wal::init();
+    // init job
     job::init().await.expect("job init failed");
 
     // gRPC server

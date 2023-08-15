@@ -54,6 +54,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
 
 pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Error> {
     Ok(ALERTS_TEMPLATES
+        .clone()
         .iter()
         .filter_map(|template| {
             let k = template.key();

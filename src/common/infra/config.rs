@@ -342,9 +342,9 @@ pub struct Etcd {
     pub addr: String,
     #[env_config(name = "ZO_ETCD_PREFIX", default = "/zinc/observe/")]
     pub prefix: String,
-    #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 2)]
+    #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
-    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 5)]
+    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 10)]
     pub command_timeout: u64,
     #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,

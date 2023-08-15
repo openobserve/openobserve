@@ -40,10 +40,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     loop {
         interval.tick().await;
-        let leaders = METRIC_CLUSTER_LEADER.clone();
-
         // only update if there's a change
-        for item in leaders.iter() {
+        for item in METRIC_CLUSTER_LEADER.clone().iter() {
             if last_leaders.contains_key(item.key()) {
                 let last_leader = last_leaders.get(item.key()).unwrap();
                 if item.value().eq(last_leader) {
