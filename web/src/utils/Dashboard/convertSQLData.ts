@@ -546,6 +546,153 @@ export const convertSQLData = (
     });
     return traces;
   };
+// const getUnitValue = (value: any) => {
+//   switch (props.data.value.config?.unit) {
+//     case "bytes": {
+//       const units = ["B", "KB", "MB", "GB", "TB"];
+//       for (let unit of units) {
+//         if (value < 1024) {
+//           return {
+//             value: `${parseFloat(value).toFixed(2)}`,
+//             unit: `${unit}`,
+//           };
+//         }
+//         value /= 1024;
+//       }
+//       return {
+//         value: `${parseFloat(value).toFixed(2)}`,
+//         unit: "PB",
+//       };
+//     }
+//     case "custom": {
+//       return {
+//         value: `${value}`,
+//         unit: `${props.data.value.config.unit_custom ?? ""}`,
+//       };
+//     }
+//     case "seconds": {
+//       const units = [
+//         { unit: "ms", divisor: 0.001 },
+//         { unit: "s", divisor: 1 },
+//         { unit: "m", divisor: 60 },
+//         { unit: "h", divisor: 3600 },
+//         { unit: "D", divisor: 86400 },
+//         { unit: "M", divisor: 2592000 }, // Assuming 30 days in a month
+//         { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
+//       ];
+//       for (const unitInfo of units) {
+//         const unitValue = value ? value / unitInfo.divisor : 0;
+//         if (unitValue >= 1 && unitValue < 1000) {
+//           return {
+//             value: unitValue.toFixed(2),
+//             unit: unitInfo.unit,
+//           };
+//         }
+//       }
+
+//       // If the value is too large to fit in any unit, return the original seconds
+//       return {
+//         value: value,
+//         unit: "s",
+//       };
+//     }
+//     case "bps": {
+//       const units = ["B", "KB", "MB", "GB", "TB"];
+//       for (let unit of units) {
+//         if (value < 1024) {
+//           return {
+//             value: `${parseFloat(value).toFixed(2)}`,
+//             unit: `${unit}/s`,
+//           };
+//         }
+//         value /= 1024;
+//       }
+//       return {
+//         value: `${parseFloat(value).toFixed(2)}`,
+//         unit: "PB/s",
+//       };
+//     }
+//     case "percent-1": {
+//       return {
+//         value: `${(parseFloat(value) * 100).toFixed(2)}`,
+//         unit: "%",
+//       };
+//       // `${parseFloat(value) * 100}`;
+//     }
+//     case "percent": {
+//       return {
+//         value: `${parseFloat(value).toFixed(2)}`,
+//         unit: "%",
+//       };
+//       // ${parseFloat(value)}`;
+//     }
+//     case "default": {
+//       return {
+//         value: value,
+//         unit: "",
+//       };
+//     }
+//     default: {
+//       return {
+//         value: value,
+//         unit: "",
+//       };
+//     }
+//   }
+// };
+
+// const formatUnitValue = (obj: any) => {
+//   return `${obj.value}${obj.unit}`;
+// };
+
+// const maxValueSize =
+//   props.data.value.type == "area-stacked"
+//     ? tracess.reduce((sum: any, it: any) => {
+//         let max = it.y.reduce((max: any, it: any) => {
+//           if (!isNaN(it)) return Math.max(max, it);
+//           return max;
+//         }, 0);
+//         return sum + max;
+//       }, 0)
+//     : tracess.reduce((max: any, it: any) => {
+//         return it.y.reduce((max: any, it: any) => {
+//           if (!isNaN(it)) return Math.max(max, it);
+//           return max;
+//         }, 0);
+//       });
+
+// // Calculate the minimum value size from the 'y' values in the 'traces' array
+// const minValueSize = tracess.reduce((min: any, it: any) => {
+//   return it.y.reduce((min: any, it: any) => {
+//     if (!isNaN(it)) return Math.min(min, it);
+//     return min;
+//   }, maxValueSize);
+// });
+
+// // Initialize empty arrays to hold tick values and tick text
+// let yTickVals = [];
+// let yTickText = [];
+
+// // Calculate the interval size for 5 equally spaced ticks
+// let intervalSize = (maxValueSize - minValueSize) / 4;
+
+// // If the data doesn't vary much, use a percentage of the max value as the interval size
+// if (intervalSize === 0) {
+//   intervalSize = maxValueSize * 0.2;
+// }
+
+// // Generate tick values and tick text for the y-axis
+// for (let i = 0; i <= 4; i++) {
+//   let val = minValueSize + intervalSize * i;
+//   yTickVals.push(minValueSize + intervalSize * i);
+//   yTickText.push(formatUnitValue(getUnitValue(val)));
+// }
+// // result = result.map((it: any) => moment(it + "Z").toISOString(true))
+// const yAxisTickOptions = !props.data.value.config?.unit
+//   ? {}
+//   : { tickvals: yTickVals, ticktext: yTickText };
+
+
 
   const getLegendPosition = (type: string) => {
     const legendPosition = props.data.config?.legends_position;
@@ -605,6 +752,9 @@ export const convertSQLData = (
           },
           x: xData,
           y: getAxisDataFromKey(key),
+          // hovertext: traces.map((value: any) =>
+          //   formatUnitValue(getUnitValue(value[1]))
+          // ),
           customdata: getAxisDataFromKey(xAxisKeys[0]), //TODO: need to check for the data value, check for multiple x
           hovertemplate:
             "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
@@ -931,6 +1081,7 @@ export const convertSQLData = (
       orientation: getLegendPosition("sql"),
       itemclick: ["pie", "donut"].includes(props.data.type) ? "toggle" : false,
     },
+    // ...yAxisTickOptions,
     margin: {
       l: props.data.type == "pie" ? 60 : 32,
       r: props.data.type == "pie" ? 60 : 16,

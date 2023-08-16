@@ -13,13 +13,13 @@
 
     <div class="space"></div>
 
-    <q-select v-if="promqlMode" outlined
+    <q-select outlined
       v-model="dashboardPanelData.data.config.unit" :options="unitOptions" dense
       label="Unit" class="showLabelOnTop" stack-label emit-value
       :display-value="`${dashboardPanelData.data.config.unit ? unitOptions.find(it => it.value == dashboardPanelData.data.config.unit)?.label : 'Default'}`">
     </q-select>
     <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
-    <q-input v-if="promqlMode && dashboardPanelData.data.config.unit == 'custom'" v-model="dashboardPanelData.data.config.unit_custom" label="Custom unit" color="input-border"
+    <q-input v-if=" dashboardPanelData.data.config.unit == 'custom'" v-model="dashboardPanelData.data.config.unit_custom" label="Custom unit" color="input-border"
     bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label filled dense label-slot/>
 
     <div class="space"></div>
