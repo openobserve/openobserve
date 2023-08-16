@@ -381,30 +381,30 @@ export const convertPromQLData = (
   const maxValueSize =
     props.data.value.type == "area-stacked"
       ? tracess.reduce((sum: any, it: any) => {
-          let max = it.y.reduce((max: any, it: any) => {
-            if (!isNaN(it)) return Math.max(max, it);
+          let max = it.y.reduce((max: any, i: any) => {
+            if (!isNaN(i)) return Math.max(max, i);
             return max;
           }, 0);
           return sum + max;
         }, 0)
       : tracess.reduce(
           (max: any, it: any) =>{
-          return it.y.reduce((max: any, it: any) => {
+          return Math.max(max,it.y.reduce((max: any, it: any) => {
             if (!isNaN(it)) return Math.max(max, it);
             return max;
           },
           0
-        );
-          })
+        ));
+          },0)
 
   // Calculate the minimum value size from the 'y' values in the 'traces' array
   const minValueSize = tracess.reduce(
-    (min: any, it: any) => { return it.y.reduce((min:any,it:any)=> { if(!isNaN(it)) return Math.min(min,it);
+    (min: any, it: any) => { return Math.min(min,it.y.reduce((min:any,it:any)=> { if(!isNaN(it)) return Math.min(min,it);
     return min;
    },
     maxValueSize
-  );
-    })
+  ));
+    },maxValueSize)
 
   // Initialize empty arrays to hold tick values and tick text
   let yTickVals = [];
