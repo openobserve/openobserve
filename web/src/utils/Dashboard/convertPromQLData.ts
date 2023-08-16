@@ -52,6 +52,8 @@ export const convertPromQLData = (
   };
 
   const getUnitValue = (value: any) => {
+    console.log("unit value--", props.data.value.config?.unit);
+    
     switch (props.data.value.config?.unit) {
       case "bytes": {
         const units = ["B", "KB", "MB", "GB", "TB"];
@@ -296,7 +298,7 @@ export const convertPromQLData = (
               return {
                 name: getPromqlLegendName(
                   metric.metric,
-                  props.data.value.queries[index].promql_legend
+                  props.data.value.queries[index].config.promql_legend
                 ),
                 x: values.map((value: any) =>
                   moment(value[0] * 1000).toISOString(true)
