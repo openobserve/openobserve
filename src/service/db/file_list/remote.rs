@@ -49,9 +49,9 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let mut tasks = Vec::with_capacity(CONFIG.limit.file_move_thread_num + 1);
+    let mut tasks = Vec::with_capacity(CONFIG.limit.query_thread_num + 1);
     let (tx, mut rx) = mpsc::channel::<Vec<FileKey>>(files_num);
-    let chunk_size = std::cmp::max(1, files_num / CONFIG.limit.file_move_thread_num);
+    let chunk_size = std::cmp::max(1, files_num / CONFIG.limit.query_thread_num);
     for chunk in files.chunks(chunk_size) {
         let chunk = chunk.to_vec();
         let tx = tx.clone();
