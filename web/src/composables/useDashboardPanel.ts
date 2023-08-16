@@ -100,8 +100,10 @@ const useDashboardPanelData = () => {
   const $q = useQuasar();
 
   const resetDashboardPanelData = () => {
-    Object.assign(dashboardPanelData.data, getDefaultDashboardPanelData());
-    // console.log("updated...",dashboardPanelData);
+    console.log("resetDashboardPanelData");
+    
+    Object.assign(dashboardPanelData, getDefaultDashboardPanelData());
+    console.log("updated...",dashboardPanelData);
   };
 
   const generateLabelFromName = (name: string) => {
