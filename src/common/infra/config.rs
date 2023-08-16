@@ -271,14 +271,14 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
+    #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "daily")]
+    pub metrics_file_retention: String,
     #[env_config(name = "ZO_HEARTBEAT_INTERVAL", default = 30)] // in minutes
     pub hb_interval: i64,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 0)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
     pub http_worker_num: usize,
-    #[env_config(name = "ZO_METRIC_FILE_MAX_RETENTION", default = "daily")]
-    pub metric_file_max_retention: String,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // in seconds
     pub calculate_stats_interval: u64,
 }
