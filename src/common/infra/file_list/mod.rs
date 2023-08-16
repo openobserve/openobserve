@@ -39,7 +39,7 @@ pub fn connect() -> Box<dyn FileList> {
         "sqlite" => Box::<sqlite::SqliteFileList>::default(),
         "dynamo" => Box::<dynamo::DynamoFileList>::default(),
         "duckdb" => Box::<duckdb::DuckDBFileList>::default(),
-        _ => Box::<sled::SledFileList>::default(),
+        _ => Box::<sqlite::SqliteFileList>::default(),
     }
 }
 
@@ -73,7 +73,7 @@ pub async fn init() -> Result<()> {
         "sqlite" => sqlite::init().await,
         "dynamo" => dynamo::init().await,
         "duckdb" => duckdb::init().await,
-        _ => sled::init().await,
+        _ => sqlite::init().await,
     }
 }
 

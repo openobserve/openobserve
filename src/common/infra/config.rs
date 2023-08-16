@@ -175,7 +175,7 @@ pub struct Common {
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
-    #[env_config(name = "ZO_FILE_LIST_STORAGE", default = "sled")]
+    #[env_config(name = "ZO_FILE_LIST_STORAGE", default = "sqlite")]
     pub file_list_storage: String,
     // external storage no need sync file_list to s3
     #[env_config(name = "ZO_FILE_LIST_EXTERNAL", default = false)]
@@ -503,7 +503,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // format file list storage
     if cfg.common.file_list_storage.is_empty() {
-        cfg.common.file_list_storage = "sled".to_string();
+        cfg.common.file_list_storage = "sqlite".to_string();
     }
     cfg.common.file_list_storage = cfg.common.file_list_storage.to_lowercase();
     if cfg.common.local_mode || cfg.common.file_list_storage.starts_with("dynamo") {
