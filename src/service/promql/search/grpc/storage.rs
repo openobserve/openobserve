@@ -25,7 +25,7 @@ use crate::common::infra::{cache::file_data, config::CONFIG};
 use crate::common::meta::{
     common::FileKey,
     search::Session as SearchSession,
-    stream::{ScanStats, StreamParams},
+    stream::{PartitionTimeLevel, ScanStats, StreamParams},
     StreamType,
 };
 use crate::service::{
@@ -34,9 +34,10 @@ use crate::service::{
         datafusion::{exec::register_table, storage::StorageType},
         match_source,
     },
+    stream,
 };
 
-#[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip_all,fields(org_id = org_id,stream_name = stream_name))]
+#[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip_all, fields(org_id = org_id, stream_name = stream_name))]
 pub(crate) async fn create_context(
     session_id: &str,
     org_id: &str,
@@ -54,8 +55,30 @@ pub(crate) async fn create_context(
         ));
     }
 
+    // get latest schema
+    let stream_type = StreamType::Metrics;
+    let schema = match db::schema::get(org_id, stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(err) => {
+            log::error!("get schema error: {}", err);
+            return Err(datafusion::error::DataFusionError::Execution(
+                err.to_string(),
+            ));
+        }
+    };
+    let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
+    let partition_time_level =
+        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+
     // get file list
-    let mut files = get_file_list(org_id, stream_name, time_range, filters).await?;
+    let mut files = get_file_list(
+        org_id,
+        stream_name,
+        partition_time_level,
+        time_range,
+        filters,
+    )
+    .await?;
     if files.is_empty() {
         return Ok((
             SessionContext::new(),
@@ -103,17 +126,6 @@ pub(crate) async fn create_context(
         );
     }
 
-    // fetch all schema versions, get latest schema
-    let stream_type = StreamType::Metrics;
-    let schema = match db::schema::get(org_id, stream_name, stream_type).await {
-        Ok(schema) => schema,
-        Err(err) => {
-            log::error!("get schema error: {}", err);
-            return Err(datafusion::error::DataFusionError::Execution(
-                err.to_string(),
-            ));
-        }
-    };
     let schema = Arc::new(
         schema
             .to_owned()
@@ -136,10 +148,11 @@ pub(crate) async fn create_context(
     Ok((ctx, schema, scan_stats))
 }
 
-#[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip_all,fields(org_id = org_id,stream_name = stream_name))]
+#[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip_all, fields(org_id = org_id, stream_name = stream_name))]
 async fn get_file_list(
     org_id: &str,
     stream_name: &str,
+    time_level: PartitionTimeLevel,
     time_range: (i64, i64),
     filters: &[(&str, &str)],
 ) -> Result<Vec<FileKey>> {
@@ -148,6 +161,7 @@ async fn get_file_list(
         org_id,
         stream_name,
         StreamType::Metrics,
+        time_level,
         time_min,
         time_max,
     )

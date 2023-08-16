@@ -62,7 +62,7 @@ impl TableProvider for StorageProvider {
     }
 }
 
-#[tracing::instrument(name = "promql:search:grpc:search", skip_all,fields(org_id = req.org_id))]
+#[tracing::instrument(name = "promql:search:grpc:search", skip_all, fields(org_id = req.org_id))]
 pub async fn search(
     req: &cluster_rpc::MetricsQueryRequest,
 ) -> Result<cluster_rpc::MetricsQueryResponse> {

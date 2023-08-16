@@ -20,9 +20,9 @@ use tokio::{sync::Semaphore, task, time};
 use crate::common::infra::{config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
 use crate::common::{json, utils::populate_file_meta};
-
-use crate::service::usage::report_compression_stats;
-use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
+use crate::service::{
+    db, schema::schema_evolution, search::datafusion::new_writer, usage::report_compression_stats,
+};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !CONFIG.common.wal_memory_mode_enabled {
@@ -54,7 +54,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         if columns.len() != 5 {
             continue;
         }
-        let _ = columns[0].to_string();
+        // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);
         let stream_name = columns[3].to_string();
@@ -86,37 +86,37 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 data,
             )
             .await;
-            drop(permit);
-            match ret {
-                Err(e) => log::error!("[JOB] Error while uploading memory file to storage {}", e),
+            if let Err(e) = ret {
+                log::error!("[JOB] Error while uploading memory file to storage {}", e);
+                drop(permit);
+                return Ok(());
+            }
 
-                Ok((key, meta, _stream_type)) => {
-                    match db::file_list::local::set(&key, meta, false).await {
-                        Ok(_) => {
-                            wal::MEMORY_FILES.remove(&local_file);
-                            // metrics
-                            let columns = key.split('/').collect::<Vec<&str>>();
-                            if columns[0] == "files" {
-                                metrics::INGEST_WAL_USED_BYTES
-                                    .with_label_values(&[columns[1], columns[3], columns[2]])
-                                    .sub(meta.original_size as i64);
-                                report_compression_stats(
-                                    meta.into(),
-                                    &org_id,
-                                    &stream_name,
-                                    stream_type,
-                                )
-                                .await;
-                            }
-                        }
-                        Err(e) => log::error!(
-                            "[JOB] Failed write memory file meta:{}, error: {}",
-                            local_file,
-                            e.to_string()
-                        ),
-                    }
-                }
-            };
+            let (key, meta, _stream_type) = ret.unwrap();
+            let ret = db::file_list::local::set(&key, meta, false).await;
+            if let Err(e) = ret {
+                log::error!(
+                    "[JOB] Failed write memory file meta: {}, error: {}",
+                    local_file,
+                    e.to_string()
+                );
+                drop(permit);
+                return Ok(());
+            }
+
+            // delete files
+            wal::MEMORY_FILES.remove(&local_file);
+
+            // metrics
+            let columns = key.split('/').collect::<Vec<&str>>();
+            if columns[0] == "files" {
+                metrics::INGEST_WAL_USED_BYTES
+                    .with_label_values(&[columns[1], columns[3], columns[2]])
+                    .sub(meta.original_size as i64);
+                report_compression_stats(meta.into(), &org_id, &stream_name, stream_type).await;
+            }
+
+            drop(permit);
             Ok(())
         });
         tasks.push(task);

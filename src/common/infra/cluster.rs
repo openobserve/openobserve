@@ -195,7 +195,7 @@ pub async fn register() -> Result<()> {
         http_addr: format!("http://{}:{}", get_local_http_ip(), CONFIG.http.port),
         grpc_addr: format!("http://{}:{}", get_local_grpc_ip(), CONFIG.grpc.port),
         role: LOCAL_NODE_ROLE.clone(),
-        cpu_num: sys_info::cpu_num().unwrap() as u64,
+        cpu_num: CONFIG.limit.cpu_num as u64,
         status: NodeStatus::Prepare,
     };
     // cache local node
@@ -242,7 +242,7 @@ pub async fn set_online() -> Result<()> {
             http_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.http.port),
             grpc_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.grpc.port),
             role: LOCAL_NODE_ROLE.clone(),
-            cpu_num: sys_info::cpu_num().unwrap() as u64,
+            cpu_num: CONFIG.limit.cpu_num as u64,
             status: NodeStatus::Online,
         },
     };
@@ -259,13 +259,6 @@ pub async fn set_online() -> Result<()> {
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let _resp = client.put(key, val, Some(opt)).await?;
-
-    // if local node is ingester, broadcast local file_list to the cluster
-    if is_ingester(&LOCAL_NODE_ROLE) {
-        tokio::task::spawn(async move {
-            let _ = db::file_list::local::broadcast_cache(None).await;
-        });
-    }
 
     Ok(())
 }
@@ -293,6 +286,7 @@ pub fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
     }
     Some(
         NODES
+            .clone()
             .iter()
             .filter_map(|node| cond(&node).then(|| node.clone()))
             .collect(),
@@ -376,7 +370,12 @@ async fn watch_node_list() -> Result<()> {
                         "cluster->node: broadcast local file_list to new node [{:?}]",
                         item_value.name
                     );
-                    db::file_list::local::broadcast_cache(Some(item_key))
+                    let notice_uuid = if item_key.eq(LOCAL_NODE_UUID.as_str()) {
+                        None
+                    } else {
+                        Some(item_key)
+                    };
+                    db::file_list::local::broadcast_cache(notice_uuid)
                         .await
                         .unwrap();
                 }

@@ -17,7 +17,7 @@ use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{body::MessageBody, http::header, web, HttpResponse};
 use actix_web_httpauth::middleware::HttpAuthentication;
 use futures::FutureExt;
-use std::rc::Rc;
+use std::sync::Arc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -41,7 +41,7 @@ use crate::common::infra::config::CONFIG;
 pub mod openapi;
 pub mod ui;
 
-fn get_cors() -> Rc<Cors> {
+fn get_cors() -> Arc<Cors> {
     let cors = Cors::default()
         .send_wildcard()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
@@ -52,7 +52,7 @@ fn get_cors() -> Rc<Cors> {
         ])
         .allow_any_origin()
         .max_age(3600);
-    Rc::new(cors)
+    Arc::new(cors)
 }
 
 pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {

@@ -14,7 +14,7 @@ use crate::common::{
 };
 
 pub static EVENT_SENDER: Lazy<broadcast::Sender<Event>> = Lazy::new(|| {
-    let (tx, _) = broadcast::channel(1);
+    let (tx, _) = broadcast::channel(1024);
     tx
 });
 

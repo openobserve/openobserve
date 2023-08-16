@@ -36,7 +36,7 @@
     "feedback": "Feedback",
     "documentation": "Docs",
     "tickets": "Billet",
-    "organizations": "Organisations",
+    "organizations": "Organizations",
     "function": "Fonctions",
     "ingestion": "Ingestion",
     "metrics": "Métriques",
@@ -61,7 +61,7 @@
     "singnInWithGoogle": "Continuez avec Google"
   },
   "user": {
-    "header": "Membre de l'organisation",
+    "header": "Membre de l'organization",
     "id": "ID utilisateur",
     "name": "Nom d'utilisateur",
     "role": "Rôle",
@@ -85,7 +85,7 @@
     "memberCreated": "Membre créé",
     "memberUpdated": "Membre mis à jour",
     "updateRole": "Mettre à jour le rôle",
-    "orgMemberId": "ID de membre de l'organisation",
+    "orgMemberId": "ID de membre de l'organization",
     "view": "Afficher",
     "update": "Mettre à jour",
     "delete": "Supprimer",
@@ -103,8 +103,8 @@
     "changePassword": "Modifier le mot de passe",
     "oldPassword": "Ancien mot de passe",
     "newPassword": "Nouveau mot de passe",
-    "organization": "Organisation",
-    "otherOrganization": "Autre organisation",
+    "organization": "Organization",
+    "otherOrganization": "Autre organization",
     "isExistingUser": "Utilisateur existant ?"
   },
   "ticket": {
@@ -131,19 +131,19 @@
     "cancel": "Annuler"
   },
   "organization": {
-    "header": "Organisations",
-    "orgName": "Nom de l'organisation",
-    "createOrganization": "Créer une organisation",
-    "updateOrganization": "Mettre à jour l'organisation",
+    "header": "Organizations",
+    "orgName": "Nom de l'organization",
+    "createOrganization": "Créer une organization",
+    "updateOrganization": "Mettre à jour l'organization",
     "nameHolder": "Tapez le nom ici",
-    "add": "Ajouter une organisation",
+    "add": "Ajouter une organization",
     "save": "Enregistrer",
     "cancel": "Annuler",
-    "delete": "Supprimer l'organisation",
-    "search": "Organisation de recherche",
+    "delete": "Supprimer l'organization",
+    "search": "Organization de recherche",
     "subject": "Objet",
     "description": "Description",
-    "id": "ID de l'organisation",
+    "id": "ID de l'organization",
     "createdAt": "Créé à",
     "updatedAt": "Mis à jour à",
     "status": "Statut",
@@ -239,7 +239,7 @@
   },
   "syslog": {
     "stream": "Stream",
-    "organization": "Organisation",
+    "organization": "Organization",
     "subnets": "Sous-réseaux",
     "deleteRoute": "Supprimer l'itinéraire",
     "syslog_addroute": "Ajouter un itinéraire",
@@ -346,9 +346,9 @@
     "rtAlert": "Alertes en temps réel",
     "noData": "Aucune donnée ingérée",
     "findIngestion": "Découvrez comment ingérer des logs >>",
-    "ingestionMsg": "Il semble que vous n'ayez ingéré aucune donnée à l'organisation sélectionnée. Les données peuvent être ingérées de différentes manières, comme fluentbit.",
+    "ingestionMsg": "Il semble que vous n'ayez ingéré aucune donnée à l'organization sélectionnée. Les données peuvent être ingérées de différentes manières, comme fluentbit.",
     "inestedInSearch": "Essayez Log Search",
-    "searchInDemoOrg": "Vous pouvez explorer les fonctionnalités de recherche en passant à l'organisation de démonstration. Pour passer à l'organisation de démonstration, sélectionnez « Organisation de démonstration » en utilisant le menu déroulant de l'organisation en haut. Nous continuons à ingérer des données factices dans l'organisation de démonstration."
+    "searchInDemoOrg": "Vous pouvez explorer les fonctionnalités de recherche en passant à l'organization de démonstration. Pour passer à l'organization de démonstration, sélectionnez « Organization de démonstration » en utilisant le menu déroulant de l'organization en haut. Nous continuons à ingérer des données factices dans l'organization de démonstration."
   },
   "billing": {
     "header": "Utilisation et facturation",

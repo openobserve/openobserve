@@ -31,12 +31,12 @@ use crate::common::infra::{
 use crate::common::meta::{
     common::FileKey,
     search,
-    stream::{ScanStats, StreamParams},
+    stream::{PartitionTimeLevel, ScanStats, StreamParams},
     StreamType,
 };
 use crate::common::{flatten, json, str::find};
 use crate::handler::grpc::cluster_rpc;
-use crate::service::{db, file_list, format_partition_key, format_stream_name};
+use crate::service::{db, file_list, format_partition_key, format_stream_name, stream};
 
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
@@ -80,13 +80,18 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
     (time_min, time_max)
 }
 
-#[tracing::instrument(skip(sql),fields(org_id = sql.org_id,stream_name = sql.stream_name))]
-async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<FileKey> {
+#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+async fn get_file_list(
+    sql: &sql::Sql,
+    stream_type: StreamType,
+    time_level: PartitionTimeLevel,
+) -> Vec<FileKey> {
     let (time_min, time_max) = get_times(sql, stream_type).await;
     let file_list = match file_list::query(
         &sql.org_id,
         &sql.stream_name,
         stream_type,
+        time_level,
         time_min,
         time_max,
     )
@@ -137,7 +142,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         n => n,
     };
 
-    let file_list = get_file_list(&meta, stream_type).await;
+    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
+    let partition_time_level =
+        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+
+    let file_list = get_file_list(&meta, stream_type, partition_time_level).await;
     let file_num = file_list.len();
     let offset = if querier_num >= file_num {
         1

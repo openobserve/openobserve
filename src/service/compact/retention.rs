@@ -26,6 +26,7 @@ use crate::common::infra::{
 };
 use crate::common::meta::{
     common::{FileKey, FileMeta},
+    stream::PartitionTimeLevel,
     StreamType,
 };
 use crate::common::{json, utils::is_local_disk_storage};
@@ -100,7 +101,15 @@ pub async fn delete_all(
     } else {
         // delete files from s3
         // first fetch file list from local cache
-        let files = file_list::query(org_id, stream_name, stream_type, 0, 0).await?;
+        let files = file_list::query(
+            org_id,
+            stream_name,
+            stream_type,
+            PartitionTimeLevel::Unset,
+            0,
+            0,
+        )
+        .await?;
         match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
@@ -201,8 +210,15 @@ pub async fn delete_by_date(
     } else {
         // delete files from s3
         // first fetch file list from local cache
-        let files =
-            file_list::query(org_id, stream_name, stream_type, time_range.0, time_range.1).await?;
+        let files = file_list::query(
+            org_id,
+            stream_name,
+            stream_type,
+            PartitionTimeLevel::Unset,
+            time_range.0,
+            time_range.1,
+        )
+        .await?;
         match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
@@ -250,8 +266,15 @@ async fn delete_from_file_list(
     stream_type: StreamType,
     time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
-    let files =
-        file_list::query(org_id, stream_name, stream_type, time_range.0, time_range.1).await?;
+    let files = file_list::query(
+        org_id,
+        stream_name,
+        stream_type,
+        PartitionTimeLevel::Unset,
+        time_range.0,
+        time_range.1,
+    )
+    .await?;
     if files.is_empty() {
         return Ok(());
     }

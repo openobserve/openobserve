@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap;
 use dashmap::{DashMap, DashSet};
 use datafusion::arrow::datatypes::Schema;
 use dotenv_config::EnvConfig;
@@ -20,23 +21,23 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use reqwest::Client;
 use std::{sync::Arc, time::Duration};
-use sys_info::hostname;
 use vector_enrichment::TableRegistry;
 
-use crate::common::file::get_file_meta;
-use crate::common::meta::alert::{
-    AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer,
+use crate::common::meta::{
+    alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer},
+    functions::{StreamFunctionsList, Transform},
+    prom::ClusterLeader,
+    syslog::SyslogRoute,
+    user::User,
 };
-use crate::common::meta::functions::{StreamFunctionsList, Transform};
-use crate::common::meta::prom::ClusterLeader;
-use crate::common::meta::syslog::SyslogRoute;
-use crate::common::meta::user::User;
+use crate::common::{cgroup, file::get_file_meta};
 use crate::service::enrichment::StreamTable;
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
 pub type RwHashMap<K, V> = DashMap<K, V, ahash::RandomState>;
 pub type RwHashSet<K> = DashSet<K, ahash::RandomState>;
+pub type RwAHashMap<K, V> = tokio::sync::RwLock<AHashMap<K, V>>;
 
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -67,17 +68,18 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
 pub static STREAM_SCHEMAS: Lazy<RwHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);
 pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
-    Lazy::new(Default::default);
-pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(Default::default);
-pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(Default::default);
-pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(Default::default);
-pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
-pub static METRIC_CLUSTER_MAP: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(Default::default);
-pub static METRIC_CLUSTER_LEADER: Lazy<RwHashMap<String, ClusterLeader>> =
-    Lazy::new(Default::default);
-pub static STREAM_ALERTS: Lazy<RwHashMap<String, AlertList>> = Lazy::new(Default::default);
-pub static TRIGGERS: Lazy<RwHashMap<String, Trigger>> = Lazy::new(Default::default);
-pub static TRIGGERS_IN_PROCESS: Lazy<RwHashMap<String, TriggerTimer>> = Lazy::new(Default::default);
+    Lazy::new(DashMap::default);
+pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
+pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
+pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
+pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
+pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
+pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
+pub static STREAM_ALERTS: Lazy<RwHashMap<String, AlertList>> = Lazy::new(DashMap::default);
+pub static TRIGGERS: Lazy<RwHashMap<String, Trigger>> = Lazy::new(DashMap::default);
+pub static TRIGGERS_IN_PROCESS: Lazy<RwHashMap<String, TriggerTimer>> = Lazy::new(DashMap::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, DestinationTemplate>> =
     Lazy::new(Default::default);
 pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, AlertDestination>> =
@@ -251,6 +253,9 @@ pub struct Common {
 
 #[derive(EnvConfig)]
 pub struct Limit {
+    // no need set by environment
+    pub cpu_num: usize,
+    pub mem_total: usize,
     #[env_config(name = "ZO_JSON_LIMIT", default = 209715200)]
     pub req_json_limit: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
@@ -259,7 +264,7 @@ pub struct Limit {
     pub max_file_size_on_disk: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
-    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
+    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 60)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
@@ -271,16 +276,14 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
+    #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "daily")]
+    pub metrics_file_retention: String,
     #[env_config(name = "ZO_HEARTBEAT_INTERVAL", default = 30)] // in minutes
     pub hb_interval: i64,
-    // no need set by environment
-    pub cpu_num: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 0)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
     pub http_worker_num: usize,
-    #[env_config(name = "ZO_METRIC_FILE_MAX_RETENTION", default = "daily")]
-    pub metric_file_max_retention: String,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // in seconds
     pub calculate_stats_interval: u64,
 }
@@ -347,9 +350,9 @@ pub struct Etcd {
     pub addr: String,
     #[env_config(name = "ZO_ETCD_PREFIX", default = "/zinc/observe/")]
     pub prefix: String,
-    #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 2)]
+    #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
-    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 5)]
+    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 10)]
     pub command_timeout: u64,
     #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
@@ -423,7 +426,7 @@ pub fn init() -> Config {
     dotenv().ok();
     let mut cfg = Config::init().unwrap();
     // set cpu num
-    let cpu_num = sys_info::cpu_num().unwrap() as usize;
+    let cpu_num = cgroup::get_cpu_limit();
     cfg.limit.cpu_num = cpu_num;
     if cfg.limit.http_worker_num == 0 {
         cfg.limit.http_worker_num = cpu_num;
@@ -467,7 +470,7 @@ pub fn init() -> Config {
 
 fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.file_push_interval == 0 {
-        cfg.limit.file_push_interval = 10;
+        cfg.limit.file_push_interval = 60;
     }
     // check max_file_size_on_disk to MB
     cfg.limit.max_file_size_on_disk *= 1024 * 1024;
@@ -477,7 +480,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
-        cfg.common.instance_name = hostname().unwrap();
+        cfg.common.instance_name = sys_info::hostname().unwrap();
     }
 
     // HACK for tracing, always disable tracing except ingester and querier
@@ -510,7 +513,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check compact_max_file_size to MB
     cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.interval == 0 {
-        cfg.compact.interval = 600;
+        cfg.compact.interval = 60;
     }
     if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
         return Err(anyhow::anyhow!(
@@ -588,10 +591,10 @@ fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    let mem_total = cgroup::get_memory_limit();
+    cfg.limit.mem_total = mem_total;
     if cfg.memory_cache.max_size == 0 {
-        // meminfo unit is KB
-        let meminfo = sys_info::mem_info()?;
-        cfg.memory_cache.max_size = meminfo.total as usize * 1024 / 2; // 50%
+        cfg.memory_cache.max_size = mem_total / 2; // 50%
     } else {
         cfg.memory_cache.max_size *= 1024 * 1024;
     }

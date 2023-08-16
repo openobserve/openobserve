@@ -42,7 +42,7 @@ pub async fn ingest(
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
     // check if we are allowed to ingest
@@ -140,12 +140,12 @@ pub async fn ingest(
     let _ = write_file(
         buf,
         thread_id,
-        &mut stream_file_name,
         StreamParams {
             org_id,
             stream_name,
             stream_type: StreamType::Logs,
         },
+        &mut stream_file_name,
         None,
     );
 

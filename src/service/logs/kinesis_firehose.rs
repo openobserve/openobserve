@@ -18,6 +18,7 @@ use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
 use std::io::Read;
 
+use super::StreamMeta;
 use crate::common::infra::{cluster, config::CONFIG, metrics};
 use crate::common::meta::{
     alert::{Alert, Trigger},
@@ -35,8 +36,6 @@ use crate::common::{
 use crate::service::{
     db, format_stream_name, ingestion::write_file, usage::report_request_usage_stats,
 };
-
-use super::StreamMeta;
 
 pub async fn process(
     org_id: &str,
@@ -89,6 +88,7 @@ pub async fn process(
                 .await;
         partition_keys = partition_det.partition_keys;
     }
+
     // Start get stream alerts
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
@@ -237,12 +237,12 @@ pub async fn process(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        &mut stream_file_name,
         StreamParams {
             org_id,
             stream_name,
             stream_type: StreamType::Logs,
         },
+        &mut stream_file_name,
         None,
     );
 

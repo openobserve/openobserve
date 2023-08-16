@@ -65,7 +65,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         if columns.len() != 5 {
             continue;
         }
-        let _ = columns[0].to_string();
+        // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);
         let stream_name = columns[3].to_string();
@@ -101,49 +101,45 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
             let ret =
                 upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
-            drop(permit);
-            match ret {
-                Err(e) => log::error!("[JOB] Error while uploading disk file to storage {}", e),
-                Ok((key, meta, _stream_type)) => {
-                    match db::file_list::local::set(&key, meta, false).await {
-                        Ok(_) => {
-                            match fs::remove_file(&local_file) {
-                                Ok(_) => {
-                                    // metrics
-                                    let columns = key.split('/').collect::<Vec<&str>>();
-                                    if columns[0] == "files" {
-                                        metrics::INGEST_WAL_USED_BYTES
-                                            .with_label_values(&[
-                                                columns[1], columns[3], columns[2],
-                                            ])
-                                            .sub(meta.original_size as i64);
+            if let Err(e) = ret {
+                log::error!("[JOB] Error while uploading disk file to storage {}", e);
+                drop(permit);
+                return Ok(());
+            }
 
-                                        report_compression_stats(
-                                            meta.into(),
-                                            &org_id,
-                                            &stream_name,
-                                            stream_type,
-                                        )
-                                        .await;
-                                    }
-                                }
-                                Err(e) => {
-                                    log::error!(
-                                        "[JOB] Failed to remove disk file from disk: {}, {}",
-                                        local_file,
-                                        e.to_string()
-                                    )
-                                }
-                            }
-                        }
-                        Err(e) => log::error!(
-                            "[JOB] Failed write disk file meta:{}, error: {}",
-                            local_file,
-                            e.to_string()
-                        ),
-                    }
-                }
-            };
+            let (key, meta, _stream_type) = ret.unwrap();
+            let ret = db::file_list::local::set(&key, meta, false).await;
+            if let Err(e) = ret {
+                log::error!(
+                    "[JOB] Failed write disk file meta: {}, error: {}",
+                    local_file,
+                    e.to_string()
+                );
+                drop(permit);
+                return Ok(());
+            }
+
+            let ret = fs::remove_file(&local_file);
+            if let Err(e) = ret {
+                log::error!(
+                    "[JOB] Failed to remove disk file from disk: {}, {}",
+                    local_file,
+                    e.to_string()
+                );
+                drop(permit);
+                return Ok(());
+            }
+
+            // metrics
+            let columns = key.split('/').collect::<Vec<&str>>();
+            if columns[0] == "files" {
+                metrics::INGEST_WAL_USED_BYTES
+                    .with_label_values(&[columns[1], columns[3], columns[2]])
+                    .sub(meta.original_size as i64);
+                report_compression_stats(meta.into(), &org_id, &stream_name, stream_type).await;
+            }
+
+            drop(permit);
             Ok(())
         });
         tasks.push(task);

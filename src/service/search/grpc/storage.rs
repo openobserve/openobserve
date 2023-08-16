@@ -23,38 +23,28 @@ use crate::common::infra::{
     config::CONFIG,
     errors::{Error, ErrorCodes},
 };
-use crate::common::meta::{self, common::FileKey, stream::ScanStats};
+use crate::common::meta::{
+    self,
+    common::FileKey,
+    stream::{PartitionTimeLevel, ScanStats},
+};
 use crate::service::{
     db, file_list,
     search::{
         datafusion::{exec, storage::StorageType},
         sql::Sql,
     },
+    stream,
 };
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
     file_list: &[FileKey],
     stream_type: meta::StreamType,
 ) -> super::SearchResult {
-    // get file list
-    let files = match file_list.is_empty() {
-        true => get_file_list(&sql, stream_type).await?,
-        false => file_list.to_vec(),
-    };
-    if files.is_empty() {
-        return Ok((HashMap::new(), ScanStats::default()));
-    }
-    log::info!(
-        "search->storage: org {}, stream {}, load file_list num {}",
-        &sql.org_id,
-        &sql.stream_name,
-        files.len(),
-    );
-
     // fetch all schema versions, group files by version
     let schema_versions =
         match db::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
@@ -73,6 +63,26 @@ pub async fn search(
     }
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
+
+    let stream_settings = stream::stream_settings(schema_latest).unwrap_or_default();
+    let partition_time_level =
+        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+
+    // get file list
+    let files = match file_list.is_empty() {
+        true => get_file_list(&sql, stream_type, partition_time_level).await?,
+        false => file_list.to_vec(),
+    };
+    if files.is_empty() {
+        return Ok((HashMap::new(), ScanStats::default()));
+    }
+    log::info!(
+        "search->storage: org {}, stream {}, load file_list num {}",
+        &sql.org_id,
+        &sql.stream_name,
+        files.len(),
+    );
+
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
     let mut scan_stats = ScanStats::new();
@@ -221,13 +231,18 @@ pub async fn search(
     Ok((results, scan_stats))
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
-async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<FileKey>, Error> {
+#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+async fn get_file_list(
+    sql: &Sql,
+    stream_type: meta::StreamType,
+    time_level: PartitionTimeLevel,
+) -> Result<Vec<FileKey>, Error> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     let file_list = match file_list::query(
         &sql.org_id,
         &sql.stream_name,
         stream_type,
+        time_level,
         time_min,
         time_max,
     )

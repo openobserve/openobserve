@@ -19,9 +19,10 @@ use crate::common::infra::config::CONFIG;
 use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) {
+    if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) || !CONFIG.common.usage_enabled {
         return Ok(());
     }
+
     // should run it every 10 minutes
     let mut interval = time::interval(time::Duration::from_secs(
         CONFIG.limit.calculate_stats_interval,

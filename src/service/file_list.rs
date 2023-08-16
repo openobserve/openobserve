@@ -18,7 +18,7 @@ use crate::common;
 use crate::common::infra::{config::CONFIG, file_list, ider, storage};
 use crate::common::meta::{
     common::{FileKey, FileMeta},
-    stream::ScanStats,
+    stream::{PartitionTimeLevel, ScanStats},
     StreamType,
 };
 use crate::service::db;
@@ -28,6 +28,7 @@ pub async fn query(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    time_level: PartitionTimeLevel,
     time_min: i64,
     time_max: i64,
 ) -> Result<Vec<FileKey>, anyhow::Error> {
@@ -35,7 +36,7 @@ pub async fn query(
         org_id,
         stream_type,
         stream_name,
-        common::meta::stream::PartitionTimeLevel::Hourly,
+        time_level,
         (time_min, time_max),
     )
     .await?;
