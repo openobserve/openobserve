@@ -13,12 +13,11 @@
 // limitations under the License.
 
 use super::Engine;
+use crate::service::promql::value::{InstantValue, Label, Sample, Value};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result;
 use promql_parser::parser::Expr as PromExpr;
 use promql_parser::parser::LabelModifier;
-
-use crate::service::promql::value::{InstantValue, Label, Sample, Value};
 
 pub async fn count_values(
     ctx: &mut Engine,

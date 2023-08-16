@@ -16,7 +16,7 @@ use crate::service::promql::common::std_deviation2;
 use crate::service::promql::value::{InstantValue, Sample, Value};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
-
+use rayon::prelude::*;
 pub fn stddev(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
     let score_values = super::eval_std_dev_var(param, data, "stddev")?;
     if score_values.is_none() {
@@ -24,11 +24,12 @@ pub fn stddev(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Re
     }
     let values = score_values
         .unwrap()
-        .values()
+        .par_iter()
         .map(|it| {
-            let std_var = std_deviation2(&it.values, it.current_mean, it.current_count).unwrap();
+            let std_var =
+                std_deviation2(&it.1.values, it.1.current_mean, it.1.current_count).unwrap();
             InstantValue {
-                labels: it.labels.clone(),
+                labels: it.1.labels.clone(),
                 sample: Sample::new(timestamp, std_var),
             }
         })

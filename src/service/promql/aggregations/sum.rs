@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::service::promql::value::{InstantValue, Sample, Value};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
-
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use rayon::prelude::*;
 
 pub fn sum(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
     let score_values = super::eval_arithmetic(param, data, "sum", |total, val| total + val)?;
@@ -24,10 +24,10 @@ pub fn sum(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Resul
     }
     let values = score_values
         .unwrap()
-        .values()
+        .par_iter()
         .map(|it| InstantValue {
-            labels: it.labels.clone(),
-            sample: Sample::new(timestamp, it.value),
+            labels: it.1.labels.clone(),
+            sample: Sample::new(timestamp, it.1.value),
         })
         .collect();
     Ok(Value::Vector(values))

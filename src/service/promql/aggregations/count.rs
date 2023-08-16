@@ -14,6 +14,7 @@
 
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
+use rayon::prelude::*;
 
 use crate::service::promql::value::{InstantValue, Sample, Value};
 
@@ -24,10 +25,10 @@ pub fn count(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Res
     }
     let values = score_values
         .unwrap()
-        .values()
+        .par_iter()
         .map(|it| InstantValue {
-            labels: it.labels.clone(),
-            sample: Sample::new(timestamp, it.num as _),
+            labels: it.1.labels.clone(),
+            sample: Sample::new(timestamp, it.1.num as _),
         })
         .collect();
     Ok(Value::Vector(values))
