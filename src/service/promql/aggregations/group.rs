@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::service::promql::value::{InstantValue, Sample, Value};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
-
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use rayon::prelude::*;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators
 pub fn group(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
@@ -25,10 +25,10 @@ pub fn group(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Res
     }
     let values = score_values
         .unwrap()
-        .values()
+        .par_iter()
         .map(|v| InstantValue {
-            labels: v.labels.clone(),
-            sample: Sample::new(timestamp, v.value),
+            labels: v.1.labels.clone(),
+            sample: Sample::new(timestamp, v.1.value),
         })
         .collect();
     Ok(Value::Vector(values))
