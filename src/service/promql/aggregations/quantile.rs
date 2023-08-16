@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::Expr as PromExpr;
-
 use super::Engine;
 use crate::service::promql::common::quantile as calculate_quantile;
 use crate::service::promql::value::Labels;
 use crate::service::promql::value::{InstantValue, Sample, Value};
+use datafusion::error::{DataFusionError, Result};
+use promql_parser::parser::Expr as PromExpr;
+use rayon::prelude::*;
 
 pub async fn quantile(
     ctx: &mut Engine,
@@ -58,7 +58,7 @@ pub async fn quantile(
         return prepare_vector(timestamp, f64::NAN);
     }
 
-    let values: Vec<f64> = data.iter().map(|item| item.sample.value).collect();
+    let values: Vec<f64> = data.par_iter().map(|item| item.sample.value).collect();
 
     let quantile_value = calculate_quantile(&values, qtile).unwrap();
     prepare_vector(timestamp, quantile_value)

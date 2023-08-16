@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::service::promql::value::{InstantValue, Sample, Value};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
-
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use rayon::prelude::*;
 
 pub fn avg(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
     let score_values = super::eval_arithmetic(param, data, "avg", |total, val| total + val)?;
@@ -24,10 +24,10 @@ pub fn avg(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Resul
     }
     let values = score_values
         .unwrap()
-        .values()
+        .par_iter()
         .map(|v| InstantValue {
-            labels: v.labels.clone(),
-            sample: Sample::new(timestamp, v.value / v.num as f64),
+            labels: v.1.labels.clone(),
+            sample: Sample::new(timestamp, v.1.value / v.1.num as f64),
         })
         .collect();
     Ok(Value::Vector(values))
