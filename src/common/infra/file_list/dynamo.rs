@@ -42,6 +42,9 @@ lazy_static! {
 }
 
 pub async fn init() -> Result<()> {
+    // create dynamo db table
+    let client = CLIENT.get().await;
+    _ = create_table(&client, &CONFIG.common.file_list_dynamo_table_name).await?;
     Ok(())
 }
 
@@ -56,8 +59,6 @@ async fn connect() -> Client {
         Client::new(&aws_config::load_from_env().await)
     };
 
-    // create dynamo db table
-    _ = create_file_list_table(&client, &CONFIG.common.file_list_dynamo_table_name).await;
     client
 }
 
@@ -236,7 +237,7 @@ impl super::FileList for DynamoFileList {
         let client = CLIENT.get().await;
         let resp: std::result::Result<Vec<QueryOutput>, _> = client
             .query()
-            .table_name("a")
+            .table_name(&self.table)
             .key_condition_expression("#stream = :stream AND #file BETWEEN :file1 AND :file2")
             .expression_attribute_names("#stream", "stream".to_string())
             .expression_attribute_names("#file", "file".to_string())
@@ -287,7 +288,7 @@ impl super::FileList for DynamoFileList {
     }
 }
 
-async fn create_file_list_table(client: &aws_sdk_dynamodb::Client, table_name: &str) -> Result<()> {
+async fn create_table(client: &aws_sdk_dynamodb::Client, table_name: &str) -> Result<()> {
     let tables = client
         .list_tables()
         .send()

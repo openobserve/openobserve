@@ -49,9 +49,9 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let mut tasks = Vec::with_capacity(CONFIG.limit.query_thread_num);
+    let mut tasks = Vec::with_capacity(CONFIG.limit.file_move_thread_num + 1);
     let (tx, mut rx) = mpsc::channel::<Vec<FileKey>>(files_num);
-    let chunk_size = std::cmp::max(1, files_num / CONFIG.limit.query_thread_num);
+    let chunk_size = std::cmp::max(1, files_num / CONFIG.limit.file_move_thread_num);
     for chunk in files.chunks(chunk_size) {
         let chunk = chunk.to_vec();
         let tx = tx.clone();
@@ -62,6 +62,7 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
                 for file in chunk {
                     match process_file(&file).await {
                         Ok(ret) => {
+                            stats.file_count += ret.len();
                             if let Err(e) = tx.send(ret).await {
                                 log::error!("Error sending file: {:?} {:?}", file, e);
                                 continue;
@@ -83,18 +84,17 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     let mut stats = ProcessStats::default();
     let mut message_num = 0;
-    while let Some(files) = rx.recv().await {
+    while let Some(files) = rx.recv().await { 
         if !files.is_empty() {
             infra_file_list::batch_add(&files).await?;
             tokio::task::yield_now().await;
-        }
+        } 
         message_num += 1;
         if message_num == files_num {
             break;
         }
     }
     stats.caching_time = start.elapsed().as_millis() as usize;
-    stats.file_count = files_num;
 
     let task_results = try_join_all(tasks).await?;
     for task_result in task_results {

@@ -17,7 +17,7 @@ use chrono::Utc;
 use once_cell::sync::Lazy;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
-    ConnectOptions, Pool, Row, Sqlite,
+    ConnectOptions, Pool, QueryBuilder, Row, Sqlite,
 };
 use std::str::FromStr;
 
@@ -51,7 +51,7 @@ fn connect() -> Pool<Sqlite> {
 
     let pool_opts = SqlitePoolOptions::new();
     let pool_opts = pool_opts.min_connections(CONFIG.limit.cpu_num as u32);
-    let pool_opts = pool_opts.max_connections(CONFIG.limit.query_thread_num as u32 * 2);
+    let pool_opts = pool_opts.max_connections(CONFIG.limit.query_thread_num as u32);
     pool_opts.connect_lazy_with(db_opts)
 }
 
@@ -119,27 +119,23 @@ DELETE FROM file_list
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
         let pool = CLIENT.clone();
-        let chunks = files.chunks(1000);
+        let chunks = files.chunks(100);
         for files in chunks {
-            let mut sqls = Vec::with_capacity(files.len() + 2);
-            sqls.push("INSERT INTO file_list (stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)".to_string());
-            sqls.push(" VALUES ".to_string());
-            let files_num = files.len();
-            let mut i = 0;
-            for file in files {
-                i += 1;
-                let dim = if i == files_num { "; " } else { ", " };
-                let (stream_key, date_key, file_name) = super::parse_file_key_columns(&file.key)?;
-                sqls.push(format!(
-                    " ('{stream_key}', '{date_key}', '{file_name}', false, {}, {}, {}, {}, {}){dim} ",
-                    file.meta.min_ts,
-                    file.meta.max_ts,
-                    file.meta.records,
-                    file.meta.original_size,
-                    file.meta.compressed_size
-                ));
-            }
-            match sqlx::query(&sqls.join("\n")).execute(&pool).await {
+            let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new("INSERT INTO file_list (stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
+            query_builder.push_values(files, |mut b, item| {
+                let (stream_key, date_key, file_name) =
+                    super::parse_file_key_columns(&item.key).expect("parse file key failed");
+                b.push_bind(stream_key)
+                    .push_bind(date_key)
+                    .push_bind(file_name)
+                    .push_bind(false)
+                    .push_bind(item.meta.min_ts)
+                    .push_bind(item.meta.max_ts)
+                    .push_bind(item.meta.records as i64)
+                    .push_bind(item.meta.original_size as i64)
+                    .push_bind(item.meta.compressed_size as i64);
+            });
+            match query_builder.build().execute(&pool).await {
                 Ok(_) => {}
                 Err(sqlx::Error::Database(e)) => {
                     if e.is_unique_violation() {
@@ -159,7 +155,7 @@ DELETE FROM file_list
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
         let pool = CLIENT.clone();
-        let chunks = files.chunks(1000);
+        let chunks = files.chunks(100);
         for files in chunks {
             let mut sqls = Vec::with_capacity(files.len() + 2);
             sqls.push("BEGIN TRANSACTION;".to_string());

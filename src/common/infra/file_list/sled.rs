@@ -74,50 +74,15 @@ impl super::FileList for SledFileList {
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
-        let chunks = files.chunks(100);
-        for files in chunks {
-            let mut groups: ahash::AHashMap<String, Vec<FileKey>> = ahash::AHashMap::default();
-            for file in files.iter() {
-                let (stream_key, date_key, file_name) = super::parse_file_key_columns(&file.key)?;
-                let entry = groups.entry(stream_key).or_default();
-                entry.push(FileKey {
-                    key: format!("{date_key}/{file_name}"),
-                    meta: file.meta,
-                    deleted: file.deleted,
-                });
-            }
-            for (stream_key, files) in groups {
-                let client = CLIENT.clone();
-                let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
-                let mut batch = sled::Batch::default();
-                for file in files {
-                    batch.insert::<&str, Vec<u8>>(&file.key, (&file.meta).into());
-                }
-                bucket.apply_batch(batch)?;
-            }
+        for file in files {
+            self.add(&file.key, &file.meta).await?;
         }
         Ok(())
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
-        let chunks = files.chunks(100);
-        for files in chunks {
-            let mut groups: ahash::AHashMap<String, Vec<String>> = ahash::AHashMap::default();
-            for file in files.iter() {
-                let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                let file = format!("{date_key}/{file_name}");
-                let entry = groups.entry(stream_key).or_default();
-                entry.push(file);
-            }
-            for (stream_key, files) in groups {
-                let client = CLIENT.clone();
-                let bucket = client.open_tree(stream_key.as_bytes()).unwrap();
-                let mut batch = sled::Batch::default();
-                for file in files {
-                    batch.remove::<&str>(&file);
-                }
-                bucket.apply_batch(batch)?;
-            }
+        for file in files {
+            self.remove(&file).await?;
         }
         Ok(())
     }
