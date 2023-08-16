@@ -128,9 +128,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .expect("file list remote cache failed");
     }
 
-    // Shouldn't serve request until initialization finishes
-    log::info!("Start job");
-
     // compactor run
     tokio::task::spawn(async move { compact::run().await });
 
@@ -147,6 +144,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move { stats::run().await });
     }
 
+    // Shouldn't serve request until initialization finishes
+    log::info!("Job initialization complete");
+
     // Syslog server start
     let start_syslog = *SYSLOG_ENABLED.read();
     if start_syslog {
@@ -156,20 +156,4 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use std::env;
-
-    use super::*;
-
-    #[actix_web::test]
-    #[ignore]
-    async fn test_init() {
-        env::set_var("ZO_LOCAL_MODE", "true");
-        env::set_var("ZO_NODE_ROLE", "all");
-        let _ = init().await;
-        //assert_eq!(fs::metadata(&CONFIG.common.data_wal_dir).is_ok(), true)
-    }
 }
