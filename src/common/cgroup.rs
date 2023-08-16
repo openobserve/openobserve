@@ -41,7 +41,7 @@ pub fn get_cpu_limit() -> usize {
 pub fn get_memory_limit() -> usize {
     let mem_size = if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory.max") {
         if !val.to_lowercase().starts_with("max") {
-            val.parse::<usize>().unwrap_or_default()
+            val.trim_end().parse::<usize>().unwrap_or_default()
         } else {
             0
         }
