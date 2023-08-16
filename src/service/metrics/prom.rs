@@ -22,7 +22,7 @@ use std::collections::HashMap;
 
 use crate::common::infra::{
     cache::stats,
-    cluster,
+    cluster::{self, LOCAL_NODE_UUID},
     config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
     errors::{Error, Result},
     metrics,
@@ -37,13 +37,13 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{json, time::parse_i64_to_timestamp_micros};
-use crate::service::usage::report_request_usage_stats;
 use crate::service::{
     db,
     ingestion::{chk_schema_by_record, write_file},
     schema::{set_schema_metadata, stream_schema_exists},
     search as search_service,
     stream::unwrap_partition_time_level,
+    usage::report_request_usage_stats,
 };
 
 pub(crate) mod prometheus {
@@ -61,7 +61,7 @@ pub async fn remote_write(
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
     let mut min_ts =
@@ -111,31 +111,34 @@ pub async fn remote_write(
 
     // parse timeseries
     let mut first_line = true;
-    for mut event in request.timeseries {
+    for event in request.timeseries {
         // get labels
         let mut replica_label = String::new();
 
-        let mut labels: FxIndexMap<String, String> = event
-            .labels
-            .drain(..)
-            .map(|label| (label.name, label.value))
-            .collect();
-
-        let metric_name = match labels.get(NAME_LABEL) {
-            Some(v) => v.clone(),
+        let metric_name = match labels_value(&event.labels, NAME_LABEL) {
+            Some(v) => v,
             None => continue,
         };
 
-        let replica_label_value = labels.remove(&CONFIG.prom.ha_replica_label);
-        let cluster_name_value = labels.remove(&CONFIG.prom.ha_cluster_label);
         if !has_entry {
-            if replica_label_value.is_some() {
-                replica_label = replica_label_value.unwrap();
-            }
-            if cluster_name.is_empty() && cluster_name_value.is_some() {
-                cluster_name = format!("{}/{}", org_id, cluster_name_value.unwrap());
+            if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_replica_label) {
+                replica_label = v;
+            };
+            if cluster_name.is_empty() {
+                if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_cluster_label) {
+                    cluster_name = format!("{}/{}", org_id, v);
+                }
             }
         }
+        let labels: FxIndexMap<String, String> = event
+            .labels
+            .iter()
+            .filter(|label| {
+                label.name != CONFIG.prom.ha_replica_label
+                    && label.name != CONFIG.prom.ha_cluster_label
+            })
+            .map(|label| (label.name.clone(), label.value.clone()))
+            .collect();
 
         let buf = metric_data_map.entry(metric_name.to_owned()).or_default();
 
@@ -164,7 +167,12 @@ pub async fn remote_write(
             }
 
             if first_line && dedup_enabled {
-                match METRIC_CLUSTER_LEADER.get(&cluster_name) {
+                match METRIC_CLUSTER_LEADER
+                    .clone()
+                    .read()
+                    .await
+                    .get(&cluster_name)
+                {
                     Some(leader) => {
                         last_received = leader.last_received;
                         has_entry = true;
@@ -327,21 +335,22 @@ pub async fn remote_write(
             log::warn!("stream [{stream_name}] is being deleted");
             continue;
         }
+
         let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
             details.partition_time_level
         } else {
-            Some(CONFIG.limit.metric_file_max_retention.as_str().into())
+            Some(CONFIG.limit.metrics_file_retention.as_str().into())
         };
 
         let mut req_stats = write_file(
             stream_data,
             thread_id,
-            &mut stream_file_name,
             StreamParams {
                 org_id,
                 stream_name: &stream_name,
                 stream_type: StreamType::Metrics,
             },
+            &mut stream_file_name,
             time_level,
         );
 
@@ -747,26 +756,31 @@ fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
 
 async fn prom_ha_handler(
     has_entry: bool,
-    cluster_name: &String,
-    replica_label: &String,
+    cluster_name: &str,
+    replica_label: &str,
     last_received: i64,
     election_interval: i64,
 ) -> bool {
     let mut _accept_record = false;
     let curr_ts = Utc::now().timestamp_micros();
     if !has_entry {
-        METRIC_CLUSTER_MAP.insert(cluster_name.to_owned(), vec![]);
+        METRIC_CLUSTER_MAP
+            .write()
+            .await
+            .insert(cluster_name.to_owned(), vec![]);
         log::info!("Making {} leader for {} ", replica_label, cluster_name);
-        METRIC_CLUSTER_LEADER.insert(
+        METRIC_CLUSTER_LEADER.write().await.insert(
             cluster_name.to_owned(),
             prom::ClusterLeader {
                 name: replica_label.to_owned(),
                 last_received: curr_ts,
+                updated_by: LOCAL_NODE_UUID.to_string(),
             },
         );
         _accept_record = true;
     } else {
-        let mut leader = METRIC_CLUSTER_LEADER.get_mut(cluster_name).unwrap();
+        let mut lock = METRIC_CLUSTER_LEADER.write().await;
+        let leader = lock.get_mut(cluster_name).unwrap();
         if replica_label.eq(&leader.name) {
             _accept_record = true;
             leader.last_received = curr_ts;
@@ -793,13 +807,26 @@ async fn prom_ha_handler(
         }
     }
 
-    let mut replica_list = METRIC_CLUSTER_MAP
-        .entry(cluster_name.to_owned())
-        .or_default();
-    if !replica_list.contains(replica_label) {
+    let mut lock = METRIC_CLUSTER_MAP.write().await;
+    let replica_list = lock.entry(cluster_name.to_owned()).or_default();
+    let replica_list_db = if !replica_list.contains(&replica_label.to_string()) {
         replica_list.push(replica_label.to_owned());
-        let _ = db::metrics::set_prom_cluster_info(cluster_name, &replica_list).await;
+        replica_list.clone()
+    } else {
+        vec![]
+    };
+    drop(lock);
+
+    if !replica_list_db.is_empty() {
+        let _ = db::metrics::set_prom_cluster_info(cluster_name, &replica_list_db.to_vec()).await;
     }
 
     _accept_record
+}
+
+fn labels_value(labels: &[prometheus::Label], name: &str) -> Option<String> {
+    labels
+        .binary_search_by_key(&name, |label| label.name.as_str())
+        .ok()
+        .map(|index| labels[index].value.clone())
 }

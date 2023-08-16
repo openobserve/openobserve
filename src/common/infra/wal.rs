@@ -22,14 +22,14 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard},
 };
 
-use crate::common::meta::StreamType;
-use crate::common::{file::get_file_contents, meta::stream::StreamParams};
-use crate::common::{
-    infra::{
-        config::{CONFIG, FILE_EXT_JSON},
-        ider, metrics,
-    },
-    meta::stream::PartitionTimeLevel,
+use crate::common::file::get_file_contents;
+use crate::common::infra::{
+    config::{CONFIG, FILE_EXT_JSON},
+    ider, metrics,
+};
+use crate::common::meta::{
+    stream::{PartitionTimeLevel, StreamParams},
+    StreamType,
 };
 
 // MANAGER for manage using WAL files, in use, should not move to s3
@@ -58,6 +58,11 @@ pub struct RwFile {
     dir: String,
     name: String,
     expired: i64,
+}
+
+pub fn init() {
+    _ = MANAGER.data.len();
+    _ = MEMORY_FILES.list().len();
 }
 
 pub fn get_or_create(
@@ -186,7 +191,7 @@ impl Manager {
         };
 
         // check size & ttl
-        if file.size() >= (CONFIG.limit.max_file_size_on_disk).try_into().unwrap()
+        if file.size() >= (CONFIG.limit.max_file_size_on_disk as i64)
             || file.expired() <= chrono::Utc::now().timestamp()
         {
             self.data

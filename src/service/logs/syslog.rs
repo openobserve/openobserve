@@ -19,6 +19,7 @@ use datafusion::arrow::datatypes::Schema;
 use std::net::SocketAddr;
 use syslog_loose::{Message, ProcId, Protocol};
 
+use super::StreamMeta;
 use crate::common::infra::{
     cluster,
     config::{CONFIG, SYSLOG_ROUTES},
@@ -34,8 +35,6 @@ use crate::common::meta::{
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
-
-use super::StreamMeta;
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     let start = std::time::Instant::now();
@@ -181,12 +180,12 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     write_file(
         buf,
         thread_id,
-        &mut stream_file_name,
         StreamParams {
             org_id,
             stream_name,
             stream_type: StreamType::Logs,
         },
+        &mut stream_file_name,
         None,
     );
 

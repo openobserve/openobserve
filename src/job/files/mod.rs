@@ -12,10 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::common::infra::cluster;
 use crate::common::meta::StreamType;
 
 pub mod disk;
 pub mod memory;
+
+pub async fn run() -> Result<(), anyhow::Error> {
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        return Ok(()); // not an ingester, no need to init job
+    }
+
+    tokio::task::spawn(async move { disk::run().await });
+    tokio::task::spawn(async move { memory::run().await });
+
+    Ok(())
+}
 
 pub fn generate_storage_file_name(
     org_id: &str,

@@ -26,17 +26,15 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
+use crate::common::infra::{cluster, config::CONFIG, wal};
 use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
+    stream::StreamParams,
     traces::{Event, Span, SpanRefType},
     StreamType,
 };
 use crate::common::{flatten, json};
-use crate::common::{
-    infra::{cluster, config::CONFIG, wal},
-    meta::stream::StreamParams,
-};
 use crate::service::{
     db, format_partition_key, format_stream_name,
     schema::{add_stream_schema, stream_schema_exists},
@@ -67,7 +65,7 @@ pub async fn handle_trace_request(
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
-            "Quota exceeded for this organisation".to_string(),
+            "Quota exceeded for this organization".to_string(),
         )));
     }
 

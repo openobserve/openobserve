@@ -168,8 +168,7 @@ pub fn stream_res(
     if settings.partition_time_level.unwrap_or_default() == PartitionTimeLevel::Unset
         && stream_type.eq(&StreamType::Metrics)
     {
-        settings.partition_time_level =
-            Some(CONFIG.limit.metric_file_max_retention.as_str().into());
+        settings.partition_time_level = Some(CONFIG.limit.metrics_file_retention.as_str().into());
     }
 
     Stream {
@@ -340,7 +339,7 @@ pub fn unwrap_partition_time_level(
         Some(l) => l,
         None => {
             if stream_type == StreamType::Metrics {
-                PartitionTimeLevel::from(CONFIG.limit.metric_file_max_retention.as_str())
+                PartitionTimeLevel::from(CONFIG.limit.metrics_file_retention.as_str())
             } else {
                 PartitionTimeLevel::default()
             }

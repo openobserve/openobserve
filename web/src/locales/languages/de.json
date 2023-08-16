@@ -36,7 +36,7 @@
     "feedback": "Rückmeldung",
     "documentation": "Dokumente",
     "tickets": "Fahrkarte",
-    "organizations": "Organisationen",
+    "organizations": "Organizationen",
     "function": "Funktionen",
     "ingestion": "Verschlucken",
     "metrics": "Metriken",
@@ -61,7 +61,7 @@
     "singnInWithGoogle": "Weiter mit Google"
   },
   "user": {
-    "header": "Mitglied der Organisation",
+    "header": "Mitglied der Organization",
     "id": "Benutzer-ID",
     "name": "Name des Benutzers",
     "role": "Rolle",
@@ -85,7 +85,7 @@
     "memberCreated": "Mitglied erstellt",
     "memberUpdated": "Mitglied aktualisiert",
     "updateRole": "Rolle aktualisieren",
-    "orgMemberId": "Mitglieds-ID der Organisation",
+    "orgMemberId": "Mitglieds-ID der Organization",
     "view": "Ansicht",
     "update": "Aktualisieren",
     "delete": "Löschen",
@@ -103,8 +103,8 @@
     "changePassword": "Passwort ändern",
     "oldPassword": "Altes Passwort",
     "newPassword": "Neues Passwort",
-    "organization": "Organisation",
-    "otherOrganization": "Andere Organisation",
+    "organization": "Organization",
+    "otherOrganization": "Andere Organization",
     "isExistingUser": "Bestehender Benutzer?"
   },
   "ticket": {
@@ -131,19 +131,19 @@
     "cancel": "Stornieren"
   },
   "organization": {
-    "header": "Organisationen",
-    "orgName": "Name der Organisation",
-    "createOrganization": "Organisation erstellen",
-    "updateOrganization": "Organisation aktualisieren",
+    "header": "Organizationen",
+    "orgName": "Name der Organization",
+    "createOrganization": "Organization erstellen",
+    "updateOrganization": "Organization aktualisieren",
     "nameHolder": "Geben Sie hier den Namen ein",
-    "add": "Organisation hinzufügen",
+    "add": "Organization hinzufügen",
     "save": "Speichern",
     "cancel": "Stornieren",
-    "delete": "Organisation löschen",
-    "search": "Organisation suchen",
+    "delete": "Organization löschen",
+    "search": "Organization suchen",
     "subject": "Betreff",
     "description": "Beschreibung",
-    "id": "Organisations-ID",
+    "id": "Organizations-ID",
     "createdAt": "Erstellt am",
     "updatedAt": "Aktualisiert am",
     "status": "Status",
@@ -239,7 +239,7 @@
   },
   "syslog": {
     "stream": "Streamen",
-    "organization": "Organisation",
+    "organization": "Organization",
     "subnets": "Subnetze",
     "deleteRoute": "Route löschen",
     "syslog_addroute": "Route hinzufügen",
@@ -346,9 +346,9 @@
     "rtAlert": "Benachrichtigungen in Echtzeit",
     "noData": "Keine Daten aufgenommen",
     "findIngestion": "Finden Sie heraus, wie Sie Logs einlesen können >>",
-    "ingestionMsg": "Sieht so aus, als ob Sie keine Daten in die ausgewählte Organisation aufgenommen haben. Es gibt verschiedene Möglichkeiten, wie Daten aufgenommen werden können, wie Fluentbit.",
+    "ingestionMsg": "Sieht so aus, als ob Sie keine Daten in die ausgewählte Organization aufgenommen haben. Es gibt verschiedene Möglichkeiten, wie Daten aufgenommen werden können, wie Fluentbit.",
     "inestedInSearch": "Versuchen Sie es mit der Protokollsuche",
-    "searchInDemoOrg": "Sie können die Suchfunktionen erkunden, indem Sie zur Demo-Organisation wechseln. Um zur Demo-Organisation zu wechseln, wählen Sie im Drop-down-Menü der Organisation oben „Demo-Organisation“ aus. Wir nehmen weiterhin Dummy-Daten in die Demo-Organisation auf."
+    "searchInDemoOrg": "Sie können die Suchfunktionen erkunden, indem Sie zur Demo-Organization wechseln. Um zur Demo-Organization zu wechseln, wählen Sie im Drop-down-Menü der Organization oben „Demo-Organization“ aus. Wir nehmen weiterhin Dummy-Daten in die Demo-Organization auf."
   },
   "billing": {
     "header": "Nutzung und Abrechnung",

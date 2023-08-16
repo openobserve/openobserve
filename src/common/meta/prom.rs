@@ -34,10 +34,12 @@ pub struct Metric<'a> {
     pub value: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Eq, PartialEq, Deserialize)]
 pub struct ClusterLeader {
     pub name: String,
     pub last_received: i64,
+    #[serde(default)]
+    pub updated_by: String, // instance id of ingestor
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/f5fcaa3872ce03808567fabc56afc9cf61c732cb/model/textparse/interface.go#L106-L119
