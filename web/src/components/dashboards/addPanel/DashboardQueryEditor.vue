@@ -114,7 +114,7 @@ export default defineComponent({
         const addTab = () => {            
             const newQuery = {
                 query: "",
-                customQuery: false,
+                customQuery: true,
                 fields: {
                     stream: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
                     stream_type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type,
