@@ -63,6 +63,7 @@ aws-sdk-dynamodb = "0.28.0"
 base64 = "0.21"
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes = "1.4"
+byteorder = "1.4.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.1", default-features = false, features = [
   "std",
@@ -163,7 +164,6 @@ vrl = { git = "https://github.com/zinclabs/vrl", rev = "2bbe6728fc0a9d0c20b6ee86
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.12"
-byteorder = "1.4.3"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

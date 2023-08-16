@@ -21,7 +21,7 @@ use crate::common::meta::StreamType;
 use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if CONFIG.common.local_mode {
+    if CONFIG.common.local_mode || CONFIG.common.file_list_external {
         return Ok(());
     }
 
