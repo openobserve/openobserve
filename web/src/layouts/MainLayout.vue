@@ -15,13 +15,13 @@
 
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
-    <q-header :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'">
+    <q-header :class="store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white'">
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
           <img
             class="appLogo"
             :src="
-              store.state.theme == 'dark'
+              store?.state?.theme == 'dark'
                 ? getImageURL('images/common/open_observe_logo_2.svg')
                 : getImageURL('images/common/open_observe_logo.svg')
             "
@@ -405,7 +405,7 @@ export default defineComponent({
         title: t("menu.user"),
         icon: outlinedPerson,
         link: "/users",
-        display: store.state.currentuser.role == "admin" ? true : false,
+        display: store.state?.currentuser?.role == "admin" ? true : false,
       },
       {
         title: t("menu.slack"),
@@ -716,13 +716,13 @@ export default defineComponent({
   },
   computed: {
     changeOrganization() {
-      return this.store.state.organizations;
+      return this.store?.state?.organizations;
     },
     changeOrganizationIdentifier() {
-      return this.store.state.selectedOrganization?.identifier;
+      return this.store?.state?.selectedOrganization?.identifier;
     },
     forceFetchOrganization() {
-      return this.router.currentRoute.value.query.update_org;
+      return this.router?.currentRoute?.value?.query?.update_org;
     },
   },
   watch: {
