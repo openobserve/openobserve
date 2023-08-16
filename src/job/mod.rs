@@ -83,10 +83,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move { telemetry::run().await });
     }
 
-    // check cache dir
-    std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
-    std::fs::create_dir_all(&CONFIG.common.data_cache_dir)?;
-
     // initialize metadata
     tokio::task::spawn(async move { db::functions::watch().await });
     tokio::task::spawn(async move { db::schema::watch().await });
@@ -126,11 +122,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // cache file list
     infra_file_list::init().await?;
-    // if !CONFIG.common.file_list_external {
-    db::file_list::remote::cache("", false)
-        .await
-        .expect("file list remote cache failed");
-    // }
+    if !CONFIG.common.file_list_external {
+        db::file_list::remote::cache("", false)
+            .await
+            .expect("file list remote cache failed");
+    }
 
     // Shouldn't serve request until initialization finishes
     log::info!("Start job");

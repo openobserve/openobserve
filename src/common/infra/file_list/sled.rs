@@ -82,7 +82,7 @@ impl super::FileList for SledFileList {
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
         for file in files {
-            self.remove(&file).await?;
+            self.remove(file).await?;
         }
         Ok(())
     }

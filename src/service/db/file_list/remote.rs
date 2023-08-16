@@ -84,11 +84,11 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     let mut stats = ProcessStats::default();
     let mut message_num = 0;
-    while let Some(files) = rx.recv().await { 
+    while let Some(files) = rx.recv().await {
         if !files.is_empty() {
             infra_file_list::batch_add(&files).await?;
             tokio::task::yield_now().await;
-        } 
+        }
         message_num += 1;
         if message_num == files_num {
             break;

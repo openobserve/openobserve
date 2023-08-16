@@ -44,12 +44,12 @@ lazy_static! {
 pub async fn init() -> Result<()> {
     // create dynamo db table
     let client = CLIENT.get().await;
-    _ = create_table(&client, &CONFIG.common.file_list_dynamo_table_name).await?;
+    create_table(client, &CONFIG.common.file_list_dynamo_table_name).await?;
     Ok(())
 }
 
 async fn connect() -> Client {
-    let client = if CONFIG.common.local_mode {
+    if CONFIG.common.local_mode {
         let region = Region::new("us-west-2");
         let shared_config = aws_config::from_env()
             .region(region)
@@ -57,9 +57,7 @@ async fn connect() -> Client {
         Client::new(&shared_config.load().await)
     } else {
         Client::new(&aws_config::load_from_env().await)
-    };
-
-    client
+    }
 }
 
 pub struct DynamoFileList {

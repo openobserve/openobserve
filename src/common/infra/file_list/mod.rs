@@ -66,6 +66,8 @@ pub trait FileList: Sync + 'static {
 }
 
 pub async fn init() -> Result<()> {
+    // check cache dir
+    std::fs::create_dir_all(&CONFIG.common.data_cache_dir)?;
     match CONFIG.common.file_list_storage.as_str() {
         "sled" => sled::init().await,
         "sqlite" => sqlite::init().await,
