@@ -30,7 +30,7 @@
                             v-if="index > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)"
                             name="close"
                             class="q-ml-sm"
-                            @click.stop="removeQuery(index)"
+                            @click.stop="removeTab(index)"
                             style="cursor: pointer"
                             
                         />
@@ -39,7 +39,7 @@
                 <!-- <div v-if="promqlMode" class="query-tabs-container">
                     <div v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" class="query-tab" :class="{ 'active': index === activeTab }" @click="handleActiveTab(index)">
                         <div class="tab-label">{{ 'Query ' + (index + 1) }}</div>
-                        <div v-if="index > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)" @click.stop="removeQuery(index)">
+                        <div v-if="index > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)" @click.stop="removeTab(index)">
                             <i class="material-icons">cancel</i>
                         </div>
                     </div>
@@ -97,7 +97,7 @@ export default defineComponent({
         const router = useRouter();
         const { t } = useI18n();
         const $q = useQuasar();
-        const { dashboardPanelData, promqlMode, updateXYFieldsOnCustomQueryChange } = useDashboardPanelData()
+        const { dashboardPanelData, promqlMode, updateXYFieldsOnCustomQueryChange,addQuery,removeQuery } = useDashboardPanelData()
         const confirmQueryModeChangeDialog = ref(false)
         const parser = new Parser();
         let streamName = "";
@@ -111,29 +111,14 @@ export default defineComponent({
         //     activeTab.value=index;
         // }
         
-        const addTab = () => {            
-            const newQuery = {
-                query: "",
-                customQuery: true,
-                fields: {
-                    stream: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
-                    stream_type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type,
-                    x: [],
-                    y: [],
-                    filter: [],
-                },
-            config: {
-                promql_legend: "",
-            },
-        };
-            
-            dashboardPanelData.data.queries.push(newQuery);
+        const addTab = () => {         
+            addQuery();
             activeTab.value = dashboardPanelData.data.queries.length - 1;
         };
 
-        const removeQuery = async (index) => {
+        const removeTab = async (index) => {
             if (activeTab.value >= dashboardPanelData.data.queries.length-1) activeTab.value -=1;
-            dashboardPanelData.data.queries.splice(index,1);
+            removeQuery(index);
         };
 
         const currentQuery = computed({
@@ -373,7 +358,7 @@ export default defineComponent({
             onUpdateToggle,
             activeTab,
             addTab,
-            removeQuery,
+            removeTab,
             currentQuery
         };
     },

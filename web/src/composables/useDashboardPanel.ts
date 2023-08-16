@@ -99,6 +99,28 @@ const useDashboardPanelData = () => {
   const store = useStore();
   const $q = useQuasar();
 
+const addQuery = () => {
+  const newQuery:any = {
+    query: "",
+    customQuery: true,
+    fields: {
+      stream: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
+      stream_type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type,
+      x: [],
+      y: [],
+      filter: [],
+    },
+    config: {
+      promql_legend: "",
+    },
+  }
+  dashboardPanelData.data.queries.push(newQuery);
+};
+
+const removeQuery = (index: number) => {
+  dashboardPanelData.data.queries.splice(index,1);
+}
+
   const resetDashboardPanelData = () => {
     console.log("resetDashboardPanelData");
     
@@ -464,6 +486,8 @@ const useDashboardPanelData = () => {
     isAddYAxisNotAllowed,
     isAddZAxisNotAllowed,
     promqlMode,
+    addQuery,
+    removeQuery
   };
 };
 export default useDashboardPanelData;
