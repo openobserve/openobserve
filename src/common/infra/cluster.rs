@@ -196,7 +196,7 @@ pub async fn register() -> Result<()> {
         http_addr: format!("http://{}:{}", get_local_http_ip(), CONFIG.http.port),
         grpc_addr: format!("http://{}:{}", get_local_grpc_ip(), CONFIG.grpc.port),
         role: LOCAL_NODE_ROLE.clone(),
-        cpu_num: sys_info::cpu_num().unwrap() as u64,
+        cpu_num: CONFIG.limit.cpu_num as u64,
         status: NodeStatus::Prepare,
     };
     // cache local node
@@ -243,7 +243,7 @@ pub async fn set_online() -> Result<()> {
             http_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.http.port),
             grpc_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.grpc.port),
             role: LOCAL_NODE_ROLE.clone(),
-            cpu_num: sys_info::cpu_num().unwrap() as u64,
+            cpu_num: CONFIG.limit.cpu_num as u64,
             status: NodeStatus::Online,
         },
     };
