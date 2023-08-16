@@ -112,25 +112,19 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     // create sqlite table index
     if CONFIG.common.file_list_storage.as_str() == "sqlite" {
         infra_file_list::sqlite::create_table_index().await?;
-        log::info!("Creata table index done");
+        log::info!("Load file_list create table index done");
     }
 
     // delete files
-    log::info!("need to delete {} files", super::DELETED_FILES.len());
     let deleted_files = super::DELETED_FILES
         .iter()
         .map(|v| v.key().to_string())
         .collect::<Vec<String>>();
     infra_file_list::batch_remove(&deleted_files).await?;
 
-    // for item in super::DELETED_FILES.iter() {
-    //     super::progress(item.key(), item.value().to_owned(), true, false).await?;
-    // }
-
-    log::info!("Load file_list [{prefix}] done deleting done");
-
     // cache result
     rw.insert(prefix.clone());
+    log::info!("Load file_list [{prefix}] done deleting done");
 
     // clean deleted files
     super::DELETED_FILES.clear();
