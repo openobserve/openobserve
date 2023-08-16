@@ -28,7 +28,6 @@ use crate::common::meta::{
     stream::PartitionTimeLevel,
     StreamType,
 };
-use crate::service::{db, stream};
 
 pub async fn write_file(file_key: &FileKey) -> Result<(), anyhow::Error> {
     let (stream_key, date_key, file_name) = parse_file_key_columns(&file_key.key)?;
@@ -149,6 +148,7 @@ pub async fn query(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    time_level: PartitionTimeLevel,
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<QueryOutput>, aws_sdk_dynamodb::Error> {
     if time_range.is_some() && (time_range.unwrap().0 == 0 || time_range.unwrap().1 == 0) {
@@ -163,13 +163,7 @@ pub async fn query(
         // here must add one hour, because the between does not include the end hour
         let t2: DateTime<Utc> = Utc.timestamp_nanos(t2 * 1000) + Duration::hours(1);
         // Handle partiton time level
-        let schema = db::schema::get(org_id, stream_name, stream_type)
-            .await
-            .unwrap();
-        let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
-        let partition_time_level =
-            stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-        if partition_time_level == PartitionTimeLevel::Daily {
+        if time_level == PartitionTimeLevel::Daily {
             (
                 t1.format("%Y/%m/%d/00/").to_string(),
                 t2.format("%Y/%m/%d/%H/").to_string(),
@@ -214,10 +208,18 @@ pub async fn get_stream_file_list(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    time_level: PartitionTimeLevel,
     time_min: i64,
     time_max: i64,
 ) -> Result<Vec<FileKey>, anyhow::Error> {
-    let resp = query(org_id, stream_name, stream_type, Some((time_min, time_max))).await?;
+    let resp = query(
+        org_id,
+        stream_name,
+        stream_type,
+        time_level,
+        Some((time_min, time_max)),
+    )
+    .await?;
     Ok(resp
         .iter()
         .filter(|v| v.count() > 0)

@@ -381,8 +381,8 @@ pub fn init_functions_runtime() -> Runtime {
 pub fn write_file(
     buf: AHashMap<String, Vec<String>>,
     thread_id: usize,
-    stream_file_name: &mut String,
     stream_params: StreamParams,
+    stream_file_name: &mut String,
     partition_time_level: Option<PartitionTimeLevel>,
 ) -> RequestStats {
     let mut write_buf = BytesMut::new();

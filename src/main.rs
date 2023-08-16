@@ -106,13 +106,22 @@ async fn main() -> Result<(), anyhow::Error> {
         env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
     }
     log::info!("Starting OpenObserve {}", VERSION);
+    log::info!(
+        "System info: CPU cores {}, MEM total {} MB",
+        CONFIG.limit.cpu_num,
+        CONFIG.limit.mem_total / 1024 / 1024
+    );
 
     // init jobs
     // it must be initialized before the server starts
     cluster::register_and_keepalive()
         .await
         .expect("cluster init failed");
-    let _ = ider::generate();
+    // init ider
+    ider::init();
+    // init wal
+    wal::init();
+    // init job
     job::init().await.expect("job init failed");
 
     // gRPC server

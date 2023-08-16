@@ -14,6 +14,7 @@
 
 pub mod auth;
 pub mod base64;
+pub mod cgroup;
 pub mod file;
 pub mod flatten;
 pub mod functions;

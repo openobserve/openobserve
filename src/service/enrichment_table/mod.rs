@@ -149,12 +149,12 @@ pub async fn save_enrichment_data(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        &mut stream_file_name,
         StreamParams {
             org_id,
             stream_name,
             stream_type: StreamType::EnrichmentTables,
         },
+        &mut stream_file_name,
         None,
     );
     req_stats.response_time = start.elapsed().as_secs_f64();

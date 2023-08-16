@@ -46,7 +46,7 @@ pub async fn ingest(
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
     // check if we are allowed to ingest
@@ -79,6 +79,7 @@ pub async fn ingest(
         &mut stream_schema_map,
     )
     .await;
+
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
         let partition_det =
@@ -86,6 +87,7 @@ pub async fn ingest(
                 .await;
         partition_keys = partition_det.partition_keys;
     }
+
     // Start get stream alerts
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
@@ -177,12 +179,12 @@ pub async fn ingest(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        &mut stream_file_name,
         StreamParams {
             org_id,
             stream_name,
             stream_type: StreamType::Logs,
         },
+        &mut stream_file_name,
         None,
     );
 

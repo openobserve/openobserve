@@ -15,6 +15,7 @@
 use bytes::Bytes;
 use std::sync::Arc;
 
+use crate::common::infra::cluster::LOCAL_NODE_UUID;
 use crate::common::infra::config::METRIC_CLUSTER_LEADER;
 use crate::common::infra::db::Event;
 use crate::common::json;
@@ -53,11 +54,16 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: ClusterLeader = json::from_slice(&ev.value.unwrap()).unwrap();
-                METRIC_CLUSTER_LEADER.insert(item_key.to_owned(), item_value);
+                if item_value.updated_by != LOCAL_NODE_UUID.to_string() {
+                    METRIC_CLUSTER_LEADER
+                        .write()
+                        .await
+                        .insert(item_key.to_owned(), item_value);
+                }
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                METRIC_CLUSTER_LEADER.remove(item_key);
+                METRIC_CLUSTER_LEADER.write().await.remove(item_key);
             }
         }
     }
@@ -71,7 +77,10 @@ pub async fn cache_prom_cluster_leader() -> Result<(), anyhow::Error> {
     for (item_key, item_value) in ret {
         let item_key_str = item_key.strip_prefix(key).unwrap();
         let json_val: ClusterLeader = json::from_slice(&item_value).unwrap();
-        METRIC_CLUSTER_LEADER.insert(item_key_str.to_string(), json_val);
+        METRIC_CLUSTER_LEADER
+            .write()
+            .await
+            .insert(item_key_str.to_string(), json_val);
     }
     log::info!("Prometheus cluster leaders Cached");
     Ok(())

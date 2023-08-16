@@ -18,7 +18,6 @@ use once_cell::sync::Lazy;
 
 use crate::common::infra::config::{FxIndexSet, RwHashMap};
 use crate::common::meta::{common::FileMeta, stream::PartitionTimeLevel, StreamType};
-use crate::service::{db, stream};
 
 static FILES: Lazy<RwHashMap<String, RwHashMap<String, FxIndexSet<String>>>> =
     Lazy::new(Default::default);
@@ -127,6 +126,7 @@ pub async fn get_file_list(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    time_level: PartitionTimeLevel,
     time_min: i64,
     time_max: i64,
 ) -> Result<Vec<String>, anyhow::Error> {
@@ -136,13 +136,7 @@ pub async fn get_file_list(
         let time_max = Utc.timestamp_nanos(time_max * 1000);
         if time_min + Duration::hours(48) >= time_max {
             // Handle partiton time level
-            let schema = db::schema::get(org_id, stream_name, stream_type).await?;
-            let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
-            let partition_time_level = stream::unwrap_partition_time_level(
-                stream_settings.partition_time_level,
-                stream_type,
-            );
-            if partition_time_level == PartitionTimeLevel::Daily {
+            if time_level == PartitionTimeLevel::Daily {
                 keys.push(time_min.format("%Y/%m/%d/00/").to_string());
             }
             // less than 48 hours, generate keys by hours
@@ -347,10 +341,26 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_file_list() {
-        let ret = get_file_list("default", "olympics", StreamType::Logs, 0, 0).await;
+        let ret = get_file_list(
+            "default",
+            "olympics",
+            StreamType::Logs,
+            PartitionTimeLevel::Hourly,
+            0,
+            0,
+        )
+        .await;
         assert!(ret.is_ok());
 
-        let ret = get_file_list("default", "olympics", StreamType::Logs, 1678613530133899, 0).await;
+        let ret = get_file_list(
+            "default",
+            "olympics",
+            StreamType::Logs,
+            PartitionTimeLevel::Hourly,
+            1678613530133899,
+            0,
+        )
+        .await;
         assert!(ret.is_ok());
 
         let ret = scan_prefix("default", "olympics", StreamType::Logs, "");

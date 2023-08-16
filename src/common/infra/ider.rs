@@ -22,6 +22,10 @@ use super::cluster;
 static mut IDER: Lazy<SnowflakeIdGenerator> =
     Lazy::new(|| unsafe { SnowflakeIdGenerator::new(1, cluster::LOCAL_NODE_ID) });
 
+pub fn init() {
+    _ = generate();
+}
+
 pub fn generate() -> String {
     let id = unsafe { IDER.real_time_generate() };
     format!("{}{}", id, generate_random_string(6))
