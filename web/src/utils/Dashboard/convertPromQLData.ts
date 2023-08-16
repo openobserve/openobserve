@@ -52,7 +52,7 @@ export const convertPromQLData = (
   };
 
   const getUnitValue = (value: any) => {
-    console.log("unit value--", props.data.value.config?.unit);
+    // console.log("unit value--", props.data.value.config?.unit);
     
     switch (props.data.value.config?.unit) {
       case "bytes": {
