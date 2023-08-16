@@ -1,6 +1,6 @@
 <template>
     <div>
-        <q-select style="min-width: 150px;" filled outlined dense v-model="selectedValue" :display-value="selectedValue ?selectedValue : '(No Data Found)'" :label="variableItem?.label || variableItem?.name"
+        <q-select style="min-width: 150px;" filled outlined dense v-model="selectedValue" :display-value="selectedValue ? selectedValue : !variableItem.isLoading ? '(No Data Found)' : ''" :label="variableItem?.label || variableItem?.name"
             :options="fieldsFilteredOptions" input-debounce="0" behavior="menu" use-input
             stack-label @filter="fieldsFilterFn" option-value="name" option-label="name" emit-value class="textbox col no-case"
             :loading="variableItem.isLoading">
