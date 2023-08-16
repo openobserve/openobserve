@@ -19,11 +19,11 @@ use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
 use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::stream::StreamParams;
-use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{IngestionResponse, StreamStatus},
+    stream::StreamParams,
+    usage::UsageType,
     StreamType,
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
@@ -46,7 +46,7 @@ pub async fn ingest(
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
     // check if we are allowed to ingest
@@ -171,12 +171,12 @@ pub async fn ingest(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        &mut stream_file_name,
         StreamParams {
             org_id,
             stream_name,
             stream_type: StreamType::Logs,
         },
+        &mut stream_file_name,
         None,
     );
 

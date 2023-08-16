@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-
 use aws_sdk_dynamodb::types::AttributeValue;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::common::infra::cache::file_list::parse_file_key_columns;
 use crate::common::json;

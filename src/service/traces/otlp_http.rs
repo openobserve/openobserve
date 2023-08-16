@@ -21,10 +21,10 @@ use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
 use crate::common::infra::{cluster, config::CONFIG};
-use crate::common::meta::stream::StreamParams;
 use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
+    stream::StreamParams,
     traces::{Event, Span, SpanRefType},
     usage::UsageType,
     StreamType,
@@ -70,7 +70,7 @@ pub async fn traces_json(
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
-            "Quota exceeded for this organisation".to_string(),
+            "Quota exceeded for this organization".to_string(),
         )));
     }
 
@@ -368,12 +368,12 @@ pub async fn traces_json(
     let mut req_stats = write_file(
         data_buf,
         thread_id,
-        &mut traces_file_name,
         StreamParams {
             org_id,
             stream_name: traces_stream_name,
             stream_type: StreamType::Traces,
         },
+        &mut traces_file_name,
         None,
     );
     req_stats.response_time = start.elapsed().as_secs_f64();

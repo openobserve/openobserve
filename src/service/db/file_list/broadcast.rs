@@ -118,6 +118,7 @@ async fn send_to_node(
                 }
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            tokio::task::yield_now().await;
         }
         // connect to the node
         let token: MetadataValue<_> = get_internal_grpc_token()
