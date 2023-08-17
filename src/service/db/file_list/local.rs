@@ -72,7 +72,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
 }
 
 pub async fn get_all() -> Result<Vec<FileKey>, anyhow::Error> {
-    let mut result = Vec::new();
+    let mut result = Vec::with_capacity(1024);
     let pattern = format!("{}/file_list/*.json", &CONFIG.common.data_wal_dir);
     let files = scan_files(&pattern);
     let mut line_num = 0;
@@ -116,13 +116,13 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 #[inline]
-pub async fn broadcast_cache(node_uuid: Option<&str>) -> Result<(), anyhow::Error> {
+pub async fn broadcast_cache(node_uuid: Option<String>) -> Result<(), anyhow::Error> {
     let files = get_all().await?;
     if files.is_empty() {
         return Ok(());
     }
     for chunk in files.chunks(100) {
-        if let Err(e) = super::broadcast::send(chunk, node_uuid).await {
+        if let Err(e) = super::broadcast::send(chunk, node_uuid.clone()).await {
             log::error!("broadcast cached file list failed: {}", e);
         }
     }

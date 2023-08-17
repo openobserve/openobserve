@@ -30,7 +30,7 @@ static EVENTS: Lazy<RwLock<ahash::AHashMap<String, EventChannel>>> =
 type EventChannel = Arc<mpsc::UnboundedSender<Vec<FileKey>>>;
 
 /// send an event to broadcast, will create a new channel for each nodes
-pub async fn send(items: &[FileKey], node_uuid: Option<&str>) -> Result<(), anyhow::Error> {
+pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), anyhow::Error> {
     if CONFIG.common.local_mode {
         return Ok(());
     }
@@ -42,7 +42,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<&str>) -> Result<(), anyh
         })
         .unwrap()
     } else {
-        get_node_by_uuid(node_uuid.unwrap())
+        get_node_by_uuid(&node_uuid.unwrap())
             .map(|node| vec![node])
             .unwrap_or_default()
     };
