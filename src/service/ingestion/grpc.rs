@@ -1,5 +1,8 @@
 use crate::common::json;
-use opentelemetry_proto::tonic::common::v1::AnyValue;
+use opentelemetry_proto::tonic::{
+    common::v1::AnyValue,
+    metrics::v1::{exemplar, number_data_point},
+};
 
 pub fn get_val(attr_val: &Option<AnyValue>) -> json::Value {
     match attr_val {
@@ -73,6 +76,26 @@ pub fn get_severity_value(severity_number: i32) -> String {
         _ => "Unspecified",
     }
     .into()
+}
+
+pub fn get_metric_val(attr_val: &Option<number_data_point::Value>) -> json::Value {
+    match attr_val {
+        Some(local_val) => match local_val {
+            number_data_point::Value::AsDouble(val) => json::json!(val),
+            number_data_point::Value::AsInt(val) => json::json!(*val as f64),
+        },
+        None => json::Value::Null,
+    }
+}
+
+pub fn get_exemplar_val(attr_val: &Option<exemplar::Value>) -> json::Value {
+    match attr_val {
+        Some(local_val) => match local_val {
+            exemplar::Value::AsDouble(val) => json::json!(val),
+            exemplar::Value::AsInt(val) => json::json!(*val as f64),
+        },
+        None => json::Value::Null,
+    }
 }
 
 #[cfg(test)]

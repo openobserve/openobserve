@@ -112,6 +112,7 @@ opentelemetry-proto = { version = "0.1", features = [
   "gen-tonic",
   "traces",
   "logs",
+  "metrics",
   "with-serde",
   "build-server",
 ] }

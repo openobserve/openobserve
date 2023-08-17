@@ -24,6 +24,7 @@ use crate::handler::grpc::cluster_rpc::{
     metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
     MetricsWalFileRequest, MetricsWalFileResponse,
 };
+use crate::handler::grpc::request::MetadataMap;
 use crate::service::promql::search as SearchService;
 
 pub struct Querier;
@@ -36,9 +37,8 @@ impl Metrics for Querier {
         req: Request<MetricsQueryRequest>,
     ) -> Result<Response<MetricsQueryResponse>, Status> {
         let start = std::time::Instant::now();
-        let parent_cx = global::get_text_map_propagator(|prop| {
-            prop.extract(&super::MetadataMap(req.metadata()))
-        });
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
         tracing::Span::current().set_parent(parent_cx);
 
         let req: &MetricsQueryRequest = req.get_ref();

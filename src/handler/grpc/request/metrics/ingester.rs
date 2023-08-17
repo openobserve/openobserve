@@ -1,21 +1,21 @@
 use async_trait::async_trait;
-use opentelemetry_proto::tonic::collector::logs::v1::{
-    logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
+use opentelemetry_proto::tonic::collector::metrics::v1::{
+    metrics_service_server::MetricsService, ExportMetricsServiceRequest,
+    ExportMetricsServiceResponse,
 };
-use tonic::Response;
-use tonic::Status;
+use tonic::{Response, Status};
 
 use crate::common::infra::config::CONFIG;
 
 #[derive(Default)]
-pub struct LogsServer;
+pub struct MetricsServer;
 
 #[async_trait]
-impl LogsService for LogsServer {
+impl MetricsService for MetricsServer {
     async fn export(
         &self,
-        request: tonic::Request<ExportLogsServiceRequest>,
-    ) -> Result<tonic::Response<ExportLogsServiceResponse>, tonic::Status> {
+        request: tonic::Request<ExportMetricsServiceRequest>,
+    ) -> Result<tonic::Response<ExportMetricsServiceResponse>, tonic::Status> {
         let metadata = request.metadata().clone();
         let msg = format!(
             "Please specify organization id with header key '{}' ",
@@ -31,14 +31,14 @@ impl LogsService for LogsServer {
             return Err(Status::invalid_argument(msg));
         }
 
-        let resp = crate::service::logs::json_no_fn::handle_grpc_request(
+        let resp = crate::service::metrics::otlp::handle_grpc_request(
             org_id.unwrap().to_str().unwrap(),
             0,
             in_req,
         )
         .await;
         if resp.is_ok() {
-            return Ok(Response::new(ExportLogsServiceResponse {}));
+            return Ok(Response::new(ExportMetricsServiceResponse {}));
         } else {
             Err(Status::internal(resp.err().unwrap().to_string()))
         }

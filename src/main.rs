@@ -53,8 +53,8 @@ use openobserve::{
                 search_server::SearchServer, usage_server::UsageServer,
             },
             request::{
-                event::Eventer, logs::LogsServer, metrics::Querier, search::Searcher,
-                traces::TraceServer, usage::UsageServerImpl,
+                event::Eventer, logs::LogsServer, search::Searcher, traces::TraceServer,
+                usage::UsageServerImpl, metrics::querier::Querier,
             },
         },
         http::router::*,

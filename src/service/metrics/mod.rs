@@ -18,6 +18,7 @@ use crate::common;
 use crate::common::meta::prom::{Metadata, METADATA_LABEL};
 
 pub mod json;
+pub mod otlp;
 pub mod prom;
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {

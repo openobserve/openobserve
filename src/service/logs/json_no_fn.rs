@@ -200,7 +200,7 @@ pub async fn ingest(
     ))
 }
 
-pub async fn handle_logs_request(
+pub async fn handle_grpc_request(
     org_id: &str,
     thread_id: usize,
     request: ExportLogsServiceRequest,
@@ -251,12 +251,12 @@ pub async fn handle_logs_request(
 
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
-    for resource_logs in &request.resource_logs {
-        for instrumentation_logs in &resource_logs.instrumentation_library_logs {
+    for resource_log in &request.resource_logs {
+        for instrumentation_logs in &resource_log.instrumentation_library_logs {
             for log_record in &instrumentation_logs.log_records {
                 let mut rec = json::json!({});
 
-                match &resource_logs.resource {
+                match &resource_log.resource {
                     Some(res) => {
                         for item in &res.attributes {
                             rec[item.key.as_str()] = get_val(&item.value);
@@ -484,7 +484,7 @@ pub mod test {
             resource_logs: vec![res_logs],
         };
 
-        let result = super::handle_logs_request(org_id, thread_id, request).await;
+        let result = super::handle_grpc_request(org_id, thread_id, request).await;
         assert!(result.is_ok());
     }
 }
