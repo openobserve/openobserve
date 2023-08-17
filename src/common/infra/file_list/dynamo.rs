@@ -41,13 +41,6 @@ lazy_static! {
     static ref CLIENT: AsyncOnce<Client> = AsyncOnce::new(async { connect().await });
 }
 
-pub async fn init() -> Result<()> {
-    // create dynamo db table
-    let client = CLIENT.get().await;
-    create_table(client, &CONFIG.common.file_list_dynamo_table_name).await?;
-    Ok(())
-}
-
 async fn connect() -> Client {
     if CONFIG.common.local_mode {
         let region = Region::new("us-west-2");
@@ -286,7 +279,9 @@ impl super::FileList for DynamoFileList {
     }
 }
 
-async fn create_table(client: &aws_sdk_dynamodb::Client, table_name: &str) -> Result<()> {
+pub async fn create_table() -> Result<()> {
+    let client = CLIENT.get().await.clone();
+    let table_name = &CONFIG.common.file_list_dynamo_table_name;
     let tables = client
         .list_tables()
         .send()
@@ -330,5 +325,9 @@ async fn create_table(client: &aws_sdk_dynamodb::Client, table_name: &str) -> Re
 
         log::info!("Table {} created successfully", table_name);
     }
+    Ok(())
+}
+
+pub async fn create_table_index() -> Result<()> {
     Ok(())
 }

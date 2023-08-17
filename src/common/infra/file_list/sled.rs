@@ -29,11 +29,6 @@ lazy_static! {
     static ref CLIENT: ::sled::Db = connect();
 }
 
-pub async fn init() -> Result<()> {
-    _ = CLIENT.clone().is_empty();
-    Ok(())
-}
-
 pub fn connect() -> ::sled::Db {
     ::sled::open(format!("{}file_list.sled", CONFIG.common.data_cache_dir))
         .expect("sled db dir create failed")
@@ -228,4 +223,14 @@ fn generate_prefix(time_level: PartitionTimeLevel, time_range: (i64, i64)) -> Ve
         }
     }
     keys
+}
+
+pub async fn create_table() -> Result<()> {
+    let client = CLIENT.clone();
+    _ = client.is_empty();
+    Ok(())
+}
+
+pub async fn create_table_index() -> Result<()> {
+    Ok(())
 }

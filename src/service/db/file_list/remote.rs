@@ -109,11 +109,9 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
         stats.caching_time
     );
 
-    // create sqlite table index
-    if CONFIG.common.file_list_storage.as_str() == "sqlite" {
-        infra_file_list::sqlite::create_table_index().await?;
-        log::info!("Load file_list create table index done");
-    }
+    // create table index
+    infra_file_list::create_table_index().await?;
+    log::info!("Load file_list create table index done");
 
     // delete files
     let deleted_files = super::DELETED_FILES

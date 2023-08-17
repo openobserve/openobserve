@@ -33,10 +33,6 @@ use crate::common::meta::{
 
 static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
 
-pub async fn init() -> Result<()> {
-    create_table().await
-}
-
 fn connect() -> Pool<Sqlite> {
     let url = format!("{}{}", CONFIG.common.data_cache_dir, "file_list.sqlite");
     if std::path::Path::new(&url).exists() {
@@ -359,14 +355,9 @@ pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
     sqlx::query(
         r#"
-CREATE INDEX IF NOT EXISTS file_list_stream_idx
-    on file_list (stream);
-
-CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx
-    on file_list (stream, min_ts, max_ts);
-
-CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx
-    on file_list (stream, date, file);
+CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);
+CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);
+CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);
     "#,
     )
     .execute(&pool)

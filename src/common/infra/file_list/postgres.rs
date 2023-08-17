@@ -33,12 +33,6 @@ use crate::common::meta::{
 
 static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
 
-pub async fn init() -> Result<()> {
-    create_table().await?;
-    create_table_index().await?;
-    Ok(())
-}
-
 fn connect() -> Pool<Postgres> {
     let db_opts = PgConnectOptions::from_str(&CONFIG.common.file_list_postgres_dsn)
         .expect("postgres connect options create failed")
@@ -152,17 +146,16 @@ DELETE FROM file_list
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
-            let mut sqls = Vec::with_capacity(files.len() + 2);
-            sqls.push("BEGIN TRANSACTION;".to_string());
+            let mut tx = pool.begin().await?;
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                sqls.push(format!("DELETE FROM file_list WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';"));
+                let sql = format!("DELETE FROM file_list WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
+                match sqlx::query(&sql).execute(&mut *tx).await {
+                    Ok(_) => {}
+                    Err(e) => return Err(e.into()),
+                }
             }
-            sqls.push("END TRANSACTION;".to_string());
-            match sqlx::query(&sqls.join("\n")).execute(&pool).await {
-                Ok(_) => {}
-                Err(e) => return Err(e.into()),
-            }
+            tx.commit().await?;
         }
         Ok(())
     }
@@ -352,27 +345,21 @@ CREATE TABLE IF NOT EXISTS file_list
 
 pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
+    let mut tx = pool.begin().await?;
+    sqlx::query(r#"CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);"#)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query(
-        r#"
-CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);
-    "#,
+        r#"CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);"#,
     )
-    .execute(&pool)
+    .execute(&mut *tx)
     .await?;
     sqlx::query(
-        r#"
-CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);
-"#,
+        r#"CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);"#,
     )
-    .execute(&pool)
+    .execute(&mut *tx)
     .await?;
-    sqlx::query(
-        r#"
-CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);
-"#,
-    )
-    .execute(&pool)
-    .await?;
+    tx.commit().await?;
 
     Ok(())
 }

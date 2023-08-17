@@ -121,13 +121,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     // cache file list
-    infra_file_list::init().await?;
+    infra_file_list::create_table().await?;
     // TODO should be removed
     // if !CONFIG.common.file_list_external {
     db::file_list::remote::cache("", false)
         .await
         .expect("file list remote cache failed");
     // }
+    infra_file_list::create_table_index().await?;
 
     // compactor run
     tokio::task::spawn(async move { compact::run().await });

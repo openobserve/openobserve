@@ -67,16 +67,29 @@ pub trait FileList: Sync + 'static {
     async fn clear(&self) -> Result<()>;
 }
 
-pub async fn init() -> Result<()> {
+pub async fn create_table() -> Result<()> {
     // check cache dir
     std::fs::create_dir_all(&CONFIG.common.data_cache_dir)?;
     match CONFIG.common.file_list_storage.as_str() {
-        "sled" => sled::init().await,
-        "sqlite" => sqlite::init().await,
-        "postgres" | "postgresql" => postgres::init().await,
-        "dynamo" | "dynamodb" => dynamo::init().await,
-        "duckdb" => duckdb::init().await,
-        _ => sqlite::init().await,
+        "sled" => sled::create_table().await,
+        "sqlite" => sqlite::create_table().await,
+        "postgres" | "postgresql" => postgres::create_table().await,
+        "dynamo" | "dynamodb" => dynamo::create_table().await,
+        "duckdb" => duckdb::create_table().await,
+        _ => sqlite::create_table().await,
+    }
+}
+
+pub async fn create_table_index() -> Result<()> {
+    // check cache dir
+    std::fs::create_dir_all(&CONFIG.common.data_cache_dir)?;
+    match CONFIG.common.file_list_storage.as_str() {
+        "sled" => sled::create_table_index().await,
+        "sqlite" => sqlite::create_table_index().await,
+        "postgres" | "postgresql" => postgres::create_table_index().await,
+        "dynamo" | "dynamodb" => dynamo::create_table_index().await,
+        "duckdb" => duckdb::create_table_index().await,
+        _ => sqlite::create_table_index().await,
     }
 }
 

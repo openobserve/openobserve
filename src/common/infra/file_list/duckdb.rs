@@ -41,10 +41,6 @@ pub struct DuckDB {
     pub client: r2d2::Pool<DuckdbConnectionManager>,
 }
 
-pub async fn init() -> Result<()> {
-    Ok(())
-}
-
 impl DuckDB {
     pub async fn connect() -> DuckDB {
         let db_path = format!("{}duckdb", CONFIG.common.data_cache_dir);
@@ -60,9 +56,6 @@ impl DuckDB {
             Ok(_) => log::info!("set env success "),
             Err(err) => panic!("set env err {err} "),
         }
-        create_file_list_table(&CONFIG.common.file_list_dynamo_table_name)
-            .await
-            .unwrap();
         DuckDB { client: pool }
     }
 
@@ -78,17 +71,6 @@ fn get_config() -> String {
         set s3_secret_access_key = \"{}\";set s3_region = \"{}\";",
         CONFIG.s3.access_key, CONFIG.s3.secret_key, CONFIG.s3.region_name
     )
-}
-
-async fn create_file_list_table(table_name: &str) -> Result<()> {
-    let conn = DUCK_DB_CLIENT.get().await.connection();
-    let sql = format!(
-        "CREATE TABLE IF NOT EXISTS {table_name}(stream VARCHAR, date VARCHAR, file VARCHAR,
-                         min_ts bigint, max_ts bigint, records bigint, original_size bigint, compressed_size bigint,
-                         deleted BOOLEAN);",    
-    );
-    conn.execute_batch(&sql).unwrap();
-    Ok(())
 }
 
 pub struct DuckDBFileList {
@@ -335,6 +317,22 @@ impl super::FileList for DuckDBFileList {
     }
 }
 
+pub async fn create_table() -> Result<()> {
+    let conn = DUCK_DB_CLIENT.get().await.connection();
+    let table_name = &CONFIG.common.file_list_dynamo_table_name;
+    let sql = format!(
+        "CREATE TABLE IF NOT EXISTS {table_name}(stream VARCHAR, date VARCHAR, file VARCHAR,
+                         min_ts bigint, max_ts bigint, records bigint, original_size bigint, compressed_size bigint,
+                         deleted BOOLEAN);",    
+    );
+    conn.execute_batch(&sql).unwrap();
+    Ok(())
+}
+
+pub async fn create_table_index() -> Result<()> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::common::infra::file_list::FileList;
@@ -343,9 +341,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_duckdb() {
-        let _ = create_file_list_table(&CONFIG.common.file_list_dynamo_table_name)
-            .await
-            .unwrap();
+        let _ = create_table().await.unwrap();
         let table = DuckDBFileList::new();
         table.clear().await.unwrap();
         assert_eq!(0, table.len().await);
