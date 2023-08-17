@@ -364,9 +364,14 @@ async fn watch_node_list() -> Result<()> {
                 let item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
                 log::info!("[CLUSTER] join {:?}", item_value.clone());
                 NODES.insert(item_key.to_string(), item_value.clone());
-                // need broadcast local file list to the new node
-                // also need broadcast own file list to other nodes when an ingester join
-                if item_value.status.eq(&NodeStatus::Prepare) && is_ingester(&LOCAL_NODE_ROLE) {
+                // The ingester need broadcast local file list to the new node
+                // -- 1. broadcast to the node prepare
+                // -- 2. broadcast to the node online (only itself)
+                if is_ingester(&LOCAL_NODE_ROLE)
+                    && (item_value.status.eq(&NodeStatus::Prepare)
+                        || (item_value.status.eq(&NodeStatus::Online)
+                            && item_key.eq(LOCAL_NODE_UUID.as_str())))
+                {
                     log::info!("[CLUSTER] broadcast file_list to new node: {}", item_key);
                     let notice_uuid = if item_key.eq(LOCAL_NODE_UUID.as_str()) {
                         None
