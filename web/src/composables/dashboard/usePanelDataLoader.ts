@@ -181,14 +181,18 @@ console.log('dependentAvailableVariables: ',dependentAvailableVariables);
 };
 
   const replaceQueryValue = (query: any) => {
-    if (currentDependentVariablesData.value?.length) {
-      currentDependentVariablesData.value?.forEach((variable: any) => {
+    if (currentDependentVariablesData?.length) {
+      console.log("inside replaceQueryValue");
+      
+      currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
         const variableValue = variable.value;
         query = query.replaceAll(variableName, variableValue);
       });
-    }
     return query;
+  }else{
+    return query
+  }
   };
 
   const processApiError = async (error: any, type: any) => {
