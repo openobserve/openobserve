@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ahash::AHashMap;
 use arrow_schema::Field;
 use chrono::Duration;
 use datafusion::arrow::datatypes::Schema;
@@ -22,10 +21,7 @@ use utoipa::ToSchema;
 
 use crate::common::{infra::config::CONFIG, meta::StreamType, utils::json};
 
-use super::{
-    alert::{Alert, Trigger},
-    usage::Stats,
-};
+use super::usage::Stats;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {

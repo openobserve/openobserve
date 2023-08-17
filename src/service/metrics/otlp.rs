@@ -4,10 +4,10 @@ use crate::{
         json,
         meta::{
             self,
-            alert::{Alert, Evaluate, Trigger},
+            alert::{Alert, Trigger},
             http::HttpResponse as MetaHttpResponse,
-            prom::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-            stream::PartitioningDetails,
+            prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+            stream::{PartitioningDetails, StreamParams},
             usage::UsageType,
             StreamType,
         },
@@ -17,13 +17,14 @@ use crate::{
         ingestion::{
             chk_schema_by_record,
             grpc::{get_exemplar_val, get_metric_val, get_val},
+            write_file,
         },
-        schema::stream_schema_exists,
+        schema::{set_schema_metadata, stream_schema_exists},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
 };
-use actix_web::{http, web, HttpResponse};
+use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::Utc;
@@ -70,20 +71,28 @@ pub async fn handle_grpc_request(
                 // check for schema
                 let _schema_exists = stream_schema_exists(
                     org_id,
-                    &metric_name,
+                    metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
                 )
                 .await;
+
                 // get partition keys
                 if !stream_partitioning_map.contains_key(metric_name) {
                     let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                        &metric_name,
+                        metric_name,
                         &metric_schema_map,
                     )
                     .await;
-                    stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
+                    stream_partitioning_map
+                        .insert(metric_name.clone().to_owned(), partition_det.clone());
                 }
+                let partition_det = stream_partitioning_map.get(metric_name).unwrap();
+                let partition_keys = partition_det.partition_keys.clone();
+                let partition_time_level = unwrap_partition_time_level(
+                    partition_det.partition_time_level,
+                    StreamType::Metrics,
+                );
 
                 // Start get stream alerts
                 let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
@@ -110,50 +119,43 @@ pub async fn handle_grpc_request(
                     None => {}
                 }
                 rec[NAME_LABEL] = metric_name.to_owned().into();
-                rec["unit"] = metric.unit.to_owned().into();
-                rec["description"] = metric.description.to_owned().into();
+
+                //metadata handling
+                let mut metadata = prom::Metadata {
+                    metric_family_name: rec[NAME_LABEL].to_string(),
+                    metric_type: MetricType::Unknown,
+                    help: metric.description.to_owned(),
+                    unit: metric.unit.to_owned(),
+                };
+                let mut prom_meta: AHashMap<String, String> = AHashMap::new();
 
                 let records = match &metric.data {
                     Some(data) => match data {
-                        Data::Gauge(gauge) => process_gauge(&mut rec, gauge),
-                        Data::Sum(sum) => process_sum(&mut rec, sum),
-                        Data::Histogram(hist) => process_histogram(&mut rec, hist),
-                        Data::ExponentialHistogram(exp_hist) => todo!(),
-                        Data::Summary(summary) => process_summary(&mut rec, summary),
+                        Data::Gauge(gauge) => {
+                            process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta)
+                        }
+                        Data::Sum(sum) => process_sum(&mut rec, sum, &mut metadata, &mut prom_meta),
+                        Data::Histogram(hist) => {
+                            process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta)
+                        }
+                        Data::ExponentialHistogram(exp_hist) => process_exponential_histogram(
+                            &mut rec,
+                            exp_hist,
+                            &mut metadata,
+                            &mut prom_meta,
+                        ),
+                        Data::Summary(summary) => {
+                            process_summary(&mut rec, summary, &mut metadata, &mut prom_meta)
+                        }
                     },
                     None => vec![],
                 };
+
+                set_schema_metadata(org_id, metric_name, StreamType::Metrics, prom_meta)
+                    .await
+                    .unwrap();
+
                 for mut rec in records {
-                    // check for schema
-                    let _schema_exists = stream_schema_exists(
-                        org_id,
-                        &metric_name,
-                        StreamType::Metrics,
-                        &mut metric_schema_map,
-                    )
-                    .await;
-
-                    // get partition keys
-                    if !stream_partitioning_map.contains_key(metric_name) {
-                        let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                            &metric_name,
-                            &metric_schema_map,
-                        )
-                        .await;
-                        stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
-                    }
-                    let partition_det = stream_partitioning_map.get(metric_name).unwrap();
-                    let partition_keys = partition_det.partition_keys.clone();
-                    let partition_time_level = unwrap_partition_time_level(
-                        partition_det.partition_time_level,
-                        StreamType::Metrics,
-                    );
-
-                    // Start get stream alerts
-                    let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
-                    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
-                    // End get stream alert
-
                     // get json object
                     let val_map: &mut serde_json::Map<String, serde_json::Value> =
                         rec.as_object_mut().unwrap();
@@ -169,7 +171,7 @@ pub async fn handle_grpc_request(
                         &mut metric_schema_map,
                         org_id,
                         StreamType::Metrics,
-                        &metric_name,
+                        metric_name,
                         timestamp,
                         &value_str,
                     )
@@ -204,12 +206,12 @@ pub async fn handle_grpc_request(
                                     );
                                     if set_trigger {
                                         stream_trigger_map.insert(
-                                            metric_name.clone(),
+                                            metric_name.to_owned(),
                                             Trigger {
                                                 timestamp,
                                                 is_valid: true,
                                                 alert_name: alert.name.clone(),
-                                                stream: metric_name.clone(),
+                                                stream: metric_name.to_owned(),
                                                 org: org_id.to_string(),
                                                 stream_type: StreamType::Metrics,
                                                 last_sent_at: 0,
@@ -228,6 +230,79 @@ pub async fn handle_grpc_request(
         }
     }
 
+    let time = start.elapsed().as_secs_f64();
+    for (stream_name, stream_data) in metric_data_map {
+        // stream_data could be empty if metric value is nan, check it
+        if stream_data.is_empty() {
+            continue;
+        }
+
+        // write to file
+        let mut stream_file_name = "".to_string();
+
+        // check if we are allowed to ingest
+        if db::compact::retention::is_deleting_stream(
+            org_id,
+            &stream_name,
+            StreamType::Metrics,
+            None,
+        ) {
+            log::warn!("stream [{stream_name}] is being deleted");
+            continue;
+        }
+
+        let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
+            details.partition_time_level
+        } else {
+            Some(CONFIG.limit.metrics_file_retention.as_str().into())
+        };
+
+        let mut req_stats = write_file(
+            stream_data,
+            thread_id,
+            StreamParams {
+                org_id,
+                stream_name: &stream_name,
+                stream_type: StreamType::Metrics,
+            },
+            &mut stream_file_name,
+            time_level,
+        );
+
+        req_stats.response_time += time;
+        report_request_usage_stats(
+            req_stats,
+            org_id,
+            &stream_name,
+            StreamType::Metrics,
+            UsageType::Metrics,
+            0,
+        )
+        .await;
+    }
+
+    // only one trigger per request, as it updates etcd
+    for (_, entry) in &stream_trigger_map {
+        let mut alerts = stream_alerts_map
+            .get(&format!(
+                "{}/{}/{}",
+                entry.org,
+                StreamType::Metrics,
+                entry.stream
+            ))
+            .unwrap()
+            .clone();
+
+        alerts.retain(|alert| alert.name.eq(&entry.alert_name));
+        if !alerts.is_empty() {
+            crate::service::ingestion::send_ingest_notification(
+                entry.clone(),
+                alerts.first().unwrap().clone(),
+            )
+            .await;
+        }
+    }
+
     let res = ExportMetricsServiceResponse {};
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
@@ -238,8 +313,21 @@ pub async fn handle_grpc_request(
         .body(out));
 }
 
-fn process_gauge(rec: &mut json::Value, gauge: &Gauge) -> Vec<serde_json::Value> {
+fn process_gauge(
+    rec: &mut json::Value,
+    gauge: &Gauge,
+    metadata: &mut prom::Metadata,
+    prom_meta: &mut AHashMap<String, String>,
+) -> Vec<serde_json::Value> {
     let mut records = vec![];
+
+    // set metadata
+    metadata.metric_type = MetricType::Gauge;
+    prom_meta.insert(
+        meta::prom::METADATA_LABEL.to_string(),
+        json::to_string(&metadata).unwrap(),
+    );
+
     for data_point in &gauge.data_points {
         process_data_point(rec, data_point);
         let val_map = rec.as_object_mut().unwrap();
@@ -250,7 +338,19 @@ fn process_gauge(rec: &mut json::Value, gauge: &Gauge) -> Vec<serde_json::Value>
     records
 }
 
-fn process_sum(rec: &mut json::Value, sum: &Sum) -> Vec<serde_json::Value> {
+fn process_sum(
+    rec: &mut json::Value,
+    sum: &Sum,
+    metadata: &mut prom::Metadata,
+    prom_meta: &mut AHashMap<String, String>,
+) -> Vec<serde_json::Value> {
+    // set metadata
+    metadata.metric_type = MetricType::Counter;
+    prom_meta.insert(
+        meta::prom::METADATA_LABEL.to_string(),
+        json::to_string(&metadata).unwrap(),
+    );
+
     let mut records = vec![];
     process_aggregation_temporality(rec, sum.aggregation_temporality);
     rec["is_monotonic"] = sum.is_monotonic.into();
@@ -264,7 +364,19 @@ fn process_sum(rec: &mut json::Value, sum: &Sum) -> Vec<serde_json::Value> {
     records
 }
 
-fn process_histogram(rec: &mut json::Value, hist: &Histogram) -> Vec<serde_json::Value> {
+fn process_histogram(
+    rec: &mut json::Value,
+    hist: &Histogram,
+    metadata: &mut prom::Metadata,
+    prom_meta: &mut AHashMap<String, String>,
+) -> Vec<serde_json::Value> {
+    // set metadata
+    metadata.metric_type = MetricType::Histogram;
+    prom_meta.insert(
+        meta::prom::METADATA_LABEL.to_string(),
+        json::to_string(&metadata).unwrap(),
+    );
+
     let mut records = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
     for data_point in &hist.data_points {
@@ -278,14 +390,22 @@ fn process_histogram(rec: &mut json::Value, hist: &Histogram) -> Vec<serde_json:
     records
 }
 
-/* fn process_exponentail_histogram(
+fn process_exponential_histogram(
     rec: &mut json::Value,
     hist: &ExponentialHistogram,
+    metadata: &mut prom::Metadata,
+    prom_meta: &mut AHashMap<String, String>,
 ) -> Vec<serde_json::Value> {
+    // set metadata
+    metadata.metric_type = MetricType::ExponentialHistogram;
+    prom_meta.insert(
+        meta::prom::METADATA_LABEL.to_string(),
+        json::to_string(&metadata).unwrap(),
+    );
     let mut records = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
     for data_point in &hist.data_points {
-        for mut bucket_rec in process_hist_data_point(rec, data_point) {
+        for mut bucket_rec in process_exp_hist_data_point(rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
@@ -293,11 +413,22 @@ fn process_histogram(rec: &mut json::Value, hist: &Histogram) -> Vec<serde_json:
         }
     }
     records
-} */
+}
 
-fn process_summary(rec: &mut json::Value, summary: &Summary) -> Vec<serde_json::Value> {
+fn process_summary(
+    rec: &mut json::Value,
+    summary: &Summary,
+    metadata: &mut prom::Metadata,
+    prom_meta: &mut AHashMap<String, String>,
+) -> Vec<serde_json::Value> {
+    // set metadata
+    metadata.metric_type = MetricType::Summary;
+    prom_meta.insert(
+        meta::prom::METADATA_LABEL.to_string(),
+        json::to_string(&metadata).unwrap(),
+    );
+
     let mut records = vec![];
-
     for data_point in &summary.data_points {
         for mut bucket_rec in process_summary_data_point(rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
@@ -359,13 +490,11 @@ fn process_hist_data_point(
     let last_index = data_point.bucket_counts.len() - 1;
     for i in 0..last_index {
         let mut bucket_rec = rec.clone();
-        match data_point.bucket_counts.get(i) {
-            Some(val) => bucket_rec["value"] = val.clone().into(),
-            None => {}
+        if let Some(val) = data_point.bucket_counts.get(i) {
+            bucket_rec["value"] = (*val).into()
         }
-        match data_point.explicit_bounds.get(i) {
-            Some(val) => bucket_rec["le"] = val.clone().into(),
-            None => {}
+        if let Some(val) = data_point.explicit_bounds.get(i) {
+            bucket_rec["le"] = (*val).into()
         }
         if i == last_index {
             bucket_rec["le"] = std::f64::INFINITY.into();
@@ -375,7 +504,7 @@ fn process_hist_data_point(
     bucket_recs
 }
 
-/* fn process_exp_hist_data_point(
+fn process_exp_hist_data_point(
     rec: &mut json::Value,
     data_point: &ExponentialHistogramDataPoint,
 ) -> Vec<serde_json::Value> {
@@ -384,8 +513,6 @@ fn process_hist_data_point(
     for attr in &data_point.attributes {
         rec[attr.key.as_str()] = get_val(&attr.value);
     }
-    rec["count"] = data_point.count.into();
-    rec["sum"] = data_point.sum.into();
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.into();
     rec["flag"] = if data_point.flags == 1 {
@@ -395,21 +522,48 @@ fn process_hist_data_point(
     }
     .into();
     process_exemplars(rec, &data_point.exemplars);
-    for i in 0..data_point.bucket_counts.len() {
-        let mut bucket_rec = rec.clone();
-        match data_point.bucket_counts.get(i) {
-            Some(val) => bucket_rec["bucket_count"] = val.clone().into(),
-            None => {}
-        }
-        match data_point.explicit_bounds.get(i) {
-            Some(val) => bucket_rec["bucket_upper_bound"] = val.clone().into(),
-            None => {}
-        }
+    // add count record
+    let mut count_rec = rec.clone();
+    count_rec["value"] = data_point.count.into();
+    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
+    bucket_recs.push(count_rec);
 
-        bucket_recs.push(bucket_rec);
+    // add sum record
+    let mut sum_rec = rec.clone();
+    sum_rec["value"] = data_point.sum.into();
+    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
+    bucket_recs.push(sum_rec);
+
+    let base = 2 ^ (2 ^ -data_point.scale);
+    // add negative bucket records
+    match &data_point.negative {
+        Some(buckets) => {
+            let offset = buckets.offset;
+            for (i, val) in buckets.bucket_counts.iter().enumerate() {
+                let mut bucket_rec = rec.clone();
+                bucket_rec["value"] = (*val).into();
+                bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).into();
+                bucket_recs.push(bucket_rec);
+            }
+        }
+        None => {}
     }
+    // add positive bucket records
+    match &data_point.positive {
+        Some(buckets) => {
+            let offset = buckets.offset;
+            for (i, val) in buckets.bucket_counts.iter().enumerate() {
+                let mut bucket_rec = rec.clone();
+                bucket_rec["value"] = (*val).into();
+                bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).into();
+                bucket_recs.push(bucket_rec);
+            }
+        }
+        None => {}
+    }
+
     bucket_recs
-} */
+}
 
 fn process_summary_data_point(
     rec: &mut json::Value,
