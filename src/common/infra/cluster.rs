@@ -100,14 +100,14 @@ pub async fn register_and_keepalive() -> Result<()> {
     if CONFIG.common.local_mode {
         let roles = load_local_node_role();
         if !is_single_node(&roles) {
-            panic!("For local mode only single node deployment is allowed !");
+            panic!("For local mode only single node deployment is allowed!");
         }
         // cache local node
         NODES.insert(LOCAL_NODE_UUID.clone(), load_local_mode_node());
         return Ok(());
     }
     if let Err(e) = register().await {
-        log::error!("Register to cluster failed: {}", e);
+        log::error!("[CLUSTER] Register to cluster failed: {}", e);
         return Err(e);
     }
 
@@ -133,13 +133,13 @@ pub async fn register_and_keepalive() -> Result<()> {
             {
                 break;
             }
-            log::error!("keepalive lease id expired or revoked, set node online again.");
+            log::error!("[CLUSTER] keepalive lease id expired or revoked, set node online again.");
             // get new lease id
             let mut client = ETCD_CLIENT.get().await.clone().unwrap();
             let resp = match client.lease_grant(LOCAL_NODE_KEY_TTL, None).await {
                 Ok(resp) => resp,
                 Err(e) => {
-                    log::error!("lease grant failed: {}", e);
+                    log::error!("[CLUSTER] lease grant failed: {}", e);
                     continue;
                 }
             };
@@ -149,7 +149,7 @@ pub async fn register_and_keepalive() -> Result<()> {
                 LOCAL_NODE_KEY_LEASE_ID = id;
             }
             if let Err(e) = set_online().await {
-                log::error!("set node online failed: {}", e);
+                log::error!("[CLUSTER] set node online failed: {}", e);
                 continue;
             }
         }
@@ -219,7 +219,7 @@ pub async fn register() -> Result<()> {
     // 7. register ok, release lock
     locker.unlock().await?;
 
-    log::info!("Register to cluster ok");
+    log::info!("[CLUSTER] Register to cluster ok");
     Ok(())
 }
 
@@ -332,7 +332,7 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
     let key = format!("{}nodes/", &CONFIG.etcd.prefix);
     let opt = etcd_client::GetOptions::new().with_prefix();
     let ret = client.get(key.clone(), Some(opt)).await.map_err(|e| {
-        log::error!("Error getting node list from etcd {}: {}", key.clone(), e);
+        log::error!("[CLUSTER] error getting nodes: {}", e);
         e
     })?;
 
@@ -362,29 +362,28 @@ async fn watch_node_list() -> Result<()> {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
-                log::info!("cluster->node: join {:?}", item_value.clone());
+                log::info!("[CLUSTER] join {:?}", item_value.clone());
                 NODES.insert(item_key.to_string(), item_value.clone());
                 // need broadcast local file list to the new node
                 // also need broadcast own file list to other nodes when an ingester join
                 if item_value.status.eq(&NodeStatus::Prepare) && is_ingester(&LOCAL_NODE_ROLE) {
-                    log::info!(
-                        "cluster->node: broadcast local file_list to new node [{:?}]",
-                        item_value.name
-                    );
+                    log::info!("[CLUSTER] broadcast file_list to new node: {}", item_key);
                     let notice_uuid = if item_key.eq(LOCAL_NODE_UUID.as_str()) {
                         None
                     } else {
-                        Some(item_key)
+                        Some(item_key.to_string())
                     };
-                    db::file_list::local::broadcast_cache(notice_uuid)
-                        .await
-                        .unwrap();
+                    tokio::task::spawn(async move {
+                        if let Err(e) = db::file_list::local::broadcast_cache(notice_uuid).await {
+                            log::error!("[CLUSTER] broadcast file_list error: {}", e);
+                        }
+                    });
                 }
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value = NODES.get(item_key).unwrap().clone();
-                log::info!("cluster->node: leave {:?}", item_value.clone());
+                log::info!("[CLUSTER] leave {:?}", item_value.clone());
                 NODES.remove(item_key);
             }
         }
