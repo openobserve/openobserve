@@ -182,6 +182,8 @@ pub struct Common {
     pub file_list_external: bool,
     #[env_config(name = "ZO_FILE_LIST_DYNAMO_TABLE_NAME", default = "")]
     pub file_list_dynamo_table_name: String,
+    #[env_config(name = "ZO_FILE_LIST_POSTGRES_DSN", default = "")]
+    pub file_list_postgres_dsn: String,
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]
@@ -506,7 +508,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.file_list_storage = "sqlite".to_string();
     }
     cfg.common.file_list_storage = cfg.common.file_list_storage.to_lowercase();
-    if cfg.common.local_mode || cfg.common.file_list_storage.starts_with("dynamo") {
+    if cfg.common.local_mode
+        || cfg.common.file_list_storage.starts_with("dynamo")
+        || cfg.common.file_list_storage.starts_with("postgres")
+        || cfg.common.file_list_storage.starts_with("mysql")
+    {
         cfg.common.file_list_external = true;
     }
 

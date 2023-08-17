@@ -26,6 +26,7 @@ use crate::common::meta::{
 
 pub mod duckdb;
 pub mod dynamo;
+pub mod postgres;
 pub mod sled;
 pub mod sqlite;
 
@@ -37,7 +38,8 @@ pub fn connect() -> Box<dyn FileList> {
     match CONFIG.common.file_list_storage.as_str() {
         "sled" => Box::<sled::SledFileList>::default(),
         "sqlite" => Box::<sqlite::SqliteFileList>::default(),
-        "dynamo" => Box::<dynamo::DynamoFileList>::default(),
+        "postgres" | "postgresql" => Box::<postgres::PostgresFileList>::default(),
+        "dynamo" | "dynamodb" => Box::<dynamo::DynamoFileList>::default(),
         "duckdb" => Box::<duckdb::DuckDBFileList>::default(),
         _ => Box::<sqlite::SqliteFileList>::default(),
     }
@@ -71,7 +73,8 @@ pub async fn init() -> Result<()> {
     match CONFIG.common.file_list_storage.as_str() {
         "sled" => sled::init().await,
         "sqlite" => sqlite::init().await,
-        "dynamo" => dynamo::init().await,
+        "postgres" | "postgresql" => postgres::init().await,
+        "dynamo" | "dynamodb" => dynamo::init().await,
         "duckdb" => duckdb::init().await,
         _ => sqlite::init().await,
     }
