@@ -80,7 +80,7 @@ const getDefaultDashboardPanelData = () => ({
         queryErrors: []
       },
       editorValue: "",
-      dateTime: {start_time: new Date(), end_time: new Date()},
+      dateTime: {start_time: "", end_time: ""},
       filterValue: <any>[],
       stream: {
         selectedStreamFields: [],

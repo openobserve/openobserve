@@ -41,6 +41,7 @@ export const usePanelDataLoader = (
     let endISOTimestamp: any;
     // console.log("timestamps", timestamps);
     if (
+      timestamps?.start_time && timestamps?.end_time &&
       timestamps.start_time != "Invalid Date" &&
       timestamps.end_time != "Invalid Date"
     ) {
@@ -48,6 +49,8 @@ export const usePanelDataLoader = (
         new Date(timestamps.start_time.toISOString()).getTime() * 1000;
       endISOTimestamp =
         new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+    } else {
+      return;
     }
     // console.log("Query data:", queryData);
     // console.log("Timestamps:", timestamps);
@@ -128,7 +131,6 @@ export const usePanelDataLoader = (
         });
     }
   };
-
 
   watch(
     ()=>[panelSchema?.value, selectedTimeObj?.value],
@@ -225,7 +227,7 @@ console.log('dependentAvailableVariables: ',dependentAvailableVariables);
  
 
   watch(()=>isVisible.value, async () => {
-    console.log("loadDataaaaaaaaaa 3",isVisible.value,isDirty.value);
+    // console.log("loadDataaaaaaaaaa 3",isVisible.value,isDirty.value);
     
       if (isVisible.value && isDirty.value && (panelSchema.value.queries?.length)) {
         loadData();
@@ -271,7 +273,10 @@ console.log('dependentAvailableVariables: ',dependentAvailableVariables);
       if(!isAllValuesSame) {
           currentDependentVariablesData = JSON.parse(JSON.stringify(newDependentVariablesData));
           isDirty.value = true;
-          if(isVisible.value)loadData();
+          if(isVisible.value) {
+            console.log("variables changed, 2, loading data");
+            loadData();
+          }
       }
   }, { deep: true });
 
