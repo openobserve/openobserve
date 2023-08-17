@@ -34,7 +34,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
             break;
         }
     }
-    if CONFIG.common.local_mode {
+    if CONFIG.common.file_list_external {
         return Ok(());
     }
 
@@ -62,7 +62,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     Ok(())
 }
 
-pub async fn broadcast_cache(node_uuid: Option<&str>) -> Result<(), anyhow::Error> {
+pub async fn broadcast_cache(node_uuid: Option<String>) -> Result<(), anyhow::Error> {
     let files = file_list::list().await?;
     if files.is_empty() {
         return Ok(());
@@ -72,7 +72,7 @@ pub async fn broadcast_cache(node_uuid: Option<&str>) -> Result<(), anyhow::Erro
             .iter()
             .map(|(k, v)| FileKey::new(k, v.to_owned(), false))
             .collect::<Vec<_>>();
-        if let Err(e) = super::broadcast::send(&chunk, node_uuid).await {
+        if let Err(e) = super::broadcast::send(&chunk, node_uuid.clone()).await {
             log::error!("[FILE_LIST] broadcast cached file list failed: {}", e);
         }
     }
