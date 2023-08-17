@@ -511,7 +511,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.local_mode
         || cfg.common.file_list_storage.starts_with("dynamo")
         || cfg.common.file_list_storage.starts_with("postgres")
-        || cfg.common.file_list_storage.starts_with("mysql")
     {
         cfg.common.file_list_external = true;
     }
