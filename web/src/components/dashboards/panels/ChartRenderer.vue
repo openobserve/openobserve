@@ -1,10 +1,10 @@
 <template>
-  <div ref="plotRef" class="plotlycontainer" id="chart1" style="height: 100%"></div>
+  <div ref="chartRef" class="plotlycontainer" id="chart1" style="height: 100%"></div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch } from "vue";
-import Plotly from "plotly.js-dist-min";
+import * as echarts from "echarts";
 
 export default defineComponent({
   name: "ChartRenderer",
@@ -16,30 +16,22 @@ export default defineComponent({
     },
   },
   setup(props: any) {
-    const plotRef: any = ref(null);
+    const chartRef: any = ref(null);
+    let chart:any;
 
     onMounted(() => {
       console.log("ChartRenderer: mounted");
-      Plotly.newPlot(plotRef.value, props.data?.traces || [], props.data?.layout, {
-        responsive: true,
-        showLink: false,
-      });
+      console.log("props at chartrenderer",{props});
+        chart = echarts.init(chartRef.value)
+        chart.setOption(props?.data?.traces || {});
     });
 
-    watch(() => props.data,
-      // [props.traces, props.layout],
-      async () => {
+    watch(() => props.data.traces,
+      () => {
         console.log("ChartRenderer: props.data updated", props.data);
-        console.log("ChartRenderer: props.data updated: plotRef.value", plotRef.value);
-
-        Plotly.newPlot(plotRef.value, props.data.traces, props.data.layout, {
-          responsive: true,
-          displaylogo: false,
-          displayModeBar: false,
-        });
+        chart.setOption(props?.data?.traces || {});
       })
-
-    return { plotRef }
+    return { chartRef };
   },
 })
 </script>

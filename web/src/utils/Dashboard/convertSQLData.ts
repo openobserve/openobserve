@@ -71,29 +71,54 @@ export const convertSQLData = (
         };
       case "line":
         return {
-          mode: "lines",
+          type: "line",
+          areaStyle:null
         };
       case "scatter":
         return {
-          mode: "markers",
+          type: "scatter",
+          symbolSize:10
         };
       case "pie":
         return {
           type: "pie",
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          },
+          radius:"50%"
         };
       case "donut":
         return {
           type: "pie",
+          radius: ['40%', '70%'],
+          avoidLabelOverlap: false,
+          label: {
+            show: false,
+            position: 'center'
+          },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: 16,
+              fontWeight: 'bold'
+            }
+          },
+          labelLine: {
+            show: false
+          },
         };
       case "h-bar":
         return {
           type: "bar",
-          orientation: "h",
         };
       case "area":
         return {
-          fill: "tozeroy", //TODO: hoe to change the color of plot chart
-          type: "scatter",
+          type: 'line',
+          areaStyle: {}
         };
       case "stacked":
         return {
@@ -719,117 +744,93 @@ export const convertSQLData = (
 
   let traces: any;
 
-  switch (props.data.type) {
-    case "bar":
-    case "line":
-    case "scatter":
-    case "area": {
-      // x axis values
-      // if x axis length is 1, then use the normal labels,
-      // more more than one, we need to create array of array for each key
-      const xData = !xAxisKeys.length
+  let option={
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {}
+    },
+    xAxis:{
+      type: 'category',
+      boundaryGap: false,
+      data: !xAxisKeys.length
         ? []
         : xAxisKeys.length == 1
         ? getAxisDataFromKey(xAxisKeys[0])
         : xAxisKeys?.map((key: any) => {
             return getAxisDataFromKey(key);
-          });
+        })
+    },
+    yAxis: {
+      type: 'value'
+    },
+    series:[]
+  };
+
+  switch (props.data.type) {
+    case "bar":
+    case "line":
+    case "area": {
 
       //generate trace based on the y axis keys
-      traces = yAxisKeys?.map((key: any) => {
+      option.series = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key
-          )?.label,
           ...getPropsByChartTypeForTraces(),
-          showlegend: props.data.config?.show_legends,
-          marker: {
-            color:
-              props.data?.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key
-              )?.color || "#5960b2",
-            opacity: 0.8,
-          },
-          x: xData,
-          y: getAxisDataFromKey(key),
-          // hovertext: traces.map((value: any) =>
-          //   formatUnitValue(getUnitValue(value[1]))
-          // ),
-          customdata: getAxisDataFromKey(xAxisKeys[0]), //TODO: need to check for the data value, check for multiple x
-          hovertemplate:
-            "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
+          data:getAxisDataFromKey(key)
+        };
+        return trace;
+      });
+      break;
+    }
+    case "scatter":
+    {
+      let i=0;
+      option.series = yAxisKeys?.map((key: any) => {
+        const trace = {
+          ...getPropsByChartTypeForTraces(),
+          data:getAxisDataFromKey(key).map((it,index)=>{return [option.xAxis.data[i++],it]}),
         };
         return trace;
       });
       break;
     }
     case "h-bar": {
-      // x axis values
-      // if x axis length is 1, then use the normal labels,
-      // more more than one, we need to create array of array for each key
-      const xData = !xAxisKeys.length
-        ? []
-        : xAxisKeys.length == 1
-        ? getAxisDataFromKey(xAxisKeys[0])
-        : xAxisKeys?.map((key: any) => {
-            return getAxisDataFromKey(key);
-          });
-
       //generate trace based on the y axis keys
-      traces = yAxisKeys?.map((key: any) => {
+      option.series = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key
-          )?.label,
           ...getPropsByChartTypeForTraces(),
-          showlegend: props.data.config?.show_legends,
-          marker: {
-            color:
-              props.data?.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key
-              )?.color || "#5960b2",
-            opacity: 0.8,
-          },
-          x: getAxisDataFromKey(key),
-          y: xData,
-          customdata: getAxisDataFromKey(xAxisKeys[0]), //TODO: need to check for the data value, check for multiple x
-          hovertemplate:
-            "%{fullData.name}: %{x}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
+          data:getAxisDataFromKey(key)
         };
         return trace;
       });
+      const temp = option.xAxis;
+      option.xAxis = option.yAxis;
+      option.yAxis=temp;
       break;
     }
     case "pie": {
-      // x axis values
-      // if x axis length is 1, then use the normal labels,
-      // more more than one, we need to create array of array for each key
-      const xData = !xAxisKeys.length
-        ? []
-        : xAxisKeys.length == 1
-        ? getAxisDataFromKey(xAxisKeys[0])
-        : xAxisKeys?.map((key: any) => {
-            return getAxisDataFromKey(key);
-          });
+      option.tooltip={
+        trigger: 'item'
+      }
 
+      let i=0;
       //generate trace based on the y axis keys
-      traces = yAxisKeys?.map((key: any) => {
+      option.series = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key
-          )?.label,
+          // name: props.data?.queries[0]?.fields?.y.find(
+          //   (it: any) => it.alias == key
+          // )?.label,
           ...getPropsByChartTypeForTraces(),
-          showlegend: props.data.config?.show_legends,
-          marker: {
-            color:
-              props.data?.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key
-              )?.color || "#5960b2",
-            opacity: 0.8,
-          },
-          labels: textwrapper(xData),
-          values: getAxisDataFromKey(key),
-          hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
+          // showlegend: props.data.config?.show_legends,
+          // marker: {
+          //   color:
+          //     props.data?.queries[0]?.fields?.y.find(
+          //       (it: any) => it.alias == key
+          //     )?.color || "#5960b2",
+          //   opacity: 0.8,
+          // },
+          // labels: textwrapper(xData),
+          data: getAxisDataFromKey(key).map((it,index)=>{return {value:it,name:option.xAxis.data[i++]}}),
+          // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
         return trace;
       });
@@ -837,37 +838,26 @@ export const convertSQLData = (
       break;
     }
     case "donut": {
-      // x axis values
-      // if x axis length is 1, then use the normal labels,
-      // more more than one, we need to create array of array for each key
-      const xData = !xAxisKeys.length
-        ? []
-        : xAxisKeys.length == 1
-        ? getAxisDataFromKey(xAxisKeys[0])
-        : xAxisKeys?.map((key: any) => {
-            return getAxisDataFromKey(key);
-          });
 
+      let i=0;
       //generate trace based on the y axis keys
-      traces = yAxisKeys?.map((key: any) => {
+      option.series = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key
-          )?.label,
+          // name: props.data?.queries[0]?.fields?.y.find(
+          //   (it: any) => it.alias == key
+          // )?.label,
           ...getPropsByChartTypeForTraces(),
-          showlegend: props.data.config?.show_legends,
-          marker: {
-            color:
-              props.data?.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key
-              )?.color || "#5960b2",
-            opacity: 0.8,
-          },
-          labels: textwrapper(xData),
-          values: getAxisDataFromKey(key),
-          domain: { column: 0 },
-          hole: 0.4,
-          hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
+          // showlegend: props.data.config?.show_legends,
+          // marker: {
+          //   color:
+          //     props.data?.queries[0]?.fields?.y.find(
+          //       (it: any) => it.alias == key
+          //     )?.color || "#5960b2",
+          //   opacity: 0.8,
+          // },
+          // labels: textwrapper(xData),
+          data: getAxisDataFromKey(key).map((it,index)=>{return {value:it,name:option.xAxis.data[i++]}}),
+          // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
         return trace;
       });
@@ -1101,7 +1091,7 @@ export const convertSQLData = (
   //   displayModeBar: false,
   // });
   return {
-    traces,
+    traces:option,
     layout,
   };
 };
