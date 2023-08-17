@@ -606,17 +606,16 @@ async fn handle_new_schema(
 }
 
 fn get_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (Vec<Field>, bool, Vec<Field>) {
-    let schema_fields = schema.to_cloned_fields();
     let mut field_datatype_delta: Vec<_> = vec![];
     let mut new_field_delta: Vec<_> = vec![];
     let mut merged_fields: AHashMap<String, Field> = AHashMap::new();
     let mut is_schema_changed = false;
 
-    for f in schema_fields.iter() {
-        merged_fields.insert(f.name().to_owned(), f.clone());
+    for f in schema.fields.iter() {
+        merged_fields.insert(f.name().to_owned(), (**f).clone());
     }
 
-    for item in inferred_schema.to_cloned_fields().iter() {
+    for item in inferred_schema.fields.iter() {
         let item_name = item.name();
         let item_data_type = item.data_type();
 
@@ -630,8 +629,8 @@ fn get_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (Vec<Field>,
                             is_widening_conversion(existing_field.data_type(), item_data_type);
                         if allowed {
                             is_schema_changed = true;
-                            field_datatype_delta.push(item.to_owned().clone());
-                            merged_fields.insert(item_name.to_owned(), item.clone());
+                            field_datatype_delta.push((**item).clone());
+                            merged_fields.insert(item_name.to_owned(), (**item).clone());
                         } else {
                             let mut meta = existing_field.metadata().clone();
                             meta.insert("zo_cast".to_owned(), true.to_string());
@@ -643,7 +642,7 @@ fn get_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (Vec<Field>,
             None => {
                 is_schema_changed = true;
                 new_field_delta.push(item);
-                merged_fields.insert(item_name.to_owned(), item.to_owned().clone());
+                merged_fields.insert(item_name.to_owned(), (**item).clone());
             }
         }
     }
