@@ -63,6 +63,11 @@ export const convertSQLData = (
     return result;
   };
 
+  const getAxisDataAsArray = () => {
+    let result: any[] = searchQueryData?.data?.map((item: any) => [...item]);
+    return result;
+  }
+
   const getPropsByChartTypeForTraces = () => {
     switch (props.data.type) {
       case "bar":
@@ -82,12 +87,19 @@ export const convertSQLData = (
       case "pie":
         return {
           type: "pie",
+          avoidLabelOverlap: false,
           emphasis: {
             itemStyle: {
               shadowBlur: 10,
               shadowOffsetX: 0,
               shadowColor: 'rgba(0, 0, 0, 0.5)'
+            },
+            label:{
+              show:false
             }
+          },
+          label:{
+            show:false
           },
           radius:"50%"
         };
@@ -97,8 +109,8 @@ export const convertSQLData = (
           radius: ['40%', '70%'],
           avoidLabelOverlap: false,
           label: {
-            show: false,
-            position: 'center'
+            show: true,
+            // position: 'center'
           },
           emphasis: {
             label: {
@@ -108,7 +120,7 @@ export const convertSQLData = (
             }
           },
           labelLine: {
-            show: false
+            show: true
           },
         };
       case "h-bar":
@@ -745,13 +757,26 @@ export const convertSQLData = (
   let traces: any;
 
   let option={
+    legend :{
+      // orient: 'vertical',
+      // right: '2%',
+      // top: 'middle',
+      // data: ['Count']
+    },
+    grid : {
+      left: '10%',
+      right: '10%',
+      top: '10%',
+      bottom: '10%'
+    },
     tooltip: {
       trigger: 'axis',
-      axisPointer: {}
+      axisPointer: {
+        type:"shadow"
+      }
     },
     xAxis:{
       type: 'category',
-      boundaryGap: false,
       data: !xAxisKeys.length
         ? []
         : xAxisKeys.length == 1
@@ -773,11 +798,11 @@ export const convertSQLData = (
 
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
-        const trace = {
+        const seriesObj = {
           ...getPropsByChartTypeForTraces(),
           data:getAxisDataFromKey(key)
         };
-        return trace;
+        return seriesObj;
       });
       break;
     }
@@ -785,22 +810,22 @@ export const convertSQLData = (
     {
       let i=0;
       option.series = yAxisKeys?.map((key: any) => {
-        const trace = {
+        const seriesObj = {
           ...getPropsByChartTypeForTraces(),
           data:getAxisDataFromKey(key).map((it,index)=>{return [option.xAxis.data[i++],it]}),
         };
-        return trace;
+        return seriesObj;
       });
       break;
     }
     case "h-bar": {
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
-        const trace = {
+        const seriesObj = {
           ...getPropsByChartTypeForTraces(),
           data:getAxisDataFromKey(key)
         };
-        return trace;
+        return seriesObj;
       });
       const temp = option.xAxis;
       option.xAxis = option.yAxis;
@@ -815,7 +840,7 @@ export const convertSQLData = (
       let i=0;
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
-        const trace = {
+        const seriesObj = {
           // name: props.data?.queries[0]?.fields?.y.find(
           //   (it: any) => it.alias == key
           // )?.label,
@@ -832,7 +857,8 @@ export const convertSQLData = (
           data: getAxisDataFromKey(key).map((it,index)=>{return {value:it,name:option.xAxis.data[i++]}}),
           // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
-        return trace;
+        option.xAxis.data=null;
+        return seriesObj;
       });
       console.log("multiple:- traces", traces);
       break;
@@ -861,6 +887,8 @@ export const convertSQLData = (
         };
         return trace;
       });
+      option.xAxis.data=null;
+
       console.log("multiple:- traces", traces);
       break;
     }
@@ -1082,8 +1110,8 @@ export const convertSQLData = (
     ...getThemeLayoutOptions(store),
   };
 
-  console.log("layout", layout);
-  console.log("traces", traces);
+  console.log("optionss", xAxisKeys,yAxisKeys);
+  console.log("optionss", option);
 
   // Plotly.react(plotRef.value, traces, layout, {
   //   responsive: true,
