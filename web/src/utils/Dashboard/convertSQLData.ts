@@ -758,6 +758,12 @@ export const convertSQLData = (
 
   let option={
     legend :{
+      show:true,
+      // type: 'scroll',
+      orient: 'vertical',
+      right: 10,
+      top: 20,
+      bottom: 20,
       // orient: 'vertical',
       // right: '2%',
       // top: 'middle',
@@ -772,7 +778,7 @@ export const convertSQLData = (
     tooltip: {
       trigger: 'axis',
       axisPointer: {
-        type:"shadow"
+        type:"cross"
       }
     },
     xAxis:{
@@ -799,8 +805,11 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
+          name: props.data?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label,
           ...getPropsByChartTypeForTraces(),
-          data:getAxisDataFromKey(key)
+          data: getAxisDataFromKey(key),
         };
         return seriesObj;
       });
