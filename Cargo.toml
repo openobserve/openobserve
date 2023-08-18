@@ -148,7 +148,7 @@ tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tonic = { version = "0.8", features = ["prost", "gzip"] }
-tracing = { version = "0.1.37", features = ["log-always","attributes"] }
+tracing = { version = "0.1.37", features = ["attributes"] }
 tracing-opentelemetry = "0.18"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.2"
