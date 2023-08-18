@@ -77,6 +77,7 @@ export const convertSQLData = (
       case "line":
         return {
           type: "line",
+          smooth:true,
           areaStyle:null
         };
       case "scatter":
