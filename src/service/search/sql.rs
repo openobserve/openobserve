@@ -419,11 +419,11 @@ impl Sql {
                         .get(1)
                         .unwrap()
                         .as_str()
-                        .split(',')
+                        .splitn(2, ',')
                         .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
                         .collect::<Vec<&str>>();
                     let field = attrs.first().unwrap();
-                    let value = attrs.get(1).unwrap();
+                    let value = attrs.last().unwrap();
                     origin_sql = origin_sql.replace(
                         cap.get(0).unwrap().as_str(),
                         &format!("\"{field}\" {re_fn} '%{value}%'"),
