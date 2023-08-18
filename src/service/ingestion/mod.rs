@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_format_partition_key() {
-        assert_eq!(format_partition_key("default/olympics"), "default.olympics");
+        assert_eq!(format_partition_key("default/olympics"), "defaultolympics");
     }
     #[test]
     fn test_get_hour_key() {

@@ -101,6 +101,9 @@ fn flatten_array(
     depth: u32,
     flattened: &mut Map<String, Value>,
 ) -> Result<(), anyhow::Error> {
+    if current.is_empty() {
+        return Ok(());
+    }
     // for (i, obj) in current.iter().enumerate() {
     //     let parent_key = format!("{}{}{}", parent_key, KEY_SEPARATOR, i);
     //     flatten_value(obj, parent_key, depth + 1, flattened)?;
@@ -150,11 +153,7 @@ mod tests {
         assert_eq!(
             flatten(&obj).unwrap(),
             json!({
-                format!("s{k}a{k}0", k = KEY_SEPARATOR): 1,
-                format!("s{k}a{k}1", k = KEY_SEPARATOR): 2.0,
-                format!("s{k}a{k}2", k = KEY_SEPARATOR): "b",
-                format!("s{k}a{k}3", k = KEY_SEPARATOR): null,
-                format!("s{k}a{k}4", k = KEY_SEPARATOR): true,
+                format!("s{k}a", k = KEY_SEPARATOR): "[1,2.0,\"b\",null,true]",
             })
         );
     }
@@ -193,9 +192,7 @@ mod tests {
         });
         assert_eq!(
             flatten(&obj).unwrap(),
-            json!({"simple_key": "simple_value", "key_0": "value1", "key_1_key": "value2",
-                "key_2_nested_array_0": "nested1", "key_2_nested_array_1": "nested2",
-                "key_2_nested_array_2_0": "nested3", "key_2_nested_array_2_1": "nested4"}),
+            json!({"simple_key": "simple_value", "key": "[\"value1\",{\"key\":\"value2\"},{\"nested_array\":[\"nested1\",\"nested2\",[\"nested3\",\"nested4\"]]}]"}),
         );
     }
 
@@ -235,7 +232,10 @@ mod tests {
     #[test]
     fn empty_complex_object() {
         let obj = json!({"key": {"key2": {}, "key3": [[], {}, {"k": {}, "q": []}]}});
-        assert_eq!(flatten(&obj).unwrap(), json!({}));
+        assert_eq!(
+            flatten(&obj).unwrap(),
+            json!({"key_key3": "[[],{},{\"k\":{},\"q\":[]}]"})
+        );
     }
 
     #[test]
@@ -284,10 +284,7 @@ mod tests {
     #[test]
     fn complex_array() {
         let obj = json!({"a": [1, [2, [3, 4], 5], 6]});
-        assert_eq!(
-            flatten(&obj).unwrap(),
-            json!({"a_0": 1, "a_2": 6, "a_1_0": 2, "a_1_1_0": 3, "a_1_1_1": 4, "a_1_2": 5}),
-        );
+        assert_eq!(flatten(&obj).unwrap(), json!({"a": "[1,[2,[3,4],5],6]"}),);
     }
 
     #[test]
@@ -303,7 +300,7 @@ mod tests {
             ),
             (
                 json!({"a": {"A.1": [1, [3, 4], 5], "A_2": 6}}),
-                json!({"a_a_1_0": 1, "a_a_1_1_0": 3, "a_a_1_1_1": 4, "a_a_1_2": 5, "a_a_2": 6}),
+                json!({"a_a_1": "[1,[3,4],5]", "a_a_2": 6}),
             ),
         ];
         for (input, expected) in datas.iter() {
@@ -343,10 +340,7 @@ mod tests {
             "address_city": "Anytown",
             "address_state": "CA",
             "address_postalcode": "12345",
-            "phonenumbers_0_type":"home",
-            "phonenumbers_0_number": "555-555-1234",
-            "phonenumbers_1_type":"work",
-            "phonenumbers_1_number": "555-555-5678"
+            "phonenumbers":"[{\"number\":\"555-555-1234\",\"type\":\"home\"},{\"number\":\"555-555-5678\",\"type\":\"work\"}]"
         });
 
         let output = flatten(&input).unwrap();

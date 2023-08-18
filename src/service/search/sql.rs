@@ -130,8 +130,10 @@ impl Sql {
         // 3. no group by
         let mut fast_mode = meta.selection.is_none()
             && meta.group_by.is_empty()
+            && (meta.order_by.is_empty() || meta.order_by[0].0 == CONFIG.common.column_timestamp)
             && !meta.fields.iter().any(|f| f.contains('('))
-            && !meta.field_alias.iter().any(|f| f.0.contains('('));
+            && !meta.field_alias.iter().any(|f| f.0.contains('('))
+            && !origin_sql.to_lowercase().contains("distinct");
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
@@ -417,11 +419,11 @@ impl Sql {
                         .get(1)
                         .unwrap()
                         .as_str()
-                        .split(',')
+                        .splitn(2, ',')
                         .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
                         .collect::<Vec<&str>>();
                     let field = attrs.first().unwrap();
-                    let value = attrs.get(1).unwrap();
+                    let value = attrs.last().unwrap();
                     origin_sql = origin_sql.replace(
                         cap.get(0).unwrap().as_str(),
                         &format!("\"{field}\" {re_fn} '%{value}%'"),
