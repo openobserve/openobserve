@@ -864,7 +864,14 @@ export const convertSQLData = (
           //   opacity: 0.8,
           // },
           // labels: textwrapper(xData),
-          data: getAxisDataFromKey(key).map((it,index)=>{return {value:[it],name:option.xAxis.data[i++]}}),
+          data: getAxisDataFromKey(key).map((it, index) => {
+            return { value: [it], name: option.xAxis.data[i++] };
+          }),
+          label: {
+            show: true,
+            formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
+            position: "inside", // You can adjust the position of the labels
+          },
           // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
         option.xAxis.data=null;
@@ -874,7 +881,9 @@ export const convertSQLData = (
       break;
     }
     case "donut": {
-
+    option.tooltip = {
+      trigger: "item",
+    };
       let i=0;
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
@@ -892,7 +901,14 @@ export const convertSQLData = (
           //   opacity: 0.8,
           // },
           // labels: textwrapper(xData),
-          data: getAxisDataFromKey(key).map((it,index)=>{return {value:it,name:option.xAxis.data[i++]}}),
+          data: getAxisDataFromKey(key).map((it, index) => {
+            return { value: it, name: option.xAxis.data[i++] };
+          }),
+          label: {
+            show: true,
+            formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
+            position: "inside", // You can adjust the position of the labels
+          },
           // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
         return trace;
