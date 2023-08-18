@@ -614,9 +614,19 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     let mut sel_fields_name = Vec::new();
     let mut sel_fields_has_star = false;
     let mut last_is_as = false;
-    for (i, field) in fields.iter().enumerate() {
-        let field = field.trim();
-        if field.to_lowercase().eq("select") || field.to_lowercase().eq("distinct") {
+    let mut last_is_distinct = false;
+    for (_, field) in fields.iter().enumerate() {
+        let field = if last_is_distinct {
+            last_is_distinct = false;
+            format!("DISTINCT {}", field.trim())
+        } else {
+            field.trim().to_string()
+        };
+        if field.to_lowercase().eq("select") {
+            continue;
+        }
+        if field.to_lowercase().eq("distinct") {
+            last_is_distinct = true;
             continue;
         }
         if field.to_lowercase().eq("as") {
@@ -624,8 +634,8 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
             continue;
         }
         if last_is_as {
-            new_fields.remove(new_fields.len() - 1);
-            new_fields.push(format!("{} AS {field}", fields[i - 2]));
+            let orgin_field = new_fields.remove(new_fields.len() - 1);
+            new_fields.push(format!("{orgin_field} AS {field}"));
             sel_fields_name.remove(sel_fields_name.len() - 1);
             sel_fields_name.push(field.to_string().replace('"', "").replace(", ", ","));
             last_is_as = false;
@@ -693,7 +703,11 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         if !field.contains('(') {
             if field.contains(" AS ") {
                 need_rewrite = true;
-                fields[i] = format!("\"{}\"", schema_field);
+                if field.contains("DISTINCT ") {
+                    fields[i] = format!("DISTINCT \"{}\" AS \"{}\"", schema_field, schema_field);
+                } else {
+                    fields[i] = format!("\"{}\"", schema_field);
+                }
             } else if field != schema_field && *field == schema_field.replace("tbl.", "") {
                 need_rewrite = true;
                 fields[i] = format!("\"{}\" AS \"{}\"", schema_field, field);
@@ -712,6 +726,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         }
         fields[i] = format!("{fn_name}(\"{}\") AS \"{}\"", schema_field, schema_field);
     }
+
     if need_rewrite {
         sql = format!("SELECT {} FROM {}", &fields.join(", "), &sql[from_pos..]);
         if sql.contains("_PLACEHOLDER_") {
