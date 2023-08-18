@@ -202,8 +202,8 @@ pub async fn ingest(
                             action.clone(),
                             value,
                             &mut bulk_res,
-                            Some(TS_PARSE_FAILED.to_owned()),
-                            Some(TS_PARSE_FAILED.to_owned()),
+                            Some(TS_PARSE_FAILED.to_string()),
+                            Some(TS_PARSE_FAILED.to_string()),
                         );
                         continue;
                     }
@@ -221,7 +221,7 @@ pub async fn ingest(
                     action.clone(),
                     value,
                     &mut bulk_res,
-                    failure_reason.to_owned(),
+                    Some(TS_PARSE_FAILED.to_string()),
                     failure_reason,
                 );
                 continue;
@@ -264,7 +264,7 @@ pub async fn ingest(
                     action.clone(),
                     value,
                     &mut bulk_res,
-                    Some(SCHEMA_CONFORMANCE_FAILED.to_owned()),
+                    Some(SCHEMA_CONFORMANCE_FAILED.to_string()),
                     Some(status.error),
                 );
             } else {
