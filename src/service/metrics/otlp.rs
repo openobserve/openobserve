@@ -14,6 +14,7 @@
 
 use crate::{
     common::{
+        flatten,
         infra::{cluster, config::CONFIG},
         json,
         meta::{
@@ -166,13 +167,15 @@ pub async fn handle_grpc_request(
                     },
                     None => vec![],
                 };
-                if schema_exists.has_metadata {
+                if !schema_exists.has_metadata {
                     set_schema_metadata(org_id, metric_name, StreamType::Metrics, prom_meta)
                         .await
                         .unwrap();
                 }
 
                 for mut rec in records {
+                    // flattening
+                    rec = flatten::flatten(&rec)?;
                     // get json object
                     let val_map: &mut serde_json::Map<String, serde_json::Value> =
                         rec.as_object_mut().unwrap();

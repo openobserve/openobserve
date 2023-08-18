@@ -12,14 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    common::meta::{
-        alert::{Alert, Evaluate, Trigger},
-        http::HttpResponse as MetaHttpResponse,
-        usage::UsageType,
-    },
-    service::usage::report_request_usage_stats,
-};
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
@@ -38,10 +30,18 @@ use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
     StreamType,
 };
+
 use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::ingestion;
 use crate::service::ingestion::grpc::get_val;
 use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
+use crate::{
+    common::meta::{
+        alert::{Alert, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        usage::UsageType,
+    },
+    service::usage::report_request_usage_stats,
+};
 
 pub async fn ingest(
     org_id: &str,
@@ -225,6 +225,7 @@ pub async fn handle_grpc_request(
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut stream_status = StreamStatus::new(stream_name);
 
     let stream_schema = stream_schema_exists(
         org_id,
@@ -273,14 +274,24 @@ pub async fn handle_grpc_request(
                     }
                     None => {}
                 }
-                rec[CONFIG.common.column_timestamp.clone()] = if log_record.time_unix_nano != 0 {
+
+                // check ingestion time
+                let earlest_time =
+                    Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+
+                let ts = if log_record.time_unix_nano != 0 {
                     log_record.time_unix_nano / 1000
-                } else if log_record.observed_time_unix_nano != 0 {
-                    log_record.observed_time_unix_nano / 1000
                 } else {
-                    Utc::now().timestamp_micros() as u64
+                    log_record.observed_time_unix_nano / 1000
+                };
+
+                if ts < earlest_time.timestamp_micros().try_into().unwrap() {
+                    stream_status.status.failed += 1; // to old data, just discard
+                    stream_status.status.error = super::get_upto_discard_error();
+                    continue;
                 }
-                .into();
+
+                rec[CONFIG.common.column_timestamp.clone()] = ts.into();
                 rec["severity"] = log_record.severity_text.to_owned().into();
                 //rec["name"] = log_record.name.to_owned().into();
                 rec["body"] = get_val(&log_record.body);
@@ -316,50 +327,28 @@ pub async fn handle_grpc_request(
                     }
                 };
 
-                let value_str = json::to_string(&rec).unwrap();
+                //flattening
+                rec = flatten::flatten(&rec)?;
+                // get json object
+                let local_val = rec.as_object_mut().unwrap();
 
-                let timestamp = rec[CONFIG.common.column_timestamp.clone()]
-                    .as_u64()
-                    .unwrap();
+                let local_trigger = super::add_valid_record(
+                    StreamMeta {
+                        org_id: org_id.to_string(),
+                        stream_name: stream_name.to_string(),
+                        partition_keys: partition_keys.clone(),
+                        stream_alerts_map: stream_alerts_map.clone(),
+                    },
+                    &mut stream_schema_map,
+                    &mut stream_status.status,
+                    &mut data_buf,
+                    local_val,
+                )
+                .await;
 
-                // get hour key
-                let hour_key = ingestion::get_hour_key(
-                    timestamp.try_into().unwrap(),
-                    &partition_keys,
-                    rec.as_object().unwrap(),
-                    None,
-                );
-
-                if !stream_alerts_map.is_empty() {
-                    // Start check for alert trigger
-                    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, stream_name);
-                    if let Some(alerts) = stream_alerts_map.get(&key) {
-                        for alert in alerts {
-                            if alert.is_real_time {
-                                let set_trigger =
-                                    alert.condition.evaluate(rec.as_object().unwrap().clone());
-                                if set_trigger {
-                                    trigger = Some(Trigger {
-                                        timestamp: timestamp.try_into().unwrap(),
-                                        is_valid: true,
-                                        alert_name: alert.name.clone(),
-                                        stream: stream_name.to_string(),
-                                        org: org_id.to_string(),
-                                        stream_type: StreamType::Logs,
-                                        last_sent_at: 0,
-                                        count: 0,
-                                        is_ingest_time: true,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    // End check for alert trigger
+                if local_trigger.is_some() {
+                    trigger = Some(local_trigger.unwrap());
                 }
-
-                let hour_buf = data_buf.entry(hour_key.clone()).or_default();
-
-                hour_buf.push(value_str);
             }
         }
     }
