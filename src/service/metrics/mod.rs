@@ -41,10 +41,10 @@ pub fn signature_without_labels(
     labels: &common::json::Map<String, common::json::Value>,
     exclude_names: &[&str],
 ) -> Signature {
-    let mut labels: Vec<(&str, &str)> = labels
+    let mut labels: Vec<(&str, String)> = labels
         .iter()
         .filter(|(key, _value)| !exclude_names.contains(&key.as_str()))
-        .map(|(key, value)| (key.as_str(), value.as_str().unwrap()))
+        .map(|(key, value)| (key.as_str(), value.to_string()))
         .collect();
     labels.sort_by(|a, b| a.0.cmp(b.0));
 
