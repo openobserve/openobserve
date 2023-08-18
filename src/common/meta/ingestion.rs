@@ -163,7 +163,7 @@ impl BulkResponseItem {
             _shards: None,
             _seq_no: None,
             _primary_term: None,
-            status: 200,
+            status: 422,
             error: Some(error),
             original_record: Some(orig_record),
         }
