@@ -106,7 +106,7 @@ opentelemetry = { version = "0.18", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.11", features = [
   "http-proto",
   "serialize",
-  "reqwest-client", 
+  "reqwest-client",
 ] }
 opentelemetry-proto = { version = "0.1", features = [
   "gen-tonic",
