@@ -8,10 +8,10 @@ use tonic::{Response, Status};
 use crate::common::infra::config::CONFIG;
 
 #[derive(Default)]
-pub struct MetricsServer;
+pub struct Ingester;
 
 #[async_trait]
-impl MetricsService for MetricsServer {
+impl MetricsService for Ingester {
     async fn export(
         &self,
         request: tonic::Request<ExportMetricsServiceRequest>,

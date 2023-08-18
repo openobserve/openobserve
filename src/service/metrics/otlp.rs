@@ -37,6 +37,8 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
+const EXCLUDE_LABELS: [&str; 5] = [VALUE_LABEL, "start_time", "is_monotonic", "exemplars", "le"];
+
 pub async fn handle_grpc_request(
     org_id: &str,
     thread_id: usize,
@@ -69,7 +71,7 @@ pub async fn handle_grpc_request(
             for metric in &instrumentation_metric.metrics {
                 let metric_name = &metric.name;
                 // check for schema
-                let _schema_exists = stream_schema_exists(
+                let schema_exists = stream_schema_exists(
                     org_id,
                     metric_name,
                     StreamType::Metrics,
@@ -150,10 +152,11 @@ pub async fn handle_grpc_request(
                     },
                     None => vec![],
                 };
-
-                set_schema_metadata(org_id, metric_name, StreamType::Metrics, prom_meta)
-                    .await
-                    .unwrap();
+                if schema_exists.has_metadata {
+                    set_schema_metadata(org_id, metric_name, StreamType::Metrics, prom_meta)
+                        .await
+                        .unwrap();
+                }
 
                 for mut rec in records {
                     // get json object
@@ -357,11 +360,20 @@ fn process_sum(
     for data_point in &sum.data_points {
         process_data_point(rec, data_point);
         let val_map = rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
+
+        let vec: Vec<&str> = get_exclude_labels();
+
+        let hash = super::signature_without_labels(val_map, &vec);
         val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
         records.push(rec.clone());
     }
     records
+}
+
+fn get_exclude_labels() -> Vec<&'static str> {
+    let mut vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
+    vec.push(&CONFIG.common.column_timestamp);
+    vec
 }
 
 fn process_histogram(
@@ -382,7 +394,8 @@ fn process_histogram(
     for data_point in &hist.data_points {
         for mut bucket_rec in process_hist_data_point(rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
+            let vec: Vec<&str> = get_exclude_labels();
+            let hash = super::signature_without_labels(val_map, &vec);
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             records.push(bucket_rec);
         }
@@ -407,7 +420,8 @@ fn process_exponential_histogram(
     for data_point in &hist.data_points {
         for mut bucket_rec in process_exp_hist_data_point(rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
+            let vec: Vec<&str> = get_exclude_labels();
+            let hash = super::signature_without_labels(val_map, &vec);
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             records.push(bucket_rec);
         }
@@ -432,7 +446,8 @@ fn process_summary(
     for data_point in &summary.data_points {
         for mut bucket_rec in process_summary_data_point(rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
+            let vec: Vec<&str> = get_exclude_labels();
+            let hash = super::signature_without_labels(val_map, &vec);
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             records.push(bucket_rec);
         }
@@ -444,7 +459,7 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) {
     for attr in &data_point.attributes {
         rec[attr.key.as_str()] = get_val(&attr.value);
     }
-    rec["value"] = get_metric_val(&data_point.value);
+    rec[VALUE_LABEL] = get_metric_val(&data_point.value);
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.into();
     rec["flag"] = if data_point.flags == 1 {
@@ -476,13 +491,13 @@ fn process_hist_data_point(
     process_exemplars(rec, &data_point.exemplars);
     // add count record
     let mut count_rec = rec.clone();
-    count_rec["value"] = data_point.count.into();
+    count_rec[VALUE_LABEL] = data_point.count.into();
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
-    sum_rec["value"] = data_point.sum.into();
+    sum_rec[VALUE_LABEL] = data_point.sum.into();
     sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
     bucket_recs.push(sum_rec);
 
@@ -491,7 +506,7 @@ fn process_hist_data_point(
     for i in 0..last_index {
         let mut bucket_rec = rec.clone();
         if let Some(val) = data_point.bucket_counts.get(i) {
-            bucket_rec["value"] = (*val).into()
+            bucket_rec[VALUE_LABEL] = (*val).into()
         }
         if let Some(val) = data_point.explicit_bounds.get(i) {
             bucket_rec["le"] = (*val).into()
@@ -524,13 +539,13 @@ fn process_exp_hist_data_point(
     process_exemplars(rec, &data_point.exemplars);
     // add count record
     let mut count_rec = rec.clone();
-    count_rec["value"] = data_point.count.into();
+    count_rec[VALUE_LABEL] = data_point.count.into();
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
-    sum_rec["value"] = data_point.sum.into();
+    sum_rec[VALUE_LABEL] = data_point.sum.into();
     sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
     bucket_recs.push(sum_rec);
 
@@ -541,7 +556,7 @@ fn process_exp_hist_data_point(
             let offset = buckets.offset;
             for (i, val) in buckets.bucket_counts.iter().enumerate() {
                 let mut bucket_rec = rec.clone();
-                bucket_rec["value"] = (*val).into();
+                bucket_rec[VALUE_LABEL] = (*val).into();
                 bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).into();
                 bucket_recs.push(bucket_rec);
             }
@@ -554,7 +569,7 @@ fn process_exp_hist_data_point(
             let offset = buckets.offset;
             for (i, val) in buckets.bucket_counts.iter().enumerate() {
                 let mut bucket_rec = rec.clone();
-                bucket_rec["value"] = (*val).into();
+                bucket_rec[VALUE_LABEL] = (*val).into();
                 bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).into();
                 bucket_recs.push(bucket_rec);
             }
@@ -584,20 +599,20 @@ fn process_summary_data_point(
     .into();
     // add count record
     let mut count_rec = rec.clone();
-    count_rec["value"] = data_point.count.into();
+    count_rec[VALUE_LABEL] = data_point.count.into();
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
-    sum_rec["value"] = data_point.sum.into();
+    sum_rec[VALUE_LABEL] = data_point.sum.into();
     sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
     bucket_recs.push(sum_rec);
 
     // add bucket records
     for value in &data_point.quantile_values {
         let mut bucket_rec = rec.clone();
-        bucket_rec["value"] = value.value.into();
+        bucket_rec[VALUE_LABEL] = value.value.into();
         bucket_rec["quantile"] = value.quantile.into();
         bucket_recs.push(bucket_rec);
     }
@@ -611,7 +626,7 @@ fn process_exemplars(rec: &mut json::Value, exemplars: &Vec<Exemplar>) {
         for attr in &exemplar.filtered_attributes {
             exemplar_rec[attr.key.as_str()] = get_val(&attr.value);
         }
-        exemplar_rec["value"] = get_exemplar_val(&exemplar.value);
+        exemplar_rec[VALUE_LABEL] = get_exemplar_val(&exemplar.value);
         exemplar_rec[&CONFIG.common.column_timestamp] = (exemplar.time_unix_nano / 1000).into();
 
         match TraceId::from_bytes(exemplar.trace_id.as_slice().try_into().unwrap_or_default()) {

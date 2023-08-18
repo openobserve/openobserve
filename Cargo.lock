@@ -3505,9 +3505,6 @@ name = "log"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b06a4cde4c0f271a446782e3eff8de789548ce57dbc8eca9292c27f4a42004b4"
-dependencies = [
- "value-bag",
-]
 
 [[package]]
 name = "lrlex"
@@ -4032,10 +4029,8 @@ dependencies = [
  "object_store",
  "once_cell",
  "opentelemetry",
- "opentelemetry-appender-log",
  "opentelemetry-otlp",
  "opentelemetry-proto",
- "opentelemetry_api 0.20.0",
  "parking_lot 0.12.1",
  "parquet",
  "prometheus",
@@ -4094,18 +4089,8 @@ version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69d6c3d7288a106c0a363e4b0e8d308058d56902adefb16f4936f417ffef086e"
 dependencies = [
- "opentelemetry_api 0.18.0",
+ "opentelemetry_api",
  "opentelemetry_sdk",
-]
-
-[[package]]
-name = "opentelemetry-appender-log"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dd820844a1b8339c91bca25ac389411c1854d30a3e0a55576c2138e11a76ddf"
-dependencies = [
- "log",
- "opentelemetry_api 0.20.0",
 ]
 
 [[package]]
@@ -4117,7 +4102,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "http",
- "opentelemetry_api 0.18.0",
+ "opentelemetry_api",
  "reqwest",
 ]
 
@@ -4185,22 +4170,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "opentelemetry_api"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a81f725323db1b1206ca3da8bb19874bbd3f57c3bcd59471bfb04525b265b9b"
-dependencies = [
- "futures-channel",
- "futures-util",
- "indexmap 1.9.3",
- "js-sys",
- "once_cell",
- "pin-project-lite",
- "thiserror",
- "urlencoding",
-]
-
-[[package]]
 name = "opentelemetry_sdk"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4214,7 +4183,7 @@ dependencies = [
  "futures-executor",
  "futures-util",
  "once_cell",
- "opentelemetry_api 0.18.0",
+ "opentelemetry_api",
  "percent-encoding",
  "rand",
  "thiserror",
@@ -6620,12 +6589,6 @@ name = "valuable"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
-
-[[package]]
-name = "value-bag"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d92ccd67fb88503048c01b59152a04effd0782d035a83a6d256ce6085f08f4a3"
 
 [[package]]
 name = "value-trait"

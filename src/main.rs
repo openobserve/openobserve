@@ -22,6 +22,7 @@ use opentelemetry::{
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
+    metrics::v1::metrics_service_server::MetricsServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
 use std::{
@@ -53,8 +54,12 @@ use openobserve::{
                 search_server::SearchServer, usage_server::UsageServer,
             },
             request::{
-                event::Eventer, logs::LogsServer, search::Searcher, traces::TraceServer,
-                usage::UsageServerImpl, metrics::querier::Querier,
+                event::Eventer,
+                logs::LogsServer,
+                metrics::{ingester::Ingester, querier::Querier},
+                search::Searcher,
+                traces::TraceServer,
+                usage::UsageServerImpl,
             },
         },
         http::router::*,
@@ -229,6 +234,9 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
     let metrics_svc = MetricsServer::new(Querier)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
+    let metrics_ingest_svc = MetricsServiceServer::new(Ingester)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
     let usage_svc = UsageServer::new(UsageServerImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
@@ -236,7 +244,9 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
     let tracer = TraceServer::default();
-    let trace_svc = TraceServiceServer::new(tracer);
+    let trace_svc = TraceServiceServer::new(tracer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
 
     tokio::task::spawn(async move {
         log::info!("starting gRPC server at {}", gaddr);
@@ -245,6 +255,7 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
             .add_service(event_svc)
             .add_service(search_svc)
             .add_service(metrics_svc)
+            .add_service(metrics_ingest_svc)
             .add_service(trace_svc)
             .add_service(usage_svc)
             .add_service(logs_svc)
