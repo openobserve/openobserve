@@ -689,10 +689,14 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     let mut need_rewrite = false;
     for i in 0..fields.len() {
         let field = fields.get(i).unwrap();
+        let schema_field = schema.field(i).name();
         if !field.contains('(') {
             if field.contains(" AS ") {
                 need_rewrite = true;
-                fields[i] = format!("\"{}\"", schema.field(i).name());
+                fields[i] = format!("\"{}\"", schema_field);
+            } else if field != schema_field && *field == schema_field.replace("tbl.", "") {
+                need_rewrite = true;
+                fields[i] = format!("\"{}\" AS \"{}\"", schema_field, field);
             }
             continue;
         }
@@ -700,17 +704,13 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         let cap = RE_FIELD_FN.captures(field).unwrap();
         let mut fn_name = cap.get(1).unwrap().as_str().to_lowercase();
         if !AGGREGATE_UDF_LIST.contains(&fn_name.as_str()) {
-            fields[i] = format!("\"{}\"", schema.field(i).name());
+            fields[i] = format!("\"{}\"", schema_field);
             continue;
         }
         if fn_name == "count" {
             fn_name = "sum".to_string();
         }
-        fields[i] = format!(
-            "{fn_name}(\"{}\") as \"{}\"",
-            schema.field(i).name(),
-            schema.field(i).name()
-        );
+        fields[i] = format!("{fn_name}(\"{}\") AS \"{}\"", schema_field, schema_field);
     }
     if need_rewrite {
         sql = format!("SELECT {} FROM {}", &fields.join(", "), &sql[from_pos..]);
