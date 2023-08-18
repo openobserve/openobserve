@@ -664,7 +664,7 @@ mod tests {
         cfg.common.parquet_compression = "zstd".to_string();
         assert_eq!(
             get_parquet_compression(),
-            parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap())
+            parquet::basic::Compression::ZSTD(Default::default())
         );
 
         cfg.limit.file_push_interval = 0;
