@@ -96,11 +96,11 @@ export const convertSQLData = (
               shadowColor: 'rgba(0, 0, 0, 0.5)'
             },
             label:{
-              show:false
+              show:true
             }
           },
           label:{
-            show:false
+            show:true
           },
           radius:"50%"
         };
@@ -116,12 +116,12 @@ export const convertSQLData = (
           emphasis: {
             label: {
               show: true,
-              fontSize: 16,
+              fontSize: 12,
               fontWeight: 'bold'
             }
           },
           labelLine: {
-            show: true
+            show: false
           },
         };
       case "h-bar":
@@ -942,13 +942,30 @@ export const convertSQLData = (
       option.xAxis.data=Array.from(
         new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
       );
-      option.series = yAxisKeys?.map((key: any) => {
+
+      // stacked with xAxis's second value
+      // allow 2 xAxis and 1 yAxis value for stack chart
+      // get second x axis key
+      const key1 = xAxisKeys[1];
+      // get the unique value of the second xAxis's key
+      const stackedXAxisUniqueValue = [
+        ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
+      ].filter((it) => it);
+
+      option.series = stackedXAxisUniqueValue?.map((key: any) => {
         const seriesObj = {
           name: props.data?.queries[0]?.fields?.y.find(
             (it: any) => it.alias == key
           )?.label,
-          ...getPropsByChartTypeForTraces(),
-          data: getAxisDataFromKey(key),
+          ...getPropsByChartTypeForTraces(),    
+          data: Array.from(
+            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
+          ).map(
+            (it: any) =>
+              searchQueryData.data.find(
+                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+              )?.[yAxisKeys[0]] || 0
+          ),
         };
         return seriesObj;
       });
