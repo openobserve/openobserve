@@ -23,13 +23,13 @@ export default defineComponent({
       console.log("ChartRenderer: mounted");
       console.log("props at chartrenderer",{props});
         chart = echarts.init(chartRef.value)
-        chart.setOption(props?.data?.option || {});
+        chart.setOption(props?.data?.option || {},true);
     });
 
     watch(() => props.data.option,
       () => {
         console.log("ChartRenderer: props.data updated", props.data);
-        chart.setOption(props?.data?.option || {});
+        chart.setOption(props?.data?.option || {},true);
       },{deep:true})
     return { chartRef };
   },

@@ -135,8 +135,12 @@ export const convertSQLData = (
         };
       case "stacked":
         return {
-          type: "bar",
-        };
+          type: 'bar',
+          stack: 'total',
+          emphasis: {
+            focus: 'series'
+          },
+      };
       case "heatmap":
         return {
           type: "heatmap",
@@ -157,8 +161,11 @@ export const convertSQLData = (
         };
       case "h-stacked":
         return {
-          type: "bar",
-          orientation: "h",
+          type: 'bar',
+          stack: 'total',
+          emphasis: {
+            focus: 'series'
+          },
         };
       default:
         return {
@@ -939,9 +946,32 @@ export const convertSQLData = (
       break;
     }
     case "area-stacked": {
-      option.xAxis.data=Array.from(
-        new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
-      );
+      option.xAxis.data = Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
+      // stacked with xAxis's second value
+      // allow 2 xAxis and 1 yAxis value for stack chart
+      // get second x axis key
+      const key1 = xAxisKeys[1]
+      // get the unique value of the second xAxis's key
+      const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map((obj: any) => obj[key1]))].filter((it)=> it);
+      console.log("stacked x axis unique value", stackedXAxisUniqueValue);
+                  
+      // create a trace based on second xAxis's unique values
+      option.series = stackedXAxisUniqueValue?.map((key: any) => {
+      const seriesObj = {
+        name: key,
+        ...getPropsByChartTypeForTraces(),
+        // showlegend: props.data.config?.show_legends,
+        data: Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))).map((it: any) => (searchQueryData.data.find((it2:any)=>it2[xAxisKeys[0]] == it && it2[key1] == key))?.[yAxisKeys[0]] || 0),
+        // customdata: Array.from(new Set(getAxisDataFromKey(xAxisKeys[0]))), //TODO: need to check for the data value
+        // hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
+        // stackgroup: 'one'
+      };
+      return seriesObj
+    })
+    break;
+    }
+    case "stacked": {
+      option.xAxis.data=Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
 
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
@@ -958,61 +988,10 @@ export const convertSQLData = (
             (it: any) => it.alias == key
           )?.label,
           ...getPropsByChartTypeForTraces(),    
-          data: Array.from(
-            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
-          ).map(
-            (it: any) =>
-              searchQueryData.data.find(
-                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-              )?.[yAxisKeys[0]] || 0
-          ),
+          data:  Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))).map((it: any) => (searchQueryData.data.find((it2:any)=>it2[xAxisKeys[0]] == it && it2[key1] == key))?.[yAxisKeys[0]] || 0)
         };
         return seriesObj;
       });
-      break;
-    }
-    case "stacked": {
-      // stacked with xAxis's second value
-      // allow 2 xAxis and 1 yAxis value for stack chart
-      // get second x axis key
-      const key1 = xAxisKeys[1];
-      // get the unique value of the second xAxis's key
-      const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
-      ].filter((it) => it);
-      console.log("stacked x axis unique value", stackedXAxisUniqueValue);
-
-      // create a trace based on second xAxis's unique values
-      traces = stackedXAxisUniqueValue?.map((key: any) => {
-        console.log(
-          "--inside trace--",
-          props.data?.queries[0]?.fields?.x.find((it: any) => it.alias == key)
-        );
-
-        const trace = {
-          name: key,
-          ...getPropsByChartTypeForTraces(),
-          showlegend: props.data.config?.show_legends,
-          x: Array.from(
-            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
-          ),
-          y: Array.from(
-            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
-          ).map(
-            (it: any) =>
-              searchQueryData.data.find(
-                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-              )?.[yAxisKeys[0]] || 0
-          ),
-          customdata: Array.from(
-            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
-          ), //TODO: need to check for the data value
-          hovertemplate:
-            "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
-        };
-        return trace;
-      });
-      console.log("multiple:- traces", traces);
       break;
     }
     case "heatmap": {
@@ -1073,7 +1052,9 @@ export const convertSQLData = (
       break;
     }
     case "h-stacked": {
-      // stacked with xAxis second value
+      option.xAxis.data=Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
+
+      // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
       const key1 = xAxisKeys[1];
@@ -1081,32 +1062,22 @@ export const convertSQLData = (
       const stackedXAxisUniqueValue = [
         ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
       ].filter((it) => it);
-      console.log("stacked x axis unique value", stackedXAxisUniqueValue);
 
-      // create a trace based on second xAxis's unique values
-      traces = stackedXAxisUniqueValue?.map((key: any) => {
-        console.log(
-          "--inside trace--",
-          props.data?.queries[0]?.fields?.x.find((it: any) => it.alias == key)
-        );
-
-        const trace = {
-          name: key,
-          ...getPropsByChartTypeForTraces(),
-          showlegend: props.data.config?.show_legends,
-          x: searchQueryData.data
-            .filter((item: any) => item[key1] === key)
-            .map((it: any) => it[yAxisKeys[0]]),
-          y: searchQueryData.data
-            .filter((item: any) => item[key1] === key)
-            .map((it: any) => it[xAxisKeys[0]]),
-          customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
-          hovertemplate:
-            "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
+      option.series = stackedXAxisUniqueValue?.map((key: any) => {
+        const seriesObj = {
+          name: props.data?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label,
+          ...getPropsByChartTypeForTraces(),    
+          data:  Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))).map((it: any) => (searchQueryData.data.find((it2:any)=>it2[xAxisKeys[0]] == it && it2[key1] == key))?.[yAxisKeys[0]] || 0)
         };
-        return trace;
+        return seriesObj;
       });
-      console.log("multiple:- traces", traces);
+
+      const temp = option.xAxis;
+      option.xAxis = option.yAxis;
+      option.yAxis = temp;
+
       break;
     }
     case "metric": {
