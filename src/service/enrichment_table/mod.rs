@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ use crate::common::infra::{
 use crate::common::meta::{
     self, http::HttpResponse as MetaHttpResponse, stream::StreamParams, StreamType,
 };
-use crate::common::{json, meta::usage::UsageType};
+use crate::common::{meta::usage::UsageType, utils::json};
 use crate::service::{
     compact::retention,
     db, format_stream_name,

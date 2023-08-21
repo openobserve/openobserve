@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,12 +18,13 @@ use datafusion::arrow::datatypes::Schema;
 use std::sync::Arc;
 
 use crate::common::infra::cache;
-use crate::common::infra::config::{CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS};
+use crate::common::infra::config::{
+    is_local_disk_storage, CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS,
+};
 use crate::common::infra::db::Event;
-use crate::common::json;
 use crate::common::meta::stream::StreamSchema;
 use crate::common::meta::StreamType;
-use crate::common::utils::is_local_disk_storage;
+use crate::common::utils::json;
 use crate::service::enrichment::StreamTable;
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {

@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ use crate::common::meta::alert::{Alert, AlertList, Trigger};
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::common::meta::search::Query;
 use crate::common::meta::{self, StreamType};
-use crate::common::notification::send_notification;
-use crate::common::schema_ext::SchemaExt;
+use crate::common::utils::notification::send_notification;
+use crate::common::utils::schema_ext::SchemaExt;
 use crate::handler::grpc::cluster_rpc;
 
 pub mod destinations;
@@ -254,8 +254,8 @@ pub async fn trigger_alert(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::common::json;
     use crate::common::meta::alert::{AllOperator, Condition};
+    use crate::common::utils::json;
 
     fn prepare_test_alert_object(name: &str, stream: &str) -> Alert {
         Alert {

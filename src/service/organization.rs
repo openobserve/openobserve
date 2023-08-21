@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,9 +15,9 @@
 use rand::distributions::{Alphanumeric, DistString};
 
 use super::stream::get_streams;
-use crate::common::auth::is_root_user;
 use crate::common::meta::organization::{IngestionPasscode, OrgSummary};
 use crate::common::meta::user::UserOrg;
+use crate::common::utils::auth::is_root_user;
 use crate::service::db;
 
 #[tracing::instrument]

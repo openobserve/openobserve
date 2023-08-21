@@ -12,24 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::service::db::kv;
-
-pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error> {
-    let val = kv::get(org_id, key).await?;
-    Ok(val)
-}
-
-pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyhow::Error> {
-    kv::set(org_id, key, val).await?;
-    Ok(())
-}
-
-pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
-    kv::delete(org_id, key).await?;
-    Ok(())
-}
-
-pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
-    let items = kv::list(org_id, prefix).await?;
-    Ok(items)
-}
+pub mod auth;
+pub mod base64;
+pub mod cgroup;
+pub mod file;
+pub mod flatten;
+pub mod functions;
+pub mod hasher;
+pub mod http;
+pub mod json;
+pub mod notification;
+pub mod schema_ext;
+pub mod str;
+pub mod stream;
+pub mod time;
+pub mod zo_logger;

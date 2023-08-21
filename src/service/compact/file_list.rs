@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ use crate::common::infra::{
     config::{CONFIG, STREAM_SCHEMAS},
     dist_lock, ider, storage,
 };
-use crate::common::json;
 use crate::common::meta::common::FileKey;
+use crate::common::utils::json;
 use crate::service::db;
 
 pub async fn run(offset: i64) -> Result<(), anyhow::Error> {

@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ use tokio::{sync::Semaphore, task, time};
 
 use crate::common::infra::{config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
-use crate::common::{file::scan_files, json, utils::populate_file_meta};
+use crate::common::utils::{file::scan_files, json, stream::populate_file_meta};
 use crate::service::usage::report_compression_stats;
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 

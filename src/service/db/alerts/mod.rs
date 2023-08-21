@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@ use std::sync::Arc;
 
 use crate::common::infra::config::{STREAM_ALERTS, TRIGGERS_IN_PROCESS};
 use crate::common::infra::db::Event;
-use crate::common::json;
 use crate::common::meta::alert::{Alert, AlertList};
 use crate::common::meta::StreamType;
+use crate::common::utils::json;
 
 pub mod destinations;
 pub mod templates;

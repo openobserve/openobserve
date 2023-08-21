@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ use crate::common::meta::{
     usage::UsageType,
     StreamType,
 };
-use crate::common::{flatten, json, time};
+use crate::common::utils::{flatten, json, time};
 use crate::service::{
     db, ingestion::get_wal_time_key, ingestion::write_file, stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,

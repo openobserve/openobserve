@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats, anyhow
 pub fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error> {
     let mut size = 0;
     for file in files {
-        let file_size = match common::file::get_file_meta(file) {
+        let file_size = match common::utils::file::get_file_meta(file) {
             Ok(resp) => resp.len(),
             Err(_) => 0,
         };
@@ -132,7 +132,7 @@ async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), a
 
     // generate the new file list
     let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
-    let mut write_buf = common::json::to_vec(&file_data)?;
+    let mut write_buf = common::utils::json::to_vec(&file_data)?;
     write_buf.push(b'\n');
     buf.write_all(&write_buf)?;
     let compressed_bytes = buf.finish().unwrap();

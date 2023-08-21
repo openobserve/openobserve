@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ use std::sync::Arc;
 use crate::common::infra::cluster::LOCAL_NODE_UUID;
 use crate::common::infra::config::METRIC_CLUSTER_LEADER;
 use crate::common::infra::db::Event;
-use crate::common::json;
 use crate::common::meta::prom::ClusterLeader;
+use crate::common::utils::json;
 
 pub async fn set_prom_cluster_info(cluster: &str, members: &[String]) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;

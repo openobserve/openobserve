@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ use vrl::compiler::{TargetValueRef, VrlRuntime};
 
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
-    common::json,
+    common::utils::json,
     service::{ingestion::compile_vrl_function, logs::get_value},
 };
 
@@ -121,7 +121,7 @@ fn get_udf_vrl(
         let in_params = local_fn_params.split(',').collect::<Vec<&str>>();
         let mut is_multi_value = false;
         let mut res_data_vec = vec![];
-        let mut runtime = crate::common::functions::init_vrl_runtime();
+        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
         let mut col_val_map: AHashMap<String, Vec<String>> = AHashMap::new();
 
         for i in 0..len {

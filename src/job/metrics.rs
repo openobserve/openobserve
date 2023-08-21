@@ -2,13 +2,13 @@ use ahash::HashMap;
 use std::path::Path;
 use tokio::time;
 
-use crate::common::file::scan_files;
 use crate::common::infra::cache;
 use crate::common::infra::cluster;
 use crate::common::infra::config::CONFIG;
 use crate::common::infra::config::USERS;
 use crate::common::infra::metrics;
 use crate::common::meta::StreamType;
+use crate::common::utils::file::scan_files;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics

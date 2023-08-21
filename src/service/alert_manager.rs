@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ use crate::common::infra::config::{TRIGGERS, TRIGGERS_IN_PROCESS};
 use crate::common::meta;
 use crate::common::meta::alert::{Evaluate, Trigger, TriggerTimer};
 use crate::common::meta::search::Request;
-use crate::common::notification::send_notification;
+use crate::common::utils::notification::send_notification;
 use crate::service::search as SearchService;
 use crate::service::triggers;
 

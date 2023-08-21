@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,8 +16,10 @@ use futures::{StreamExt, TryStreamExt};
 use object_store::ObjectStore;
 use once_cell::sync::Lazy;
 
-use super::{config::CONFIG, metrics};
-use crate::common::utils::is_local_disk_storage;
+use super::{
+    config::{is_local_disk_storage, CONFIG},
+    metrics,
+};
 
 pub mod local;
 pub mod remote;
