@@ -428,6 +428,14 @@ export default defineComponent({
   // background: #eee;
 }
 
+.vue-grid-layout {
+    transition: none;
+  }
+
+  .vue-grid-item {
+    transition: none;
+  }
+
 // .vue-grid-item:not(.vue-grid-placeholder) {
 //   background: #ccc;
 //   border: 1px solid black;

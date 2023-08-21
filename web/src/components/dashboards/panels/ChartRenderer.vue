@@ -1,9 +1,9 @@
 <template>
-  <div ref="chartRef" class="plotlycontainer" id="chart1" style="height: 100%"></div>
+  <div ref="chartRef" class="plotlycontainer" id="chart1" style="height: 100%; width: 100%;"></div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, onUnmounted } from "vue";
+import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
 import * as echarts from "echarts";
 
 export default defineComponent({
@@ -22,9 +22,16 @@ export default defineComponent({
     const windowResizeEventCallback =() => {
         chart.resize();
       }
-    onMounted(() => {
+    onMounted(async() => {
       console.log("ChartRenderer: mounted");
       console.log("props at chartrenderer",{props});
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
       chart = echarts.init(chartRef.value)
       chart.setOption(props?.data?.option || {},true);
       window.addEventListener("resize",windowResizeEventCallback );
