@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,11 +24,11 @@ use crate::common::infra::{
     config::{CONFIG, FILE_EXT_PARQUET},
     ider, metrics, storage,
 };
-use crate::common::json;
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     StreamType,
 };
+use crate::common::utils::json;
 use crate::service::{db, file_list, search::datafusion, stream};
 
 /// compactor run steps on a stream:

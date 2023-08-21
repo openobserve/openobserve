@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,9 @@ use std::time::UNIX_EPOCH;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::file::{get_file_contents, get_file_meta, scan_files};
 use crate::common::infra::{config::CONFIG, errors, ider, metrics, wal};
 use crate::common::meta;
+use crate::common::utils::file::{get_file_contents, get_file_meta, scan_files};
 use crate::handler::grpc::cluster_rpc::{
     metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
     MetricsWalFileRequest, MetricsWalFileResponse,

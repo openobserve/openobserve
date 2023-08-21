@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,11 +24,11 @@ use std::sync::Arc;
 
 use crate::common::infra::config::{CONFIG, LOCAL_SCHEMA_LOCKER};
 use crate::common::infra::db::etcd;
-use crate::common::json;
 use crate::common::meta::prom::METADATA_LABEL;
 use crate::common::meta::stream::SchemaEvolution;
 use crate::common::meta::{ingestion::StreamSchemaChk, StreamType};
-use crate::common::schema_ext::SchemaExt;
+use crate::common::utils::json;
+use crate::common::utils::schema_ext::SchemaExt;
 use crate::service::db;
 use crate::service::search::server_internal_error;
 

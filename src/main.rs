@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ use openobserve::{
     },
     common::meta,
     common::migration,
-    common::zo_logger::{self, ZoLogger, EVENT_SENDER},
+    common::utils::zo_logger::{self, ZoLogger, EVENT_SENDER},
     handler::{
         grpc::{
             auth::check_auth,

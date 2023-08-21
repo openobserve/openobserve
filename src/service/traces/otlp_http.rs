@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ use crate::common::meta::{
     usage::UsageType,
     StreamType,
 };
-use crate::common::{flatten, json};
+use crate::common::utils::{flatten, json};
 use crate::service::{
     db, format_partition_key, format_stream_name,
     ingestion::write_file,
@@ -304,7 +304,7 @@ pub async fn traces_json(
                         json::Value::Number(timestamp.into()),
                     );
 
-                    let value_str = crate::common::json::to_string(&val_map).unwrap();
+                    let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
                     // get hour key
                     let mut hour_key = crate::service::ingestion::get_hour_key(
                         timestamp.try_into().unwrap(),

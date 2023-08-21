@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use crate::{
-    common::auth::is_root_user,
     common::infra::{
         cluster::get_internal_grpc_token,
         config::{CONFIG, ROOT_USER, USERS},
     },
+    common::utils::auth::{get_hash, is_root_user},
 };
 use http_auth_basic::Credentials;
 use tonic::{Request, Status};
@@ -72,7 +72,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         if user.token.eq(&credentials.password) {
             return Ok(req);
         }
-        let in_pass = crate::common::auth::get_hash(&credentials.password, &user.salt);
+        let in_pass = get_hash(&credentials.password, &user.salt);
         if user_id.eq(&user.email)
             && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
         {

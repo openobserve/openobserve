@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,10 +19,9 @@ use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Re
 use ahash::AHashMap as HashMap;
 use std::io::Error;
 
-use crate::{
-    common::meta::{self, alert::Alert, StreamType},
-    service::alerts,
-};
+use crate::common::meta::{self, alert::Alert, StreamType};
+use crate::common::utils::http::get_stream_type_from_request;
+use crate::service::alerts;
 
 /** CreateAlert */
 #[utoipa::path(
@@ -51,7 +50,7 @@ pub async fn save_alert(
     let (org_id, stream_name, name) = path.into_inner();
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+    let mut stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
             return Ok(
@@ -94,7 +93,7 @@ pub async fn save_alert(
 async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+    let mut stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
             return Ok(
@@ -130,7 +129,7 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
 async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> impl Responder {
     let org_id = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+    let mut stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
             return Ok(
@@ -169,7 +168,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> impl Responde
 async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+    let mut stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
             return Ok(
@@ -211,7 +210,7 @@ async fn delete_alert(
 ) -> impl Responder {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+    let mut stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
             return Ok(
@@ -253,7 +252,7 @@ async fn trigger_alert(
 ) -> impl Responder {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+    let mut stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
             return Ok(

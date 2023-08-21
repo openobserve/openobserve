@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ use super::config::{RwHashMap, CONFIG, INSTANCE_ID};
 use super::db::ETCD_CLIENT;
 use super::errors::{Error, Result};
 use crate::common::infra::db::{etcd, Event};
-use crate::common::json;
+use crate::common::utils::json;
 use crate::service::db;
 
 static LOCAL_NODE_KEY_TTL: i64 = 10; // node ttl, seconds

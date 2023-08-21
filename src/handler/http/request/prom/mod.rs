@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ use std::io::Error;
 use crate::{
     common::infra::errors,
     common::meta::{self, http::HttpResponse as MetaHttpResponse},
-    common::time::{parse_milliseconds, parse_str_to_timestamp_micros},
+    common::utils::time::{parse_milliseconds, parse_str_to_timestamp_micros},
     service::{metrics, promql},
 };
 

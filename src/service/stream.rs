@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ use datafusion::arrow::datatypes::Schema;
 use std::collections::HashMap;
 use std::io::Error;
 
-use crate::common::infra::config::CONFIG;
+use crate::common::infra::config::{is_local_disk_storage, CONFIG};
 use crate::common::infra::{cache::stats, config::STREAM_SCHEMAS};
 use crate::common::meta;
 use crate::common::meta::usage::Stats;
@@ -27,7 +27,7 @@ use crate::common::meta::{
     stream::{PartitionTimeLevel, Stream, StreamProperty, StreamSettings, StreamStats},
     StreamType,
 };
-use crate::common::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS, utils::is_local_disk_storage};
+use crate::common::utils::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS};
 use crate::service::{db, search as SearchService};
 
 use super::metrics::get_prom_metadata_from_schema;

@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::common::infra::config::ALERTS_DESTINATIONS;
 use crate::common::infra::db::Event;
-use crate::common::json;
 use crate::common::meta::alert::{AlertDestination, AlertDestinationResponse};
+use crate::common::utils::json;
 use crate::service::db;
 
 pub async fn get(

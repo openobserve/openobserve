@@ -15,7 +15,7 @@ use crate::common::meta::{
     usage::UsageType,
     StreamType,
 };
-use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::{
     db, format_stream_name, ingestion::write_file, usage::report_request_usage_stats,
 };
@@ -225,7 +225,7 @@ pub async fn process(
 fn decode_and_decompress(
     encoded_data: &str,
 ) -> Result<(String, AWSRecordType), Box<dyn std::error::Error>> {
-    let decoded_data = crate::common::base64::decode_raw(encoded_data)?;
+    let decoded_data = crate::common::utils::base64::decode_raw(encoded_data)?;
     let mut gz = GzDecoder::new(&decoded_data[..]);
     let mut decompressed_data = String::new();
     match gz.read_to_string(&mut decompressed_data) {

@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ use crate::common::meta::{
     stream::{PartitionTimeLevel, ScanStats, StreamParams},
     StreamType,
 };
-use crate::common::{flatten, json, str::find};
+use crate::common::utils::{flatten, json, str::find};
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, file_list, format_partition_key, format_stream_name, stream};
 
