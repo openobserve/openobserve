@@ -768,18 +768,13 @@ export const convertSQLData = (
 
   let traces: any;
 
-  let option={
-    legend :{
-      show:true,
-      // type: 'scroll',
-      orient: 'vertical',
-      right: 10,
-      top: 20,
-      bottom: 20,
-      // orient: 'vertical',
-      // right: '2%',
-      // top: 'middle',
-      // data: ['Count']
+  let option = {
+    legend: {
+      show: true,
+      type: "scroll",
+      orient: "vertical", // 'horizontal' | 'vertical'
+      x: "right", // 'center' | 'left' | {number},
+      y: "center", // 'center' | 'bottom' | {number}
     },
     grid : {
       left: '10%',
