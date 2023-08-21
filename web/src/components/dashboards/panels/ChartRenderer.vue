@@ -12,7 +12,7 @@ export default defineComponent({
     data: {
       required: true,
       type: Object,
-      default: () => ({ traces: [], layout: {} })
+      default: () => ({ option: {}})
     },
   },
   setup(props: any) {
@@ -23,14 +23,14 @@ export default defineComponent({
       console.log("ChartRenderer: mounted");
       console.log("props at chartrenderer",{props});
         chart = echarts.init(chartRef.value)
-        chart.setOption(props?.data?.traces || {});
+        chart.setOption(props?.data?.option || {});
     });
 
-    watch(() => props.data.traces,
+    watch(() => props.data.option,
       () => {
         console.log("ChartRenderer: props.data updated", props.data);
-        chart.setOption(props?.data?.traces || {});
-      })
+        chart.setOption(props?.data?.option || {});
+      },{deep:true})
     return { chartRef };
   },
 })

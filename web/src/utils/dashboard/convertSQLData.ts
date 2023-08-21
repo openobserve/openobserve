@@ -143,8 +143,12 @@ export const convertSQLData = (
         };
       case "area-stacked":
         return {
-          mode: "lines",
-          // fill: 'none'
+          type: "line",
+          stack: 'Total',
+          areaStyle: {},
+          emphasis: {
+            focus: 'series'
+          },
         };
       case "metric":
         return {
@@ -790,7 +794,10 @@ export const convertSQLData = (
         ? getAxisDataFromKey(xAxisKeys[0])
         : xAxisKeys?.map((key: any) => {
             return getAxisDataFromKey(key);
-        })
+        }),
+      //   axisLabel: {
+      //     margin:[50,0,0,0],
+      // }
     },
     yAxis: {
       type: 'value'
@@ -804,6 +811,7 @@ export const convertSQLData = (
     case "area": {
 
       //generate trace based on the y axis keys
+      // option.xAxis.axisLabel= {margin:[20]}
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
           name: props.data?.queries[0]?.fields?.y.find(
@@ -811,6 +819,18 @@ export const convertSQLData = (
           )?.label,
           ...getPropsByChartTypeForTraces(),
           data: getAxisDataFromKey(key),
+        //   label: {
+        //     show: true,
+        //     position: 'bottom',
+        //     align: 'left',
+        //     formatter: props.data?.queries[0]?.fields?.y.find(
+        //       (it: any) => it.alias == key
+        //     )?.label,
+        //     rotate:90,
+        //     // margin:[10,0]
+        //     // borderWidth:"15",
+        //     // borderType:"solid"
+        // },
         };
         return seriesObj;
       });
@@ -919,43 +939,19 @@ export const convertSQLData = (
       break;
     }
     case "area-stacked": {
-      // stacked with xAxis's second value
-      // allow 2 xAxis and 1 yAxis value for stack chart
-      // get second x axis key
-      const key1 = xAxisKeys[1];
-      // get the unique value of the second xAxis's key
-      const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
-      ].filter((it) => it);
-      console.log("stacked x axis unique value", stackedXAxisUniqueValue);
-
-      // create a trace based on second xAxis's unique values
-      traces = stackedXAxisUniqueValue?.map((key: any) => {
-        const trace = {
-          name: key,
+      option.xAxis.data=Array.from(
+        new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
+      );
+      option.series = yAxisKeys?.map((key: any) => {
+        const seriesObj = {
+          name: props.data?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label,
           ...getPropsByChartTypeForTraces(),
-          showlegend: props.data.config?.show_legends,
-          x: Array.from(
-            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
-          ),
-          y: Array.from(
-            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
-          ).map(
-            (it: any) =>
-              searchQueryData.data.find(
-                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-              )?.[yAxisKeys[0]] || 0
-          ),
-          customdata: Array.from(
-            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
-          ), //TODO: need to check for the data value
-          hovertemplate:
-            "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
-          stackgroup: "one",
+          data: getAxisDataFromKey(key),
         };
-        return trace;
+        return seriesObj;
       });
-      console.log("multiple:- traces", traces);
       break;
     }
     case "stacked": {
@@ -1145,7 +1141,6 @@ export const convertSQLData = (
   //   displayModeBar: false,
   // });
   return {
-    traces:option,
-    layout,
+    option,
   };
 };
