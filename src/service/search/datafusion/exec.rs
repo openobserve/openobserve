@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use ahash::AHashMap as HashMap;
+use arrow_schema::Field;
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
@@ -540,7 +541,15 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>,
             }
             i += 1;
             let row_schema = row.schema();
-            schema = Schema::try_merge(vec![schema, row_schema.as_ref().to_owned()])?;
+            let filtered_fields: Vec<Field> = row_schema
+                .fields()
+                .iter()
+                .filter(|field| field.data_type() != &DataType::Null)
+                .map(|arc_field| (**arc_field).clone())
+                .collect();
+            let row_schema = Arc::new(Schema::new(filtered_fields));
+            schema = Schema::try_merge(vec![schema.clone(), row_schema.as_ref().to_owned()])?;
+
             let file_name = format!("{work_dir}{i}.parquet");
             let mut buf_parquet = Vec::new();
             let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema.clone(), None)?;
