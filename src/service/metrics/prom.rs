@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ use crate::common::meta::{
     usage::UsageType,
     StreamType,
 };
-use crate::common::{json, time::parse_i64_to_timestamp_micros};
+use crate::common::utils::{json, time::parse_i64_to_timestamp_micros};
 use crate::service::{
     db,
     ingestion::{chk_schema_by_record, write_file},
@@ -253,7 +253,7 @@ pub async fn remote_write(
                 CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
-            let value_str = crate::common::json::to_string(&val_map).unwrap();
+            let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
             chk_schema_by_record(
                 &mut metric_schema_map,
                 org_id,

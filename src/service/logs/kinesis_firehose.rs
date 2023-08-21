@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ use crate::common::meta::{
     usage::UsageType,
     StreamType,
 };
-use crate::common::{
+use crate::common::utils::{
     flatten, json,
     time::{parse_i64_to_timestamp_micros, parse_timestamp_micro_from_value},
 };
@@ -300,7 +300,7 @@ pub async fn process(
 fn decode_and_decompress(
     encoded_data: &str,
 ) -> Result<(String, AWSRecordType), Box<dyn std::error::Error>> {
-    let decoded_data = crate::common::base64::decode_raw(encoded_data)?;
+    let decoded_data = crate::common::utils::base64::decode_raw(encoded_data)?;
     let mut gz = GzDecoder::new(&decoded_data[..]);
     let mut decompressed_data = String::new();
     match gz.read_to_string(&mut decompressed_data) {

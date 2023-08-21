@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    common::time::parse_i64_to_timestamp_micros,
+    common::utils::time::parse_i64_to_timestamp_micros,
     service::promql::value::{InstantValue, LabelsExt, Sample, Value},
 };
 use chrono::{Datelike, NaiveDate, Timelike};

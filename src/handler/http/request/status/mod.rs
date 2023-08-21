@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ use crate::common::infra::{
     cache, cluster,
     config::{self, CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
 };
-use crate::common::json;
 use crate::common::meta::functions::ZoFunction;
+use crate::common::utils::json;
 use crate::service::{db, search::datafusion::DEFAULT_FUNCTIONS};
 
 #[derive(Serialize, ToSchema)]
@@ -73,7 +73,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         build_date: config::BUILD_DATE.to_string(),
         functions_enabled: config::HAS_FUNCTIONS,
         telemetry_enabled: CONFIG.common.telemetry_enabled,
-        default_fts_keys: crate::common::stream::SQL_FULL_TEXT_SEARCH_FIELDS
+        default_fts_keys: crate::common::utils::stream::SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string())
             .collect(),

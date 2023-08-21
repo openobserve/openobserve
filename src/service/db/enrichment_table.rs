@@ -3,8 +3,8 @@ use vrl::prelude::NotNan;
 
 use crate::common::infra::cache::stats;
 use crate::common::{
-    json,
     meta::{self, search::Request},
+    utils::json,
 };
 use crate::service::search as SearchService;
 

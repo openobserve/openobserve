@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ use ahash::AHashMap as HashMap;
 use std::io::Error;
 
 use crate::common::meta;
-use crate::common::meta::functions::StreamOrder;
-use crate::common::meta::functions::Transform;
+use crate::common::meta::functions::{StreamOrder, Transform};
+use crate::common::utils::http::get_stream_type_from_request;
 
 /** CreateFunction*/
 #[utoipa::path(
@@ -142,7 +142,7 @@ async fn list_stream_functions(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+    let mut stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
             return Ok(
@@ -185,7 +185,7 @@ async fn delete_stream_function(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+    let mut stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
             return Ok(
@@ -235,7 +235,7 @@ pub async fn add_function_to_stream(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+    let mut stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
             return Ok(

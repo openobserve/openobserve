@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ use once_cell::sync::Lazy;
 use std::iter::zip;
 use std::sync::Arc;
 
-use crate::common::time;
+use crate::common::utils::time;
 
 /// The name of the date_format UDF given to DataFusion.
 pub const DATE_FORMAT_UDF_NAME: &str = "date_format";

@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ use crate::common::meta::{
     usage::RequestStats,
     StreamType,
 };
-use crate::common::{
+use crate::common::utils::{
     flatten,
     functions::get_vrl_compiler_config,
     json::{Map, Value},
@@ -375,7 +375,7 @@ pub fn _write_file(
 }
 
 pub fn init_functions_runtime() -> Runtime {
-    crate::common::functions::init_vrl_runtime()
+    crate::common::utils::functions::init_vrl_runtime()
 }
 
 pub fn write_file(

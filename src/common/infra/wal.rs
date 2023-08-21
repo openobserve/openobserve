@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard},
 };
 
-use crate::common::file::get_file_contents;
 use crate::common::infra::{
     config::{CONFIG, FILE_EXT_JSON},
     ider, metrics,
@@ -31,6 +30,7 @@ use crate::common::meta::{
     stream::{PartitionTimeLevel, StreamParams},
     StreamType,
 };
+use crate::common::utils::file::get_file_contents;
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);

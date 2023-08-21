@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ use crate::common::meta::{
     search::Session as SearchSession,
     sql,
 };
-use crate::common::{flatten, json};
+use crate::common::utils::{flatten, json};
 use crate::service::search::sql::Sql;
 
 use super::storage::{file_list, StorageType};
@@ -186,7 +186,7 @@ async fn exec_query(
     // get used UDF
     let mut field_fns = vec![];
     let mut sql_parts = vec![];
-    for fn_name in crate::common::functions::get_all_transform_keys(&sql.org_id).await {
+    for fn_name in crate::common::utils::functions::get_all_transform_keys(&sql.org_id).await {
         if sql.origin_sql.contains(&fn_name) {
             field_fns.push(fn_name.clone());
         }
@@ -1062,7 +1062,7 @@ fn apply_query_fn(
     use vector_enrichment::TableRegistry;
 
     let mut resp = vec![];
-    let mut runtime = crate::common::functions::init_vrl_runtime();
+    let mut runtime = crate::common::utils::functions::init_vrl_runtime();
     match crate::service::ingestion::compile_vrl_function(&query_fn_src, org_id) {
         Ok(program) => {
             let registry = program.config.get_custom::<TableRegistry>().unwrap();

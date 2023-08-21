@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ use std::{
 use crate::common::infra::{
     cache,
     cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-    config::CONFIG,
+    config::{is_local_disk_storage, CONFIG},
     dist_lock, ider, storage,
 };
 use crate::common::meta::{
@@ -29,7 +29,7 @@ use crate::common::meta::{
     stream::PartitionTimeLevel,
     StreamType,
 };
-use crate::common::{json, utils::is_local_disk_storage};
+use crate::common::utils::json;
 use crate::service::{db, file_list};
 
 pub async fn delete_by_stream(

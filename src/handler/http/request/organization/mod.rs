@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@ use actix_web_httpauth::extractors::basic::BasicAuth;
 use std::collections::HashSet;
 use std::io::Error;
 
-use crate::common::auth::is_root_user;
 use crate::common::infra::config::{STREAM_SCHEMAS, USERS};
 use crate::common::meta::organization::{
     OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
 };
+use crate::common::utils::auth::is_root_user;
 use crate::service::organization::get_passcode;
 use crate::service::organization::{self, update_passcode};
 

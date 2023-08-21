@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ pub mod prom;
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
-    let metadata: Metadata = common::json::from_str(metadata).unwrap();
+    let metadata: Metadata = common::utils::json::from_str(metadata).unwrap();
     Some(metadata)
 }
 
@@ -38,7 +38,7 @@ impl From<Signature> for String {
 /// `signature_without_labels` is just as [`signature`], but only for labels not matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(
-    labels: &common::json::Map<String, common::json::Value>,
+    labels: &common::utils::json::Map<String, common::utils::json::Value>,
     exclude_names: &[&str],
 ) -> Signature {
     let mut labels: Vec<(&str, String)> = labels

@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use actix_web::HttpResponse;
 use datafusion::arrow::{datatypes::Schema, json as arrow_json, record_batch::RecordBatch};
 use datafusion::{datasource::MemTable, prelude::SessionContext};
+use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
 use crate::common::infra::config::{CONFIG, FILE_EXT_JSON};
-use crate::common::json;
-use crate::common::meta::common::FileMeta;
-use crate::common::meta::StreamType;
+use crate::common::meta::{common::FileMeta, StreamType};
+use crate::common::utils::json;
+
+pub const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 5] = ["log", "message", "msg", "content", "data"];
+
+#[inline(always)]
+pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
+    /*  return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+        http::StatusCode::BAD_REQUEST.into(),
+        Some("only 'type' query param with value 'logs' or 'metrics' allowed".to_string()),
+    ))); */
+
+    Err(Error::new(
+        ErrorKind::Other,
+        "only 'type' query param with value 'logs' or 'metrics' allowed",
+    ))
+}
 
 #[inline(always)]
 pub fn increment_stream_file_num_v1(file_name: &str) -> u32 {
@@ -50,11 +66,6 @@ pub fn get_file_name_v1(org_id: &str, stream_name: &str, suffix: u32) -> String 
         suffix,
         FILE_EXT_JSON
     )
-}
-
-#[inline]
-pub fn is_local_disk_storage() -> bool {
-    CONFIG.common.local_mode && CONFIG.common.local_mode_storage.eq("disk")
 }
 
 pub async fn populate_file_meta(
@@ -171,5 +182,11 @@ mod tests {
             .unwrap();
         assert_eq!(file_meta.records, 4);
         assert_eq!(file_meta.min_ts, val - 100);
+    }
+
+    #[test]
+    fn test_stream_type_query_param_error() {
+        let res = stream_type_query_param_error();
+        assert!(res.is_err());
     }
 }
