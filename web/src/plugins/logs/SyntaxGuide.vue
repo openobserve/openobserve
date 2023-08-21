@@ -10,7 +10,7 @@
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
- limitations under the License. 
+ limitations under the License.
 -->
 
 <template>
@@ -37,8 +37,8 @@
                 <li>
                   For full text search of value 'error' use
                   <span class="bg-highlight"
-                    >match_all('error')
-                  > in query editor</span
+                    >match_all('error')> in query editor</span
+                  >
                 </li>
                 <li>
                   For case-insensitive full text search of value 'error' use
