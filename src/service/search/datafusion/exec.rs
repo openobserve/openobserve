@@ -287,39 +287,41 @@ async fn exec_query(
                 ));
             }
             Some(resp) => {
-                let mem_table = datafusion::datasource::MemTable::try_new(
-                    resp.first().unwrap().schema(),
-                    vec![resp],
-                )?;
-                q_ctx.deregister_table("tbl")?;
-                q_ctx.register_table("tbl", Arc::new(mem_table))?;
-                // -- fix mem table, add missing columns
-                let mut tmp_df = q_ctx.table("tbl").await?;
-                let tmp_fields = tmp_df
-                    .schema()
-                    .field_names()
-                    .iter()
-                    .map(|f| f.strip_prefix("tbl.").unwrap().to_string())
-                    .collect::<Vec<String>>();
-                let need_add_columns = schema
-                    .fields()
-                    .iter()
-                    .filter(|field| !tmp_fields.contains(field.name()))
-                    .map(|field| field.name().as_str())
-                    .collect::<Vec<&str>>();
-                if !need_add_columns.is_empty() {
-                    for column in need_add_columns {
-                        tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
-                    }
+                if !resp.is_empty() {
+                    let mem_table = datafusion::datasource::MemTable::try_new(
+                        resp.first().unwrap().schema(),
+                        vec![resp],
+                    )?;
                     q_ctx.deregister_table("tbl")?;
-                    q_ctx.register_table("tbl", tmp_df.clone().into_view())?;
-                    // re-register to ctx
-                    if !fast_mode {
-                        ctx.deregister_table("tbl")?;
-                        ctx.register_table("tbl", tmp_df.into_view())?;
+                    q_ctx.register_table("tbl", Arc::new(mem_table))?;
+                    // -- fix mem table, add missing columns
+                    let mut tmp_df = q_ctx.table("tbl").await?;
+                    let tmp_fields = tmp_df
+                        .schema()
+                        .field_names()
+                        .iter()
+                        .map(|f| f.strip_prefix("tbl.").unwrap().to_string())
+                        .collect::<Vec<String>>();
+                    let need_add_columns = schema
+                        .fields()
+                        .iter()
+                        .filter(|field| !tmp_fields.contains(field.name()))
+                        .map(|field| field.name().as_str())
+                        .collect::<Vec<&str>>();
+                    if !need_add_columns.is_empty() {
+                        for column in need_add_columns {
+                            tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
+                        }
+                        q_ctx.deregister_table("tbl")?;
+                        q_ctx.register_table("tbl", tmp_df.clone().into_view())?;
+                        // re-register to ctx
+                        if !fast_mode {
+                            ctx.deregister_table("tbl")?;
+                            ctx.register_table("tbl", tmp_df.into_view())?;
+                        }
                     }
+                    // -- fix done
                 }
-                // -- fix done
             }
         }
     } else {
