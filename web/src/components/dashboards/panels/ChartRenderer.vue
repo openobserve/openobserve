@@ -3,7 +3,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch } from "vue";
+import { defineComponent, ref, onMounted, watch, onUnmounted } from "vue";
 import * as echarts from "echarts";
 
 export default defineComponent({
@@ -19,12 +19,20 @@ export default defineComponent({
     const chartRef: any = ref(null);
     let chart:any;
 
+    const windowResizeEventCallback =() => {
+        chart.resize();
+      }
     onMounted(() => {
       console.log("ChartRenderer: mounted");
       console.log("props at chartrenderer",{props});
-        chart = echarts.init(chartRef.value)
-        chart.setOption(props?.data?.option || {},true);
+      chart = echarts.init(chartRef.value)
+      chart.setOption(props?.data?.option || {},true);
+      window.addEventListener("resize",windowResizeEventCallback );
     });
+
+    onUnmounted(()=>{
+      window.removeEventListener("resize",windowResizeEventCallback);
+    })
 
     watch(() => props.data.option,
       () => {
