@@ -69,7 +69,12 @@ async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
         let columns = file_path.splitn(2, '/').collect::<Vec<&str>>();
 
         // eg: file_list/0/2023/08/21/08/7099303408192061440f3XQ2p.json
-        let file_name = columns[1].to_string();
+        let mut file_name = columns[1].to_string();
+
+        // Hack: compatible for <= 0.5.1
+        if !file_name.contains('/') && file_name.contains('_') {
+            file_name = file_name.replace('_', "/");
+        }
 
         // check the file is using for write
         if wal::check_in_use("", "", StreamType::Filelist, &file_name) {

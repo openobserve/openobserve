@@ -68,7 +68,12 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);
         let stream_name = columns[3].to_string();
-        let file_name = columns[4].to_string();
+        let mut file_name = columns[4].to_string();
+
+        // Hack: compatible for <= 0.5.1
+        if !file_name.contains('/') && file_name.contains('_') {
+            file_name = file_name.replace('_', "/");
+        }
 
         // check the file is using for write
         if wal::check_in_use(&org_id, &stream_name, stream_type, &file_name) {
