@@ -176,7 +176,7 @@ impl Manager {
         stream_type: StreamType,
         key: &str,
     ) -> Option<Arc<RwFile>> {
-        let full_key = format!("{org_id}/{stream_name}/{stream_type}/{key}");
+        let full_key = format!("{org_id}/{stream_type}/{stream_name}/{key}");
         let file = match self
             .data
             .get(thread_id)
@@ -220,7 +220,7 @@ impl Manager {
         let stream_name = stream.stream_name;
         let stream_type = stream.stream_type;
 
-        let full_key = format!("{org_id}/{stream_name}/{stream_type}/{key}");
+        let full_key = format!("{org_id}/{stream_type}/{stream_name}/{key}");
         let mut data = self.data.get(thread_id).unwrap().write().unwrap();
         if let Some(f) = data.get(&full_key) {
             return f.clone();
@@ -267,10 +267,10 @@ impl Manager {
         stream_type: StreamType,
         file_name: &str,
     ) -> bool {
-        let columns = file_name.splitn(2, '/').collect::<Vec<&str>>();
+        let columns = file_name.split('/').collect::<Vec<&str>>();
         let thread_id: usize = columns.first().unwrap().parse().unwrap();
-        let key = columns.last().unwrap();
-        if let Some(file) = self.get(thread_id, org_id, stream_name, stream_type, key) {
+        let key = columns[1..columns.len() - 1].join("/");
+        if let Some(file) = self.get(thread_id, org_id, stream_name, stream_type, &key) {
             if file.name() == file_name {
                 return true;
             }
