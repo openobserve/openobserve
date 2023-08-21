@@ -46,7 +46,7 @@ pub fn format_partition_key(input: &str) -> String {
         if output.len() > MAX_KEY_LENGTH {
             break;
         }
-        if c.is_alphanumeric() || c == '=' || c == '-' {
+        if c.is_alphanumeric() || c == '=' || c == '-' || c == '_' {
             output.push(c);
         }
     }

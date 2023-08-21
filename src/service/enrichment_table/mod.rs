@@ -23,15 +23,21 @@ use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 use std::io::Error;
 
-use crate::common::infra::{
-    cache::stats,
-    cluster,
-    config::{CONFIG, STREAM_SCHEMAS},
+use crate::common::{
+    infra::{
+        cache::stats,
+        cluster,
+        config::{CONFIG, STREAM_SCHEMAS},
+    },
+    meta::{
+        self,
+        http::HttpResponse as MetaHttpResponse,
+        stream::{PartitionTimeLevel, StreamParams},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::json,
 };
-use crate::common::meta::{
-    self, http::HttpResponse as MetaHttpResponse, stream::StreamParams, StreamType,
-};
-use crate::common::{meta::usage::UsageType, utils::json};
 use crate::service::{
     compact::retention,
     db, format_stream_name,
@@ -126,8 +132,13 @@ pub async fn save_enrichment_data(
                     .await;
 
                     if records.is_empty() {
-                        hour_key =
-                            super::ingestion::get_hour_key(timestamp, &vec![], &json_record, None);
+                        hour_key = super::ingestion::get_wal_time_key(
+                            timestamp,
+                            &vec![],
+                            PartitionTimeLevel::Unset,
+                            &json_record,
+                            None,
+                        );
                     }
                     records.push(value_str);
                 }

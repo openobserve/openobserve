@@ -66,7 +66,6 @@ pub async fn ingest(
     let mut trigger: Option<Trigger> = None;
 
     // Start Register Transforms for stream
-
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
         StreamType::Logs,
