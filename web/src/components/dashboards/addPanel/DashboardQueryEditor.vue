@@ -160,18 +160,19 @@ export default defineComponent({
         ], () => {
             // only continue if current mode is auto query generation
             if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
-                // console.log("Updating query");
+                console.log("Updating query");
 
                 // STEP 1: first check if there is at least 1 field selected
                 if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length == 0 && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length == 0) {
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = ""
                     return;
                 }
+console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x",dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z);
 
                 // STEP 2: Now, continue if we have at least 1 field selected
                 // merge the fields list
                 let query = "SELECT "
-                const fields = [...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x, ...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y, ...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z]
+                const fields = [...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x, ...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y, ...dashboardPanelData.data?.queries[dashboardPanelData.layout.currentQueryIndex].fields?.z ? [...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z] : []].flat()
                 const filter = [...dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.filter]
                 const array = fields.map((field, i) => {
                     let selector = ""
