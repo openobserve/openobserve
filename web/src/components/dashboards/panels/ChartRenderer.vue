@@ -1,5 +1,5 @@
 <template>
-  <div ref="chartRef" class="plotlycontainer" id="chart1" style="height: 100%; width: 100%;"></div>
+  <div ref="chartRef" class="plotlycontainer" id="chart1" style="height: 90%; width: 100%;"></div>
 </template>
 
 <script lang="ts">

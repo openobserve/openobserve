@@ -1,6 +1,6 @@
 <template>
   <div ref="chartPanelRef"  style="height: 100%; position: relative;">
-    <div v-show="!errorDetail" class="plotlycontainer" style="height: 100%; width: 100%;">
+    <div v-show="!errorDetail" class="plotlycontainer" style="height: 90%; width: 100%;">
       <ChartRenderer v-if="panelSchema.type != 'table'" :data="panelData" />
       <TableRenderer v-else-if="panelSchema.type == 'table'" :data="panelData" />
     </div>
