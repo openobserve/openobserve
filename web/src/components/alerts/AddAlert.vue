@@ -733,7 +733,7 @@ export default defineComponent({
             dismiss();
             this.q.notify({
               type: "negative",
-              message: err.response.data.error,
+              message: err.response?.data?.error || err.response?.data?.message,
             });
           });
         segment.track("Button Click", {
