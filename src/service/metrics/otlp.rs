@@ -14,9 +14,7 @@
 
 use crate::{
     common::{
-        flatten,
         infra::{cluster, config::CONFIG},
-        json,
         meta::{
             self,
             alert::{Alert, Trigger},
@@ -26,6 +24,7 @@ use crate::{
             usage::UsageType,
             StreamType,
         },
+        utils::{flatten, json},
     },
     service::{
         db,
@@ -186,7 +185,7 @@ pub async fn handle_grpc_request(
                         .as_i64()
                         .unwrap_or(Utc::now().timestamp_micros());
 
-                    let value_str = crate::common::json::to_string(&val_map).unwrap();
+                    let value_str = json::to_string(&val_map).unwrap();
                     chk_schema_by_record(
                         &mut metric_schema_map,
                         org_id,
