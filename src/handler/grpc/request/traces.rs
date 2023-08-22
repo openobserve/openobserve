@@ -44,7 +44,7 @@ impl TraceService for TraceServer {
             return Err(Status::invalid_argument(msg));
         }
 
-        let resp = handle_trace_request(org_id.unwrap().to_str().unwrap(), 0, in_req).await;
+        let resp = handle_trace_request(org_id.unwrap().to_str().unwrap(), 0, in_req, true).await;
         if resp.is_ok() {
             return Ok(Response::new(ExportTraceServiceResponse {}));
         } else {

@@ -26,7 +26,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::infra::{cluster, config::CONFIG, wal};
+use crate::common::infra::{cluster, config::CONFIG, metrics, wal};
 use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
@@ -52,6 +52,7 @@ pub async fn handle_trace_request(
     org_id: &str,
     thread_id: usize,
     request: ExportTraceServiceRequest,
+    is_grpc: bool,
 ) -> Result<HttpResponse, Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -68,7 +69,7 @@ pub async fn handle_trace_request(
             "Quota exceeded for this organization".to_string(),
         )));
     }
-
+    let start = std::time::Instant::now();
     let traces_stream_name = "default";
     let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
         AHashMap::new();
@@ -333,6 +334,30 @@ pub async fn handle_trace_request(
             super::ingestion::send_ingest_notification(val, alerts.first().unwrap().clone()).await;
         }
     }
+    let time = start.elapsed().as_secs_f64();
+    let ep = if is_grpc {
+        "grpc/export/traces"
+    } else {
+        "/api/org/traces"
+    };
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            ep,
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            ep,
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.to_string().as_str(),
+        ])
+        .inc();
     let res = ExportTraceServiceResponse {};
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
