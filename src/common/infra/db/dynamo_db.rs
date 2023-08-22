@@ -64,6 +64,13 @@ fn default_oper() -> String {
     "query".to_string()
 }
 
+pub enum DbOperation {
+    Get,
+    Put,
+    Delete,
+    List,
+}
+
 impl DynamoDb {
     pub async fn connect() -> Client {
         if CONFIG.common.local_mode {
