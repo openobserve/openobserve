@@ -310,10 +310,8 @@ export const convertPromQLData = (
       }
     },
     xAxis:{
-      type: 'category',
-      data:searchQueryData.data[0].result[0].values.sort((a: any, b: any) => a[0] - b[0]).map((value: any) =>
-      moment(value[0] * 1000).toISOString(true)
-    ),
+      type: 'time',
+      // data:searchQueryData.data[0].result[0].values.sort((a: any, b: any) => a[0] - b[0]).map((value: any) =>value[0]*1000),
     },
     yAxis: {
       type: 'value'
@@ -347,7 +345,7 @@ export const convertPromQLData = (
                   metric.metric,
                   props.data.value.queries[index].config.promql_legend
                 ),
-                data: values.map((value: any) => +value[1]),
+                data: values.map((value: any) => [value[0] * 1000, value[1]]),
                 // hovertext: values.map((value: any) =>
                 //   formatUnitValue(getUnitValue(value[1]))
                 // ),
