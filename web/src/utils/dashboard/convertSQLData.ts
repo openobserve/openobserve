@@ -802,24 +802,24 @@ export const convertSQLData = (
       },
     },
     xAxis: {
-      type: "category",
-      position: "bottom",
-      data: !xAxisKeys.length
-        ? []
-        : xAxisKeys.length == 1
-        ? getAxisDataFromKey(xAxisKeys[0])
-        : xAxisKeys?.map((key: any) => {
-            return getAxisDataFromKey(key);
-          }),
-      axisTick: {
-        alignWithLabel: true,
+        type: "category",
+        position: "bottom",
+        data: !xAxisKeys.length
+          ? []
+          : xAxisKeys.length == 1
+          ? getAxisDataFromKey(xAxisKeys[0])
+          : xAxisKeys?.map((key: any) => {
+             return getAxisDataFromKey(key);
+            }),
+        axisTick: {
+          alignWithLabel: true,
+        },
+        min: "dataMin",
+        max: "dataMax",
+        splitLine: {
+          show: true,
+        },
       },
-      min: "dataMin",
-      max: "dataMax",
-      splitLine: {
-        show: true,
-      },
-    },
     yAxis: {
       type: "value",
       // min: "dataMin",

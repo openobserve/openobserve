@@ -74,6 +74,6 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .plotlycontainer {
-  height: 100%;
+  height: 90%;
 }
 </style>
