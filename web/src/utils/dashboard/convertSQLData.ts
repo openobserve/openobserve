@@ -768,18 +768,18 @@ export const convertSQLData = (
 
   let traces: any;
 
-  const xAxisData = xAxisKeys?.map((key: any) => getAxisDataFromKey(key));
+  // const xAxisData = xAxisKeys?.map((key: any) => getAxisDataFromKey(key));
 
-  const xAxisData1 = new Set(xAxisData[xAxisData.length - 1]);
+  // const xAxisData1 = new Set(xAxisData[xAxisData.length - 1]);
 
-  const xAxisData2 =   new Array(xAxisData1.length).fill("");
-  [...new Set((xAxisKeys?.map((key: any) => getAxisDataFromKey(key))).flat())].map((x: any,i:any) => {
-    i==0? xAxisData2[yAxisKeys.length * i ] = x : xAxisData2[yAxisKeys.length * i - 1] = x;
-  })
+  // const xAxisData2 =   new Array(xAxisData1.length).fill("");
+  // [...new Set((xAxisKeys?.map((key: any) => getAxisDataFromKey(key))).flat())].map((x: any,i:any) => {
+  //   i==0? xAxisData2[yAxisKeys.length * i ] = x : xAxisData2[yAxisKeys.length * i - 1] = x;
+  // })
 
   
-  console.log("xAxisKeys?.map",xAxisData1, xAxisData2);
-
+  // console.log("xAxisKeys?.map",xAxisData1, xAxisData2);
+  
   let option = {
     legend: {
       show: true,
@@ -801,49 +801,64 @@ export const convertSQLData = (
         type:"cross"
       }
     },
-    xAxis:[{
+    xAxis:{
       type: 'category',
-      position:"bottom",
       data: !xAxisKeys.length
         ? []
         : xAxisKeys.length == 1
         ? getAxisDataFromKey(xAxisKeys[0])
-        : xAxisData1,
+        : xAxisKeys?.map((key: any) => {
+            return getAxisDataFromKey(key);
+        }),
       //   axisLabel: {
       //     margin:[50,0,0,0],
       // }
     },
-    {
-    	position: "bottom",
-    	data: xAxisData2,
-      interval: 1,
-      axisLine: {
-      	show: false
-      },
-      axisTick: {
-      	alignWithLabel: false,
-        length: 40,
-        align: "left",
-        interval: function(index, value) {
-          return value ? true : false;
-        }
-      },
-      axisLabel: {
-      	margin: 30
-      },
-      splitLine: {
-        show: true,
-        interval: function(index, value) {
-          return value ? true : false;
-        }
-      }
-    }
-  ],
     yAxis: {
       type: 'value'
     },
     series:[]
   };
+
+//   xAxis:[{
+//     type: 'category',
+//     position:"bottom",
+//     data: !xAxisKeys.length
+//       ? []
+//       : xAxisKeys.length == 1
+//       ? getAxisDataFromKey(xAxisKeys[0])
+//       : xAxisData1,
+//     //   axisLabel: {
+//     //     margin:[50,0,0,0],
+//     // }
+//   },
+//   {
+//     position: "bottom",
+//     data: xAxisData2,
+//     interval: 1,
+//     axisLine: {
+//       show: false
+//     },
+//     axisTick: {
+//       alignWithLabel: false,
+//       length: 40,
+//       align: "left",
+//       interval: function(index, value) {
+//         return value ? true : false;
+//       }
+//     },
+//     axisLabel: {
+//       margin: 30
+//     },
+//     splitLine: {
+//       show: true,
+//       interval: function(index, value) {
+//         return value ? true : false;
+//       }
+//     }
+//   }
+// ]
+  
 
   switch (props.data.type) {
     case "bar":
