@@ -15,13 +15,13 @@
 
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
-    <q-header :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'">
+    <q-header :class="store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white'">
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
           <img
             class="appLogo"
             :src="
-              store.state.theme == 'dark'
+              store?.state?.theme == 'dark'
                 ? getImageURL('images/common/open_observe_logo_2.svg')
                 : getImageURL('images/common/open_observe_logo.svg')
             "
@@ -186,7 +186,7 @@
     </q-drawer>
 
     <q-page-container
-      :key="store.state.selectedOrganization.identifier"
+      :key="store.state.selectedOrganization?.identifier"
       v-if="isLoading"
     >
       <router-view v-slot="{ Component }">
@@ -405,7 +405,7 @@ export default defineComponent({
         title: t("menu.user"),
         icon: outlinedPerson,
         link: "/users",
-        display: store.state.currentuser.role == "admin" ? true : false,
+        display: store.state?.currentuser?.role == "admin" ? true : false,
       },
       {
         title: t("menu.slack"),
@@ -496,7 +496,7 @@ export default defineComponent({
       if (
         mainLayoutMixin.setup().customOrganization != undefined &&
         mainLayoutMixin.setup().customOrganization !=
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization?.identifier
       ) {
         useLocalOrganization("");
         store.dispatch("setSelectedOrganization", {});
@@ -541,7 +541,7 @@ export default defineComponent({
         : "";
       let tempDefaultOrg = {};
       let localOrgFlag = false;
-      if (store.state.organizations.length > 0) {
+      if (store.state.organizations?.length > 0) {
         const localOrg: any = useLocalOrganization();
         orgOptions.value = store.state.organizations.map(
           (data: {
@@ -592,7 +592,7 @@ export default defineComponent({
                 store.state.userInfo.email == data.UserObj.email &&
                 (customOrganization == "" ||
                   customOrganization == undefined)) ||
-              (store.state.organizations.length == 1 &&
+              (store.state.organizations?.length == 1 &&
                 (customOrganization == "" || customOrganization == undefined))
             ) {
               selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
@@ -669,12 +669,12 @@ export default defineComponent({
           name: "dashboards",
         });
       } else if (
-        machedRoutes.length > 2 &&
+        machedRoutes?.length > 2 &&
         !excludeParentRedirect.includes(router.currentRoute.value.name) &&
         router.currentRoute.value.path.indexOf("/ingestion/") == -1 &&
         router.currentRoute.value.path.indexOf("/billings/") == -1
       ) {
-        if (machedRoutes[machedRoutes.length - 2].children.length > 0) {
+        if (machedRoutes[machedRoutes.length - 2]?.children?.length > 0) {
           machedRoutes[machedRoutes.length - 2].children.forEach(
             (route: any) => {
               if (route.name == machedRoutes[machedRoutes.length - 1].name) {
@@ -716,13 +716,13 @@ export default defineComponent({
   },
   computed: {
     changeOrganization() {
-      return this.store.state.organizations;
+      return this.store?.state?.organizations;
     },
     changeOrganizationIdentifier() {
-      return this.store.state.selectedOrganization.identifier;
+      return this.store?.state?.selectedOrganization?.identifier;
     },
     forceFetchOrganization() {
-      return this.router.currentRoute.value.query.update_org;
+      return this.router?.currentRoute?.value?.query?.update_org;
     },
   },
   watch: {

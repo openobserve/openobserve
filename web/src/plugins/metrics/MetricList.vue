@@ -354,7 +354,9 @@ export default defineComponent({
         (stream: any) =>
           stream.name === searchObj.data.metrics.selectedMetric?.value
       ).schema;
-      filteredMetricLabels.value = [...selectedMetricLabels.value];
+
+      if (Array.isArray(selectedMetricLabels.value))
+        filteredMetricLabels.value = [...selectedMetricLabels.value];
     };
     watch(
       () => searchObj.data.metrics.selectedMetric,
