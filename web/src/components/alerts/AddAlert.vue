@@ -503,10 +503,14 @@ export default defineComponent({
           .replace(suffixCode.value, "")
           .trim();
       }
-      prefixCode.value = `select * from`;
-      suffixCode.value = "'" + formData.value.stream_name + "'";
-      const someCode = `${prefixCode.value} ${editorData.value} ${suffixCode.value}`;
-      editorobj.setValue(someCode);
+
+      if (!props.isUpdated) {
+        prefixCode.value = `select * from`;
+        suffixCode.value = "'" + formData.value.stream_name + "'";
+        const someCode = `${prefixCode.value} ${editorData.value} ${suffixCode.value}`;
+        editorobj.setValue(someCode);
+      }
+
       formData.value.sql = editorobj.getValue();
       const selected_stream: any = schemaList.value.filter(
         (stream) => stream["name"] === stream_name
