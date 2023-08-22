@@ -14,7 +14,7 @@
 
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
@@ -26,7 +26,6 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::infra::{cluster, config::CONFIG, metrics, wal};
 use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
@@ -35,10 +34,16 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::utils::{flatten, json};
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::usage::UsageType,
+};
 use crate::service::{
     db, format_partition_key, format_stream_name,
     schema::{add_stream_schema, stream_schema_exists},
 };
+
+use super::{ingestion::write_file, usage::report_request_usage_stats};
 
 pub mod otlp_http;
 
@@ -273,68 +278,21 @@ pub async fn handle_trace_request(
         }
     }
 
-    let mut write_buf = BytesMut::new();
-    for (key, entry) in data_buf {
-        if entry.is_empty() {
-            continue;
-        }
-
-        write_buf.clear();
-        for row in &entry {
-            write_buf.put(row.as_bytes());
-            write_buf.put("\n".as_bytes());
-        }
-        let file = wal::get_or_create(
-            thread_id,
-            StreamParams {
-                org_id,
-                stream_name: traces_stream_name,
-                stream_type: StreamType::Traces,
-            },
-            None,
-            &key,
-            false,
-        );
-        let traces_file_name = file.full_name();
-
-        file.write(write_buf.as_ref());
-
-        if !stream_schema.has_fields && !traces_file_name.is_empty() {
-            let file = OpenOptions::new()
-                .read(true)
-                .open(&traces_file_name)
-                .unwrap();
-            add_stream_schema(
-                org_id,
-                traces_stream_name,
-                StreamType::Traces,
-                &file,
-                &mut traces_schema_map,
-                min_ts,
-            )
-            .await;
-        }
-    }
-
-    // only one trigger per request, as it updates etcd
-    if trigger.is_some() {
-        let val = trigger.unwrap();
-        let mut alerts = stream_alerts_map
-            .get(&format!(
-                "{}/{}/{}",
-                val.org,
-                StreamType::Traces,
-                val.stream
-            ))
-            .unwrap()
-            .clone();
-
-        alerts.retain(|alert| alert.name.eq(&val.alert_name));
-        if !alerts.is_empty() {
-            super::ingestion::send_ingest_notification(val, alerts.first().unwrap().clone()).await;
-        }
-    }
+    let mut traces_file_name = "".to_string();
+    let mut req_stats = write_file(
+        data_buf,
+        thread_id,
+        StreamParams {
+            org_id,
+            stream_name: traces_stream_name,
+            stream_type: StreamType::Traces,
+        },
+        &mut traces_file_name,
+        None,
+    );
     let time = start.elapsed().as_secs_f64();
+    req_stats.response_time = time;
+
     let ep = if is_grpc {
         "grpc/export/traces"
     } else {
@@ -358,6 +316,64 @@ pub async fn handle_trace_request(
             StreamType::Traces.to_string().as_str(),
         ])
         .inc();
+
+    //metric + data usage
+    report_request_usage_stats(
+        req_stats,
+        org_id,
+        traces_stream_name,
+        StreamType::Traces,
+        UsageType::Traces,
+        0,
+    )
+    .await;
+
+    let schema_exists = stream_schema_exists(
+        org_id,
+        traces_stream_name,
+        StreamType::Traces,
+        &mut traces_schema_map,
+    )
+    .await;
+    if !schema_exists.has_fields && !traces_file_name.is_empty() {
+        let file = OpenOptions::new()
+            .read(true)
+            .open(&traces_file_name)
+            .unwrap();
+        add_stream_schema(
+            org_id,
+            traces_stream_name,
+            StreamType::Traces,
+            &file,
+            &mut traces_schema_map,
+            min_ts,
+        )
+        .await;
+    }
+
+    // only one trigger per request, as it updates etcd
+    if trigger.is_some() {
+        let val = trigger.unwrap();
+        let mut alerts = stream_alerts_map
+            .get(&format!(
+                "{}/{}/{}",
+                val.org,
+                StreamType::Traces,
+                val.stream
+            ))
+            .unwrap()
+            .clone();
+
+        alerts.retain(|alert| alert.name.eq(&val.alert_name));
+        if !alerts.is_empty() {
+            crate::service::ingestion::send_ingest_notification(
+                val,
+                alerts.first().unwrap().clone(),
+            )
+            .await;
+        }
+    }
+
     let res = ExportTraceServiceResponse {};
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
