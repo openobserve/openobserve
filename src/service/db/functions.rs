@@ -15,13 +15,14 @@
 use std::sync::Arc;
 
 use crate::common::infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS};
-use crate::common::infra::db::Event;
+use crate::common::infra::db::dynamo_db::DYNAMO_DB;
+use crate::common::infra::db::{Db, Event};
 use crate::common::meta::functions::{StreamFunctionsList, Transform};
 use crate::common::utils::json;
 
 pub async fn set(org_id: &str, name: &str, js_func: Transform) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
-
+    //let db = &crate::common::infra::db::DEFAULT;
+    let db = DYNAMO_DB.get().await;
     Ok(db
         .put(
             &format!("/function/{org_id}/{name}"),
@@ -31,20 +32,23 @@ pub async fn set(org_id: &str, name: &str, js_func: Transform) -> Result<(), any
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    //let db = &crate::common::infra::db::DEFAULT;
+    let db = DYNAMO_DB.get().await;
     let val = db.get(&format!("/function/{org_id}/{name}")).await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    //let db = &crate::common::infra::db::DEFAULT;
+    let db = DYNAMO_DB.get().await;
     Ok(db
         .delete(&format!("/function/{org_id}/{name}"), false)
         .await?)
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    //let db = &crate::common::infra::db::DEFAULT;
+    let db = DYNAMO_DB.get().await;
     Ok(db
         .list(&format!("/function/{org_id}/"))
         .await?
