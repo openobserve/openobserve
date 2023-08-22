@@ -154,6 +154,7 @@ import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import type { AlertData } from "@/ts/interfaces/index";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "AlertList",
@@ -357,7 +358,7 @@ export default defineComponent({
       showAddAlertDialog.value = true;
     };
     const showAddUpdateFn = (props: any) => {
-      formData.value = props.row;
+      formData.value = cloneDeep(props.row);
       let action;
       if (!props.row) {
         isUpdated.value = false;
@@ -431,7 +432,7 @@ export default defineComponent({
         .catch((err) => {
           $q.notify({
             type: "negative",
-            message: err?.data?.message || 'Error while deleting alert.',
+            message: err?.data?.message || "Error while deleting alert.",
             timeout: 2000,
           });
         });
