@@ -26,8 +26,8 @@ export const convertTableData = (
     });
   };
 
-  const x = props.data?.fields?.x || [];
-  const y = props.data?.fields?.y || [];
+  const x = props.data?.value?.queries[0].fields?.x || [];
+  const y = props.data?.value?.queries[0].fields?.y || [];
   const columnData = [...x, ...y];
 
   const columns = columnData.map((it: any) => {
