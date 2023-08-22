@@ -111,7 +111,7 @@ export default defineComponent({
   },
   methods: {
     searchData() {
-      if (this.searchObj.loading == false) {
+      if (this.searchObj?.loading == false) {
         // this.searchObj.runQuery = true;
         this.$emit("searchdata");
       }

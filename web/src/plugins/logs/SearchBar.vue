@@ -246,9 +246,6 @@ export default defineComponent({
       console.log(value);
     },
     createNewValue(inputValue, doneFn) {
-      // Do something with the new value
-      console.log(`New value created: ${inputValue}`);
-
       // Call the doneFn with the new value
       doneFn(inputValue);
     },
@@ -332,44 +329,47 @@ export default defineComponent({
       searchObj.data.editorValue = value;
 
       updateAutoComplete(value);
-
-      if (searchObj.meta.sqlMode == true) {
-        searchObj.data.parsedQuery = parser.astify(value);
-        if (searchObj.data.parsedQuery?.from?.length > 0) {
-          if (
-            searchObj.data.parsedQuery.from[0].table !==
-              searchObj.data.stream.selectedStream.value &&
-            searchObj.data.parsedQuery.from[0].table !== streamName
-          ) {
-            let streamFound = false;
-            streamName = searchObj.data.parsedQuery.from[0].table;
-            searchObj.data.streamResults.list.forEach((stream) => {
-              if (stream.name == searchObj.data.parsedQuery.from[0].table) {
-                streamFound = true;
-                let itemObj = {
-                  label: stream.name,
-                  value: stream.name,
-                };
-                searchObj.data.stream.selectedStream = itemObj;
-                stream.schema.forEach((field) => {
-                  searchObj.data.stream.selectedStreamFields.push({
-                    name: field.name,
+      try {
+        if (searchObj.meta.sqlMode == true) {
+          searchObj.data.parsedQuery = parser.astify(value);
+          if (searchObj.data.parsedQuery?.from?.length > 0) {
+            if (
+              searchObj.data.parsedQuery.from[0].table !==
+                searchObj.data.stream.selectedStream.value &&
+              searchObj.data.parsedQuery.from[0].table !== streamName
+            ) {
+              let streamFound = false;
+              streamName = searchObj.data.parsedQuery.from[0].table;
+              searchObj.data.streamResults.list.forEach((stream) => {
+                if (stream.name == searchObj.data.parsedQuery.from[0].table) {
+                  streamFound = true;
+                  let itemObj = {
+                    label: stream.name,
+                    value: stream.name,
+                  };
+                  searchObj.data.stream.selectedStream = itemObj;
+                  stream.schema.forEach((field) => {
+                    searchObj.data.stream.selectedStreamFields.push({
+                      name: field.name,
+                    });
                   });
+                }
+              });
+              if (streamFound == false) {
+                searchObj.data.stream.selectedStream = { label: "", value: "" };
+                searchObj.data.stream.selectedStreamFields = [];
+                $q.notify({
+                  message: "Stream not found",
+                  color: "negative",
+                  position: "top",
+                  timeout: 2000,
                 });
               }
-            });
-            if (streamFound == false) {
-              searchObj.data.stream.selectedStream = { label: "", value: "" };
-              searchObj.data.stream.selectedStreamFields = [];
-              $q.notify({
-                message: "Stream not found",
-                color: "negative",
-                position: "top",
-                timeout: 2000,
-              });
             }
           }
         }
+      } catch (e) {
+        console.log("Logs: Error while updating query value");
       }
     };
 
@@ -666,7 +666,7 @@ export default defineComponent({
         } else {
           const needle = val.toLowerCase();
           functionOptions.value = searchObj.data.transforms.filter(
-            (v) => v.name.toLowerCase().indexOf(needle) > -1
+            (v) => v.name?.toLowerCase().indexOf(needle) > -1
           );
         }
       });

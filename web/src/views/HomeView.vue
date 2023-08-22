@@ -238,14 +238,14 @@ export default defineComponent({
   },
   computed: {
     selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
+      return this.store.state.selectedOrganization?.identifier;
     },
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
       if (newVal != oldVal || this.summary.value == undefined) {
         this.summary = {};
-        this.getSummary(this.store.state.selectedOrganization.identifier);
+        this.getSummary(this.store.state?.selectedOrganization?.identifier);
       }
     },
   },

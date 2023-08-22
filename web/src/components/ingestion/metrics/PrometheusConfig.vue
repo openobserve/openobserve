@@ -39,6 +39,18 @@ remote_write:
       password: {{ store.state.organizationData.organizationPasscode }}
     </pre>
   </div>
+  <div>
+    <a
+      href="https://openobserve.ai/blog/send-metrics-using-kube-prometheus-stack-to-openobserve"
+      class="q-ml-lg text-bold"
+      style="padding-right: 2px"
+      target="_blank"
+      title="Send Kubernetes Metrics Using Prometheus to OpenObserve"
+    >
+      Click here</a
+    >
+    to learn how to ingest metrics using Prometheus
+  </div>
 </template>
 
 <script lang="ts">
