@@ -802,22 +802,24 @@ export const convertSQLData = (
       },
     },
     xAxis: {
-        type: "category",
-        position: "bottom",
-        data: !xAxisKeys.length
-          ? []
-          : xAxisKeys.length == 1
-          ? getAxisDataFromKey(xAxisKeys[0])
-          : xAxisData1,
-        axisTick: {
-          alignWithLabel: true,
-        },
-        min: "dataMin",
-        max: "dataMax",
-        splitLine: {
-          show: true,
-        },
+      type: "category",
+      position: "bottom",
+      data: !xAxisKeys.length
+        ? []
+        : xAxisKeys.length == 1
+        ? getAxisDataFromKey(xAxisKeys[0])
+        : xAxisKeys?.map((key: any) => {
+            return getAxisDataFromKey(key);
+          }),
+      axisTick: {
+        alignWithLabel: true,
       },
+      min: "dataMin",
+      max: "dataMax",
+      splitLine: {
+        show: true,
+      },
+    },
     yAxis: {
       type: "value",
       // min: "dataMin",
@@ -826,35 +828,35 @@ export const convertSQLData = (
       //   show: true,
       // },
     },
-    // dataZoom: [
-    //   {
-    //     type: "slider",
-    //     show: true,
-    //     xAxisIndex: [0],
-    //     start: 0,
-    //     end: 100,
-    //   },
-    //   // {
-    //   //   type: "slider",
-    //   //   show: true,
-    //   //   yAxisIndex: [0],
-    //   //   left: "93%",
-    //   //   start: 29,
-    //   //   end: 36,
-    //   // },
-    //   {
-    //     type: "inside",
-    //     xAxisIndex: [0],
-    //     start: 0,
-    //     end: 100,
-    //   },
-    //   // {
-    //   //   type: "inside",
-    //   //   yAxisIndex: [0],
-    //   //   start: 29,
-    //   //   end: 36,
-    //   // },
-    // ],
+    dataZoom: [
+      // {
+      //   type: "slider",
+      //   show: true,
+      //   xAxisIndex: [0],
+      //   start: 0,
+      //   end: 100,
+      // },
+      // {
+      //   type: "slider",
+      //   show: true,
+      //   yAxisIndex: [0],
+      //   left: "93%",
+      //   start: 29,
+      //   end: 36,
+      // },
+      {
+        type: "inside",
+        xAxisIndex: [0],
+        start: 0,
+        end: 100,
+      },
+      // {
+      //   type: "inside",
+      //   yAxisIndex: [0],
+      //   start: 29,
+      //   end: 36,
+      // },
+    ],
     series: [],
   };
 
