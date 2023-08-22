@@ -776,11 +776,12 @@ export const convertSQLData = (
       x: "right", // 'center' | 'left' | {number},
       y: "center", // 'center' | 'bottom' | {number}
     },
-    grid : {
-      left: '10%',
-      right: '10%',
-      top: '10%',
-      bottom: '10%'
+    grid: {
+      containLabel: true,
+      left: "10%",
+      right: "10%",
+      top: "10%",
+      bottom: "10%",
     },
     tooltip: {
       trigger: 'axis',
