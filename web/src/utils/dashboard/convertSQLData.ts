@@ -790,34 +790,99 @@ export const convertSQLData = (
     },
     grid: {
       containLabel: true,
-      left: "10%",
-      right: "10%",
+      left: "2%",
+      // right: "10%",
       top: "10%",
       bottom: "10%",
     },
     tooltip: {
-      trigger: 'axis',
+      trigger: "axis",
       axisPointer: {
-        type:"cross"
-      }
+        type: "cross",
+      },
     },
-    xAxis:{
-      type: 'category',
-      data: !xAxisKeys.length
-        ? []
-        : xAxisKeys.length == 1
-        ? getAxisDataFromKey(xAxisKeys[0])
-        : xAxisKeys?.map((key: any) => {
-            return getAxisDataFromKey(key);
-        }),
-      //   axisLabel: {
-      //     margin:[50,0,0,0],
-      // }
-    },
+    xAxis: [
+      {
+        type: "category",
+        position: "bottom",
+        data: !xAxisKeys.length
+          ? []
+          : xAxisKeys.length == 1
+          ? getAxisDataFromKey(xAxisKeys[0])
+          : xAxisData1,
+        axisTick: {
+          alignWithLabel: true,
+        },
+        min: "dataMin",
+        max: "dataMax",
+        splitLine: {
+          show: true,
+        },
+      },
+      {
+        position: "bottom",
+        data: xAxisData2,
+        interval: 1,
+        axisLine: {
+          show: false,
+        },
+        axisTick: {
+          alignWithLabel: false,
+          length: 40,
+          align: "left",
+          interval: function (index, value) {
+            return value ? true : false;
+          },
+        },
+        axisLabel: {
+          margin: 30,
+        },
+        splitLine: {
+          show: true,
+          interval: function (index, value) {
+            return value ? true : false;
+          },
+        },
+      },
+    ],
     yAxis: {
-      type: 'value'
+      type: "value",
+      // min: "dataMin",
+      // max: "dataMax",
+      // splitLine: {
+      //   show: true,
+      // },
     },
-    series:[]
+    // dataZoom: [
+    //   {
+    //     type: "slider",
+    //     show: true,
+    //     xAxisIndex: [0],
+    //     start: 0,
+    //     end: 100,
+    //   },
+    //   // {
+    //   //   type: "slider",
+    //   //   show: true,
+    //   //   yAxisIndex: [0],
+    //   //   left: "93%",
+    //   //   start: 29,
+    //   //   end: 36,
+    //   // },
+    //   {
+    //     type: "inside",
+    //     xAxisIndex: [0],
+    //     start: 0,
+    //     end: 100,
+    //   },
+    //   // {
+    //   //   type: "inside",
+    //   //   yAxisIndex: [0],
+    //   //   start: 29,
+    //   //   end: 36,
+    //   // },
+    // ],
+    series: [],
   };
 
 //   xAxis:[{
