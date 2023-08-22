@@ -20,7 +20,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::infra::{cluster, config::CONFIG};
+use crate::common::infra::{cluster, config::CONFIG, metrics};
 use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
@@ -50,7 +50,7 @@ pub async fn traces_proto(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let request = ExportTraceServiceRequest::decode(body).expect("Invalid protobuf");
-    super::handle_trace_request(org_id, thread_id, request).await
+    super::handle_trace_request(org_id, thread_id, request, false).await
 }
 
 pub async fn traces_json(
@@ -376,7 +376,28 @@ pub async fn traces_json(
         &mut traces_file_name,
         None,
     );
-    req_stats.response_time = start.elapsed().as_secs_f64();
+    let time = start.elapsed().as_secs_f64();
+    req_stats.response_time = time;
+
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/api/org/traces",
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/api/org/traces",
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.to_string().as_str(),
+        ])
+        .inc();
+
     //metric + data usage
     report_request_usage_stats(
         req_stats,

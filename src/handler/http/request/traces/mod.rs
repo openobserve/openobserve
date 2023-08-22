@@ -42,7 +42,7 @@ pub async fn traces_write(
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type.eq(CONTENT_TYPE_PROTO) {
         otlp_http::traces_proto(&org_id, **thread_id, body).await
-    } else if content_type.eq(CONTENT_TYPE_JSON) {
+    } else if content_type.starts_with(CONTENT_TYPE_JSON) {
         otlp_http::traces_json(&org_id, **thread_id, body).await
     } else {
         Ok(
