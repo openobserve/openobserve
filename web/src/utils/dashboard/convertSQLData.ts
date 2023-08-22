@@ -801,8 +801,7 @@ export const convertSQLData = (
         type: "cross",
       },
     },
-    xAxis: [
-      {
+    xAxis: {
         type: "category",
         position: "bottom",
         data: !xAxisKeys.length
@@ -819,32 +818,6 @@ export const convertSQLData = (
           show: true,
         },
       },
-      {
-        position: "bottom",
-        data: xAxisData2,
-        interval: 1,
-        axisLine: {
-          show: false,
-        },
-        axisTick: {
-          alignWithLabel: false,
-          length: 40,
-          align: "left",
-          interval: function (index, value) {
-            return value ? true : false;
-          },
-        },
-        axisLabel: {
-          margin: 30,
-        },
-        splitLine: {
-          show: true,
-          interval: function (index, value) {
-            return value ? true : false;
-          },
-        },
-      },
-    ],
     yAxis: {
       type: "value",
       // min: "dataMin",
@@ -885,44 +858,51 @@ export const convertSQLData = (
     series: [],
   };
 
-//   xAxis:[{
-//     type: 'category',
-//     position:"bottom",
-//     data: !xAxisKeys.length
-//       ? []
-//       : xAxisKeys.length == 1
-//       ? getAxisDataFromKey(xAxisKeys[0])
-//       : xAxisData1,
-//     //   axisLabel: {
-//     //     margin:[50,0,0,0],
-//     // }
-//   },
-//   {
-//     position: "bottom",
-//     data: xAxisData2,
-//     interval: 1,
-//     axisLine: {
-//       show: false
-//     },
-//     axisTick: {
-//       alignWithLabel: false,
-//       length: 40,
-//       align: "left",
-//       interval: function(index, value) {
-//         return value ? true : false;
-//       }
-//     },
-//     axisLabel: {
-//       margin: 30
-//     },
-//     splitLine: {
-//       show: true,
-//       interval: function(index, value) {
-//         return value ? true : false;
-//       }
-//     }
-//   }
-// ]
+
+  // xAxis: [
+  //   {
+  //     type: "category",
+  //     position: "bottom",
+  //     data: !xAxisKeys.length
+  //       ? []
+  //       : xAxisKeys.length == 1
+  //       ? getAxisDataFromKey(xAxisKeys[0])
+  //       : xAxisData1,
+  //     axisTick: {
+  //       alignWithLabel: true,
+  //     },
+  //     min: "dataMin",
+  //     max: "dataMax",
+  //     splitLine: {
+  //       show: true,
+  //     },
+  //   },
+  //   {
+  //     position: "bottom",
+  //     data: xAxisData2,
+  //     interval: 1,
+  //     axisLine: {
+  //       show: false,
+  //     },
+  //     axisTick: {
+  //       alignWithLabel: false,
+  //       length: 40,
+  //       align: "left",
+  //       interval: function (index, value) {
+  //         return value ? true : false;
+  //       },
+  //     },
+  //     axisLabel: {
+  //       margin: 30,
+  //     },
+  //     splitLine: {
+  //       show: true,
+  //       interval: function (index, value) {
+  //         return value ? true : false;
+  //       },
+  //     },
+  //   },
+  // ],
   
 
   switch (props.data.type) {
