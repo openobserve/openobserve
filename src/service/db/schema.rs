@@ -320,7 +320,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
                 if stream_type.eq(&StreamType::EnrichmentTables) && is_local_disk_storage() {
                     let data_dir = format!(
-                        "{}/files/{org_id}/{stream_type}/{stream_name}",
+                        "{}files/{org_id}/{stream_type}/{stream_name}",
                         CONFIG.common.data_wal_dir
                     );
                     let path = std::path::Path::new(&data_dir);

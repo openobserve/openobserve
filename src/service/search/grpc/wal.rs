@@ -56,10 +56,8 @@ pub async fn search(
             }
             Ok(file_data) => {
                 scan_stats.original_size += file_data.len() as u64;
-                let file_name = format!(
-                    "/{work_dir}/{}",
-                    file.key.split('/').last().unwrap_or_default()
-                );
+                let file_key = file.key.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
+                let file_name = format!("/{work_dir}/{file_key}",);
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             }
         }
@@ -228,13 +226,13 @@ pub async fn search(
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<FileKey>, Error> {
     let pattern = format!(
-        "{}/files/{}/{stream_type}/{}/*.json",
+        "{}files/{}/{stream_type}/{}/",
         &CONFIG.common.data_wal_dir, &sql.org_id, &sql.stream_name
     );
     let files = scan_files(&pattern);
 
     let mut result = Vec::with_capacity(files.len());
-    let data_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
+    let wal_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
         Ok(path) => path,
         Err(_) => {
             return Ok(result);
@@ -275,11 +273,10 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
             }
         }
         let file = Path::new(&file).canonicalize().unwrap();
-        let file = file.strip_prefix(&data_dir).unwrap();
+        let file = file.strip_prefix(&wal_dir).unwrap();
         let local_file = file.to_str().unwrap();
         let file_path = file.parent().unwrap().to_str().unwrap().replace('\\', "/");
         let file_name = file.file_name().unwrap().to_str().unwrap();
-        let file_name = file_name.replace('_', "/");
         let source_file = format!("{file_path}/{file_name}");
         let mut file_key = FileKey::from_file_name(&source_file);
         if sql.match_source(&file_key, false, true, stream_type).await {
@@ -292,10 +289,10 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
 }
 
 fn get_schema_version(file: &str) -> Result<String, Error> {
-    // eg: 0_2023_06_23_04_12e2211ba6a46272_level=INFO_7077863742821761024s2sgQB.json
-    let column = file.split('_').collect::<Vec<&str>>();
-    if column.len() < 7 {
+    // eg: /a-b-c-d/files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
+    let column = file.split('/').collect::<Vec<&str>>();
+    if column.len() < 12 {
         return Err(Error::Message("invalid wal file name".to_string()));
     }
-    Ok(column[5].to_string())
+    Ok(column[11].to_string())
 }

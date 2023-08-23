@@ -54,7 +54,7 @@ async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
         .canonicalize()
         .unwrap();
 
-    let pattern = format!("{}/file_list/*.json", &CONFIG.common.data_wal_dir);
+    let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
     let files = scan_files(&pattern);
 
     for file in files {
@@ -66,12 +66,15 @@ async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
             .to_str()
             .unwrap()
             .replace('\\', "/");
-        let columns = file_path.split('/').collect::<Vec<&str>>();
-        // check file is in use
-        if columns.len() != 2 {
-            continue;
+        let columns = file_path.splitn(2, '/').collect::<Vec<&str>>();
+
+        // eg: file_list/0/2023/08/21/08/7099303408192061440f3XQ2p.json
+        let mut file_name = columns[1].to_string();
+
+        // Hack: compatible for <= 0.5.1
+        if !file_name.contains('/') && file_name.contains('_') {
+            file_name = file_name.replace('_', "/");
         }
-        let file_name = columns[1].to_string();
 
         // check the file is using for write
         if wal::check_in_use("", "", StreamType::Filelist, &file_name) {
@@ -112,7 +115,7 @@ async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error
     std::io::copy(&mut file, &mut encoder)?;
     let compressed_bytes = encoder.finish().unwrap();
 
-    let file_columns = file_key.split('_').collect::<Vec<&str>>();
+    let file_columns = file_key.split('/').collect::<Vec<&str>>();
     let new_file_key = format!(
         "file_list/{}/{}/{}/{}/{}.zst",
         file_columns[1], file_columns[2], file_columns[3], file_columns[4], file_columns[5]

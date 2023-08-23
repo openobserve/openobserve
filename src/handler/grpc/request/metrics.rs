@@ -82,7 +82,7 @@ impl Metrics for Querier {
         let org_id = &req.get_ref().org_id;
         let stream_name = &req.get_ref().stream_name;
         let pattern = format!(
-            "{}/files/{org_id}/metrics/{stream_name}/*.json",
+            "{}files/{org_id}/metrics/{stream_name}/",
             &CONFIG.common.data_wal_dir
         );
 
