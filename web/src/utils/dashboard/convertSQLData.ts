@@ -1238,7 +1238,7 @@ export const convertSQLData = (
   }
 
 //custom SQL: check if it is timeseries or not
-  if(option.xAxis.data.length>0){    
+  if((props.data.type != "h-bar") && option.xAxis.data.length>0){    
     const sample = option.xAxis.data.slice(0, Math.min(20, option.xAxis.data.length));
     const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
     const isTimeSeries = sample.every((value:any) => {
