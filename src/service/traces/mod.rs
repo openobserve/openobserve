@@ -42,6 +42,11 @@ use crate::service::{
     schema::{add_stream_schema, stream_schema_exists},
 };
 
+use super::{
+    ingestion::{grpc::get_val, write_file},
+    usage::report_request_usage_stats,
+};
+
 pub mod otlp_http;
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
