@@ -29,10 +29,7 @@ use tokio::sync::mpsc;
 
 use super::Event;
 use super::Stats;
-use crate::{
-    common::infra::{config::CONFIG, errors::*},
-    service::db,
-};
+use crate::common::infra::{config::CONFIG, errors::*};
 
 lazy_static! {
     pub static ref DYNAMO_DB: AsyncOnce<DynamoDb> = AsyncOnce::new(async { DynamoDb {} });
@@ -55,6 +52,14 @@ pub enum DbOperation {
     List,
 }
 
+pub struct DynamoTableDetails {
+    pub name: String,
+    pub pk: String,
+    pub rk: String,
+    pub pk_value: String,
+    pub rk_value: String,
+}
+
 impl DynamoDb {
     pub async fn connect() -> Client {
         if CONFIG.common.local_mode {
@@ -75,16 +80,27 @@ pub async fn get_dynamo_config() -> aws_config::SdkConfig {
 
 pub async fn create_dynamo_tables() {
     let client = DYNAMO_DB_CLIENT.get().await;
-    let table_name = &CONFIG.common.dynamo_file_list_table;
-    create_file_list_table(client, table_name).await.unwrap();
-    create_meta_table(client, &CONFIG.common.dynamo_meta_table)
+    create_table(
+        client,
+        &CONFIG.common.dynamo_file_list_table,
+        "stream",
+        "file",
+    )
+    .await
+    .unwrap();
+    create_table(client, &CONFIG.common.dynamo_org_meta_table, "org", "key")
+        .await
+        .unwrap();
+    create_table(client, &CONFIG.common.dynamo_meta_table, "type", "key")
         .await
         .unwrap();
 }
 
-async fn create_file_list_table(
+async fn create_table(
     client: &aws_sdk_dynamodb::Client,
     table_name: &str,
+    hash_key: &str,
+    range_key: &str,
 ) -> std::result::Result<(), aws_sdk_dynamodb::Error> {
     let tables = client.list_tables().send().await?;
     if !tables
@@ -95,21 +111,21 @@ async fn create_file_list_table(
         log::info!("Table not found, creating table {}", table_name);
         let key_schema = vec![
             KeySchemaElement::builder()
-                .attribute_name("stream")
+                .attribute_name(hash_key)
                 .key_type(KeyType::Hash)
                 .build(),
             KeySchemaElement::builder()
-                .attribute_name("file")
+                .attribute_name(range_key)
                 .key_type(KeyType::Range)
                 .build(),
         ];
         let attribute_definitions = vec![
             AttributeDefinition::builder()
-                .attribute_name("stream")
+                .attribute_name(hash_key)
                 .attribute_type(ScalarAttributeType::S)
                 .build(),
             AttributeDefinition::builder()
-                .attribute_name("file")
+                .attribute_name(range_key)
                 .attribute_type(ScalarAttributeType::S)
                 .build(),
         ];
@@ -127,59 +143,27 @@ async fn create_file_list_table(
     Ok(())
 }
 
-async fn create_meta_table(
-    client: &aws_sdk_dynamodb::Client,
-    table_name: &str,
-) -> std::result::Result<(), aws_sdk_dynamodb::Error> {
-    let tables = client.list_tables().send().await?;
-    if !tables
-        .table_names()
-        .unwrap_or(&[])
-        .contains(&table_name.to_string())
+pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetails {
+    if db_key.starts_with("/user") {
+        return DynamoTableDetails {
+            name: CONFIG.common.dynamo_meta_table.clone(),
+            pk_value: "users".to_string(),
+            rk_value: db_key.to_string(),
+            pk: "type".to_string(),
+            rk: "key".to_string(),
+        };
+    } else if db_key.starts_with("/compact/file_list")
+        || db_key.starts_with("/instance")
+        || db_key.starts_with("/meta/kv/version")
+        || db_key.starts_with("/syslog")
     {
-        log::info!("Table not found, creating table {}", table_name);
-        let key_schema = vec![
-            KeySchemaElement::builder()
-                .attribute_name("org")
-                .key_type(KeyType::Hash)
-                .build(),
-            KeySchemaElement::builder()
-                .attribute_name("key")
-                .key_type(KeyType::Range)
-                .build(),
-        ];
-        let attribute_definitions = vec![
-            AttributeDefinition::builder()
-                .attribute_name("org")
-                .attribute_type(ScalarAttributeType::S)
-                .build(),
-            AttributeDefinition::builder()
-                .attribute_name("key")
-                .attribute_type(ScalarAttributeType::S)
-                .build(),
-        ];
-        client
-            .create_table()
-            .table_name(table_name)
-            .set_key_schema(Some(key_schema))
-            .set_attribute_definitions(Some(attribute_definitions))
-            .billing_mode(BillingMode::PayPerRequest)
-            .send()
-            .await?;
-
-        log::info!("Table {} created successfully", table_name);
-    }
-    Ok(())
-}
-
-pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> (String, String) {
-    //db_key.split('/'().unwrap()
-
-    if db_key.starts_with("compact/file_list")
-        || db_key.starts_with("user")
-        || db_key.starts_with("instance")
-    {
-        return ("oo_org".to_owned(), db_key.to_owned());
+        return DynamoTableDetails {
+            name: CONFIG.common.dynamo_meta_table.clone(),
+            pk_value: "meta".to_string(),
+            rk_value: db_key.to_string(),
+            pk: "type".to_string(),
+            rk: "key".to_string(),
+        };
     }
 
     let local_key = if db_key.starts_with('/') {
@@ -192,14 +176,36 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> (String, String) 
 
     let entity = parts[0];
     match entity {
-        "function" => match operation {
+        "function" | "templates" | "destinations" => match operation {
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => {
-                (parts[1].to_string(), format!("{}/{}", parts[0], parts[2]))
+                return DynamoTableDetails {
+                    pk_value: parts[1].to_string(),
+                    rk_value: format!("{}/{}", parts[0], parts[2]),
+                    name: CONFIG.common.dynamo_org_meta_table.clone(),
+                    pk: "org".to_string(),
+                    rk: "key".to_string(),
+                }
             }
-            DbOperation::List => (parts[1].to_string(), parts[0].to_string()),
+            DbOperation::List => {
+                return DynamoTableDetails {
+                    pk_value: parts[1].to_string(),
+                    rk_value: parts[0].to_string(),
+                    name: CONFIG.common.dynamo_org_meta_table.clone(),
+                    pk: "org".to_string(),
+                    rk: "key".to_string(),
+                }
+            }
         },
 
-        _ => ("a".to_string(), "b".to_string()),
+        _ => {
+            return DynamoTableDetails {
+                pk_value: parts[1].to_string(),
+                rk_value: parts[0].to_string(),
+                name: CONFIG.common.dynamo_org_meta_table.clone(),
+                pk: "org".to_string(),
+                rk: "key".to_string(),
+            }
+        }
     }
 }
 
@@ -209,16 +215,16 @@ impl super::Db for DynamoDb {
         Ok(Stats::default())
     }
     async fn get(&self, in_key: &str) -> Result<Bytes> {
-        let (org, key) = get_dynamo_key(in_key, DbOperation::Get);
+        let table = get_dynamo_key(in_key, DbOperation::Get);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
             .query()
-            .table_name(&CONFIG.common.dynamo_meta_table)
-            .key_condition_expression("#org = :org AND #key = :key")
-            .expression_attribute_names("#org", "org".to_string())
-            .expression_attribute_values(":org", AttributeValue::S(org))
-            .expression_attribute_names("#key", "key".to_string())
-            .expression_attribute_values(":key", AttributeValue::S(key))
+            .table_name(table.name)
+            .key_condition_expression("#pk = :pk AND #rk = :rk")
+            .expression_attribute_names("#pk", table.pk)
+            .expression_attribute_values(":pk", AttributeValue::S(table.pk_value))
+            .expression_attribute_names("#rk", table.rk.to_string())
+            .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
             .select(Select::AllAttributes)
             .send()
             .await
@@ -240,14 +246,14 @@ impl super::Db for DynamoDb {
         }
     }
     async fn put(&self, in_key: &str, value: Bytes) -> Result<()> {
-        let (org, key) = get_dynamo_key(in_key, DbOperation::Put);
+        let table: DynamoTableDetails = get_dynamo_key(in_key, DbOperation::Put);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
             .clone()
             .put_item()
-            .table_name(&CONFIG.common.dynamo_meta_table)
-            .item("org", AttributeValue::S(org))
-            .item("key", AttributeValue::S(key))
+            .table_name(table.name)
+            .item(table.pk, AttributeValue::S(table.pk_value))
+            .item(table.rk, AttributeValue::S(table.rk_value))
             .item(
                 "value",
                 AttributeValue::S(String::from_utf8(value.to_vec()).expect("Invalid UTF-8 data")),
@@ -263,14 +269,14 @@ impl super::Db for DynamoDb {
         }
     }
     async fn delete(&self, in_key: &str, with_prefix: bool) -> Result<()> {
-        let (org, key) = get_dynamo_key(in_key, DbOperation::Delete);
+        let table = get_dynamo_key(in_key, DbOperation::Delete);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
             .clone()
             .delete_item()
-            .table_name(&CONFIG.common.dynamo_meta_table)
-            .key("org", AttributeValue::S(org))
-            .key("key", AttributeValue::S(key))
+            .table_name(table.name)
+            .key(table.pk, AttributeValue::S(table.pk_value))
+            .key(table.rk, AttributeValue::S(table.rk_value))
             .send()
             .await
         {
@@ -294,17 +300,17 @@ impl super::Db for DynamoDb {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let mut result = HashMap::default();
-        let (org, key) = get_dynamo_key(prefix, DbOperation::Put);
+        let table = get_dynamo_key(prefix, DbOperation::List);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
             .clone()
             .query()
-            .table_name(&CONFIG.common.dynamo_meta_table)
-            .key_condition_expression("#org = :org and begins_with(#key , :key)")
-            .expression_attribute_names("#org", "org".to_string())
-            .expression_attribute_values(":org", AttributeValue::S(org))
-            .expression_attribute_names("#key", "key".to_string())
-            .expression_attribute_values(":key", AttributeValue::S(key))
+            .table_name(table.name)
+            .key_condition_expression("#pk = :pk and begins_with(#rk , :rk)")
+            .expression_attribute_names("#pk", table.pk)
+            .expression_attribute_values(":pk", AttributeValue::S(table.pk_value))
+            .expression_attribute_names("#rk", table.rk.clone())
+            .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
             .select(Select::AllAttributes)
             .send()
             .await
@@ -312,7 +318,7 @@ impl super::Db for DynamoDb {
             Ok(resp) => {
                 let items = resp.items().unwrap();
                 if items.is_empty() {
-                    return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+                    return Ok(result);
                 }
                 for item in items {
                     match item.get("value") {
@@ -320,7 +326,7 @@ impl super::Db for DynamoDb {
                             Ok(s) => {
                                 let res = s.as_bytes().to_vec().into();
                                 result.insert(
-                                    item.get("key").unwrap().as_s().unwrap().to_owned(),
+                                    item.get(&table.rk).unwrap().as_s().unwrap().to_owned(),
                                     res,
                                 );
                             }
@@ -331,7 +337,7 @@ impl super::Db for DynamoDb {
                 }
             }
             Err(err) => {
-                println!("err is {:?}", err);
+                println!("err: {:?}", err);
                 return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
             }
         }

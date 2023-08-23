@@ -141,7 +141,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let _ = cluster::set_online().await;
 
     //This is specifically for enrichment tables,as caching is happening using search service
-    db::schema::cache().await.expect("schema cache failed");
+    //TODO : fix enrichment tables
+    //db::schema::cache().await.expect("schema cache failed");
 
     // metrics
     let prometheus = metrics::create_prometheus_handler();

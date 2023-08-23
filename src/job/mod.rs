@@ -67,8 +67,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         )
         .await;
     }
-    // cache users
-    tokio::task::spawn(async move { db::user::watch().await });
+
+    if !CONFIG
+        .common
+        .meta_store
+        .eq(&MetaStore::DynamoDB.to_string())
+    {
+        // cache users
+        tokio::task::spawn(async move { db::user::watch().await });
+    }
     db::user::cache().await.expect("user cache failed");
 
     //set instance id
@@ -138,6 +145,45 @@ pub async fn init() -> Result<(), anyhow::Error> {
         && (cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
             || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE))
     {
+        // initialize metadata
+        tokio::task::spawn(async move { db::functions::watch().await });
+        tokio::task::spawn(async move { db::schema::watch().await });
+        tokio::task::spawn(async move { db::compact::retention::watch().await });
+        tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
+        tokio::task::spawn(async move { db::alerts::watch().await });
+        tokio::task::spawn(async move { db::triggers::watch().await });
+        tokio::task::spawn(async move { db::alerts::templates::watch().await });
+        tokio::task::spawn(async move { db::alerts::destinations::watch().await });
+        tokio::task::spawn(async move { db::syslog::watch().await });
+        tokio::task::spawn(async move { db::syslog::watch_syslog_settings().await });
+        tokio::task::yield_now().await; // yield let other tasks run
+
+        db::functions::cache()
+            .await
+            .expect("functions cache failed");
+        db::compact::retention::cache()
+            .await
+            .expect("compact delete cache failed");
+        db::metrics::cache_prom_cluster_leader()
+            .await
+            .expect("prom cluster leader cache failed");
+        db::alerts::cache().await.expect("alerts cache failed");
+        db::triggers::cache()
+            .await
+            .expect("alerts triggers cache failed");
+        db::alerts::templates::cache()
+            .await
+            .expect("alerts templates cache failed");
+        db::alerts::destinations::cache()
+            .await
+            .expect("alerts destinations cache failed");
+        db::syslog::cache().await.expect("syslog cache failed");
+        db::syslog::cache_syslog_settings()
+            .await
+            .expect("syslog settings cache failed");
+
+        // cache file list
+
         db::file_list::local::cache()
             .await
             .expect("file list local cache failed");
