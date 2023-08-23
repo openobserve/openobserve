@@ -111,6 +111,8 @@ opentelemetry-otlp = { version = "0.11", features = [
 opentelemetry-proto = { version = "0.1", features = [
   "gen-tonic",
   "traces",
+  "logs",
+  "metrics",
   "with-serde",
   "build-server",
 ] }
@@ -170,3 +172,5 @@ tonic-build = { version = "0.8", features = ["prost"] }
 datafusion-expr = "28"
 expect-test = "1.4"
 float-cmp = "0.9"
+
+

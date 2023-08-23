@@ -197,6 +197,15 @@ pub async fn remote_write(
                 return Ok(());
             }
 
+            // check for schema
+            let _schema_exists = stream_schema_exists(
+                org_id,
+                &metric_name,
+                StreamType::Metrics,
+                &mut metric_schema_map,
+            )
+            .await;
+
             // get partition keys
             if !stream_partitioning_map.contains_key(&metric_name) {
                 let partition_det = crate::service::ingestion::get_stream_partition_keys(
@@ -363,14 +372,6 @@ pub async fn remote_write(
             StreamType::Metrics,
             UsageType::Metrics,
             fns_length as u16,
-        )
-        .await;
-
-        let _schema_exists = stream_schema_exists(
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            &mut metric_schema_map,
         )
         .await;
     }
