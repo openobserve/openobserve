@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::infra::{cluster, config::CONFIG};
-use crate::common::meta::StreamType;
+use crate::common::{
+    infra::{cluster, config::FILE_EXT_PARQUET},
+    meta::StreamType,
+};
 
 mod disk;
 mod memory;
@@ -22,9 +24,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(()); // not an ingester, no need to init job
     }
-
-    // create wal dir
-    std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
 
     tokio::task::spawn(async move { disk::run().await });
     tokio::task::spawn(async move { memory::run().await });

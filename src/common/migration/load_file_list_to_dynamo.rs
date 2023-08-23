@@ -20,9 +20,11 @@ use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
 use tokio::sync::RwLock;
 
-use crate::common::infra::{config::CONFIG, file_list, storage};
-use crate::common::utils::json;
-use crate::common::meta::common::FileKey;
+use crate::common::{
+    infra::{config::CONFIG, file_list, storage},
+    meta::common::FileKey,
+    utils::json,
+};
 use crate::service::db::file_list::{BLOCKED_ORGS, DELETED_FILES};
 
 lazy_static! {

@@ -18,7 +18,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::common::infra::file_list::parse_file_key_columns;
-use crate::common::utils::json;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileKey {

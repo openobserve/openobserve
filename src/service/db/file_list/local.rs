@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::infra::{config::CONFIG, file_list, wal};
-use crate::common::json;
-use crate::common::meta::{
-    common::{FileKey, FileMeta},
-    stream::StreamParams,
-    StreamType,
+use crate::common::{
+    infra::{config::CONFIG, file_list, wal},
+    meta::{
+        common::{FileKey, FileMeta},
+        stream::StreamParams,
+        StreamType,
+    },
+    utils::json,
 };
 
 pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {
