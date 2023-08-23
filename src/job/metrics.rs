@@ -41,7 +41,7 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
         Ok(path) => path,
         Err(_) => return Ok(()),
     };
-    let pattern = format!("{}/files/*/*/*/*.json", &CONFIG.common.data_wal_dir);
+    let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
     let files = scan_files(&pattern);
     let mut sizes = HashMap::default();
     for file in files {

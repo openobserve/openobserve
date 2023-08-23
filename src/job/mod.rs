@@ -12,12 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::infra::config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED};
-use crate::common::infra::{cluster, ider};
-use crate::common::meta::organization::DEFAULT_ORG;
-use crate::common::meta::user::UserRequest;
-use crate::service::{db, users};
 use regex::Regex;
+
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
+        ider,
+    },
+    meta::{organization::DEFAULT_ORG, user::UserRequest},
+    utils::file::clean_empty_dirs,
+};
+use crate::service::{db, users};
 
 mod alert_manager;
 mod compact;
@@ -141,7 +147,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // ingester run
     if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?; // create wal dir
+        // create wal dir
+        std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
+        // clean empty dirs
+        clean_empty_dirs(&CONFIG.common.data_wal_dir)?;
     }
     tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { file_list::run().await });

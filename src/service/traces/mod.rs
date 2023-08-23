@@ -25,19 +25,17 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use super::ingestion::grpc::get_val;
-use super::{ingestion::write_file, usage::report_request_usage_stats};
-use crate::common::meta::{
-    alert::{Alert, Evaluate, Trigger},
-    http::HttpResponse as MetaHttpResponse,
-    stream::StreamParams,
-    traces::{Event, Span, SpanRefType},
-    StreamType,
-};
-use crate::common::utils::{flatten, json};
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics},
-    meta::usage::UsageType,
+    meta::{
+        alert::{Alert, Evaluate, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        stream::{PartitionTimeLevel, StreamParams},
+        traces::{Event, Span, SpanRefType},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json},
 };
 use crate::service::{
     db, format_partition_key, format_stream_name,
@@ -218,9 +216,10 @@ pub async fn handle_trace_request(
                 let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
 
                 // get hour key
-                let mut hour_key = super::ingestion::get_hour_key(
+                let mut hour_key = super::ingestion::get_wal_time_key(
                     timestamp.try_into().unwrap(),
                     &partition_keys,
+                    PartitionTimeLevel::Hourly,
                     value.as_object().unwrap(),
                     None,
                 );
