@@ -14,6 +14,12 @@
 
 use regex::Regex;
 
+use crate::common::infra::config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED};
+use crate::common::infra::{cluster, ider};
+use crate::common::meta::meta_store::MetaStore;
+use crate::common::meta::organization::DEFAULT_ORG;
+use crate::common::meta::user::UserRequest;
+use crate::common::utils::file::clean_empty_dirs;
 use crate::common::{
     infra::{
         cluster,
@@ -132,6 +138,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         && (cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
             || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE))
     {
+        db::file_list::local::cache()
+            .await
+            .expect("file list local cache failed");
         db::file_list::remote::cache("", false)
             .await
             .expect("file list remote cache failed");

@@ -20,6 +20,15 @@ use crate::common::{
         StreamType,
     },
     utils::json,
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+
+use crate::common::infra::{cache::file_list::parse_file_key_columns, config::CONFIG, wal};
+use crate::common::meta::meta_store::MetaStore;
+use crate::common::meta::stream::StreamParams;
+use crate::common::meta::{
+    common::{FileKey, FileMeta},
+    StreamType,
 };
 
 pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {

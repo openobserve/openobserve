@@ -29,16 +29,23 @@ use tokio::sync::mpsc;
 
 use super::Event;
 use super::Stats;
-use crate::common::infra::{config::CONFIG, errors::*};
+use crate::{
+    common::infra::{config::CONFIG, errors::*},
+    service::db,
+};
 
 lazy_static! {
-    pub static ref DYNAMO_DB: AsyncOnce<DynamoDb> = AsyncOnce::new(async { DynamoDb::new().await });
+    pub static ref DYNAMO_DB: AsyncOnce<DynamoDb> = AsyncOnce::new(async { DynamoDb {} });
     pub static ref DYNAMO_DB_CLIENT: AsyncOnce<Client> =
-        AsyncOnce::new(async { DYNAMO_DB.get().await.client.clone() });
+        AsyncOnce::new(async { DynamoDb::connect().await });
 }
 
-pub struct DynamoDb {
-    client: Client,
+pub struct DynamoDb {}
+
+impl Default for DynamoDb {
+    fn default() -> Self {
+        DynamoDb {}
+    }
 }
 
 pub enum DbOperation {
@@ -49,8 +56,8 @@ pub enum DbOperation {
 }
 
 impl DynamoDb {
-    pub async fn new() -> DynamoDb {
-        let client = if CONFIG.common.local_mode {
+    pub async fn connect() -> Client {
+        if CONFIG.common.local_mode {
             let region = Region::new("us-west-2");
             let shared_config = aws_config::from_env()
                 .region(region)
@@ -58,8 +65,7 @@ impl DynamoDb {
             Client::new(&shared_config.load().await)
         } else {
             Client::new(&get_dynamo_config().await)
-        };
-        DynamoDb { client }
+        }
     }
 }
 
@@ -168,6 +174,14 @@ async fn create_meta_table(
 
 pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> (String, String) {
     //db_key.split('/'().unwrap()
+
+    if db_key.starts_with("compact/file_list")
+        || db_key.starts_with("user")
+        || db_key.starts_with("instance")
+    {
+        return ("oo_org".to_owned(), db_key.to_owned());
+    }
+
     let local_key = if db_key.starts_with('/') {
         &db_key[1..]
     } else {
@@ -176,15 +190,16 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> (String, String) 
 
     let parts = local_key.split('/').collect::<Vec<&str>>();
 
-    if parts[0].eq("function") {
-        match operation {
+    let entity = parts[0];
+    match entity {
+        "function" => match operation {
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => {
                 (parts[1].to_string(), format!("{}/{}", parts[0], parts[2]))
             }
             DbOperation::List => (parts[1].to_string(), parts[0].to_string()),
-        }
-    } else {
-        ("a".to_string(), "b".to_string())
+        },
+
+        _ => ("a".to_string(), "b".to_string()),
     }
 }
 
@@ -195,9 +210,8 @@ impl super::Db for DynamoDb {
     }
     async fn get(&self, in_key: &str) -> Result<Bytes> {
         let (org, key) = get_dynamo_key(in_key, DbOperation::Get);
-        match self
-            .client
-            .clone()
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        match client
             .query()
             .table_name(&CONFIG.common.dynamo_meta_table)
             .key_condition_expression("#org = :org AND #key = :key")
@@ -227,8 +241,8 @@ impl super::Db for DynamoDb {
     }
     async fn put(&self, in_key: &str, value: Bytes) -> Result<()> {
         let (org, key) = get_dynamo_key(in_key, DbOperation::Put);
-        match self
-            .client
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        match client
             .clone()
             .put_item()
             .table_name(&CONFIG.common.dynamo_meta_table)
@@ -250,8 +264,8 @@ impl super::Db for DynamoDb {
     }
     async fn delete(&self, in_key: &str, with_prefix: bool) -> Result<()> {
         let (org, key) = get_dynamo_key(in_key, DbOperation::Delete);
-        match self
-            .client
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        match client
             .clone()
             .delete_item()
             .table_name(&CONFIG.common.dynamo_meta_table)
@@ -281,8 +295,8 @@ impl super::Db for DynamoDb {
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let mut result = HashMap::default();
         let (org, key) = get_dynamo_key(prefix, DbOperation::Put);
-        match self
-            .client
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        match client
             .clone()
             .query()
             .table_name(&CONFIG.common.dynamo_meta_table)

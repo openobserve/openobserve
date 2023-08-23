@@ -15,7 +15,9 @@
 use std::io::Write;
 
 use crate::common;
+use crate::common::infra::{cache::file_list, config::CONFIG, ider, storage};
 use crate::common::infra::{config::CONFIG, file_list, ider, storage};
+use crate::common::meta::meta_store::MetaStore;
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     stream::{PartitionTimeLevel, ScanStats},

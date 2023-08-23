@@ -18,6 +18,8 @@ use bytes::Bytes;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
+use crate::common::meta::meta_store::MetaStore;
+
 use super::config::CONFIG;
 use super::errors::Result;
 
@@ -29,9 +31,18 @@ pub use self::sled::SLED_CLIENT;
 
 lazy_static! {
     pub static ref DEFAULT: Box<dyn Db> = default();
+    pub static ref CLUSTER_COORDINATOR: Box<dyn Db> = cluster_coordinator();
 }
 
 pub fn default() -> Box<dyn Db> {
+    match CONFIG.common.meta_store.as_str().into() {
+        MetaStore::Sled => Box::<sled::Sled>::default(),
+        MetaStore::Etcd => Box::<etcd::Etcd>::default(),
+        MetaStore::DynamoDB => Box::<dynamo_db::DynamoDb>::default(),
+    }
+}
+
+pub fn cluster_coordinator() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
         Box::<sled::Sled>::default()
     } else {

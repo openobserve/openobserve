@@ -251,8 +251,8 @@ pub struct Common {
     pub usage_org: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
-    #[env_config(name = "ZO_DYNAMO_META_STORE_ENABLED", default = false)]
-    pub use_dynamo_meta_store: bool,
+    #[env_config(name = "ZO_META_STORE", default = "dynamodb")]
+    pub meta_store: String,
     #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
     pub dynamo_file_list_table: String,
     #[env_config(name = "ZO_DYNAMO_META_TABLE", default = "zo_meta")]
