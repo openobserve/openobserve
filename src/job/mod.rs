@@ -60,8 +60,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         )
         .await;
     }
-    // cache users
-    tokio::task::spawn(async move { db::user::watch().await });
+
+    if !CONFIG
+        .common
+        .meta_store
+        .eq(&MetaStore::DynamoDB.to_string())
+    {
+        // cache users
+        tokio::task::spawn(async move { db::user::watch().await });
+    }
     db::user::cache().await.expect("user cache failed");
 
     //set instance id

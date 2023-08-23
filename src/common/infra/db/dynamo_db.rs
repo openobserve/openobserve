@@ -30,10 +30,7 @@ use tokio::sync::mpsc;
 
 use super::Event;
 use super::Stats;
-use crate::{
-    common::infra::{config::CONFIG, errors::*},
-    service::db,
-};
+use crate::common::infra::{config::CONFIG, errors::*};
 
 lazy_static! {
     pub static ref DYNAMO_DB: AsyncOnce<DynamoDb> = AsyncOnce::new(async { DynamoDb {} });
@@ -72,6 +69,14 @@ pub enum DbOperation {
     Put,
     Delete,
     List,
+}
+
+pub struct DynamoTableDetails {
+    pub name: String,
+    pub pk: String,
+    pub rk: String,
+    pub pk_value: String,
+    pub rk_value: String,
 }
 
 impl DynamoDb {
