@@ -24,7 +24,6 @@ use crate::common::meta::{
     StreamType,
 };
 
-pub mod duckdb;
 pub mod dynamo;
 pub mod postgres;
 pub mod sled;
@@ -40,7 +39,6 @@ pub fn connect() -> Box<dyn FileList> {
         "sqlite" => Box::<sqlite::SqliteFileList>::default(),
         "postgres" | "postgresql" => Box::<postgres::PostgresFileList>::default(),
         "dynamo" | "dynamodb" => Box::<dynamo::DynamoFileList>::default(),
-        "duckdb" => Box::<duckdb::DuckDBFileList>::default(),
         _ => Box::<sqlite::SqliteFileList>::default(),
     }
 }
@@ -75,7 +73,6 @@ pub async fn create_table() -> Result<()> {
         "sqlite" => sqlite::create_table().await,
         "postgres" | "postgresql" => postgres::create_table().await,
         "dynamo" | "dynamodb" => dynamo::create_table().await,
-        "duckdb" => duckdb::create_table().await,
         _ => sqlite::create_table().await,
     }
 }
@@ -88,7 +85,6 @@ pub async fn create_table_index() -> Result<()> {
         "sqlite" => sqlite::create_table_index().await,
         "postgres" | "postgresql" => postgres::create_table_index().await,
         "dynamo" | "dynamodb" => dynamo::create_table_index().await,
-        "duckdb" => duckdb::create_table_index().await,
         _ => sqlite::create_table_index().await,
     }
 }
