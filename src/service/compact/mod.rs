@@ -16,12 +16,15 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
 
-use crate::common::infra::{
-    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-    config::CONFIG,
-    dist_lock,
-};
 use crate::common::meta::StreamType;
+use crate::common::{
+    infra::{
+        cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+        config::CONFIG,
+        dist_lock,
+    },
+    meta::meta_store::MetaStore,
+};
 use crate::service::db;
 
 mod file_list;

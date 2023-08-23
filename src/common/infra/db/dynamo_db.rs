@@ -30,7 +30,10 @@ use tokio::sync::mpsc;
 
 use super::Event;
 use super::Stats;
-use crate::common::infra::{config::CONFIG, errors::*};
+use crate::{
+    common::infra::{config::CONFIG, errors::*},
+    service::db,
+};
 
 lazy_static! {
     pub static ref DYNAMO_DB: AsyncOnce<DynamoDb> = AsyncOnce::new(async { DynamoDb {} });
