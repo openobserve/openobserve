@@ -50,10 +50,9 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     for (file, data) in files {
         let local_file = file.to_owned();
-        let columns = local_file.split('/').collect::<Vec<&str>>();
-        if columns.len() != 5 {
-            continue;
-        }
+        let columns = local_file.splitn(5, '/').collect::<Vec<&str>>();
+
+        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
         // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);
