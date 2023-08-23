@@ -856,35 +856,43 @@ export const convertSQLData = (
       //   show: true,
       // },
     },
-    dataZoom: [
-      // {
-      //   type: "slider",
-      //   show: true,
-      //   xAxisIndex: [0],
-      //   start: 0,
-      //   end: 100,
-      // },
-      // {
-      //   type: "slider",
-      //   show: true,
-      //   yAxisIndex: [0],
-      //   left: "93%",
-      //   start: 29,
-      //   end: 36,
-      // },
-      {
-        type: "inside",
-        xAxisIndex: [0],
-        start: 0,
-        end: 100,
+    toolbox: {
+      show: true,
+      feature: {
+        dataZoom: {
+          yAxisIndex: "none",
+        },
       },
-      // {
-      //   type: "inside",
-      //   yAxisIndex: [0],
-      //   start: 29,
-      //   end: 36,
-      // },
-    ],
+    },
+    // dataZoom: [
+    //   // {
+    //   //   type: "slider",
+    //   //   show: true,
+    //   //   xAxisIndex: [0],
+    //   //   start: 0,
+    //   //   end: 100,
+    //   // },
+    //   // {
+    //   //   type: "slider",
+    //   //   show: true,
+    //   //   yAxisIndex: [0],
+    //   //   left: "93%",
+    //   //   start: 29,
+    //   //   end: 36,
+    //   // },
+    //   {
+    //     type: "inside",
+    //     xAxisIndex: [0],
+    //     start: 0,
+    //     end: 100,
+    //   },
+    //   // {
+    //   //   type: "inside",
+    //   //   yAxisIndex: [0],
+    //   //   start: 29,
+    //   //   end: 36,
+    //   // },
+    // ],
     series: [],
   };
 
