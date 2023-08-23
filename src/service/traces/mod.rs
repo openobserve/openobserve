@@ -20,7 +20,6 @@ use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
-    common::v1::AnyValue,
     trace::v1::{status::StatusCode, Status},
 };
 use prost::Message;
@@ -43,7 +42,10 @@ use crate::service::{
     schema::{add_stream_schema, stream_schema_exists},
 };
 
-use super::{ingestion::write_file, usage::report_request_usage_stats};
+use super::{
+    ingestion::{grpc::get_val, write_file},
+    usage::report_request_usage_stats,
+};
 
 pub mod otlp_http;
 
@@ -118,7 +120,7 @@ pub async fn handle_trace_request(
 
         for res_attr in resource.attributes {
             if res_attr.key.eq(SERVICE_NAME) {
-                let loc_service_name = get_val(res_attr.value);
+                let loc_service_name = get_val(&res_attr.value);
                 if !loc_service_name.eq(&json::Value::Null) {
                     service_name = loc_service_name.as_str().unwrap().to_string();
                     service_att_map.insert(res_attr.key, loc_service_name);
@@ -126,7 +128,7 @@ pub async fn handle_trace_request(
             } else {
                 service_att_map.insert(
                     format!("{}.{}", SERVICE, res_attr.key),
-                    get_val(res_attr.value),
+                    get_val(&res_attr.value),
                 );
             }
         }
@@ -167,14 +169,14 @@ pub async fn handle_trace_request(
                 let end_time: u64 = span.end_time_unix_nano;
                 let mut span_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 for span_att in span.attributes {
-                    span_att_map.insert(span_att.key, get_val(span_att.value));
+                    span_att_map.insert(span_att.key, get_val(&span_att.value));
                 }
 
                 let mut events = vec![];
                 let mut event_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 for event in span.events {
                     for event_att in event.attributes {
-                        event_att_map.insert(event_att.key, get_val(event_att.value));
+                        event_att_map.insert(event_att.key, get_val(&event_att.value));
                     }
                     events.push(Event {
                         name: event.name,
@@ -385,48 +387,6 @@ pub async fn handle_trace_request(
         .body(out));
 }
 
-fn get_val(attr_val: Option<AnyValue>) -> json::Value {
-    match attr_val {
-        Some(local_val) => match local_val.value {
-            Some(val) => match val {
-                opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
-                    inner_val,
-                ) => json::json!(inner_val.as_str()),
-                opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(inner_val) => {
-                    json::json!(inner_val.to_string())
-                }
-                opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(inner_val) => {
-                    json::json!(inner_val.to_string())
-                }
-                opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(
-                    inner_val,
-                ) => json::json!(inner_val.to_string()),
-                opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(inner_val) => {
-                    let mut vals = vec![];
-                    for item in inner_val.values.iter().cloned() {
-                        vals.push(get_val(Some(item)))
-                    }
-                    json::json!(vals)
-                }
-                opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue(
-                    inner_val,
-                ) => {
-                    let mut vals = json::Map::new();
-                    for item in inner_val.values.iter().cloned() {
-                        vals.insert(item.key, get_val(item.value));
-                    }
-                    json::json!(vals)
-                }
-                opentelemetry_proto::tonic::common::v1::any_value::Value::BytesValue(inner_val) => {
-                    json::json!(inner_val)
-                }
-            },
-            None => json::Value::Null,
-        },
-        None => json::Value::Null,
-    }
-}
-
 fn get_span_status(status: Option<Status>) -> String {
     match status {
         Some(v) => match v.code() {
@@ -435,84 +395,5 @@ fn get_span_status(status: Option<Status>) -> String {
             StatusCode::Unset => "UNSET".to_string(),
         },
         None => "".to_string(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_val() {
-        let in_str = "Test".to_string();
-        let str_val = AnyValue {
-            value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
-                    in_str.clone(),
-                ),
-            ),
-        };
-        let resp = get_val(Some(str_val));
-        assert_eq!(resp.as_str().unwrap(), in_str);
-
-        let in_bool = false;
-        let bool_val = AnyValue {
-            value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(in_bool),
-            ),
-        };
-        let resp = get_val(Some(bool_val));
-        assert_eq!(resp.as_str().unwrap(), in_bool.to_string());
-
-        let in_int = 20;
-        let int_val = AnyValue {
-            value: Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(in_int)),
-        };
-        let resp = get_val(Some(int_val.clone()));
-        assert_eq!(resp.as_str().unwrap(), in_int.to_string());
-
-        let in_double = 20.00;
-        let double_val = AnyValue {
-            value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(in_double),
-            ),
-        };
-        let resp = get_val(Some(double_val));
-        assert_eq!(resp.as_str().unwrap(), in_double.to_string());
-
-        let in_arr = vec![int_val.clone()];
-        let arr_val = AnyValue {
-            value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue {
-                    0: opentelemetry_proto::tonic::common::v1::ArrayValue { values: in_arr },
-                },
-            ),
-        };
-        let resp = get_val(Some(arr_val));
-        assert!(resp.as_array().unwrap().len() > 0);
-
-        let kv_val = AnyValue {
-            value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue {
-                    0: opentelemetry_proto::tonic::common::v1::KeyValueList {
-                        values: vec![opentelemetry_proto::tonic::common::v1::KeyValue {
-                            key: in_str.clone(),
-                            value: Some(int_val.clone()),
-                        }],
-                    },
-                },
-            ),
-        };
-        let resp = get_val(Some(kv_val));
-        assert!(resp.as_object().unwrap().contains_key(&in_str));
-
-        let in_byte =
-            opentelemetry_proto::tonic::common::v1::any_value::Value::BytesValue(vec![8u8]);
-
-        let byte_val = AnyValue {
-            value: Some(in_byte),
-        };
-        let resp = get_val(Some(byte_val));
-        assert!(resp.as_array().unwrap().len() > 0);
     }
 }
