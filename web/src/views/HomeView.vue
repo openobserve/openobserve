@@ -1,4 +1,4 @@
-<!-- Copyright 2022 Zinc Labs Inc. and Contributors
+<!-- Copyright 2023 Zinc Labs Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -238,14 +238,14 @@ export default defineComponent({
   },
   computed: {
     selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
+      return this.store.state.selectedOrganization?.identifier;
     },
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
       if (newVal != oldVal || this.summary.value == undefined) {
         this.summary = {};
-        this.getSummary(this.store.state.selectedOrganization.identifier);
+        this.getSummary(this.store.state?.selectedOrganization?.identifier);
       }
     },
   },
