@@ -225,15 +225,15 @@ impl super::Db for DynamoDb {
             Err(_) => Err(Error::from(DbError::KeyNotExists(in_key.to_string()))),
         }
     }
-    async fn put(&self, key: &str, value: Bytes) -> Result<()> {
-        let (pk, rk) = get_dynamo_key(key, DbOperation::Put);
+    async fn put(&self, in_key: &str, value: Bytes) -> Result<()> {
+        let (org, key) = get_dynamo_key(in_key, DbOperation::Put);
         match self
             .client
             .clone()
             .put_item()
             .table_name(&CONFIG.common.dynamo_meta_table)
-            .item("org", AttributeValue::S(pk))
-            .item("key", AttributeValue::S(rk))
+            .item("org", AttributeValue::S(org))
+            .item("key", AttributeValue::S(key))
             .item(
                 "value",
                 AttributeValue::S(String::from_utf8(value.to_vec()).expect("Invalid UTF-8 data")),
@@ -248,31 +248,31 @@ impl super::Db for DynamoDb {
             }
         }
     }
-    async fn delete(&self, key: &str, with_prefix: bool) -> Result<()> {
-        let (pk, rk) = get_dynamo_key(key, DbOperation::Delete);
+    async fn delete(&self, in_key: &str, with_prefix: bool) -> Result<()> {
+        let (org, key) = get_dynamo_key(in_key, DbOperation::Delete);
         match self
             .client
             .clone()
             .delete_item()
             .table_name(&CONFIG.common.dynamo_meta_table)
-            .key("org", AttributeValue::S(pk))
-            .key("key", AttributeValue::S(rk))
+            .key("org", AttributeValue::S(org))
+            .key("key", AttributeValue::S(key))
             .send()
             .await
         {
             Ok(_) => {}
-            Err(err) => {
-                return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+            Err(_) => {
+                return Err(Error::from(DbError::KeyNotExists(in_key.to_string())));
             }
         }
         Ok(())
     }
 
     /// Contrary to `delete`, this call won't fail if `key` is missing.
-    async fn delete_if_exists(&self, key: &str, with_prefix: bool) -> Result<()> {
+    async fn delete_if_exists(&self, in_key: &str, with_prefix: bool) -> Result<()> {
         use crate::common::infra::errors::{DbError, Error};
 
-        match self.delete(key, with_prefix).await {
+        match self.delete(in_key, with_prefix).await {
             Ok(()) | Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(()),
             Err(e) => Err(e),
         }
