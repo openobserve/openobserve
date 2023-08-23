@@ -804,8 +804,7 @@ export const convertSQLData = (
       left: "15",
       right: "10%",
       top: "15",
-      bottom: "15",
-
+      bottom: "30",
     },
     tooltip: {
       trigger: "axis",
@@ -826,6 +825,13 @@ export const convertSQLData = (
       axisTick: {
         alignWithLabel: true,
       },
+      name: props.data.queries[0]?.fields?.x[0]?.label,
+      nameLocation: "middle",
+      nameGap: 30,
+      nameTextStyle: {
+        fontWeight: "bold",
+        fontSize: 14,
+      },
       // min: "dataMin",
       // max: "dataMax",
       splitLine: {
@@ -834,6 +840,16 @@ export const convertSQLData = (
     },
     yAxis: {
       type: "value",
+      name:
+        props.data.queries[0]?.fields?.y?.length == 1
+          ? props.data.queries[0]?.fields?.y[0]?.label
+          : "",
+      nameLocation: "middle",
+      nameGap: 60,
+      nameTextStyle: {
+        fontWeight: "bold",
+        fontSize: 14,
+      },
       // min: "dataMin",
       // max: "dataMax",
       // splitLine: {
