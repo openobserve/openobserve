@@ -19,7 +19,8 @@ export default defineComponent({
     const chartRef: any = ref(null);
     let chart:any;
 
-    const windowResizeEventCallback =() => {
+    const windowResizeEventCallback = async () => {
+        await nextTick()
         chart.resize();
       }
     onMounted(async() => {
@@ -33,12 +34,12 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       chart = echarts.init(chartRef.value)
-      chart.setOption(props?.data?.option || {},true);
-      window.addEventListener("resize",windowResizeEventCallback );
+      chart.setOption(props?.data?.option || {}, true);
+      window.addEventListener("resize", windowResizeEventCallback);
     });
 
     onUnmounted(()=>{
-      window.removeEventListener("resize",windowResizeEventCallback);
+      window.removeEventListener("resize", windowResizeEventCallback);
     })
 
     watch(() => props.data.option,
