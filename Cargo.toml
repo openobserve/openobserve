@@ -119,7 +119,6 @@ promql-parser = "0.2"
 prost = "0.11"
 pyroscope = { version = "0.5.6", optional = true }
 pyroscope_pprofrs = { version = "0.2.5", optional = true }
-r2d2 = "0.8.10"
 rand = "0.8"
 rayon = "1.7.0"
 regex = "1.7"
@@ -175,5 +174,3 @@ tonic-build = { version = "0.8", features = ["prost"] }
 datafusion-expr = "28"
 expect-test = "1.4"
 float-cmp = "0.9"
-
-
