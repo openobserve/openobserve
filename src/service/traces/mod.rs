@@ -27,14 +27,14 @@ use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
 use crate::common::{
-    infra::{cluster, config::CONFIG, wal, metrics},
+    infra::{cluster, config::CONFIG, metrics},
     meta::{
         alert::{Alert, Evaluate, Trigger},
         http::HttpResponse as MetaHttpResponse,
         stream::{PartitionTimeLevel, StreamParams},
         traces::{Event, Span, SpanRefType},
+        usage::UsageType,
         StreamType,
-      usage::UsageType,
     },
     utils::{flatten, json},
 };
