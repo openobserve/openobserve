@@ -56,9 +56,27 @@ export const convertSQLData = (
   const getAxisDataFromKey = (key: string) => {
     console.log("key", key);
 
+    const data = searchQueryData.data.filter((item: any) => {
+      return xAxisKeys.every((key: any) => {
+        return item[key];
+      }) && yAxisKeys.every((key: any) => {
+        return item[key];
+      })
+    })
+        
+    const keys = Object.keys(data[0]); // Assuming there's at least one object
+    const keyArrays = {};
+    
+    for (const key of keys) {
+      keyArrays[key] = data.map(obj => obj[key]);
+    }
+    
+    let result = keyArrays[key];
+    
+
     // when the key is not available in the data that is not show the default value
-    let result: string[] = searchQueryData?.data?.map((item: any) => item[key]).filter((item: any) => item!==undefined);
-    console.log("result", result);
+    // let result: string[] = searchQueryData?.data?.map((item: any) => item[key]).filter((item: any) => item!==undefined);
+    // console.log("result", result);
     const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
     if (field && field.alias == key) {
       // now we have the format, convert that format
@@ -812,32 +830,66 @@ export const convertSQLData = (
         type: "cross",
       },
     },
-    xAxis: {
-      type: "category",
-      position: "bottom",
-      data: !xAxisKeys.length
-        ? []
-        : xAxisKeys.length == 1
-        ? getAxisDataFromKey(xAxisKeys[0])
-        : xAxisKeys?.map((key: any) => {
-            return getAxisDataFromKey(key);
-          }),
-      axisTick: {
-        alignWithLabel: true,
-      },
-      name: props.data.queries[0]?.fields?.x[0]?.label,
-      nameLocation: "middle",
-      nameGap: 30,
-      nameTextStyle: {
-        fontWeight: "bold",
-        fontSize: 14,
-      },
-      // min: "dataMin",
-      // max: "dataMax",
-      splitLine: {
-        show: true,
-      },
-    },
+    // xAxis: {
+    //   type: "category",
+    //   position: "bottom",
+    //   data: !xAxisKeys.length
+    //     ? []
+    //     : xAxisKeys.length == 1
+    //     ? getAxisDataFromKey(xAxisKeys[0])
+    //     : xAxisKeys?.map((key: any) => {
+    //         return getAxisDataFromKey(key);
+    //       }),
+    //   axisTick: {
+    //     alignWithLabel: true,
+    //   },
+    //   name: props.data.queries[0]?.fields?.x[0]?.label,
+    //   nameLocation: "middle",
+    //   nameGap: 30,
+    //   nameTextStyle: {
+    //     fontWeight: "bold",
+    //     fontSize: 14,
+    //   },
+    //   // min: "dataMin",
+    //   // max: "dataMax",
+    //   splitLine: {
+    //     show: true,
+    //   },
+    // },
+    xAxis:xAxisKeys?.map((key: any) => {
+        return {
+          type: "category",
+          position: "bottom",
+          name: props.data.queries[0]?.fields?.x[0]?.label,
+          nameLocation: "middle",
+          nameGap: 30,
+          nameTextStyle: {
+            fontWeight: "bold",
+            fontSize: 14,
+          },
+          // min: "dataMin",
+          // max: "dataMax",
+          splitLine: {
+            show: true,
+          },
+          data: getAxisDataFromKey(key),
+          // axisTick: {
+          //   alignWithLabel: true,
+          // },
+          // name: props.data.queries[0]?.fields?.x[0]?.label,
+          // nameLocation: "middle",
+          // nameGap: 30,
+          // nameTextStyle: {
+          //   fontWeight: "bold",
+          //   fontSize: 14,
+          // },
+          // // min: "dataMin",
+          // // max: "dataMax",
+          // splitLine: {
+          //   show: true,
+          // },
+        };
+      }).flat(),
     yAxis: {
       type: "value",
       name:
@@ -895,6 +947,7 @@ export const convertSQLData = (
     // ],
     series: [],
   };
+
 
 
   // xAxis: [
@@ -976,11 +1029,10 @@ export const convertSQLData = (
     }
     case "scatter":
     {
-      let i=0;
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
           ...getPropsByChartTypeForTraces(),
-          data:getAxisDataFromKey(key).map((it,index)=>{return [option.xAxis.data[i++],it]}),
+          data:getAxisDataFromKey(key).map((it,i:number)=>{return [option.xAxis[0].data[i],it]}),
         };
         return seriesObj;
       });
@@ -1023,7 +1075,7 @@ export const convertSQLData = (
           // },
           // labels: textwrapper(xData),
           data: getAxisDataFromKey(key).map((it, index) => {
-            return { value: [it], name: option.xAxis.data[i++] };
+            return { value: [it], name: option.xAxis[0].data[i++] };
           }),
           label: {
             show: true,
@@ -1252,34 +1304,34 @@ export const convertSQLData = (
   };
 
 //auto SQL: if x axis has time series
-  const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
-    if (field) {
-      option.series.map((seriesObj: any) => {
-      seriesObj.data=seriesObj.data.map((it: any,index:any) => [option.xAxis.data[index],it])
-    })
-    option.xAxis.type="time";
-    option.xAxis.data=[];
-  }
+  // const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
+  //   if (field) {
+  //     option.series.map((seriesObj: any) => {
+  //     seriesObj.data=seriesObj.data.map((it: any,index:any) => [option.xAxis.data[index],it])
+  //   })
+  //   option.xAxis[0].type="time";
+  //   option.xAxis[0].data=[];
+  // }
 
 //custom SQL: check if it is timeseries or not
-  if((props.data.type != "h-bar") && option.xAxis.data.length>0){    
-    const sample = option.xAxis.data.slice(0, Math.min(20, option.xAxis.data.length));
-    const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
-    const isTimeSeries = sample.every((value:any) => {
-      return iso8601Pattern.test(value)
-    });
-    console.log("optionss11", option);
+  // if((props.data.type != "h-bar") && option.xAxis.length>0){    
+  //   const sample = option.xAxis[0].data.slice(0, Math.min(20, option.xAxis[0].data.length));
+  //   const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
+  //   const isTimeSeries = sample.every((value:any) => {
+  //     return iso8601Pattern.test(value)
+  //   });
+  //   console.log("optionss11", option);
   
-    console.log("istimeseries", isTimeSeries);
+  //   console.log("istimeseries", isTimeSeries);
     
-    if (isTimeSeries) {
-      option.series.map((seriesObj: any) => {
-        seriesObj.data=seriesObj.data.map((it: any,index:any) => [(new Date(option.xAxis.data[index])-new Date("1970-01-01T00:00:00")),it])
-      });
-    option.xAxis.type="time";
-    option.xAxis.data=[];
-    }
-  }
+  //   if (isTimeSeries) {
+  //     option.series.map((seriesObj: any) => {
+  //       seriesObj.data=seriesObj.data.map((it: any,index:any) => [(new Date(option.xAxis.data[index])-new Date("1970-01-01T00:00:00")),it])
+  //     });
+  //   option.xAxis[0].type="time";
+  //   option.xAxis[0].data=[];
+  //   }
+  // }
 
   console.log("optionss", option);
 
