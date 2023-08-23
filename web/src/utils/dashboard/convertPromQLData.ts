@@ -288,6 +288,16 @@ export const convertPromQLData = (
   console.log("convertPromQLData: searchQueryData", searchQueryData);
   console.log("convertPromQLData: searchQueryData.data", searchQueryData.data);
 
+  const formatDate =(date:any)=>{
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(2);
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
+  }
 
   let option = {
     legend: {
@@ -304,17 +314,51 @@ export const convertPromQLData = (
       bottom: '10%'
     },
     tooltip: {
+      show:true,
       trigger: 'axis',
+      textStyle:{
+        fontSize:12
+      },
+      formatter: function (name:any) {
+        console.log("name--",name);
+        if(name.length==0)
+          return "";
+
+        const date = new Date(name[0].data[0]);
+
+        let hoverText = name.map((it:any)=>{
+          return `${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.data[1]))}`;
+        });
+        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+      },
       axisPointer: {
-        type:"cross"
-      }
+        show:true,
+        type:"cross",
+        label: {
+          textStyle:{
+            fontSize:12
+          },
+          show: true,
+          formatter: function (name:any) {
+            if(name.axisDimension=="y")
+              return formatUnitValue(getUnitValue(name.value));
+            const date = new Date(name.value);
+            return `${formatDate(date)}`;
+          }
+        }
+      },
     },
     xAxis:{
       type: 'time',
       // data:searchQueryData.data[0].result[0].values.sort((a: any, b: any) => a[0] - b[0]).map((value: any) =>value[0]*1000),
     },
     yAxis: {
-      type: 'value'
+      type: 'value',
+      axisLabel: {
+        formatter: function (name:any) {
+            return formatUnitValue(getUnitValue(name))
+        }
+      },
     },
     series:[]
   };
