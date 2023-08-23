@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,25 +38,19 @@ pub fn generate_storage_file_name(
     stream_name: &str,
     wal_file_name: &str,
 ) -> String {
-    let mut file_columns = wal_file_name.split('_').collect::<Vec<&str>>();
+    // eg: 0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
+    let file_columns = wal_file_name.splitn(7, '/').collect::<Vec<&str>>();
     let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     let file_date = format!(
         "{}/{}/{}/{}",
         file_columns[1], file_columns[2], file_columns[3], file_columns[4]
     );
+    // let hash_id = file_columns[5].to_string();
     let file_name = file_columns.last().unwrap().to_string();
-    let file_name = file_name.replace(".json", ".parquet");
-    file_columns.retain(|&x| x.contains('='));
-    let mut partition_key = String::from("");
-    for key in file_columns {
-        let key = key.replace('.', "_");
-        partition_key.push_str(&key);
-        partition_key.push('/');
-    }
-
-    if partition_key.eq("") {
-        format!("files/{stream_key}/{file_date}/{file_name}")
-    } else {
-        format!("files/{stream_key}/{file_date}/{partition_key}{file_name}")
-    }
+    let file_ext_pos = file_name.rfind('.').unwrap();
+    let file_name = file_name[..file_ext_pos].to_string();
+    format!(
+        "files/{stream_key}/{file_date}/{file_name}{}",
+        FILE_EXT_PARQUET
+    )
 }

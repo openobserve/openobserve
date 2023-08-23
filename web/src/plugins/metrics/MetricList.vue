@@ -1,4 +1,4 @@
-<!-- Copyright 2022 Zinc Labs Inc. and Contributors
+<!-- Copyright 2023 Zinc Labs Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -354,7 +354,9 @@ export default defineComponent({
         (stream: any) =>
           stream.name === searchObj.data.metrics.selectedMetric?.value
       ).schema;
-      filteredMetricLabels.value = [...selectedMetricLabels.value];
+
+      if (Array.isArray(selectedMetricLabels.value))
+        filteredMetricLabels.value = [...selectedMetricLabels.value];
     };
     watch(
       () => searchObj.data.metrics.selectedMetric,

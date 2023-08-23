@@ -1,7 +1,7 @@
 use arrow_schema::{Field, Schema};
 use itertools::Itertools;
 
-use crate::common::schema_ext::SchemaExt;
+use crate::common::utils::schema_ext::SchemaExt;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Signature(pub [u8; 32]);

@@ -1,4 +1,4 @@
-<!-- Copyright 2022 Zinc Labs Inc. and Contributors
+<!-- Copyright 2023 Zinc Labs Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -10,7 +10,7 @@
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
- limitations under the License. 
+ limitations under the License.
 -->
 
 <template>
@@ -24,7 +24,7 @@
     label="Syntax Guide"
     icon="help"
   >
-    <q-menu :class="store.state.theme =='dark' ? 'theme-dark' : 'theme-light'">
+    <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <q-card flat v-if="!sqlmode">
         <q-card-section class="syntax-guide-title">
           <div class="label">Syntax Guide</div>
@@ -35,43 +35,32 @@
             <div class="syntax-guide-text">
               <ul class="guide-list">
                 <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >match_all('error') in query editor</span
-                  >
+                  For full text search of value 'error' use 
+                  <span class="bg-highlight">match_all('error')</span> in query editor
                 </li>
                 <li>
-                  For case-insensitive full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >match_all_ignore_case('error')</span
-                  >
+                  For case-insensitive full text search of value 'error' use 
+                  <span class="bg-highlight">match_all_ignore_case('error')</span>
                 </li>
                 <li>
-                  For column search of value 'error' use
-                  <span class="bg-highlight"
-                    >str_match(<b>fieldname</b>, 'error')</span
-                  >
+                  For column search of value 'error' use 
+                  <span class="bg-highlight">str_match(<b>fieldname</b>, 'error')</span>
                 </li>
                 <li>
-                  To search value 200 for code column use
+                  To search value 200 for code column use 
                   <span class="bg-highlight">code=200</span>
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
+                  To search value 'stderr' for stream column use 
                   <span class="bg-highlight">stream='stderr'</span>
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on cloumn
-                  log use
+                  To search and use query function <i>extract_ip</i> on cloumn log use 
                   <span class="bg-highlight">extract_ip(log) | code=200</span>
                 </li>
                 <li>
                   For additional examples,
-                  <a
-                    href="https://openobserve.ai/docs/example-queries/"
-                    target="_blank"
-                    >click here</a
-                  >.
+                  <a href="https://openobserve.ai/docs/example-queries/" target="_blank">click here</a>.
                 </li>
               </ul>
             </div>
@@ -89,51 +78,31 @@
               <ul class="guide-list">
                 <li>
                   For full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
-                  >
+                  <span class="bg-highlight">SELECT * FROM <b>stream</b> WHERE match_all('error')</span> in query editor
                 </li>
                 <li>
                   For case-insensitive full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all_ignore_case('error')</span
-                  >
+                  <span class="bg-highlight">SELECT * FROM <b>stream</b> WHERE match_all_ignore_case('error')</span>
                 </li>
                 <li>
                   For column search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    str_match(<b>fieldname</b>, 'error')</span
-                  >
+                  <span class="bg-highlight">SELECT * FROM <b>stream</b> WHERE str_match(<b>fieldname</b>, 'error')</span>
                 </li>
                 <li>
                   To search value 200 for code column use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE code=200</span
-                  >
+                  <span class="bg-highlight">SELECT * FROM <b>stream</b> WHERE code=200</span>
                 </li>
                 <li>
                   To search value 'stderr' for stream column use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
-                  >
+                  <span class="bg-highlight">SELECT * FROM <b>stream</b> WHERE stream='stderr'</span>
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on cloumn
-                  log use
-                  <span class="bg-highlight"
-                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE
-                    code=200</span
-                  >
+                  To search and use query function <i>extract_ip</i> on cloumn log use
+                  <span class="bg-highlight">SELECT extract_ip(log) FROM <b>stream</b> WHERE code=200</span>
                 </li>
                 <li>
                   For additional examples,
-                  <a
-                    href="https://openobserve.ai/docs/example-queries/"
-                    target="_blank"
-                    >click here</a
-                  >.
+                  <a href="https://openobserve.ai/docs/example-queries/" target="_blank">click here</a>.
                 </li>
               </ul>
             </div>
@@ -162,7 +131,7 @@ export default defineComponent({
     const store = useStore();
     return {
       t,
-      store
+      store,
     };
   },
 });
@@ -173,10 +142,12 @@ export default defineComponent({
   padding: 0 10px;
   margin: 10px 0 0 0;
 }
+
 .guide-list li {
   font-size: 14px;
   line-height: 23px;
 }
+
 .q-btn:before {
   border: 0px solid #d5d5d5;
 }
@@ -221,6 +192,7 @@ export default defineComponent({
 .syntax-section {
   margin-bottom: 5px;
 }
+
 .bg-highlight {
   padding-left: 5px;
   padding-right: 5px;

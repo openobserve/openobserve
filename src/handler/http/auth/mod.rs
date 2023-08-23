@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,9 +24,9 @@ use actix_web_httpauth::extractors::basic::BasicAuth;
 use crate::common::infra::config::CONFIG;
 use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::meta::user::UserRole;
-use crate::common::{
-    self,
+use crate::common::utils::{
     auth::{get_hash, is_root_user},
+    base64,
 };
 use crate::service::{db, users};
 
@@ -165,7 +165,7 @@ pub async fn validator_aws(
     match req.headers().get("X-Amz-Firehose-Access-Key") {
         Some(val) => match val.to_str() {
             Ok(val) => {
-                let amz_creds = common::base64::decode(val).unwrap();
+                let amz_creds = base64::decode(val).unwrap();
                 let creds = amz_creds
                     .split(':')
                     .map(|s| s.to_string())
@@ -203,7 +203,7 @@ pub async fn validator_gcp(
             .unwrap();
     match query.get("API-Key") {
         Some(val) => {
-            let gcp_creds = common::base64::decode(val).unwrap();
+            let gcp_creds = base64::decode(val).unwrap();
             let creds = gcp_creds
                 .split(':')
                 .map(|s| s.to_string())

@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ use crate::common::meta::{
     stream::PartitionTimeLevel,
     StreamType,
 };
-use crate::common::{json, utils::is_local_disk_storage};
+use crate::common::utils::json;
 use crate::service::{db, file_list};
 
 pub async fn delete_by_stream(
@@ -90,7 +90,7 @@ pub async fn delete_all(
 
     if is_local_disk_storage() {
         let data_dir = format!(
-            "{}/files/{org_id}/{stream_type}/{stream_name}",
+            "{}files/{org_id}/{stream_type}/{stream_name}",
             CONFIG.common.data_stream_dir
         );
         let path = std::path::Path::new(&data_dir);
@@ -197,7 +197,7 @@ pub async fn delete_by_date(
     if is_local_disk_storage() {
         while date_start <= date_end {
             let data_dir = format!(
-                "{}/files/{org_id}/{stream_type}/{stream_name}/{}",
+                "{}files/{org_id}/{stream_type}/{stream_name}/{}",
                 CONFIG.common.data_stream_dir,
                 date_start.format("%Y/%m/%d")
             );

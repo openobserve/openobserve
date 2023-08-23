@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use crate::common::infra::config::ALERTS_TEMPLATES;
 use crate::common::infra::db::Event;
-use crate::common::json;
 use crate::common::meta::alert::DestinationTemplate;
 use crate::common::meta::organization::DEFAULT_ORG;
+use crate::common::utils::json;
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<DestinationTemplate>, anyhow::Error> {
     let map_key = format!("{org_id}/{name}");

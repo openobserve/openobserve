@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,12 +16,12 @@ use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse, Respond
 use ahash::AHashMap as HashMap;
 use std::io::{Error, ErrorKind};
 
-use crate::common::http::get_stream_type_from_request;
 use crate::common::meta::{
     self,
     stream::{ListStream, StreamSettings},
     StreamType,
 };
+use crate::common::utils::http::get_stream_type_from_request;
 use crate::service::stream;
 
 /** GetSchema */

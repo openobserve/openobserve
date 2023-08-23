@@ -1,4 +1,4 @@
-<!-- Copyright 2022 Zinc Labs Inc. and Contributors
+<!-- Copyright 2023 Zinc Labs Inc.
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
@@ -154,6 +154,7 @@ import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import type { AlertData } from "@/ts/interfaces/index";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "AlertList",
@@ -357,7 +358,7 @@ export default defineComponent({
       showAddAlertDialog.value = true;
     };
     const showAddUpdateFn = (props: any) => {
-      formData.value = props.row;
+      formData.value = cloneDeep(props.row);
       let action;
       if (!props.row) {
         isUpdated.value = false;
@@ -431,7 +432,7 @@ export default defineComponent({
         .catch((err) => {
           $q.notify({
             type: "negative",
-            message: err?.data?.message || 'Error while deleting alert.',
+            message: err?.data?.message || "Error while deleting alert.",
             timeout: 2000,
           });
         });

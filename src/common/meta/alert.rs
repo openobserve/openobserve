@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ use std::fmt;
 use utoipa::ToSchema;
 
 use super::{search::Query, StreamType};
-use crate::common::json::{Map, Value};
+use crate::common::utils::json::{Map, Value};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
@@ -319,7 +319,7 @@ pub trait Evaluate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::json::json;
+    use crate::common::utils::json::json;
 
     #[test]
     fn test_evaluate() {

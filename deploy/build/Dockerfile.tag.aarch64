@@ -18,6 +18,7 @@ FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
 WORKDIR /app
 COPY . /app
 COPY --from=webBuilder /web/dist web/dist
+RUN mkdir -p /app/target/release/
 
 # RUN cargo build --release
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \

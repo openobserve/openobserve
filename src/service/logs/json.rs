@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ use crate::common::meta::{
     usage::UsageType,
     StreamType,
 };
-use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::{
     db, format_stream_name, ingestion::write_file, schema::stream_schema_exists,
     usage::report_request_usage_stats,
@@ -66,7 +66,6 @@ pub async fn ingest(
     let mut trigger: Option<Trigger> = None;
 
     // Start Register Transforms for stream
-
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
         StreamType::Logs,

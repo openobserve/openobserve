@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,16 +20,18 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::infra::{cluster, config::CONFIG};
-use crate::common::meta::{
-    alert::{Alert, Evaluate, Trigger},
-    http::HttpResponse as MetaHttpResponse,
-    stream::StreamParams,
-    traces::{Event, Span, SpanRefType},
-    usage::UsageType,
-    StreamType,
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        alert::{Alert, Evaluate, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        stream::{PartitionTimeLevel, StreamParams},
+        traces::{Event, Span, SpanRefType},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json},
 };
-use crate::common::{flatten, json};
 use crate::service::{
     db, format_partition_key, format_stream_name,
     ingestion::write_file,
@@ -50,7 +52,7 @@ pub async fn traces_proto(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let request = ExportTraceServiceRequest::decode(body).expect("Invalid protobuf");
-    super::handle_trace_request(org_id, thread_id, request).await
+    super::handle_trace_request(org_id, thread_id, request, false).await
 }
 
 pub async fn traces_json(
@@ -304,11 +306,12 @@ pub async fn traces_json(
                         json::Value::Number(timestamp.into()),
                     );
 
-                    let value_str = crate::common::json::to_string(&val_map).unwrap();
+                    let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
                     // get hour key
-                    let mut hour_key = crate::service::ingestion::get_hour_key(
+                    let mut hour_key = crate::service::ingestion::get_wal_time_key(
                         timestamp.try_into().unwrap(),
                         &partition_keys,
+                        PartitionTimeLevel::Hourly,
                         value.as_object().unwrap(),
                         None,
                     );
@@ -376,7 +379,28 @@ pub async fn traces_json(
         &mut traces_file_name,
         None,
     );
-    req_stats.response_time = start.elapsed().as_secs_f64();
+    let time = start.elapsed().as_secs_f64();
+    req_stats.response_time = time;
+
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/api/org/traces",
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/api/org/traces",
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.to_string().as_str(),
+        ])
+        .inc();
+
     //metric + data usage
     report_request_usage_stats(
         req_stats,

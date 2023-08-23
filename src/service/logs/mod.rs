@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,14 +16,23 @@ use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
 use datafusion::arrow::datatypes::Schema;
 
-use crate::common;
-use crate::common::hasher::get_fields_key_xxh3;
-use crate::common::infra::config::CONFIG;
-use crate::common::json::{Map, Value};
-use crate::common::meta::alert::{Alert, Evaluate, Trigger};
-use crate::common::meta::ingestion::RecordStatus;
-use crate::common::meta::StreamType;
+use crate::common::{
+    infra::config::CONFIG,
+    meta::{
+        alert::{Alert, Evaluate, Trigger},
+        ingestion::RecordStatus,
+        stream::PartitionTimeLevel,
+        StreamType,
+    },
+    utils::{
+        self,
+        hasher::get_fields_key_xxh3,
+        json::{Map, Value},
+    },
+};
 use crate::service::schema::check_for_schema;
+
+use super::ingestion::get_wal_time_key;
 
 pub mod bulk;
 pub mod gcs_pub_sub;
@@ -183,7 +192,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Opt
         }
     }
     if parse_error.is_empty() {
-        (Some(common::json::to_string(&local_map).unwrap()), None)
+        (Some(utils::json::to_string(&local_map).unwrap()), None)
     } else {
         (None, Some(parse_error))
     }
@@ -219,7 +228,7 @@ async fn add_valid_record(
         .as_i64()
         .unwrap();
 
-    let mut value_str = common::json::to_string(&local_val).unwrap();
+    let mut value_str = utils::json::to_string(&local_val).unwrap();
     // check schema
     let schema_evolution = check_for_schema(
         &stream_meta.org_id,
@@ -233,9 +242,10 @@ async fn add_valid_record(
 
     // get hour key
     let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
-    let hour_key = super::ingestion::get_hour_key(
+    let hour_key = get_wal_time_key(
         timestamp,
         &stream_meta.partition_keys,
+        PartitionTimeLevel::Hourly,
         local_val,
         Some(&schema_key),
     );
@@ -244,7 +254,7 @@ async fn add_valid_record(
     if schema_evolution.schema_compatible {
         let valid_record = if schema_evolution.types_delta.is_some() {
             let delta = schema_evolution.types_delta.unwrap();
-            let loc_value: Value = common::json::from_slice(value_str.as_bytes()).unwrap();
+            let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
             let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
                 cast_to_type(loc_value, delta)
             } else if schema_evolution.is_schema_changed {

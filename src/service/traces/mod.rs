@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,30 +14,37 @@
 
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
-    common::v1::AnyValue,
     trace::v1::{status::StatusCode, Status},
 };
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::infra::{cluster, config::CONFIG, wal};
-use crate::common::meta::{
-    alert::{Alert, Evaluate, Trigger},
-    http::HttpResponse as MetaHttpResponse,
-    stream::StreamParams,
-    traces::{Event, Span, SpanRefType},
-    StreamType,
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        alert::{Alert, Evaluate, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        stream::{PartitionTimeLevel, StreamParams},
+        traces::{Event, Span, SpanRefType},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json},
 };
-use crate::common::{flatten, json};
 use crate::service::{
     db, format_partition_key, format_stream_name,
     schema::{add_stream_schema, stream_schema_exists},
+};
+
+use super::{
+    ingestion::{grpc::get_val, write_file},
+    usage::report_request_usage_stats,
 };
 
 pub mod otlp_http;
@@ -52,6 +59,7 @@ pub async fn handle_trace_request(
     org_id: &str,
     thread_id: usize,
     request: ExportTraceServiceRequest,
+    is_grpc: bool,
 ) -> Result<HttpResponse, Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -68,7 +76,7 @@ pub async fn handle_trace_request(
             "Quota exceeded for this organization".to_string(),
         )));
     }
-
+    let start = std::time::Instant::now();
     let traces_stream_name = "default";
     let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
         AHashMap::new();
@@ -112,7 +120,7 @@ pub async fn handle_trace_request(
 
         for res_attr in resource.attributes {
             if res_attr.key.eq(SERVICE_NAME) {
-                let loc_service_name = get_val(res_attr.value);
+                let loc_service_name = get_val(&res_attr.value);
                 if !loc_service_name.eq(&json::Value::Null) {
                     service_name = loc_service_name.as_str().unwrap().to_string();
                     service_att_map.insert(res_attr.key, loc_service_name);
@@ -120,7 +128,7 @@ pub async fn handle_trace_request(
             } else {
                 service_att_map.insert(
                     format!("{}.{}", SERVICE, res_attr.key),
-                    get_val(res_attr.value),
+                    get_val(&res_attr.value),
                 );
             }
         }
@@ -161,14 +169,14 @@ pub async fn handle_trace_request(
                 let end_time: u64 = span.end_time_unix_nano;
                 let mut span_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 for span_att in span.attributes {
-                    span_att_map.insert(span_att.key, get_val(span_att.value));
+                    span_att_map.insert(span_att.key, get_val(&span_att.value));
                 }
 
                 let mut events = vec![];
                 let mut event_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 for event in span.events {
                     for event_att in event.attributes {
-                        event_att_map.insert(event_att.key, get_val(event_att.value));
+                        event_att_map.insert(event_att.key, get_val(&event_att.value));
                     }
                     events.push(Event {
                         name: event.name,
@@ -210,12 +218,13 @@ pub async fn handle_trace_request(
                     json::Value::Number(timestamp.into()),
                 );
 
-                let value_str = crate::common::json::to_string(&val_map).unwrap();
+                let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
 
                 // get hour key
-                let mut hour_key = super::ingestion::get_hour_key(
+                let mut hour_key = super::ingestion::get_wal_time_key(
                     timestamp.try_into().unwrap(),
                     &partition_keys,
+                    PartitionTimeLevel::Hourly,
                     value.as_object().unwrap(),
                     None,
                 );
@@ -272,47 +281,77 @@ pub async fn handle_trace_request(
         }
     }
 
-    let mut write_buf = BytesMut::new();
-    for (key, entry) in data_buf {
-        if entry.is_empty() {
-            continue;
-        }
+    let mut traces_file_name = "".to_string();
+    let mut req_stats = write_file(
+        data_buf,
+        thread_id,
+        StreamParams {
+            org_id,
+            stream_name: traces_stream_name,
+            stream_type: StreamType::Traces,
+        },
+        &mut traces_file_name,
+        None,
+    );
+    let time = start.elapsed().as_secs_f64();
+    req_stats.response_time = time;
 
-        write_buf.clear();
-        for row in &entry {
-            write_buf.put(row.as_bytes());
-            write_buf.put("\n".as_bytes());
-        }
-        let file = wal::get_or_create(
-            thread_id,
-            StreamParams {
-                org_id,
-                stream_name: traces_stream_name,
-                stream_type: StreamType::Traces,
-            },
-            None,
-            &key,
-            false,
-        );
-        let traces_file_name = file.full_name();
+    let ep = if is_grpc {
+        "grpc/export/traces"
+    } else {
+        "/api/org/traces"
+    };
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            ep,
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            ep,
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.to_string().as_str(),
+        ])
+        .inc();
 
-        file.write(write_buf.as_ref());
+    //metric + data usage
+    report_request_usage_stats(
+        req_stats,
+        org_id,
+        traces_stream_name,
+        StreamType::Traces,
+        UsageType::Traces,
+        0,
+    )
+    .await;
 
-        if !stream_schema.has_fields && !traces_file_name.is_empty() {
-            let file = OpenOptions::new()
-                .read(true)
-                .open(&traces_file_name)
-                .unwrap();
-            add_stream_schema(
-                org_id,
-                traces_stream_name,
-                StreamType::Traces,
-                &file,
-                &mut traces_schema_map,
-                min_ts,
-            )
-            .await;
-        }
+    let schema_exists = stream_schema_exists(
+        org_id,
+        traces_stream_name,
+        StreamType::Traces,
+        &mut traces_schema_map,
+    )
+    .await;
+    if !schema_exists.has_fields && !traces_file_name.is_empty() {
+        let file = OpenOptions::new()
+            .read(true)
+            .open(&traces_file_name)
+            .unwrap();
+        add_stream_schema(
+            org_id,
+            traces_stream_name,
+            StreamType::Traces,
+            &file,
+            &mut traces_schema_map,
+            min_ts,
+        )
+        .await;
     }
 
     // only one trigger per request, as it updates etcd
@@ -330,9 +369,14 @@ pub async fn handle_trace_request(
 
         alerts.retain(|alert| alert.name.eq(&val.alert_name));
         if !alerts.is_empty() {
-            super::ingestion::send_ingest_notification(val, alerts.first().unwrap().clone()).await;
+            crate::service::ingestion::send_ingest_notification(
+                val,
+                alerts.first().unwrap().clone(),
+            )
+            .await;
         }
     }
+
     let res = ExportTraceServiceResponse {};
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
@@ -343,48 +387,6 @@ pub async fn handle_trace_request(
         .body(out));
 }
 
-fn get_val(attr_val: Option<AnyValue>) -> json::Value {
-    match attr_val {
-        Some(local_val) => match local_val.value {
-            Some(val) => match val {
-                opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
-                    inner_val,
-                ) => json::json!(inner_val.as_str()),
-                opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(inner_val) => {
-                    json::json!(inner_val.to_string())
-                }
-                opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(inner_val) => {
-                    json::json!(inner_val.to_string())
-                }
-                opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(
-                    inner_val,
-                ) => json::json!(inner_val.to_string()),
-                opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(inner_val) => {
-                    let mut vals = vec![];
-                    for item in inner_val.values.iter().cloned() {
-                        vals.push(get_val(Some(item)))
-                    }
-                    json::json!(vals)
-                }
-                opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue(
-                    inner_val,
-                ) => {
-                    let mut vals = json::Map::new();
-                    for item in inner_val.values.iter().cloned() {
-                        vals.insert(item.key, get_val(item.value));
-                    }
-                    json::json!(vals)
-                }
-                opentelemetry_proto::tonic::common::v1::any_value::Value::BytesValue(inner_val) => {
-                    json::json!(inner_val)
-                }
-            },
-            None => json::Value::Null,
-        },
-        None => json::Value::Null,
-    }
-}
-
 fn get_span_status(status: Option<Status>) -> String {
     match status {
         Some(v) => match v.code() {
@@ -393,84 +395,5 @@ fn get_span_status(status: Option<Status>) -> String {
             StatusCode::Unset => "UNSET".to_string(),
         },
         None => "".to_string(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_val() {
-        let in_str = "Test".to_string();
-        let str_val = AnyValue {
-            value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
-                    in_str.clone(),
-                ),
-            ),
-        };
-        let resp = get_val(Some(str_val));
-        assert_eq!(resp.as_str().unwrap(), in_str);
-
-        let in_bool = false;
-        let bool_val = AnyValue {
-            value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(in_bool),
-            ),
-        };
-        let resp = get_val(Some(bool_val));
-        assert_eq!(resp.as_str().unwrap(), in_bool.to_string());
-
-        let in_int = 20;
-        let int_val = AnyValue {
-            value: Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(in_int)),
-        };
-        let resp = get_val(Some(int_val.clone()));
-        assert_eq!(resp.as_str().unwrap(), in_int.to_string());
-
-        let in_double = 20.00;
-        let double_val = AnyValue {
-            value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(in_double),
-            ),
-        };
-        let resp = get_val(Some(double_val));
-        assert_eq!(resp.as_str().unwrap(), in_double.to_string());
-
-        let in_arr = vec![int_val.clone()];
-        let arr_val = AnyValue {
-            value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue {
-                    0: opentelemetry_proto::tonic::common::v1::ArrayValue { values: in_arr },
-                },
-            ),
-        };
-        let resp = get_val(Some(arr_val));
-        assert!(resp.as_array().unwrap().len() > 0);
-
-        let kv_val = AnyValue {
-            value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue {
-                    0: opentelemetry_proto::tonic::common::v1::KeyValueList {
-                        values: vec![opentelemetry_proto::tonic::common::v1::KeyValue {
-                            key: in_str.clone(),
-                            value: Some(int_val.clone()),
-                        }],
-                    },
-                },
-            ),
-        };
-        let resp = get_val(Some(kv_val));
-        assert!(resp.as_object().unwrap().contains_key(&in_str));
-
-        let in_byte =
-            opentelemetry_proto::tonic::common::v1::any_value::Value::BytesValue(vec![8u8]);
-
-        let byte_val = AnyValue {
-            value: Some(in_byte),
-        };
-        let resp = get_val(Some(byte_val));
-        assert!(resp.as_array().unwrap().len() > 0);
     }
 }

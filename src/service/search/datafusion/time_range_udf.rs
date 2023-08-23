@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,8 +27,7 @@ use once_cell::sync::Lazy;
 use std::iter::zip;
 use std::sync::Arc;
 
-use crate::common::str;
-use crate::common::time;
+use crate::common::utils::{str, time};
 
 /// The name of the time_range UDF given to DataFusion.
 pub const TIME_RANGE_UDF_NAME: &str = "time_range";

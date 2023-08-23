@@ -1,4 +1,4 @@
-<!-- Copyright 2022 Zinc Labs Inc. and Contributors
+<!-- Copyright 2023 Zinc Labs Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -473,7 +473,7 @@ export default defineComponent({
         };
       } else {
         let start, end;
-        if (!selectedDate.value.from && !selectedTime.value.startTime) {
+        if (!selectedDate.value?.from && !selectedTime.value?.startTime) {
           start = new Date();
         } else {
           start = new Date(
@@ -481,7 +481,7 @@ export default defineComponent({
           );
         }
 
-        if (selectedDate.value.to == "" && selectedTime.value.endTime == "") {
+        if (selectedDate.value?.to == "" && selectedTime.value?.endTime == "") {
           end = new Date();
         } else {
           end = new Date(

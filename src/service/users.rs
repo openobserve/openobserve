@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,19 +21,16 @@ use std::io::Error;
 use uuid::Uuid;
 
 use super::db;
+use crate::common::meta::user::{User, UserList, UserResponse, UserRole};
 use crate::common::{infra::config::USERS, meta::user::UpdateUser};
 use crate::{
-    common::auth::get_hash,
     common::infra::config::ROOT_USER,
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
         organization::DEFAULT_ORG,
         user::{UserOrg, UserRequest},
     },
-};
-use crate::{
-    common::auth::is_root_user,
-    common::meta::user::{User, UserList, UserResponse, UserRole},
+    common::utils::auth::{get_hash, is_root_user},
 };
 
 pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {

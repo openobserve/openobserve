@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 use opentelemetry::propagation::Extractor;
 
 pub mod event;
+pub mod logs;
 pub mod metrics;
 pub mod search;
 pub mod traces;

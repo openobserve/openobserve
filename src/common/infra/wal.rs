@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,10 +19,10 @@ use once_cell::sync::Lazy;
 use std::{
     fs::{File, OpenOptions},
     io::Write,
+    path::Path,
     sync::{Arc, RwLock, RwLockReadGuard},
 };
 
-use crate::common::file::get_file_contents;
 use crate::common::infra::{
     config::{CONFIG, FILE_EXT_JSON},
     ider, metrics,
@@ -31,6 +31,7 @@ use crate::common::meta::{
     stream::{PartitionTimeLevel, StreamParams},
     StreamType,
 };
+use crate::common::utils::file::get_file_contents;
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
@@ -175,7 +176,7 @@ impl Manager {
         stream_type: StreamType,
         key: &str,
     ) -> Option<Arc<RwFile>> {
-        let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
+        let full_key = format!("{org_id}/{stream_type}/{stream_name}/{key}");
         let file = match self
             .data
             .get(thread_id)
@@ -219,7 +220,7 @@ impl Manager {
         let stream_name = stream.stream_name;
         let stream_type = stream.stream_type;
 
-        let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
+        let full_key = format!("{org_id}/{stream_type}/{stream_name}/{key}");
         let mut data = self.data.get(thread_id).unwrap().write().unwrap();
         if let Some(f) = data.get(&full_key) {
             return f.clone();
@@ -266,9 +267,9 @@ impl Manager {
         stream_type: StreamType,
         file_name: &str,
     ) -> bool {
-        let columns = file_name.split('_').collect::<Vec<&str>>();
-        let thread_id: usize = columns[0].parse().unwrap();
-        let key = columns[1..columns.len() - 1].join("_");
+        let columns = file_name.split('/').collect::<Vec<&str>>();
+        let thread_id: usize = columns.first().unwrap().parse().unwrap();
+        let key = columns[1..columns.len() - 1].join("/");
         if let Some(file) = self.get(thread_id, org_id, stream_name, stream_type, &key) {
             if file.name() == file_name {
                 return true;
@@ -324,9 +325,9 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = format!("{thread_id}_{key}_{id}{}", FILE_EXT_JSON);
+        let file_name = format!("{thread_id}/{key}/{id}{}", FILE_EXT_JSON);
         let file_path = format!("{dir_path}{file_name}");
-        std::fs::create_dir_all(&dir_path).unwrap();
+        std::fs::create_dir_all(Path::new(&file_path).parent().unwrap()).unwrap();
 
         let (file, cache) = if use_cache {
             (None, Some(RwLock::new(BytesMut::with_capacity(524288)))) // 512KB
@@ -492,11 +493,11 @@ mod tests {
         file.write(&data);
         assert_eq!(file.read().unwrap(), data);
         assert_eq!(file.size(), data.len() as i64);
-        assert!(file.name().contains(&format!("{}_{}", thread_id, key)));
+        assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
     }
 
     #[test]
-    fn test_memory_files() {
+    fn test_wal_memory_files() {
         let memory_files = MemoryFiles::new();
         let file_name = "test_file".to_string();
         let data = Bytes::from("test_data".to_string().into_bytes());
@@ -507,7 +508,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rw_file() {
+    fn test_wal_rw_file() {
         let thread_id = 1;
         let org_id = "test_org";
         let stream_name = "test_stream";
@@ -529,6 +530,6 @@ mod tests {
         file.write(&data);
         assert_eq!(file.read().unwrap(), data);
         assert_eq!(file.size(), data.len() as i64);
-        assert!(file.name().contains(&format!("{}_{}", thread_id, key)));
+        assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
     }
 }

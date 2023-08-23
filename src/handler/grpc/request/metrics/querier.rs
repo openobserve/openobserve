@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,13 +17,14 @@ use std::time::UNIX_EPOCH;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::file::{get_file_contents, get_file_meta, scan_files};
 use crate::common::infra::{config::CONFIG, errors, ider, metrics, wal};
 use crate::common::meta;
+use crate::common::utils::file::{get_file_contents, get_file_meta, scan_files};
 use crate::handler::grpc::cluster_rpc::{
     metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
     MetricsWalFileRequest, MetricsWalFileResponse,
 };
+use crate::handler::grpc::request::MetadataMap;
 use crate::service::promql::search as SearchService;
 
 pub struct Querier;
@@ -36,9 +37,8 @@ impl Metrics for Querier {
         req: Request<MetricsQueryRequest>,
     ) -> Result<Response<MetricsQueryResponse>, Status> {
         let start = std::time::Instant::now();
-        let parent_cx = global::get_text_map_propagator(|prop| {
-            prop.extract(&super::MetadataMap(req.metadata()))
-        });
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
         tracing::Span::current().set_parent(parent_cx);
 
         let req: &MetricsQueryRequest = req.get_ref();
@@ -82,7 +82,7 @@ impl Metrics for Querier {
         let org_id = &req.get_ref().org_id;
         let stream_name = &req.get_ref().stream_name;
         let pattern = format!(
-            "{}/files/{org_id}/metrics/{stream_name}/*.json",
+            "{}files/{org_id}/metrics/{stream_name}/",
             &CONFIG.common.data_wal_dir
         );
 

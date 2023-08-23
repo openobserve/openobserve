@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ use std::{
 };
 
 use crate::common::meta::{sql::Sql as MetaSql, stream::StreamParams, StreamType};
-use crate::common::str::find;
+use crate::common::utils::str::find;
 use crate::common::{
     infra::{
         config::CONFIG,
@@ -130,8 +130,10 @@ impl Sql {
         // 3. no group by
         let mut fast_mode = meta.selection.is_none()
             && meta.group_by.is_empty()
+            && (meta.order_by.is_empty() || meta.order_by[0].0 == CONFIG.common.column_timestamp)
             && !meta.fields.iter().any(|f| f.contains('('))
-            && !meta.field_alias.iter().any(|f| f.0.contains('('));
+            && !meta.field_alias.iter().any(|f| f.0.contains('('))
+            && !origin_sql.to_lowercase().contains("distinct");
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
@@ -364,7 +366,7 @@ impl Sql {
         let match_all_fields = if !fts_fields.is_empty() {
             fts_fields.iter().map(|v| v.to_lowercase()).collect()
         } else {
-            crate::common::stream::SQL_FULL_TEXT_SEARCH_FIELDS
+            crate::common::utils::stream::SQL_FULL_TEXT_SEARCH_FIELDS
                 .iter()
                 .map(|v| v.to_string())
                 .collect::<String>()
@@ -417,11 +419,11 @@ impl Sql {
                         .get(1)
                         .unwrap()
                         .as_str()
-                        .split(',')
+                        .splitn(2, ',')
                         .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
                         .collect::<Vec<&str>>();
                     let field = attrs.first().unwrap();
-                    let value = attrs.get(1).unwrap();
+                    let value = attrs.last().unwrap();
                     origin_sql = origin_sql.replace(
                         cap.get(0).unwrap().as_str(),
                         &format!("\"{field}\" {re_fn} '%{value}%'"),
@@ -549,7 +551,9 @@ impl Sql {
         match &sql_meta {
             Ok(sql_meta) => {
                 let mut used_fns = vec![];
-                for fn_name in crate::common::functions::get_all_transform_keys(&org_id).await {
+                for fn_name in
+                    crate::common::utils::functions::get_all_transform_keys(&org_id).await
+                {
                     let str_re = format!(r"(?i){}[ ]*\(.*\)", fn_name);
                     let re1 = Regex::new(&str_re).unwrap();
                     let cap = re1.captures(&origin_sql);

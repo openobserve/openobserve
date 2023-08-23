@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@ use std::sync::Arc;
 
 use crate::common::infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS};
 use crate::common::infra::db::Event;
-use crate::common::json;
 use crate::common::meta::functions::{StreamFunctionsList, Transform};
+use crate::common::utils::json;
 
 pub async fn set(org_id: &str, name: &str, js_func: Transform) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;

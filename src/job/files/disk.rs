@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ use tokio::{sync::Semaphore, task, time};
 
 use crate::common::infra::{config::CONFIG, metrics, storage, wal};
 use crate::common::meta::{common::FileMeta, StreamType};
-use crate::common::{file::scan_files, json, utils::populate_file_meta};
+use crate::common::utils::{file::scan_files, json, stream::populate_file_meta};
 use crate::service::usage::report_compression_stats;
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
@@ -42,11 +42,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
  * upload compressed files to storage & delete moved files from local
  */
 async fn move_files_to_storage() -> Result<(), anyhow::Error> {
-    let data_dir = Path::new(&CONFIG.common.data_wal_dir)
+    let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
         .unwrap();
 
-    let pattern = format!("{}/files/*/*/*/*.json", &CONFIG.common.data_wal_dir);
+    let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
     let files = scan_files(&pattern);
 
     // use multiple threads to upload files
@@ -56,20 +56,24 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let local_file = file.to_owned();
         let local_path = Path::new(&file).canonicalize().unwrap();
         let file_path = local_path
-            .strip_prefix(&data_dir)
+            .strip_prefix(&wal_dir)
             .unwrap()
             .to_str()
             .unwrap()
             .replace('\\', "/");
-        let columns = file_path.split('/').collect::<Vec<&str>>();
-        if columns.len() != 5 {
-            continue;
-        }
+        let columns = file_path.splitn(5, '/').collect::<Vec<&str>>();
+
+        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
         // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);
         let stream_name = columns[3].to_string();
-        let file_name = columns[4].to_string();
+        let mut file_name = columns[4].to_string();
+
+        // Hack: compatible for <= 0.5.1
+        if !file_name.contains('/') && file_name.contains('_') {
+            file_name = file_name.replace('_', "/");
+        }
 
         // check the file is using for write
         if wal::check_in_use(&org_id, &stream_name, stream_type, &file_name) {

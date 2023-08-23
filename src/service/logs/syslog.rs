@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ use crate::common::meta::{
     syslog::SyslogRoute,
     StreamType,
 };
-use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {

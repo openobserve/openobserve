@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ use crate::common::meta::{
     usage::UsageType,
     StreamType,
 };
-use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::{
     db, ingestion::write_file, schema::stream_schema_exists, usage::report_request_usage_stats,
 };
@@ -202,8 +202,8 @@ pub async fn ingest(
                             action.clone(),
                             value,
                             &mut bulk_res,
-                            Some(TS_PARSE_FAILED.to_owned()),
-                            Some(TS_PARSE_FAILED.to_owned()),
+                            Some(TS_PARSE_FAILED.to_string()),
+                            Some(TS_PARSE_FAILED.to_string()),
                         );
                         continue;
                     }
@@ -221,7 +221,7 @@ pub async fn ingest(
                     action.clone(),
                     value,
                     &mut bulk_res,
-                    failure_reason.to_owned(),
+                    Some(TS_PARSE_FAILED.to_string()),
                     failure_reason,
                 );
                 continue;
@@ -264,7 +264,7 @@ pub async fn ingest(
                     action.clone(),
                     value,
                     &mut bulk_res,
-                    Some(SCHEMA_CONFORMANCE_FAILED.to_owned()),
+                    Some(SCHEMA_CONFORMANCE_FAILED.to_string()),
                     Some(status.error),
                 );
             } else {

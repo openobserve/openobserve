@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,17 @@ use crate::common::meta::organization::DEFAULT_ORG;
 use crate::common::meta::user::UserRequest;
 use crate::service::{db, users};
 use regex::Regex;
+
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
+        ider,
+    },
+    meta::{organization::DEFAULT_ORG, user::UserRequest},
+    utils::file::clean_empty_dirs,
+};
+use crate::service::{db, users};
 
 mod alert_manager;
 mod compact;

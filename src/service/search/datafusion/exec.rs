@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use ahash::AHashMap as HashMap;
+use arrow_schema::Field;
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
@@ -52,7 +53,7 @@ use crate::common::meta::{
     search::Session as SearchSession,
     sql,
 };
-use crate::common::{flatten, json};
+use crate::common::utils::{flatten, json};
 use crate::service::search::sql::Sql;
 
 use super::storage::{file_list, StorageType};
@@ -186,7 +187,7 @@ async fn exec_query(
     // get used UDF
     let mut field_fns = vec![];
     let mut sql_parts = vec![];
-    for fn_name in crate::common::functions::get_all_transform_keys(&sql.org_id).await {
+    for fn_name in crate::common::utils::functions::get_all_transform_keys(&sql.org_id).await {
         if sql.origin_sql.contains(&fn_name) {
             field_fns.push(fn_name.clone());
         }
@@ -286,39 +287,41 @@ async fn exec_query(
                 ));
             }
             Some(resp) => {
-                let mem_table = datafusion::datasource::MemTable::try_new(
-                    resp.first().unwrap().schema(),
-                    vec![resp],
-                )?;
-                q_ctx.deregister_table("tbl")?;
-                q_ctx.register_table("tbl", Arc::new(mem_table))?;
-                // -- fix mem table, add missing columns
-                let mut tmp_df = q_ctx.table("tbl").await?;
-                let tmp_fields = tmp_df
-                    .schema()
-                    .field_names()
-                    .iter()
-                    .map(|f| f.strip_prefix("tbl.").unwrap().to_string())
-                    .collect::<Vec<String>>();
-                let need_add_columns = schema
-                    .fields()
-                    .iter()
-                    .filter(|field| !tmp_fields.contains(field.name()))
-                    .map(|field| field.name().as_str())
-                    .collect::<Vec<&str>>();
-                if !need_add_columns.is_empty() {
-                    for column in need_add_columns {
-                        tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
-                    }
+                if !resp.is_empty() {
+                    let mem_table = datafusion::datasource::MemTable::try_new(
+                        resp.first().unwrap().schema(),
+                        vec![resp],
+                    )?;
                     q_ctx.deregister_table("tbl")?;
-                    q_ctx.register_table("tbl", tmp_df.clone().into_view())?;
-                    // re-register to ctx
-                    if !fast_mode {
-                        ctx.deregister_table("tbl")?;
-                        ctx.register_table("tbl", tmp_df.into_view())?;
+                    q_ctx.register_table("tbl", Arc::new(mem_table))?;
+                    // -- fix mem table, add missing columns
+                    let mut tmp_df = q_ctx.table("tbl").await?;
+                    let tmp_fields = tmp_df
+                        .schema()
+                        .field_names()
+                        .iter()
+                        .map(|f| f.strip_prefix("tbl.").unwrap().to_string())
+                        .collect::<Vec<String>>();
+                    let need_add_columns = schema
+                        .fields()
+                        .iter()
+                        .filter(|field| !tmp_fields.contains(field.name()))
+                        .map(|field| field.name().as_str())
+                        .collect::<Vec<&str>>();
+                    if !need_add_columns.is_empty() {
+                        for column in need_add_columns {
+                            tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
+                        }
+                        q_ctx.deregister_table("tbl")?;
+                        q_ctx.register_table("tbl", tmp_df.clone().into_view())?;
+                        // re-register to ctx
+                        if !fast_mode {
+                            ctx.deregister_table("tbl")?;
+                            ctx.register_table("tbl", tmp_df.into_view())?;
+                        }
                     }
+                    // -- fix done
                 }
-                // -- fix done
             }
         }
     } else {
@@ -540,7 +543,15 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>,
             }
             i += 1;
             let row_schema = row.schema();
-            schema = Schema::try_merge(vec![schema, row_schema.as_ref().to_owned()])?;
+            let filtered_fields: Vec<Field> = row_schema
+                .fields()
+                .iter()
+                .filter(|field| field.data_type() != &DataType::Null)
+                .map(|arc_field| (**arc_field).clone())
+                .collect();
+            let row_schema = Arc::new(Schema::new(filtered_fields));
+            schema = Schema::try_merge(vec![schema.clone(), row_schema.as_ref().to_owned()])?;
+
             let file_name = format!("{work_dir}{i}.parquet");
             let mut buf_parquet = Vec::new();
             let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema.clone(), None)?;
@@ -614,9 +625,19 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     let mut sel_fields_name = Vec::new();
     let mut sel_fields_has_star = false;
     let mut last_is_as = false;
-    for (i, field) in fields.iter().enumerate() {
-        let field = field.trim();
-        if field.to_lowercase().eq("select") || field.to_lowercase().eq("distinct") {
+    let mut last_is_distinct = false;
+    for (_, field) in fields.iter().enumerate() {
+        let field = if last_is_distinct {
+            last_is_distinct = false;
+            format!("DISTINCT {}", field.trim())
+        } else {
+            field.trim().to_string()
+        };
+        if field.to_lowercase().eq("select") {
+            continue;
+        }
+        if field.to_lowercase().eq("distinct") {
+            last_is_distinct = true;
             continue;
         }
         if field.to_lowercase().eq("as") {
@@ -624,8 +645,8 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
             continue;
         }
         if last_is_as {
-            new_fields.remove(new_fields.len() - 1);
-            new_fields.push(format!("{} AS {field}", fields[i - 2]));
+            let orgin_field = new_fields.remove(new_fields.len() - 1);
+            new_fields.push(format!("{orgin_field} AS {field}"));
             sel_fields_name.remove(sel_fields_name.len() - 1);
             sel_fields_name.push(field.to_string().replace('"', "").replace(", ", ","));
             last_is_as = false;
@@ -689,10 +710,18 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     let mut need_rewrite = false;
     for i in 0..fields.len() {
         let field = fields.get(i).unwrap();
+        let schema_field = schema.field(i).name();
         if !field.contains('(') {
             if field.contains(" AS ") {
                 need_rewrite = true;
-                fields[i] = format!("\"{}\"", schema.field(i).name());
+                if field.contains("DISTINCT ") {
+                    fields[i] = format!("DISTINCT \"{}\" AS \"{}\"", schema_field, schema_field);
+                } else {
+                    fields[i] = format!("\"{}\"", schema_field);
+                }
+            } else if field != schema_field && *field == schema_field.replace("tbl.", "") {
+                need_rewrite = true;
+                fields[i] = format!("\"{}\" AS \"{}\"", schema_field, field);
             }
             continue;
         }
@@ -700,18 +729,15 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         let cap = RE_FIELD_FN.captures(field).unwrap();
         let mut fn_name = cap.get(1).unwrap().as_str().to_lowercase();
         if !AGGREGATE_UDF_LIST.contains(&fn_name.as_str()) {
-            fields[i] = format!("\"{}\"", schema.field(i).name());
+            fields[i] = format!("\"{}\"", schema_field);
             continue;
         }
         if fn_name == "count" {
             fn_name = "sum".to_string();
         }
-        fields[i] = format!(
-            "{fn_name}(\"{}\") as \"{}\"",
-            schema.field(i).name(),
-            schema.field(i).name()
-        );
+        fields[i] = format!("{fn_name}(\"{}\") AS \"{}\"", schema_field, schema_field);
     }
+
     if need_rewrite {
         sql = format!("SELECT {} FROM {}", &fields.join(", "), &sql[from_pos..]);
         if sql.contains("_PLACEHOLDER_") {
@@ -1047,7 +1073,7 @@ fn apply_query_fn(
     use vector_enrichment::TableRegistry;
 
     let mut resp = vec![];
-    let mut runtime = crate::common::functions::init_vrl_runtime();
+    let mut runtime = crate::common::utils::functions::init_vrl_runtime();
     match crate::service::ingestion::compile_vrl_function(&query_fn_src, org_id) {
         Ok(program) => {
             let registry = program.config.get_custom::<TableRegistry>().unwrap();

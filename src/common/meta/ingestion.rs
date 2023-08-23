@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::json;
+use crate::common::utils::json;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {
@@ -163,7 +163,7 @@ impl BulkResponseItem {
             _shards: None,
             _seq_no: None,
             _primary_term: None,
-            status: 200,
+            status: 422,
             error: Some(error),
             original_record: Some(orig_record),
         }

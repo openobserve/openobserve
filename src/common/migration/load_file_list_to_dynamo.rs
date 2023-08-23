@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ use std::io::{BufRead, BufReader};
 use tokio::sync::RwLock;
 
 use crate::common::infra::{config::CONFIG, file_list, storage};
-use crate::common::json;
+use crate::common::utils::json;
 use crate::common::meta::common::FileKey;
 use crate::service::db::file_list::{BLOCKED_ORGS, DELETED_FILES};
 

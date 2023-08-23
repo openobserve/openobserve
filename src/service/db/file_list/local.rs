@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,7 +41,6 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     // write into local cache for s3
     let mut write_buf = json::to_vec(&file_data)?;
     write_buf.push(b'\n');
-    let hour_key = date_key.replace('/', "_");
     let file = wal::get_or_create(
         0,
         StreamParams {
@@ -50,7 +49,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
             stream_type: StreamType::Filelist,
         },
         None,
-        &hour_key,
+        &date_key,
         false,
     );
     file.write(write_buf.as_ref());

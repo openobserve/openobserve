@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,15 +19,15 @@ use chrono::Duration;
 use std::collections::HashMap;
 use std::io::Error;
 
-use crate::common::base64;
-use crate::common::functions;
-use crate::common::http::get_stream_type_from_request;
 use crate::common::infra::config::CONFIG;
 use crate::common::infra::{errors, metrics};
-use crate::common::json;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::common::meta::usage::{RequestStats, UsageType};
 use crate::common::meta::{self, StreamType};
+use crate::common::utils::base64;
+use crate::common::utils::functions;
+use crate::common::utils::http::get_stream_type_from_request;
+use crate::common::utils::json;
 use crate::service::search as SearchService;
 use crate::service::usage::report_request_usage_stats;
 

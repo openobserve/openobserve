@@ -1,4 +1,4 @@
-<!-- Copyright 2022 Zinc Labs Inc. and Contributors
+<!-- Copyright 2023 Zinc Labs Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -38,6 +38,18 @@ remote_write:
       username: {{ currUserEmail }}
       password: {{ store.state.organizationData.organizationPasscode }}
     </pre>
+  </div>
+  <div>
+    <a
+      href="https://openobserve.ai/blog/send-metrics-using-kube-prometheus-stack-to-openobserve"
+      class="q-ml-lg text-bold"
+      style="padding-right: 2px"
+      target="_blank"
+      title="Send Kubernetes Metrics Using Prometheus to OpenObserve"
+    >
+      Click here</a
+    >
+    to learn how to ingest metrics using Prometheus
   </div>
 </template>
 

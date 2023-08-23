@@ -1,4 +1,4 @@
-// Copyright 2022 Zinc Labs Inc. and Contributors
+// Copyright 2023 Zinc Labs Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ use crate::common::meta::{
     syslog::SyslogRoute,
     user::User,
 };
-use crate::common::{cgroup, file::get_file_meta};
+use crate::common::utils::{cgroup, file::get_file_meta};
 use crate::service::enrichment::StreamTable;
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -665,6 +665,11 @@ pub fn get_parquet_compression() -> parquet::basic::Compression {
     }
 }
 
+#[inline]
+pub fn is_local_disk_storage() -> bool {
+    CONFIG.common.local_mode && CONFIG.common.local_mode_storage.eq("disk")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -694,7 +699,7 @@ mod tests {
         cfg.common.parquet_compression = "zstd".to_string();
         assert_eq!(
             get_parquet_compression(),
-            parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap())
+            parquet::basic::Compression::ZSTD(Default::default())
         );
 
         cfg.limit.file_push_interval = 0;
