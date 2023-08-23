@@ -19,26 +19,30 @@ use chrono::{TimeZone, Utc};
 use datafusion::arrow::json::reader::infer_json_schema;
 use std::{collections::BTreeMap, io::BufReader};
 use vector_enrichment::TableRegistry;
-use vrl::compiler::{runtime::Runtime, CompilationResult, TargetValueRef};
-use vrl::prelude::state;
+use vrl::{
+    compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
+    prelude::state,
+};
 
-use crate::common::infra::{
-    config::{CONFIG, STREAM_ALERTS, STREAM_FUNCTIONS},
-    metrics,
-    wal::get_or_create,
-};
-use crate::common::meta::{
-    alert::{Alert, Trigger},
-    functions::{StreamTransform, VRLRuntimeConfig},
-    stream::{PartitionTimeLevel, PartitioningDetails, StreamParams},
-    usage::RequestStats,
-    StreamType,
-};
-use crate::common::utils::{
-    flatten,
-    functions::get_vrl_compiler_config,
-    json::{Map, Value},
-    notification::send_notification,
+use crate::common::{
+    infra::{
+        config::{CONFIG, STREAM_ALERTS, STREAM_FUNCTIONS},
+        metrics,
+        wal::get_or_create,
+    },
+    meta::{
+        alert::{Alert, Trigger},
+        functions::{StreamTransform, VRLRuntimeConfig},
+        stream::{PartitionTimeLevel, PartitioningDetails, StreamParams},
+        usage::RequestStats,
+        StreamType,
+    },
+    utils::{
+        flatten,
+        functions::get_vrl_compiler_config,
+        json::{Map, Value},
+        notification::send_notification,
+    },
 };
 use crate::service::{db, format_partition_key, stream::stream_settings, triggers};
 
@@ -148,40 +152,6 @@ pub async fn get_stream_alerts<'a>(
     stream_alerts_map.insert(key, alerts);
 }
 
-pub fn get_hour_key(
-    timestamp: i64,
-    partition_keys: &Vec<String>,
-    local_val: &Map<String, Value>,
-    suffix: Option<&str>,
-) -> String {
-    // get hour file name
-
-    let mut hour_key = Utc
-        .timestamp_nanos(timestamp * 1000)
-        .format("%Y_%m_%d_%H")
-        .to_string();
-    if let Some(s) = suffix {
-        hour_key.push_str(&format!("_{s}"));
-    } else {
-        hour_key.push_str("_keeping");
-    }
-
-    for key in partition_keys {
-        match local_val.get(key) {
-            Some(v) => {
-                let val = if v.is_string() {
-                    format!("{}={}", key, v.as_str().unwrap())
-                } else {
-                    format!("{}={}", key, v)
-                };
-                hour_key.push_str(&format!("_{}", format_partition_key(&val)));
-            }
-            None => continue,
-        };
-    }
-    hour_key
-}
-
 pub fn get_wal_time_key(
     timestamp: i64,
     partition_keys: &Vec<String>,
@@ -193,19 +163,18 @@ pub fn get_wal_time_key(
     let mut time_key = match time_level {
         PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => Utc
             .timestamp_nanos(timestamp * 1000)
-            .format("%Y_%m_%d_%H")
+            .format("%Y/%m/%d/%H")
             .to_string(),
         PartitionTimeLevel::Daily => Utc
             .timestamp_nanos(timestamp * 1000)
-            .format("%Y_%m_%d_00")
+            .format("%Y/%m/%d/00")
             .to_string(),
     };
     if let Some(s) = suffix {
-        time_key.push_str(&format!("_{s}"));
+        time_key.push_str(&format!("/{s}"));
     } else {
-        time_key.push_str("_keeping");
+        time_key.push_str("/default");
     }
-
     for key in partition_keys {
         match local_val.get(key) {
             Some(v) => {
@@ -214,7 +183,7 @@ pub fn get_wal_time_key(
                 } else {
                     format!("{}={}", key, v)
                 };
-                time_key.push_str(&format!("_{}", format_partition_key(&val)));
+                time_key.push_str(&format!("/{}", format_partition_key(&val)));
             }
             None => continue,
         };
@@ -333,7 +302,7 @@ pub fn _write_file(
         if entry.is_empty() {
             continue;
         }
-        let file = crate::common::infra::wal::get_or_create(
+        let file = get_or_create(
             thread_id,
             StreamParams {
                 org_id,
@@ -424,36 +393,49 @@ mod tests {
         assert_eq!(format_partition_key("default/olympics"), "defaultolympics");
     }
     #[test]
-    fn test_get_hour_key() {
+    fn test_get_wal_time_key() {
         let mut local_val = Map::new();
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_hour_key(
+            get_wal_time_key(
                 1620000000,
                 &vec!["country".to_string(), "sport".to_string()],
+                PartitionTimeLevel::Hourly,
                 &local_val,
                 None
             ),
-            "1970_01_01_00_keeping_country=USA_sport=basketball"
+            "1970/01/01/00/keeping/country=USA/sport=basketball"
         );
     }
 
     #[test]
-    fn test_get_hour_key_no_partition_keys() {
+    fn test_get_wal_time_key_no_partition_keys() {
         let mut local_val = Map::new();
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_hour_key(1620000000, &vec![], &local_val, None),
-            "1970_01_01_00_keeping"
+            get_wal_time_key(
+                1620000000,
+                &vec![],
+                PartitionTimeLevel::Hourly,
+                &local_val,
+                None
+            ),
+            "1970/01/01/00/keeping"
         );
     }
     #[test]
-    fn test_get_hour_key_no_partition_keys_no_local_val() {
+    fn test_get_wal_time_key_no_partition_keys_no_local_val() {
         assert_eq!(
-            get_hour_key(1620000000, &vec![], &Map::new(), None),
-            "1970_01_01_00_keeping"
+            get_wal_time_key(
+                1620000000,
+                &vec![],
+                PartitionTimeLevel::Hourly,
+                &Map::new(),
+                None
+            ),
+            "1970/01/01/00/keeping"
         );
     }
     #[actix_web::test]

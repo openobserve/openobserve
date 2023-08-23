@@ -90,7 +90,7 @@ pub async fn delete_all(
 
     if is_local_disk_storage() {
         let data_dir = format!(
-            "{}/files/{org_id}/{stream_type}/{stream_name}",
+            "{}files/{org_id}/{stream_type}/{stream_name}",
             CONFIG.common.data_stream_dir
         );
         let path = std::path::Path::new(&data_dir);
@@ -197,7 +197,7 @@ pub async fn delete_by_date(
     if is_local_disk_storage() {
         while date_start <= date_end {
             let data_dir = format!(
-                "{}/files/{org_id}/{stream_type}/{stream_name}/{}",
+                "{}files/{org_id}/{stream_type}/{stream_name}/{}",
                 CONFIG.common.data_stream_dir,
                 date_start.format("%Y/%m/%d")
             );

@@ -48,7 +48,6 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     // local mode
     let mut write_buf = json::to_vec(&file_data)?;
     write_buf.push(b'\n');
-    let hour_key = date_key.replace('/', "_");
     let file = wal::get_or_create(
         0,
         StreamParams {
@@ -57,7 +56,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
             stream_type: StreamType::Filelist,
         },
         None,
-        &hour_key,
+        &date_key,
         false,
     );
     file.write(write_buf.as_ref());
@@ -73,7 +72,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
 
 pub async fn get_all() -> Result<Vec<FileKey>, anyhow::Error> {
     let mut result = Vec::with_capacity(1024);
-    let pattern = format!("{}/file_list/*.json", &CONFIG.common.data_wal_dir);
+    let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
     let files = scan_files(&pattern);
     let mut line_num = 0;
     for file in files {
