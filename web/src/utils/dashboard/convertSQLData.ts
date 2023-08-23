@@ -59,7 +59,11 @@ export const convertSQLData = (
     // when the key is not available in the data that is not show the default value
     let result: string[] = searchQueryData?.data?.map((item: any) => item[key]).filter((item: any) => item!==undefined);
     console.log("result", result);
-
+    const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
+    if (field && field.alias == key) {
+      // now we have the format, convert that format
+      result = result.map((it: any) => (new Date(it)-new Date("1970-01-01T00:00:00")));
+    }
     return result;
   };
 
@@ -996,7 +1000,7 @@ export const convertSQLData = (
           },
           // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
-        option.xAxis.data=null;
+        option.xAxis.data=[];
         return seriesObj;
       });
       console.log("multiple:- traces", traces);
@@ -1215,7 +1219,36 @@ export const convertSQLData = (
     ...getThemeLayoutOptions(store),
   };
 
-  console.log("optionss", xAxisKeys,yAxisKeys);
+//auto SQL: if x axis has time series
+  const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
+    if (field) {
+      option.series.map((seriesObj: any) => {
+      seriesObj.data=seriesObj.data.map((it: any,index:any) => [option.xAxis.data[index],it])
+    })
+    option.xAxis.type="time";
+    option.xAxis.data=[];
+  }
+
+//custom SQL: check if it is timeseries or not
+  if(option.xAxis.data.length>0){    
+    const sample = option.xAxis.data.slice(0, Math.min(20, option.xAxis.data.length));
+    const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
+    const isTimeSeries = sample.every((value:any) => {
+      return iso8601Pattern.test(value)
+    });
+    console.log("optionss11", option);
+  
+    console.log("istimeseries", isTimeSeries);
+    
+    if (isTimeSeries) {
+      option.series.map((seriesObj: any) => {
+        seriesObj.data=seriesObj.data.map((it: any,index:any) => [(new Date(option.xAxis.data[index])-new Date("1970-01-01T00:00:00")),it])
+      });
+    option.xAxis.type="time";
+    option.xAxis.data=[];
+    }
+  }
+
   console.log("optionss", option);
 
   // Plotly.react(plotRef.value, traces, layout, {
