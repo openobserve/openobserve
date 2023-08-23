@@ -23,7 +23,7 @@
             path: link,
             exact: false,
             query: {
-              org_identifier: store.state.selectedOrganization.identifier,
+              org_identifier: store.state.selectedOrganization?.identifier,
             },
           }
         : ''

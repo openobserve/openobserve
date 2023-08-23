@@ -11,8 +11,7 @@
 -->
 
 <template>
-  <q-page data-test="alerts-page"
-class="q-pa-none" style="min-height: inherit">
+  <q-page data-test="alerts-page" class="q-pa-none" style="min-height: inherit">
     <q-splitter
       v-model="splitterModel"
       unit="px"

@@ -415,21 +415,29 @@ export default defineComponent({
       formData.value.sql = e.target.value;
     };
     const updateCondtions = (e: any) => {
-      const ast = parser.astify(e.target.value);
-      sqlAST.value = ast;
-      // If sqlAST.value.columns is not type of array then return
-      if (!Array.isArray(sqlAST.value.columns)) return;
-      sqlAST.value.columns.forEach(function (item: any, index: any) {
-        let val;
-        if (item["as"] === undefined || item["as"] === null) {
-          val = item["expr"]["column"];
-        } else {
-          val = item["as"];
-        }
-        if (!triggerCols.value.includes(val)) {
-          triggerCols.value.push(val);
-        }
-      });
+      try {
+        const ast = parser.astify(e.target.value);
+        if (ast) sqlAST.value = ast;
+        else return;
+
+        // If sqlAST.value.columns is not type of array then return
+        if (!sqlAST.value) return;
+        if (!Array.isArray(sqlAST.value?.columns)) return;
+
+        sqlAST.value.columns.forEach(function (item: any) {
+          let val;
+          if (item["as"] === undefined || item["as"] === null) {
+            val = item["expr"]["column"];
+          } else {
+            val = item["as"];
+          }
+          if (!triggerCols.value.includes(val)) {
+            triggerCols.value.push(val);
+          }
+        });
+      } catch (e) {
+        console.log("Alerts: Error while parsing SQL query");
+      }
     };
     const editorData = ref("");
     const prefixCode = ref("");
@@ -495,10 +503,14 @@ export default defineComponent({
           .replace(suffixCode.value, "")
           .trim();
       }
-      prefixCode.value = `select * from`;
-      suffixCode.value = "'" + formData.value.stream_name + "'";
-      const someCode = `${prefixCode.value} ${editorData.value} ${suffixCode.value}`;
-      editorobj.setValue(someCode);
+
+      if (!props.isUpdated) {
+        prefixCode.value = `select * from`;
+        suffixCode.value = "'" + formData.value.stream_name + "'";
+        const someCode = `${prefixCode.value} ${editorData.value} ${suffixCode.value}`;
+        editorobj.setValue(someCode);
+      }
+
       formData.value.sql = editorobj.getValue();
       const selected_stream: any = schemaList.value.filter(
         (stream) => stream["name"] === stream_name
@@ -721,7 +733,7 @@ export default defineComponent({
             dismiss();
             this.q.notify({
               type: "negative",
-              message: err.response.data.error,
+              message: err.response?.data?.error || err.response?.data?.message,
             });
           });
         segment.track("Button Click", {
