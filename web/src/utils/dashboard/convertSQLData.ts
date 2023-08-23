@@ -789,15 +789,23 @@ export const convertSQLData = (
       show: true,
       type: "scroll",
       orient: "vertical", // 'horizontal' | 'vertical'
-      x: "right", // 'center' | 'left' | {number},
-      y: "center", // 'center' | 'bottom' | {number}
+      // x: "right", // 'center' | 'left' | {number},
+      // y: "center", // 'center' | 'bottom' | {number}
+      width:'10%',
+      right: '0%',
+      top: 'middle',
+      // textStyle: {
+      //   width: 40, // height:10,
+      //   overflow: "truncate",
+      // },
     },
     grid: {
       containLabel: true,
-      left: "2%",
-      // right: "10%",
-      top: "10%",
-      bottom: "10%",
+      left: "15",
+      right: "10%",
+      top: "15",
+      bottom: "15",
+
     },
     tooltip: {
       trigger: "axis",
@@ -806,24 +814,24 @@ export const convertSQLData = (
       },
     },
     xAxis: {
-        type: "category",
-        position: "bottom",
-        data: !xAxisKeys.length
-          ? []
-          : xAxisKeys.length == 1
-          ? getAxisDataFromKey(xAxisKeys[0])
-          : xAxisKeys?.map((key: any) => {
-             return getAxisDataFromKey(key);
-            }),
-        axisTick: {
-          alignWithLabel: true,
-        },
-        min: "dataMin",
-        max: "dataMax",
-        splitLine: {
-          show: true,
-        },
+      type: "category",
+      position: "bottom",
+      data: !xAxisKeys.length
+        ? []
+        : xAxisKeys.length == 1
+        ? getAxisDataFromKey(xAxisKeys[0])
+        : xAxisKeys?.map((key: any) => {
+            return getAxisDataFromKey(key);
+          }),
+      axisTick: {
+        alignWithLabel: true,
       },
+      // min: "dataMin",
+      // max: "dataMax",
+      splitLine: {
+        show: true,
+      },
+    },
     yAxis: {
       type: "value",
       // min: "dataMin",
