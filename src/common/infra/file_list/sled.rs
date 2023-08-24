@@ -30,7 +30,7 @@ lazy_static! {
 }
 
 pub fn connect() -> ::sled::Db {
-    ::sled::open(format!("{}file_list.sled", CONFIG.common.data_cache_dir))
+    ::sled::open(format!("{}file_list.sled", CONFIG.common.data_db_dir))
         .expect("sled db dir create failed")
 }
 

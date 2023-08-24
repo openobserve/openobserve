@@ -34,7 +34,7 @@ use crate::common::meta::{
 static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
 
 fn connect() -> Pool<Sqlite> {
-    let url = format!("{}{}", CONFIG.common.data_cache_dir, "file_list.sqlite");
+    let url = format!("{}{}", CONFIG.common.data_db_dir, "file_list.sqlite");
     if !CONFIG.common.local_mode && std::path::Path::new(&url).exists() {
         std::fs::remove_file(&url).expect("remove file failed");
     }

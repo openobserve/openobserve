@@ -67,7 +67,7 @@ pub trait FileList: Sync + 'static {
 
 pub async fn create_table() -> Result<()> {
     // check cache dir
-    std::fs::create_dir_all(&CONFIG.common.data_cache_dir)?;
+    std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
     match CONFIG.common.file_list_storage.as_str() {
         "sled" => sled::create_table().await,
         "sqlite" => sqlite::create_table().await,
@@ -79,7 +79,7 @@ pub async fn create_table() -> Result<()> {
 
 pub async fn create_table_index() -> Result<()> {
     // check cache dir
-    std::fs::create_dir_all(&CONFIG.common.data_cache_dir)?;
+    std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
     match CONFIG.common.file_list_storage.as_str() {
         "sled" => sled::create_table_index().await,
         "sqlite" => sqlite::create_table_index().await,

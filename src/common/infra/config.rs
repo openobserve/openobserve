@@ -196,8 +196,8 @@ pub struct Common {
     pub data_wal_dir: String,
     #[env_config(name = "ZO_DATA_STREAM_DIR", default = "")] // ./data/openobserve/stream/
     pub data_stream_dir: String,
-    #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
-    pub data_cache_dir: String,
+    #[env_config(name = "ZO_DATA_DB_DIR", default = "")] // ./data/openobserve/db/
+    pub data_db_dir: String,
     #[env_config(name = "ZO_BASE_URI", default = "")]
     pub base_uri: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
@@ -553,11 +553,11 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.common.data_stream_dir.ends_with('/') {
         cfg.common.data_stream_dir = format!("{}/", cfg.common.data_stream_dir);
     }
-    if cfg.common.data_cache_dir.is_empty() {
-        cfg.common.data_cache_dir = format!("{}cache/", cfg.common.data_dir);
+    if cfg.common.data_db_dir.is_empty() {
+        cfg.common.data_db_dir = format!("{}db/", cfg.common.data_dir);
     }
-    if !cfg.common.data_cache_dir.ends_with('/') {
-        cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
+    if !cfg.common.data_db_dir.ends_with('/') {
+        cfg.common.data_db_dir = format!("{}/", cfg.common.data_db_dir);
     }
     if cfg.common.base_uri.ends_with('/') {
         cfg.common.base_uri = cfg.common.base_uri.trim_end_matches('/').to_string();
