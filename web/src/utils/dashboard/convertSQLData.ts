@@ -71,7 +71,7 @@ export const convertSQLData = (
       keyArrays[key] = data.map(obj => obj[key]);
     }
     
-    let result = keyArrays[key];
+    let result = keyArrays[key]||[];
     
 
     // when the key is not available in the data that is not show the default value
@@ -856,11 +856,11 @@ export const convertSQLData = (
     //     show: true,
     //   },
     // },
-    xAxis:xAxisKeys?.map((key: any) => {
+    xAxis:xAxisKeys?.map((key: any,index:number) => {
         return {
           type: "category",
-          position: "bottom",
-          name: props.data.queries[0]?.fields?.x[0]?.label,
+          position: props.data.type == "h-bar" ? "left" : "bottom",
+          name: props.data.queries[0]?.fields?.x[index]?.label,
           nameLocation: "middle",
           nameGap: 30,
           nameTextStyle: {
@@ -873,21 +873,6 @@ export const convertSQLData = (
             show: true,
           },
           data: getAxisDataFromKey(key),
-          // axisTick: {
-          //   alignWithLabel: true,
-          // },
-          // name: props.data.queries[0]?.fields?.x[0]?.label,
-          // nameLocation: "middle",
-          // nameGap: 30,
-          // nameTextStyle: {
-          //   fontWeight: "bold",
-          //   fontSize: 14,
-          // },
-          // // min: "dataMin",
-          // // max: "dataMax",
-          // splitLine: {
-          //   show: true,
-          // },
         };
       }).flat(),
     yAxis: {
@@ -1056,8 +1041,6 @@ export const convertSQLData = (
       option.tooltip={
         trigger: 'item'
       }
-
-      let i=0;
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
@@ -1074,8 +1057,8 @@ export const convertSQLData = (
           //   opacity: 0.8,
           // },
           // labels: textwrapper(xData),
-          data: getAxisDataFromKey(key).map((it, index) => {
-            return { value: [it], name: option.xAxis[0].data[i++] };
+          data: getAxisDataFromKey(key).map((it:any, i:number) => {
+            return { value: it, name: option.xAxis[0].data[i] };
           }),
           label: {
             show: true,
@@ -1084,20 +1067,19 @@ export const convertSQLData = (
           },
           // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
-        option.xAxis.data=[];
         return seriesObj;
       });
-      console.log("multiple:- traces", traces);
+      option.xAxis=[];
+      option.yAxis=[];
       break;
     }
     case "donut": {
     option.tooltip = {
       trigger: "item",
     };
-      let i=0;
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
-        const trace = {
+        const seriesObj = {
           // name: props.data?.queries[0]?.fields?.y.find(
           //   (it: any) => it.alias == key
           // )?.label,
@@ -1111,8 +1093,8 @@ export const convertSQLData = (
           //   opacity: 0.8,
           // },
           // labels: textwrapper(xData),
-          data: getAxisDataFromKey(key).map((it, index) => {
-            return { value: it, name: option.xAxis.data[i++] };
+          data: getAxisDataFromKey(key).map((it: any, i:number) => {
+            return { value: it, name: option.xAxis[0].data[i] };
           }),
           label: {
             show: true,
@@ -1121,11 +1103,10 @@ export const convertSQLData = (
           },
           // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
-        return trace;
+        return seriesObj;
       });
-      option.xAxis.data=null;
-
-      console.log("multiple:- traces", traces);
+      option.xAxis=[];
+      option.yAxis=[];
       break;
     }
     case "area-stacked": {
@@ -1304,34 +1285,31 @@ export const convertSQLData = (
   };
 
 //auto SQL: if x axis has time series
-  // const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
-  //   if (field) {
-  //     option.series.map((seriesObj: any) => {
-  //     seriesObj.data=seriesObj.data.map((it: any,index:any) => [option.xAxis.data[index],it])
-  //   })
-  //   option.xAxis[0].type="time";
-  //   option.xAxis[0].data=[];
-  // }
+  const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
+    if (field) {
+      option.series.map((seriesObj: any) => {
+      seriesObj.data=seriesObj.data.map((it: any,index:any) => [option.xAxis[0].data[index],it])
+    })
+    option.xAxis[0].type="time";
+    option.xAxis[0].data=[];
+  }
 
 //custom SQL: check if it is timeseries or not
-  // if((props.data.type != "h-bar") && option.xAxis.length>0){    
-  //   const sample = option.xAxis[0].data.slice(0, Math.min(20, option.xAxis[0].data.length));
-  //   const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
-  //   const isTimeSeries = sample.every((value:any) => {
-  //     return iso8601Pattern.test(value)
-  //   });
-  //   console.log("optionss11", option);
+if((props.data.type != "h-bar") && option.xAxis.length>0 && option.xAxis[0].data.length>0){    
+  const sample = option.xAxis[0].data.slice(0, Math.min(20, option.xAxis[0].data.length));
   
-  //   console.log("istimeseries", isTimeSeries);
-    
-  //   if (isTimeSeries) {
-  //     option.series.map((seriesObj: any) => {
-  //       seriesObj.data=seriesObj.data.map((it: any,index:any) => [(new Date(option.xAxis.data[index])-new Date("1970-01-01T00:00:00")),it])
-  //     });
-  //   option.xAxis[0].type="time";
-  //   option.xAxis[0].data=[];
-  //   }
-  // }
+    const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
+    const isTimeSeries = sample.every((value:any) => {
+      return iso8601Pattern.test(value)
+    });
+    if (isTimeSeries) {
+      option.series.map((seriesObj: any) => {
+        seriesObj.data=seriesObj.data.map((it: any,index:any) => [(new Date(option.xAxis.data[index])-new Date("1970-01-01T00:00:00")),it])
+      });
+    option.xAxis[0].type="time";
+    option.xAxis[0].data=[];
+    }
+  }
 
   console.log("optionss", option);
 
