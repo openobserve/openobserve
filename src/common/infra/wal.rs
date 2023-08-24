@@ -89,7 +89,7 @@ pub fn get_search_in_memory_files(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-) -> Result<Vec<Vec<u8>>, std::io::Error> {
+) -> Result<Vec<(String, Vec<u8>)>, std::io::Error> {
     if !CONFIG.common.wal_memory_mode_enabled {
         return Ok(vec![]);
     }
@@ -108,7 +108,7 @@ pub fn get_search_in_memory_files(
                         && file.stream_type == stream_type
                     {
                         if let Ok(data) = file.read() {
-                            Some(data)
+                            Some((file.wal_name(), data))
                         } else {
                             None
                         }
@@ -116,13 +116,13 @@ pub fn get_search_in_memory_files(
                         None
                     }
                 })
-                .collect::<Vec<Vec<u8>>>() // removing `collect()` would have been
-                                           // even better but can't, due to `data`
-                                           // getting borrowed beyond its lifetime
+                .collect::<Vec<(String, Vec<u8>)>>() // removing `collect()` would have been
+                                                     // even better but can't, due to `data`
+                                                     // getting borrowed beyond its lifetime
         }),
         MEMORY_FILES.list().iter().filter_map(|(file, data)| {
             if file.starts_with(&prefix) {
-                Some(data.to_vec())
+                Some((file.clone(), data.to_vec()))
             } else {
                 None
             }
@@ -453,6 +453,14 @@ impl RwFile {
     #[inline]
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    #[inline]
+    pub fn wal_name(&self) -> String {
+        format!(
+            "files/{}/{}/{}/{}",
+            self.org_id, self.stream_type, self.stream_name, self.name
+        )
     }
 
     #[inline]

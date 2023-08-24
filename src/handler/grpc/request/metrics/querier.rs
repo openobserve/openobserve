@@ -17,7 +17,7 @@ use std::time::UNIX_EPOCH;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::infra::{config::CONFIG, errors, ider, metrics, wal};
+use crate::common::infra::{config::CONFIG, errors, metrics, wal};
 use crate::common::meta;
 use crate::common::utils::file::{get_file_contents, get_file_meta, scan_files};
 use crate::handler::grpc::cluster_rpc::{
@@ -142,11 +142,8 @@ impl Metrics for Querier {
             let mem_files =
                 wal::get_search_in_memory_files(org_id, stream_name, meta::StreamType::Metrics)
                     .unwrap_or_default();
-            for body in mem_files {
-                resp.files.push(MetricsWalFile {
-                    name: format!("{}.json", ider::generate()),
-                    body,
-                });
+            for (name, body) in mem_files {
+                resp.files.push(MetricsWalFile { name, body });
             }
         }
 
