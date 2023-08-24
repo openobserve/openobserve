@@ -730,11 +730,11 @@ fn split_sql_token(text: &str) -> Vec<String> {
     let mut quote = ' ';
     for i in 0..text_chars_len {
         let c = text_chars.get(i).unwrap();
-        if *c == '(' {
+        if !in_quote && *c == '(' {
             bracket += 1;
             continue;
         }
-        if *c == ')' {
+        if !in_quote && *c == ')' {
             bracket -= 1;
             continue;
         }
@@ -787,7 +787,7 @@ mod tests {
     use super::*;
 
     #[actix_web::test]
-    async fn sql_works() {
+    async fn test_sql_works() {
         let org_id = "test_org";
         let col = "_timestamp";
         let table = "default";
@@ -822,7 +822,7 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn test_context_sqls() {
+    async fn test_sql_contexts() {
         let sqls = [
             ("select * from table1", true, (0,0)),
             ("select * from table1 where a=1", true, (0,0)),
@@ -917,7 +917,7 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn test_full_sqls() {
+    async fn test_sql_full() {
         let sqls = [
             ("select * from table1", true, 0,(0,0)),
             ("select * from table1 where a=1", true, 0,(0,0)),
