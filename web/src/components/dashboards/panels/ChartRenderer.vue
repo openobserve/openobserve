@@ -5,49 +5,56 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
 import * as echarts from "echarts";
+import { useStore } from "vuex";
 
 export default defineComponent({
-  name: "ChartRenderer",
-  props: {
-    data: {
-      required: true,
-      type: Object,
-      default: () => ({ option: {}})
+    name: "ChartRenderer",
+    props: {
+        data: {
+            required: true,
+            type: Object,
+            default: () => ({ option: {} })
+        },
     },
-  },
-  setup(props: any) {
-    const chartRef: any = ref(null);
-    let chart:any;
+    setup(props: any) {
+        const chartRef: any = ref(null);
+        let chart: any;
+        const store = useStore();
+        const windowResizeEventCallback = async () => {
+            await nextTick();
+            chart.resize();
+        }
 
-    const windowResizeEventCallback = async () => {
-        await nextTick()
-        chart.resize();
-      }
-    onMounted(async() => {
-      console.log("ChartRenderer: mounted");
-      console.log("props at chartrenderer",{props});
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      chart = echarts.init(chartRef.value)
-      chart.setOption(props?.data?.option || {}, true);
-      window.addEventListener("resize", windowResizeEventCallback);
-    });
+        watch(() => store.state.theme, (newTheme) => {
+          const theme = newTheme === 'dark' ? 'dark' : 'light';
+          chart.dispose();
+          chart = echarts.init(chartRef.value, theme);
+          chart.setOption(props.data.option || {}, true);
+        });
 
-    onUnmounted(()=>{
-      window.removeEventListener("resize", windowResizeEventCallback);
-    })
-
-    watch(() => props.data.option,
-      () => {
-        console.log("ChartRenderer: props.data updated", props.data);
-        chart.setOption(props?.data?.option || {},true);
-      },{deep:true})
-    return { chartRef };
-  },
+        onMounted(async () => {
+            console.log("ChartRenderer: mounted");
+            console.log("props at chartrenderer", { props });
+            await nextTick();
+            await nextTick();
+            await nextTick();
+            await nextTick();
+            await nextTick();
+            await nextTick();
+            await nextTick();
+            const theme = store.state.theme === 'dark' ? 'dark' : 'light';
+            chart = echarts.init(chartRef.value, theme);
+            chart.setOption(props?.data?.option || {}, true);
+            window.addEventListener("resize", windowResizeEventCallback);
+        });
+        onUnmounted(() => {
+            window.removeEventListener("resize", windowResizeEventCallback);
+        });
+        watch(() => props.data.option, () => {
+            console.log("ChartRenderer: props.data updated", props.data);
+            chart.setOption(props?.data?.option || {}, true);
+        }, { deep: true });
+        return { chartRef };
+    },
 })
 </script>

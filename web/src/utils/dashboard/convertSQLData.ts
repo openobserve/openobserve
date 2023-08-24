@@ -803,15 +803,24 @@ export const convertSQLData = (
   // console.log("xAxisKeys?.map",xAxisData1, xAxisData2);
   
   let option = {
+    backgroundColor: "transparent",
     legend: {
       show: true,
       type: "scroll",
       orient: "vertical", // 'horizontal' | 'vertical'
       // x: "right", // 'center' | 'left' | {number},
       // y: "center", // 'center' | 'bottom' | {number}
-      width:'10%',
-      right: '0%',
-      top: 'middle',
+      width: "10%",
+      right: "0%",
+      top: "middle",
+      tooltip: {
+        show: true,
+        padding: 2,
+        textStyle: {
+          fontSize: 12,
+        },
+        backgroundColor: "rgba(255,255,255,0.8)",
+      },
       // textStyle: {
       //   width: 40, // height:10,
       //   overflow: "truncate",
