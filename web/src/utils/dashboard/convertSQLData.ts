@@ -1277,7 +1277,8 @@ export const convertSQLData = (
       break;
     }
     case "h-stacked": {
-      option.xAxis.data=Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
+      option.xAxis[0].data=Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
+      option.xAxis = option.xAxis.slice(0,1);
 
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
@@ -1290,9 +1291,7 @@ export const convertSQLData = (
 
       option.series = stackedXAxisUniqueValue?.map((key: any) => {
         const seriesObj = {
-          name: props.data?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key
-          )?.label,
+          name: key,
           ...getPropsByChartTypeForTraces(),    
           data:  Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))).map((it: any) => (searchQueryData.data.find((it2:any)=>it2[xAxisKeys[0]] == it && it2[key1] == key))?.[yAxisKeys[0]] || 0)
         };
