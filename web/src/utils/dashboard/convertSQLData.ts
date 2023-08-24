@@ -807,15 +807,21 @@ export const convertSQLData = (
     legend: {
       show: true,
       type: "scroll",
-      orient: "vertical", // 'horizontal' | 'vertical'
+      orient: "horizontal", // 'horizontal' | 'vertical'
       // x: "right", // 'center' | 'left' | {number},
       // y: "center", // 'center' | 'bottom' | {number}
-      width: "10%",
-      right: "0%",
-      top: "middle",
+      left: "0",
+      // right: "25",
+      top: "bottom",
+      padding: [
+        10, // up
+        20, // right
+        0, // down
+        10, // left
+      ],
       tooltip: {
         show: true,
-        padding: 2,
+        padding: 10,
         textStyle: {
           fontSize: 12,
         },
@@ -922,6 +928,7 @@ export const convertSQLData = (
       // },
     },
     toolbox: {
+      orient: "vertical",
       show: true,
       feature: {
         dataZoom: {
@@ -1044,6 +1051,9 @@ export const convertSQLData = (
     {
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
+          name: props.data?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label,
           ...getPropsByChartTypeForTraces(),
           data:getAxisDataFromKey(key).map((it,i:number)=>{return [option.xAxis[0].data[i],it]}),
         };
@@ -1055,6 +1065,9 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
+          name: props.data?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label,
           ...getPropsByChartTypeForTraces(),
           data:getAxisDataFromKey(key)
         };
