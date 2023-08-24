@@ -300,6 +300,7 @@ export const convertPromQLData = (
   }
 
   let option = {
+    backgroundColor: "transparent",
     legend: {
       show: true,
       type: "scroll",
