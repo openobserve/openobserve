@@ -888,25 +888,45 @@ export const convertSQLData = (
     //   },
     // },
     xAxis:xAxisKeys?.map((key: any,index:number) => {
+      const data = getAxisDataFromKey(key);      
+
+      const arr = [];
+      for(let i=0;i<data.length;i++){
+        if(i==0||data[i]!=data[i-1])arr.push(i)
+      }      
         return {
           type: "category",
           position: props.data.type == "h-bar" ? "left" : "bottom",
           name: index==0 ? props.data.queries[0]?.fields?.x[index]?.label : "",
           nameLocation: "middle",
-          nameGap: 14 * (xAxisKeys.length - index + 1),
+          nameGap: 18 * (xAxisKeys.length - index + 1),
           nameTextStyle: {
             fontWeight: "bold",
             fontSize: 14,
           },
           axisLabel: {
-            margin: 14 * (xAxisKeys.length - index)
+             interval: index == xAxisKeys.length-1  ? "auto" : function(i,value){
+              return arr.includes(i);
+            },
+            overflow: index == xAxisKeys.length-1  ? "none" :"truncate",
+            width:100,
+            margin: 18 * (xAxisKeys.length - index -1) + 5
           },
           // min: "dataMin",
           // max: "dataMax",
           splitLine: {
-            show: true,
+            show: false,
           },
-          data: getAxisDataFromKey(key),
+          axisTick:{
+            show: xAxisKeys.length == 1 ? false : true,
+            align:"left",
+            alignWithLabel: false,
+            length: 20 * (xAxisKeys.length - index),
+            interval:function(i,value){
+              return arr.includes(i);
+            }
+          },
+          data: data,
         };
       }).flat(),
     yAxis: {
