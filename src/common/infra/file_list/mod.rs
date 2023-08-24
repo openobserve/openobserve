@@ -14,14 +14,16 @@
 
 use async_trait::async_trait;
 
-use crate::common::infra::{
-    config::CONFIG,
-    errors::{Error, Result},
-};
-use crate::common::meta::{
-    common::{FileKey, FileMeta},
-    stream::PartitionTimeLevel,
-    StreamType,
+use crate::common::{
+    infra::{
+        config::CONFIG,
+        errors::{Error, Result},
+    },
+    meta::{
+        common::{FileKey, FileMeta},
+        stream::{PartitionTimeLevel, StreamStats},
+        StreamType,
+    },
 };
 
 pub mod dynamo;
@@ -59,6 +61,12 @@ pub trait FileList: Sync + 'static {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>>;
+    async fn stats(
+        &self,
+        org_id: &str,
+        stream_type: Option<StreamType>,
+        stream_name: Option<&str>,
+    ) -> Result<Vec<(String, StreamStats)>>;
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
@@ -131,6 +139,15 @@ pub async fn query(
 }
 
 #[inline]
+pub async fn stats(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> Result<Vec<(String, StreamStats)>> {
+    CLIENT.stats(org_id, stream_type, stream_name).await
+}
+
+#[inline]
 pub async fn contains(file: &str) -> Result<bool> {
     CLIENT.contains(file).await
 }
@@ -168,4 +185,54 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String)> {
     );
     let file_name = columns[8].to_string();
     Ok((stream_key, date_key, file_name))
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct FileRecord {
+    pub stream: String,
+    pub date: String,
+    pub file: String,
+    pub deleted: bool,
+    pub min_ts: i64,
+    pub max_ts: i64,
+    pub records: i64,
+    pub original_size: i64,
+    pub compressed_size: i64,
+}
+
+impl From<&FileRecord> for FileMeta {
+    fn from(record: &FileRecord) -> Self {
+        Self {
+            min_ts: record.min_ts,
+            max_ts: record.max_ts,
+            records: record.records as u64,
+            original_size: record.original_size as u64,
+            compressed_size: record.compressed_size as u64,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct StatsRecord {
+    pub stream: String,
+    pub min_ts: i64,
+    pub max_ts: i64,
+    pub records: i64,
+    pub file_num: i64,
+    pub original_size: i64,
+    pub compressed_size: i64,
+}
+
+impl From<&StatsRecord> for StreamStats {
+    fn from(record: &StatsRecord) -> Self {
+        Self {
+            created_at: 0,
+            doc_time_min: record.min_ts,
+            doc_time_max: record.max_ts,
+            doc_num: record.records as u64,
+            file_num: record.file_num as u64,
+            storage_size: record.original_size as f64,
+            compressed_size: record.compressed_size as f64,
+        }
+    }
 }

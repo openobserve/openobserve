@@ -290,7 +290,6 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
 
 fn get_schema_version(file: &str) -> Result<String, Error> {
     // eg: /a-b-c-d/files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
-    println!("file: {}", file);
     let column = file.split('/').collect::<Vec<&str>>();
     if column.len() < 12 {
         return Err(Error::Message(format!("invalid wal file name: {}", file)));

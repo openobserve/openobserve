@@ -15,14 +15,16 @@
 use async_trait::async_trait;
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 
-use crate::common::infra::{
-    config::CONFIG,
-    errors::{Error, Result},
-};
-use crate::common::meta::{
-    common::{FileKey, FileMeta},
-    stream::PartitionTimeLevel,
-    StreamType,
+use crate::common::{
+    infra::{
+        config::CONFIG,
+        errors::{Error, Result},
+    },
+    meta::{
+        common::{FileKey, FileMeta},
+        stream::{PartitionTimeLevel, StreamStats},
+        StreamType,
+    },
 };
 
 lazy_static! {
@@ -160,6 +162,65 @@ impl super::FileList for SledFileList {
                     .collect::<Vec<_>>(),
             );
         }
+        Ok(files)
+    }
+
+    async fn stats(
+        &self,
+        org_id: &str,
+        stream_type: Option<StreamType>,
+        stream_name: Option<&str>,
+    ) -> Result<Vec<(String, StreamStats)>> {
+        let client = CLIENT.clone();
+        let mut buckets = Vec::new();
+        if stream_type.is_some() && stream_name.is_some() {
+            buckets.push(format!(
+                "{org_id}/{}/{}",
+                stream_type.unwrap(),
+                stream_name.unwrap()
+            ));
+        } else {
+            let org = format!("{}/", org_id);
+            buckets = client
+                .tree_names()
+                .iter()
+                .filter_map(|v| {
+                    let v = String::from_utf8(v.to_vec()).unwrap();
+                    if v.starts_with(&org) {
+                        Some(v)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+        }
+
+        let mut files = Vec::with_capacity(buckets.len());
+        for name in buckets {
+            let bucket = client.open_tree(name.as_bytes()).unwrap();
+            let mut iter = bucket.iter();
+            let mut stats = StreamStats::default();
+            loop {
+                let item = iter.next();
+                if item.is_none() {
+                    break;
+                }
+                let (_key, value) = item.unwrap().unwrap();
+                let meta = FileMeta::try_from(value.as_ref()).unwrap();
+                if meta.min_ts < stats.doc_time_min {
+                    stats.doc_time_min = meta.min_ts;
+                }
+                if meta.max_ts > stats.doc_time_max {
+                    stats.doc_time_max = meta.max_ts;
+                }
+                stats.file_num += 1;
+                stats.doc_num += meta.records;
+                stats.storage_size += meta.original_size as f64;
+                stats.compressed_size += meta.compressed_size as f64;
+            }
+            files.push((name, stats));
+        }
+
         Ok(files)
     }
 

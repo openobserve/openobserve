@@ -148,14 +148,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { file_list::run().await });
+    tokio::task::spawn(async move { stats::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
     tokio::task::spawn(async move { compact::run().await });
     tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { prom::run().await });
-
-    if CONFIG.common.usage_enabled {
-        tokio::task::spawn(async move { stats::run().await });
-    }
 
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");

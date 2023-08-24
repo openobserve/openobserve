@@ -27,14 +27,16 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::collections::HashMap;
 use tokio_stream::StreamExt;
 
-use crate::common::infra::{
-    config::CONFIG,
-    errors::{Error, Result},
-};
-use crate::common::meta::{
-    common::{FileKey, FileMeta},
-    stream::PartitionTimeLevel,
-    StreamType,
+use crate::common::{
+    infra::{
+        config::CONFIG,
+        errors::{Error, Result},
+    },
+    meta::{
+        common::{FileKey, FileMeta},
+        stream::{PartitionTimeLevel, StreamStats},
+        StreamType,
+    },
 };
 
 lazy_static! {
@@ -260,6 +262,15 @@ impl super::FileList for DynamoFileList {
             })
             .collect();
         Ok(resp)
+    }
+
+    async fn stats(
+        &self,
+        _org_id: &str,
+        _stream_type: Option<StreamType>,
+        _stream_name: Option<&str>,
+    ) -> Result<Vec<(String, StreamStats)>> {
+        Ok(vec![])
     }
 
     async fn contains(&self, file: &str) -> Result<bool> {
