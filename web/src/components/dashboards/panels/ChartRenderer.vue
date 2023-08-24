@@ -27,9 +27,12 @@ export default defineComponent({
 
         watch(() => store.state.theme, (newTheme) => {
           const theme = newTheme === 'dark' ? 'dark' : 'light';
-          chart.dispose();
+          chart.dispose();  
           chart = echarts.init(chartRef.value, theme);
-          chart.setOption(props.data.option || {}, true);
+          const options = props.data.option || {}
+          options.animation = false
+          chart.setOption(options, true);
+          chart.setOption({animation: true});
         });
 
         onMounted(async () => {
