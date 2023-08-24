@@ -837,6 +837,22 @@ export const convertSQLData = (
       trigger: "axis",
       axisPointer: {
         type: "cross",
+        label:{
+          show:true,
+          // padding:1,
+          formatter: function (params) {
+            // console.log(params, "params");
+            if(params.axisDimension=="y") return params.value.toString();
+            let lineBreaks="";
+            for(let i=0;i<(xAxisKeys.length-params.axisIndex-1);i++){
+              lineBreaks+=" \n \n";
+              console.log("params",lineBreaks);
+              
+            }
+            // console.log("params",str+params.value);
+            return `${lineBreaks}  ${params.value}`;
+        }
+        }
       },
     },
     // xAxis: {
@@ -869,12 +885,15 @@ export const convertSQLData = (
         return {
           type: "category",
           position: props.data.type == "h-bar" ? "left" : "bottom",
-          name: props.data.queries[0]?.fields?.x[index]?.label,
+          name: index==0 ? props.data.queries[0]?.fields?.x[index]?.label : "",
           nameLocation: "middle",
-          nameGap: 30,
+          nameGap: 14 * (xAxisKeys.length - index + 1),
           nameTextStyle: {
             fontWeight: "bold",
             fontSize: 14,
+          },
+          axisLabel: {
+            margin: 14 * (xAxisKeys.length - index)
           },
           // min: "dataMin",
           // max: "dataMax",
