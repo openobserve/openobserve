@@ -801,14 +801,50 @@ const formatDate =(date:any)=>{
     legendConfig.left = "0"; // Apply left positioning
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
+  /**
+   * Calculates the width of a given text.
+   * Useful to calculate nameGap for the left axis
+   *
+   * @param {string} text - The text to calculate the width of.
+   * @return {number} The width of the text in pixels.
+   */
+  const calculateWidthText = (text: string): number => {
+    if (!text) return 0;
+
+    const span = document.createElement('span');
+    document.body.appendChild(span);
+
+    span.style.font = 'sans-serif';
+    span.style.fontSize = '12px';
+    span.style.height = 'auto';
+    span.style.width = 'auto';
+    span.style.top = '0px';
+    span.style.position = 'absolute';
+    span.style.whiteSpace = 'no-wrap';
+    span.innerHTML = text;
+
+    const width = Math.ceil(span.clientWidth);
+    span.remove();
+    return width;
+};
+
+  const data = getAxisDataFromKey(yAxisKeys[0]);      
+  // get the largest label from the data from array of string with reduce
+  const largestLabel = data.reduce((largest: any, label: any) => {
+    return label?.toString().length > largest?.toString().length ? label : largest;
+  }, '');
+
+  // const largestLabel = 
+  const nameGap = calculateWidthText(largestLabel) + 8
+  console.log('namegap data:', data, largestLabel, nameGap);
 
   let option:any = {
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
       containLabel: true,
-      left: "10%",
-      right: "10%",
+      left: "30",
+      right: "20",
       top: "15",
       bottom: "30",
     },
@@ -880,12 +916,13 @@ const formatDate =(date:any)=>{
       for(let i=0;i<data.length;i++){
         if(i==0||data[i]!=data[i-1])arr.push(i)
       }      
+
         return {
           type: "category",
           position: props.data.type == "h-bar" ? "left" : "bottom",
           name: index==0 ? props.data.queries[0]?.fields?.x[index]?.label : "",
           nameLocation: "middle",
-          nameGap: 18 * (xAxisKeys.length - index + 1),
+          nameGap: 16 * (xAxisKeys.length - index + 1),
           nameTextStyle: {
             fontWeight: "bold",
             fontSize: 14,
@@ -922,7 +959,7 @@ const formatDate =(date:any)=>{
           ? props.data.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
-      nameGap: 60,
+      nameGap: nameGap,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
