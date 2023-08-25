@@ -86,17 +86,17 @@ pub trait Db: Sync + 'static {
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>>;
-    async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>>;
+    //async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>>;
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>>;
     async fn count(&self, prefix: &str) -> Result<usize>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
-    async fn transaction(
+    /*  async fn transaction(
         &self,
         check_key: &str, // check the key exists
         and_ops: Vec<Event>,
         else_ops: Vec<Event>,
-    ) -> Result<()>;
+    ) -> Result<()>; */
 }
 
 #[cfg(test)]
@@ -138,8 +138,9 @@ mod tests {
         assert_eq!(db.list_keys("/foo/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/").await.unwrap().len(), 3);
 
-        let mut events = db.list_use_channel("/foo/").await.unwrap();
-        let events = Arc::get_mut(&mut events).unwrap();
-        assert_eq!(events.recv().await.unwrap().0, "/foo/bar1");
+        /*  let mut events = db.list_use_channel("/foo/").await.unwrap();
+               let events = Arc::get_mut(&mut events).unwrap();
+               assert_eq!(events.recv().await.unwrap().0, "/foo/bar1");
+        */
     }
 }

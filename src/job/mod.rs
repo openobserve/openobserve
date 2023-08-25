@@ -42,6 +42,15 @@ pub(crate) mod syslog_server;
 mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
+    //create dynamo db table
+    if CONFIG
+        .common
+        .meta_store
+        .eq(&MetaStore::DynamoDB.to_string())
+    {
+        crate::common::infra::db::dynamo_db::create_dynamo_tables().await;
+    }
+
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
     )
@@ -147,7 +156,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         // initialize metadata
         tokio::task::spawn(async move { db::functions::watch().await });
-        tokio::task::spawn(async move { db::schema::watch().await });
         tokio::task::spawn(async move { db::compact::retention::watch().await });
         tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
         tokio::task::spawn(async move { db::alerts::watch().await });
