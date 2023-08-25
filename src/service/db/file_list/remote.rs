@@ -21,10 +21,10 @@ use std::{
     io::{BufRead, BufReader},
     sync::atomic,
 };
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, RwLock};
 
 use crate::common::{
-    infra::{config::CONFIG, storage},
+    infra::{config::CONFIG, file_list as infra_file_list, storage},
     meta::common::FileKey,
     utils::json,
 };
@@ -41,23 +41,33 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     }
 
     let files = storage::list(&prefix).await?;
-    log::info!("Load file_list [{prefix}] gets {} files", files.len());
+    let files_num = files.len();
+    log::info!("Load file_list [{prefix}] gets {} files", files_num);
     if files.is_empty() {
         // cache result
         rw.insert(prefix);
         return Ok(());
     }
 
-    let mut tasks = Vec::new();
-    let chunk_size = std::cmp::max(1, files.len() / CONFIG.limit.query_thread_num);
+    let mut tasks = Vec::with_capacity(CONFIG.limit.query_thread_num + 1);
+    let (tx, mut rx) = mpsc::channel::<Vec<FileKey>>(files_num);
+    let chunk_size = std::cmp::max(1, files_num / CONFIG.limit.query_thread_num);
     for chunk in files.chunks(chunk_size) {
         let chunk = chunk.to_vec();
+        let tx = tx.clone();
         let task: tokio::task::JoinHandle<Result<ProcessStats, anyhow::Error>> =
             tokio::task::spawn(async move {
+                let start = std::time::Instant::now();
                 let mut stats = ProcessStats::default();
                 for file in chunk {
                     match process_file(&file).await {
-                        Ok(ret) => stats = stats + ret,
+                        Ok(ret) => {
+                            stats.file_count += ret.len();
+                            if let Err(e) = tx.send(ret).await {
+                                log::error!("Error sending file: {:?} {:?}", file, e);
+                                continue;
+                            }
+                        }
                         Err(err) => {
                             log::error!("Error processing file: {:?} {:?}", file, err);
                             continue;
@@ -65,33 +75,54 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
                     }
                     tokio::task::yield_now().await;
                 }
+                stats.download_time = start.elapsed().as_millis() as usize;
                 Ok(stats)
             });
         tasks.push(task);
     }
 
+    let start = std::time::Instant::now();
     let mut stats = ProcessStats::default();
+    let mut message_num = 0;
+    while let Some(files) = rx.recv().await {
+        if !files.is_empty() {
+            infra_file_list::batch_add(&files).await?;
+            tokio::task::yield_now().await;
+        }
+        message_num += 1;
+        if message_num == files_num {
+            break;
+        }
+    }
+    stats.caching_time = start.elapsed().as_millis() as usize;
+
     let task_results = try_join_all(tasks).await?;
     for task_result in task_results {
         stats = stats + task_result?;
     }
 
     log::info!(
-        "Load file_list [{prefix}] load {}:{} done, download: {}ms, uncompress: {}ms, caching: {}ms",
-        files.len(),
+        "Load file_list [{prefix}] load {}:{} done, download: {}ms, caching: {}ms",
+        files_num,
         stats.file_count,
         stats.download_time,
-        stats.uncompress_time,
         stats.caching_time
     );
 
+    // create table index
+    infra_file_list::create_table_index().await?;
+    log::info!("Load file_list create table index done");
+
     // delete files
-    for item in super::DELETED_FILES.iter() {
-        super::progress(item.key(), item.value().to_owned(), true, false).await?;
-    }
+    let deleted_files = super::DELETED_FILES
+        .iter()
+        .map(|v| v.key().to_string())
+        .collect::<Vec<String>>();
+    infra_file_list::batch_remove(&deleted_files).await?;
 
     // cache result
     rw.insert(prefix.clone());
+    log::info!("Load file_list [{prefix}] done deleting done");
 
     // clean deleted files
     super::DELETED_FILES.clear();
@@ -99,29 +130,25 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn process_file(file: &str) -> Result<ProcessStats, anyhow::Error> {
-    let start = std::time::Instant::now();
-    let mut stats = ProcessStats::default();
+async fn process_file(file: &str) -> Result<Vec<FileKey>, anyhow::Error> {
     // download file list from storage
     let data = match storage::get(file).await {
         Ok(data) => data,
         Err(_) => {
-            return Ok(stats);
+            return Ok(vec![]);
         }
     };
-    stats.download_time = start.elapsed().as_millis() as usize;
 
     // uncompress file
     let uncompress = zstd::decode_all(data.reader())?;
-    stats.uncompress_time = start.elapsed().as_millis() as usize - stats.download_time;
     let uncompress_reader = BufReader::new(uncompress.reader());
     // parse file list
+    let mut records = Vec::with_capacity(1024);
     for line in uncompress_reader.lines() {
         let line = line?;
         if line.is_empty() {
             continue;
         }
-        stats.file_count += 1;
         let item: FileKey = json::from_slice(line.as_bytes())?;
         // check backlist
         if !super::BLOCKED_ORGS.is_empty() {
@@ -137,11 +164,10 @@ async fn process_file(file: &str) -> Result<ProcessStats, anyhow::Error> {
             super::DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;
         }
-        super::progress(&item.key, item.meta, item.deleted, false).await?;
+        records.push(item);
     }
-    stats.caching_time =
-        start.elapsed().as_millis() as usize - stats.uncompress_time - stats.download_time;
-    Ok(stats)
+
+    Ok(records)
 }
 
 pub async fn cache_time_range(time_min: i64, mut time_max: i64) -> Result<(), anyhow::Error> {
@@ -211,7 +237,6 @@ pub async fn cache_latest_hour() -> Result<(), anyhow::Error> {
 struct ProcessStats {
     pub file_count: usize,
     pub download_time: usize,
-    pub uncompress_time: usize,
     pub caching_time: usize,
 }
 
@@ -222,7 +247,6 @@ impl std::ops::Add<ProcessStats> for ProcessStats {
         ProcessStats {
             file_count: self.file_count + rhs.file_count,
             download_time: self.download_time + rhs.download_time,
-            uncompress_time: self.uncompress_time + rhs.uncompress_time,
             caching_time: self.caching_time + rhs.caching_time,
         }
     }

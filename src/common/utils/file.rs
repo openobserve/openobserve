@@ -52,6 +52,9 @@ pub fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
     let mut dirs = Vec::new();
     for entry in walkdir::WalkDir::new(dir) {
         let entry = entry?;
+        if entry.path().display().to_string() == dir {
+            continue;
+        }
         if entry.file_type().is_dir() {
             dirs.push(entry.path().to_str().unwrap().to_string());
         }

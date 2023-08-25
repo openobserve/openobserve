@@ -32,4 +32,5 @@ FROM gcr.io/distroless/cc as runtime
 COPY --from=builder /app/target/release/openobserve /
 COPY --from=builder /lib/x86_64-linux-gnu/liblzma.so.5 /lib/x86_64-linux-gnu/liblzma.so.5
 COPY --from=builder /lib/x86_64-linux-gnu/libz.so.1 /lib/x86_64-linux-gnu/libz.so.1
+RUN mkdir /data && chmod 777 /data
 CMD ["/openobserve"]

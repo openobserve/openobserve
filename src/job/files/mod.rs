@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::infra::cluster;
-use crate::common::infra::config::FILE_EXT_PARQUET;
-use crate::common::meta::StreamType;
+use crate::common::{
+    infra::{cluster, config::FILE_EXT_PARQUET},
+    meta::StreamType,
+};
 
-pub mod disk;
-pub mod memory;
+mod disk;
+mod memory;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {

@@ -146,7 +146,7 @@ impl Serialize for StreamSettings {
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("StreamSettings", 4)?;
+        let mut state = serializer.serialize_struct("stream_settings", 4)?;
         let mut part_keys = HashMap::new();
         for (index, key) in self.partition_keys.iter().enumerate() {
             part_keys.insert(format!("L{index}"), key.to_string());

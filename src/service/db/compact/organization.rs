@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
 use crate::common::infra::config::RwHashMap;
 
-pub static STREAMS: Lazy<RwHashMap<String, RwHashMap<String, i64>>> = Lazy::new(DashMap::default);
+pub static STREAMS: Lazy<RwHashMap<String, RwHashMap<String, i64>>> = Lazy::new(Default::default);
 
 fn mk_key(org_id: &str) -> String {
     format!("/compact/organization/{org_id}")

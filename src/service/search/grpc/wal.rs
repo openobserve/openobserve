@@ -24,7 +24,7 @@ use crate::common::infra::{
     cache::tmpfs,
     config::CONFIG,
     errors::{Error, ErrorCodes},
-    ider, wal,
+    wal,
 };
 use crate::common::meta::{self, common::FileKey, stream::ScanStats};
 use crate::common::utils::file::{get_file_contents, get_file_meta, scan_files};
@@ -57,7 +57,7 @@ pub async fn search(
             Ok(file_data) => {
                 scan_stats.original_size += file_data.len() as u64;
                 let file_key = file.key.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
-                let file_name = format!("/{work_dir}/{file_key}",);
+                let file_name = format!("/{work_dir}/{file_key}");
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             }
         }
@@ -67,9 +67,9 @@ pub async fn search(
     if CONFIG.common.wal_memory_mode_enabled {
         let mem_files = wal::get_search_in_memory_files(&sql.org_id, &sql.stream_name, stream_type)
             .unwrap_or_default();
-        for file_data in mem_files {
+        for (file_key, file_data) in mem_files {
             scan_stats.original_size += file_data.len() as u64;
-            let file_name = format!("/{work_dir}/{}.json", ider::generate());
+            let file_name = format!("/{work_dir}/{file_key}");
             tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             files.push(FileKey::from_file_name(&file_name));
         }
@@ -292,7 +292,7 @@ fn get_schema_version(file: &str) -> Result<String, Error> {
     // eg: /a-b-c-d/files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
     let column = file.split('/').collect::<Vec<&str>>();
     if column.len() < 12 {
-        return Err(Error::Message("invalid wal file name".to_string()));
+        return Err(Error::Message(format!("invalid wal file name: {}", file)));
     }
     Ok(column[11].to_string())
 }

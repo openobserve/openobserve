@@ -21,10 +21,13 @@ use crate::common::utils::file::scan_files;
 use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    tokio::task::spawn(async move { run_move_file_to_s3().await });
-    if !CONFIG.common.local_mode {
-        tokio::task::spawn(async move { run_sync_s3_to_cache().await });
+    if CONFIG.common.local_mode || CONFIG.common.file_list_external {
+        return Ok(());
     }
+
+    tokio::task::spawn(async move { run_move_file_to_s3().await });
+    tokio::task::spawn(async move { run_sync_s3_to_cache().await });
+
     Ok(())
 }
 
@@ -32,9 +35,6 @@ pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(()); // not an ingester, no need to init job
     }
-
-    // create wal dir
-    fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
 
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
     interval.tick().await; // trigger the first run
@@ -81,7 +81,6 @@ async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
             continue;
         }
         log::info!("[JOB] convert file_list: {}", file);
-
         match upload_file(&local_file, &file_name).await {
             Ok(_) => match fs::remove_file(&local_file) {
                 Ok(_) => {}

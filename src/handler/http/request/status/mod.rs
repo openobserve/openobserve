@@ -22,6 +22,7 @@ use utoipa::ToSchema;
 use crate::common::infra::{
     cache, cluster,
     config::{self, CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
+    file_list,
 };
 use crate::common::meta::functions::ZoFunction;
 use crate::common::utils::json;
@@ -119,11 +120,8 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"cache_files":file_num, "memory_limit":max_size,"mem_size": cur_size}),
     );
 
-    let (file_list_num, files_num, mem_size) = cache::file_list::get_file_num().unwrap();
-    stats.insert(
-        "FILE_LIST",
-        json::json!({"file_list_num":file_list_num, "files_num":files_num, "mem_size":mem_size}),
-    );
+    let file_list_num = file_list::len().await;
+    stats.insert("FILE_LIST", json::json!({"num":file_list_num}));
 
     let tmpfs_mem_size = cache::tmpfs::stats().unwrap();
     stats.insert("TMPFS", json::json!({ "mem_size": tmpfs_mem_size }));

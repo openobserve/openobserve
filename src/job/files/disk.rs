@@ -224,7 +224,7 @@ async fn upload_file(
 
     let mut meta_batch = vec![];
     let mut buf_parquet = Vec::new();
-    let mut writer = new_writer(&mut buf_parquet, &arrow_schema);
+    let mut writer = new_writer(&mut buf_parquet, &arrow_schema, None);
 
     if res_records.is_empty() {
         file.seek(SeekFrom::Start(0)).unwrap();

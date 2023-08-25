@@ -52,7 +52,7 @@ pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
-pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
+pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
@@ -65,8 +65,8 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
 });
 
 // global cache variables
-pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(DashMap::default);
-pub static STREAM_SCHEMAS: Lazy<RwHashMap<String, Vec<Schema>>> = Lazy::new(DashMap::default);
+pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
+pub static STREAM_SCHEMAS: Lazy<RwHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);
 pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
     Lazy::new(DashMap::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
@@ -81,16 +81,16 @@ pub static STREAM_ALERTS: Lazy<RwHashMap<String, AlertList>> = Lazy::new(DashMap
 pub static TRIGGERS: Lazy<RwHashMap<String, Trigger>> = Lazy::new(DashMap::default);
 pub static TRIGGERS_IN_PROCESS: Lazy<RwHashMap<String, TriggerTimer>> = Lazy::new(DashMap::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, DestinationTemplate>> =
-    Lazy::new(DashMap::default);
+    Lazy::new(Default::default);
 pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, AlertDestination>> =
-    Lazy::new(DashMap::default);
-pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(DashMap::default);
+    Lazy::new(Default::default);
+pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
-pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(DashMap::default);
+pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
 pub static LOCAL_SCHEMA_LOCKER: Lazy<RwHashMap<String, tokio::sync::RwLock<bool>>> =
-    Lazy::new(|| Arc::new(DashMap::default)());
+    Lazy::new(|| Arc::new(Default::default)());
 
 #[derive(EnvConfig)]
 pub struct Config {
@@ -175,6 +175,15 @@ pub struct Common {
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
+    #[env_config(name = "ZO_FILE_LIST_STORAGE", default = "sqlite")]
+    pub file_list_storage: String,
+    // external storage no need sync file_list to s3
+    #[env_config(name = "ZO_FILE_LIST_EXTERNAL", default = false)]
+    pub file_list_external: bool,
+    #[env_config(name = "ZO_FILE_LIST_DYNAMO_TABLE_NAME", default = "")]
+    pub file_list_dynamo_table_name: String,
+    #[env_config(name = "ZO_FILE_LIST_POSTGRES_DSN", default = "")]
+    pub file_list_postgres_dsn: String,
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]
@@ -187,6 +196,8 @@ pub struct Common {
     pub data_wal_dir: String,
     #[env_config(name = "ZO_DATA_STREAM_DIR", default = "")] // ./data/openobserve/stream/
     pub data_stream_dir: String,
+    #[env_config(name = "ZO_DATA_DB_DIR", default = "")] // ./data/openobserve/db/
+    pub data_db_dir: String,
     #[env_config(name = "ZO_BASE_URI", default = "")]
     pub base_uri: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
@@ -240,10 +251,6 @@ pub struct Common {
     pub usage_org: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
-    #[env_config(name = "ZO_DYNAMO_META_STORE_ENABLED", default = false)]
-    pub use_dynamo_meta_store: bool,
-    #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
-    pub dynamo_file_list_table: String,
 }
 
 #[derive(EnvConfig)]
@@ -464,6 +471,7 @@ pub fn init() -> Config {
     if let Err(e) = check_s3_config(&mut cfg) {
         panic!("s3 config error: {e}");
     }
+
     cfg
 }
 
@@ -500,6 +508,18 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
+    // format file list storage
+    if cfg.common.file_list_storage.is_empty() {
+        cfg.common.file_list_storage = "sqlite".to_string();
+    }
+    cfg.common.file_list_storage = cfg.common.file_list_storage.to_lowercase();
+    if cfg.common.local_mode
+        || cfg.common.file_list_storage.starts_with("dynamo")
+        || cfg.common.file_list_storage.starts_with("postgres")
+    {
+        cfg.common.file_list_external = true;
+    }
+
     // check compact_max_file_size to MB
     cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.interval == 0 {
@@ -532,6 +552,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_stream_dir.ends_with('/') {
         cfg.common.data_stream_dir = format!("{}/", cfg.common.data_stream_dir);
+    }
+    if cfg.common.data_db_dir.is_empty() {
+        cfg.common.data_db_dir = format!("{}db/", cfg.common.data_dir);
+    }
+    if !cfg.common.data_db_dir.ends_with('/') {
+        cfg.common.data_db_dir = format!("{}/", cfg.common.data_db_dir);
     }
     if cfg.common.base_uri.ends_with('/') {
         cfg.common.base_uri = cfg.common.base_uri.trim_end_matches('/').to_string();
@@ -624,7 +650,11 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.s3.provider.eq("swift") {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
-    cfg.common.dynamo_file_list_table = format!("{}-file-list", cfg.s3.bucket_name);
+
+    if cfg.common.file_list_dynamo_table_name.is_empty() {
+        cfg.common.file_list_dynamo_table_name = format!("{}-file-list", cfg.s3.bucket_name);
+    }
+
     Ok(())
 }
 

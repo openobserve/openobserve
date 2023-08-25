@@ -18,7 +18,7 @@ use crate::common::{
     infra::{
         cluster,
         config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
-        ider,
+        file_list as infra_file_list, ider,
     },
     meta::{organization::DEFAULT_ORG, user::UserRequest},
     utils::file::clean_empty_dirs,
@@ -127,39 +127,35 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     // cache file list
-    if !CONFIG.common.use_dynamo_meta_store {
-        db::file_list::local::cache()
-            .await
-            .expect("file list local cache failed");
+    infra_file_list::create_table().await?;
+    if !CONFIG.common.file_list_external
+        && (cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
+            || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE))
+    {
         db::file_list::remote::cache("", false)
             .await
             .expect("file list remote cache failed");
     }
+    infra_file_list::create_table_index().await?;
 
-    // Shouldn't serve request until initialization finishes
-    log::info!("Start job");
-
-    // compactor run
-    tokio::task::spawn(async move { compact::run().await });
-
-    // alert manager run
-    tokio::task::spawn(async move { alert_manager::run().await });
-
-    // ingester run
+    // check wal directory
     if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         // create wal dir
         std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
-        // clean empty dirs
+        // clean empty sub dirs
         clean_empty_dirs(&CONFIG.common.data_wal_dir)?;
     }
+
     tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { file_list::run().await });
-    tokio::task::spawn(async move { prom::run().await });
+    tokio::task::spawn(async move { stats::run().await });
+    tokio::task::spawn(async move { alert_manager::run().await });
+    tokio::task::spawn(async move { compact::run().await });
     tokio::task::spawn(async move { metrics::run().await });
+    tokio::task::spawn(async move { prom::run().await });
 
-    if CONFIG.common.usage_enabled {
-        tokio::task::spawn(async move { stats::run().await });
-    }
+    // Shouldn't serve request until initialization finishes
+    log::info!("Job initialization complete");
 
     // Syslog server start
     let start_syslog = *SYSLOG_ENABLED.read();
@@ -169,26 +165,5 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .expect("syslog server run failed");
     }
 
-    //create dynamo db table
-    if CONFIG.common.use_dynamo_meta_store {
-        crate::common::infra::db::dynamo_db::create_dynamo_tables().await;
-    }
-
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use std::env;
-
-    use super::*;
-
-    #[actix_web::test]
-    #[ignore]
-    async fn test_init() {
-        env::set_var("ZO_LOCAL_MODE", "true");
-        env::set_var("ZO_NODE_ROLE", "all");
-        let _ = init().await;
-        //assert_eq!(fs::metadata(&CONFIG.common.data_wal_dir).is_ok(), true)
-    }
 }

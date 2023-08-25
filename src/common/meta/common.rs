@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use aws_sdk_dynamodb::types::AttributeValue;
+use byteorder::{ByteOrder, LittleEndian};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::common::infra::cache::file_list::parse_file_key_columns;
-use crate::common::utils::json;
+use crate::common::infra::file_list::parse_file_key_columns;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileKey {
@@ -27,6 +27,14 @@ pub struct FileKey {
 }
 
 impl FileKey {
+    pub fn new(key: &str, meta: FileMeta, deleted: bool) -> Self {
+        Self {
+            key: key.to_string(),
+            meta,
+            deleted,
+        }
+    }
+
     pub fn from_file_name(file: &str) -> Self {
         Self {
             key: file.to_string(),
@@ -36,48 +44,13 @@ impl FileKey {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct FileMeta {
-    pub min_ts: i64, // microseconds
-    pub max_ts: i64, // microseconds
-    pub records: u64,
-    pub original_size: u64,
-    pub compressed_size: u64,
-}
-
-impl From<&str> for FileMeta {
-    fn from(data: &str) -> Self {
-        json::from_str::<FileMeta>(data).unwrap()
-    }
-}
-
-impl From<FileMeta> for Vec<u8> {
-    fn from(value: FileMeta) -> Vec<u8> {
-        json::to_vec(&value).unwrap()
-    }
-}
-
-impl From<FileMeta> for String {
-    fn from(data: FileMeta) -> Self {
-        json::to_string(&data).unwrap()
-    }
-}
-
-impl From<FileMeta> for bytes::Bytes {
-    fn from(value: FileMeta) -> bytes::Bytes {
-        json::to_vec(&value).unwrap().into()
-    }
-}
-
 impl From<&FileKey> for HashMap<String, AttributeValue> {
     fn from(file_key: &FileKey) -> Self {
         let mut item = HashMap::new();
         let (stream_key, date_key, file_name) = parse_file_key_columns(&file_key.key).unwrap();
+        let file_name = format!("{date_key}/{file_name}");
         item.insert("stream".to_string(), AttributeValue::S(stream_key));
-        item.insert(
-            "file".to_string(),
-            AttributeValue::S(format!("{}/{}", date_key, file_name)),
-        );
+        item.insert("file".to_string(), AttributeValue::S(file_name));
         item.insert(
             "deleted".to_string(),
             AttributeValue::Bool(file_key.deleted),
@@ -143,37 +116,48 @@ impl From<&HashMap<String, AttributeValue>> for FileKey {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct FileMeta {
+    pub min_ts: i64, // microseconds
+    pub max_ts: i64, // microseconds
+    pub records: u64,
+    pub original_size: u64,
+    pub compressed_size: u64,
+}
 
-    #[test]
-    fn test_file_key() {
-        let file_key = FileKey::default();
-        let file_key_str = json::to_string(&file_key).unwrap();
-        let file_key2: FileKey = json::from_str(&file_key_str).unwrap();
-        assert_eq!(format!("{:?}", file_key), format!("{:?}", file_key2));
+impl From<&FileMeta> for Vec<u8> {
+    fn from(value: &FileMeta) -> Vec<u8> {
+        let mut bytes = [0; 40];
+        LittleEndian::write_i64(&mut bytes[0..8], value.min_ts);
+        LittleEndian::write_i64(&mut bytes[8..16], value.max_ts);
+        LittleEndian::write_u64(&mut bytes[16..24], value.records);
+        LittleEndian::write_u64(&mut bytes[24..32], value.original_size);
+        LittleEndian::write_u64(&mut bytes[32..40], value.compressed_size);
+        bytes.to_vec()
     }
+}
 
-    #[test]
-    fn test_file_meta() {
-        let file_meta = FileMeta {
-            min_ts: 100,
-            max_ts: 200,
-            records: 1000,
-            original_size: 10000,
-            compressed_size: 150,
-        };
-        let file_meta_str = json::to_string(&file_meta).unwrap();
-        assert_eq!(FileMeta::try_from(file_meta_str.as_str()), Ok(file_meta));
+impl TryFrom<&[u8]> for FileMeta {
+    type Error = std::io::Error;
 
-        let file_meta_str: Vec<u8> = file_meta.into();
-        let file_meta_string: String = file_meta.into();
-        let file_meta_bytes: bytes::Bytes = file_meta.into();
-        assert_eq!(
-            String::from_utf8(file_meta_str.clone()).unwrap(),
-            file_meta_string
-        );
-        assert_eq!(file_meta_str, file_meta_bytes.to_vec());
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < 40 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid FileMeta",
+            ));
+        }
+        let min_ts = LittleEndian::read_i64(&value[0..8]);
+        let max_ts = LittleEndian::read_i64(&value[8..16]);
+        let records = LittleEndian::read_u64(&value[16..24]);
+        let original_size = LittleEndian::read_u64(&value[24..32]);
+        let compressed_size = LittleEndian::read_u64(&value[32..40]);
+        Ok(Self {
+            min_ts,
+            max_ts,
+            records,
+            original_size,
+            compressed_size,
+        })
     }
 }

@@ -20,10 +20,20 @@ use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
 use tokio::sync::RwLock;
 
-use crate::common::infra::{config::CONFIG, storage};
-use crate::common::meta::common::FileKey;
-use crate::common::utils::json;
-use crate::service::db::file_list::{dynamo_db, BLOCKED_ORGS, DELETED_FILES};
+use crate::common::{
+    infra::{config::CONFIG, file_list, storage},
+    meta::common::FileKey,
+    utils::json,
+};
+use crate::service::db::file_list::{BLOCKED_ORGS, DELETED_FILES};
+
+lazy_static! {
+    static ref DYNAMO_DB_CLIENT: Box<dyn file_list::FileList> = connect();
+}
+
+pub fn connect() -> Box<dyn file_list::FileList> {
+    Box::<file_list::dynamo::DynamoFileList>::default()
+}
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
@@ -81,7 +91,7 @@ pub async fn load(prefix: &str) -> Result<(), anyhow::Error> {
         .iter()
         .map(|v| v.key().clone())
         .collect::<Vec<String>>();
-    dynamo_db::batch_delete(&delete_files).await?;
+    DYNAMO_DB_CLIENT.batch_remove(&delete_files).await?;
 
     println!(
         "Load file_list [{prefix}] load {}:{} done",
@@ -137,6 +147,6 @@ async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
         total_count
     );
 
-    dynamo_db::batch_write(&file_keys).await?;
+    DYNAMO_DB_CLIENT.batch_add(&file_keys).await?;
     Ok(count)
 }

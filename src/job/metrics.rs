@@ -1,14 +1,31 @@
+// Copyright 2023 Zinc Labs Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use ahash::HashMap;
 use std::path::Path;
 use tokio::time;
 
-use crate::common::infra::cache;
-use crate::common::infra::cluster;
-use crate::common::infra::config::CONFIG;
-use crate::common::infra::config::USERS;
-use crate::common::infra::metrics;
-use crate::common::meta::StreamType;
-use crate::common::utils::file::scan_files;
+use crate::common::{
+    infra::{
+        cache, cluster,
+        config::{CONFIG, USERS},
+        metrics,
+    },
+    meta::StreamType,
+    utils::file::scan_files,
+};
+use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics
@@ -119,13 +136,13 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     }
 
     let stream_types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
-    let orgs = cache::file_list::get_all_organization()?;
+    let orgs = db::schema::list_organizations_from_cache();
     metrics::META_NUM_ORGANIZATIONS
         .with_label_values(&[])
         .set(orgs.len() as i64);
     for org_id in &orgs {
         for stream_type in stream_types {
-            let streams = cache::file_list::get_all_stream(org_id.as_str(), stream_type)?;
+            let streams = db::schema::list_streams_from_cache(org_id, stream_type);
             if !streams.is_empty() {
                 metrics::META_NUM_STREAMS
                     .with_label_values(&[org_id.as_str(), stream_type.to_string().as_str()])

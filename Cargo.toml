@@ -63,6 +63,7 @@ aws-sdk-dynamodb = "0.28.0"
 base64 = "0.21"
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes = "1.4"
+byteorder = "1.4.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.1", default-features = false, features = [
   "std",
@@ -96,11 +97,7 @@ log = "0.4"
 lru = "0.10"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
-object_store = { version = "0.6", features = [
-  "aws",
-  "azure",
-  "gcp",
-] }
+object_store = { version = "0.6", features = ["aws", "azure", "gcp"] }
 once_cell = "1.17"
 opentelemetry = { version = "0.18", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.11", features = [
@@ -138,6 +135,11 @@ simd-json = "0.10.3"
 sled = "0.34"
 snap = "1"
 sqlparser = { version = "0.35", features = ["serde"] }
+sqlx = { version = "0.7", features = [
+  "runtime-tokio-rustls",
+  "postgres",
+  "sqlite",
+] }
 strum = { version = "0.24", features = ["derive"] }
 sys-info = "0.9"
 syslog_loose = "0.18.0"
@@ -172,5 +174,3 @@ tonic-build = { version = "0.8", features = ["prost"] }
 datafusion-expr = "28"
 expect-test = "1.4"
 float-cmp = "0.9"
-
-
