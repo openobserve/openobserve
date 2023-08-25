@@ -823,7 +823,7 @@ const formatDate =(date:any)=>{
             let lineBreaks="";
             if(props.data.type==="h-bar"){
               if(params.axisDimension=="x") return formatUnitValue(getUnitValue(params.value));              
-              for(let i=0;i<(yAxisKeys.length-params.axisIndex-1);i++){
+              for(let i=0;i<(xAxisKeys.length-params.axisIndex-1);i++){
                 lineBreaks+=" \n \n";              
               }
               params.value =params.value.toString();
