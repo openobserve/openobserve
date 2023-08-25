@@ -95,6 +95,9 @@ pub async fn create_dynamo_tables() {
     create_table(&CONFIG.common.dynamo_schema_table, "org", "key")
         .await
         .unwrap();
+    create_table(&CONFIG.common.dynamo_compact_table, "org", "key")
+        .await
+        .unwrap();
 }
 
 async fn create_table(
@@ -154,10 +157,6 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
     let mut parts = local_key.split('/').collect::<Vec<&str>>();
     let entity = parts[0];
 
-    if local_key.starts_with("compact/organization/") {
-        parts.swap(1, 2)
-    };
-
     if db_key.starts_with("/user") {
         return DynamoTableDetails {
             name: CONFIG.common.dynamo_meta_table.clone(),
@@ -185,7 +184,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
     }
 
     match entity {
-        "function" | "templates" | "destinations" | "dashboard" | "alerts" | "kv" | "compact"
+        "function" | "templates" | "destinations" | "dashboard" | "alerts" | "kv"
         | "metrics_members" | "metrics_leader" => match operation {
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
                 pk_value: parts[1].to_string(),
@@ -254,6 +253,54 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                 }
             }
         },
+        "compact" => match operation {
+            DbOperation::Get | DbOperation::Put | DbOperation::Delete => {
+                parts.swap(1, 2);
+                let rk_value = if local_key.starts_with("compact/organization/") {
+                    format!("{}/{}", parts[0], parts[2])
+                } else {
+                    format!("{}/{}/{}", parts[0], parts[2], parts[3])
+                };
+
+                DynamoTableDetails {
+                    pk_value: parts[1].to_string(),
+                    rk_value,
+                    name: CONFIG.common.dynamo_compact_table.clone(),
+                    pk: "org".to_string(),
+                    rk: "key".to_string(),
+                    operation: "query".to_string(),
+                    entity: entity.to_string(),
+                }
+            }
+            DbOperation::List => {
+                let rk_value = if local_key.eq("compact/delete/") {
+                    local_key.to_string()
+                } else {
+                    parts[0].to_string()
+                };
+                if parts.len() == 1 || parts[1].is_empty() || local_key.eq("compact/delete/") {
+                    DynamoTableDetails {
+                        pk_value: parts[1].to_string(),
+                        rk_value,
+                        name: CONFIG.common.dynamo_compact_table.clone(),
+                        pk: "org".to_string(),
+                        rk: "key".to_string(),
+                        operation: "scan".to_string(),
+                        entity: entity.to_string(),
+                    }
+                } else {
+                    DynamoTableDetails {
+                        pk_value: parts[1].to_string(),
+                        rk_value: parts[0].to_string(),
+                        name: CONFIG.common.dynamo_compact_table.clone(),
+                        pk: "org".to_string(),
+                        rk: "key".to_string(),
+                        operation: "query".to_string(),
+                        entity: entity.to_string(),
+                    }
+                }
+            }
+        },
 
         _ => DynamoTableDetails {
             pk_value: parts[1].to_string(),
@@ -277,11 +324,11 @@ impl super::Db for DynamoDb {
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
             .query()
-            .table_name(table.name)
+            .table_name(&table.name)
             .key_condition_expression("#pk = :pk AND #rk = :rk")
-            .expression_attribute_names("#pk", table.pk)
+            .expression_attribute_names("#pk", &table.pk)
             .expression_attribute_values(":pk", AttributeValue::S(table.pk_value))
-            .expression_attribute_names("#rk", table.rk.to_string())
+            .expression_attribute_names("#rk", &table.rk)
             .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
             .select(Select::AllAttributes)
             .send()
@@ -308,7 +355,6 @@ impl super::Db for DynamoDb {
         let table: DynamoTableDetails = get_dynamo_key(in_key, DbOperation::Put);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
-            .clone()
             .put_item()
             .table_name(table.name)
             .item(table.pk, AttributeValue::S(table.pk_value))
@@ -332,7 +378,6 @@ impl super::Db for DynamoDb {
         let table = get_dynamo_key(in_key, DbOperation::Delete);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
-            .clone()
             .delete_item()
             .table_name(table.name)
             .key(table.pk, AttributeValue::S(table.pk_value))
@@ -364,13 +409,12 @@ impl super::Db for DynamoDb {
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         if table.operation == "query" {
             match client
-                .clone()
                 .query()
-                .table_name(table.name.clone())
+                .table_name(&table.name)
                 .key_condition_expression("#pk = :pk and begins_with(#rk , :rk)")
-                .expression_attribute_names("#pk", table.pk.clone())
+                .expression_attribute_names("#pk", &table.pk)
                 .expression_attribute_values(":pk", AttributeValue::S(table.pk_value.clone()))
-                .expression_attribute_names("#rk", table.rk.clone())
+                .expression_attribute_names("#rk", &table.rk)
                 .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
                 .select(Select::AllAttributes)
                 .send()
@@ -423,13 +467,12 @@ impl super::Db for DynamoDb {
         let table = get_dynamo_key(prefix, DbOperation::List);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
-            .clone()
             .query()
-            .table_name(table.name)
+            .table_name(&table.name)
             .key_condition_expression("#pk = :pk and begins_with(#rk , :rk)")
-            .expression_attribute_names("#pk", table.pk)
+            .expression_attribute_names("#pk", &table.pk)
             .expression_attribute_values(":pk", AttributeValue::S(table.pk_value))
-            .expression_attribute_names("#rk", table.rk.clone())
+            .expression_attribute_names("#rk", &table.rk)
             .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
             .select(Select::AllAttributes)
             .send()
@@ -474,13 +517,12 @@ impl super::Db for DynamoDb {
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         if table.operation == "query" {
             match client
-                .clone()
                 .query()
-                .table_name(table.name.clone())
+                .table_name(&table.name)
                 .key_condition_expression("#pk = :pk and begins_with(#rk , :rk)")
-                .expression_attribute_names("#pk", table.pk.clone())
+                .expression_attribute_names("#pk", &table.pk)
                 .expression_attribute_values(":pk", AttributeValue::S(table.pk_value))
-                .expression_attribute_names("#rk", table.rk.clone())
+                .expression_attribute_names("#rk", &table.rk)
                 .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
                 .select(Select::AllAttributes)
                 .send()
@@ -520,11 +562,10 @@ impl super::Db for DynamoDb {
             }
         } else {
             match client
-                .clone()
                 .scan()
-                .table_name(table.name.clone())
+                .table_name(&table.name)
                 .filter_expression("begins_with(#rk , :rk)")
-                .expression_attribute_names("#rk", table.rk.clone())
+                .expression_attribute_names("#rk", &table.rk)
                 .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
                 .select(Select::AllAttributes)
                 .send()
@@ -576,9 +617,9 @@ async fn scan_prefix(
     match client
         .clone()
         .scan()
-        .table_name(table.name.clone())
+        .table_name(&table.name)
         .filter_expression("begins_with(#rk , :rk)")
-        .expression_attribute_names("#rk", table.rk.clone())
+        .expression_attribute_names("#rk", &table.rk)
         .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
         .select(Select::AllAttributes)
         .send()

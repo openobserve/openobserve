@@ -261,6 +261,8 @@ pub struct Common {
     pub dynamo_meta_table: String,
     #[env_config(name = "ZO_DYNAMO_SCHEMA_TABLE", default = "zo_org_schema")]
     pub dynamo_schema_table: String,
+    #[env_config(name = "ZO_DYNAMO_COMPACTOR_TABLE", default = "zo_org_compact")]
+    pub dynamo_compact_table: String,
 }
 
 #[derive(EnvConfig)]

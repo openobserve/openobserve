@@ -157,7 +157,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // initialize metadata
         tokio::task::spawn(async move { db::functions::watch().await });
         tokio::task::spawn(async move { db::compact::retention::watch().await });
-        tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
         tokio::task::spawn(async move { db::alerts::watch().await });
         tokio::task::spawn(async move { db::triggers::watch().await });
         tokio::task::spawn(async move { db::alerts::templates::watch().await });
