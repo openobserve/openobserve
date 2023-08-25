@@ -157,41 +157,49 @@ export const convertPromQLData = (
       case "bar":
         return {
           type: "bar",
+          emphasis: { focus: "series" },
         };
       case "line":
         return {
           type: "line",
-          smooth:true,
+          emphasis: { focus: "series" },
+          smooth: true,
           showSymbol: false,
         };
       case "scatter":
         return {
           type: "scatter",
-          symbolSize:5
+          emphasis: { focus: "series" },
+          symbolSize: 5,
         };
       case "pie":
         return {
           type: "pie",
+          emphasis: { focus: "series" },
         };
       case "donut":
         return {
           type: "pie",
+          emphasis: { focus: "series" },
         };
       case "h-bar":
         return {
           type: "bar",
           orientation: "h",
+          emphasis: { focus: "series" },
         };
       case "area":
         return {
           type: "line",
+          emphasis: { focus: "series" },
           smooth: true,
-          areaStyle:{},
+          areaStyle: {},
           showSymbol: false,
         };
       case "stacked":
         return {
-          type: 'bar',
+          type: "bar",
+          emphasis: { focus: "series" },
         };
       case "area-stacked":
         return {
@@ -211,7 +219,8 @@ export const convertPromQLData = (
         };
       case "h-stacked":
         return {
-          type: 'bar',
+          type: "bar",
+          emphasis: { focus: "series" },
           orientation: "h",
         };
       default:
@@ -367,8 +376,8 @@ export const convertPromQLData = (
         }
       },
     },
-    xAxis:{
-      type: 'time',
+    xAxis: {
+      type: "time",
       // data:searchQueryData.data[0].result[0].values.sort((a: any, b: any) => a[0] - b[0]).map((value: any) =>value[0]*1000),
     },
     yAxis: {
@@ -377,6 +386,9 @@ export const convertPromQLData = (
         formatter: function (name: any) {
           return formatUnitValue(getUnitValue(name));
         },
+      },
+      axisLine: {
+        show: true,
       },
     },
     toolbox: {

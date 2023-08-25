@@ -95,17 +95,20 @@ export const convertSQLData = (
       case "bar":
         return {
           type: "bar",
+          emphasis: { focus: "series" },
         };
       case "line":
         return {
           type: "line",
-          smooth:true,
-          areaStyle:null
+          emphasis: { focus: "series" },
+          smooth: true,
+          areaStyle: null,
         };
       case "scatter":
         return {
           type: "scatter",
-          symbolSize:10
+          emphasis: { focus: "series" },
+          symbolSize: 10,
         };
       case "pie":
         return {
@@ -149,11 +152,13 @@ export const convertSQLData = (
       case "h-bar":
         return {
           type: "bar",
+          emphasis: { focus: "series" },
         };
       case "area":
         return {
-          type: 'line',
-          areaStyle: {}
+          type: "line",
+          emphasis: { focus: "series" },
+          areaStyle: {},
         };
       case "stacked":
         return {
@@ -166,6 +171,7 @@ export const convertSQLData = (
       case "heatmap":
         return {
           type: "heatmap",
+          emphasis: { focus: "series" },
         };
       case "area-stacked":
         return {
