@@ -617,153 +617,116 @@ export const convertSQLData = (
     });
     return traces;
   };
-// const getUnitValue = (value: any) => {
-//   switch (props.data.value.config?.unit) {
-//     case "bytes": {
-//       const units = ["B", "KB", "MB", "GB", "TB"];
-//       for (let unit of units) {
-//         if (value < 1024) {
-//           return {
-//             value: `${parseFloat(value).toFixed(2)}`,
-//             unit: `${unit}`,
-//           };
-//         }
-//         value /= 1024;
-//       }
-//       return {
-//         value: `${parseFloat(value).toFixed(2)}`,
-//         unit: "PB",
-//       };
-//     }
-//     case "custom": {
-//       return {
-//         value: `${value}`,
-//         unit: `${props.data.value.config.unit_custom ?? ""}`,
-//       };
-//     }
-//     case "seconds": {
-//       const units = [
-//         { unit: "ms", divisor: 0.001 },
-//         { unit: "s", divisor: 1 },
-//         { unit: "m", divisor: 60 },
-//         { unit: "h", divisor: 3600 },
-//         { unit: "D", divisor: 86400 },
-//         { unit: "M", divisor: 2592000 }, // Assuming 30 days in a month
-//         { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
-//       ];
-//       for (const unitInfo of units) {
-//         const unitValue = value ? value / unitInfo.divisor : 0;
-//         if (unitValue >= 1 && unitValue < 1000) {
-//           return {
-//             value: unitValue.toFixed(2),
-//             unit: unitInfo.unit,
-//           };
-//         }
-//       }
+const getUnitValue = (value: any) => {  
+  switch (props.data.config?.unit) {
+    case "bytes": {
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      for (let unit of units) {
+        if (value < 1024) {
+          return {
+            value: `${parseFloat(value).toFixed(2)}`,
+            unit: `${unit}`,
+          };
+        }
+        value /= 1024;
+      }
+      return {
+        value: `${parseFloat(value).toFixed(2)}`,
+        unit: "PB",
+      };
+    }
+    case "custom": {
+      return {
+        value: `${value}`,
+        unit: `${props.data.value.config.unit_custom ?? ""}`,
+      };
+    }
+    case "seconds": {
+      const units = [
+        { unit: "ms", divisor: 0.001 },
+        { unit: "s", divisor: 1 },
+        { unit: "m", divisor: 60 },
+        { unit: "h", divisor: 3600 },
+        { unit: "D", divisor: 86400 },
+        { unit: "M", divisor: 2592000 }, // Assuming 30 days in a month
+        { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
+      ];
+      for (const unitInfo of units) {
+        const unitValue = value ? value / unitInfo.divisor : 0;
+        if (unitValue >= 1 && unitValue < 1000) {
+          return {
+            value: unitValue.toFixed(2),
+            unit: unitInfo.unit,
+          };
+        }
+      }
 
-//       // If the value is too large to fit in any unit, return the original seconds
-//       return {
-//         value: value,
-//         unit: "s",
-//       };
-//     }
-//     case "bps": {
-//       const units = ["B", "KB", "MB", "GB", "TB"];
-//       for (let unit of units) {
-//         if (value < 1024) {
-//           return {
-//             value: `${parseFloat(value).toFixed(2)}`,
-//             unit: `${unit}/s`,
-//           };
-//         }
-//         value /= 1024;
-//       }
-//       return {
-//         value: `${parseFloat(value).toFixed(2)}`,
-//         unit: "PB/s",
-//       };
-//     }
-//     case "percent-1": {
-//       return {
-//         value: `${(parseFloat(value) * 100).toFixed(2)}`,
-//         unit: "%",
-//       };
-//       // `${parseFloat(value) * 100}`;
-//     }
-//     case "percent": {
-//       return {
-//         value: `${parseFloat(value).toFixed(2)}`,
-//         unit: "%",
-//       };
-//       // ${parseFloat(value)}`;
-//     }
-//     case "default": {
-//       return {
-//         value: value,
-//         unit: "",
-//       };
-//     }
-//     default: {
-//       return {
-//         value: value,
-//         unit: "",
-//       };
-//     }
-//   }
-// };
+      // If the value is too large to fit in any unit, return the original seconds
+      return {
+        value: value,
+        unit: "s",
+      };
+    }
+    case "bps": {
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      for (let unit of units) {
+        if (value < 1024) {
+          return {
+            value: `${parseFloat(value).toFixed(2)}`,
+            unit: `${unit}/s`,
+          };
+        }
+        value /= 1024;
+      }
+      return {
+        value: `${parseFloat(value).toFixed(2)}`,
+        unit: "PB/s",
+      };
+    }
+    case "percent-1": {
+      return {
+        value: `${(parseFloat(value) * 100).toFixed(2)}`,
+        unit: "%",
+      };
+      // `${parseFloat(value) * 100}`;
+    }
+    case "percent": {
+      return {
+        value: `${parseFloat(value).toFixed(2)}`,
+        unit: "%",
+      };
+      // ${parseFloat(value)}`;
+    }
+    case "default": {
+      return {
+        value: value,
+        unit: "",
+      };
+    }
+    default: {
+      return {
+        value: value,
+        unit: "",
+      };
+    }
+  }
+};
 
-// const formatUnitValue = (obj: any) => {
-//   return `${obj.value}${obj.unit}`;
-// };
-
-// const maxValueSize =
-//   props.data.value.type == "area-stacked"
-//     ? tracess.reduce((sum: any, it: any) => {
-//         let max = it.y.reduce((max: any, it: any) => {
-//           if (!isNaN(it)) return Math.max(max, it);
-//           return max;
-//         }, 0);
-//         return sum + max;
-//       }, 0)
-//     : tracess.reduce((max: any, it: any) => {
-//         return it.y.reduce((max: any, it: any) => {
-//           if (!isNaN(it)) return Math.max(max, it);
-//           return max;
-//         }, 0);
-//       });
-
-// // Calculate the minimum value size from the 'y' values in the 'traces' array
-// const minValueSize = tracess.reduce((min: any, it: any) => {
-//   return it.y.reduce((min: any, it: any) => {
-//     if (!isNaN(it)) return Math.min(min, it);
-//     return min;
-//   }, maxValueSize);
-// });
-
-// // Initialize empty arrays to hold tick values and tick text
-// let yTickVals = [];
-// let yTickText = [];
-
-// // Calculate the interval size for 5 equally spaced ticks
-// let intervalSize = (maxValueSize - minValueSize) / 4;
-
-// // If the data doesn't vary much, use a percentage of the max value as the interval size
-// if (intervalSize === 0) {
-//   intervalSize = maxValueSize * 0.2;
-// }
-
-// // Generate tick values and tick text for the y-axis
-// for (let i = 0; i <= 4; i++) {
-//   let val = minValueSize + intervalSize * i;
-//   yTickVals.push(minValueSize + intervalSize * i);
-//   yTickText.push(formatUnitValue(getUnitValue(val)));
-// }
-// // result = result.map((it: any) => moment(it + "Z").toISOString(true))
-// const yAxisTickOptions = !props.data.value.config?.unit
-//   ? {}
-//   : { tickvals: yTickVals, ticktext: yTickText };
+const formatUnitValue = (obj: any) => {
+  return `${obj.value}${obj.unit}`;
+};
 
 
+const formatDate =(date:any)=>{
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(2);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+
+  return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
+}
 
   const getLegendPosition = (type: string) => {
     const legendPosition = props.data.config?.legends_position;
@@ -847,18 +810,23 @@ export const convertSQLData = (
           show:true,
           // padding:1,
           formatter: function (params) {
-            // console.log(params, "params");
-            if(params.axisDimension=="y") return params.value.toString();
+            if(params.axisDimension=="y") return props.data.type == "h-bar" ? params.value.toString() :formatUnitValue(getUnitValue(params.value));
             let lineBreaks="";
             for(let i=0;i<(xAxisKeys.length-params.axisIndex-1);i++){
-              lineBreaks+=" \n \n";
-              console.log("params",lineBreaks);
-              
+              lineBreaks+=" \n \n";              
             }
-            // console.log("params",str+params.value);
+            params.value = props.data.type == "h-bar" ?formatUnitValue(getUnitValue(params.value)):params.value.toString();
             return `${lineBreaks}  ${params.value}`;
         }
         }
+      },
+      formatter: function (name: any) {
+        if (name.length == 0) return "";
+
+        let hoverText = name.map((it:any)=>{
+          return `${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.value))}`;
+        });
+        return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
     // xAxis: {
@@ -941,6 +909,11 @@ export const convertSQLData = (
         fontWeight: "bold",
         fontSize: 14,
       },
+      axisLabel: {
+        formatter: function (value, index) {
+            return formatUnitValue(getUnitValue(value));
+        }
+    },
       // min: "dataMin",
       // max: "dataMax",
       splitLine: {
@@ -1069,6 +1042,15 @@ export const convertSQLData = (
     }
     case "scatter":
     {
+      option.tooltip.formatter = function (name: any) {
+        if (name.length == 0) return "";
+        console.log("name--", name);
+        
+        let hoverText = name.map((it:any)=>{
+          return `${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.value[1]))}`;
+        });
+        return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
+      }
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
           name: props.data?.queries[0]?.fields?.y.find(
@@ -1100,7 +1082,10 @@ export const convertSQLData = (
     }
     case "pie": {
       option.tooltip={
-        trigger: 'item'
+        trigger: 'item',
+        formatter: function (name: any) {          
+          return `${name.marker} ${name.name} : <b>${formatUnitValue(getUnitValue(name.value))}</b>`;
+        }
       }
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
@@ -1138,6 +1123,9 @@ export const convertSQLData = (
     case "donut": {
     option.tooltip = {
       trigger: "item",
+      formatter: function (name: any) {
+        return `${name.marker} ${name.name} : <b>${formatUnitValue(getUnitValue(name.value))}<b/>`;
+      }
     };
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
@@ -1354,6 +1342,17 @@ export const convertSQLData = (
     })
     option.xAxis[0].type="time";
     option.xAxis[0].data=[];
+    option.tooltip.formatter=function (name: any) {
+      console.log("name--", name);
+      if (name.length == 0) return "";
+
+      const date = new Date(name[0].data[0]);
+
+      let hoverText = name.map((it:any)=>{
+        return `${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.data[1]))}`;
+      });
+      return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+    }
   }
 
 //custom SQL: check if it is timeseries or not
@@ -1370,8 +1369,19 @@ if((props.data.type != "h-bar") && option.xAxis.length>0 && option.xAxis[0].data
       });
     option.xAxis[0].type="time";
     option.xAxis[0].data=[];
-    }
+    option.tooltip.formatter=function (name: any) {
+      console.log("name--", name);
+      if (name.length == 0) return "";
+
+      const date = new Date(name[0].data[0]);
+
+      let hoverText = name.map((it:any)=>{
+        return `${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.data[1]))}`;
+      });
+      return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+    };
   }
+}
 
   console.log("optionss", option);
 
