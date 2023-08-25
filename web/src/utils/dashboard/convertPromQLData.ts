@@ -461,16 +461,17 @@ export const convertPromQLData = (
                 show:false
               };
               option.angleAxis= {
-                type: 'value',
-                startAngle: 0,
+                // type: 'value',
+                // startAngle: 0,
                 show: false,
               };
               option.radiusAxis= {
-                type: 'value',
+                // type: 'value',
                 show: false
               };
               option.polar= {};
-
+              option.xAxis= [];
+              option.yAxis= [];
               return {
                 ...getPropsByChartTypeForTraces(),
                 renderItem: ()=>{
@@ -480,7 +481,7 @@ export const convertPromQLData = (
                       {
                         type: 'text',
                         style: {
-                          text: parseFloat(unitValue.value).toFixed(2),
+                          text: parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
                           fontSize: 80,
                           fontWeight: 500,
                           align: 'center',

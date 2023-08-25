@@ -919,6 +919,9 @@ const formatDate =(date:any)=>{
       splitLine: {
         show: false,
       },
+      axisLine: {
+        show: true,
+      }
     },
     toolbox: {
       orient: "vertical",
