@@ -121,7 +121,10 @@ pub async fn create_dynamo_tables() {
     create_table(&CONFIG.common.dynamo_compact_table, "org", "key")
         .await
         .unwrap();
-    create_table(client, &CONFIG.common.dynamo_schema_table, "org", "key")
+    create_table(&CONFIG.common.dynamo_meta_table, "type", "key")
+        .await
+        .unwrap();
+    create_table(&CONFIG.common.dynamo_schema_table, "org", "key")
         .await
         .unwrap();
 }
@@ -182,6 +185,10 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
 
     let mut parts = local_key.split('/').collect::<Vec<&str>>();
     let entity = parts[0];
+
+    if local_key.starts_with("compact/organization/") {
+        parts.swap(1, 2)
+    };
 
     if db_key.starts_with("/user") {
         return DynamoTableDetails {
