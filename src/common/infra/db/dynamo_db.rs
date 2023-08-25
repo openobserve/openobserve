@@ -186,10 +186,6 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
     let mut parts = local_key.split('/').collect::<Vec<&str>>();
     let entity = parts[0];
 
-    if local_key.starts_with("compact/organization/") {
-        parts.swap(1, 2)
-    };
-
     if db_key.starts_with("/user") {
         return DynamoTableDetails {
             name: CONFIG.common.dynamo_meta_table.clone(),
