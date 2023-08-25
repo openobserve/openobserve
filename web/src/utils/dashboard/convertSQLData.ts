@@ -1172,6 +1172,11 @@ const formatDate =(date:any)=>{
     case "area-stacked": {
       option.xAxis[0].data = Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
       option.xAxis = option.xAxis.slice(0,1);
+      option.tooltip.axisPointer.label= {
+        show:true
+      };
+      option.xAxis[0].axisLabel={};
+      option.xAxis[0].axisTick={};
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
@@ -1198,6 +1203,12 @@ const formatDate =(date:any)=>{
     case "stacked": {
       option.xAxis[0].data=Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
       option.xAxis = option.xAxis.slice(0,1);
+      option.tooltip.axisPointer.label= {
+        show:true
+      };
+      option.xAxis[0].axisLabel.margin=5;
+      option.xAxis[0].axisLabel={};
+      option.xAxis[0].axisTick={};
 
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
