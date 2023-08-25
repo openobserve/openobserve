@@ -166,9 +166,9 @@ export default defineComponent({
       });
     } else {
       this.VerifyAndCreateUser();
-
-      this.userActivity.setUser();
     }
+
+    this.userActivity.setUser();
   },
   methods: {
     /**
