@@ -820,12 +820,20 @@ const formatDate =(date:any)=>{
           show:true,
           // padding:1,
           formatter: function (params:any) {
-            if(params.axisDimension=="y") return props.data.type == "h-bar" ? params.value.toString() :formatUnitValue(getUnitValue(params.value));
             let lineBreaks="";
+            if(props.data.type==="h-bar"){
+              if(params.axisDimension=="x") return formatUnitValue(getUnitValue(params.value));              
+              for(let i=0;i<(yAxisKeys.length-params.axisIndex);i++){
+                lineBreaks+=" \n \n";              
+              }
+              params.value =params.value.toString();
+              return `${lineBreaks}  ${params.value}`;
+            }
+            if(params.axisDimension=="y") return formatUnitValue(getUnitValue(params.value));
             for(let i=0;i<(xAxisKeys.length-params.axisIndex-1);i++){
               lineBreaks+=" \n \n";              
             }
-            params.value = props.data.type == "h-bar" ?formatUnitValue(getUnitValue(params.value)):params.value.toString();
+            params.value = params.value.toString();
             return `${lineBreaks}  ${params.value}`;
         }
         }
