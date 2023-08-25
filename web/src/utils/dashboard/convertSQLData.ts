@@ -638,7 +638,7 @@ const getUnitValue = (value: any) => {
     case "custom": {
       return {
         value: `${value}`,
-        unit: `${props.data.value.config.unit_custom ?? ""}`,
+        unit: `${props.data.config.unit_custom ?? ""}`,
       };
     }
     case "seconds": {
@@ -1353,6 +1353,14 @@ const formatDate =(date:any)=>{
       });
       return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
     }
+    option.tooltip.axisPointer={
+      type: 'cross',
+      formatter: function (params) {
+      const date = new Date(params[0].value[0]);
+      console.log("name--",params,date);
+      return formatDate(date).toString();
+    }
+    }
   }
 
 //custom SQL: check if it is timeseries or not
@@ -1369,17 +1377,14 @@ if((props.data.type != "h-bar") && option.xAxis.length>0 && option.xAxis[0].data
       });
     option.xAxis[0].type="time";
     option.xAxis[0].data=[];
-    option.tooltip.formatter=function (name: any) {
-      console.log("name--", name);
-      if (name.length == 0) return "";
-
-      const date = new Date(name[0].data[0]);
-
-      let hoverText = name.map((it:any)=>{
-        return `${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.data[1]))}`;
-      });
-      return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
-    };
+    option.tooltip.axisPointer={
+      type: 'cross',
+      formatter: function (params) {
+        const date = new Date(params[0].value[0]);
+        console.log("name--",params,date);
+        return formatDate(date).toString();
+      }
+    }
   }
 }
 
