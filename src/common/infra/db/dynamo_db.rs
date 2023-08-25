@@ -71,12 +71,20 @@ pub enum DbOperation {
     List,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DynamoTableDetails {
     pub name: String,
     pub pk: String,
     pub rk: String,
     pub pk_value: String,
     pub rk_value: String,
+    #[serde(default = "default_oper")]
+    pub operation: String,
+    pub entity: String,
+}
+
+fn default_oper() -> String {
+    "query".to_string()
 }
 
 impl DynamoDb {
@@ -111,6 +119,9 @@ pub async fn create_dynamo_tables() {
         .await
         .unwrap();
     create_table(&CONFIG.common.dynamo_compact_table, "org", "key")
+        .await
+        .unwrap();
+    create_table(client, &CONFIG.common.dynamo_schema_table, "org", "key")
         .await
         .unwrap();
 }
