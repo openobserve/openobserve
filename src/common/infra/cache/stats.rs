@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
 use crate::common::infra::config::RwHashMap;
@@ -20,7 +19,7 @@ use crate::common::meta::common::FileMeta;
 use crate::common::meta::stream::StreamStats;
 use crate::common::meta::StreamType;
 
-static STATS: Lazy<RwHashMap<String, StreamStats>> = Lazy::new(DashMap::default);
+static STATS: Lazy<RwHashMap<String, StreamStats>> = Lazy::new(Default::default);
 
 const STREAM_STATS_MEM_SIZE: usize = std::mem::size_of::<StreamStats>();
 

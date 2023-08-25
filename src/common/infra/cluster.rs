@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use dashmap::DashMap;
 use etcd_client::PutOptions;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -35,7 +34,7 @@ static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
 pub static mut LOCAL_NODE_ID: i32 = 0;
 pub static LOCAL_NODE_UUID: Lazy<String> = Lazy::new(load_local_node_uuid);
 pub static LOCAL_NODE_ROLE: Lazy<Vec<Role>> = Lazy::new(load_local_node_role);
-static NODES: Lazy<RwHashMap<String, Node>> = Lazy::new(DashMap::default);
+static NODES: Lazy<RwHashMap<String, Node>> = Lazy::new(Default::default);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Node {

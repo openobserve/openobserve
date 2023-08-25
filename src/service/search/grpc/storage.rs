@@ -238,7 +238,7 @@ async fn get_file_list(
     time_level: PartitionTimeLevel,
 ) -> Result<Vec<FileKey>, Error> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let file_list = match file_list::get_file_list(
+    let file_list = match file_list::query(
         &sql.org_id,
         &sql.stream_name,
         stream_type,

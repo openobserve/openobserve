@@ -13,14 +13,13 @@
 // limitations under the License.
 
 use chrono::{TimeZone, Utc};
-use dashmap::DashMap;
 use object_store::ObjectMeta;
 use once_cell::sync::Lazy;
 
 use crate::common::infra::config::RwHashMap;
 use crate::common::meta::common::FileKey;
 
-pub static FILES: Lazy<RwHashMap<String, Vec<ObjectMeta>>> = Lazy::new(DashMap::default);
+pub static FILES: Lazy<RwHashMap<String, Vec<ObjectMeta>>> = Lazy::new(Default::default);
 
 pub fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     let data = match FILES.get(session_id) {
@@ -53,36 +52,5 @@ pub fn clear(session_id: &str) {
         .collect::<Vec<_>>();
     for key in keys {
         FILES.remove(&key);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::common::meta::common::FileKey;
-
-    #[actix_web::test]
-    async fn test_storage_file_list() {
-        let meta = crate::common::meta::common::FileMeta {
-            min_ts: 100,
-            max_ts: 200,
-            records: 10000,
-            original_size: 1024,
-            compressed_size: 1,
-        };
-        let file_name = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
-        let file_key = FileKey {
-            key: file_name.to_string(),
-            meta: meta.clone(),
-            deleted: false,
-        };
-        crate::common::infra::cache::file_list::set_file_to_cache(file_name, meta).unwrap();
-        let session_id = "1234";
-        set(session_id, &[file_key]).await;
-
-        let get_resp = get(session_id);
-        assert!(get_resp.unwrap().len() > 0);
-
-        clear(session_id);
     }
 }

@@ -18,11 +18,11 @@ use once_cell::sync::Lazy;
 use crate::common::infra::{
     cache, cluster,
     config::{RwHashMap, CONFIG},
+    file_list,
 };
 use crate::common::meta::common::FileMeta;
 
 pub mod broadcast;
-pub mod dynamo_db;
 pub mod local;
 pub mod remote;
 
@@ -38,70 +38,28 @@ pub async fn progress(
     delete: bool,
     download: bool,
 ) -> Result<(), anyhow::Error> {
-    let old_data = cache::file_list::get_file_from_cache(key);
-    match delete {
-        true => {
-            let data = match old_data {
-                Ok(meta) => meta,
-                Err(_e) => {
-                    return Ok(());
-                }
-            };
-            match cache::file_list::del_file_from_cache(key) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!(
-                        "service:db:file_list: delete {}, set_file_to_cache error: {}",
-                        key,
-                        e
-                    );
-                }
-            }
-            if old_data.is_err() {
-                return Ok(()); // not exists, skip decrease stats
-            };
-            match cache::stats::decr_stream_stats(key, data) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!(
-                        "service:db:file_list: delete {}, incr_stream_stats error: {}",
-                        key,
-                        e
-                    );
-                }
-            }
+    if delete {
+        if let Err(e) = file_list::remove(key).await {
+            log::error!(
+                "service:db:file_list: delete {}, set_file_to_cache error: {}",
+                key,
+                e
+            );
         }
-        false => {
-            match cache::file_list::set_file_to_cache(key, data) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!(
-                        "service:db:file_list: add {}, set_file_to_cache error: {}",
-                        key,
-                        e
-                    );
-                }
-            }
-            if download
-                && CONFIG.memory_cache.cache_latest_files
-                && cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
-            {
-                // maybe load already merged file, no need report error
-                _ = cache::file_data::download(key).await;
-            }
-            if old_data.is_ok() {
-                return Ok(()); // already exists, skip increase stats
-            };
-            match cache::stats::incr_stream_stats(key, data) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!(
-                        "service:db:file_list: add {}, incr_stream_stats error: {}",
-                        key,
-                        e
-                    );
-                }
-            }
+    } else {
+        if let Err(e) = file_list::add(key, &data).await {
+            log::error!(
+                "service:db:file_list: add {}, set_file_to_cache error: {}",
+                key,
+                e
+            );
+        }
+        if download
+            && CONFIG.memory_cache.cache_latest_files
+            && cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
+        {
+            // maybe load already merged file, no need report error
+            _ = cache::file_data::download(key).await;
         }
     }
 

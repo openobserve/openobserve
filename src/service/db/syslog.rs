@@ -23,7 +23,7 @@ use crate::common::{
     utils::json,
 };
 
-#[tracing::instrument]
+#[tracing::instrument(name = "service:db:syslog:toggle_syslog_setting")]
 pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
     Ok(db::DEFAULT
         .put(
@@ -33,7 +33,7 @@ pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
         .await?)
 }
 
-#[tracing::instrument]
+#[tracing::instrument(name = "service:db:syslog:list")]
 pub async fn list() -> Result<Vec<SyslogRoute>, anyhow::Error> {
     Ok(db::DEFAULT
         .list("/syslog/route/")
@@ -43,7 +43,7 @@ pub async fn list() -> Result<Vec<SyslogRoute>, anyhow::Error> {
         .collect())
 }
 
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(name = "service:db:syslog:set", skip_all)]
 pub async fn set(route: &SyslogRoute) -> Result<(), anyhow::Error> {
     Ok(db::DEFAULT
         .put(
@@ -53,13 +53,13 @@ pub async fn set(route: &SyslogRoute) -> Result<(), anyhow::Error> {
         .await?)
 }
 
-#[tracing::instrument]
+#[tracing::instrument(name = "service:db:syslog:get")]
 pub async fn get(id: &str) -> Result<SyslogRoute, anyhow::Error> {
     let val = db::DEFAULT.get(&format!("/syslog/route/{id}")).await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
-#[tracing::instrument]
+#[tracing::instrument(name = "service:db:syslog:delete")]
 pub async fn delete(id: &str) -> Result<(), anyhow::Error> {
     Ok(db::DEFAULT
         .delete(&format!("/syslog/route/{id}"), false)

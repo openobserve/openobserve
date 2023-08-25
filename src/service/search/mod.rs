@@ -87,7 +87,7 @@ async fn get_file_list(
     time_level: PartitionTimeLevel,
 ) -> Vec<FileKey> {
     let (time_min, time_max) = get_times(sql, stream_type).await;
-    let file_list = match file_list::get_file_list(
+    let file_list = match file_list::query(
         &sql.org_id,
         &sql.stream_name,
         stream_type,

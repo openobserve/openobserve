@@ -18,6 +18,7 @@ pub mod config;
 pub mod db;
 pub mod dist_lock;
 pub mod errors;
+pub mod file_list;
 pub mod ider;
 pub mod metrics;
 pub mod storage;
