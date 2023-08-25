@@ -38,16 +38,16 @@ export const convertPromQLData = (
     }
   };
 
-  const getLegendPosition = (type: string) => {
+  const getLegendPosition = () => {
     const legendPosition = props.data.value?.config?.legends_position;
 
     switch (legendPosition) {
       case "bottom":
-        return "h";
+        return "horizontal";
       case "right":
-        return "v";
+        return "vertical";
       default:
-        return type == "promql" ? "h" : "v";
+        return "horizontal";
     }
   };
 
@@ -308,33 +308,40 @@ export const convertPromQLData = (
     return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
   }
 
+  const legendPosition = getLegendPosition();
+
+  const legendConfig = {
+    show: true,
+    type: "scroll",
+    orient: legendPosition,
+    padding: [10, 20, 0, 10],
+    tooltip: {
+      show: true,
+      padding: 10,
+      textStyle: {
+        fontSize: 12,
+      },
+      backgroundColor: "rgba(255,255,255,0.8)",
+    },
+    textStyle: {
+      width: 150,
+      overflow: "truncate",
+    },
+  };
+
+  // Additional logic to adjust the legend position
+  if (legendPosition === "vertical") {
+    legendConfig.left = null; // Remove left positioning
+    legendConfig.right = 0; // Apply right positioning
+    legendConfig.top = "center"; // Apply bottom positioning
+  } else {
+    legendConfig.left = "0"; // Apply left positioning
+    legendConfig.top = "bottom"; // Apply bottom positioning
+  }
+
   let option = {
     backgroundColor: "transparent",
-    legend: {
-      show: true,
-      type: "scroll",
-      orient: "horizontal", // 'horizontal' | 'vertical'
-      left: "0",
-      top: "bottom",
-      padding: [
-        10, // up
-        20, // right
-        0, // down
-        10, // left
-      ],
-      tooltip: {
-        show: true,
-        padding: 10,
-        textStyle: {
-          fontSize: 12,
-        },
-        backgroundColor: "rgba(255,255,255,0.8)",
-      },
-      textStyle: {
-        width: 150, // height:10,
-        overflow: "truncate",
-      },
-    },
+    legend: legendConfig,
     grid: {
       containLabel: true,
       left: "10%",
