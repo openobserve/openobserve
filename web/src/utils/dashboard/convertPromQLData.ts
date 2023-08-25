@@ -339,7 +339,7 @@ export const convertPromQLData = (
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
 
-  let option = {
+  let option:any = {
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
