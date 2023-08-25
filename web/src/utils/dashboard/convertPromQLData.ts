@@ -304,26 +304,44 @@ export const convertPromQLData = (
     legend: {
       show: true,
       type: "scroll",
-      orient: "vertical", // 'horizontal' | 'vertical'
-      x: "right", // 'center' | 'left' | {number},
-      y: "center", // 'center' | 'bottom' | {number}
+      orient: "horizontal", // 'horizontal' | 'vertical'
+      left: "0",
+      top: "bottom",
+      padding: [
+        10, // up
+        20, // right
+        0, // down
+        10, // left
+      ],
+      tooltip: {
+        show: true,
+        padding: 10,
+        textStyle: {
+          fontSize: 12,
+        },
+        backgroundColor: "rgba(255,255,255,0.8)",
+      },
+      textStyle: {
+        width: 150, // height:10,
+        overflow: "truncate",
+      },
     },
-    grid : {
-      left: '10%',
-      right: '10%',
-      top: '10%',
-      bottom: '10%'
+    grid: {
+      containLabel: true,
+      left: "10%",
+      right: "10%",
+      top: "15",
+      bottom: "30",
     },
     tooltip: {
-      show:true,
-      trigger: 'axis',
-      textStyle:{
-        fontSize:12
+      show: true,
+      trigger: "axis",
+      textStyle: {
+        fontSize: 12,
       },
-      formatter: function (name:any) {
-        console.log("name--",name);
-        if(name.length==0)
-          return "";
+      formatter: function (name: any) {
+        console.log("name--", name);
+        if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
 
@@ -333,11 +351,11 @@ export const convertPromQLData = (
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       },
       axisPointer: {
-        show:true,
-        type:"cross",
+        show: true,
+        type: "cross",
         label: {
-          textStyle:{
-            fontSize:12
+          textStyle: {
+            fontSize: 12,
           },
           show: true,
           formatter: function (name:any) {
@@ -354,11 +372,20 @@ export const convertPromQLData = (
       // data:searchQueryData.data[0].result[0].values.sort((a: any, b: any) => a[0] - b[0]).map((value: any) =>value[0]*1000),
     },
     yAxis: {
-      type: 'value',
+      type: "value",
       axisLabel: {
-        formatter: function (name:any) {
-            return formatUnitValue(getUnitValue(name))
-        }
+        formatter: function (name: any) {
+          return formatUnitValue(getUnitValue(name));
+        },
+      },
+    },
+    toolbox: {
+      orient: "vertical",
+      show: true,
+      feature: {
+        dataZoom: {
+          yAxisIndex: "none",
+        },
       },
     },
     series:[]
