@@ -32,7 +32,6 @@ import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import moment from "moment";
-import userActivityTracking from "@/composables/activityTracking";
 
 export default defineComponent({
   name: "PageLoginCallback",
@@ -42,7 +41,6 @@ export default defineComponent({
     const router = useRouter();
     const selectedOrg = ref("");
     let orgOptions = ref([{ label: Number, value: String }]);
-    const userActivity = userActivityTracking();
 
     /**
      * Get all organizations for the user
@@ -92,10 +90,6 @@ export default defineComponent({
           }
         );
 
-        userActivity.setUserProperty(
-          "orgIdentifier",
-          selectedOrg.value?.identifier
-        );
         const redirectURI = window.sessionStorage.getItem("redirectURI");
         window.sessionStorage.removeItem("redirectURI");
         redirectUser(redirectURI);
@@ -121,7 +115,6 @@ export default defineComponent({
       store,
       redirectUser,
       getDefaultOrganization,
-      userActivity,
     };
   },
   data() {
@@ -167,8 +160,6 @@ export default defineComponent({
     } else {
       this.VerifyAndCreateUser();
     }
-
-    this.userActivity.setUser();
   },
   methods: {
     /**
