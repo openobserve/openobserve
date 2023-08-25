@@ -103,7 +103,7 @@ export const getUserInfo = (loginString: string) => {
 };
 
 export const getLoginURL = () => {
-  return `https://${config.oauth.domain}/login?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&scope=${config.oauth.scope}&redirect_uri=${config.oauth.redirectSignIn}`;
+  return `https://${config.oauth.domain}/oauth/v2/authorize?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&redirect_uri=${config.oauth.redirectSignIn}&scope=${config.oauth.scope}`;
 };
 
 export const getLogoutURL = () => {
