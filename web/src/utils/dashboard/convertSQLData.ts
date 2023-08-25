@@ -830,15 +830,15 @@ const formatDate =(date:any)=>{
     return width;
 };
 
-  const data = getAxisDataFromKey(yAxisKeys[0]);      
+  // const data = getAxisDataFromKey(yAxisKeys[0]);      
   // get the largest label from the data from array of string with reduce
-  const largestLabel = data.reduce((largest: any, label: any) => {
+  const largestLabel =(data:any)=> data.reduce((largest: any, label: any) => {
     return label?.toString().length > largest?.toString().length ? label : largest;
   }, '');
 
   // const largestLabel = 
-  const nameGap = calculateWidthText(largestLabel) + 8
-  console.log('namegap data:', data, largestLabel, nameGap);
+  // const nameGap = calculateWidthText(largestLabel) + 8
+  // console.log('namegap data:', data, largestLabel, nameGap);
 
   let option:any = {
     backgroundColor: "transparent",
@@ -961,7 +961,7 @@ const formatDate =(date:any)=>{
           ? props.data.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
-      nameGap: nameGap,
+      nameGap: calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys[0])))+8,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
@@ -1138,6 +1138,9 @@ const formatDate =(date:any)=>{
       const temp = option.xAxis;
       option.xAxis = option.yAxis;
       option.yAxis=temp;
+      option.yAxis.map((it:any)=>{
+        it.nameGap = calculateWidthText(largestLabel(it.data))+8;
+      })
       break;
     }
     case "pie": {
