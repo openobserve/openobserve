@@ -272,6 +272,7 @@ import {
   outlinedFormatListBulleted,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
+import userActivityTracking from "@/composables/activityTracking";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -607,6 +608,11 @@ export default defineComponent({
             if (data.type == "default") {
               tempDefaultOrg = optiondata;
             }
+
+            userActivityTracking().setUserProperty(
+              "orgIdentifier",
+              selectedOrg.value?.identifier
+            );
 
             return optiondata;
           }
