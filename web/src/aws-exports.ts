@@ -39,6 +39,11 @@ const config = {
     : "false",
   freePlan: "Free-Plan-USD-Monthly",
   paidPlan: "professional-USD-Monthly",
+  ddApplicationID: import.meta.env.VITE_DD_APP_ID,
+  ddClientToken: import.meta.env.VITE_DD_CLIENT_TOKEN,
+  ddSite: import.meta.env.VITE_DD_SITE,
+  ddService: import.meta.env.VITE_DD_SERVICE,
+  environment: import.meta.env.VITE_ENVIRONMENT,
 };
 
 export default config;
