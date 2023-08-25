@@ -83,32 +83,26 @@ pub async fn get_dynamo_config() -> aws_config::SdkConfig {
 }
 
 pub async fn create_dynamo_tables() {
-    let client = DYNAMO_DB_CLIENT.get().await;
-    create_table(
-        client,
-        &CONFIG.common.dynamo_file_list_table,
-        "stream",
-        "file",
-    )
-    .await
-    .unwrap();
-    create_table(client, &CONFIG.common.dynamo_org_meta_table, "org", "key")
+    create_table(&CONFIG.common.dynamo_file_list_table, "stream", "file")
         .await
         .unwrap();
-    create_table(client, &CONFIG.common.dynamo_meta_table, "type", "key")
+    create_table(&CONFIG.common.dynamo_org_meta_table, "org", "key")
         .await
         .unwrap();
-    create_table(client, &CONFIG.common.dynamo_schema_table, "org", "key")
+    create_table(&CONFIG.common.dynamo_meta_table, "type", "key")
+        .await
+        .unwrap();
+    create_table(&CONFIG.common.dynamo_schema_table, "org", "key")
         .await
         .unwrap();
 }
 
 async fn create_table(
-    client: &aws_sdk_dynamodb::Client,
     table_name: &str,
     hash_key: &str,
     range_key: &str,
 ) -> std::result::Result<(), aws_sdk_dynamodb::Error> {
+    let client = DYNAMO_DB_CLIENT.get().await.clone();
     let tables = client.list_tables().send().await?;
     if !tables
         .table_names()
@@ -151,13 +145,18 @@ async fn create_table(
 }
 
 pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetails {
-    let local_key = if db_key.starts_with('/') {
-        &db_key[1..]
+    let local_key = if let Some(key) = db_key.strip_prefix('/') {
+        key
     } else {
         db_key
     };
-    let parts = local_key.split('/').collect::<Vec<&str>>();
+
+    let mut parts = local_key.split('/').collect::<Vec<&str>>();
     let entity = parts[0];
+
+    if local_key.starts_with("compact/organization/") {
+        parts.swap(1, 2)
+    };
 
     if db_key.starts_with("/user") {
         return DynamoTableDetails {
@@ -186,42 +185,41 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
     }
 
     match entity {
-        "function" | "templates" | "destinations" | "dashboard" | "alerts" | "kv" => {
-            match operation {
-                DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
-                    pk_value: parts[1].to_string(),
-                    rk_value: format!("{}/{}", parts[0], parts[2]),
-                    name: CONFIG.common.dynamo_org_meta_table.clone(),
-                    pk: "org".to_string(),
-                    rk: "key".to_string(),
-                    operation: "query".to_string(),
-                    entity: entity.to_string(),
-                },
-                DbOperation::List => {
-                    if parts.len() == 1 || parts[1].is_empty() {
-                        DynamoTableDetails {
-                            pk_value: parts[1].to_string(),
-                            rk_value: parts[0].to_string(),
-                            name: CONFIG.common.dynamo_org_meta_table.clone(),
-                            pk: "org".to_string(),
-                            rk: "key".to_string(),
-                            operation: "scan".to_string(),
-                            entity: entity.to_string(),
-                        }
-                    } else {
-                        DynamoTableDetails {
-                            pk_value: parts[1].to_string(),
-                            rk_value: parts[0].to_string(),
-                            name: CONFIG.common.dynamo_org_meta_table.clone(),
-                            pk: "org".to_string(),
-                            rk: "key".to_string(),
-                            operation: "query".to_string(),
-                            entity: entity.to_string(),
-                        }
+        "function" | "templates" | "destinations" | "dashboard" | "alerts" | "kv" | "compact"
+        | "metrics_members" | "metrics_leader" => match operation {
+            DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
+                pk_value: parts[1].to_string(),
+                rk_value: format!("{}/{}", parts[0], parts[2]),
+                name: CONFIG.common.dynamo_org_meta_table.clone(),
+                pk: "org".to_string(),
+                rk: "key".to_string(),
+                operation: "query".to_string(),
+                entity: entity.to_string(),
+            },
+            DbOperation::List => {
+                if parts.len() == 1 || parts[1].is_empty() {
+                    DynamoTableDetails {
+                        pk_value: parts[1].to_string(),
+                        rk_value: parts[0].to_string(),
+                        name: CONFIG.common.dynamo_org_meta_table.clone(),
+                        pk: "org".to_string(),
+                        rk: "key".to_string(),
+                        operation: "scan".to_string(),
+                        entity: entity.to_string(),
+                    }
+                } else {
+                    DynamoTableDetails {
+                        pk_value: parts[1].to_string(),
+                        rk_value: parts[0].to_string(),
+                        name: CONFIG.common.dynamo_org_meta_table.clone(),
+                        pk: "org".to_string(),
+                        rk: "key".to_string(),
+                        operation: "query".to_string(),
+                        entity: entity.to_string(),
                     }
                 }
             }
-        }
+        },
         "schema" => match operation {
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
                 pk_value: parts[1].to_string(),

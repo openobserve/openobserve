@@ -172,9 +172,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         db::compact::retention::cache()
             .await
             .expect("compact delete cache failed");
-        db::metrics::cache_prom_cluster_leader()
-            .await
-            .expect("prom cluster leader cache failed");
+
         db::alerts::cache().await.expect("alerts cache failed");
         db::triggers::cache()
             .await

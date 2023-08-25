@@ -115,30 +115,31 @@ pub async fn remote_write(
         // get labels
         let mut replica_label = String::new();
 
-        let metric_name = match labels_value(&event.labels, NAME_LABEL) {
-            Some(v) => v,
-            None => continue,
-        };
-
-        if !has_entry {
-            if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_replica_label) {
-                replica_label = v;
-            };
-            if cluster_name.is_empty() {
-                if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_cluster_label) {
-                    cluster_name = format!("{}/{}", org_id, v);
-                }
-            }
-        }
         let labels: FxIndexMap<String, String> = event
             .labels
             .iter()
             .filter(|label| {
-                label.name != CONFIG.prom.ha_replica_label
-                    && label.name != CONFIG.prom.ha_cluster_label
+                if label.name == CONFIG.prom.ha_replica_label {
+                    if !has_entry {
+                        replica_label = label.value.clone();
+                    }
+                    false
+                } else if label.name == CONFIG.prom.ha_cluster_label {
+                    if !has_entry && cluster_name.is_empty() {
+                        cluster_name = format!("{}/{}", org_id, label.value.clone());
+                    }
+                    false
+                } else {
+                    true
+                }
             })
             .map(|label| (label.name.clone(), label.value.clone()))
             .collect();
+
+        let metric_name = match labels.get(NAME_LABEL) {
+            Some(v) => v.to_owned(),
+            None => continue,
+        };
 
         let buf = metric_data_map.entry(metric_name.to_owned()).or_default();
 
@@ -825,7 +826,8 @@ async fn prom_ha_handler(
     _accept_record
 }
 
-fn labels_value(labels: &[prometheus::Label], name: &str) -> Option<String> {
+// binary_search_by_key works on sorted slice , since it is not , it fails to return __replica__ label value , hence commenting out
+fn _labels_value(labels: &[prometheus::Label], name: &str) -> Option<String> {
     labels
         .binary_search_by_key(&name, |label| label.name.as_str())
         .ok()
