@@ -124,12 +124,12 @@ export const convertSQLData = (
           label:{
             show:true
           },
-          radius:"50%"
+          radius:"80%"
         };
       case "donut":
         return {
           type: "pie",
-          radius: ['40%', '70%'],
+          radius: ['50%', '80%'],
           avoidLabelOverlap: false,
           label: {
             show: true,
@@ -834,7 +834,7 @@ export const convertSQLData = (
     },
     grid: {
       containLabel: true,
-      left: "15",
+      left: "10%",
       right: "10%",
       top: "15",
       bottom: "30",
@@ -1125,6 +1125,7 @@ export const convertSQLData = (
             show: true,
             formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
             position: "inside", // You can adjust the position of the labels
+            fontSize: 10
           },
           // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
@@ -1161,6 +1162,7 @@ export const convertSQLData = (
             show: true,
             formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
             position: "inside", // You can adjust the position of the labels
+            fontSize: 10,
           },
           // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
