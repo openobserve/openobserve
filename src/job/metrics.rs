@@ -153,6 +153,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
 
     //let users = db.count("/user/").await?;
     let users = USERS.len();
+
     metrics::META_NUM_USERS_TOTAL
         .with_label_values(&[])
         .set(users as i64);
