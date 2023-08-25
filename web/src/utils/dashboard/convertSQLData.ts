@@ -58,9 +58,9 @@ export const convertSQLData = (
 
     const data = searchQueryData.data.filter((item: any) => {
       return xAxisKeys.every((key: any) => {
-        return item[key];
+        return item[key]!=null;
       }) && yAxisKeys.every((key: any) => {
-        return item[key];
+        return item[key]!=null;
       })
     })
         
