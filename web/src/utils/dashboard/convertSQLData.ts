@@ -157,6 +157,7 @@ export const convertSQLData = (
       case "area":
         return {
           type: "line",
+          smooth:true,
           emphasis: { focus: "series" },
           areaStyle: {},
         };
@@ -176,6 +177,7 @@ export const convertSQLData = (
       case "area-stacked":
         return {
           type: "line",
+          smooth:true,
           stack: 'Total',
           areaStyle: {},
           emphasis: {
