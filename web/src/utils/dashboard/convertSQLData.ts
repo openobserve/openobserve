@@ -1316,25 +1316,20 @@ const formatDate =(date:any)=>{
         option.yAxis= [];
         option.series=[{
           ...getPropsByChartTypeForTraces(),
-          renderItem: ()=>{
+          renderItem: function(params: any) {            
             return {
-              type: 'group',
-              children: [
-                {
-                  type: 'text',
-                  style: {
-                    text: parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
-                    fontSize: 80,
-                    fontWeight: 500,
-                    align: 'center',
-                    verticalAlign: 'middle',
-                    x: 175,
-                    y: 100,
-                  }
-                }
-              ]
+              type: 'text',
+              style: {
+                text: parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
+                fontSize: Math.min((params.coordSys.cx / 2),90),    //coordSys is relative. so that we can use it to calculate the dynamic size
+                fontWeight: 500,
+                align: 'center',
+                verticalAlign: 'middle',
+                x: params.coordSys.cx,
+                y: params.coordSys.cy,
+              }
             }
-          }
+          } 
         }
       ];
       break;
