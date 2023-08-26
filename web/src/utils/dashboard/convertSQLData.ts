@@ -924,7 +924,7 @@ const formatDate =(date:any)=>{
           position: props.data.type == "h-bar" ? "left" : "bottom",
           name: index==0 ? props.data.queries[0]?.fields?.x[index]?.label : "",
           nameLocation: "middle",
-          nameGap: 16 * (xAxisKeys.length - index + 1),
+          nameGap: 13 * (xAxisKeys.length - index + 1),
           nameTextStyle: {
             fontWeight: "bold",
             fontSize: 14,
@@ -1141,6 +1141,7 @@ const formatDate =(date:any)=>{
       option.yAxis.map((it:any)=>{
         it.nameGap = calculateWidthText(largestLabel(it.data))+8;
       })
+      option.xAxis.nameGap = 20;
       break;
     }
     case "pie": {
@@ -1231,6 +1232,7 @@ const formatDate =(date:any)=>{
       };
       option.xAxis[0].axisLabel={};
       option.xAxis[0].axisTick={};
+      option.xAxis[0].nameGap=20;
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
@@ -1263,6 +1265,8 @@ const formatDate =(date:any)=>{
       option.xAxis[0].axisLabel.margin=5;
       option.xAxis[0].axisLabel={};
       option.xAxis[0].axisTick={};
+      option.xAxis[0].nameGap=20;
+
 
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
