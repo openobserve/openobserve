@@ -20,7 +20,7 @@ use crate::common::infra::{
     config::CONFIG,
     file_list as infra_file_list,
 };
-use crate::service::{db, usage};
+use crate::service::{compact::stats::update_stats_from_file_list, db, usage};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { usage_report_stats().await });
@@ -50,16 +50,24 @@ async fn usage_report_stats() -> Result<(), anyhow::Error> {
 // TODO
 // job for file_list_external = true
 // 1. get stats from file_list write into stream_stats (update or insert)
-// 2. get stats from stream_stats and write into infra/cache/stats
-// 3. -- mantian an offset
-// 4. compactor need update subtracted stats
-// 5. compactor need update data retention subtracted stats
+// 2. compactor need update subtracted stats
+// 3. compactor need update data retention subtracted stats
 async fn file_list_update_stats() -> Result<(), anyhow::Error> {
-    if !is_querier(&super::cluster::LOCAL_NODE_ROLE) || !CONFIG.common.file_list_external {
+    if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) || !CONFIG.common.file_list_external {
         return Ok(());
     }
 
-    Ok(())
+    // should run it every 10 minutes
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.limit.calculate_stats_interval,
+    ));
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        if let Err(e) = update_stats_from_file_list().await {
+            log::error!("[STATS] run update stats from file list error: {}", e);
+        }
+    }
 }
 
 async fn cache_stream_stats() -> Result<(), anyhow::Error> {

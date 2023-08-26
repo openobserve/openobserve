@@ -65,7 +65,7 @@ pub trait FileList: Sync + Send + 'static {
         org_id: &str,
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
-        pk_value: Option<&str>,
+        pk_value: Option<(&str, &str)>,
     ) -> Result<Vec<(String, StreamStats)>>;
     async fn get_stream_stats(
         &self,
@@ -73,7 +73,8 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>>;
-    async fn set_stream_stats(&self, data: Vec<(&str, &FileMeta)>) -> Result<()>;
+    async fn set_stream_stats(&self, org_id: &str, streams: &[(String, StreamStats)])
+        -> Result<()>;
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
     async fn clear(&self) -> Result<()>;
@@ -157,7 +158,7 @@ pub async fn stats(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
-    pk_value: Option<&str>,
+    pk_value: Option<(&str, &str)>,
 ) -> Result<Vec<(String, StreamStats)>> {
     CLIENT
         .stats(org_id, stream_type, stream_name, pk_value)
@@ -176,8 +177,8 @@ pub async fn get_stream_stats(
 }
 
 #[inline]
-pub async fn set_stream_stats(data: Vec<(&str, &FileMeta)>) -> Result<()> {
-    CLIENT.set_stream_stats(data).await
+pub async fn set_stream_stats(org_id: &str, streams: &[(String, StreamStats)]) -> Result<()> {
+    CLIENT.set_stream_stats(org_id, streams).await
 }
 
 #[inline]

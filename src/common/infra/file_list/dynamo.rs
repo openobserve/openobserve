@@ -277,7 +277,7 @@ impl super::FileList for DynamoFileList {
         _org_id: &str,
         _stream_type: Option<StreamType>,
         _stream_name: Option<&str>,
-        _pk_value: Option<&str>,
+        _pk_value: Option<(&str, &str)>,
     ) -> Result<Vec<(String, StreamStats)>> {
         Ok(vec![])
     }
@@ -291,7 +291,11 @@ impl super::FileList for DynamoFileList {
         Ok(vec![])
     }
 
-    async fn set_stream_stats(&self, _data: Vec<(&str, &FileMeta)>) -> Result<()> {
+    async fn set_stream_stats(
+        &self,
+        _org_id: &str,
+        _streams: &[(String, StreamStats)],
+    ) -> Result<()> {
         Ok(())
     }
 

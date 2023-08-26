@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap as HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
 use once_cell::sync::Lazy;
+use std::cmp::{max, min};
+
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     ConnectOptions, Pool, Postgres, QueryBuilder, Row,
@@ -69,8 +72,8 @@ impl super::FileList for PostgresFileList {
         match  sqlx::query(
             r#"
 INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
-        "#,
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+            "#,
         )
         .bind(org_id)
         .bind(stream_key)
@@ -100,7 +103,8 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
         sqlx::query(
             r#"
 DELETE FROM file_list 
-    WHERE stream = $1 AND date = $2 AND file = $3;"#,
+    WHERE stream = $1 AND date = $2 AND file = $3;
+            "#,
         )
         .bind(stream_key)
         .bind(date_key)
@@ -173,7 +177,7 @@ DELETE FROM file_list
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
-        "#,
+            "#,
         )
         .bind(stream_key)
         .bind(date_key)
@@ -190,7 +194,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
-        "#,
+            "#,
         )
         .bind(stream_key)
         .bind(date_key)
@@ -209,7 +213,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
     FROM file_list;
-        "#,
+            "#,
         )
         .fetch_all(&pool)
         .await?;
@@ -250,7 +254,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
     FROM file_list 
     WHERE stream = $1 AND min_ts >= $2 AND max_ts <= $3;
-        "#,
+            "#,
         )
         .bind(stream_key)
         .bind(time_start)
@@ -281,7 +285,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         org_id: &str,
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
-        _pk_value: Option<&str>,
+        pk_value: Option<(&str, &str)>,
     ) -> Result<Vec<(String, StreamStats)>> {
         let (field, value) = if stream_type.is_some() && stream_name.is_some() {
             (
@@ -296,17 +300,25 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         } else {
             ("org", org_id.to_string())
         };
-        let pool = CLIENT.clone();
-        let ret = sqlx::query_as::<_, super::StatsRecord>(
-            format!("
+        let sql = format!(
+            r#"
 SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_num, SUM(records) as records, SUM(original_size) as original_size, SUM(compressed_size) as compressed_size
     FROM file_list 
-    WHERE {field} = $1 GROUP BY stream;
-        ").as_str(),
-       )
-    .bind(value)
-    .fetch_all(&pool)
-    .await?;
+    WHERE {field} = '{value}';
+            "#,
+        );
+        let sql = match pk_value {
+            None => format!("{} GROUP BY stream", sql),
+            Some(("", "")) => format!("{} GROUP BY stream", sql),
+            Some(("0", "0")) => format!("{} GROUP BY stream", sql),
+            Some((min, max)) => {
+                format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+            }
+        };
+        let pool = CLIENT.clone();
+        let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
+            .fetch_all(&pool)
+            .await?;
         Ok(ret
             .iter()
             .map(|r| (r.stream.to_owned(), r.into()))
@@ -315,14 +327,97 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
 
     async fn get_stream_stats(
         &self,
-        _org_id: &str,
-        _stream_type: Option<StreamType>,
-        _stream_name: Option<&str>,
+        org_id: &str,
+        stream_type: Option<StreamType>,
+        stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        Ok(vec![])
+        let sql = if stream_type.is_some() && stream_name.is_some() {
+            format!(
+                "SELECT * FROM stream_stats WHERE stream = '{}/{}/{}';",
+                org_id,
+                stream_type.unwrap(),
+                stream_name.unwrap()
+            )
+        } else {
+            format!("SELECT * FROM stream_stats WHERE org = '{}';", org_id)
+        };
+        let pool = CLIENT.clone();
+        let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
+            .fetch_all(&pool)
+            .await?;
+        Ok(ret
+            .iter()
+            .map(|r| (r.stream.to_owned(), r.into()))
+            .collect())
     }
 
-    async fn set_stream_stats(&self, _data: Vec<(&str, &FileMeta)>) -> Result<()> {
+    async fn set_stream_stats(
+        &self,
+        org_id: &str,
+        streams: &[(String, StreamStats)],
+    ) -> Result<()> {
+        let pool = CLIENT.clone();
+        let old_stats = self.get_stream_stats(org_id, None, None).await?;
+        let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
+        let mut new_streams = Vec::new();
+        let mut update_streams = Vec::with_capacity(streams.len());
+        for (stream_key, meta) in streams {
+            let mut stats = match old_stats.get(stream_key) {
+                Some(s) => s.to_owned(),
+                None => {
+                    new_streams.push(stream_key);
+                    StreamStats::default()
+                }
+            };
+            stats.file_num = max(0, stats.file_num + meta.file_num);
+            stats.doc_num = max(0, stats.doc_num + meta.doc_num);
+            stats.doc_time_min = min(stats.doc_time_min, meta.doc_time_min);
+            stats.doc_time_max = max(stats.doc_time_max, meta.doc_time_max);
+            stats.storage_size += meta.storage_size;
+            if stats.storage_size < 0.0 {
+                stats.storage_size = 0.0;
+            }
+            stats.compressed_size += meta.compressed_size;
+            if stats.compressed_size < 0.0 {
+                stats.compressed_size = 0.0;
+            }
+            update_streams.push((stream_key, stats));
+        }
+
+        let mut tx = pool.begin().await?;
+        for stream_key in new_streams {
+            let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+            sqlx::query(
+                r#"
+INSERT OR IGNORE INTO stream_stats 
+    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
+    VALUES ($1, $2, 0, 0, 0, 0, 0, 0);
+                "#,
+            )
+            .bind(org_id)
+            .bind(stream_key)
+            .execute(&mut *tx)
+            .await?;
+        }
+        for (stream_key, stats) in update_streams {
+            sqlx::query(
+                r#"
+UPDATE stream_stats 
+    SET file_num = $1, min_ts = $2, max_ts = $3, records = $4, original_size = $5, compressed_size = $6
+    WHERE stream = $7;
+                "#,
+            )
+            .bind(stats.file_num)
+            .bind(stats.doc_time_min)
+            .bind(stats.doc_time_max)
+            .bind(stats.doc_num)
+            .bind(stats.storage_size as i64)
+            .bind(stats.compressed_size as i64)
+            .bind(stream_key)
+            .execute(&mut *tx)
+            .await?;
+        }
+
         Ok(())
     }
 
@@ -394,7 +489,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     original_size   BIGINT not null,
     compressed_size BIGINT not null
 );
-    "#,
+        "#,
     )
     .execute(&pool)
     .await?;
@@ -405,28 +500,30 @@ CREATE TABLE IF NOT EXISTS stream_stats
 pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
-    sqlx::query(r#"CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);"#)
+    // create index for file_list
+    sqlx::query("CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);")
         .execute(&mut *tx)
         .await?;
-    sqlx::query(r#"CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);"#)
+    sqlx::query("CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);")
         .execute(&mut *tx)
         .await?;
     sqlx::query(
-        r#"CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);"#,
+        "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
     )
     .execute(&mut *tx)
     .await?;
     sqlx::query(
-        r#"CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);"#,
+        "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);",
     )
     .execute(&mut *tx)
     .await?;
 
-    sqlx::query(r#"CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);"#)
+    // create index for stream_stats
+    sqlx::query("CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);")
         .execute(&mut *tx)
         .await?;
     sqlx::query(
-        r#"CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (stream);"#,
+        "CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (stream);",
     )
     .execute(&mut *tx)
     .await?;

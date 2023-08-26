@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn complex_array() {
         let obj = json!({"a": [1, [2, [3, 4], 5], 6]});
-        assert_eq!(flatten(&obj).unwrap(), json!({"a": "[1,[2,[3,4],5],6]"}),);
+        assert_eq!(flatten(&obj).unwrap(), json!({"a": "[1,[2,[3,4],5],6]"}));
     }
 
     #[test]
