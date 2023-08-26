@@ -106,7 +106,7 @@ pub(crate) async fn create_context(
 
     // if scan_compressed_size > 80% of total memory cache, skip memory cache
     let storage_type = if !CONFIG.memory_cache.enabled
-        || scan_stats.compressed_size > CONFIG.memory_cache.skip_size as u64
+        || scan_stats.compressed_size > CONFIG.memory_cache.skip_size as i64
     {
         StorageType::FsNoCache
     } else {

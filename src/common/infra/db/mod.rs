@@ -15,6 +15,7 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
+use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -27,9 +28,7 @@ pub mod sled;
 pub use self::etcd::ETCD_CLIENT;
 pub use self::sled::SLED_CLIENT;
 
-lazy_static! {
-    pub static ref DEFAULT: Box<dyn Db> = default();
-}
+pub static DEFAULT: Lazy<Box<dyn Db>> = Lazy::new(default);
 
 pub fn default() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
@@ -58,7 +57,7 @@ pub struct EventData {
 }
 
 #[async_trait]
-pub trait Db: Sync + 'static {
+pub trait Db: Sync + Send + 'static {
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
     async fn put(&self, key: &str, value: Bytes) -> Result<()>;

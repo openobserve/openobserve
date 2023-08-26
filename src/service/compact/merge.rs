@@ -251,7 +251,7 @@ async fn merge_files(
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
     for file in files_with_size.iter() {
-        if new_file_size + file.meta.original_size > CONFIG.compact.max_file_size {
+        if new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64 {
             break;
         }
         new_file_size += file.meta.original_size;
@@ -263,7 +263,7 @@ async fn merge_files(
             .inc();
         metrics::COMPACT_MERGED_BYTES
             .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-            .inc_by(file.meta.original_size);
+            .inc_by(file.meta.original_size as u64);
     }
     // no files need to merge
     if new_file_list.len() <= 1 {
@@ -382,7 +382,7 @@ async fn merge_files(
     let mut new_file_meta =
         datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema).await?;
     new_file_meta.original_size = new_file_size;
-    new_file_meta.compressed_size = buf.len() as u64;
+    new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
     }

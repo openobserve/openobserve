@@ -55,7 +55,7 @@ pub async fn search(
                 files.retain(|x| x != file);
             }
             Ok(file_data) => {
-                scan_stats.original_size += file_data.len() as u64;
+                scan_stats.original_size += file_data.len() as i64;
                 let file_key = file.key.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
                 let file_name = format!("/{work_dir}/{file_key}");
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
@@ -68,14 +68,14 @@ pub async fn search(
         let mem_files = wal::get_search_in_memory_files(&sql.org_id, &sql.stream_name, stream_type)
             .unwrap_or_default();
         for (file_key, file_data) in mem_files {
-            scan_stats.original_size += file_data.len() as u64;
+            scan_stats.original_size += file_data.len() as i64;
             let file_name = format!("/{work_dir}/{file_key}");
             tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             files.push(FileKey::from_file_name(&file_name));
         }
     }
 
-    scan_stats.files = files.len() as u64;
+    scan_stats.files = files.len() as i64;
     if scan_stats.files == 0 {
         return Ok((HashMap::new(), scan_stats));
     }

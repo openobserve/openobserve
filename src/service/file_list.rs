@@ -59,7 +59,7 @@ pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
 #[inline]
 pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats, anyhow::Error> {
     let mut stats = ScanStats::new();
-    stats.files = files.len() as u64;
+    stats.files = files.len() as i64;
     for file in files {
         stats.records += file.meta.records;
         stats.original_size += file.meta.original_size;

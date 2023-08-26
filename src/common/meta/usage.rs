@@ -22,10 +22,10 @@ pub const STATS_STREAM: &str = "stats";
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UsageData {
     pub event: UsageEvent,
+    pub year: i32,
+    pub month: u32,
     pub day: u32,
     pub hour: u32,
-    pub month: u32,
-    pub year: i32,
     pub org_id: String,
     pub request_body: String,
     pub size: f64,
@@ -33,7 +33,7 @@ pub struct UsageData {
     pub user_email: String,
     pub response_time: f64,
     pub stream_type: StreamType,
-    pub num_records: u64,
+    pub num_records: i64,
     pub stream_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compressed_size: Option<f64>,
@@ -160,7 +160,7 @@ impl ToString for UsageType {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RequestStats {
     pub size: f64,
-    pub records: u64,
+    pub records: i64,
     pub response_time: f64,
     #[serde(default)]
     pub request_body: Option<String>,

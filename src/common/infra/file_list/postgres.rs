@@ -79,9 +79,9 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
         .bind(false)
         .bind(meta.min_ts)
         .bind(meta.max_ts)
-        .bind(meta.records as i64)
-        .bind(meta.original_size as i64)
-        .bind(meta.compressed_size as i64)
+        .bind(meta.records )
+        .bind(meta.original_size )
+        .bind(meta.compressed_size )
         .execute(&pool)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
@@ -126,9 +126,9 @@ DELETE FROM file_list
                     .push_bind(false)
                     .push_bind(item.meta.min_ts)
                     .push_bind(item.meta.max_ts)
-                    .push_bind(item.meta.records as i64)
-                    .push_bind(item.meta.original_size as i64)
-                    .push_bind(item.meta.compressed_size as i64);
+                    .push_bind(item.meta.records)
+                    .push_bind(item.meta.original_size)
+                    .push_bind(item.meta.compressed_size);
             });
             match query_builder.build().execute(&pool).await {
                 Ok(_) => {}
@@ -181,6 +181,26 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         .fetch_one(&pool)
         .await?;
         Ok(FileMeta::from(&ret))
+    }
+
+    async fn contains(&self, file: &str) -> Result<bool> {
+        let pool = CLIENT.clone();
+        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let ret = sqlx::query(
+            r#"
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
+    FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
+        "#,
+        )
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .fetch_one(&pool)
+        .await;
+        if let Err(sqlx::Error::RowNotFound) = ret {
+            return Ok(false);
+        }
+        Ok(!ret.unwrap().is_empty())
     }
 
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
@@ -248,11 +268,20 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
+    async fn get_max_pk_value(&self) -> Result<String> {
+        let pool = CLIENT.clone();
+        let ret: i64 = sqlx::query_scalar(r#"SELECT MAX(id) AS id FROM file_list;"#)
+            .fetch_one(&pool)
+            .await?;
+        Ok(ret.to_string())
+    }
+
     async fn stats(
         &self,
         org_id: &str,
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
+        _pk_value: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
         let (field, value) = if stream_type.is_some() && stream_name.is_some() {
             (
@@ -284,24 +313,17 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
             .collect())
     }
 
-    async fn contains(&self, file: &str) -> Result<bool> {
-        let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-        let ret = sqlx::query(
-            r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
-    FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
-        "#,
-        )
-        .bind(stream_key)
-        .bind(date_key)
-        .bind(file_name)
-        .fetch_one(&pool)
-        .await;
-        if let Err(sqlx::Error::RowNotFound) = ret {
-            return Ok(false);
-        }
-        Ok(!ret.unwrap().is_empty())
+    async fn get_stream_stats(
+        &self,
+        _org_id: &str,
+        _stream_type: Option<StreamType>,
+        _stream_name: Option<&str>,
+    ) -> Result<Vec<(String, StreamStats)>> {
+        Ok(vec![])
+    }
+
+    async fn set_stream_stats(&self, _data: Vec<(&str, &FileMeta)>) -> Result<()> {
+        Ok(())
     }
 
     async fn len(&self) -> usize {
@@ -347,13 +369,32 @@ CREATE TABLE IF NOT EXISTS file_list
     date    VARCHAR not null,
     file    VARCHAR not null,
     deleted BOOLEAN default false not null,
-    min_ts  BIGINT not null,
-    max_ts  BIGINT not null,
-    records BIGINT not null,
+    min_ts   BIGINT not null,
+    max_ts   BIGINT not null,
+    records  BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null
 );
         "#,
+    )
+    .execute(&pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS stream_stats
+(
+    id      INT GENERATED ALWAYS AS IDENTITY,
+    org     VARCHAR not null,
+    stream  VARCHAR not null,
+    file_num BIGINT not null,
+    min_ts   BIGINT not null,
+    max_ts   BIGINT not null,
+    records  BIGINT not null,
+    original_size   BIGINT not null,
+    compressed_size BIGINT not null
+);
+    "#,
     )
     .execute(&pool)
     .await?;
@@ -377,6 +418,15 @@ pub async fn create_table_index() -> Result<()> {
     .await?;
     sqlx::query(
         r#"CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(r#"CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);"#)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        r#"CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (stream);"#,
     )
     .execute(&mut *tx)
     .await?;

@@ -21,13 +21,17 @@ use std::{
     io::{BufRead, BufReader},
     sync::atomic,
 };
-use tokio::sync::{mpsc, RwLock};
+use tokio::{
+    sync::{mpsc, RwLock},
+    time,
+};
 
 use crate::common::{
-    infra::{config::CONFIG, file_list as infra_file_list, storage},
+    infra::{cache::stats, config::CONFIG, file_list as infra_file_list, storage},
     meta::common::FileKey,
     utils::json,
 };
+use crate::service::db;
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
@@ -127,6 +131,28 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     // clean deleted files
     super::DELETED_FILES.clear();
     super::DELETED_FILES.shrink_to_fit();
+    Ok(())
+}
+
+pub async fn cache_stats() -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+    let orgs = db::schema::list_organizations_from_cache();
+    for org_id in orgs {
+        let ret = infra_file_list::stats(&org_id, None, None, None).await;
+        if ret.is_err() {
+            log::error!("Load stream stats error: {}", ret.err().unwrap());
+            continue;
+        }
+        for (stream, stats) in ret.unwrap() {
+            let columns = stream.split('/').collect::<Vec<&str>>();
+            let org_id = columns[0];
+            let stream_type = columns[1];
+            let stream_name = columns[2];
+            stats::set_stream_stats(org_id, stream_name, stream_type.into(), stats);
+        }
+        time::sleep(time::Duration::from_millis(100)).await;
+    }
+    log::info!("Load stream stats in {}s", start.elapsed().as_secs());
     Ok(())
 }
 

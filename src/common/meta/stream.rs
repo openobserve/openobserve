@@ -54,8 +54,8 @@ pub struct StreamStats {
     pub created_at: i64,
     pub doc_time_min: i64,
     pub doc_time_max: i64,
-    pub doc_num: u64,
-    pub file_num: u64,
+    pub doc_num: i64,
+    pub file_num: i64,
     pub storage_size: f64,
     pub compressed_size: f64,
 }
@@ -112,7 +112,7 @@ impl From<Stats> for StreamStats {
             created_at: 0,
             doc_time_min: meta.min_ts,
             doc_time_max: meta.max_ts,
-            doc_num: meta.records as u64,
+            doc_num: meta.records,
             file_num: 0,
             storage_size: meta.original_size,
             compressed_size: meta.compressed_size.unwrap_or_default(),
@@ -263,10 +263,10 @@ pub struct SchemaEvolution {
 
 #[derive(Clone, Copy, Default)]
 pub struct ScanStats {
-    pub files: u64,
-    pub records: u64,
-    pub original_size: u64,
-    pub compressed_size: u64,
+    pub files: i64,
+    pub records: i64,
+    pub original_size: i64,
+    pub compressed_size: i64,
 }
 
 impl ScanStats {

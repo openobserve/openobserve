@@ -99,7 +99,7 @@ pub async fn search(
         };
         files_group.insert(schema_latest_id, files);
     } else {
-        scan_stats.files = files.len() as u64;
+        scan_stats.files = files.len() as i64;
         for file in files.iter() {
             // calculate scan size
             scan_stats.records += file.meta.records;
@@ -139,7 +139,7 @@ pub async fn search(
 
     // if scan_compressed_size > 80% of total memory cache, skip memory cache
     let storage_type = if !CONFIG.memory_cache.enabled
-        || scan_stats.compressed_size > CONFIG.memory_cache.skip_size as u64
+        || scan_stats.compressed_size > CONFIG.memory_cache.skip_size as i64
     {
         StorageType::FsNoCache
     } else {

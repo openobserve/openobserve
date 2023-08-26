@@ -101,13 +101,13 @@ impl From<&HashMap<String, AttributeValue>> for FileKey {
                     item.meta.max_ts = v.as_n().unwrap().parse::<i64>().unwrap();
                 }
                 "records" => {
-                    item.meta.records = v.as_n().unwrap().parse::<u64>().unwrap();
+                    item.meta.records = v.as_n().unwrap().parse::<i64>().unwrap();
                 }
                 "original_size" => {
-                    item.meta.original_size = v.as_n().unwrap().parse::<u64>().unwrap();
+                    item.meta.original_size = v.as_n().unwrap().parse::<i64>().unwrap();
                 }
                 "compressed_size" => {
-                    item.meta.compressed_size = v.as_n().unwrap().parse::<u64>().unwrap();
+                    item.meta.compressed_size = v.as_n().unwrap().parse::<i64>().unwrap();
                 }
                 _ => {}
             }
@@ -120,9 +120,9 @@ impl From<&HashMap<String, AttributeValue>> for FileKey {
 pub struct FileMeta {
     pub min_ts: i64, // microseconds
     pub max_ts: i64, // microseconds
-    pub records: u64,
-    pub original_size: u64,
-    pub compressed_size: u64,
+    pub records: i64,
+    pub original_size: i64,
+    pub compressed_size: i64,
 }
 
 impl From<&FileMeta> for Vec<u8> {
@@ -130,9 +130,9 @@ impl From<&FileMeta> for Vec<u8> {
         let mut bytes = [0; 40];
         LittleEndian::write_i64(&mut bytes[0..8], value.min_ts);
         LittleEndian::write_i64(&mut bytes[8..16], value.max_ts);
-        LittleEndian::write_u64(&mut bytes[16..24], value.records);
-        LittleEndian::write_u64(&mut bytes[24..32], value.original_size);
-        LittleEndian::write_u64(&mut bytes[32..40], value.compressed_size);
+        LittleEndian::write_i64(&mut bytes[16..24], value.records);
+        LittleEndian::write_i64(&mut bytes[24..32], value.original_size);
+        LittleEndian::write_i64(&mut bytes[32..40], value.compressed_size);
         bytes.to_vec()
     }
 }
@@ -149,9 +149,9 @@ impl TryFrom<&[u8]> for FileMeta {
         }
         let min_ts = LittleEndian::read_i64(&value[0..8]);
         let max_ts = LittleEndian::read_i64(&value[8..16]);
-        let records = LittleEndian::read_u64(&value[16..24]);
-        let original_size = LittleEndian::read_u64(&value[24..32]);
-        let compressed_size = LittleEndian::read_u64(&value[32..40]);
+        let records = LittleEndian::read_i64(&value[16..24]);
+        let original_size = LittleEndian::read_i64(&value[24..32]);
+        let compressed_size = LittleEndian::read_i64(&value[32..40]);
         Ok(Self {
             min_ts,
             max_ts,

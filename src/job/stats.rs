@@ -24,11 +24,12 @@ use crate::service::{db, usage};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { usage_report_stats().await });
-    tokio::task::spawn(async move { file_list_stats().await });
+    tokio::task::spawn(async move { file_list_update_stats().await });
+    tokio::task::spawn(async move { cache_stream_stats().await });
     Ok(())
 }
 
-pub async fn usage_report_stats() -> Result<(), anyhow::Error> {
+async fn usage_report_stats() -> Result<(), anyhow::Error> {
     if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) || !CONFIG.common.usage_enabled {
         return Ok(());
     }
@@ -40,17 +41,29 @@ pub async fn usage_report_stats() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        let ret = usage::stats::publish_stats().await;
-        if ret.is_err() {
-            log::error!("[STATS] run error: {}", ret.err().unwrap());
+        if let Err(e) = usage::stats::publish_stats().await {
+            log::error!("[STATS] run publish stats error: {}", e);
         }
     }
 }
 
-pub async fn file_list_stats() -> Result<(), anyhow::Error> {
-    if !is_querier(&super::cluster::LOCAL_NODE_ROLE)
-        || CONFIG.common.file_list_storage.starts_with("dynamo")
-    {
+// TODO
+// job for file_list_external = true
+// 1. get stats from file_list write into stream_stats (update or insert)
+// 2. get stats from stream_stats and write into infra/cache/stats
+// 3. -- mantian an offset
+// 4. compactor need update subtracted stats
+// 5. compactor need update data retention subtracted stats
+async fn file_list_update_stats() -> Result<(), anyhow::Error> {
+    if !is_querier(&super::cluster::LOCAL_NODE_ROLE) || !CONFIG.common.file_list_external {
+        return Ok(());
+    }
+
+    Ok(())
+}
+
+async fn cache_stream_stats() -> Result<(), anyhow::Error> {
+    if !is_querier(&super::cluster::LOCAL_NODE_ROLE) {
         return Ok(());
     }
 
@@ -61,11 +74,15 @@ pub async fn file_list_stats() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
+        let start = std::time::Instant::now();
         let orgs = db::schema::list_organizations_from_cache();
         for org_id in orgs {
-            let ret = infra_file_list::stats(&org_id, None, None).await;
+            let ret = infra_file_list::get_stream_stats(&org_id, None, None).await;
             if ret.is_err() {
-                log::error!("[STATS] run error: {}", ret.err().unwrap());
+                log::error!(
+                    "[STATS] run cache stream stats error: {}",
+                    ret.err().unwrap()
+                );
                 continue;
             }
             for (stream, stats) in ret.unwrap() {
@@ -75,7 +92,11 @@ pub async fn file_list_stats() -> Result<(), anyhow::Error> {
                 let stream_name = columns[2];
                 stats::set_stream_stats(org_id, stream_name, stream_type.into(), stats);
             }
-            time::sleep(time::Duration::from_secs(2)).await;
+            time::sleep(time::Duration::from_millis(100)).await;
         }
+        log::info!(
+            "[STATS] cache stream stats in {}s",
+            start.elapsed().as_secs()
+        );
     }
 }

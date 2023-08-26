@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use async_trait::async_trait;
+use once_cell::sync::Lazy;
 
 use crate::common::{
     infra::{
@@ -28,16 +29,12 @@ use crate::common::{
 
 pub mod dynamo;
 pub mod postgres;
-pub mod sled;
 pub mod sqlite;
 
-lazy_static! {
-    static ref CLIENT: Box<dyn FileList> = connect();
-}
+static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn FileList> {
     match CONFIG.common.file_list_storage.as_str() {
-        "sled" => Box::<sled::SledFileList>::default(),
         "sqlite" => Box::<sqlite::SqliteFileList>::default(),
         "postgres" | "postgresql" => Box::<postgres::PostgresFileList>::default(),
         "dynamo" | "dynamodb" => Box::<dynamo::DynamoFileList>::default(),
@@ -46,12 +43,13 @@ pub fn connect() -> Box<dyn FileList> {
 }
 
 #[async_trait]
-pub trait FileList: Sync + 'static {
+pub trait FileList: Sync + Send + 'static {
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()>;
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_remove(&self, files: &[String]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
+    async fn contains(&self, file: &str) -> Result<bool>;
     async fn list(&self) -> Result<Vec<(String, FileMeta)>>;
     async fn query(
         &self,
@@ -61,13 +59,21 @@ pub trait FileList: Sync + 'static {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>>;
+    async fn get_max_pk_value(&self) -> Result<String>;
     async fn stats(
         &self,
         org_id: &str,
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
+        pk_value: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>>;
-    async fn contains(&self, file: &str) -> Result<bool>;
+    async fn get_stream_stats(
+        &self,
+        org_id: &str,
+        stream_type: Option<StreamType>,
+        stream_name: Option<&str>,
+    ) -> Result<Vec<(String, StreamStats)>>;
+    async fn set_stream_stats(&self, data: Vec<(&str, &FileMeta)>) -> Result<()>;
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
     async fn clear(&self) -> Result<()>;
@@ -77,7 +83,6 @@ pub async fn create_table() -> Result<()> {
     // check cache dir
     std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
     match CONFIG.common.file_list_storage.as_str() {
-        "sled" => sled::create_table().await,
         "sqlite" => sqlite::create_table().await,
         "postgres" | "postgresql" => postgres::create_table().await,
         "dynamo" | "dynamodb" => dynamo::create_table().await,
@@ -87,7 +92,6 @@ pub async fn create_table() -> Result<()> {
 
 pub async fn create_table_index() -> Result<()> {
     match CONFIG.common.file_list_storage.as_str() {
-        "sled" => sled::create_table_index().await,
         "sqlite" => sqlite::create_table_index().await,
         "postgres" | "postgresql" => postgres::create_table_index().await,
         "dynamo" | "dynamodb" => dynamo::create_table_index().await,
@@ -121,6 +125,11 @@ pub async fn get(file: &str) -> Result<FileMeta> {
 }
 
 #[inline]
+pub async fn contains(file: &str) -> Result<bool> {
+    CLIENT.contains(file).await
+}
+
+#[inline]
 pub async fn list() -> Result<Vec<(String, FileMeta)>> {
     CLIENT.list().await
 }
@@ -139,17 +148,36 @@ pub async fn query(
 }
 
 #[inline]
+pub async fn get_max_pk_value() -> Result<String> {
+    CLIENT.get_max_pk_value().await
+}
+
+#[inline]
 pub async fn stats(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
+    pk_value: Option<&str>,
 ) -> Result<Vec<(String, StreamStats)>> {
-    CLIENT.stats(org_id, stream_type, stream_name).await
+    CLIENT
+        .stats(org_id, stream_type, stream_name, pk_value)
+        .await
 }
 
 #[inline]
-pub async fn contains(file: &str) -> Result<bool> {
-    CLIENT.contains(file).await
+pub async fn get_stream_stats(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> Result<Vec<(String, StreamStats)>> {
+    CLIENT
+        .get_stream_stats(org_id, stream_type, stream_name)
+        .await
+}
+
+#[inline]
+pub async fn set_stream_stats(data: Vec<(&str, &FileMeta)>) -> Result<()> {
+    CLIENT.set_stream_stats(data).await
 }
 
 #[inline]
@@ -205,9 +233,9 @@ impl From<&FileRecord> for FileMeta {
         Self {
             min_ts: record.min_ts,
             max_ts: record.max_ts,
-            records: record.records as u64,
-            original_size: record.original_size as u64,
-            compressed_size: record.compressed_size as u64,
+            records: record.records,
+            original_size: record.original_size,
+            compressed_size: record.compressed_size,
         }
     }
 }
@@ -215,10 +243,10 @@ impl From<&FileRecord> for FileMeta {
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct StatsRecord {
     pub stream: String,
+    pub file_num: i64,
     pub min_ts: i64,
     pub max_ts: i64,
     pub records: i64,
-    pub file_num: i64,
     pub original_size: i64,
     pub compressed_size: i64,
 }
@@ -229,8 +257,8 @@ impl From<&StatsRecord> for StreamStats {
             created_at: 0,
             doc_time_min: record.min_ts,
             doc_time_max: record.max_ts,
-            doc_num: record.records as u64,
-            file_num: record.file_num as u64,
+            doc_num: record.records,
+            file_num: record.file_num,
             storage_size: record.original_size as f64,
             compressed_size: record.compressed_size as f64,
         }

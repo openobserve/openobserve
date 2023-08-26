@@ -513,10 +513,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.file_list_storage = "sqlite".to_string();
     }
     cfg.common.file_list_storage = cfg.common.file_list_storage.to_lowercase();
-    if cfg.common.local_mode
-        || cfg.common.file_list_storage.starts_with("dynamo")
-        || cfg.common.file_list_storage.starts_with("postgres")
-    {
+    if cfg.common.local_mode || cfg.common.file_list_storage != "sqlite" {
         cfg.common.file_list_external = true;
     }
 

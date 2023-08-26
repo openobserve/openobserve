@@ -189,6 +189,10 @@ impl super::FileList for DynamoFileList {
         Ok(file_key.meta)
     }
 
+    async fn contains(&self, file: &str) -> Result<bool> {
+        Ok(self.get(file).await.is_ok())
+    }
+
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
         return Ok(vec![]); // disallow list all data
     }
@@ -264,7 +268,21 @@ impl super::FileList for DynamoFileList {
         Ok(resp)
     }
 
+    async fn get_max_pk_value(&self) -> Result<String> {
+        Ok("".to_string()) // TODO
+    }
+
     async fn stats(
+        &self,
+        _org_id: &str,
+        _stream_type: Option<StreamType>,
+        _stream_name: Option<&str>,
+        _pk_value: Option<&str>,
+    ) -> Result<Vec<(String, StreamStats)>> {
+        Ok(vec![])
+    }
+
+    async fn get_stream_stats(
         &self,
         _org_id: &str,
         _stream_type: Option<StreamType>,
@@ -273,8 +291,8 @@ impl super::FileList for DynamoFileList {
         Ok(vec![])
     }
 
-    async fn contains(&self, file: &str) -> Result<bool> {
-        Ok(self.get(file).await.is_ok())
+    async fn set_stream_stats(&self, _data: Vec<(&str, &FileMeta)>) -> Result<()> {
+        Ok(())
     }
 
     async fn len(&self) -> usize {

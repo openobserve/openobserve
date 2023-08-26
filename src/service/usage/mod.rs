@@ -45,7 +45,7 @@ pub async fn report_request_usage_stats(
 ) {
     metrics::INGEST_RECORDS
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-        .inc_by(stats.records);
+        .inc_by(stats.records as u64);
     metrics::INGEST_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(stats.size as u64);
@@ -78,7 +78,7 @@ pub async fn report_request_usage_stats(
             unit: "MB".to_owned(),
             user_email: "".to_owned(),
             response_time: stats.response_time,
-            num_records: stats.records * num_functions as u64,
+            num_records: stats.records * num_functions as i64,
             stream_type,
             stream_name: stream_name.to_owned(),
             min_ts: None,
@@ -130,10 +130,10 @@ pub async fn report_compression_stats(
     let now = Utc::now();
     let usage = vec![UsageData {
         event: UsageEvent::Ingestion,
+        year: now.year(),
+        month: now.month(),
         day: now.day(),
         hour: now.hour(),
-        month: now.month(),
-        year: now.year(),
         org_id: org_id.to_owned(),
         request_body: "".to_owned(),
         size: stats.size,
