@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub async fn get_offset() -> (String, String) {
+pub async fn get_offset() -> (i64, String) {
     let db = &crate::common::infra::db::DEFAULT;
     let key = "/compact/stream_stats/offset";
     let value = match db.get(key).await {
@@ -21,15 +21,15 @@ pub async fn get_offset() -> (String, String) {
     };
     if value.contains(';') {
         let mut parts = value.split(';');
-        let offset: String = parts.next().unwrap().parse().unwrap();
+        let offset: i64 = parts.next().unwrap().parse().unwrap();
         let node = parts.next().unwrap().to_string();
         (offset, node)
     } else {
-        (value, String::from(""))
+        (value.parse().unwrap(), String::from(""))
     }
 }
 
-pub async fn set_offset(offset: &str, node: Option<&str>) -> Result<(), anyhow::Error> {
+pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = "/compact/stream_stats/offset";
     let val = if let Some(node) = node {

@@ -59,13 +59,13 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>>;
-    async fn get_max_pk_value(&self) -> Result<String>;
+    async fn get_max_pk_value(&self) -> Result<i64>;
     async fn stats(
         &self,
         org_id: &str,
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
-        pk_value: Option<(&str, &str)>,
+        pk_value: Option<(i64, i64)>,
     ) -> Result<Vec<(String, StreamStats)>>;
     async fn get_stream_stats(
         &self,
@@ -149,7 +149,7 @@ pub async fn query(
 }
 
 #[inline]
-pub async fn get_max_pk_value() -> Result<String> {
+pub async fn get_max_pk_value() -> Result<i64> {
     CLIENT.get_max_pk_value().await
 }
 
@@ -158,7 +158,7 @@ pub async fn stats(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
-    pk_value: Option<(&str, &str)>,
+    pk_value: Option<(i64, i64)>,
 ) -> Result<Vec<(String, StreamStats)>> {
     CLIENT
         .stats(org_id, stream_type, stream_name, pk_value)

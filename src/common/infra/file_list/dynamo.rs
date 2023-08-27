@@ -25,7 +25,10 @@ use aws_sdk_dynamodb::{
     Client,
 };
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use std::collections::HashMap;
+use std::{
+    cmp::{max, min},
+    collections::HashMap,
+};
 use tokio_stream::StreamExt;
 
 use crate::common::{
@@ -78,12 +81,14 @@ impl Default for DynamoFileList {
 impl super::FileList for DynamoFileList {
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         let file_name = format!("{date_key}/{file_name}");
         CLIENT
             .get()
             .await
             .put_item()
             .table_name(&self.table)
+            .item("org", AttributeValue::S(org_id))
             .item("stream", AttributeValue::S(stream_key))
             .item("file", AttributeValue::S(file_name))
             .item("deleted", AttributeValue::Bool(false))
@@ -240,12 +245,16 @@ impl super::FileList for DynamoFileList {
         let resp: std::result::Result<Vec<QueryOutput>, _> = client
             .query()
             .table_name(&self.table)
-            .key_condition_expression("#stream = :stream AND #file BETWEEN :file1 AND :file2")
+            .key_condition_expression("#stream = :stream AND #file BETWEEN :file1 AND :file2 AND #min_ts <= :ts1 AND #max_ts >= :ts2")
             .expression_attribute_names("#stream", "stream".to_string())
             .expression_attribute_names("#file", "file".to_string())
+            .expression_attribute_names("#min_ts", "min_ts".to_string())
+            .expression_attribute_names("#max_ts", "max_ts".to_string())
             .expression_attribute_values(":stream", AttributeValue::S(stream_key))
             .expression_attribute_values(":file1", AttributeValue::S(file_start))
             .expression_attribute_values(":file2", AttributeValue::S(file_end))
+            .expression_attribute_values(":ts1", AttributeValue::N(time_end.to_string()))
+            .expression_attribute_values(":ts2", AttributeValue::S(time_start.to_string()))
             .select(Select::AllAttributes)
             .into_paginator()
             .page_size(1000)
@@ -271,18 +280,99 @@ impl super::FileList for DynamoFileList {
         Ok(resp)
     }
 
-    async fn get_max_pk_value(&self) -> Result<String> {
-        Ok("".to_string()) // TODO
+    async fn get_max_pk_value(&self) -> Result<i64> {
+        Ok(0)
     }
 
     async fn stats(
         &self,
-        _org_id: &str,
-        _stream_type: Option<StreamType>,
-        _stream_name: Option<&str>,
-        _pk_value: Option<(&str, &str)>,
+        org_id: &str,
+        stream_type: Option<StreamType>,
+        stream_name: Option<&str>,
+        pk_value: Option<(i64, i64)>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        Ok(vec![])
+        let (time_start, time_end) = pk_value.unwrap_or((0, 0));
+        let client = CLIENT.get().await;
+        let query = if stream_type.is_some() && stream_name.is_some() {
+            let stream_key = format!("{org_id}/{}/{}", stream_type.unwrap(), stream_name.unwrap());
+            if time_start == 0 && time_end == 0 {
+                client
+                    .query()
+                    .table_name(&self.table)
+                    .index_name("org-created-at-index")
+                    .key_condition_expression("#org = :org AND #stream = :stream")
+                    .expression_attribute_names("#org", "org".to_string())
+                    .expression_attribute_names("#stream", "stream".to_string())
+                    .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
+                    .expression_attribute_values(":stream", AttributeValue::S(stream_key))
+            } else {
+                client.query()
+            .table_name(&self.table).index_name("org-created-at-index")
+            .key_condition_expression("#org = :org AND #stream = :stream AND #created_at1 > :ts1 AND #created_at2 <= :ts2")
+            .expression_attribute_names("#org", "org".to_string())
+            .expression_attribute_names("#stream", "stream".to_string())
+            .expression_attribute_names("#created_at1", "created_at".to_string())
+            .expression_attribute_names("#created_at2", "created_at".to_string())
+            .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
+            .expression_attribute_values(":stream", AttributeValue::S(stream_key))
+            .expression_attribute_values(":ts1", AttributeValue::S(time_start.to_string()))
+            .expression_attribute_values(":ts2", AttributeValue::S(time_end.to_string()))
+            }
+        } else if time_start == 0 && time_end == 0 {
+            client
+                .query()
+                .table_name(&self.table)
+                .index_name("org-created-at-index")
+                .key_condition_expression("#org = :org")
+                .expression_attribute_names("#org", "org".to_string())
+                .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
+        } else {
+            client
+                .query()
+                .table_name(&self.table)
+                .index_name("org-created-at-index")
+                .key_condition_expression(
+                    "#org = :org AND #created_at1 > :ts1 AND #created_at2 <= :ts2",
+                )
+                .expression_attribute_names("#org", "org".to_string())
+                .expression_attribute_names("#created_at1", "created_at".to_string())
+                .expression_attribute_names("#created_at2", "created_at".to_string())
+                .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
+                .expression_attribute_values(":ts1", AttributeValue::S(time_start.to_string()))
+                .expression_attribute_values(":ts2", AttributeValue::S(time_end.to_string()))
+        };
+
+        let resp: std::result::Result<Vec<QueryOutput>, _> = query
+            .select(Select::AllAttributes)
+            .into_paginator()
+            .page_size(1000)
+            .send()
+            .collect()
+            .await;
+        let resp = resp.map_err(|e| Error::Message(e.to_string()))?;
+        let resp: Vec<_> = resp
+            .iter()
+            .filter(|v| v.count() > 0)
+            .flat_map(|v| v.items().unwrap())
+            .map(|v| {
+                let file = FileKey::from(v);
+                (file.key.to_owned(), file.meta.to_owned())
+            })
+            .collect();
+
+        // calculate stats
+        let mut stats = HashMap::new();
+        for (file, meta) in resp {
+            let stream_stats = stats.entry(file).or_insert_with(StreamStats::default);
+            stream_stats.file_num += 1;
+            stream_stats.doc_time_min = min(stream_stats.doc_time_min, meta.min_ts);
+            stream_stats.doc_time_max = max(stream_stats.doc_time_max, meta.max_ts);
+            stream_stats.doc_num += meta.records;
+            stream_stats.storage_size += meta.original_size as f64;
+            stream_stats.compressed_size += meta.compressed_size as f64;
+        }
+
+        Ok(stats.into_iter().collect())
     }
 
     async fn get_stream_stats(
@@ -355,6 +445,10 @@ pub async fn create_table_file_list() -> Result<()> {
     ];
     let attribute_definitions = vec![
         AttributeDefinition::builder()
+            .attribute_name("org")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
             .attribute_name("stream")
             .attribute_type(ScalarAttributeType::S)
             .build(),
@@ -369,10 +463,10 @@ pub async fn create_table_file_list() -> Result<()> {
     ];
 
     let index_created = GlobalSecondaryIndex::builder()
-        .index_name("stream-created-at-index")
+        .index_name("org-created-at-index")
         .set_key_schema(Some(vec![
             KeySchemaElement::builder()
-                .attribute_name("stream")
+                .attribute_name("org")
                 .key_type(KeyType::Hash)
                 .build(),
             KeySchemaElement::builder()

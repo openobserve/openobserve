@@ -35,14 +35,11 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     }
 
     // get latest offset
-    let mut latest_pk = infra_file_list::get_max_pk_value().await?;
-    if latest_pk.is_empty() {
-        latest_pk = String::from("0");
-    }
-    let pk_value = if offset == "0" && latest_pk == "0" {
+    let latest_pk = infra_file_list::get_max_pk_value().await?;
+    let pk_value = if offset == 0 && latest_pk == 0 {
         None
     } else {
-        Some((offset.as_str(), latest_pk.as_str()))
+        Some((offset, latest_pk))
     };
 
     // get stats from file_list
@@ -56,12 +53,12 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     }
 
     // update offset
-    db::compact::stats::set_offset(&latest_pk, Some(&LOCAL_NODE_UUID.clone())).await?;
+    db::compact::stats::set_offset(latest_pk, Some(&LOCAL_NODE_UUID.clone())).await?;
 
     Ok(())
 }
 
-async fn update_stats_lock_node() -> Result<String, anyhow::Error> {
+async fn update_stats_lock_node() -> Result<i64, anyhow::Error> {
     let lock_key = format!("compact/stream_stats/offset");
     let mut locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
     // check the working node for the organization again, maybe other node locked it first
@@ -74,7 +71,7 @@ async fn update_stats_lock_node() -> Result<String, anyhow::Error> {
     }
 
     // bind the job to this node
-    if let Err(e) = db::compact::stats::set_offset(&offset, Some(&LOCAL_NODE_UUID.clone())).await {
+    if let Err(e) = db::compact::stats::set_offset(offset, Some(&LOCAL_NODE_UUID.clone())).await {
         dist_lock::unlock(&mut locker).await?;
         return Err(e);
     }

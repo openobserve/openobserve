@@ -277,12 +277,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn get_max_pk_value(&self) -> Result<String> {
+    async fn get_max_pk_value(&self) -> Result<i64> {
         let pool = CLIENT.clone();
         let ret: i64 = sqlx::query_scalar(r#"SELECT MAX(id) AS id FROM file_list;"#)
             .fetch_one(&pool)
             .await?;
-        Ok(ret.to_string())
+        Ok(ret)
     }
 
     async fn stats(
@@ -290,7 +290,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         org_id: &str,
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
-        pk_value: Option<(&str, &str)>,
+        pk_value: Option<(i64, i64)>,
     ) -> Result<Vec<(String, StreamStats)>> {
         let (field, value) = if stream_type.is_some() && stream_name.is_some() {
             (
@@ -314,15 +314,8 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         );
         let sql = match pk_value {
             None => format!("{} GROUP BY stream", sql),
-            Some(("", "")) => format!("{} GROUP BY stream", sql),
-            Some(("0", "0")) => format!("{} GROUP BY stream", sql),
-            Some((mut min, mut max)) => {
-                if min.is_empty() {
-                    min = "0";
-                }
-                if max.is_empty() {
-                    max = "0";
-                }
+            Some((0, 0)) => format!("{} GROUP BY stream", sql),
+            Some((min, max)) => {
                 format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
             }
         };
