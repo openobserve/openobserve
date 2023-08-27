@@ -49,7 +49,9 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache();
     for org_id in orgs {
         let stream_stats = infra_file_list::stats(&org_id, None, None, pk_value).await?;
-        infra_file_list::set_stream_stats(&org_id, &stream_stats).await?;
+        if !stream_stats.is_empty() {
+            infra_file_list::set_stream_stats(&org_id, &stream_stats).await?;
+        }
         time::sleep(time::Duration::from_secs(1)).await;
     }
 

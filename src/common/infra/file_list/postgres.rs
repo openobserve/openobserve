@@ -302,16 +302,23 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         };
         let sql = format!(
             r#"
-SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_num, SUM(records) as records, SUM(original_size) as original_size, SUM(compressed_size) as compressed_size
+SELECT stream, MIN(min_ts)::BIGINT as min_ts, MAX(max_ts)::BIGINT as max_ts, COUNT(*)::BIGINT as file_num, 
+    SUM(records)::BIGINT as records, SUM(original_size)::BIGINT as original_size, SUM(compressed_size)::BIGINT as compressed_size
     FROM file_list 
-    WHERE {field} = '{value}';
+    WHERE {field} = '{value}'
             "#,
         );
         let sql = match pk_value {
             None => format!("{} GROUP BY stream", sql),
             Some(("", "")) => format!("{} GROUP BY stream", sql),
             Some(("0", "0")) => format!("{} GROUP BY stream", sql),
-            Some((min, max)) => {
+            Some((mut min, mut max)) => {
+                if min.is_empty() {
+                    min = "0";
+                }
+                if max.is_empty() {
+                    max = "0";
+                }
                 format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
             }
         };
@@ -387,9 +394,9 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         let mut tx = pool.begin().await?;
         for stream_key in new_streams {
             let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-            sqlx::query(
+            if let Err(e) = sqlx::query(
                 r#"
-INSERT OR IGNORE INTO stream_stats 
+INSERT INTO stream_stats 
     (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
     VALUES ($1, $2, 0, 0, 0, 0, 0, 0);
                 "#,
@@ -397,8 +404,20 @@ INSERT OR IGNORE INTO stream_stats
             .bind(org_id)
             .bind(stream_key)
             .execute(&mut *tx)
-            .await?;
+            .await
+            {
+                log::error!(
+                    "[POSTGRES] insert stream stats error: {}, stream: {}",
+                    e,
+                    stream_key
+                );
+            }
         }
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit stream stats error: {}", e);
+        }
+
+        let mut tx = pool.begin().await?;
         for (stream_key, stats) in update_streams {
             sqlx::query(
                 r#"
@@ -416,6 +435,9 @@ UPDATE stream_stats
             .bind(stream_key)
             .execute(&mut *tx)
             .await?;
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit stream stats error: {}", e);
         }
 
         Ok(())
@@ -458,7 +480,7 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS file_list
 (
-    id      INT GENERATED ALWAYS AS IDENTITY,
+    id      BIGINT GENERATED ALWAYS AS IDENTITY,
     org     VARCHAR not null,
     stream  VARCHAR not null,
     date    VARCHAR not null,
@@ -479,7 +501,7 @@ CREATE TABLE IF NOT EXISTS file_list
         r#"
 CREATE TABLE IF NOT EXISTS stream_stats
 (
-    id      INT GENERATED ALWAYS AS IDENTITY,
+    id      BIGINT GENERATED ALWAYS AS IDENTITY,
     org     VARCHAR not null,
     stream  VARCHAR not null,
     file_num BIGINT not null,
