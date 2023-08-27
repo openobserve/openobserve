@@ -18,8 +18,9 @@ use aws_sdk_dynamodb::{
     config::Region,
     operation::query::QueryOutput,
     types::{
-        AttributeDefinition, AttributeValue, BillingMode, DeleteRequest, KeySchemaElement, KeyType,
-        PutRequest, ScalarAttributeType, Select, WriteRequest,
+        AttributeDefinition, AttributeValue, BillingMode, DeleteRequest, GlobalSecondaryIndex,
+        KeySchemaElement, KeyType, Projection, ProjectionType, PutRequest, ScalarAttributeType,
+        Select, WriteRequest,
     },
     Client,
 };
@@ -96,6 +97,10 @@ impl super::FileList for DynamoFileList {
             .item(
                 "compressed_size",
                 AttributeValue::N(meta.compressed_size.to_string()),
+            )
+            .item(
+                "created_at",
+                AttributeValue::N(Utc::now().timestamp_micros().to_string()),
             )
             .send()
             .await
@@ -256,9 +261,7 @@ impl super::FileList for DynamoFileList {
             .flat_map(|v| v.items().unwrap())
             .filter_map(|v| {
                 let file = FileKey::from(v);
-                if (file.meta.min_ts >= time_start && file.meta.min_ts <= time_end)
-                    || (file.meta.max_ts >= time_start && file.meta.max_ts <= time_end)
-                {
+                if file.meta.min_ts <= time_end && file.meta.max_ts <= time_start {
                     Some((file.key.to_owned(), file.meta.to_owned()))
                 } else {
                     None
@@ -313,6 +316,18 @@ impl super::FileList for DynamoFileList {
 }
 
 pub async fn create_table() -> Result<()> {
+    create_table_file_list().await?;
+    create_table_stream_stats().await?;
+    Ok(())
+}
+
+pub async fn create_table_index() -> Result<()> {
+    create_table_file_list_index().await?;
+    create_table_stream_stats_index().await?;
+    Ok(())
+}
+
+pub async fn create_table_file_list() -> Result<()> {
     let client = CLIENT.get().await.clone();
     let table_name = &CONFIG.common.file_list_dynamo_table_name;
     let tables = client
@@ -320,47 +335,129 @@ pub async fn create_table() -> Result<()> {
         .send()
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
-    if !tables
+    if tables
         .table_names()
         .unwrap_or(&[])
         .contains(&table_name.to_string())
     {
-        log::info!("Table not found, creating table {}", table_name);
-        let key_schema = vec![
+        return Ok(());
+    }
+
+    let key_schema = vec![
+        KeySchemaElement::builder()
+            .attribute_name("stream")
+            .key_type(KeyType::Hash)
+            .build(),
+        KeySchemaElement::builder()
+            .attribute_name("file")
+            .key_type(KeyType::Range)
+            .build(),
+    ];
+    let attribute_definitions = vec![
+        AttributeDefinition::builder()
+            .attribute_name("stream")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("file")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("created_at")
+            .attribute_type(ScalarAttributeType::N)
+            .build(),
+    ];
+
+    let index_created = GlobalSecondaryIndex::builder()
+        .index_name("stream-created-at-index")
+        .set_key_schema(Some(vec![
             KeySchemaElement::builder()
                 .attribute_name("stream")
                 .key_type(KeyType::Hash)
                 .build(),
             KeySchemaElement::builder()
-                .attribute_name("file")
+                .attribute_name("created_at")
                 .key_type(KeyType::Range)
                 .build(),
-        ];
-        let attribute_definitions = vec![
-            AttributeDefinition::builder()
-                .attribute_name("stream")
-                .attribute_type(ScalarAttributeType::S)
+        ]))
+        .set_projection(Some(
+            Projection::builder()
+                .projection_type(ProjectionType::All)
                 .build(),
-            AttributeDefinition::builder()
-                .attribute_name("file")
-                .attribute_type(ScalarAttributeType::S)
-                .build(),
-        ];
-        client
-            .create_table()
-            .table_name(table_name)
-            .set_key_schema(Some(key_schema))
-            .set_attribute_definitions(Some(attribute_definitions))
-            .billing_mode(BillingMode::PayPerRequest)
-            .send()
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
+        ))
+        .build();
 
-        log::info!("Table {} created successfully", table_name);
-    }
+    client
+        .create_table()
+        .table_name(table_name)
+        .set_key_schema(Some(key_schema))
+        .set_attribute_definitions(Some(attribute_definitions))
+        .set_global_secondary_indexes(Some(vec![index_created]))
+        .billing_mode(BillingMode::PayPerRequest)
+        .send()
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+
+    log::info!("Table {} created successfully", table_name);
+
     Ok(())
 }
 
-pub async fn create_table_index() -> Result<()> {
+pub async fn create_table_stream_stats() -> Result<()> {
+    let client = CLIENT.get().await.clone();
+    let table_name = &CONFIG.common.stream_stats_dynamo_table_name;
+    let tables = client
+        .list_tables()
+        .send()
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+    if tables
+        .table_names()
+        .unwrap_or(&[])
+        .contains(&table_name.to_string())
+    {
+        return Ok(());
+    }
+
+    let key_schema = vec![
+        KeySchemaElement::builder()
+            .attribute_name("org")
+            .key_type(KeyType::Hash)
+            .build(),
+        KeySchemaElement::builder()
+            .attribute_name("stream")
+            .key_type(KeyType::Range)
+            .build(),
+    ];
+    let attribute_definitions = vec![
+        AttributeDefinition::builder()
+            .attribute_name("org")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("stream")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+    ];
+    client
+        .create_table()
+        .table_name(table_name)
+        .set_key_schema(Some(key_schema))
+        .set_attribute_definitions(Some(attribute_definitions))
+        .billing_mode(BillingMode::PayPerRequest)
+        .send()
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+
+    log::info!("Table {} created successfully", table_name);
+
+    Ok(())
+}
+
+pub async fn create_table_file_list_index() -> Result<()> {
+    Ok(())
+}
+
+pub async fn create_table_stream_stats_index() -> Result<()> {
     Ok(())
 }

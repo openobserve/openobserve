@@ -75,6 +75,10 @@ impl From<&FileKey> for HashMap<String, AttributeValue> {
             "compressed_size".to_string(),
             AttributeValue::N(file_key.meta.compressed_size.to_string()),
         );
+        item.insert(
+            "created_at".to_string(),
+            AttributeValue::N(chrono::Utc::now().timestamp_micros().to_string()),
+        );
         item
     }
 }

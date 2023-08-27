@@ -182,6 +182,8 @@ pub struct Common {
     pub file_list_external: bool,
     #[env_config(name = "ZO_FILE_LIST_DYNAMO_TABLE_NAME", default = "")]
     pub file_list_dynamo_table_name: String,
+    #[env_config(name = "ZO_STREAM_STATS_DYNAMO_TABLE_NAME", default = "")]
+    pub stream_stats_dynamo_table_name: String,
     #[env_config(name = "ZO_FILE_LIST_POSTGRES_DSN", default = "")]
     pub file_list_postgres_dsn: String,
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
@@ -650,6 +652,9 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.file_list_dynamo_table_name.is_empty() {
         cfg.common.file_list_dynamo_table_name = format!("{}-file-list", cfg.s3.bucket_name);
+    }
+    if cfg.common.stream_stats_dynamo_table_name.is_empty() {
+        cfg.common.stream_stats_dynamo_table_name = format!("{}-stream-stats", cfg.s3.bucket_name);
     }
 
     Ok(())
