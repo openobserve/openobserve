@@ -23,6 +23,7 @@ use crate::common::meta::meta_store::MetaStore;
 use super::config::CONFIG;
 use super::errors::Result;
 
+pub mod dynamo_db;
 pub mod etcd;
 pub mod sled;
 

@@ -36,7 +36,7 @@ lazy_static! {
 }
 
 pub fn connect() -> Box<dyn FileList> {
-    match CONFIG.common.file_list_storage.as_str() {
+    match CONFIG.common.meta_store.as_str() {
         "sled" => Box::<sled::SledFileList>::default(),
         "sqlite" => Box::<sqlite::SqliteFileList>::default(),
         "postgres" | "postgresql" => Box::<postgres::PostgresFileList>::default(),
@@ -76,7 +76,7 @@ pub trait FileList: Sync + 'static {
 pub async fn create_table() -> Result<()> {
     // check cache dir
     std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
-    match CONFIG.common.file_list_storage.as_str() {
+    match CONFIG.common.meta_store.as_str() {
         "sled" => sled::create_table().await,
         "sqlite" => sqlite::create_table().await,
         "postgres" | "postgresql" => postgres::create_table().await,
@@ -86,7 +86,7 @@ pub async fn create_table() -> Result<()> {
 }
 
 pub async fn create_table_index() -> Result<()> {
-    match CONFIG.common.file_list_storage.as_str() {
+    match CONFIG.common.meta_store.as_str() {
         "sled" => sled::create_table_index().await,
         "sqlite" => sqlite::create_table_index().await,
         "postgres" | "postgresql" => postgres::create_table_index().await,

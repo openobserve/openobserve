@@ -15,20 +15,11 @@
 use regex::Regex;
 
 use crate::common::infra::config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED};
-use crate::common::infra::{cluster, ider};
+use crate::common::infra::{cluster, file_list as infra_file_list, ider};
 use crate::common::meta::meta_store::MetaStore;
 use crate::common::meta::organization::DEFAULT_ORG;
 use crate::common::meta::user::UserRequest;
 use crate::common::utils::file::clean_empty_dirs;
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
-        file_list as infra_file_list, ider,
-    },
-    meta::{organization::DEFAULT_ORG, user::UserRequest},
-    utils::file::clean_empty_dirs,
-};
 use crate::service::{db, users};
 
 mod alert_manager;
@@ -42,14 +33,7 @@ pub(crate) mod syslog_server;
 mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    //create dynamo db table
-    if CONFIG
-        .common
-        .meta_store
-        .eq(&MetaStore::DynamoDB.to_string())
-    {
-        crate::common::infra::db::dynamo_db::create_dynamo_tables().await;
-    }
+    infra_file_list::create_table().await?;
 
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
@@ -76,15 +60,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         )
         .await;
     }
-
-    if !CONFIG
-        .common
-        .meta_store
-        .eq(&MetaStore::DynamoDB.to_string())
-    {
-        // cache users
-        tokio::task::spawn(async move { db::user::watch().await });
-    }
+    // cache users
+    tokio::task::spawn(async move { db::user::watch().await });
     db::user::cache().await.expect("user cache failed");
 
     //set instance id
@@ -149,49 +126,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     // cache file list
-    infra_file_list::create_table().await?;
+
     if !CONFIG.common.file_list_external
         && (cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
             || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE))
     {
-        // initialize metadata
-        tokio::task::spawn(async move { db::functions::watch().await });
-        tokio::task::spawn(async move { db::compact::retention::watch().await });
-        tokio::task::spawn(async move { db::alerts::watch().await });
-        tokio::task::spawn(async move { db::triggers::watch().await });
-        tokio::task::spawn(async move { db::alerts::templates::watch().await });
-        tokio::task::spawn(async move { db::alerts::destinations::watch().await });
-        tokio::task::spawn(async move { db::syslog::watch().await });
-        tokio::task::spawn(async move { db::syslog::watch_syslog_settings().await });
-        tokio::task::yield_now().await; // yield let other tasks run
-
-        db::functions::cache()
-            .await
-            .expect("functions cache failed");
-        db::compact::retention::cache()
-            .await
-            .expect("compact delete cache failed");
-
-        db::alerts::cache().await.expect("alerts cache failed");
-        db::triggers::cache()
-            .await
-            .expect("alerts triggers cache failed");
-        db::alerts::templates::cache()
-            .await
-            .expect("alerts templates cache failed");
-        db::alerts::destinations::cache()
-            .await
-            .expect("alerts destinations cache failed");
-        db::syslog::cache().await.expect("syslog cache failed");
-        db::syslog::cache_syslog_settings()
-            .await
-            .expect("syslog settings cache failed");
-
-        // cache file list
-
-        db::file_list::local::cache()
-            .await
-            .expect("file list local cache failed");
         db::file_list::remote::cache("", false)
             .await
             .expect("file list remote cache failed");
