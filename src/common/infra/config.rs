@@ -454,19 +454,24 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
-    // check data path config
-    if let Err(e) = check_path_config(&mut cfg) {
-        panic!("data path config error: {e}");
-    }
-
     // check memeory cache
     if let Err(e) = check_memory_cache_config(&mut cfg) {
         panic!("memory cache config error: {e}");
     }
 
+    // check data path config
+    if let Err(e) = check_path_config(&mut cfg) {
+        panic!("data path config error: {e}");
+    }
+
     // check etcd config
     if let Err(e) = check_etcd_config(&mut cfg) {
         panic!("etcd config error: {e}");
+    }
+
+    // check sled config
+    if let Err(e) = check_sled_config(&mut cfg) {
+        panic!("sled config error: {e}");
     }
 
     // check s3 config
@@ -594,6 +599,24 @@ fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             name = name.split(':').collect::<Vec<&str>>()[0].to_string();
         }
         cfg.etcd.domain_name = name;
+    }
+
+    if !cfg.etcd.prefix.is_empty() && !cfg.etcd.prefix.ends_with('/') {
+        cfg.etcd.prefix = format!("{}/", cfg.etcd.prefix);
+    }
+
+    Ok(())
+}
+
+fn check_sled_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.sled.data_dir.is_empty() {
+        cfg.sled.data_dir = format!("{}db/", cfg.common.data_dir);
+    }
+    if !cfg.sled.data_dir.ends_with('/') {
+        cfg.sled.data_dir = format!("{}/", cfg.sled.data_dir);
+    }
+    if !cfg.sled.prefix.is_empty() && !cfg.sled.prefix.ends_with('/') {
+        cfg.sled.prefix = format!("{}/", cfg.sled.prefix);
     }
 
     Ok(())

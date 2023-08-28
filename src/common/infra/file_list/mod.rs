@@ -13,7 +13,9 @@
 // limitations under the License.
 
 use async_trait::async_trait;
+use aws_sdk_dynamodb::types::AttributeValue;
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 use crate::common::{
     infra::{
@@ -262,6 +264,56 @@ impl From<&StatsRecord> for StreamStats {
             file_num: record.file_num,
             storage_size: record.original_size as f64,
             compressed_size: record.compressed_size as f64,
+        }
+    }
+}
+
+impl From<&HashMap<String, AttributeValue>> for StatsRecord {
+    fn from(data: &HashMap<String, AttributeValue>) -> Self {
+        StatsRecord {
+            stream: data.get("stream").unwrap().as_s().unwrap().to_string(),
+            file_num: data
+                .get("file_num")
+                .unwrap()
+                .as_n()
+                .unwrap()
+                .parse::<i64>()
+                .unwrap(),
+            min_ts: data
+                .get("min_ts")
+                .unwrap()
+                .as_n()
+                .unwrap()
+                .parse::<i64>()
+                .unwrap(),
+            max_ts: data
+                .get("max_ts")
+                .unwrap()
+                .as_n()
+                .unwrap()
+                .parse::<i64>()
+                .unwrap(),
+            records: data
+                .get("records")
+                .unwrap()
+                .as_n()
+                .unwrap()
+                .parse::<i64>()
+                .unwrap(),
+            original_size: data
+                .get("original_size")
+                .unwrap()
+                .as_n()
+                .unwrap()
+                .parse::<i64>()
+                .unwrap(),
+            compressed_size: data
+                .get("compressed_size")
+                .unwrap()
+                .as_n()
+                .unwrap()
+                .parse::<i64>()
+                .unwrap(),
         }
     }
 }

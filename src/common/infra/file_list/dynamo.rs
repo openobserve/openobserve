@@ -60,13 +60,15 @@ async fn connect() -> Client {
 }
 
 pub struct DynamoFileList {
-    table: String,
+    file_list_table: String,
+    stream_stats_table: String,
 }
 
 impl DynamoFileList {
     pub fn new() -> Self {
         Self {
-            table: CONFIG.common.file_list_dynamo_table_name.clone(),
+            file_list_table: CONFIG.common.file_list_dynamo_table_name.clone(),
+            stream_stats_table: CONFIG.common.stream_stats_dynamo_table_name.clone(),
         }
     }
 }
@@ -87,7 +89,7 @@ impl super::FileList for DynamoFileList {
             .get()
             .await
             .put_item()
-            .table_name(&self.table)
+            .table_name(&self.file_list_table)
             .item("org", AttributeValue::S(org_id))
             .item("stream", AttributeValue::S(stream_key))
             .item("file", AttributeValue::S(file_name))
@@ -123,7 +125,7 @@ impl super::FileList for DynamoFileList {
             .get()
             .await
             .delete_item()
-            .table_name(&self.table)
+            .table_name(&self.file_list_table)
             .set_key(Some(item))
             .send()
             .await
@@ -142,7 +144,7 @@ impl super::FileList for DynamoFileList {
                 .get()
                 .await
                 .batch_write_item()
-                .request_items(&self.table, reqs)
+                .request_items(&self.file_list_table, reqs)
                 .send()
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
@@ -166,7 +168,7 @@ impl super::FileList for DynamoFileList {
                 .get()
                 .await
                 .batch_write_item()
-                .request_items(&self.table, reqs)
+                .request_items(&self.file_list_table, reqs)
                 .send()
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
@@ -181,11 +183,11 @@ impl super::FileList for DynamoFileList {
         let client = CLIENT.get().await;
         let resp = client
             .query()
-            .table_name(&self.table)
+            .table_name(&self.file_list_table)
             .key_condition_expression("#stream = :stream AND #file = :file")
             .expression_attribute_names("#stream", "stream".to_string())
-            .expression_attribute_values(":stream", AttributeValue::S(stream_key))
             .expression_attribute_names("#file", "file".to_string())
+            .expression_attribute_values(":stream", AttributeValue::S(stream_key))
             .expression_attribute_values(":file", AttributeValue::S(file_name))
             .select(Select::AllAttributes)
             .send()
@@ -244,17 +246,13 @@ impl super::FileList for DynamoFileList {
         let client = CLIENT.get().await;
         let resp: std::result::Result<Vec<QueryOutput>, _> = client
             .query()
-            .table_name(&self.table)
-            .key_condition_expression("#stream = :stream AND #file BETWEEN :file1 AND :file2 AND #min_ts <= :ts1 AND #max_ts >= :ts2")
+            .table_name(&self.file_list_table)
+            .key_condition_expression("#stream = :stream AND #file BETWEEN :file1 AND :file2")
             .expression_attribute_names("#stream", "stream".to_string())
             .expression_attribute_names("#file", "file".to_string())
-            .expression_attribute_names("#min_ts", "min_ts".to_string())
-            .expression_attribute_names("#max_ts", "max_ts".to_string())
             .expression_attribute_values(":stream", AttributeValue::S(stream_key))
             .expression_attribute_values(":file1", AttributeValue::S(file_start))
             .expression_attribute_values(":file2", AttributeValue::S(file_end))
-            .expression_attribute_values(":ts1", AttributeValue::N(time_end.to_string()))
-            .expression_attribute_values(":ts2", AttributeValue::S(time_start.to_string()))
             .select(Select::AllAttributes)
             .into_paginator()
             .page_size(1000)
@@ -270,7 +268,7 @@ impl super::FileList for DynamoFileList {
             .flat_map(|v| v.items().unwrap())
             .filter_map(|v| {
                 let file = FileKey::from(v);
-                if file.meta.min_ts <= time_end && file.meta.max_ts <= time_start {
+                if file.meta.min_ts <= time_end && file.meta.max_ts >= time_start {
                     Some((file.key.to_owned(), file.meta.to_owned()))
                 } else {
                     None
@@ -281,7 +279,8 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn get_max_pk_value(&self) -> Result<i64> {
-        Ok(0)
+        // we subtract 10 minutes to avoid the case that the last file insert at the same time
+        Ok(Utc::now().timestamp_micros() - Duration::minutes(10).num_microseconds().unwrap())
     }
 
     async fn stats(
@@ -298,7 +297,7 @@ impl super::FileList for DynamoFileList {
             if time_start == 0 && time_end == 0 {
                 client
                     .query()
-                    .table_name(&self.table)
+                    .table_name(&self.file_list_table)
                     .index_name("org-created-at-index")
                     .key_condition_expression("#org = :org AND #stream = :stream")
                     .expression_attribute_names("#org", "org".to_string())
@@ -306,40 +305,41 @@ impl super::FileList for DynamoFileList {
                     .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
                     .expression_attribute_values(":stream", AttributeValue::S(stream_key))
             } else {
-                client.query()
-            .table_name(&self.table).index_name("org-created-at-index")
-            .key_condition_expression("#org = :org AND #stream = :stream AND #created_at1 > :ts1 AND #created_at2 <= :ts2")
-            .expression_attribute_names("#org", "org".to_string())
-            .expression_attribute_names("#stream", "stream".to_string())
-            .expression_attribute_names("#created_at1", "created_at".to_string())
-            .expression_attribute_names("#created_at2", "created_at".to_string())
-            .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
-            .expression_attribute_values(":stream", AttributeValue::S(stream_key))
-            .expression_attribute_values(":ts1", AttributeValue::S(time_start.to_string()))
-            .expression_attribute_values(":ts2", AttributeValue::S(time_end.to_string()))
+                let time_start = time_start + 1; // because the beween is [start, end], we don't want to include the start
+                client
+                    .query()
+                    .table_name(&self.file_list_table)
+                    .index_name("org-created-at-index")
+                    .key_condition_expression(
+                        "#org = :org AND #stream = :stream AND #created_at BETWEEN :ts1 AND :ts2",
+                    )
+                    .expression_attribute_names("#org", "org".to_string())
+                    .expression_attribute_names("#stream", "stream".to_string())
+                    .expression_attribute_names("#created_at", "created_at".to_string())
+                    .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
+                    .expression_attribute_values(":stream", AttributeValue::S(stream_key))
+                    .expression_attribute_values(":ts1", AttributeValue::N(time_start.to_string()))
+                    .expression_attribute_values(":ts2", AttributeValue::N(time_end.to_string()))
             }
         } else if time_start == 0 && time_end == 0 {
             client
                 .query()
-                .table_name(&self.table)
+                .table_name(&self.file_list_table)
                 .index_name("org-created-at-index")
-                .key_condition_expression("#org = :org")
-                .expression_attribute_names("#org", "org".to_string())
+                .key_condition_expression("org = :org")
                 .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
         } else {
+            let time_start = time_start + 1; // because the beween is [start, end], we don't want to include the start
             client
                 .query()
-                .table_name(&self.table)
+                .table_name(&self.file_list_table)
                 .index_name("org-created-at-index")
-                .key_condition_expression(
-                    "#org = :org AND #created_at1 > :ts1 AND #created_at2 <= :ts2",
-                )
+                .key_condition_expression("#org = :org AND #created_at BETWEEN :ts1 AND :ts2")
                 .expression_attribute_names("#org", "org".to_string())
-                .expression_attribute_names("#created_at1", "created_at".to_string())
-                .expression_attribute_names("#created_at2", "created_at".to_string())
+                .expression_attribute_names("#created_at", "created_at".to_string())
                 .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
-                .expression_attribute_values(":ts1", AttributeValue::S(time_start.to_string()))
-                .expression_attribute_values(":ts2", AttributeValue::S(time_end.to_string()))
+                .expression_attribute_values(":ts1", AttributeValue::N(time_start.to_string()))
+                .expression_attribute_values(":ts2", AttributeValue::N(time_end.to_string()))
         };
 
         let resp: std::result::Result<Vec<QueryOutput>, _> = query
@@ -363,9 +363,13 @@ impl super::FileList for DynamoFileList {
         // calculate stats
         let mut stats = HashMap::new();
         for (file, meta) in resp {
-            let stream_stats = stats.entry(file).or_insert_with(StreamStats::default);
+            let (stream_key, _date_key, _file_name) = super::parse_file_key_columns(&file)?;
+            let stream_stats = stats.entry(stream_key).or_insert_with(StreamStats::default);
             stream_stats.file_num += 1;
             stream_stats.doc_time_min = min(stream_stats.doc_time_min, meta.min_ts);
+            if stream_stats.doc_time_min == 0 {
+                stream_stats.doc_time_min = meta.min_ts;
+            }
             stream_stats.doc_time_max = max(stream_stats.doc_time_max, meta.max_ts);
             stream_stats.doc_num += meta.records;
             stream_stats.storage_size += meta.original_size as f64;
@@ -377,18 +381,126 @@ impl super::FileList for DynamoFileList {
 
     async fn get_stream_stats(
         &self,
-        _org_id: &str,
-        _stream_type: Option<StreamType>,
-        _stream_name: Option<&str>,
+        org_id: &str,
+        stream_type: Option<StreamType>,
+        stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        Ok(vec![])
+        let client = CLIENT.get().await;
+        let query = if stream_type.is_some() && stream_name.is_some() {
+            let stream_key = format!("{org_id}/{}/{}", stream_type.unwrap(), stream_name.unwrap());
+            client
+                .query()
+                .table_name(&self.stream_stats_table)
+                .key_condition_expression("#org = :org AND #stream = :stream")
+                .expression_attribute_names("#org", "org".to_string())
+                .expression_attribute_names("#stream", "stream".to_string())
+                .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
+                .expression_attribute_values(":stream", AttributeValue::S(stream_key))
+        } else {
+            client
+                .query()
+                .table_name(&self.stream_stats_table)
+                .key_condition_expression("#org = :org")
+                .expression_attribute_names("#org", "org".to_string())
+                .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
+        };
+
+        let resp: std::result::Result<Vec<QueryOutput>, _> = query
+            .select(Select::AllAttributes)
+            .into_paginator()
+            .page_size(1000)
+            .send()
+            .collect()
+            .await;
+        let resp = resp.map_err(|e| Error::Message(e.to_string()))?;
+        let resp: Vec<_> = resp
+            .iter()
+            .filter(|v| v.count() > 0)
+            .flat_map(|v| v.items().unwrap())
+            .map(|v| {
+                let stat = super::StatsRecord::from(v);
+                (stat.stream.to_owned(), (&stat).into())
+            })
+            .collect();
+        Ok(resp)
     }
 
     async fn set_stream_stats(
         &self,
-        _org_id: &str,
-        _streams: &[(String, StreamStats)],
+        org_id: &str,
+        streams: &[(String, StreamStats)],
     ) -> Result<()> {
+        let old_stats = self.get_stream_stats(org_id, None, None).await?;
+        let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
+        let mut update_streams = Vec::with_capacity(streams.len());
+        for (stream_key, meta) in streams {
+            let mut stats = match old_stats.get(stream_key) {
+                Some(s) => s.to_owned(),
+                None => StreamStats::default(),
+            };
+            stats.file_num = max(0, stats.file_num + meta.file_num);
+            stats.doc_num = max(0, stats.doc_num + meta.doc_num);
+            stats.doc_time_min = min(stats.doc_time_min, meta.doc_time_min);
+            if stats.doc_time_min == 0 {
+                stats.doc_time_min = meta.doc_time_min;
+            }
+            stats.doc_time_max = max(stats.doc_time_max, meta.doc_time_max);
+            stats.storage_size += meta.storage_size;
+            if stats.storage_size < 0.0 {
+                stats.storage_size = 0.0;
+            }
+            stats.compressed_size += meta.compressed_size;
+            if stats.compressed_size < 0.0 {
+                stats.compressed_size = 0.0;
+            }
+            update_streams.push((stream_key, stats));
+        }
+
+        for batch in update_streams.chunks(25) {
+            let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
+            for (stream_key, stats) in batch {
+                let mut item = HashMap::with_capacity(10);
+                item.insert("org".to_string(), AttributeValue::S(org_id.to_string()));
+                item.insert(
+                    "stream".to_string(),
+                    AttributeValue::S(stream_key.to_string()),
+                );
+                item.insert(
+                    "file_num".to_string(),
+                    AttributeValue::N(stats.file_num.to_string()),
+                );
+                item.insert(
+                    "min_ts".to_string(),
+                    AttributeValue::N(stats.doc_time_min.to_string()),
+                );
+                item.insert(
+                    "max_ts".to_string(),
+                    AttributeValue::N(stats.doc_time_max.to_string()),
+                );
+                item.insert(
+                    "records".to_string(),
+                    AttributeValue::N(stats.doc_num.to_string()),
+                );
+                item.insert(
+                    "original_size".to_string(),
+                    AttributeValue::N((stats.storage_size as i64).to_string()),
+                );
+                item.insert(
+                    "compressed_size".to_string(),
+                    AttributeValue::N((stats.compressed_size as i64).to_string()),
+                );
+                let req = PutRequest::builder().set_item(Some(item)).build();
+                reqs.push(WriteRequest::builder().put_request(req).build());
+            }
+            CLIENT
+                .get()
+                .await
+                .batch_write_item()
+                .request_items(&self.stream_stats_table, reqs)
+                .send()
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
         Ok(())
     }
 

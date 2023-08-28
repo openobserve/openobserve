@@ -400,7 +400,7 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS file_list
 (
-    id      BIGINT  not null primary key autoincrement,
+    id      INTEGER  not null primary key autoincrement,
     org     VARCHAR not null,
     stream  VARCHAR not null,
     date    VARCHAR not null,
@@ -421,7 +421,7 @@ CREATE TABLE IF NOT EXISTS file_list
         r#"
 CREATE TABLE IF NOT EXISTS stream_stats
 (
-    id      BIGINT  not null primary key autoincrement,
+    id      INTEGER  not null primary key autoincrement,
     org     VARCHAR not null,
     stream  VARCHAR not null,
     file_num BIGINT not null,
@@ -470,7 +470,7 @@ CREATE TRIGGER IF NOT EXISTS update_stream_stats_insert
     AFTER INSERT ON file_list
 BEGIN
     INSERT OR IGNORE INTO stream_stats (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
-        VALUES (NEW.org, NEW.stream, 0, 0, 0, 0, 0, 0);
+        VALUES (NEW.org, NEW.stream, 0, 32492800506000000, 0, 0, 0, 0);
     UPDATE stream_stats SET file_num = file_num + 1, min_ts = min(NEW.min_ts, min_ts), max_ts = max(NEW.max_ts, max_ts), records = records + NEW.records, original_size = original_size + NEW.original_size, compressed_size = compressed_size + NEW.compressed_size
         WHERE stream = NEW.stream;
 END;

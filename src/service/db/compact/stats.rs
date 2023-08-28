@@ -17,7 +17,7 @@ pub async fn get_offset() -> (i64, String) {
     let key = "/compact/stream_stats/offset";
     let value = match db.get(key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
-        Err(_) => String::from(""),
+        Err(_) => String::from("0"),
     };
     if value.contains(';') {
         let mut parts = value.split(';');

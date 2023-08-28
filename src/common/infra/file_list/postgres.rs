@@ -372,6 +372,9 @@ SELECT stream, MIN(min_ts)::BIGINT as min_ts, MAX(max_ts)::BIGINT as max_ts, COU
             stats.file_num = max(0, stats.file_num + meta.file_num);
             stats.doc_num = max(0, stats.doc_num + meta.doc_num);
             stats.doc_time_min = min(stats.doc_time_min, meta.doc_time_min);
+            if stats.doc_time_min == 0 {
+                stats.doc_time_min = meta.doc_time_min;
+            }
             stats.doc_time_max = max(stats.doc_time_max, meta.doc_time_max);
             stats.storage_size += meta.storage_size;
             if stats.storage_size < 0.0 {
