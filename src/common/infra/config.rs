@@ -175,8 +175,8 @@ pub struct Common {
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
-    /* #[env_config(name = "ZO_FILE_LIST_STORAGE", default = "sqlite")]
-    pub file_list_storage: String, */
+    #[env_config(name = "ZO_FILE_LIST_STORAGE", default = "sqlite")]
+    pub file_list_storage: String,
     // external storage no need sync file_list to s3
     #[env_config(name = "ZO_FILE_LIST_EXTERNAL", default = false)]
     pub file_list_external: bool,
@@ -249,7 +249,7 @@ pub struct Common {
     pub usage_org: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
-    #[env_config(name = "ZO_META_STORE", default = "dynamodb")]
+    #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
     pub dynamo_file_list_table: String,
@@ -519,15 +519,22 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
     // format file list storage
-    if cfg.common.meta_store.is_empty() {
-        cfg.common.meta_store = "sqlite".to_string();
+
+    if cfg.common.file_list_storage.is_empty() {
+        cfg.common.file_list_storage = "sqlite".to_string();
     }
-    cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
+    cfg.common.meta_store = cfg.common.file_list_storage.to_lowercase();
     if cfg.common.local_mode
         || cfg.common.meta_store.starts_with("dynamo")
         || cfg.common.meta_store.starts_with("postgres")
     {
         cfg.common.file_list_external = true;
+    }
+
+    if cfg.common.meta_store.is_empty() && cfg.common.local_mode {
+        cfg.common.file_list_storage = "sled".to_string();
+    } else if cfg.common.meta_store.is_empty() {
+        cfg.common.file_list_storage = "etcd".to_string();
     }
 
     // check compact_max_file_size to MB

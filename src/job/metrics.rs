@@ -33,7 +33,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     load_ingest_wal_used_bytes().await?;
 
     // update metrics every 60 seconds
-    let mut interval = time::interval(time::Duration::from_secs(6000));
+    let mut interval = time::interval(time::Duration::from_secs(60));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;

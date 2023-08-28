@@ -15,7 +15,10 @@
 use async_trait::async_trait;
 use aws_sdk_dynamodb::{
     operation::query::QueryOutput,
-    types::{AttributeValue, DeleteRequest, PutRequest, Select, WriteRequest},
+    types::{
+        AttributeDefinition, AttributeValue, BillingMode, DeleteRequest, KeySchemaElement, KeyType,
+        PutRequest, ScalarAttributeType, Select, WriteRequest,
+    },
 };
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::collections::HashMap;
@@ -265,9 +268,9 @@ impl super::FileList for DynamoFileList {
     }
 }
 
-/* pub async fn create_table() -> Result<()> {
-    let client = CLIENT.get().await.clone();
-    let table_name = &CONFIG.common.file_list_dynamo_table_name;
+pub async fn create_table() -> Result<()> {
+    let client = DYNAMO_DB_CLIENT.get().await.clone();
+    let table_name = &CONFIG.common.dynamo_file_list_table;
     let tables = client
         .list_tables()
         .send()
@@ -312,7 +315,7 @@ impl super::FileList for DynamoFileList {
         log::info!("Table {} created successfully", table_name);
     }
     Ok(())
-} */
+}
 
 pub async fn create_table_index() -> Result<()> {
     Ok(())
