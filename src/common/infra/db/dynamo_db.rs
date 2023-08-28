@@ -258,6 +258,11 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                 parts.swap(1, 2);
                 let rk_value = if local_key.starts_with("compact/organization/") {
                     format!("{}/{}", parts[0], parts[2])
+                } else if local_key.starts_with("compact/delete/") {
+                    format!(
+                        "{}/{}/{}/{}/{}",
+                        parts[0], parts[2], parts[3], parts[4], parts[5]
+                    )
                 } else {
                     format!("{}/{}/{}", parts[0], parts[2], parts[3])
                 };
@@ -636,7 +641,13 @@ async fn scan_prefix(
                         Ok(s) => {
                             let res = s.as_bytes().to_vec().into();
                             let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
-                            let key = if table.name != CONFIG.common.dynamo_meta_table {
+                            let key = if local_key.starts_with("compact/delete/") {
+                                let org = item.get(&table.pk).unwrap().as_s().unwrap();
+                                local_key.replace(
+                                    "compact/delete/",
+                                    &format!("/{}/{}/", "compact/delete", org),
+                                )
+                            } else if table.name != CONFIG.common.dynamo_meta_table {
                                 let org = item.get(&table.pk).unwrap().as_s().unwrap();
                                 local_key.replace(
                                     &format!("{}/", table.entity),
