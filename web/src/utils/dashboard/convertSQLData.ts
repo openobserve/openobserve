@@ -774,6 +774,7 @@ const formatDate =(date:any)=>{
                 verticalAlign: 'middle',
                 x: params.coordSys.cx,
                 y: params.coordSys.cy,
+                fill:store.state.theme == "dark" ? "#fff" : "#000",
               }
             }
           } 

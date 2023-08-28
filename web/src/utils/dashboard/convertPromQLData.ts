@@ -426,6 +426,7 @@ export const convertPromQLData = (
                       verticalAlign: 'middle',
                       x: params.coordSys.cx,
                       y: params.coordSys.cy,
+                      fill:store.state.theme == "dark" ? "#fff" : "#000",
                     }
                   }
                 } 
