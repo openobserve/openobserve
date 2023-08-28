@@ -66,7 +66,7 @@ pub struct SpanReference {
     pub ref_type: SpanRefType,
 }
 
-//Service which has generated the trace id - span id ...in distrubited tracing there can be multiple services using same trace id
+//Service which has generated the trace id - span id ...in distributed tracing there can be multiple services using same trace id
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Service {
     pub name: String,

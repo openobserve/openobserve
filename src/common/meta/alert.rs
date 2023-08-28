@@ -324,13 +324,13 @@ mod tests {
     #[test]
     fn test_evaluate() {
         let condition = Condition {
-            column: "occurance".to_owned(),
+            column: "occurrence".to_owned(),
             operator: AllOperator::GreaterThanEquals,
             ignore_case: None,
             value: json!("5"),
             is_numeric: None,
         };
-        let row = json!({"Country":"USA","occurance": 10});
+        let row = json!({"Country":"USA","occurrence": 10});
         condition.evaluate(row.as_object().unwrap().clone());
     }
 }
