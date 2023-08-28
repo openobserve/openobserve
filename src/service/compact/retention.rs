@@ -27,7 +27,7 @@ use crate::common::{
     },
     meta::{
         common::{FileKey, FileMeta},
-        stream::PartitionTimeLevel,
+        stream::{PartitionTimeLevel, StreamStats},
         StreamType,
     },
     utils::json,
@@ -251,11 +251,18 @@ pub async fn delete_by_date(
         }
     }
 
-    // update metadata
-    cache::stats::reset_stream_stats_time(org_id, stream_name, stream_type, (time_range.1, 0))?;
-
     // delete from file list
     delete_from_file_list(org_id, stream_name, stream_type, time_range).await?;
+
+    // update stream stats retention time
+    infra_file_list::reset_stream_stats_min_ts(
+        org_id,
+        &[(
+            format!("{org_id}/{stream_type}/{stream_name}"),
+            time_range.1,
+        )],
+    )
+    .await?;
 
     // mark delete done
     db::compact::retention::delete_stream_done(org_id, stream_name, stream_type, Some(date_range))
@@ -281,9 +288,13 @@ async fn delete_from_file_list(
         return Ok(());
     }
 
+    // collect stream stats
+    let mut stream_stats = StreamStats::default();
+
     let mut file_list_days: HashSet<String> = HashSet::new();
     let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
     for file in files {
+        stream_stats = stream_stats - file.meta;
         let file_name = file.key.clone();
         let columns: Vec<_> = file_name.split('/').collect();
         let day_key = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
@@ -300,12 +311,19 @@ async fn delete_from_file_list(
         });
     }
 
-    // send file list to storage
-    match write_file_list(file_list_days, hours_files).await {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("[COMPACT] file_list write to db failed: {}", e);
-        }
+    // write file list to storage
+    write_file_list(file_list_days, hours_files).await?;
+
+    // update stream stats
+    if CONFIG.common.file_list_external && stream_stats.doc_num != 0 {
+        infra_file_list::set_stream_stats(
+            org_id,
+            &[(
+                format!("{org_id}/{stream_type}/{stream_name}"),
+                stream_stats,
+            )],
+        )
+        .await?;
     }
 
     Ok(())
@@ -336,23 +354,33 @@ async fn write_file_list_db_only(
             .filter(|v| v.deleted)
             .map(|v| v.key.clone())
             .collect::<Vec<_>>();
-        // set to dynamo db
+        // set to external db
         // retry 5 times
+        let mut success = false;
         for _ in 0..5 {
             if let Err(e) = infra_file_list::batch_add(&put_items).await {
-                log::error!("[COMPACT] batch_write to dynamo db failed, retrying: {}", e);
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-            if let Err(e) = infra_file_list::batch_remove(&del_items).await {
                 log::error!(
-                    "[COMPACT] batch_delete to dynamo db failed, retrying: {}",
+                    "[COMPACT] batch_write to external db failed, retrying: {}",
                     e
                 );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
+            if let Err(e) = infra_file_list::batch_remove(&del_items).await {
+                log::error!(
+                    "[COMPACT] batch_delete to external db failed, retrying: {}",
+                    e
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
+            }
+            success = true;
             break;
+        }
+        if !success {
+            return Err(anyhow::anyhow!(
+                "[COMPACT] batch_write to external db failed"
+            ));
         }
     }
     Ok(())

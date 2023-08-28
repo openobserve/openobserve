@@ -496,6 +496,48 @@ impl super::FileList for DynamoFileList {
         Ok(())
     }
 
+    async fn reset_stream_stats_min_ts(
+        &self,
+        org_id: &str,
+        streams: &[(String, i64)],
+    ) -> Result<()> {
+        let old_stats = self.get_stream_stats(org_id, None, None).await?;
+        let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
+        let mut update_streams = Vec::with_capacity(streams.len());
+        for (stream_key, min_ts) in streams {
+            if old_stats.get(stream_key).is_some() {
+                update_streams.push((stream_key, min_ts));
+            };
+        }
+
+        for batch in update_streams.chunks(25) {
+            let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
+            for (stream_key, min_ts) in batch {
+                let mut item = HashMap::with_capacity(10);
+                item.insert("org".to_string(), AttributeValue::S(org_id.to_string()));
+                item.insert(
+                    "stream".to_string(),
+                    AttributeValue::S(stream_key.to_string()),
+                );
+                item.insert(
+                    "min_ts".to_string(),
+                    AttributeValue::N((**min_ts).to_string()),
+                );
+                let req = PutRequest::builder().set_item(Some(item)).build();
+                reqs.push(WriteRequest::builder().put_request(req).build());
+            }
+            CLIENT
+                .get()
+                .await
+                .batch_write_item()
+                .request_items(&self.stream_stats_table, reqs)
+                .send()
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
     async fn len(&self) -> usize {
         0 // TODO
     }

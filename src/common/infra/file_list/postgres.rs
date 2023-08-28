@@ -116,7 +116,7 @@ DELETE FROM file_list
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
-            let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new("INSERT INTO file_list (stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
+            let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
                     super::parse_file_key_columns(&item.key).expect("parse file key failed");
@@ -412,6 +412,40 @@ UPDATE stream_stats
             .bind(stats.doc_num)
             .bind(stats.storage_size as i64)
             .bind(stats.compressed_size as i64)
+            .bind(stream_key)
+            .execute(&mut *tx)
+            .await?;
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit stream stats error: {}", e);
+        }
+
+        Ok(())
+    }
+
+    async fn reset_stream_stats_min_ts(
+        &self,
+        org_id: &str,
+        streams: &[(String, i64)],
+    ) -> Result<()> {
+        let pool = CLIENT.clone();
+        let old_stats = self.get_stream_stats(org_id, None, None).await?;
+        let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
+        let mut update_streams = Vec::with_capacity(streams.len());
+        for (stream_key, min_ts) in streams {
+            if old_stats.get(stream_key).is_some() {
+                update_streams.push((stream_key, min_ts));
+            };
+        }
+
+        let mut tx = pool.begin().await?;
+        for (stream_key, min_ts) in update_streams {
+            sqlx::query(
+                r#"
+UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;
+                "#,
+            )
+            .bind(*min_ts)
             .bind(stream_key)
             .execute(&mut *tx)
             .await?;

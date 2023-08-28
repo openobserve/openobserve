@@ -195,11 +195,13 @@ pub async fn merge_by_stream(
             }
             events.sort_by(|a, b| a.key.cmp(&b.key));
 
-            // send file list to storage
+            // write file list to storage
             match write_file_list(&events).await {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("[COMPACT] write file list failed: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    continue;
                 }
             }
 
@@ -227,14 +229,16 @@ pub async fn merge_by_stream(
     db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
 
     // update stream stats
-    infra_file_list::set_stream_stats(
-        org_id,
-        &[(
-            format!("{org_id}/{stream_type}/{stream_name}"),
-            stream_stats,
-        )],
-    )
-    .await?;
+    if CONFIG.common.file_list_external && stream_stats.doc_num != 0 {
+        infra_file_list::set_stream_stats(
+            org_id,
+            &[(
+                format!("{org_id}/{stream_type}/{stream_name}"),
+                stream_stats,
+            )],
+        )
+        .await?;
+    }
 
     // metrics
     let time = start.elapsed().as_secs_f64();
@@ -440,25 +444,34 @@ async fn write_file_list_db_only(events: &[FileKey]) -> Result<(), anyhow::Error
         .filter(|v| v.deleted)
         .map(|v| v.key.clone())
         .collect::<Vec<_>>();
-    // set to dynamo db
+    // set to external db
     // retry 5 times
+    let mut success = false;
     for _ in 0..5 {
         if let Err(e) = infra_file_list::batch_add(&put_items).await {
-            log::error!("[COMPACT] batch_write to dynamo db failed, retrying: {}", e);
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        if let Err(e) = infra_file_list::batch_remove(&del_items).await {
             log::error!(
-                "[COMPACT] batch_delete to dynamo db failed, retrying: {}",
+                "[COMPACT] batch_write to external db failed, retrying: {}",
                 e
             );
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
+        if let Err(e) = infra_file_list::batch_remove(&del_items).await {
+            log::error!(
+                "[COMPACT] batch_delete to external db failed, retrying: {}",
+                e
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        success = true;
         break;
     }
-    Ok(())
+    if !success {
+        Err(anyhow::anyhow!("batch_write to external db failed"))
+    } else {
+        Ok(())
+    }
 }
 
 async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
