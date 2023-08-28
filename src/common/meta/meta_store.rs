@@ -13,7 +13,7 @@ impl From<&str> for MetaStore {
         match s.to_lowercase().as_str() {
             "sled" => MetaStore::Sled,
             "etcd" => MetaStore::Etcd,
-            "dynamodb" => MetaStore::DynamoDB,
+            "dynamo" | "dynamodb" => MetaStore::DynamoDB,
             _ => MetaStore::Sled,
         }
     }
@@ -24,7 +24,7 @@ impl From<String> for MetaStore {
         match s.to_lowercase().as_str() {
             "sled" => MetaStore::Sled,
             "etcd" => MetaStore::Etcd,
-            "dynamodb" => MetaStore::DynamoDB,
+            "dynamo" | "dynamodb" => MetaStore::DynamoDB,
             _ => MetaStore::Sled,
         }
     }
