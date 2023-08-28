@@ -253,13 +253,13 @@ pub struct Common {
     pub meta_store: String,
     #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
     pub dynamo_file_list_table: String,
-    #[env_config(name = "ZO_DYNAMO_ORG_META_TABLE", default = "zo_org_meta")]
+    #[env_config(name = "ZO_DYNAMO_ORG_META_TABLE", default = "")]
     pub dynamo_org_meta_table: String,
-    #[env_config(name = "ZO_DYNAMO_META_TABLE", default = "zo_meta")]
+    #[env_config(name = "ZO_DYNAMO_META_TABLE", default = "")]
     pub dynamo_meta_table: String,
-    #[env_config(name = "ZO_DYNAMO_SCHEMA_TABLE", default = "zo_org_schema")]
+    #[env_config(name = "ZO_DYNAMO_SCHEMA_TABLE", default = "")]
     pub dynamo_schema_table: String,
-    #[env_config(name = "ZO_DYNAMO_COMPACTOR_TABLE", default = "zo_org_compact")]
+    #[env_config(name = "ZO_DYNAMO_COMPACTOR_TABLE", default = "")]
     pub dynamo_compact_table: String,
 }
 
@@ -523,18 +523,18 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.file_list_storage.is_empty() {
         cfg.common.file_list_storage = "sqlite".to_string();
     }
-    cfg.common.meta_store = cfg.common.file_list_storage.to_lowercase();
+    cfg.common.file_list_storage = cfg.common.file_list_storage.to_lowercase();
     if cfg.common.local_mode
-        || cfg.common.meta_store.starts_with("dynamo")
-        || cfg.common.meta_store.starts_with("postgres")
+        || cfg.common.file_list_storage.starts_with("dynamo")
+        || cfg.common.file_list_storage.starts_with("postgres")
     {
         cfg.common.file_list_external = true;
     }
 
     if cfg.common.meta_store.is_empty() && cfg.common.local_mode {
-        cfg.common.file_list_storage = "sled".to_string();
+        cfg.common.meta_store = "sled".to_string();
     } else if cfg.common.meta_store.is_empty() {
-        cfg.common.file_list_storage = "etcd".to_string();
+        cfg.common.meta_store = "etcd".to_string();
     }
 
     // check compact_max_file_size to MB
@@ -670,6 +670,19 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.dynamo_file_list_table.is_empty() {
         cfg.common.dynamo_file_list_table = format!("{}-file-list", cfg.s3.bucket_name);
+    }
+
+    if cfg.common.dynamo_org_meta_table.is_empty() {
+        cfg.common.dynamo_org_meta_table = format!("{}-org-meta", cfg.s3.bucket_name);
+    }
+    if cfg.common.dynamo_meta_table.is_empty() {
+        cfg.common.dynamo_meta_table = format!("{}-meta", cfg.s3.bucket_name);
+    }
+    if cfg.common.dynamo_schema_table.is_empty() {
+        cfg.common.dynamo_schema_table = format!("{}-org-schema", cfg.s3.bucket_name);
+    }
+    if cfg.common.dynamo_compact_table.is_empty() {
+        cfg.common.dynamo_compact_table = format!("{}-org-compact", cfg.s3.bucket_name);
     }
 
     Ok(())
