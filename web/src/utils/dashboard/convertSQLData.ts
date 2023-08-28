@@ -383,7 +383,7 @@ const formatDate =(date:any)=>{
     grid: {
       containLabel: true,
       left: "30",
-      right: "20",
+      right: legendConfig.orient === "vertical" ? 200 : "20",
       top: "15",
       bottom: "30",
     },
