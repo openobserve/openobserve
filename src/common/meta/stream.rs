@@ -16,12 +16,14 @@ use arrow_schema::Field;
 use chrono::Duration;
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
-use std::collections::HashMap;
+use std::{cmp::max, collections::HashMap};
 use utoipa::ToSchema;
 
-use crate::common::{infra::config::CONFIG, meta::StreamType, utils::json};
-
-use super::usage::Stats;
+use crate::common::{
+    infra::config::CONFIG,
+    meta::{common::FileMeta, usage::Stats, StreamType},
+    utils::json,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
@@ -86,6 +88,42 @@ impl StreamStats {
             .unwrap();
         (self.doc_time_min, self.doc_time_max + file_push_interval)
     }
+
+    pub fn add_file_meta(&mut self, meta: &FileMeta) {
+        self.file_num += 1;
+        self.doc_num = max(0, self.doc_num + meta.records);
+        self.doc_time_min = self.doc_time_min.min(meta.min_ts);
+        self.doc_time_max = self.doc_time_max.max(meta.max_ts);
+        self.storage_size += meta.original_size as f64;
+        self.compressed_size += meta.compressed_size as f64;
+        if self.doc_time_min == 0 {
+            self.doc_time_min = meta.min_ts;
+        }
+        if self.storage_size < 0.0 {
+            self.storage_size = 0.0;
+        }
+        if self.compressed_size < 0.0 {
+            self.compressed_size = 0.0;
+        }
+    }
+
+    pub fn add_stream_stats(&mut self, stats: &StreamStats) {
+        self.file_num = max(0, self.file_num + stats.file_num);
+        self.doc_num = max(0, self.doc_num + stats.doc_num);
+        self.doc_time_min = self.doc_time_min.min(stats.doc_time_min);
+        self.doc_time_max = self.doc_time_max.max(stats.doc_time_max);
+        self.storage_size += stats.storage_size;
+        self.compressed_size += stats.compressed_size;
+        if self.doc_time_min == 0 {
+            self.doc_time_min = stats.doc_time_min;
+        }
+        if self.storage_size < 0.0 {
+            self.storage_size = 0.0;
+        }
+        if self.compressed_size < 0.0 {
+            self.compressed_size = 0.0;
+        }
+    }
 }
 
 impl From<&str> for StreamStats {
@@ -117,6 +155,26 @@ impl From<Stats> for StreamStats {
             storage_size: meta.original_size,
             compressed_size: meta.compressed_size.unwrap_or_default(),
         }
+    }
+}
+
+impl std::ops::Sub<FileMeta> for StreamStats {
+    type Output = Self;
+
+    fn sub(self, rhs: FileMeta) -> Self::Output {
+        let mut ret = Self {
+            created_at: self.created_at,
+            file_num: self.file_num - 1,
+            doc_num: self.doc_num - rhs.records,
+            doc_time_min: self.doc_time_min.min(rhs.min_ts),
+            doc_time_max: self.doc_time_max.max(rhs.max_ts),
+            storage_size: self.storage_size - rhs.original_size as f64,
+            compressed_size: self.compressed_size - rhs.compressed_size as f64,
+        };
+        if ret.doc_time_min == 0 {
+            ret.doc_time_min = rhs.min_ts;
+        }
+        ret
     }
 }
 

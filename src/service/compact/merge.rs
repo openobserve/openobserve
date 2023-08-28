@@ -19,16 +19,19 @@ use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::{collections::HashMap, io::Write, sync::Arc};
 
-use crate::common::infra::{
-    cache,
-    config::{CONFIG, FILE_EXT_PARQUET},
-    file_list as infra_file_list, ider, metrics, storage,
+use crate::common::{
+    infra::{
+        cache,
+        config::{CONFIG, FILE_EXT_PARQUET},
+        file_list as infra_file_list, ider, metrics, storage,
+    },
+    meta::{
+        common::{FileKey, FileMeta},
+        stream::StreamStats,
+        StreamType,
+    },
+    utils::json,
 };
-use crate::common::meta::{
-    common::{FileKey, FileMeta},
-    StreamType,
-};
-use crate::common::utils::json;
 use crate::service::{db, file_list, search::datafusion, stream};
 
 /// compactor run steps on a stream:
@@ -145,13 +148,13 @@ pub async fn merge_by_stream(
     let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
         let file_name = file.key.clone();
-        let prefix = {
-            let pos = file_name.rfind('/').unwrap();
-            file_name[..pos].to_string()
-        };
+        let prefix = file_name[..file_name.rfind('/').unwrap()].to_string();
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(file.to_owned());
     }
+
+    // collect stream stats
+    let mut stream_stats = StreamStats::default();
 
     for (prefix, files_with_size) in partition_files_with_size.iter_mut() {
         // sort by file size
@@ -183,6 +186,7 @@ pub async fn merge_by_stream(
                 deleted: false,
             });
             for file in new_file_list.iter() {
+                stream_stats = stream_stats - file.meta;
                 events.push(FileKey {
                     key: file.key.clone(),
                     meta: FileMeta::default(),
@@ -221,6 +225,16 @@ pub async fn merge_by_stream(
     // write new offset
     let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
     db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
+
+    // update stream stats
+    infra_file_list::set_stream_stats(
+        org_id,
+        &[(
+            format!("{org_id}/{stream_type}/{stream_name}"),
+            stream_stats,
+        )],
+    )
+    .await?;
 
     // metrics
     let time = start.elapsed().as_secs_f64();

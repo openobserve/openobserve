@@ -20,10 +20,7 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     ConnectOptions, Pool, Postgres, QueryBuilder, Row,
 };
-use std::{
-    cmp::{max, min},
-    str::FromStr,
-};
+use std::str::FromStr;
 
 use crate::common::{
     infra::{
@@ -362,7 +359,7 @@ SELECT stream, MIN(min_ts)::BIGINT as min_ts, MAX(max_ts)::BIGINT as max_ts, COU
         let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
         let mut new_streams = Vec::new();
         let mut update_streams = Vec::with_capacity(streams.len());
-        for (stream_key, meta) in streams {
+        for (stream_key, item) in streams {
             let mut stats = match old_stats.get(stream_key) {
                 Some(s) => s.to_owned(),
                 None => {
@@ -370,21 +367,7 @@ SELECT stream, MIN(min_ts)::BIGINT as min_ts, MAX(max_ts)::BIGINT as max_ts, COU
                     StreamStats::default()
                 }
             };
-            stats.file_num = max(0, stats.file_num + meta.file_num);
-            stats.doc_num = max(0, stats.doc_num + meta.doc_num);
-            stats.doc_time_min = min(stats.doc_time_min, meta.doc_time_min);
-            if stats.doc_time_min == 0 {
-                stats.doc_time_min = meta.doc_time_min;
-            }
-            stats.doc_time_max = max(stats.doc_time_max, meta.doc_time_max);
-            stats.storage_size += meta.storage_size;
-            if stats.storage_size < 0.0 {
-                stats.storage_size = 0.0;
-            }
-            stats.compressed_size += meta.compressed_size;
-            if stats.compressed_size < 0.0 {
-                stats.compressed_size = 0.0;
-            }
+            stats.add_stream_stats(item);
             update_streams.push((stream_key, stats));
         }
 

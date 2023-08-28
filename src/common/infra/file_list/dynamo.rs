@@ -365,15 +365,7 @@ impl super::FileList for DynamoFileList {
         for (file, meta) in resp {
             let (stream_key, _date_key, _file_name) = super::parse_file_key_columns(&file)?;
             let stream_stats = stats.entry(stream_key).or_insert_with(StreamStats::default);
-            stream_stats.file_num += 1;
-            stream_stats.doc_time_min = min(stream_stats.doc_time_min, meta.min_ts);
-            if stream_stats.doc_time_min == 0 {
-                stream_stats.doc_time_min = meta.min_ts;
-            }
-            stream_stats.doc_time_max = max(stream_stats.doc_time_max, meta.max_ts);
-            stream_stats.doc_num += meta.records;
-            stream_stats.storage_size += meta.original_size as f64;
-            stream_stats.compressed_size += meta.compressed_size as f64;
+            stream_stats.add_file_meta(&meta);
         }
 
         Ok(stats.into_iter().collect())
