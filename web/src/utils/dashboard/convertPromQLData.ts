@@ -279,7 +279,7 @@ export const convertPromQLData = (
     grid: {
       containLabel: true,
       left: "30",
-      right: legendConfig.orient === "vertical" ? 220 : "20",
+      right: legendConfig.orient === "vertical" ? 220 : "40",
       top: "15",
       bottom: "30",
     },
