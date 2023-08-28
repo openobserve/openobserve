@@ -259,13 +259,13 @@ const getUnitValue = (value: any) => {
     }
     case "default": {
       return {
-        value: value.toFixed(2),
+        value: Number.isInteger(value) ? value : value.toFixed(2),
         unit: "",
       };
     }
     default: {
       return {
-        value: value.toFixed(2),
+        value: Number.isInteger(value) ? value : value.toFixed(2),
         unit: "",
       };
     }
@@ -470,7 +470,7 @@ const formatDate =(date:any)=>{
           ? props.data.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
-      nameGap: calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys[0])))+24,
+      nameGap: calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys[0])))+8,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
