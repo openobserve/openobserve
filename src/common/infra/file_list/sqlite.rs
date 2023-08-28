@@ -86,9 +86,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
         .bind(false)
         .bind(meta.min_ts)
         .bind(meta.max_ts)
-        .bind(meta.records )
-        .bind(meta.original_size )
-        .bind(meta.compressed_size )
+        .bind(meta.records)
+        .bind(meta.original_size)
+        .bind(meta.compressed_size)
         .execute(&pool)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {

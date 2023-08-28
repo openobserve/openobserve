@@ -16,13 +16,14 @@ use ahash::AHashMap as HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
 use once_cell::sync::Lazy;
-use std::cmp::{max, min};
-
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     ConnectOptions, Pool, Postgres, QueryBuilder, Row,
 };
-use std::str::FromStr;
+use std::{
+    cmp::{max, min},
+    str::FromStr,
+};
 
 use crate::common::{
     infra::{
@@ -82,9 +83,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
         .bind(false)
         .bind(meta.min_ts)
         .bind(meta.max_ts)
-        .bind(meta.records )
-        .bind(meta.original_size )
-        .bind(meta.compressed_size )
+        .bind(meta.records)
+        .bind(meta.original_size)
+        .bind(meta.compressed_size)
         .execute(&pool)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
