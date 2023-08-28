@@ -1,13 +1,8 @@
-import { getThemeLayoutOptions } from "@/utils/dashboard/getThemeLayoutOptions";
-
 export const convertSQLData = (
   panelSchema: any,
   searchQueryDataTemp: any,
   store: any
 ) => {
-  // console.log("renderSqlBasedChart", props);
-  console.log("searchQueryData", searchQueryDataTemp);
-  console.log("panelSchema", panelSchema);
   const props = {
     data: panelSchema.value,
     width: 6,
@@ -17,15 +12,8 @@ export const convertSQLData = (
     data: searchQueryDataTemp,
   };
 
-  console.log("data after conversion:", props);
-  console.log("data after conversion:", searchQueryData);
-
-  //   const store = useStore();
-  // const plotRef: any = ref(null);
   // get the x axis key
   const getXAxisKeys = () => {
-    console.log("props.data?.queries[0]?.fields.x", props.data?.queries[0]?.fields?.x);
-
     return props.data?.queries[0]?.fields?.x?.length
       ? props.data?.queries[0]?.fields?.x.map((it: any) => it.alias)
       : [];
@@ -33,8 +21,6 @@ export const convertSQLData = (
 
   // get the y axis key
   const getYAxisKeys = () => {
-    console.log("props.data?.queries[0]?.fields.y", props.data?.queries[0]?.fields?.y);
-
     return props.data?.queries[0]?.fields?.y?.length
       ? props.data?.queries[0]?.fields?.y.map((it: any) => it.alias)
       : [];
@@ -42,11 +28,6 @@ export const convertSQLData = (
 
   // get the z axis key
   const getZAxisKeys = () => {
-    console.log(
-      "props.data?.queries[0]?.fields.z",
-      props.data?.queries[0]?.fields?.z
-    );
-
     return props.data?.queries[0]?.fields?.z?.length
       ? props.data?.queries[0]?.fields?.z.map((it: any) => it.alias)
       : [];
@@ -54,7 +35,6 @@ export const convertSQLData = (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    console.log("key", key);
 
     const data = searchQueryData.data.filter((item: any) => {
       return xAxisKeys.every((key: any) => {
@@ -75,8 +55,6 @@ export const convertSQLData = (
     
 
     // when the key is not available in the data that is not show the default value
-    // let result: string[] = searchQueryData?.data?.map((item: any) => item[key]).filter((item: any) => item!==undefined);
-    // console.log("result", result);
     const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
     if (field && field.alias == key) {
       // now we have the format, convert that format
@@ -84,11 +62,6 @@ export const convertSQLData = (
     }
     return result;
   };
-
-  const getAxisDataAsArray = () => {
-    let result: any[] = searchQueryData?.data?.map((item: any) => [...item]);
-    return result;
-  }
 
   const getPropsByChartTypeForTraces = () => {
     switch (props.data.type) {
@@ -204,427 +177,6 @@ export const convertSQLData = (
     }
   };
 
-  const getTickLength = () => props.width - 2;
-  const getTickLimits = (layout: string[]) => {
-    // do the splitting
-    const n = getTickLength();
-
-    // get the range of difference
-    console.log("layout", layout);
-    const range = layout.length / n;
-
-    // find the indexes at intervals
-    const array = [...Array(n).keys()];
-    const resultIndex = [
-      ...array.map((it: number, i: number) => it * range),
-      layout.length - 1,
-    ];
-
-    // get the actual values from the indexes
-    const tickVals = resultIndex.map((it: number) => layout[Math.floor(it)]);
-    return tickVals;
-  };
-
-  const getPropsByChartTypeForLayout = () => {
-    const xAxisKey = getXAxisKeys().length ? getXAxisKeys()[0] : "";
-    console.log("xAxisKey", xAxisKey);
-    const xAxisData = getAxisDataFromKey(xAxisKey);
-    console.log("xAxisData", xAxisData);
-    const xAxisDataWithTicks = getTickLimits(xAxisData);
-
-    console.log("data with tick", xAxisDataWithTicks);
-
-    switch (props.data.type) {
-      case "bar": {
-        const xaxis: any = {
-          title: props.data?.queries[0]?.fields?.x[0]?.label,
-          tickangle:
-            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
-              ? 0
-              : -20,
-          automargin: true,
-        };
-
-        const yaxis: any = {
-          title:
-            props.data?.queries[0]?.fields?.y?.length == 1
-              ? props.data?.queries[0]?.fields.y[0]?.label
-              : "",
-          automargin: true,
-          fixedrange: true,
-        };
-
-        if (props.data?.queries[0]?.fields?.x.length == 1) {
-          (xaxis["tickmode"] = "array"),
-            (xaxis["tickvals"] = xAxisDataWithTicks),
-            (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
-        }
-
-        const trace = {
-          barmode: "group",
-          xaxis: xaxis,
-          yaxis: yaxis,
-        };
-        return trace;
-      }
-      case "line": {
-        const xaxis: any = {
-          title: props.data?.queries[0]?.fields?.x[0]?.label,
-          tickangle:
-            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
-              ? 0
-              : -20,
-          automargin: true,
-          // rangeslider: { range: xAxisDataWithTicks },
-        };
-
-        const yaxis: any = {
-          title:
-            props.data?.queries[0]?.fields?.y?.length == 1
-              ? props.data?.queries[0]?.fields?.y[0]?.label
-              : "",
-          automargin: true,
-          fixedrange: true,
-        };
-
-        if (props.data?.queries[0]?.fields?.x.length == 1) {
-          (xaxis["tickmode"] = "array"),
-            (xaxis["tickvals"] = xAxisDataWithTicks),
-            (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
-        }
-
-        const trace = {
-          xaxis: xaxis,
-          yaxis: yaxis,
-        };
-        return trace;
-      }
-      case "scatter": {
-        const xaxis: any = {
-          title: props.data?.queries[0]?.fields?.x[0]?.label,
-          tickangle:
-            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
-              ? 0
-              : -20,
-          automargin: true,
-        };
-
-        const yaxis: any = {
-          title:
-            props.data?.queries[0]?.fields?.y?.length == 1
-              ? props.data?.queries[0]?.fields?.y[0]?.label
-              : "",
-          automargin: true,
-          fixedrange: true,
-        };
-
-        if (props.data?.queries[0]?.fields?.x.length == 1) {
-          (xaxis["tickmode"] = "array"),
-            (xaxis["tickvals"] = xAxisDataWithTicks),
-            (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
-        }
-
-        const trace = {
-          scattermode: "group",
-          xaxis: xaxis,
-          yaxis: yaxis,
-        };
-        return trace;
-      }
-      case "pie":
-        return {
-          xaxis: {
-            title: props.data?.queries[0]?.fields?.x[0]?.label,
-            tickangle: -20,
-            automargin: true,
-          },
-          yaxis: {
-            tickmode: "array",
-            tickvals: xAxisDataWithTicks,
-            ticktext: textformat(xAxisDataWithTicks),
-            title:
-              props.data?.queries[0]?.fields?.y?.length == 1
-                ? props.data?.queries[0]?.fields?.y[0]?.label
-                : "",
-            automargin: true,
-          },
-        };
-      case "donut":
-        return {
-          xaxis: {
-            title: props.data?.queries[0]?.fields?.x[0]?.label,
-            tickangle: -20,
-            automargin: true,
-          },
-          yaxis: {
-            tickmode: "array",
-            tickvals: xAxisDataWithTicks,
-            ticktext: textformat(xAxisDataWithTicks),
-            title:
-              props.data?.queries[0]?.fields?.y?.length == 1
-                ? props.data?.queries[0]?.fields?.y[0]?.label
-                : "",
-            automargin: true,
-          },
-        };
-      case "h-bar": {
-        const xaxis: any = {
-          title: props.data?.queries[0]?.fields?.y[0]?.label,
-          tickangle: -20,
-          automargin: true,
-          fixedrange: true,
-        };
-
-        const yaxis: any = {
-          title:
-            props.data?.queries[0]?.fields?.x?.length == 1
-              ? props.data?.queries[0]?.fields?.x[0]?.label
-              : "",
-          automargin: true,
-        };
-
-        if (props.data?.queries[0]?.fields?.x.length == 1) {
-          (yaxis["tickmode"] = "array"),
-            (yaxis["tickvals"] = xAxisDataWithTicks),
-            (yaxis["ticktext"] = textformat(xAxisDataWithTicks));
-        }
-
-        const trace = {
-          barmode: "group",
-          xaxis: xaxis,
-          yaxis: yaxis,
-        };
-
-        return trace;
-      }
-      case "area": {
-        const xaxis: any = {
-          title: props.data?.queries[0]?.fields?.x[0]?.label,
-          tickangle:
-            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
-              ? 0
-              : -20,
-          automargin: true,
-        };
-
-        const yaxis: any = {
-          title:
-            props.data?.queries[0]?.fields?.y?.length == 1
-              ? props.data?.queries[0]?.fields?.y[0]?.label
-              : "",
-          automargin: true,
-          fixedrange: true,
-        };
-
-        if (props.data?.queries[0]?.fields?.x.length == 1) {
-          (xaxis["tickmode"] = "array"),
-            (xaxis["tickvals"] = xAxisDataWithTicks),
-            (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
-        }
-
-        const trace = {
-          xaxis: xaxis,
-          yaxis: yaxis,
-        };
-
-        return trace;
-      }
-      case "area-stacked": {
-        const xaxis: any = {
-          title: props.data?.queries[0]?.fields?.x[0]?.label,
-          tickangle:
-            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
-              ? 0
-              : -20,
-          automargin: true,
-        };
-
-        const yaxis: any = {
-          title:
-            props.data?.queries[0]?.fields?.y?.length == 1
-              ? props.data?.queries[0]?.fields?.y[0]?.label
-              : "",
-          automargin: true,
-          fixedrange: true,
-        };
-
-        //show tickvals and ticktext value when the stacked chart hasn't timestamp
-        // if the first field is timestamp we dont want to show the tickvals
-        // format value only for without timestamp
-        // stacked chart is alwayes stacked with first field value
-        if (
-          props.data?.queries[0]?.fields?.x.length &&
-          props.data?.queries[0]?.fields?.x[0].aggregationFunction != "histogram" &&
-          !props.data?.queries[0]?.fields?.x[0].column !=
-            store.state.zoConfig.timestamp_column
-        ) {
-          (xaxis["tickmode"] = "array"),
-            (xaxis["tickvals"] = xAxisDataWithTicks),
-            (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
-        }
-
-        const layout = {
-          barmode: "stack",
-          xaxis: xaxis,
-          yaxis: yaxis,
-        };
-
-        return layout;
-      }
-      case "stacked": {
-        const xaxis: any = {
-          title: props.data?.queries[0]?.fields?.x[0]?.label,
-          tickangle:
-            props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
-              ? 0
-              : -20,
-          automargin: true,
-        };
-
-        const yaxis: any = {
-          title:
-            props.data?.queries[0]?.fields?.y?.length == 1
-              ? props.data?.queries[0]?.fields?.y[0]?.label
-              : "",
-          automargin: true,
-          fixedrange: true,
-        };
-
-        //show tickvals and ticktext value when the stacked chart hasn't timestamp
-        // if the first field is timestamp we dont want to show the tickvals
-        // format value only for without timestamp
-        // stacked chart is alwayes stacked with first field value
-        if (
-          props.data?.queries[0]?.fields?.x.length &&
-          props.data?.queries[0]?.fields?.x[0].aggregationFunction != "histogram" &&
-          !props.data?.queries[0]?.fields?.x[0].column !=
-            store.state.zoConfig.timestamp_column
-        ) {
-          (xaxis["tickmode"] = "array"),
-            (xaxis["tickvals"] = xAxisDataWithTicks),
-            (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
-        }
-
-        const layout = {
-          barmode: "stack",
-          xaxis: xaxis,
-          yaxis: yaxis,
-        };
-
-        return layout;
-      }
-      case "heatmap": {
-        const xaxis: any = {
-          title: props.data.fields?.x[0]?.label,
-          tickangle:
-            props.data?.fields?.x[0]?.aggregationFunction == "histogram"
-              ? 0
-              : -20,
-          automargin: true,
-        };
-        const yaxis: any = {
-          title:
-            props.data.fields?.y?.length == 1
-              ? props.data.fields.y[0]?.label
-              : "",
-          automargin: true,
-          fixedrange: true,
-          autosize: true,
-          width: 700,
-          height: 700,
-        };
-        //show tickvals and ticktext value when the stacked chart hasn't timestamp
-        // if the first field is timestamp we dont want to show the tickvals
-        // format value only for without timestamp
-        // stacked chart is alwayes stacked with first field value
-        if (
-          props.data.fields?.x.length &&
-          props.data.fields?.x[0].aggregationFunction != "histogram" &&
-          !props.data.fields?.x[0].column !=
-            store.state.zoConfig.timestamp_column
-        ) {
-          (xaxis["tickmode"] = "array"),
-            (xaxis["tickvals"] = xAxisDataWithTicks),
-            (xaxis["ticktext"] = textformat(xAxisDataWithTicks));
-        }
-        const layout = {
-          xaxis: xaxis,
-          yaxis: yaxis,
-        };
-        return layout;
-      }
-      case "h-stacked":
-        return {
-          barmode: "stack",
-          xaxis: {
-            title: props.data?.queries[0]?.fields?.y[0]?.label,
-            tickangle: -20,
-            automargin: true,
-          },
-          yaxis: {
-            title:
-              props.data?.queries[0]?.fields?.x?.length == 1
-                ? props.data?.queries[0]?.fields?.x[0]?.label
-                : "",
-            automargin: true,
-          },
-        };
-      case "metric":
-        return {
-          paper_bgcolor: "white",
-          // width: 600,
-          // height: 200,
-        };
-      default:
-        return {
-          xaxis: {
-            tickmode: "array",
-            tickvals: xAxisDataWithTicks,
-            ticktext: textformat(xAxisDataWithTicks),
-            title: props.data?.queries[0]?.fields?.x[0]?.label,
-            tickangle:
-              props.data?.queries[0]?.fields?.x[0]?.aggregationFunction == "histogram"
-                ? 0
-                : -20,
-            automargin: true,
-          },
-          yaxis: {
-            title:
-              props.data?.queries[0]?.fields?.y?.length == 1
-                ? props.data?.queries[0]?.fields?.y[0]?.label
-                : "",
-            automargin: true,
-            fixedrange: true,
-          },
-        };
-    }
-  };
-
-  //It is used for showing long label truncate with "..."
-  const textformat = function (layout: any) {
-    let data = layout.map((text: any) => {
-      if (text && text.toString().length > 15) {
-        return text.toString().substring(0, 15) + "...";
-      } else {
-        return text;
-      }
-    });
-    return data;
-  };
-
-  // wrap the text for long x axis names for pie charts
-  const addBreaksAtLength = 12;
-  const textwrapper = function (traces: any) {
-    traces = traces.map((text: any) => {
-      let rxp = new RegExp(".{1," + addBreaksAtLength + "}", "g");
-      if (text) {
-        return text?.toString()?.match(rxp)?.join("<br>");
-      } else {
-        return " ";
-      }
-    });
-    return traces;
-  };
 const getUnitValue = (value: any) => {  
   switch (props.data.config?.unit) {
     case "bytes": {
@@ -749,8 +301,6 @@ const formatDate =(date:any)=>{
     }
   };
 
-  console.log("Query: rendering chart");
-  console.log("Query: chart type", props.data);
   // Step 1: Get the X-Axis key
   const xAxisKeys = getXAxisKeys();
 
@@ -759,23 +309,10 @@ const formatDate =(date:any)=>{
 
   const zAxisKeys = getZAxisKeys();
 
-  let traces: any;
-
-  // const xAxisData = xAxisKeys?.map((key: any) => getAxisDataFromKey(key));
-
-  // const xAxisData1 = new Set(xAxisData[xAxisData.length - 1]);
-
-  // const xAxisData2 =   new Array(xAxisData1.length).fill("");
-  // [...new Set((xAxisKeys?.map((key: any) => getAxisDataFromKey(key))).flat())].map((x: any,i:any) => {
-  //   i==0? xAxisData2[yAxisKeys.length * i ] = x : xAxisData2[yAxisKeys.length * i - 1] = x;
-  // })
-
-  
-  // console.log("xAxisKeys?.map",xAxisData1, xAxisData2);
   
   const legendPosition = getLegendPosition();
 
-  const legendConfig = {
+  const legendConfig:any = {
     show: props.data.config?.show_legends,
     type: "scroll",
     orient: legendPosition,
@@ -856,7 +393,6 @@ const formatDate =(date:any)=>{
         type: "cross",
         label:{
           show:true,
-          // padding:1,
           formatter: function (params:any) {
             let lineBreaks="";
             if(props.data.type==="h-bar"){
@@ -885,32 +421,6 @@ const formatDate =(date:any)=>{
         return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
-    // xAxis: {
-    //   type: "category",
-    //   position: "bottom",
-    //   data: !xAxisKeys.length
-    //     ? []
-    //     : xAxisKeys.length == 1
-    //     ? getAxisDataFromKey(xAxisKeys[0])
-    //     : xAxisKeys?.map((key: any) => {
-    //         return getAxisDataFromKey(key);
-    //       }),
-    //   axisTick: {
-    //     alignWithLabel: true,
-    //   },
-    //   name: props.data.queries[0]?.fields?.x[0]?.label,
-    //   nameLocation: "middle",
-    //   nameGap: 30,
-    //   nameTextStyle: {
-    //     fontWeight: "bold",
-    //     fontSize: 14,
-    //   },
-    //   // min: "dataMin",
-    //   // max: "dataMax",
-    //   splitLine: {
-    //     show: true,
-    //   },
-    // },
     xAxis:xAxisKeys?.map((key: any,index:number) => {
       const data = getAxisDataFromKey(key);      
 
@@ -938,8 +448,6 @@ const formatDate =(date:any)=>{
             width:100,
             margin: 18 * (xAxisKeys.length - index -1) + 5
           },
-          // min: "dataMin",
-          // max: "dataMax",
           splitLine: {
             show: false,
           },
@@ -972,8 +480,6 @@ const formatDate =(date:any)=>{
             return formatUnitValue(getUnitValue(value));
         }
     },
-      // min: "dataMin",
-      // max: "dataMax",
       splitLine: {
         show: false,
       },
@@ -990,93 +496,13 @@ const formatDate =(date:any)=>{
         },
       },
     },
-    // dataZoom: [
-    //   // {
-    //   //   type: "slider",
-    //   //   show: true,
-    //   //   xAxisIndex: [0],
-    //   //   start: 0,
-    //   //   end: 100,
-    //   // },
-    //   // {
-    //   //   type: "slider",
-    //   //   show: true,
-    //   //   yAxisIndex: [0],
-    //   //   left: "93%",
-    //   //   start: 29,
-    //   //   end: 36,
-    //   // },
-    //   {
-    //     type: "inside",
-    //     xAxisIndex: [0],
-    //     start: 0,
-    //     end: 100,
-    //   },
-    //   // {
-    //   //   type: "inside",
-    //   //   yAxisIndex: [0],
-    //   //   start: 29,
-    //   //   end: 36,
-    //   // },
-    // ],
     series: [],
   };
-
-
-
-  // xAxis: [
-  //   {
-  //     type: "category",
-  //     position: "bottom",
-  //     data: !xAxisKeys.length
-  //       ? []
-  //       : xAxisKeys.length == 1
-  //       ? getAxisDataFromKey(xAxisKeys[0])
-  //       : xAxisData1,
-  //     axisTick: {
-  //       alignWithLabel: true,
-  //     },
-  //     min: "dataMin",
-  //     max: "dataMax",
-  //     splitLine: {
-  //       show: true,
-  //     },
-  //   },
-  //   {
-  //     position: "bottom",
-  //     data: xAxisData2,
-  //     interval: 1,
-  //     axisLine: {
-  //       show: false,
-  //     },
-  //     axisTick: {
-  //       alignWithLabel: false,
-  //       length: 40,
-  //       align: "left",
-  //       interval: function (index, value) {
-  //         return value ? true : false;
-  //       },
-  //     },
-  //     axisLabel: {
-  //       margin: 30,
-  //     },
-  //     splitLine: {
-  //       show: true,
-  //       interval: function (index, value) {
-  //         return value ? true : false;
-  //       },
-  //     },
-  //   },
-  // ],
-  
 
   switch (props.data.type) {
     case "bar":
     case "line":
     case "area": {
-
-      //generate trace based on the y axis keys
-      // option.xAxis.axisLabel= {margin:[20]}
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
           name: props.data?.queries[0]?.fields?.y.find(
@@ -1084,18 +510,6 @@ const formatDate =(date:any)=>{
           )?.label,
           ...getPropsByChartTypeForTraces(),
           data: getAxisDataFromKey(key),
-        //   label: {
-        //     show: true,
-        //     position: 'bottom',
-        //     align: 'left',
-        //     formatter: props.data?.queries[0]?.fields?.y.find(
-        //       (it: any) => it.alias == key
-        //     )?.label,
-        //     rotate:90,
-        //     // margin:[10,0]
-        //     // borderWidth:"15",
-        //     // borderType:"solid"
-        // },
         };
         return seriesObj;
       });
@@ -1104,13 +518,12 @@ const formatDate =(date:any)=>{
     case "scatter":
     {
       option.tooltip.formatter = function (name: any) {
-        if (name.length == 0) return "";
-        console.log("name--", name);
-        
-        let hoverText = name.map((it:any)=>{
-          return `${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.value[1]))}`;
-        });
-        return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
+        //reduce to each name
+        const hoverText = name.reduce((text:any,it:any)=>{
+          return text+=`<br/> ${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.value[1]))}`;
+        },"");
+        //x axis name + hovertext
+        return `${name[0].name} ${hoverText}`;
       }
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
@@ -1136,9 +549,11 @@ const formatDate =(date:any)=>{
         };
         return seriesObj;
       });
+      //swap x and y axis
       const temp = option.xAxis;
       option.xAxis = option.yAxis;
       option.yAxis=temp;
+      
       option.yAxis.map((it:any)=>{
         it.nameGap = calculateWidthText(largestLabel(it.data))+8;
       })
@@ -1158,19 +573,7 @@ const formatDate =(date:any)=>{
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
-          // name: props.data?.queries[0]?.fields?.y.find(
-          //   (it: any) => it.alias == key
-          // )?.label,
           ...getPropsByChartTypeForTraces(),
-          // showlegend: props.data.config?.show_legends,
-          // marker: {
-          //   color:
-          //     props.data?.queries[0]?.fields?.y.find(
-          //       (it: any) => it.alias == key
-          //     )?.color || "#5960b2",
-          //   opacity: 0.8,
-          // },
-          // labels: textwrapper(xData),
           data: getAxisDataFromKey(key).map((it:any, i:number) => {
             return { value: it, name: option.xAxis[0].data[i] };
           }),
@@ -1180,7 +583,6 @@ const formatDate =(date:any)=>{
             position: "inside", // You can adjust the position of the labels
             fontSize: 10
           },
-          // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
         return seriesObj;
       });
@@ -1198,19 +600,7 @@ const formatDate =(date:any)=>{
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
-          // name: props.data?.queries[0]?.fields?.y.find(
-          //   (it: any) => it.alias == key
-          // )?.label,
           ...getPropsByChartTypeForTraces(),
-          // showlegend: props.data.config?.show_legends,
-          // marker: {
-          //   color:
-          //     props.data?.queries[0]?.fields?.y.find(
-          //       (it: any) => it.alias == key
-          //     )?.color || "#5960b2",
-          //   opacity: 0.8,
-          // },
-          // labels: textwrapper(xData),
           data: getAxisDataFromKey(key).map((it: any, i:number) => {
             return { value: it, name: option.xAxis[0].data[i] };
           }),
@@ -1220,7 +610,6 @@ const formatDate =(date:any)=>{
             position: "inside", // You can adjust the position of the labels
             fontSize: 10,
           },
-          // hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
         };
         return seriesObj;
       });
@@ -1243,18 +632,13 @@ const formatDate =(date:any)=>{
       const key1 = xAxisKeys[1]
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map((obj: any) => obj[key1]))].filter((it)=> it);
-      console.log("stacked x axis unique value", stackedXAxisUniqueValue);
                   
       // create a trace based on second xAxis's unique values
       option.series = stackedXAxisUniqueValue?.map((key: any) => {
       const seriesObj = {
         name: key,
         ...getPropsByChartTypeForTraces(),
-        // showlegend: props.data.config?.show_legends,
         data: Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))).map((it: any) => (searchQueryData.data.find((it2:any)=>it2[xAxisKeys[0]] == it && it2[key1] == key))?.[yAxisKeys[0]] || 0),
-        // customdata: Array.from(new Set(getAxisDataFromKey(xAxisKeys[0]))), //TODO: need to check for the data value
-        // hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
-        // stackgroup: 'one'
       };
       return seriesObj
     })
@@ -1298,10 +682,6 @@ const formatDate =(date:any)=>{
       const xAxisZerothPositionUniqueValue = [
         ...new Set(searchQueryData.data.map((obj: any) => obj[key0])),
       ].filter((it) => it);
-      console.log(
-        "X axis zeroth position unique values",
-        xAxisZerothPositionUniqueValue
-      );
 
       // get second x axis key
       const key1 = yAxisKeys[0];
@@ -1309,13 +689,9 @@ const formatDate =(date:any)=>{
       const xAxisFirstPositionUniqueValue = [
         ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
       ].filter((it) => it);
-      console.log(
-        "X axis first position unique values",
-        xAxisFirstPositionUniqueValue
-      );
 
       const yAxisKey0 = zAxisKeys[0];
-      traces = [];
+      // traces = [];
       const Zvalues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
         return xAxisZerothPositionUniqueValue.map((zero: any) => {
           return (
@@ -1323,14 +699,6 @@ const formatDate =(date:any)=>{
               (it: any) => it[key0] == zero && it[key1] == first
             )?.[yAxisKey0] || null
           );
-          // searchQueryData.data.map((it: any) => {
-          //     if(it[key0] == zero && it[key1] == first){
-          //         Zvalue.push(it[yAxisKey0])
-          //     }
-          // })
-          // console.log("Zvalue", Zvalue);
-
-          // Zvalues.push(Zvalue)
         });
       });
       console.log("Zvalues=", Zvalues);
@@ -1344,8 +712,8 @@ const formatDate =(date:any)=>{
       };
       console.log("trace:", trace);
 
-      traces.push(trace);
-      console.log("multiple:- traces", traces);
+      // traces.push(trace);
+      // console.log("multiple:- traces", traces);
       break;
     }
     case "h-stacked": {
@@ -1418,28 +786,6 @@ const formatDate =(date:any)=>{
     }
   }
 
-  console.log("Query: props by layout: ", getPropsByChartTypeForLayout());
-
-  //generate the layout value of chart
-  const layout: any = {
-    title: false,
-    showlegend: props.data.config?.show_legends,
-    autosize: true,
-    legend: {
-      bgcolor: "#0000000b",
-      // orientation: getLegendPosition("sql"),
-      itemclick: ["pie", "donut"].includes(props.data.type) ? "toggle" : false,
-    },
-    // ...yAxisTickOptions,
-    margin: {
-      l: props.data.type == "pie" ? 60 : 32,
-      r: props.data.type == "pie" ? 60 : 16,
-      t: 38,
-      b: 32,
-    },
-    ...getPropsByChartTypeForLayout(),
-    ...getThemeLayoutOptions(store),
-  };
 
 //auto SQL: if x axis has time series
   const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
@@ -1450,7 +796,6 @@ const formatDate =(date:any)=>{
     option.xAxis[0].type="time";
     option.xAxis[0].data=[];
     option.tooltip.formatter=function (name: any) {
-      console.log("name--", name);
       if (name.length == 0) return "";
 
       const date = new Date(name[0].data[0]);
@@ -1462,9 +807,8 @@ const formatDate =(date:any)=>{
     }
     option.tooltip.axisPointer={
       type: 'cross',
-      formatter: function (params) {
+      formatter: function (params:any) {
       const date = new Date(params[0].value[0]);
-      console.log("name--",params,date);
       return formatDate(date).toString();
     }
     }
@@ -1488,20 +832,11 @@ if((props.data.type != "h-bar") && option.xAxis.length>0 && option.xAxis[0].data
       type: 'cross',
       formatter: function (params:any) {
         const date = new Date(params[0].value[0]);
-        console.log("name--",params,date);
         return formatDate(date).toString();
       }
     }
   }
 }
-
-  console.log("optionss", option);
-
-  // Plotly.react(plotRef.value, traces, layout, {
-  //   responsive: true,
-  //   displaylogo: false,
-  //   displayModeBar: false,
-  // });
   return {
     option,
   };
