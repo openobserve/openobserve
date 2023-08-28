@@ -145,18 +145,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
             // clean empty sub dirs
             clean_empty_dirs(&CONFIG.common.data_wal_dir)?;
         }
-
-        tokio::task::spawn(async move { files::run().await });
-        tokio::task::spawn(async move { file_list::run().await });
-        tokio::task::spawn(async move { stats::run().await });
-        tokio::task::spawn(async move { alert_manager::run().await });
-        tokio::task::spawn(async move { compact::run().await });
-        tokio::task::spawn(async move { metrics::run().await });
-        tokio::task::spawn(async move { prom::run().await });
-
-        // Shouldn't serve request until initialization finishes
-        log::info!("Job initialization complete");
     }
+
+    tokio::task::spawn(async move { files::run().await });
+    tokio::task::spawn(async move { file_list::run().await });
+    tokio::task::spawn(async move { stats::run().await });
+    tokio::task::spawn(async move { metrics::run().await });
+    tokio::task::spawn(async move { alert_manager::run().await });
+    tokio::task::spawn(async move { compact::run().await });
+    tokio::task::spawn(async move { prom::run().await });
+
+    // Shouldn't serve request until initialization finishes
+    log::info!("Job initialization complete");
 
     // Syslog server start
     let start_syslog = *SYSLOG_ENABLED.read();
