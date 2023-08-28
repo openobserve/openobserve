@@ -707,13 +707,13 @@ const getUnitValue = (value: any) => {
     }
     case "default": {
       return {
-        value: value,
+        value: value.toFixed(2),
         unit: "",
       };
     }
     default: {
       return {
-        value: value,
+        value: value.toFixed(2),
         unit: "",
       };
     }
@@ -914,6 +914,7 @@ const formatDate =(date:any)=>{
     xAxis:xAxisKeys?.map((key: any,index:number) => {
       const data = getAxisDataFromKey(key);      
 
+      //unique value index array 
       const arr:any = [];
       for(let i=0;i<data.length;i++){
         if(i==0||data[i]!=data[i-1])arr.push(i)
@@ -961,7 +962,7 @@ const formatDate =(date:any)=>{
           ? props.data.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
-      nameGap: calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys[0])))+8,
+      nameGap: calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys[0])))+24,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
@@ -1141,6 +1142,9 @@ const formatDate =(date:any)=>{
       option.yAxis.map((it:any)=>{
         it.nameGap = calculateWidthText(largestLabel(it.data))+8;
       })
+      option.xAxis.name= props.data.queries[0]?.fields?.y?.length >= 1
+        ? props.data.queries[0]?.fields?.y[0]?.label
+        : "",
       option.xAxis.nameGap = 20;
       break;
     }
