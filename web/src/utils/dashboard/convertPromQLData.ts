@@ -311,7 +311,7 @@ export const convertPromQLData = (
   const legendPosition = getLegendPosition();
 
   const legendConfig = {
-    show: true,
+    show: props.data.value.config?.show_legends,
     type: "scroll",
     orient: legendPosition,
     padding: [10, 20, 0, 10],
@@ -356,7 +356,7 @@ export const convertPromQLData = (
         fontSize: 12,
       },
       formatter: function (name: any) {
-        console.log("name--", name);
+        // console.log("name--", name);
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);

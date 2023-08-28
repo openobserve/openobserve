@@ -776,7 +776,7 @@ const formatDate =(date:any)=>{
   const legendPosition = getLegendPosition();
 
   const legendConfig = {
-    show: true,
+    show: props.data.config?.show_legends,
     type: "scroll",
     orient: legendPosition,
     padding: [10, 20, 0, 10],
