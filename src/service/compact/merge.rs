@@ -29,14 +29,6 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::utils::json;
-use crate::common::{
-    infra::{
-        cache,
-        config::{CONFIG, FILE_EXT_PARQUET},
-        ider, metrics, storage,
-    },
-    meta::meta_store::MetaStore,
-};
 use crate::service::{db, file_list, search::datafusion, stream};
 
 /// compactor run steps on a stream:

@@ -30,15 +30,6 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::utils::json;
-use crate::common::{
-    infra::{
-        cache,
-        cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-        config::{is_local_disk_storage, CONFIG},
-        dist_lock, ider, storage,
-    },
-    meta::meta_store::MetaStore,
-};
 use crate::service::{db, file_list};
 
 pub async fn delete_by_stream(

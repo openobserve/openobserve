@@ -61,14 +61,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await;
     }
 
-    if !CONFIG
-        .common
-        .meta_store
-        .eq(&MetaStore::DynamoDB.to_string())
-    {
-        // cache users
-        tokio::task::spawn(async move { db::user::watch().await });
-    }
+    // cache users
+    tokio::task::spawn(async move { db::user::watch().await });
     db::user::cache().await.expect("user cache failed");
 
     //set instance id
@@ -132,36 +126,37 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("syslog settings cache failed");
 
-    // cache file list
+        // cache file list
 
-    if !CONFIG.common.file_list_external
-        && (cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
-            || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE))
-    {
-        db::file_list::remote::cache("", false)
-            .await
-            .expect("file list remote cache failed");
+        if !CONFIG.common.file_list_external
+            && (cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
+                || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE))
+        {
+            db::file_list::remote::cache("", false)
+                .await
+                .expect("file list remote cache failed");
+        }
+        infra_file_list::create_table_index().await?;
+
+        // check wal directory
+        if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+            // create wal dir
+            std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
+            // clean empty sub dirs
+            clean_empty_dirs(&CONFIG.common.data_wal_dir)?;
+        }
+
+        tokio::task::spawn(async move { files::run().await });
+        tokio::task::spawn(async move { file_list::run().await });
+        tokio::task::spawn(async move { stats::run().await });
+        tokio::task::spawn(async move { alert_manager::run().await });
+        tokio::task::spawn(async move { compact::run().await });
+        tokio::task::spawn(async move { metrics::run().await });
+        tokio::task::spawn(async move { prom::run().await });
+
+        // Shouldn't serve request until initialization finishes
+        log::info!("Job initialization complete");
     }
-    infra_file_list::create_table_index().await?;
-
-    // check wal directory
-    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        // create wal dir
-        std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
-        // clean empty sub dirs
-        clean_empty_dirs(&CONFIG.common.data_wal_dir)?;
-    }
-
-    tokio::task::spawn(async move { files::run().await });
-    tokio::task::spawn(async move { file_list::run().await });
-    tokio::task::spawn(async move { stats::run().await });
-    tokio::task::spawn(async move { alert_manager::run().await });
-    tokio::task::spawn(async move { compact::run().await });
-    tokio::task::spawn(async move { metrics::run().await });
-    tokio::task::spawn(async move { prom::run().await });
-
-    // Shouldn't serve request until initialization finishes
-    log::info!("Job initialization complete");
 
     // Syslog server start
     let start_syslog = *SYSLOG_ENABLED.read();
