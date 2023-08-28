@@ -26,6 +26,8 @@ use crate::common::{
     },
 };
 
+use super::db::dynamo_db;
+
 pub mod dynamo;
 pub mod postgres;
 pub mod sled;
@@ -80,7 +82,7 @@ pub async fn create_table() -> Result<()> {
         "sled" => sled::create_table().await,
         "sqlite" => sqlite::create_table().await,
         "postgres" | "postgresql" => postgres::create_table().await,
-        "dynamo" | "dynamodb" => dynamo::create_table().await,
+        "dynamo" | "dynamodb" => dynamo_db::create_meta_tables().await,
         _ => sqlite::create_table().await,
     }
 }

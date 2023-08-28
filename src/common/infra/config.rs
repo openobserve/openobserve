@@ -180,8 +180,6 @@ pub struct Common {
     // external storage no need sync file_list to s3
     #[env_config(name = "ZO_FILE_LIST_EXTERNAL", default = false)]
     pub file_list_external: bool,
-    #[env_config(name = "ZO_FILE_LIST_DYNAMO_TABLE_NAME", default = "")]
-    pub file_list_dynamo_table_name: String,
     #[env_config(name = "ZO_FILE_LIST_POSTGRES_DSN", default = "")]
     pub file_list_postgres_dsn: String,
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
@@ -663,8 +661,8 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
 
-    if cfg.common.file_list_dynamo_table_name.is_empty() {
-        cfg.common.file_list_dynamo_table_name = format!("{}-file-list", cfg.s3.bucket_name);
+    if cfg.common.dynamo_file_list_table.is_empty() {
+        cfg.common.dynamo_file_list_table = format!("{}-file-list", cfg.s3.bucket_name);
     }
 
     Ok(())

@@ -105,7 +105,7 @@ pub async fn get_dynamo_config() -> aws_config::SdkConfig {
     aws_config::load_from_env().await
 }
 
-pub async fn create_dynamo_tables() {
+pub async fn create_meta_tables() -> Result<()> {
     create_table(&CONFIG.common.dynamo_file_list_table, "stream", "file")
         .await
         .unwrap();
@@ -213,11 +213,46 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
     }
 
     match entity {
-        "function" | "templates" | "destinations" | "dashboard" | "alerts" | "kv"
-        | "metrics_members" | "metrics_leader" => match operation {
+        "function" | "templates" | "destinations" | "dashboard" | "kv" | "metrics_members"
+        | "metrics_leader" => match operation {
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
                 pk_value: parts[1].to_string(),
                 rk_value: format!("{}/{}", parts[0], parts[2]),
+                name: CONFIG.common.dynamo_org_meta_table.clone(),
+                pk: "org".to_string(),
+                rk: "key".to_string(),
+                operation: "query".to_string(),
+                entity: entity.to_string(),
+            },
+            DbOperation::List => {
+                if parts.len() == 1 || parts[1].is_empty() {
+                    DynamoTableDetails {
+                        pk_value: parts[1].to_string(),
+                        rk_value: parts[0].to_string(),
+                        name: CONFIG.common.dynamo_org_meta_table.clone(),
+                        pk: "org".to_string(),
+                        rk: "key".to_string(),
+                        operation: "scan".to_string(),
+                        entity: entity.to_string(),
+                    }
+                } else {
+                    DynamoTableDetails {
+                        pk_value: parts[1].to_string(),
+                        rk_value: parts[0].to_string(),
+                        name: CONFIG.common.dynamo_org_meta_table.clone(),
+                        pk: "org".to_string(),
+                        rk: "key".to_string(),
+                        operation: "query".to_string(),
+                        entity: entity.to_string(),
+                    }
+                }
+            }
+        },
+
+        "alerts" => match operation {
+            DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
+                pk_value: parts[1].to_string(),
+                rk_value: format!("{}/{}/{}/{}", parts[0], parts[2], parts[3], parts[4]),
                 name: CONFIG.common.dynamo_org_meta_table.clone(),
                 pk: "org".to_string(),
                 rk: "key".to_string(),
