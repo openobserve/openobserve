@@ -259,13 +259,13 @@ const getUnitValue = (value: any) => {
     }
     case "default": {
       return {
-        value: Number.isInteger(value) ? value : value.toFixed(2),
+        value: Number.isInteger(value) ? value.toFixed(2) : value,
         unit: "",
       };
     }
     default: {
       return {
-        value: Number.isInteger(value) ? value : value.toFixed(2),
+        value: Number.isInteger(value) ? value.toFixed(2) : value,
         unit: "",
       };
     }
@@ -691,26 +691,67 @@ const formatDate =(date:any)=>{
       ].filter((it) => it);
 
       const yAxisKey0 = zAxisKeys[0];
-      // traces = [];
       const Zvalues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
         return xAxisZerothPositionUniqueValue.map((zero: any) => {
           return (
             searchQueryData.data.find(
               (it: any) => it[key0] == zero && it[key1] == first
-            )?.[yAxisKey0] || null
+            )?.[yAxisKey0] || 0
           );
         });
       });
-      console.log("Zvalues=", Zvalues);
-
-      const trace = {
-        x: xAxisZerothPositionUniqueValue,
-        y: xAxisFirstPositionUniqueValue,
-        z: Zvalues,
-        ...getPropsByChartTypeForTraces(),
-        hoverongaps: false,
-      };
-      console.log("trace:", trace);
+      console.log("Zvalues=", xAxisZerothPositionUniqueValue,xAxisFirstPositionUniqueValue,Zvalues);
+      option.visualMap= {
+        min: 0,
+        max: Zvalues.reduce((a: any, b: any) => Math.max(a, b.reduce((c: any, d: any) => Math.max(c, d), 0)), 0),
+        calculable: true,
+        orient: 'horizontal',
+        // left: 'center',
+        // bottom: '15%'
+      },
+      option.series= [{
+            type:"heatmap",
+            label:{
+              show:true
+            },
+            emphasis: {
+              itemStyle: {
+                shadowBlur: 10,
+                shadowColor: 'rgba(0, 0, 0, 0.5)'
+              }
+            },
+          data: Zvalues.map((it:any,index:any)=>{
+            return xAxisZerothPositionUniqueValue.map((i:any,j:number)=>{
+              return [index,j,it[j]]
+            })
+          }).flat()
+        }]
+        option.yAxis.data=xAxisFirstPositionUniqueValue;
+        option.xAxis= {
+          type: 'category',
+          data: option.xAxis[0].data,
+          splitArea: {
+            show: true
+          }
+        },
+        option.yAxis= {
+          type: 'category',
+          data: option.yAxis.data,
+          splitArea: {
+            show: true
+          }
+        }
+          // option.xAxis=option.xAxis[0];
+          // option.yAxis.type="category"
+      
+      // const trace = {
+      //   x: xAxisZerothPositionUniqueValue,
+      //   y: xAxisFirstPositionUniqueValue,
+      //   z: Zvalues,
+      //   ...getPropsByChartTypeForTraces(),
+      //   hoverongaps: false,
+      // };
+      // console.log("trace:", trace);
 
       // traces.push(trace);
       // console.log("multiple:- traces", traces);
@@ -838,6 +879,9 @@ if((props.data.type != "h-bar") && option.xAxis.length>0 && option.xAxis[0].data
     }
   }
 }
+
+console.log("optionss:", option);
+
   return {
     option,
   };
