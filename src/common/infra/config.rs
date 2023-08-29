@@ -315,6 +315,9 @@ pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_CACHE_LATEST_FILES", default = false)]
     pub cache_latest_files: bool,
     // MB, default is 50% of system memory
+    #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE", default = 0)]
+    pub datafusion_max_size: usize,
+    // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
     // MB, will skip the cache when a query need cache great than this value, default is 80% of max_size
@@ -650,6 +653,11 @@ fn check_sled_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     let mem_total = cgroup::get_memory_limit();
     cfg.limit.mem_total = mem_total;
+    if cfg.memory_cache.datafusion_max_size == 0 {
+        cfg.memory_cache.datafusion_max_size = mem_total / 2; // 50%
+    } else {
+        cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
+    }
     if cfg.memory_cache.max_size == 0 {
         cfg.memory_cache.max_size = mem_total / 2; // 50%
     } else {
