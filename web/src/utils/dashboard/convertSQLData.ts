@@ -267,13 +267,13 @@ const getUnitValue = (value: any) => {
     }
     case "default": {
       return {
-        value: Number.isInteger(value) ? value.toFixed(2) : value,
+        value: isNaN(value) ? value :Number.isInteger(value) ? value : value.toFixed(2),
         unit: "",
       };
     }
     default: {
       return {
-        value: Number.isInteger(value) ? value.toFixed(2) : value,
+        value: isNaN(value) ? value : Number.isInteger(value) ? value : value.toFixed(2),
         unit: "",
       };
     }

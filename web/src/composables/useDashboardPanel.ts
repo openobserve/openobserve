@@ -387,6 +387,40 @@ const removeQuery = (index: number) => {
       });
   }
 
+
+const loadFilterItem = (name:any)=>{
+  StreamService
+      .fieldValues({
+        org_identifier: store.state.selectedOrganization.identifier,
+        stream_name: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
+        start_time:  new Date(dashboardPanelData.meta.dateTime["start_time"].toISOString()).getTime() * 1000,
+        end_time:  new Date(dashboardPanelData.meta.dateTime["end_time"].toISOString()).getTime() * 1000,
+        fields: [name],
+        size: 10,
+        type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type
+      })
+      .then((res:any) => {
+        const find = dashboardPanelData.meta.filterValue.findIndex((it: any) => it.column == name)
+        if (find >= 0) {
+          dashboardPanelData.meta.filterValue.splice(find, 1);
+        }
+        dashboardPanelData.meta.filterValue.push({
+          column: name,
+          value: res?.data?.hits?.[0]?.values
+            .map((it: any) => it.zo_sql_key)
+            .filter((it: any) => it),
+        });
+
+      })
+      .catch((error: any) => {
+        $q.notify({
+          type: "negative",
+          message: "Something went wrong!",
+          timeout: 5000,
+        });
+      });
+}
+
   const removeXYFilters = () => {
     if (promqlMode.value || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery == false) {
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.splice(0,dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length);
@@ -479,6 +513,7 @@ const removeQuery = (index: number) => {
     removeZAxisItem,
     removeFilterItem,
     addFilteredItem,
+    loadFilterItem,
     removeXYFilters,
     updateXYFieldsForCustomQueryMode,
     updateXYFieldsOnCustomQueryChange,

@@ -262,7 +262,7 @@
         v-mutation="handler2">
         <q-btn-group class="q-mr-sm" v-for="(filteredItem,index) in dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter" :key="index">
         <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="filteredItem.column"  class="q-pl-sm">
-          <q-menu class="q-pa-md">
+          <q-menu class="q-pa-md" @show="(e)=>loadFilterItem(filteredItem.column)">
               <div>
                 <div class="q-pa-xs">
                   <div class="q-gutter-xs">
@@ -450,6 +450,7 @@ export default defineComponent({
       removeZAxisItem,
       removeFilterItem,
       addFilteredItem,
+      loadFilterItem,
       promqlMode,
     } = useDashboardPanelData();
     const triggerOperators = [
@@ -576,6 +577,7 @@ export default defineComponent({
       removeXAxisItem,
       removeYAxisItem,
       removeZAxisItem,
+      loadFilterItem,
       triggerOperators,
       removeFilterItem,
       pagination: ref({
