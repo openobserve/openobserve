@@ -32,12 +32,6 @@ use crate::common::{
     },
     utils::json,
 };
-use crate::common::meta::{
-    common::{FileKey, FileMeta},
-    stream::PartitionTimeLevel,
-    StreamType,
-};
-use crate::common::utils::json;
 use crate::service::{db, file_list};
 
 pub async fn delete_by_stream(
@@ -319,7 +313,7 @@ async fn delete_from_file_list(
     write_file_list(file_list_days, hours_files).await?;
 
     // update stream stats
-    if CONFIG.common.file_list_external && stream_stats.doc_num != 0 {
+    if CONFIG.common.meta_store_external && stream_stats.doc_num != 0 {
         infra_file_list::set_stream_stats(
             org_id,
             &[(
@@ -337,7 +331,7 @@ async fn write_file_list(
     file_list_days: HashSet<String>,
     hours_files: HashMap<String, Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
-    if CONFIG.common.file_list_external {
+    if CONFIG.common.meta_store_external {
         write_file_list_db_only(hours_files).await
     } else {
         write_file_list_s3(file_list_days, hours_files).await

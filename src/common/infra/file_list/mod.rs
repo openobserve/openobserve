@@ -36,7 +36,7 @@ pub mod sqlite;
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn FileList> {
-    match CONFIG.common.file_list_storage.as_str() {
+    match CONFIG.common.meta_store.as_str() {
         "sqlite" => Box::<sqlite::SqliteFileList>::default(),
         "postgres" | "postgresql" => Box::<postgres::PostgresFileList>::default(),
         "dynamo" | "dynamodb" => Box::<dynamo::DynamoFileList>::default(),
@@ -88,10 +88,10 @@ pub trait FileList: Sync + Send + 'static {
     async fn clear(&self) -> Result<()>;
 }
 
-pub async fn create_file_list_table() -> Result<()> {
+pub async fn create_table() -> Result<()> {
     // check cache dir
     std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
-    match CONFIG.common.file_list_storage.as_str() {
+    match CONFIG.common.meta_store.as_str() {
         "sqlite" => sqlite::create_table().await,
         "postgres" | "postgresql" => postgres::create_table().await,
         "dynamo" | "dynamodb" => dynamo::create_table().await,
@@ -100,7 +100,7 @@ pub async fn create_file_list_table() -> Result<()> {
 }
 
 pub async fn create_table_index() -> Result<()> {
-    match CONFIG.common.file_list_storage.as_str() {
+    match CONFIG.common.meta_store.as_str() {
         "sqlite" => sqlite::create_table_index().await,
         "postgres" | "postgresql" => postgres::create_table_index().await,
         "dynamo" | "dynamodb" => dynamo::create_table_index().await,

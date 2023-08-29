@@ -24,7 +24,7 @@ use crate::common::meta::meta_store::MetaStore;
 use super::config::CONFIG;
 use super::errors::Result;
 
-pub mod dynamo_db;
+pub mod dynamo;
 pub mod etcd;
 pub mod sled;
 
@@ -38,7 +38,7 @@ pub fn default() -> Box<dyn Db> {
     match CONFIG.common.meta_store.as_str().into() {
         MetaStore::Sled => Box::<sled::Sled>::default(),
         MetaStore::Etcd => Box::<etcd::Etcd>::default(),
-        MetaStore::DynamoDB => Box::<dynamo_db::DynamoDb>::default(),
+        MetaStore::DynamoDB => Box::<dynamo::DynamoDb>::default(),
     }
 }
 

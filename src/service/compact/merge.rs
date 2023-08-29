@@ -229,7 +229,7 @@ pub async fn merge_by_stream(
     db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
 
     // update stream stats
-    if CONFIG.common.file_list_external && stream_stats.doc_num != 0 {
+    if CONFIG.common.meta_store_external && stream_stats.doc_num != 0 {
         infra_file_list::set_stream_stats(
             org_id,
             &[(
@@ -426,7 +426,7 @@ async fn write_file_list(events: &[FileKey]) -> Result<(), anyhow::Error> {
     if events.is_empty() {
         return Ok(());
     }
-    if CONFIG.common.file_list_external {
+    if CONFIG.common.meta_store_external {
         write_file_list_db_only(events).await
     } else {
         write_file_list_s3(events).await

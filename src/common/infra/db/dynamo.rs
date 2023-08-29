@@ -83,25 +83,22 @@ pub async fn get_dynamo_config() -> aws_config::SdkConfig {
 }
 
 pub async fn create_meta_tables() -> Result<()> {
-    create_table(&CONFIG.common.dynamo_file_list_table, "stream", "file")
+    create_table(&CONFIG.dynamo.org_meta_table, "org", "key")
         .await
         .unwrap();
-    create_table(&CONFIG.common.dynamo_org_meta_table, "org", "key")
+    create_table(&CONFIG.dynamo.meta_table, "type", "key")
         .await
         .unwrap();
-    create_table(&CONFIG.common.dynamo_meta_table, "type", "key")
+    create_table(&CONFIG.dynamo.schema_table, "org", "key")
         .await
         .unwrap();
-    create_table(&CONFIG.common.dynamo_schema_table, "org", "key")
+    create_table(&CONFIG.dynamo.compact_table, "org", "key")
         .await
         .unwrap();
-    create_table(&CONFIG.common.dynamo_compact_table, "org", "key")
+    create_table(&CONFIG.dynamo.meta_table, "type", "key")
         .await
         .unwrap();
-    create_table(&CONFIG.common.dynamo_meta_table, "type", "key")
-        .await
-        .unwrap();
-    create_table(&CONFIG.common.dynamo_schema_table, "org", "key")
+    create_table(&CONFIG.dynamo.schema_table, "org", "key")
         .await
         .unwrap();
     Ok(())
@@ -166,7 +163,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
 
     if db_key.starts_with("/user") {
         return DynamoTableDetails {
-            name: CONFIG.common.dynamo_meta_table.clone(),
+            name: CONFIG.dynamo.meta_table.clone(),
             pk_value: "users".to_string(),
             rk_value: db_key.to_string(),
             pk: "type".to_string(),
@@ -180,7 +177,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
         || db_key.starts_with("/syslog")
     {
         return DynamoTableDetails {
-            name: CONFIG.common.dynamo_meta_table.clone(),
+            name: CONFIG.dynamo.meta_table.clone(),
             pk_value: "meta".to_string(),
             rk_value: db_key.to_string(),
             pk: "type".to_string(),
@@ -196,7 +193,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
                 pk_value: parts[1].to_string(),
                 rk_value: format!("{}/{}", parts[0], parts[2]),
-                name: CONFIG.common.dynamo_org_meta_table.clone(),
+                name: CONFIG.dynamo.org_meta_table.clone(),
                 pk: "org".to_string(),
                 rk: "key".to_string(),
                 operation: "query".to_string(),
@@ -207,7 +204,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     DynamoTableDetails {
                         pk_value: parts[1].to_string(),
                         rk_value: parts[0].to_string(),
-                        name: CONFIG.common.dynamo_org_meta_table.clone(),
+                        name: CONFIG.dynamo.org_meta_table.clone(),
                         pk: "org".to_string(),
                         rk: "key".to_string(),
                         operation: "scan".to_string(),
@@ -217,7 +214,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     DynamoTableDetails {
                         pk_value: parts[1].to_string(),
                         rk_value: parts[0].to_string(),
-                        name: CONFIG.common.dynamo_org_meta_table.clone(),
+                        name: CONFIG.dynamo.org_meta_table.clone(),
                         pk: "org".to_string(),
                         rk: "key".to_string(),
                         operation: "query".to_string(),
@@ -231,7 +228,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
                 pk_value: parts[1].to_string(),
                 rk_value: format!("{}/{}/{}/{}", parts[0], parts[2], parts[3], parts[4]),
-                name: CONFIG.common.dynamo_org_meta_table.clone(),
+                name: CONFIG.dynamo.org_meta_table.clone(),
                 pk: "org".to_string(),
                 rk: "key".to_string(),
                 operation: "query".to_string(),
@@ -242,7 +239,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     DynamoTableDetails {
                         pk_value: parts[1].to_string(),
                         rk_value: parts[0].to_string(),
-                        name: CONFIG.common.dynamo_org_meta_table.clone(),
+                        name: CONFIG.dynamo.org_meta_table.clone(),
                         pk: "org".to_string(),
                         rk: "key".to_string(),
                         operation: "scan".to_string(),
@@ -252,7 +249,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     DynamoTableDetails {
                         pk_value: parts[1].to_string(),
                         rk_value: parts[0].to_string(),
-                        name: CONFIG.common.dynamo_org_meta_table.clone(),
+                        name: CONFIG.dynamo.org_meta_table.clone(),
                         pk: "org".to_string(),
                         rk: "key".to_string(),
                         operation: "query".to_string(),
@@ -265,7 +262,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
                 pk_value: parts[1].to_string(),
                 rk_value: format!("{}/{}/{}", parts[0], parts[2], parts[3]),
-                name: CONFIG.common.dynamo_schema_table.clone(),
+                name: CONFIG.dynamo.schema_table.clone(),
                 pk: "org".to_string(),
                 rk: "key".to_string(),
                 operation: "query".to_string(),
@@ -276,7 +273,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     DynamoTableDetails {
                         pk_value: parts[1].to_string(),
                         rk_value: parts[0].to_string(),
-                        name: CONFIG.common.dynamo_schema_table.clone(),
+                        name: CONFIG.dynamo.schema_table.clone(),
                         pk: "org".to_string(),
                         rk: "key".to_string(),
                         operation: "scan".to_string(),
@@ -286,7 +283,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     DynamoTableDetails {
                         pk_value: parts[1].to_string(),
                         rk_value: parts[0].to_string(),
-                        name: CONFIG.common.dynamo_schema_table.clone(),
+                        name: CONFIG.dynamo.schema_table.clone(),
                         pk: "org".to_string(),
                         rk: "key".to_string(),
                         operation: "query".to_string(),
@@ -312,7 +309,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                 DynamoTableDetails {
                     pk_value: parts[1].to_string(),
                     rk_value,
-                    name: CONFIG.common.dynamo_compact_table.clone(),
+                    name: CONFIG.dynamo.compact_table.clone(),
                     pk: "org".to_string(),
                     rk: "key".to_string(),
                     operation: "query".to_string(),
@@ -329,7 +326,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     DynamoTableDetails {
                         pk_value: parts[1].to_string(),
                         rk_value,
-                        name: CONFIG.common.dynamo_compact_table.clone(),
+                        name: CONFIG.dynamo.compact_table.clone(),
                         pk: "org".to_string(),
                         rk: "key".to_string(),
                         operation: "scan".to_string(),
@@ -339,7 +336,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     DynamoTableDetails {
                         pk_value: parts[1].to_string(),
                         rk_value: parts[0].to_string(),
-                        name: CONFIG.common.dynamo_compact_table.clone(),
+                        name: CONFIG.dynamo.compact_table.clone(),
                         pk: "org".to_string(),
                         rk: "key".to_string(),
                         operation: "query".to_string(),
@@ -352,7 +349,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
         _ => DynamoTableDetails {
             pk_value: parts[1].to_string(),
             rk_value: parts[0].to_string(),
-            name: CONFIG.common.dynamo_org_meta_table.clone(),
+            name: CONFIG.dynamo.org_meta_table.clone(),
             pk: "org".to_string(),
             rk: "key".to_string(),
             operation: "query".to_string(),
@@ -478,7 +475,7 @@ impl super::Db for DynamoDb {
                                 Ok(s) => {
                                     let res = s.as_bytes().to_vec().into();
                                     let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
-                                    let key = if table.name != CONFIG.common.dynamo_meta_table {
+                                    let key = if table.name != CONFIG.dynamo.meta_table {
                                         let org = item.get(&table.pk).unwrap().as_s().unwrap();
                                         local_key.replace(
                                             &format!("{}/", table.entity),
@@ -585,7 +582,7 @@ impl super::Db for DynamoDb {
                         match item.get("value") {
                             Some(_) => {
                                 let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
-                                let key = if table.name != CONFIG.common.dynamo_meta_table {
+                                let key = if table.name != CONFIG.dynamo.meta_table {
                                     let org = item.get(&table.pk).unwrap().as_s().unwrap();
                                     local_key.replace(
                                         &format!("{}/", table.entity),
@@ -627,7 +624,7 @@ impl super::Db for DynamoDb {
                         match item.get("value") {
                             Some(_) => {
                                 let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
-                                let key = if table.name != CONFIG.common.dynamo_meta_table {
+                                let key = if table.name != CONFIG.dynamo.meta_table {
                                     let org = item.get(&table.pk).unwrap().as_s().unwrap();
                                     local_key.replace(
                                         &format!("{}/", table.entity),
@@ -689,7 +686,7 @@ async fn scan_prefix(
                                     "compact/delete/",
                                     &format!("/{}/{}/", "compact/delete", org),
                                 )
-                            } else if table.name != CONFIG.common.dynamo_meta_table {
+                            } else if table.name != CONFIG.dynamo.meta_table {
                                 let org = item.get(&table.pk).unwrap().as_s().unwrap();
                                 local_key.replace(
                                     &format!("{}/", table.entity),

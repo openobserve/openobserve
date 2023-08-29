@@ -14,13 +14,16 @@
 
 use regex::Regex;
 
-use crate::common::infra::config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED};
-use crate::common::infra::db::dynamo_db;
-use crate::common::infra::{cluster, file_list as infra_file_list, ider};
-use crate::common::meta::meta_store::MetaStore;
-use crate::common::meta::organization::DEFAULT_ORG;
-use crate::common::meta::user::UserRequest;
-use crate::common::utils::file::clean_empty_dirs;
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
+        db::dynamo,
+        file_list as infra_file_list, ider,
+    },
+    meta::{meta_store::MetaStore, organization::DEFAULT_ORG, user::UserRequest},
+    utils::file::clean_empty_dirs,
+};
 use crate::service::{db, users};
 
 mod alert_manager;
@@ -34,14 +37,12 @@ pub(crate) mod syslog_server;
 mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    infra_file_list::create_file_list_table().await?;
-
     if CONFIG
         .common
         .meta_store
         .eq(&MetaStore::DynamoDB.to_string())
     {
-        dynamo_db::create_meta_tables().await?;
+        dynamo::create_meta_tables().await?;
     }
 
     let email_regex = Regex::new(
@@ -136,8 +137,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     // cache file list
-
-    if !CONFIG.common.file_list_external
+    infra_file_list::create_table().await?;
+    if !CONFIG.common.meta_store_external
         && (cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
             || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE))
     {
@@ -172,9 +173,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { file_list::run().await });
     tokio::task::spawn(async move { stats::run().await });
-    tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
     tokio::task::spawn(async move { compact::run().await });
+    tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { prom::run().await });
 
     // Shouldn't serve request until initialization finishes

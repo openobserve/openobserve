@@ -83,7 +83,7 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error
 
 // Delete one parquet file and update the file list
 pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
-    if CONFIG.common.file_list_external {
+    if CONFIG.common.meta_store_external {
         delete_parquet_file_db_only(key, file_list_only).await
     } else {
         delete_parquet_file_s3(key, file_list_only).await

@@ -105,6 +105,7 @@ pub struct Config {
     pub log: Log,
     pub etcd: Etcd,
     pub sled: Sled,
+    pub dynamo: Dynamo,
     pub s3: S3,
     pub tcp: TCP,
     pub prom: Prometheus,
@@ -175,13 +176,11 @@ pub struct Common {
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
-    #[env_config(name = "ZO_FILE_LIST_STORAGE", default = "sqlite")]
-    pub file_list_storage: String,
-    // external storage no need sync file_list to s3
-    #[env_config(name = "ZO_FILE_LIST_EXTERNAL", default = false)]
-    pub file_list_external: bool,
-    #[env_config(name = "ZO_FILE_LIST_POSTGRES_DSN", default = "")]
-    pub file_list_postgres_dsn: String,
+    #[env_config(name = "ZO_META_STORE", default = "")]
+    pub meta_store: String,
+    pub meta_store_external: bool, // external storage no need sync file_list to s3
+    #[env_config(name = "ZO_META_STORE_POSTGRES_DSN", default = "")]
+    pub meta_store_postgres_dsn: String,
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]
@@ -249,18 +248,6 @@ pub struct Common {
     pub usage_org: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
-    #[env_config(name = "ZO_META_STORE", default = "")]
-    pub meta_store: String,
-    #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
-    pub dynamo_file_list_table: String,
-    #[env_config(name = "ZO_DYNAMO_ORG_META_TABLE", default = "")]
-    pub dynamo_org_meta_table: String,
-    #[env_config(name = "ZO_DYNAMO_META_TABLE", default = "")]
-    pub dynamo_meta_table: String,
-    #[env_config(name = "ZO_DYNAMO_SCHEMA_TABLE", default = "")]
-    pub dynamo_schema_table: String,
-    #[env_config(name = "ZO_DYNAMO_COMPACTOR_TABLE", default = "")]
-    pub dynamo_compact_table: String,
 }
 
 #[derive(EnvConfig)]
@@ -396,6 +383,18 @@ pub struct Sled {
     pub prefix: String,
 }
 
+#[derive(EnvConfig)]
+pub struct Dynamo {
+    #[env_config(name = "ZO_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
+    pub prefix: String,
+    pub file_list_table: String,
+    pub stream_stats_table: String,
+    pub org_meta_table: String,
+    pub meta_table: String,
+    pub schema_table: String,
+    pub compact_table: String,
+}
+
 #[derive(Debug, EnvConfig)]
 pub struct S3 {
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
@@ -487,6 +486,11 @@ pub fn init() -> Config {
         panic!("s3 config error: {e}");
     }
 
+    // check dynamo config
+    if let Err(e) = check_dynamo_config(&mut cfg) {
+        panic!("dynamo config error: {e}");
+    }
+
     cfg
 }
 
@@ -523,20 +527,26 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
-    // format file list storage
-
-    if cfg.common.file_list_storage.is_empty() {
-        cfg.common.file_list_storage = "sqlite".to_string();
+    // format metadata storage
+    if cfg.common.meta_store.is_empty() {
+        if cfg.common.local_mode {
+            cfg.common.meta_store = "sqlite".to_string();
+        } else {
+            cfg.common.meta_store = "etcd".to_string();
+        }
     }
-    cfg.common.file_list_storage = cfg.common.file_list_storage.to_lowercase();
-    if cfg.common.local_mode || cfg.common.file_list_storage != "sqlite" {
-        cfg.common.file_list_external = true;
+    cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
+    if cfg.common.local_mode
+        || (cfg.common.meta_store != "sqlite" && cfg.common.meta_store != "etcd")
+    {
+        cfg.common.meta_store_external = true;
     }
-
-    if cfg.common.meta_store.is_empty() && cfg.common.local_mode {
-        cfg.common.meta_store = "sled".to_string();
-    } else if cfg.common.meta_store.is_empty() {
-        cfg.common.meta_store = "etcd".to_string();
+    if cfg.common.meta_store.starts_with("postgres")
+        && cfg.common.meta_store_postgres_dsn.is_empty()
+    {
+        return Err(anyhow::anyhow!(
+            "Meta store is Postgres, you must set ZO_META_STORE_POSTGRES_DSN"
+        ));
     }
 
     // check compact_max_file_size to MB
@@ -688,25 +698,23 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
 
-    if cfg.common.dynamo_file_list_table.is_empty() {
-        cfg.common.dynamo_file_list_table = format!("{}-file-list", cfg.s3.bucket_name);
-    }
+    Ok(())
+}
 
-    if cfg.common.dynamo_org_meta_table.is_empty() {
-        cfg.common.dynamo_org_meta_table = format!("{}-org-meta", cfg.s3.bucket_name);
+fn check_dynamo_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.common.meta_store.starts_with("dynamo") && cfg.dynamo.prefix.is_empty() {
+        cfg.dynamo.prefix = if cfg.s3.bucket_name.is_empty() {
+            "default".to_string()
+        } else {
+            cfg.s3.bucket_name.clone()
+        };
     }
-    if cfg.common.dynamo_meta_table.is_empty() {
-        cfg.common.dynamo_meta_table = format!("{}-meta", cfg.s3.bucket_name);
-    }
-    if cfg.common.dynamo_schema_table.is_empty() {
-        cfg.common.dynamo_schema_table = format!("{}-org-schema", cfg.s3.bucket_name);
-    }
-    if cfg.common.dynamo_compact_table.is_empty() {
-        cfg.common.dynamo_compact_table = format!("{}-org-compact", cfg.s3.bucket_name);
-    }
-    if cfg.common.stream_stats_dynamo_table_name.is_empty() {
-        cfg.common.stream_stats_dynamo_table_name = format!("{}-stream-stats", cfg.s3.bucket_name);
-    }
+    cfg.dynamo.file_list_table = format!("{}-file-list", cfg.dynamo.prefix);
+    cfg.dynamo.stream_stats_table = format!("{}-stream-stats", cfg.dynamo.prefix);
+    cfg.dynamo.org_meta_table = format!("{}-org-meta", cfg.dynamo.prefix);
+    cfg.dynamo.meta_table = format!("{}-meta", cfg.dynamo.prefix);
+    cfg.dynamo.schema_table = format!("{}-schema", cfg.dynamo.prefix);
+    cfg.dynamo.compact_table = format!("{}-compact", cfg.dynamo.prefix);
 
     Ok(())
 }

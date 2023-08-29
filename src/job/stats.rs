@@ -53,7 +53,7 @@ async fn usage_report_stats() -> Result<(), anyhow::Error> {
 // 2. compactor need update subtracted stats
 // 3. compactor need update data retention subtracted stats
 async fn file_list_update_stats() -> Result<(), anyhow::Error> {
-    if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) || !CONFIG.common.file_list_external {
+    if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) || !CONFIG.common.meta_store_external {
         return Ok(());
     }
 

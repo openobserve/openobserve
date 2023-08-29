@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use async_trait::async_trait;
-use aws_sdk_dynamodb::{config::Region, operation::query::QueryOutput, types::*, Client};
+use aws_sdk_dynamodb::{operation::query::QueryOutput, types::*};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::{
     cmp::{max, min},
@@ -24,7 +24,7 @@ use tokio_stream::StreamExt;
 use crate::common::{
     infra::{
         config::CONFIG,
-        db::dynamo_db::DYNAMO_DB_CLIENT,
+        db::dynamo::DYNAMO_DB_CLIENT,
         errors::{Error, Result},
     },
     meta::{
@@ -42,8 +42,8 @@ pub struct DynamoFileList {
 impl DynamoFileList {
     pub fn new() -> Self {
         Self {
-            file_list_table: CONFIG.common.file_list_dynamo_table_name.clone(),
-            stream_stats_table: CONFIG.common.stream_stats_dynamo_table_name.clone(),
+            file_list_table: CONFIG.dynamo.file_list_table.clone(),
+            stream_stats_table: CONFIG.dynamo.stream_stats_table.clone(),
         }
     }
 }
@@ -95,9 +95,8 @@ impl super::FileList for DynamoFileList {
         let mut key = HashMap::new();
         key.insert("stream".to_string(), AttributeValue::S(stream_key));
         key.insert("file".to_string(), AttributeValue::S(file_name));
-        CLIENT
-            .get()
-            .await
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        client
             .delete_item()
             .table_name(&self.file_list_table)
             .set_key(Some(key))
@@ -263,7 +262,7 @@ impl super::FileList for DynamoFileList {
         pk_value: Option<(i64, i64)>,
     ) -> Result<Vec<(String, StreamStats)>> {
         let (time_start, time_end) = pk_value.unwrap_or((0, 0));
-        let client = CLIENT.get().await;
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
         let query = if stream_type.is_some() && stream_name.is_some() {
             let stream_key = format!("{org_id}/{}/{}", stream_type.unwrap(), stream_name.unwrap());
             if time_start == 0 && time_end == 0 {
@@ -349,7 +348,7 @@ impl super::FileList for DynamoFileList {
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let client = CLIENT.get().await;
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
         let query = if stream_type.is_some() && stream_name.is_some() {
             let stream_key = format!("{org_id}/{}/{}", stream_type.unwrap(), stream_name.unwrap());
             client
@@ -394,6 +393,7 @@ impl super::FileList for DynamoFileList {
         org_id: &str,
         streams: &[(String, StreamStats)],
     ) -> Result<()> {
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
         let old_stats = self.get_stream_stats(org_id, None, None).await?;
         let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
         let mut update_streams = Vec::with_capacity(streams.len());
@@ -456,9 +456,7 @@ impl super::FileList for DynamoFileList {
                 let req = PutRequest::builder().set_item(Some(item)).build();
                 reqs.push(WriteRequest::builder().put_request(req).build());
             }
-            CLIENT
-                .get()
-                .await
+            client
                 .batch_write_item()
                 .request_items(&self.stream_stats_table, reqs)
                 .send()
@@ -484,9 +482,8 @@ impl super::FileList for DynamoFileList {
                 .set_value(Some(AttributeValue::N(min_ts.to_string())))
                 .build(),
         );
-        CLIENT
-            .get()
-            .await
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        client
             .update_item()
             .table_name(&self.stream_stats_table)
             .set_key(Some(key))
@@ -523,8 +520,8 @@ pub async fn create_table_index() -> Result<()> {
 }
 
 pub async fn create_table_file_list() -> Result<()> {
-    let client = CLIENT.get().await.clone();
-    let table_name = &CONFIG.common.file_list_dynamo_table_name;
+    let client = DYNAMO_DB_CLIENT.get().await.clone();
+    let table_name = &CONFIG.dynamo.file_list_table;
     let tables = client
         .list_tables()
         .send()
@@ -603,8 +600,8 @@ pub async fn create_table_file_list() -> Result<()> {
 }
 
 pub async fn create_table_stream_stats() -> Result<()> {
-    let client = CLIENT.get().await.clone();
-    let table_name = &CONFIG.common.stream_stats_dynamo_table_name;
+    let client = DYNAMO_DB_CLIENT.get().await.clone();
+    let table_name = &CONFIG.dynamo.stream_stats_table;
     let tables = client
         .list_tables()
         .send()

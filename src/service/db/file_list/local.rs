@@ -36,7 +36,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
             break;
         }
     }
-    if CONFIG.common.file_list_external {
+    if CONFIG.common.meta_store_external {
         return Ok(());
     }
 
