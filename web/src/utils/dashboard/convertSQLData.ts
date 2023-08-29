@@ -144,8 +144,16 @@ export const convertSQLData = (
       };
       case "heatmap":
         return {
-          type: "heatmap",
-          emphasis: { focus: "series" },
+          type:"heatmap",
+          label:{
+            show:true
+          },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          },
         };
       case "area-stacked":
         return {
@@ -706,41 +714,36 @@ const formatDate =(date:any)=>{
         max: Zvalues.reduce((a: any, b: any) => Math.max(a, b.reduce((c: any, d: any) => Math.max(c, d), 0)), 0),
         calculable: true,
         orient: 'horizontal',
-        // left: 'center',
-        // bottom: '15%'
+        left: 'center',
       },
       option.series= [{
-            type:"heatmap",
-            label:{
-              show:true
-            },
-            emphasis: {
-              itemStyle: {
-                shadowBlur: 10,
-                shadowColor: 'rgba(0, 0, 0, 0.5)'
-              }
-            },
+            ...getPropsByChartTypeForTraces(),
+            name: props.data?.queries[0]?.fields?.y[0].label,
           data: Zvalues.map((it:any,index:any)=>{
             return xAxisZerothPositionUniqueValue.map((i:any,j:number)=>{
               return [index,j,it[j]]
             })
           }).flat()
         }]
-        option.yAxis.data=xAxisFirstPositionUniqueValue;
+        // option.yAxis.data=xAxisFirstPositionUniqueValue;
+        option.tooltip= {
+          position: 'top'
+        },
         option.xAxis= {
           type: 'category',
-          data: option.xAxis[0].data,
+          data: xAxisZerothPositionUniqueValue,
           splitArea: {
             show: true
           }
         },
         option.yAxis= {
           type: 'category',
-          data: option.yAxis.data,
+          data: xAxisFirstPositionUniqueValue,
           splitArea: {
             show: true
           }
         }
+        option.legend.show=false;
           // option.xAxis=option.xAxis[0];
           // option.yAxis.type="category"
       
