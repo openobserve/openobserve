@@ -20,13 +20,10 @@ use datafusion::{
         json as arrowJson,
         record_batch::RecordBatch,
     },
+    common::{FileType, GetExt},
     config::ConfigOptions,
     datasource::{
-        file_format::{
-            file_type::{FileType, GetExt},
-            json::JsonFormat,
-            parquet::ParquetFormat,
-        },
+        file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
     },

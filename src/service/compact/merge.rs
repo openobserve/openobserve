@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ::datafusion::{
-    arrow::datatypes::Schema, datasource::file_format::file_type::FileType, error::DataFusionError,
-};
+use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
 use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::{collections::HashMap, io::Write, sync::Arc};
