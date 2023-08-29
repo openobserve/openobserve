@@ -158,7 +158,7 @@ pub async fn search(
             res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
 
             let req_stats = RequestStats {
-                records: res.hits.len() as u64,
+                records: res.hits.len() as i64,
                 response_time: time,
                 size: res.scan_size as f64,
                 request_body: Some(req.query.sql),
@@ -447,7 +447,7 @@ pub async fn around(
         .inc();
 
     let req_stats = RequestStats {
-        records: resp.hits.len() as u64,
+        records: resp.hits.len() as i64,
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
@@ -649,7 +649,7 @@ pub async fn values(
         .inc();
 
     let req_stats = RequestStats {
-        records: resp.hits.len() as u64,
+        records: resp.hits.len() as i64,
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),

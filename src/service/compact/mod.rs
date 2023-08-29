@@ -27,6 +27,7 @@ use crate::service::db;
 mod file_list;
 mod merge;
 pub(crate) mod retention;
+pub(crate) mod stats;
 
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
@@ -208,7 +209,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     }
 
     // after compact, compact file list from storage
-    if !CONFIG.common.file_list_external {
+    if !CONFIG.common.meta_store_external {
         let last_file_list_offset = db::compact::file_list::get_offset().await?;
         if let Err(e) = file_list::run(last_file_list_offset).await {
             log::error!("[COMPACTOR] merge file list error: {}", e);

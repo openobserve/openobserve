@@ -58,8 +58,8 @@ async-trait = "0.1"
 async_once = "0.2"
 async-recursion = "1.0"
 awc = "3.1"
-aws-config = "0.55.3"
-aws-sdk-dynamodb = "0.28.0"
+aws-config = "0.56.1"
+aws-sdk-dynamodb = "0.30.0"
 base64 = "0.21"
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes = "1.4"
@@ -139,6 +139,7 @@ sqlx = { version = "0.7", features = [
   "runtime-tokio-rustls",
   "postgres",
   "sqlite",
+  "chrono",
 ] }
 strum = { version = "0.24", features = ["derive"] }
 sys-info = "0.9"

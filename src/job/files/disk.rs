@@ -139,7 +139,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             if columns[0] == "files" {
                 metrics::INGEST_WAL_USED_BYTES
                     .with_label_values(&[columns[1], columns[3], columns[2]])
-                    .sub(meta.original_size as i64);
+                    .sub(meta.original_size);
                 report_compression_stats(meta.into(), &org_id, &stream_name, stream_type).await;
             }
 
@@ -260,8 +260,8 @@ async fn upload_file(
         min_ts: 0,
         max_ts: 0,
         records: 0,
-        original_size: file_size,
-        compressed_size: buf_parquet.len() as u64,
+        original_size: file_size as i64,
+        compressed_size: buf_parquet.len() as i64,
     };
 
     populate_file_meta(arrow_schema.clone(), vec![meta_batch], &mut file_meta).await?;

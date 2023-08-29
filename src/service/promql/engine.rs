@@ -756,10 +756,10 @@ impl Engine {
 
                 let input = self.call_expr_first_arg(args).await?;
                 let dst_label = self.call_expr_second_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid destination label found",)),
+                    DataFusionError::NotImplemented(format!("Invalid destination label found")),
                 )?;
                 let separator = self.call_expr_third_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid separator label found",)),
+                    DataFusionError::NotImplemented(format!("Invalid separator label found")),
                 )?;
 
                 let mut source_labels = vec![];
@@ -782,18 +782,18 @@ impl Engine {
                 let input = self.call_expr_first_arg(args).await?;
 
                 let dst_label = self.call_expr_second_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid destination label found",)),
+                    DataFusionError::NotImplemented(format!("Invalid destination label found")),
                 )?;
                 let replacement = self.call_expr_third_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid replacement string found",)),
+                    DataFusionError::NotImplemented(format!("Invalid replacement string found")),
                 )?;
 
                 let src_label = self.call_expr_fourth_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid source label string found",)),
+                    DataFusionError::NotImplemented(format!("Invalid source label string found")),
                 )?;
 
                 let regex = self.call_expr_fifth_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid regex string found",)),
+                    DataFusionError::NotImplemented(format!("Invalid regex string found")),
                 )?;
 
                 functions::label_replace(&input, &dst_label, &replacement, &src_label, &regex)?

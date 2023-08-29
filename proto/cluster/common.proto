@@ -14,11 +14,11 @@ message FileDescriptor {
 }
 
 message FileMeta {
-    int64  min_ts          = 1; // microseconds
-    int64  max_ts          = 2; // microseconds
-    uint64 records         = 3;
-    uint64 original_size   = 4;
-    uint64 compressed_size = 5;
+    int64  min_ts         = 1; // microseconds
+    int64  max_ts         = 2; // microseconds
+    int64 records         = 3;
+    int64 original_size   = 4;
+    int64 compressed_size = 5;
 }
 
 enum StreamType {
@@ -45,10 +45,10 @@ message Job {
 }
 
 message ScanStats {
-    uint64 files           = 1;
-    uint64 records         = 2;
-    uint64 original_size   = 3; // unit: MB
-    uint64 compressed_size = 4; // unit: MB
+    int64 files           = 1;
+    int64 records         = 2;
+    int64 original_size   = 3; // unit: MB
+    int64 compressed_size = 4; // unit: MB
 }
 
 message FileList {

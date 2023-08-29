@@ -59,9 +59,9 @@ pub(crate) async fn create_context(
 
     let work_dir = session_id.to_string();
     let mut scan_stats = ScanStats::new();
-    scan_stats.files = files.len() as u64;
+    scan_stats.files = files.len() as i64;
     for file in files {
-        scan_stats.original_size += file.body.len() as u64;
+        scan_stats.original_size += file.body.len() as i64;
         let file_name = format!("/{work_dir}/{}", file.name);
         tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
     }
