@@ -14,9 +14,10 @@
 
 use std::sync::Arc;
 
-use crate::common::infra::config::TRIGGERS;
-use crate::common::infra::db::Event;
+use crate::common::infra::config::{CONFIG, TRIGGERS};
+use crate::common::infra::db::{Event, CLUSTER_COORDINATOR};
 use crate::common::meta::alert::Trigger;
+use crate::common::meta::meta_store::MetaStore;
 use crate::common::utils::json;
 
 pub async fn get(alert_name: &str) -> Result<Option<Trigger>, anyhow::Error> {
@@ -32,15 +33,45 @@ pub async fn get(alert_name: &str) -> Result<Option<Trigger>, anyhow::Error> {
 pub async fn set(alert_name: &str, trigger: &Trigger) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/trigger/{alert_name}");
-    Ok(db
+    match db
         .put(&key.clone(), json::to_vec(trigger).unwrap().into())
-        .await?)
+        .await
+    {
+        Ok(_) => {
+            if CONFIG
+                .common
+                .meta_store
+                .eq(&MetaStore::DynamoDB.to_string())
+            {
+                CLUSTER_COORDINATOR
+                    .put(&key, CONFIG.common.meta_store.clone().into())
+                    .await?
+            }
+        }
+        Err(e) => {
+            log::error!("Error saving trigger: {}", e);
+            return Err(anyhow::anyhow!("Error saving trigger: {}", e));
+        }
+    }
+    Ok(())
 }
 
 pub async fn delete(alert_name: &str) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/trigger/{alert_name}");
-    Ok(db.delete(&key.clone(), false).await?)
+    match db.delete(&key.clone(), false).await {
+        Ok(_) => {
+            if CONFIG
+                .common
+                .meta_store
+                .eq(&MetaStore::DynamoDB.to_string())
+            {
+                CLUSTER_COORDINATOR.delete(&key, false).await?
+            }
+            Ok(())
+        }
+        Err(e) => Err(anyhow::anyhow!(e)),
+    }
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
@@ -56,7 +87,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::CLUSTER_COORDINATOR;
     let key = "/trigger/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -72,7 +103,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Trigger = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: Trigger = if CONFIG
+                    .common
+                    .meta_store
+                    .eq(&MetaStore::DynamoDB.to_string())
+                {
+                    let dynamo = &crate::common::infra::db::DEFAULT;
+                    let ret = dynamo.get(&ev.key).await?;
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 TRIGGERS.insert(item_key.to_string(), item_value.clone());
             }
             Event::Delete(ev) => {

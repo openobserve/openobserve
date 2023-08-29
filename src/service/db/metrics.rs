@@ -16,8 +16,9 @@ use bytes::Bytes;
 use std::sync::Arc;
 
 use crate::common::infra::cluster::LOCAL_NODE_UUID;
-use crate::common::infra::config::METRIC_CLUSTER_LEADER;
-use crate::common::infra::db::Event;
+use crate::common::infra::config::{CONFIG, METRIC_CLUSTER_LEADER};
+use crate::common::infra::db::{Event, CLUSTER_COORDINATOR};
+use crate::common::meta::meta_store::MetaStore;
 use crate::common::meta::prom::ClusterLeader;
 use crate::common::utils::json;
 
@@ -33,11 +34,28 @@ pub async fn set_prom_cluster_leader(
 ) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/metrics_leader/{cluster}");
-    Ok(db.put(&key, json::to_vec(&leader).unwrap().into()).await?)
+    match db.put(&key, json::to_vec(&leader).unwrap().into()).await {
+        Ok(_) => {
+            if CONFIG
+                .common
+                .meta_store
+                .eq(&MetaStore::DynamoDB.to_string())
+            {
+                CLUSTER_COORDINATOR
+                    .put(&key, CONFIG.common.meta_store.clone().into())
+                    .await?
+            }
+        }
+        Err(e) => {
+            log::error!("Error updating cluster_leader: {}", e);
+            return Err(anyhow::anyhow!("Error updating cluster_leader: {}", e));
+        }
+    }
+    Ok(())
 }
 
 pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::CLUSTER_COORDINATOR;
     let key = "/metrics_leader/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -53,7 +71,18 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: ClusterLeader = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: ClusterLeader = if CONFIG
+                    .common
+                    .meta_store
+                    .eq(&MetaStore::DynamoDB.to_string())
+                {
+                    let dynamo = &crate::common::infra::db::DEFAULT;
+                    let ret = dynamo.get(&ev.key).await?;
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
+
                 if item_value.updated_by != LOCAL_NODE_UUID.to_string() {
                     METRIC_CLUSTER_LEADER
                         .write()
