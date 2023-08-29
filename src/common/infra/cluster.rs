@@ -344,7 +344,7 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
 }
 
 async fn watch_node_list() -> Result<()> {
-    let db = &super::db::DEFAULT;
+    let db = &super::db::CLUSTER_COORDINATOR;
     let key = "/nodes/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();

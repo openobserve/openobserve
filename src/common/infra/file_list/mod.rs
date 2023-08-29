@@ -88,7 +88,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn clear(&self) -> Result<()>;
 }
 
-pub async fn create_table() -> Result<()> {
+pub async fn create_file_list_table() -> Result<()> {
     // check cache dir
     std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
     match CONFIG.common.file_list_storage.as_str() {

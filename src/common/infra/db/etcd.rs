@@ -17,8 +17,7 @@ use async_once::AsyncOnce;
 use async_trait::async_trait;
 use bytes::Bytes;
 use etcd_client::{
-    Certificate, Compare, CompareOp, DeleteOptions, EventType, GetOptions, Identity, SortOrder,
-    SortTarget, TlsOptions, TxnOp,
+    Certificate, DeleteOptions, EventType, GetOptions, Identity, SortOrder, SortTarget, TlsOptions,
 };
 use std::sync::{
     atomic::{AtomicU8, Ordering},
@@ -147,7 +146,7 @@ impl super::Db for Etcd {
         Ok(result)
     }
 
-    async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>> {
+    /* async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>> {
         let (tx, rx) = mpsc::channel(CONFIG.etcd.load_page_size as usize);
         let key = format!("{}{}", self.prefix, prefix);
         let prefix_key = self.prefix.to_string();
@@ -201,7 +200,7 @@ impl super::Db for Etcd {
             Ok(())
         });
         Ok(Arc::new(rx))
-    }
+    } */
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let mut result = Vec::new();
@@ -356,7 +355,7 @@ impl super::Db for Etcd {
         Ok(Arc::new(rx))
     }
 
-    async fn transaction(
+    /* async fn transaction(
         &self,
         check_key: &str,
         and_ops: Vec<Event>,
@@ -400,7 +399,7 @@ impl super::Db for Etcd {
         txn = txn.or_else(txn_else_ops);
         let _ = client.txn(txn).await?;
         Ok(())
-    }
+    } */
 }
 
 pub async fn connect_etcd() -> Option<etcd_client::Client> {

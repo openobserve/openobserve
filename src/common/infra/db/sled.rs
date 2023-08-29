@@ -15,7 +15,6 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
-use sled::transaction::ConflictableTransactionError;
 use std::sync::Arc;
 use tokio::{sync::mpsc, task::JoinHandle};
 
@@ -120,7 +119,7 @@ impl super::Db for Sled {
         Ok(result)
     }
 
-    async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>> {
+    /*  async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>> {
         let (tx, rx) = mpsc::channel(CONFIG.etcd.load_page_size as usize);
         let key = format!("{}{}", self.prefix, prefix);
         let prefix_key = self.prefix.to_string();
@@ -148,7 +147,7 @@ impl super::Db for Sled {
             Ok(())
         });
         Ok(Arc::new(rx))
-    }
+    } */
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let mut result = Vec::new();
@@ -235,7 +234,7 @@ impl super::Db for Sled {
         Ok(Arc::new(rx))
     }
 
-    async fn transaction(
+    /* async fn transaction(
         &self,
         check_key: &str,
         and_ops: Vec<Event>,
@@ -298,7 +297,7 @@ impl super::Db for Sled {
             Ok(_) => Ok(()),
             Err(e) => Err(Error::Message(e.to_string())),
         }
-    }
+    } */
 }
 
 pub fn connect_sled() -> Option<::sled::Db> {

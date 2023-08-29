@@ -19,9 +19,12 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
+use crate::common::meta::meta_store::MetaStore;
+
 use super::config::CONFIG;
 use super::errors::Result;
 
+pub mod dynamo_db;
 pub mod etcd;
 pub mod sled;
 
@@ -29,8 +32,17 @@ pub use self::etcd::ETCD_CLIENT;
 pub use self::sled::SLED_CLIENT;
 
 pub static DEFAULT: Lazy<Box<dyn Db>> = Lazy::new(default);
+pub static CLUSTER_COORDINATOR: Lazy<Box<dyn Db>> = Lazy::new(cluster_coordinator);
 
 pub fn default() -> Box<dyn Db> {
+    match CONFIG.common.meta_store.as_str().into() {
+        MetaStore::Sled => Box::<sled::Sled>::default(),
+        MetaStore::Etcd => Box::<etcd::Etcd>::default(),
+        MetaStore::DynamoDB => Box::<dynamo_db::DynamoDb>::default(),
+    }
+}
+
+pub fn cluster_coordinator() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
         Box::<sled::Sled>::default()
     } else {
@@ -74,17 +86,17 @@ pub trait Db: Sync + Send + 'static {
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>>;
-    async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>>;
+    //async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>>;
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>>;
     async fn count(&self, prefix: &str) -> Result<usize>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
-    async fn transaction(
+    /*  async fn transaction(
         &self,
         check_key: &str, // check the key exists
         and_ops: Vec<Event>,
         else_ops: Vec<Event>,
-    ) -> Result<()>;
+    ) -> Result<()>; */
 }
 
 #[cfg(test)]
@@ -126,8 +138,9 @@ mod tests {
         assert_eq!(db.list_keys("/foo/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/").await.unwrap().len(), 3);
 
-        let mut events = db.list_use_channel("/foo/").await.unwrap();
-        let events = Arc::get_mut(&mut events).unwrap();
-        assert_eq!(events.recv().await.unwrap().0, "/foo/bar1");
+        /*  let mut events = db.list_use_channel("/foo/").await.unwrap();
+               let events = Arc::get_mut(&mut events).unwrap();
+               assert_eq!(events.recv().await.unwrap().0, "/foo/bar1");
+        */
     }
 }

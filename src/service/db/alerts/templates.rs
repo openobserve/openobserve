@@ -14,9 +14,10 @@
 
 use std::sync::Arc;
 
-use crate::common::infra::config::ALERTS_TEMPLATES;
+use crate::common::infra::config::{ALERTS_TEMPLATES, CONFIG};
 use crate::common::infra::db::Event;
 use crate::common::meta::alert::DestinationTemplate;
+use crate::common::meta::meta_store::MetaStore;
 use crate::common::meta::organization::DEFAULT_ORG;
 use crate::common::utils::json;
 
@@ -67,15 +68,31 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Error> {
-    Ok(ALERTS_TEMPLATES
-        .clone()
-        .iter()
-        .filter_map(|template| {
-            let k = template.key();
-            (k.starts_with(&format!("{org_id}/")) || k.starts_with(&format!("{DEFAULT_ORG}/")))
-                .then(|| template.value().clone())
-        })
-        .collect())
+    if !CONFIG
+        .common
+        .meta_store
+        .eq(&MetaStore::DynamoDB.to_string())
+    {
+        Ok(ALERTS_TEMPLATES
+            .clone()
+            .iter()
+            .filter_map(|template| {
+                let k = template.key();
+                (k.starts_with(&format!("{org_id}/")) || k.starts_with(&format!("{DEFAULT_ORG}/")))
+                    .then(|| template.value().clone())
+            })
+            .collect())
+    } else {
+        let db = &crate::common::infra::db::DEFAULT;
+        let key = format!("/templates/{org_id}/", org_id = org_id);
+        let ret = db.list(key.as_str()).await?;
+        let mut templates = Vec::new();
+        for (_, item_value) in ret {
+            let json_val: DestinationTemplate = json::from_slice(&item_value).unwrap();
+            templates.push(json_val);
+        }
+        Ok(templates)
+    }
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
