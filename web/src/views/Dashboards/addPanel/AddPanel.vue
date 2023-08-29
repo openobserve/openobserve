@@ -394,9 +394,11 @@ export default defineComponent({
         }
 
         // check if aggregation function is selected or not
-        const aggregationFunctionError = dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.y.filter((it: any) => (it.aggregationFunction == null || it.aggregationFunction == ''))
-        if (dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.y.length && aggregationFunctionError.length) {
-          errors.push(...aggregationFunctionError.map((it: any) => `${currentYLabel.value}: ${it.column}: Aggregation function required`))
+        if(!(dashboardData.data.type == 'heatmap')) {
+          const aggregationFunctionError = dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.y.filter((it: any) => (it.aggregationFunction == null || it.aggregationFunction == ''))
+          if (dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.y.length && aggregationFunctionError.length) {
+            errors.push(...aggregationFunctionError.map((it: any) => `${currentYLabel.value}: ${it.column}: Aggregation function required`))
+          }
         }
 
         // check if labels are there for y axis items

@@ -246,9 +246,15 @@ console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQu
 
                 // add group by statement
                 const xAxisAlias = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.map((it: any) => it.alias)
-                // console.log("xAxisAlias",xAxisAlias);
+                const yAxisAlias = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.map((it: any) => it.alias)
 
-                query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : ''
+                // console.log("xAxisAlias",xAxisAlias);
+                if(dashboardPanelData.data.type == "heatmap"){
+                    query += xAxisAlias.length && yAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") + ", " + yAxisAlias.join(", ") : '';
+                }
+                else{
+                    query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : ''
+                }
                 query += xAxisAlias.length ? " ORDER BY " + xAxisAlias.join(", ") : ''
 
                 // console.log('generated query: ', query)
