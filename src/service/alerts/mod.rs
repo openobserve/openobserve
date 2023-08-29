@@ -263,7 +263,7 @@ mod test {
             stream: stream.to_string(),
             stream_type: Some(StreamType::Logs),
             query: Some(Query {
-                sql: format!("select count(*) as occurance from olympics"),
+                sql: format!("select count(*) as occurrence from olympics"),
                 start_time: 0,
                 end_time: 0,
                 sort_by: None,
@@ -277,7 +277,7 @@ mod test {
                 query_fn: None,
             }),
             condition: Condition {
-                column: "occurance".to_owned(),
+                column: "occurrence".to_owned(),
                 operator: AllOperator::GreaterThanEquals,
                 ignore_case: None,
                 value: json::json!("5"),
