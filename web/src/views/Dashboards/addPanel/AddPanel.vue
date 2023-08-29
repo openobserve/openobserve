@@ -31,7 +31,7 @@
         <q-btn class="q-ml-md text-bold" outline padding="sm lg" color="red" no-caps :label="t('panel.discard')"
           @click="goBackToDashboardList" />
         <q-btn class="q-ml-md text-bold" outline padding="sm lg"  no-caps
-          :label="t('panel.save')" @click="savePanelOnClick" />
+          :label="t('panel.save')"  @click="saveVariableApiCall.execute()" :loading="saveVariableApiCall.isLoading.value"  />
         <q-btn class="q-ml-md text-bold no-border" padding="sm lg" color="secondary" no-caps :label="t('panel.apply')"
           @click="runQuery" />
       </div>
@@ -132,6 +132,7 @@ import DashboardErrorsComponent from "../../../components/dashboards/addPanel/Da
 import DashboardQueryEditor from "../../../components/dashboards/addPanel/DashboardQueryEditor.vue"
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
+import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "AddPanel",
@@ -171,6 +172,11 @@ export default defineComponent({
     const currentDashboardData : any = reactive({
       data: {},
     });
+
+    const saveVariableApiCall = useLoading(async()=>{
+      const dashboardId = route.query.dashboard + "";
+      await savePanelChangesToDashboard(dashboardId);
+    })
 
     onDeactivated(async () => {
       // clear a few things
@@ -537,15 +543,12 @@ export default defineComponent({
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
+      saveVariableApiCall
     };
   },
   methods: {
     goBackToDashboardList(evt: any, row: any) {
       this.goBack();
-    },
-    savePanelOnClick() {
-      const dashboardId = this.$route.query.dashboard + "";
-      this.savePanelChangesToDashboard(dashboardId);
     },
   },
 });
