@@ -906,7 +906,7 @@ pub async fn merge_parquet_files(
         FileMeta {
             min_ts: record["min_ts"].as_i64().unwrap(),
             max_ts: record["max_ts"].as_i64().unwrap(),
-            records: record["num_records"].as_u64().unwrap(),
+            records: record["num_records"].as_i64().unwrap(),
             original_size: 0,
             compressed_size: 0,
         }

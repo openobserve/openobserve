@@ -21,7 +21,7 @@ use crate::common::utils::file::scan_files;
 use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if CONFIG.common.local_mode || CONFIG.common.file_list_external {
+    if CONFIG.common.local_mode || CONFIG.common.meta_store_external {
         return Ok(());
     }
 

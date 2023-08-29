@@ -19,16 +19,19 @@ use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::{collections::HashMap, io::Write, sync::Arc};
 
-use crate::common::infra::{
-    cache,
-    config::{CONFIG, FILE_EXT_PARQUET},
-    file_list as infra_file_list, ider, metrics, storage,
+use crate::common::{
+    infra::{
+        cache,
+        config::{CONFIG, FILE_EXT_PARQUET},
+        file_list as infra_file_list, ider, metrics, storage,
+    },
+    meta::{
+        common::{FileKey, FileMeta},
+        stream::StreamStats,
+        StreamType,
+    },
+    utils::json,
 };
-use crate::common::meta::{
-    common::{FileKey, FileMeta},
-    StreamType,
-};
-use crate::common::utils::json;
 use crate::service::{db, file_list, search::datafusion, stream};
 
 /// compactor run steps on a stream:
@@ -145,13 +148,13 @@ pub async fn merge_by_stream(
     let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
         let file_name = file.key.clone();
-        let prefix = {
-            let pos = file_name.rfind('/').unwrap();
-            file_name[..pos].to_string()
-        };
+        let prefix = file_name[..file_name.rfind('/').unwrap()].to_string();
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(file.to_owned());
     }
+
+    // collect stream stats
+    let mut stream_stats = StreamStats::default();
 
     for (prefix, files_with_size) in partition_files_with_size.iter_mut() {
         // sort by file size
@@ -183,6 +186,7 @@ pub async fn merge_by_stream(
                 deleted: false,
             });
             for file in new_file_list.iter() {
+                stream_stats = stream_stats - file.meta;
                 events.push(FileKey {
                     key: file.key.clone(),
                     meta: FileMeta::default(),
@@ -191,11 +195,13 @@ pub async fn merge_by_stream(
             }
             events.sort_by(|a, b| a.key.cmp(&b.key));
 
-            // send file list to storage
+            // write file list to storage
             match write_file_list(&events).await {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("[COMPACT] write file list failed: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    continue;
                 }
             }
 
@@ -221,6 +227,18 @@ pub async fn merge_by_stream(
     // write new offset
     let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
     db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
+
+    // update stream stats
+    if CONFIG.common.meta_store_external && stream_stats.doc_num != 0 {
+        infra_file_list::set_stream_stats(
+            org_id,
+            &[(
+                format!("{org_id}/{stream_type}/{stream_name}"),
+                stream_stats,
+            )],
+        )
+        .await?;
+    }
 
     // metrics
     let time = start.elapsed().as_secs_f64();
@@ -251,7 +269,7 @@ async fn merge_files(
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
     for file in files_with_size.iter() {
-        if new_file_size + file.meta.original_size > CONFIG.compact.max_file_size {
+        if new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64 {
             break;
         }
         new_file_size += file.meta.original_size;
@@ -263,7 +281,7 @@ async fn merge_files(
             .inc();
         metrics::COMPACT_MERGED_BYTES
             .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-            .inc_by(file.meta.original_size);
+            .inc_by(file.meta.original_size as u64);
     }
     // no files need to merge
     if new_file_list.len() <= 1 {
@@ -382,7 +400,7 @@ async fn merge_files(
     let mut new_file_meta =
         datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema).await?;
     new_file_meta.original_size = new_file_size;
-    new_file_meta.compressed_size = buf.len() as u64;
+    new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
     }
@@ -408,7 +426,7 @@ async fn write_file_list(events: &[FileKey]) -> Result<(), anyhow::Error> {
     if events.is_empty() {
         return Ok(());
     }
-    if CONFIG.common.file_list_external {
+    if CONFIG.common.meta_store_external {
         write_file_list_db_only(events).await
     } else {
         write_file_list_s3(events).await
@@ -426,25 +444,34 @@ async fn write_file_list_db_only(events: &[FileKey]) -> Result<(), anyhow::Error
         .filter(|v| v.deleted)
         .map(|v| v.key.clone())
         .collect::<Vec<_>>();
-    // set to dynamo db
+    // set to external db
     // retry 5 times
+    let mut success = false;
     for _ in 0..5 {
         if let Err(e) = infra_file_list::batch_add(&put_items).await {
-            log::error!("[COMPACT] batch_write to dynamo db failed, retrying: {}", e);
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        if let Err(e) = infra_file_list::batch_remove(&del_items).await {
             log::error!(
-                "[COMPACT] batch_delete to dynamo db failed, retrying: {}",
+                "[COMPACT] batch_write to external db failed, retrying: {}",
                 e
             );
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
+        if let Err(e) = infra_file_list::batch_remove(&del_items).await {
+            log::error!(
+                "[COMPACT] batch_delete to external db failed, retrying: {}",
+                e
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        success = true;
         break;
     }
-    Ok(())
+    if !success {
+        Err(anyhow::anyhow!("batch_write to external db failed"))
+    } else {
+        Ok(())
+    }
 }
 
 async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {

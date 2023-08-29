@@ -378,7 +378,7 @@ pub fn write_file(
         }
         file.write(write_buf.as_ref());
         req_stats.size += write_buf.len() as f64 / (1024.0 * 1024.0);
-        req_stats.records += entry.len() as u64;
+        req_stats.records += entry.len() as i64;
     }
     req_stats
 }

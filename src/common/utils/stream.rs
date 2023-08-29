@@ -109,7 +109,7 @@ pub async fn populate_file_meta(
     file_meta.records = record
         .get("num_records")
         .expect("No field found: num_records")
-        .as_u64()
+        .as_i64()
         .expect("No value found: num_records");
     Ok(())
 }

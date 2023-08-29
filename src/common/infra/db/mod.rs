@@ -15,6 +15,7 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
+use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -23,23 +24,21 @@ use crate::common::meta::meta_store::MetaStore;
 use super::config::CONFIG;
 use super::errors::Result;
 
-pub mod dynamo_db;
+pub mod dynamo;
 pub mod etcd;
 pub mod sled;
 
 pub use self::etcd::ETCD_CLIENT;
 pub use self::sled::SLED_CLIENT;
 
-lazy_static! {
-    pub static ref DEFAULT: Box<dyn Db> = default();
-    pub static ref CLUSTER_COORDINATOR: Box<dyn Db> = cluster_coordinator();
-}
+pub static DEFAULT: Lazy<Box<dyn Db>> = Lazy::new(default);
+pub static CLUSTER_COORDINATOR: Lazy<Box<dyn Db>> = Lazy::new(cluster_coordinator);
 
 pub fn default() -> Box<dyn Db> {
     match CONFIG.common.meta_store.as_str().into() {
         MetaStore::Sled => Box::<sled::Sled>::default(),
         MetaStore::Etcd => Box::<etcd::Etcd>::default(),
-        MetaStore::DynamoDB => Box::<dynamo_db::DynamoDb>::default(),
+        MetaStore::DynamoDB => Box::<dynamo::DynamoDb>::default(),
     }
 }
 
@@ -70,7 +69,7 @@ pub struct EventData {
 }
 
 #[async_trait]
-pub trait Db: Sync + 'static {
+pub trait Db: Sync + Send + 'static {
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
     async fn put(&self, key: &str, value: Bytes) -> Result<()>;
