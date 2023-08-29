@@ -1,21 +1,12 @@
 <template>
   <div>
-    <SearchBar
-      ref="searchBarRef"
-      :query-data="queryData"
-      @searchdata="getQueryData"
-      @update-query="updateQuery"
-      @change:date-time="updateDateTime"
-    ></SearchBar>
+    <SearchBar ref="searchBarRef" :query-data="queryData" @searchdata="getQueryData" @update-query="updateQuery"
+      @change:date-time="updateDateTime"></SearchBar>
     <div class="stream-data-table">
       <template v-if="isLoading.length">
         <div class="full-height flex justify-center items-center">
           <div class="q-pb-lg">
-            <q-spinner-hourglass
-              color="primary"
-              size="40px"
-              style="margin: 0 auto; display: block"
-            />
+            <q-spinner-hourglass color="primary" size="40px" style="margin: 0 auto; display: block" />
             <span class="text-center">
               Hold on tight, we're fetching your stream data.
             </span>
@@ -23,11 +14,7 @@
         </div>
       </template>
       <template v-else>
-        <StreamDataTable
-          :rows="tableData.rows"
-          :columns="tableData.columns"
-          :is-loading="!!isLoading.length"
-        />
+        <StreamDataTable :rows="tableData.rows" :columns="tableData.columns" :is-loading="!!isLoading.length" />
       </template>
     </div>
   </div>
@@ -239,15 +226,15 @@ export default defineComponent({
         } | null =
           queryData.value.dateTime.type === "relative"
             ? getConsumableRelativeTime(
-                queryData.value.dateTime.relativeTimePeriod
-              ) || null
+              queryData.value.dateTime.relativeTimePeriod
+            ) || null
             : cloneDeep(queryData.value.dateTime);
 
         if (streamData?.value?.stream_type === "enrichment_tables") {
           if (streamData.value.stats) {
             timestamps = {
-              startTime: streamData.value.stats.doc_time_min - 300000000,
-              endTime: streamData.value.stats.doc_time_max + 300000000,
+              startTime: streamData.value.stats.created_at - 300000000,
+              endTime: streamData.value.stats.created_at + 300000000,
             };
           }
         }
