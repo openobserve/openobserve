@@ -64,29 +64,6 @@ fn default_oper() -> String {
     "query".to_string()
 }
 
-pub enum DbOperation {
-    Get,
-    Put,
-    Delete,
-    List,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DynamoTableDetails {
-    pub name: String,
-    pub pk: String,
-    pub rk: String,
-    pub pk_value: String,
-    pub rk_value: String,
-    #[serde(default = "default_oper")]
-    pub operation: String,
-    pub entity: String,
-}
-
-fn default_oper() -> String {
-    "query".to_string()
-}
-
 impl DynamoDb {
     pub async fn connect() -> Client {
         if CONFIG.common.local_mode {
@@ -127,6 +104,7 @@ pub async fn create_meta_tables() -> Result<()> {
     create_table(&CONFIG.common.dynamo_schema_table, "org", "key")
         .await
         .unwrap();
+    Ok(())
 }
 
 async fn create_table(

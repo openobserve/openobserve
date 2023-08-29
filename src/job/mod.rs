@@ -135,25 +135,24 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("syslog settings cache failed");
 
-        // cache file list
+    // cache file list
 
-        if !CONFIG.common.file_list_external
-            && (cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
-                || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE))
-        {
-            db::file_list::remote::cache("", false)
-                .await
-                .expect("file list remote cache failed");
-        }
-        infra_file_list::create_table_index().await?;
+    if !CONFIG.common.file_list_external
+        && (cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
+            || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE))
+    {
+        db::file_list::remote::cache("", false)
+            .await
+            .expect("file list remote cache failed");
+    }
+    infra_file_list::create_table_index().await?;
 
-        // check wal directory
-        if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-            // create wal dir
-            std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
-            // clean empty sub dirs
-            clean_empty_dirs(&CONFIG.common.data_wal_dir)?;
-        }
+    // check wal directory
+    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        // create wal dir
+        std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
+        // clean empty sub dirs
+        clean_empty_dirs(&CONFIG.common.data_wal_dir)?;
     }
 
     db::metrics::cache_prom_cluster_leader()
