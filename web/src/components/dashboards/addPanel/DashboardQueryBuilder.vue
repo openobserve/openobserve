@@ -119,15 +119,18 @@
                       <q-select
                         v-model="
                           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index]
-                            .aggregationFunction
+                            .aggregationFunction 
                         "
-                        :options="triggerOperators"
+                        :options="dashboardPanelData.data.type == 'heatmap' ? triggerOperatorsWithHistogram : triggerOperators"
                         dense
                         filled
                         emit-value
                         map-options
                         label="Aggregation"
-                      ></q-select>
+                      >
+                        <template v-slot:append>
+                          <q-icon name="close" size="small" @click.stop.prevent="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index].aggregationFunction = null" class="cursor-pointer" />
+                        </template></q-select>
                     </div>
                     <div class="color-input-wrapper" v-if="!['table', 'pie'].includes(dashboardPanelData.data.type)">
                       <input
@@ -436,6 +439,7 @@ export default defineComponent({
     const expansionItems = reactive({
       x: true,
       y: true,
+      z: true,
       config: true,
       filter: false
     })

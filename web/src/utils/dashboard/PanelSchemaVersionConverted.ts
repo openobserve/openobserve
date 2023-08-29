@@ -1,15 +1,30 @@
+
+/**
+ * Converts the panel schema version of the given data object.
+ *
+ * @param {any} data - The data object to convert.
+ * @return {any} The converted data object.
+ */
 export function PanelSchemaVersionConverted(data: any) {
-  if (
-    !data || (typeof data === "object" && Object.keys(data).length === 0)
-  ) {
+  if (!data || (typeof data === "object" && Object.keys(data).length === 0)) {
     return;
   }
-  if(!data.version)
-  data = {...data,version:1};
+  if (!data.version) data = { ...data, version: 1 };
   switch (data.version) {
-    case 1:
+    case 1: {
+
+      // converting this to new array as z axis is added in the heatmap
+      const queryFields = {
+        stream_type: data.fields?.stream_type || "logs",
+        stream: data.fields.stream || "",
+        x: data.fields?.x || [],
+        y: data.fields?.y || [],
+        z: [], // this is a new field
+        filter: data.fields?.filter || [],
+      };
+
       data = {
-        version:2,
+        version: 2,
         id: data.id,
         type: data.type,
         config: {
@@ -25,13 +40,14 @@ export function PanelSchemaVersionConverted(data: any) {
           {
             query: data.query,
             customQuery: data.customQuery,
-            fields: data.fields,
+            fields: queryFields,
             config: {
               promql_legend: data.config.promql_legend,
             },
           },
         ],
       };
+    }
   }
 
   return data;
@@ -91,4 +107,3 @@ export function PanelSchemaVersionConverted(data: any) {
 //     },
 //   ],
 // };
-

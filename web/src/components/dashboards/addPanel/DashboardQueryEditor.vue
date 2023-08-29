@@ -163,7 +163,7 @@ export default defineComponent({
                 console.log("Updating query");
 
                 // STEP 1: first check if there is at least 1 field selected
-                if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length == 0 && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length == 0) {
+                if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length == 0 && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length == 0 && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.length == 0) {
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = ""
                     return;
                 }

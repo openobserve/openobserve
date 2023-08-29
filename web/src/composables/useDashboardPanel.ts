@@ -228,7 +228,7 @@ const removeQuery = (index: number) => {
         alias: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ? 'y_axis_' + (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length + 1) : row.name,
         column: row.name,
         color: getNewColorValue(),
-        aggregationFunction: 'count'
+        aggregationFunction: dashboardPanelData.data.type == 'heatmap' ? null : 'count'
       })
     }
     updateArrayAlias()
@@ -293,6 +293,16 @@ const removeQuery = (index: number) => {
   const updateArrayAlias = () => {
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ? 'x_axis_' + (index + 1) : it.column )
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ? 'y_axis_' + (index + 1) : it.column )
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.z.forEach(
+      (it: any, index: any) =>
+        (it.alias = !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? "z_axis_" + (index + 1)
+          : it.column)
+    );
   }
 
   const removeXAxisItem = (name: string) => {
