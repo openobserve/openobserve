@@ -14,8 +14,9 @@
 
 use std::sync::Arc;
 
-use crate::common::infra::config::{ROOT_USER, USERS};
-use crate::common::infra::db::Event;
+use crate::common::infra::config::{CONFIG, ROOT_USER, USERS};
+use crate::common::infra::db::{Event, CLUSTER_COORDINATOR};
+use crate::common::meta::meta_store::MetaStore;
 use crate::common::meta::user::{DBUser, User, UserRole};
 use crate::common::utils::json;
 
@@ -51,9 +52,26 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
 pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/user/{}", user.email);
-    db.put(&key, json::to_vec(&user).unwrap().into()).await?;
+    match db.put(&key, json::to_vec(&user).unwrap().into()).await {
+        Ok(_) => {
+            if CONFIG
+                .common
+                .meta_store
+                .eq(&MetaStore::DynamoDB.to_string())
+            {
+                CLUSTER_COORDINATOR
+                    .put(&key, CONFIG.common.meta_store.clone().into())
+                    .await?
+            }
+        }
+        Err(e) => {
+            log::error!("Error saving user: {}", e);
+            return Err(anyhow::anyhow!("Error saving user: {}", e));
+        }
+    }
+
     // cache user
-    for org in user.organizations {
+    /*   for org in user.organizations {
         USERS.insert(
             format!("{}/{}", org.name, user.email),
             User {
@@ -67,7 +85,7 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
                 salt: user.salt.clone(),
             },
         );
-    }
+    } */
     Ok(())
 }
 
@@ -75,11 +93,26 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/user/{name}");
-    Ok(db.delete(&key, false).await?)
+    match db.delete(&key, false).await {
+        Ok(_) => {
+            if CONFIG
+                .common
+                .meta_store
+                .eq(&MetaStore::DynamoDB.to_string())
+            {
+                CLUSTER_COORDINATOR.delete(&key, false).await?
+            }
+        }
+        Err(e) => {
+            log::error!("Error deleting user: {}", e);
+            return Err(anyhow::anyhow!("Error deleting user: {}", e));
+        }
+    }
+    Ok(())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::CLUSTER_COORDINATOR;
     let key = "/user/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -95,7 +128,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: DBUser = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: DBUser = if CONFIG
+                    .common
+                    .meta_store
+                    .eq(&MetaStore::DynamoDB.to_string())
+                {
+                    let dynamo = &crate::common::infra::db::DEFAULT;
+                    let ret = dynamo.get(&ev.key).await?;
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 let users = item_value.get_all_users();
                 for user in users {
                     if user.role.eq(&UserRole::Root) {
@@ -122,15 +165,15 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = "/user/";
     let ret = db.list(key).await?;
-    for (item_key, item_value) in ret {
-        let item_key = item_key.strip_prefix(key).unwrap();
+    for (_, item_value) in ret {
+        //let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: DBUser = json::from_slice(&item_value).unwrap();
         let users = json_val.get_all_users();
         for user in users {
             if user.role.eq(&UserRole::Root) {
                 ROOT_USER.insert("root".to_string(), user.clone());
             }
-            USERS.insert(format!("{}/{}", user.org, item_key), user);
+            USERS.insert(format!("{}/{}", user.org, user.email), user);
         }
     }
     log::info!("Users Cached");

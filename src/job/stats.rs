@@ -49,7 +49,7 @@ pub async fn usage_report_stats() -> Result<(), anyhow::Error> {
 
 pub async fn file_list_stats() -> Result<(), anyhow::Error> {
     if !is_querier(&super::cluster::LOCAL_NODE_ROLE)
-        || CONFIG.common.file_list_storage.starts_with("dynamo")
+        || CONFIG.common.meta_store.starts_with("dynamo")
     {
         return Ok(());
     }

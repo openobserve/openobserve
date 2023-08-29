@@ -32,6 +32,7 @@ pub mod telemetry;
 pub mod traces;
 pub mod usage;
 pub mod user;
+pub mod meta_store;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
 #[serde(rename_all = "lowercase")]

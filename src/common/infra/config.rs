@@ -180,8 +180,6 @@ pub struct Common {
     // external storage no need sync file_list to s3
     #[env_config(name = "ZO_FILE_LIST_EXTERNAL", default = false)]
     pub file_list_external: bool,
-    #[env_config(name = "ZO_FILE_LIST_DYNAMO_TABLE_NAME", default = "")]
-    pub file_list_dynamo_table_name: String,
     #[env_config(name = "ZO_FILE_LIST_POSTGRES_DSN", default = "")]
     pub file_list_postgres_dsn: String,
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
@@ -251,6 +249,18 @@ pub struct Common {
     pub usage_org: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
+    #[env_config(name = "ZO_META_STORE", default = "")]
+    pub meta_store: String,
+    #[env_config(name = "ZO_DYNAMO_FILE_LIST_TABLE", default = "")]
+    pub dynamo_file_list_table: String,
+    #[env_config(name = "ZO_DYNAMO_ORG_META_TABLE", default = "")]
+    pub dynamo_org_meta_table: String,
+    #[env_config(name = "ZO_DYNAMO_META_TABLE", default = "")]
+    pub dynamo_meta_table: String,
+    #[env_config(name = "ZO_DYNAMO_SCHEMA_TABLE", default = "")]
+    pub dynamo_schema_table: String,
+    #[env_config(name = "ZO_DYNAMO_COMPACTOR_TABLE", default = "")]
+    pub dynamo_compact_table: String,
 }
 
 #[derive(EnvConfig)]
@@ -509,6 +519,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
     // format file list storage
+
     if cfg.common.file_list_storage.is_empty() {
         cfg.common.file_list_storage = "sqlite".to_string();
     }
@@ -518,6 +529,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         || cfg.common.file_list_storage.starts_with("postgres")
     {
         cfg.common.file_list_external = true;
+    }
+
+    if cfg.common.meta_store.is_empty() && cfg.common.local_mode {
+        cfg.common.meta_store = "sled".to_string();
+    } else if cfg.common.meta_store.is_empty() {
+        cfg.common.meta_store = "etcd".to_string();
     }
 
     // check compact_max_file_size to MB
@@ -651,8 +668,21 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
 
-    if cfg.common.file_list_dynamo_table_name.is_empty() {
-        cfg.common.file_list_dynamo_table_name = format!("{}-file-list", cfg.s3.bucket_name);
+    if cfg.common.dynamo_file_list_table.is_empty() {
+        cfg.common.dynamo_file_list_table = format!("{}-file-list", cfg.s3.bucket_name);
+    }
+
+    if cfg.common.dynamo_org_meta_table.is_empty() {
+        cfg.common.dynamo_org_meta_table = format!("{}-org-meta", cfg.s3.bucket_name);
+    }
+    if cfg.common.dynamo_meta_table.is_empty() {
+        cfg.common.dynamo_meta_table = format!("{}-meta", cfg.s3.bucket_name);
+    }
+    if cfg.common.dynamo_schema_table.is_empty() {
+        cfg.common.dynamo_schema_table = format!("{}-org-schema", cfg.s3.bucket_name);
+    }
+    if cfg.common.dynamo_compact_table.is_empty() {
+        cfg.common.dynamo_compact_table = format!("{}-org-compact", cfg.s3.bucket_name);
     }
 
     Ok(())

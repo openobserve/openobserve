@@ -18,20 +18,18 @@ use std::{
     io::Write,
 };
 
-use crate::common::{
-    infra::{
-        cache,
-        cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-        config::{is_local_disk_storage, CONFIG},
-        dist_lock, file_list as infra_file_list, ider, storage,
-    },
-    meta::{
-        common::{FileKey, FileMeta},
-        stream::PartitionTimeLevel,
-        StreamType,
-    },
-    utils::json,
+use crate::common::infra::{
+    cache,
+    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+    config::{is_local_disk_storage, CONFIG},
+    dist_lock, file_list as infra_file_list, ider, storage,
 };
+use crate::common::meta::{
+    common::{FileKey, FileMeta},
+    stream::PartitionTimeLevel,
+    StreamType,
+};
+use crate::common::utils::json;
 use crate::service::{db, file_list};
 
 pub async fn delete_by_stream(

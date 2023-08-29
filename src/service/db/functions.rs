@@ -14,20 +14,34 @@
 
 use std::sync::Arc;
 
-use crate::common::infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS};
-use crate::common::infra::db::Event;
+use crate::common::infra::config::{CONFIG, QUERY_FUNCTIONS, STREAM_FUNCTIONS};
+use crate::common::infra::db::{Event, CLUSTER_COORDINATOR};
 use crate::common::meta::functions::{StreamFunctionsList, Transform};
+use crate::common::meta::meta_store::MetaStore;
 use crate::common::utils::json;
 
 pub async fn set(org_id: &str, name: &str, js_func: Transform) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
+    let key = format!("/function/{org_id}/{name}");
+    match db.put(&key, json::to_vec(&js_func).unwrap().into()).await {
+        Ok(_) => {
+            if CONFIG
+                .common
+                .meta_store
+                .eq(&MetaStore::DynamoDB.to_string())
+            {
+                CLUSTER_COORDINATOR
+                    .put(&key, CONFIG.common.meta_store.clone().into())
+                    .await?
+            }
+        }
+        Err(e) => {
+            log::error!("Error saving function: {}", e);
+            return Err(anyhow::anyhow!("Error saving function: {}", e));
+        }
+    }
 
-    Ok(db
-        .put(
-            &format!("/function/{org_id}/{name}"),
-            json::to_vec(&js_func).unwrap().into(),
-        )
-        .await?)
+    Ok(())
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
@@ -38,13 +52,28 @@ pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
-    Ok(db
-        .delete(&format!("/function/{org_id}/{name}"), false)
-        .await?)
+    let key = format!("/function/{org_id}/{name}");
+    match db.delete(&key, false).await {
+        Ok(_) => {
+            if CONFIG
+                .common
+                .meta_store
+                .eq(&MetaStore::DynamoDB.to_string())
+            {
+                CLUSTER_COORDINATOR.delete(&key, false).await?
+            }
+        }
+        Err(e) => {
+            log::error!("Error deleting function: {}", e);
+            return Err(anyhow::anyhow!("Error deleting function: {}", e));
+        }
+    }
+    Ok(())
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
+
     Ok(db
         .list(&format!("/function/{org_id}/"))
         .await?
@@ -54,7 +83,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::CLUSTER_COORDINATOR;
     let key = "/function/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -71,7 +100,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let org_id = &item_key[0..item_key.find('/').unwrap()];
-                let item_value: Transform = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: Transform = if CONFIG
+                    .common
+                    .meta_store
+                    .eq(&MetaStore::DynamoDB.to_string())
+                {
+                    let dynamo = &crate::common::infra::db::DEFAULT;
+                    let ret = dynamo.get(&ev.key).await?;
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 if item_value.streams.is_some() {
                     for stream_fn in item_value.to_stream_transform() {
                         let mut group = STREAM_FUNCTIONS

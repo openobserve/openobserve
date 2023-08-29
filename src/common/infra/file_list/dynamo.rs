@@ -12,16 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use async_once::AsyncOnce;
 use async_trait::async_trait;
 use aws_sdk_dynamodb::{
-    config::Region,
     operation::query::QueryOutput,
     types::{
         AttributeDefinition, AttributeValue, BillingMode, DeleteRequest, KeySchemaElement, KeyType,
         PutRequest, ScalarAttributeType, Select, WriteRequest,
     },
-    Client,
 };
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::collections::HashMap;
@@ -30,6 +27,7 @@ use tokio_stream::StreamExt;
 use crate::common::{
     infra::{
         config::CONFIG,
+        db::dynamo_db::DYNAMO_DB_CLIENT,
         errors::{Error, Result},
     },
     meta::{
@@ -39,22 +37,6 @@ use crate::common::{
     },
 };
 
-lazy_static! {
-    static ref CLIENT: AsyncOnce<Client> = AsyncOnce::new(async { connect().await });
-}
-
-async fn connect() -> Client {
-    if CONFIG.common.local_mode {
-        let region = Region::new("us-west-2");
-        let shared_config = aws_config::from_env()
-            .region(region)
-            .endpoint_url("http://localhost:8000");
-        Client::new(&shared_config.load().await)
-    } else {
-        Client::new(&aws_config::load_from_env().await)
-    }
-}
-
 pub struct DynamoFileList {
     table: String,
 }
@@ -62,7 +44,7 @@ pub struct DynamoFileList {
 impl DynamoFileList {
     pub fn new() -> Self {
         Self {
-            table: CONFIG.common.file_list_dynamo_table_name.clone(),
+            table: CONFIG.common.dynamo_file_list_table.clone(),
         }
     }
 }
@@ -78,9 +60,8 @@ impl super::FileList for DynamoFileList {
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
         let file_name = format!("{date_key}/{file_name}");
-        CLIENT
-            .get()
-            .await
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        client
             .put_item()
             .table_name(&self.table)
             .item("stream", AttributeValue::S(stream_key))
@@ -109,9 +90,8 @@ impl super::FileList for DynamoFileList {
         let mut item = HashMap::new();
         item.insert("stream".to_string(), AttributeValue::S(stream_key));
         item.insert("file".to_string(), AttributeValue::S(file_name));
-        CLIENT
-            .get()
-            .await
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        client
             .delete_item()
             .table_name(&self.table)
             .set_key(Some(item))
@@ -128,9 +108,8 @@ impl super::FileList for DynamoFileList {
                 let req = PutRequest::builder().set_item(Some(file.into())).build();
                 reqs.push(WriteRequest::builder().put_request(req).build());
             }
-            CLIENT
-                .get()
-                .await
+            let client = DYNAMO_DB_CLIENT.get().await.clone();
+            client
                 .batch_write_item()
                 .request_items(&self.table, reqs)
                 .send()
@@ -152,9 +131,8 @@ impl super::FileList for DynamoFileList {
                 let req = DeleteRequest::builder().set_key(Some(item)).build();
                 reqs.push(WriteRequest::builder().delete_request(req).build());
             }
-            CLIENT
-                .get()
-                .await
+            let client = DYNAMO_DB_CLIENT.get().await.clone();
+            client
                 .batch_write_item()
                 .request_items(&self.table, reqs)
                 .send()
@@ -168,7 +146,7 @@ impl super::FileList for DynamoFileList {
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
         let file_name = format!("{date_key}/{file_name}");
 
-        let client = CLIENT.get().await;
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
         let resp = client
             .query()
             .table_name(&self.table)
@@ -227,7 +205,7 @@ impl super::FileList for DynamoFileList {
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
-        let client = CLIENT.get().await;
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
         let resp: std::result::Result<Vec<QueryOutput>, _> = client
             .query()
             .table_name(&self.table)
@@ -291,8 +269,8 @@ impl super::FileList for DynamoFileList {
 }
 
 pub async fn create_table() -> Result<()> {
-    let client = CLIENT.get().await.clone();
-    let table_name = &CONFIG.common.file_list_dynamo_table_name;
+    let client = DYNAMO_DB_CLIENT.get().await.clone();
+    let table_name = &CONFIG.common.dynamo_file_list_table;
     let tables = client
         .list_tables()
         .send()
