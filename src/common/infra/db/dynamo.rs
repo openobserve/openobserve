@@ -85,22 +85,16 @@ pub async fn get_dynamo_config() -> aws_config::SdkConfig {
 pub async fn create_meta_tables() -> Result<()> {
     create_table(&CONFIG.dynamo.org_meta_table, "org", "key")
         .await
-        .unwrap();
+        .map_err(|e| Error::Message(e.to_string()))?;
     create_table(&CONFIG.dynamo.meta_table, "type", "key")
         .await
-        .unwrap();
+        .map_err(|e| Error::Message(e.to_string()))?;
     create_table(&CONFIG.dynamo.schema_table, "org", "key")
         .await
-        .unwrap();
+        .map_err(|e| Error::Message(e.to_string()))?;
     create_table(&CONFIG.dynamo.compact_table, "org", "key")
         .await
-        .unwrap();
-    create_table(&CONFIG.dynamo.meta_table, "type", "key")
-        .await
-        .unwrap();
-    create_table(&CONFIG.dynamo.schema_table, "org", "key")
-        .await
-        .unwrap();
+        .map_err(|e| Error::Message(e.to_string()))?;
     Ok(())
 }
 
