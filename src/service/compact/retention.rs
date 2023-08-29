@@ -257,10 +257,8 @@ pub async fn delete_by_date(
     // update stream stats retention time
     infra_file_list::reset_stream_stats_min_ts(
         org_id,
-        &[(
-            format!("{org_id}/{stream_type}/{stream_name}"),
-            time_range.1,
-        )],
+        format!("{org_id}/{stream_type}/{stream_name}").as_str(),
+        time_range.1,
     )
     .await?;
 

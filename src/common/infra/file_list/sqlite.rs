@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ahash::AHashMap as HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
 use once_cell::sync::Lazy;
@@ -366,35 +365,20 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
 
     async fn reset_stream_stats_min_ts(
         &self,
-        org_id: &str,
-        streams: &[(String, i64)],
+        _org_id: &str,
+        stream: &str,
+        min_ts: i64,
     ) -> Result<()> {
         let pool = CLIENT.clone();
-        let old_stats = self.get_stream_stats(org_id, None, None).await?;
-        let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
-        let mut update_streams = Vec::with_capacity(streams.len());
-        for (stream_key, min_ts) in streams {
-            if old_stats.get(stream_key).is_some() {
-                update_streams.push((stream_key, min_ts));
-            };
-        }
-
-        let mut tx = pool.begin().await?;
-        for (stream_key, min_ts) in update_streams {
-            sqlx::query(
-                r#"
+        sqlx::query(
+            r#"
 UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;
-                "#,
-            )
-            .bind(*min_ts)
-            .bind(stream_key)
-            .execute(&mut *tx)
-            .await?;
-        }
-        if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit stream stats error: {}", e);
-        }
-
+            "#,
+        )
+        .bind(min_ts)
+        .bind(stream)
+        .execute(&pool)
+        .await?;
         Ok(())
     }
 

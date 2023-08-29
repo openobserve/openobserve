@@ -80,7 +80,8 @@ pub trait FileList: Sync + Send + 'static {
     async fn reset_stream_stats_min_ts(
         &self,
         org_id: &str,
-        streams: &[(String, i64)],
+        stream: &str,
+        min_ts: i64,
     ) -> Result<()>;
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
@@ -189,8 +190,10 @@ pub async fn set_stream_stats(org_id: &str, streams: &[(String, StreamStats)]) -
 }
 
 #[inline]
-pub async fn reset_stream_stats_min_ts(org_id: &str, streams: &[(String, i64)]) -> Result<()> {
-    CLIENT.reset_stream_stats_min_ts(org_id, streams).await
+pub async fn reset_stream_stats_min_ts(org_id: &str, stream: &str, min_ts: i64) -> Result<()> {
+    CLIENT
+        .reset_stream_stats_min_ts(org_id, stream, min_ts)
+        .await
 }
 
 #[inline]

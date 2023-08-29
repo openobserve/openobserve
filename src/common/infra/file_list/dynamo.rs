@@ -14,16 +14,7 @@
 
 use async_once::AsyncOnce;
 use async_trait::async_trait;
-use aws_sdk_dynamodb::{
-    config::Region,
-    operation::query::QueryOutput,
-    types::{
-        AttributeDefinition, AttributeValue, BillingMode, DeleteRequest, GlobalSecondaryIndex,
-        KeySchemaElement, KeyType, Projection, ProjectionType, PutRequest, ScalarAttributeType,
-        Select, WriteRequest,
-    },
-    Client,
-};
+use aws_sdk_dynamodb::{config::Region, operation::query::QueryOutput, types::*, Client};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::{
     cmp::{max, min},
@@ -118,15 +109,15 @@ impl super::FileList for DynamoFileList {
     async fn remove(&self, file: &str) -> Result<()> {
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
         let file_name = format!("{date_key}/{file_name}");
-        let mut item = HashMap::new();
-        item.insert("stream".to_string(), AttributeValue::S(stream_key));
-        item.insert("file".to_string(), AttributeValue::S(file_name));
+        let mut key = HashMap::new();
+        key.insert("stream".to_string(), AttributeValue::S(stream_key));
+        key.insert("file".to_string(), AttributeValue::S(file_name));
         CLIENT
             .get()
             .await
             .delete_item()
             .table_name(&self.file_list_table)
-            .set_key(Some(item))
+            .set_key(Some(key))
             .send()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -158,10 +149,10 @@ impl super::FileList for DynamoFileList {
             for file in batch {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
                 let file_name = format!("{date_key}/{file_name}");
-                let mut item = HashMap::new();
-                item.insert("stream".to_string(), AttributeValue::S(stream_key));
-                item.insert("file".to_string(), AttributeValue::S(file_name));
-                let req = DeleteRequest::builder().set_key(Some(item)).build();
+                let mut key = HashMap::new();
+                key.insert("stream".to_string(), AttributeValue::S(stream_key));
+                key.insert("file".to_string(), AttributeValue::S(file_name));
+                let req = DeleteRequest::builder().set_key(Some(key)).build();
                 reqs.push(WriteRequest::builder().delete_request(req).build());
             }
             CLIENT
@@ -499,42 +490,29 @@ impl super::FileList for DynamoFileList {
     async fn reset_stream_stats_min_ts(
         &self,
         org_id: &str,
-        streams: &[(String, i64)],
+        stream: &str,
+        min_ts: i64,
     ) -> Result<()> {
-        let old_stats = self.get_stream_stats(org_id, None, None).await?;
-        let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
-        let mut update_streams = Vec::with_capacity(streams.len());
-        for (stream_key, min_ts) in streams {
-            if old_stats.get(stream_key).is_some() {
-                update_streams.push((stream_key, min_ts));
-            };
-        }
-
-        for batch in update_streams.chunks(25) {
-            let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
-            for (stream_key, min_ts) in batch {
-                let mut item = HashMap::with_capacity(10);
-                item.insert("org".to_string(), AttributeValue::S(org_id.to_string()));
-                item.insert(
-                    "stream".to_string(),
-                    AttributeValue::S(stream_key.to_string()),
-                );
-                item.insert(
-                    "min_ts".to_string(),
-                    AttributeValue::N((**min_ts).to_string()),
-                );
-                let req = PutRequest::builder().set_item(Some(item)).build();
-                reqs.push(WriteRequest::builder().put_request(req).build());
-            }
-            CLIENT
-                .get()
-                .await
-                .batch_write_item()
-                .request_items(&self.stream_stats_table, reqs)
-                .send()
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
-        }
+        let mut key = HashMap::new();
+        key.insert("org".to_string(), AttributeValue::S(org_id.to_string()));
+        key.insert("stream".to_string(), AttributeValue::S(stream.to_string()));
+        let mut updates = HashMap::new();
+        updates.insert(
+            "min_ts".to_string(),
+            AttributeValueUpdate::builder()
+                .set_value(Some(AttributeValue::N(min_ts.to_string())))
+                .build(),
+        );
+        CLIENT
+            .get()
+            .await
+            .update_item()
+            .table_name(&self.stream_stats_table)
+            .set_key(Some(key))
+            .set_attribute_updates(Some(updates))
+            .send()
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
