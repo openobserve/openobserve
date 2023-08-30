@@ -264,7 +264,7 @@ export default defineComponent({
 
     const updateDateTime = (value: IDateTime) => {
       queryData.value.dateTime = value;
-      if (value.valueType === "relative") getQueryData();
+      if (streamData.value) if (value.valueType === "relative") getQueryData();
     };
 
     return {
