@@ -211,7 +211,7 @@
       full-height
       maximized
     >
-      <add-to-dashboard @save="addPanelToDashboard"></add-to-dashboard>
+      <add-to-dashboard @save="addPanelToDashboard" />
     </q-dialog>
   </q-page>
 </template>
@@ -252,9 +252,8 @@ import AddToDashboard from "./AddToDashboard.vue";
 import { addPanel, getPanelId } from "@/utils/commons";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import useNotifications from "@/composables/useNotifications";
-import { getConsumableRelativeTime } from "@/utils/date";
-import { on } from "events";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
+import { getConsumableRelativeTime } from "@/utils/date";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -598,9 +597,15 @@ export default defineComponent({
         }
 
         searchObj.data.errorMsg = "";
+        const timestamps: any =
+          searchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod
+              )
+            : cloneDeep(searchObj.data.datetime);
         dashboardPanelData.meta.dateTime = {
-          start_time: new Date(searchObj.data.datetime.startTime / 1000),
-          end_time: new Date(searchObj.data.datetime.endTime / 1000),
+          start_time: new Date(timestamps.startTime / 1000),
+          end_time: new Date(timestamps.endTime / 1000),
         };
         chartData.value = cloneDeep(dashboardPanelData.data);
         updateUrlQueryParams();
