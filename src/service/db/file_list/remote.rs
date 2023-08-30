@@ -143,13 +143,15 @@ pub async fn cache_stats() -> Result<(), anyhow::Error> {
             log::error!("Load stream stats error: {}", ret.err().unwrap());
             continue;
         }
-        for (stream, stats) in ret.unwrap() {
+        let stream_stats = ret.unwrap();
+        for (stream, stats) in stream_stats.iter() {
             let columns = stream.split('/').collect::<Vec<&str>>();
             let org_id = columns[0];
             let stream_type = columns[1];
             let stream_name = columns[2];
-            stats::set_stream_stats(org_id, stream_name, stream_type.into(), stats);
+            stats::set_stream_stats(org_id, stream_name, stream_type.into(), *stats);
         }
+        infra_file_list::set_stream_stats(&org_id, &stream_stats).await?;
         time::sleep(time::Duration::from_millis(100)).await;
     }
     log::info!("Load stream stats in {}s", start.elapsed().as_secs());
