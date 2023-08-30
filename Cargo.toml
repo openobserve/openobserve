@@ -42,10 +42,10 @@ codegen-units = 4
 
 [dependencies]
 actix-cors = "0.6"
-actix-multipart = "0.6.0"
-actix-web = "4.3"
+actix-multipart = "0.6"
+actix-web = "4.4"
 actix-web-httpauth = "0.8"
-actix-web-opentelemetry = { version = "0.13", features = ["metrics"] }
+actix-web-opentelemetry = { version = "0.15", features = ["metrics"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
   "support-rust-embed-for-web",
@@ -75,10 +75,10 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { version = "28", features = ["simd"] }
-arrow = { version = "43", features = ["simd", "ipc_compression"] }
-arrow-schema = { version = "43", features = ["serde"] }
-parquet = { version = "43", features = ["arrow", "async"] }
+datafusion = { version = "30", features = ["simd"] }
+arrow = { version = "45", features = ["simd", "ipc_compression"] }
+arrow-schema = { version = "45", features = ["serde"] }
+parquet = { version = "45", features = ["arrow", "async"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
@@ -134,7 +134,7 @@ serde_json = "1"
 simd-json = "0.10.3"
 sled = "0.34"
 snap = "1"
-sqlparser = { version = "0.35", features = ["serde"] }
+sqlparser = { version = "0.36", features = ["serde"] }
 sqlx = { version = "0.7", features = [
   "runtime-tokio-rustls",
   "postgres",
@@ -172,6 +172,6 @@ prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
-datafusion-expr = "28"
+datafusion-expr = "30"
 expect-test = "1.4"
 float-cmp = "0.9"

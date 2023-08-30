@@ -15,7 +15,7 @@
 use ahash::AHashMap as HashMap;
 use datafusion::{
     arrow::{datatypes::Schema, json::reader::infer_json_schema, record_batch::RecordBatch},
-    datasource::file_format::file_type::FileType,
+    common::FileType,
 };
 use std::{io::BufReader, path::Path, sync::Arc, time::UNIX_EPOCH};
 use tracing::{info_span, Instrument};

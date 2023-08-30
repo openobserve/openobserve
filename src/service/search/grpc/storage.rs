@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use ahash::AHashMap as HashMap;
-use datafusion::{arrow::record_batch::RecordBatch, datasource::file_format::file_type::FileType};
+use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tracing::{info_span, Instrument};

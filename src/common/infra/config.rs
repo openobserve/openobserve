@@ -323,6 +323,11 @@ pub struct MemoryCache {
     // MB, when cache is full will release how many data once time, default is 1% of max_size
     #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
+    // MB, default is 50% of system memory
+    #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE", default = 0)]
+    pub datafusion_max_size: usize,
+    #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MEMORY_POOL", default = "")]
+    pub datafusion_memory_pool: String,
 }
 
 #[derive(EnvConfig)]
@@ -666,6 +671,11 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.release_size = cfg.memory_cache.max_size / 100;
     } else {
         cfg.memory_cache.release_size *= 1024 * 1024;
+    }
+    if cfg.memory_cache.datafusion_max_size == 0 {
+        cfg.memory_cache.datafusion_max_size = mem_total / 2; // 50%
+    } else {
+        cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
     }
     Ok(())
 }
