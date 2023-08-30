@@ -14,7 +14,7 @@
 
 use datafusion::{
     arrow::datatypes::Schema,
-    datasource::file_format::file_type::FileType,
+    common::FileType,
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };

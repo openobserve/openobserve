@@ -20,19 +20,17 @@ use datafusion::{
         json as arrowJson,
         record_batch::RecordBatch,
     },
+    common::{FileType, GetExt},
     config::ConfigOptions,
     datasource::{
-        file_format::{
-            file_type::{FileType, GetExt},
-            json::JsonFormat,
-            parquet::ParquetFormat,
-        },
+        file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
     },
     error::{DataFusionError, Result},
     execution::{
         context::SessionConfig,
+        memory_pool::{FairSpillPool, GreedyMemoryPool, MemoryPool},
         runtime_env::{RuntimeConfig, RuntimeEnv},
     },
     logical_expr::expr::Alias,
@@ -964,8 +962,21 @@ pub fn create_runtime_env() -> Result<RuntimeEnv> {
     let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
     object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
 
-    let rn_config =
-        RuntimeConfig::new().with_object_store_registry(Arc::new(object_store_registry));
+    let mem_pool: Arc<dyn MemoryPool> = if CONFIG
+        .memory_cache
+        .datafusion_memory_pool
+        .to_lowercase()
+        .starts_with("greedy")
+    {
+        Arc::new(GreedyMemoryPool::new(
+            CONFIG.memory_cache.datafusion_max_size,
+        ))
+    } else {
+        Arc::new(FairSpillPool::new(CONFIG.memory_cache.datafusion_max_size))
+    };
+    let rn_config = RuntimeConfig::new()
+        .with_object_store_registry(Arc::new(object_store_registry))
+        .with_memory_pool(mem_pool);
     RuntimeEnv::new(rn_config)
 }
 
