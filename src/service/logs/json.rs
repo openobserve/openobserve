@@ -62,7 +62,6 @@ pub async fn ingest(
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
-
     let mut trigger: Option<Trigger> = None;
 
     // Start Register Transforms for stream
@@ -132,8 +131,8 @@ pub async fn ingest(
             None => Utc::now().timestamp_micros(),
         };
         // check ingestion time
-        let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
-        if timestamp < earlest_time.timestamp_micros() {
+        let earliest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+        if timestamp < earliest_time.timestamp_micros() {
             stream_status.status.failed += 1; // to old data, just discard
             stream_status.status.error = super::get_upto_discard_error();
             continue;
