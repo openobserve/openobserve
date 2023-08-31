@@ -704,14 +704,14 @@ const formatDate =(date:any)=>{
           return (
             searchQueryData.data.find(
               (it: any) => it[key0] == zero && it[key1] == first
-            )?.[yAxisKey0] || 0
+            )?.[yAxisKey0] || "-"
           );
         });
       });
       console.log("Zvalues=", xAxisZerothPositionUniqueValue,xAxisFirstPositionUniqueValue,Zvalues);
       option.visualMap= {
         min: 0,
-        max: Zvalues.reduce((a: any, b: any) => Math.max(a, b.reduce((c: any, d: any) => Math.max(c, d), 0)), 0),
+        max: Zvalues.reduce((a: any, b: any) => Math.max(a, b.reduce((c: any, d: any) => Math.max(c, +d||0), 0)), 0),
         calculable: true,
         orient: 'horizontal',
         left: 'center',
@@ -721,7 +721,7 @@ const formatDate =(date:any)=>{
             name: props.data?.queries[0]?.fields?.y[0].label,
           data: Zvalues.map((it:any,index:any)=>{
             return xAxisZerothPositionUniqueValue.map((i:any,j:number)=>{
-              return [index,j,it[j]]
+              return [j,index,it[j]]
             })
           }).flat()
         }]
