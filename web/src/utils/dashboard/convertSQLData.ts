@@ -504,7 +504,7 @@ const formatDate =(date:any)=>{
     },
     toolbox: {
       orient: "vertical",
-      show: true,
+      show: !["pie","donut","metric"].includes(props.data.type),
       feature: {
         dataZoom: {
           yAxisIndex: "none",

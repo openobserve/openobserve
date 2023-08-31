@@ -336,7 +336,7 @@ export const convertPromQLData = (
     },
     toolbox: {
       orient: "vertical",
-      show: true,
+      show: !["pie","donut","metric"].includes(props.data.value.type),
       feature: {
         dataZoom: {
           yAxisIndex: "none",
