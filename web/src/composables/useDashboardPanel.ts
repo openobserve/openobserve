@@ -319,6 +319,9 @@ const removeQuery = (index: number) => {
               itemY.aggregationFunction = "count";
             }
           });
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.z = [];
       break;
 
       default:
