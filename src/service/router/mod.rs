@@ -21,7 +21,7 @@ use crate::common::infra::cluster;
 use crate::common::infra::config::CONFIG;
 
 const QUERIER_ROUTES: [&str; 13] = [
-    "/config",
+    "/summary",
     "/schema",
     "/streams",
     "/_search",
