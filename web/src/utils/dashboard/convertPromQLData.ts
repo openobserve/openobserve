@@ -308,9 +308,7 @@ export const convertPromQLData = (
         show: true,
         type: "cross",
         label: {
-          textStyle: {
-            fontSize: 12,
-          },
+          fontSize: 12,
           show: true,
           formatter: function (name:any) {
             if(name.axisDimension=="y")

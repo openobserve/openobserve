@@ -397,10 +397,14 @@ const formatDate =(date:any)=>{
     },
     tooltip: {
       trigger: "axis",
+      textStyle:{
+        fontSize:12
+      },
       axisPointer: {
         type: "cross",
         label:{
           show:true,
+          fontsize:12,
           formatter: function (params:any) {
             let lineBreaks="";
             if(props.data.type==="h-bar" || props.data.type==="h-stacked"){
@@ -577,6 +581,9 @@ const formatDate =(date:any)=>{
     case "pie": {
       option.tooltip={
         trigger: 'item',
+        textStyle:{
+          fontSize:12,
+        },
         formatter: function (name: any) {          
           return `${name.marker} ${name.name} : <b>${formatUnitValue(getUnitValue(name.value))}</b>`;
         }
@@ -604,6 +611,9 @@ const formatDate =(date:any)=>{
     case "donut": {
     option.tooltip = {
       trigger: "item",
+      textStyle:{
+        fontSize:12,
+      },
       formatter: function (name: any) {
         return `${name.marker} ${name.name} : <b>${formatUnitValue(getUnitValue(name.value))}<b/>`;
       }
@@ -633,6 +643,9 @@ const formatDate =(date:any)=>{
       option.xAxis = option.xAxis.slice(0,1);
       option.tooltip.axisPointer.label= {
         show:true,
+        label:{
+        fontsize:12,
+        },
         formatter: function (params:any) {
           if(params.axisDimension=="y") return formatUnitValue(getUnitValue(params.value));
           return params.value.toString();
@@ -664,6 +677,9 @@ const formatDate =(date:any)=>{
       option.xAxis = option.xAxis.slice(0,1);
       option.tooltip.axisPointer.label= {
         show:true,
+        label:{
+          fontsize:12,
+          },  
         formatter: function (params:any) {
           if(params.axisDimension=="y") return formatUnitValue(getUnitValue(params.value));
           return params.value.toString();
@@ -741,7 +757,10 @@ const formatDate =(date:any)=>{
           position: 'top',
         },
         option.tooltip.axisPointer={
-          type: 'cross'
+          type: 'cross',
+          label:{
+            fontsize:12,
+            },    
         }
         option.xAxis= {
           type: 'category',
@@ -869,6 +888,9 @@ const formatDate =(date:any)=>{
     }
     option.tooltip.axisPointer={
       type: 'cross',
+      label:{
+        fontsize:12,
+        },
       formatter: function (params:any) {
       const date = new Date(params[0].value[0]);
       return formatDate(date).toString();
@@ -892,6 +914,9 @@ if((props.data.type != "h-bar") && option.xAxis.length>0 && option.xAxis[0].data
     option.xAxis[0].data=[];
     option.tooltip.axisPointer={
       type: 'cross',
+      label:{
+        fontsize:12,
+        },
       formatter: function (params:any) {
         const date = new Date(params[0].value[0]);
         return formatDate(date).toString();
