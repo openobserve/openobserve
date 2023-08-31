@@ -99,19 +99,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move { telemetry::run().await });
     }
 
-    // initialize metadata
-    tokio::task::spawn(async move { db::functions::watch().await });
+    // initialize metadata watcher
     tokio::task::spawn(async move { db::schema::watch().await });
+    tokio::task::spawn(async move { db::functions::watch().await });
     tokio::task::spawn(async move { db::compact::retention::watch().await });
     tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
-    tokio::task::spawn(async move { db::alerts::watch().await });
-    tokio::task::spawn(async move { db::triggers::watch().await });
     tokio::task::spawn(async move { db::alerts::templates::watch().await });
     tokio::task::spawn(async move { db::alerts::destinations::watch().await });
-    tokio::task::spawn(async move { db::syslog::watch().await });
-    tokio::task::spawn(async move { db::syslog::watch_syslog_settings().await });
+    tokio::task::spawn(async move { db::alerts::watch().await });
+    tokio::task::spawn(async move { db::triggers::watch().await });
     tokio::task::yield_now().await; // yield let other tasks run
 
+    // cache core metadata
+    db::schema::cache().await.expect("stream cache failed");
     db::functions::cache()
         .await
         .expect("functions cache failed");
@@ -121,16 +121,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::metrics::cache_prom_cluster_leader()
         .await
         .expect("prom cluster leader cache failed");
-    db::alerts::cache().await.expect("alerts cache failed");
-    db::triggers::cache()
-        .await
-        .expect("alerts triggers cache failed");
+
+    // cache alerts
     db::alerts::templates::cache()
         .await
         .expect("alerts templates cache failed");
     db::alerts::destinations::cache()
         .await
         .expect("alerts destinations cache failed");
+    db::alerts::cache().await.expect("alerts cache failed");
+    db::triggers::cache()
+        .await
+        .expect("alerts triggers cache failed");
     db::syslog::cache().await.expect("syslog cache failed");
     db::syslog::cache_syslog_settings()
         .await
@@ -159,29 +161,21 @@ pub async fn init() -> Result<(), anyhow::Error> {
         clean_empty_dirs(&CONFIG.common.data_wal_dir)?;
     }
 
-    db::metrics::cache_prom_cluster_leader()
-        .await
-        .expect("prom cluster leader cache failed");
-    db::functions::cache()
-        .await
-        .expect("functions cache failed");
-    db::alerts::cache().await.expect("alerts cache failed");
-    db::triggers::cache()
-        .await
-        .expect("alerts triggers cache failed");
-
     tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { file_list::run().await });
     tokio::task::spawn(async move { stats::run().await });
-    tokio::task::spawn(async move { alert_manager::run().await });
     tokio::task::spawn(async move { compact::run().await });
     tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { prom::run().await });
+    tokio::task::spawn(async move { alert_manager::run().await });
 
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
 
     // Syslog server start
+    tokio::task::spawn(async move { db::syslog::watch().await });
+    tokio::task::spawn(async move { db::syslog::watch_syslog_settings().await });
+
     let start_syslog = *SYSLOG_ENABLED.read();
     if start_syslog {
         syslog_server::run(start_syslog, true)

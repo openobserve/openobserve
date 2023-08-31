@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap as HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
 use once_cell::sync::Lazy;
@@ -357,9 +358,75 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
 
     async fn set_stream_stats(
         &self,
-        _org_id: &str,
-        _streams: &[(String, StreamStats)],
+        org_id: &str,
+        streams: &[(String, StreamStats)],
     ) -> Result<()> {
+        let pool = CLIENT.clone();
+        let old_stats = self.get_stream_stats(org_id, None, None).await?;
+        let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
+        let mut new_streams = Vec::new();
+        let mut update_streams = Vec::with_capacity(streams.len());
+        for (stream_key, item) in streams {
+            let mut stats = match old_stats.get(stream_key) {
+                Some(s) => s.to_owned(),
+                None => {
+                    new_streams.push(stream_key);
+                    StreamStats::default()
+                }
+            };
+            stats.add_stream_stats(item);
+            update_streams.push((stream_key, stats));
+        }
+
+        let mut tx = pool.begin().await?;
+        for stream_key in new_streams {
+            let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+            if let Err(e) = sqlx::query(
+                r#"
+INSERT INTO stream_stats 
+    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
+    VALUES ($1, $2, 0, 0, 0, 0, 0, 0);
+                "#,
+            )
+            .bind(org_id)
+            .bind(stream_key)
+            .execute(&mut *tx)
+            .await
+            {
+                log::error!(
+                    "[SQLITE] insert stream stats error: {}, stream: {}",
+                    e,
+                    stream_key
+                );
+            }
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit stream stats error: {}", e);
+        }
+
+        let mut tx = pool.begin().await?;
+        for (stream_key, stats) in update_streams {
+            sqlx::query(
+                r#"
+UPDATE stream_stats 
+    SET file_num = $1, min_ts = $2, max_ts = $3, records = $4, original_size = $5, compressed_size = $6
+    WHERE stream = $7;
+                "#,
+            )
+            .bind(stats.file_num)
+            .bind(stats.doc_time_min)
+            .bind(stats.doc_time_max)
+            .bind(stats.doc_num)
+            .bind(stats.storage_size as i64)
+            .bind(stats.compressed_size as i64)
+            .bind(stream_key)
+            .execute(&mut *tx)
+            .await?;
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit stream stats error: {}", e);
+        }
+
         Ok(())
     }
 
@@ -500,7 +567,7 @@ END;
 
     sqlx::query(
     r#"
-CREATE TRIGGER IF NOT EXISTS update_stream_stats_UPDATE
+CREATE TRIGGER IF NOT EXISTS update_stream_stats_delete
     AFTER DELETE ON file_list
 BEGIN
     UPDATE stream_stats SET file_num = file_num - 1, records = records - OLD.records, original_size = original_size - OLD.original_size, compressed_size = compressed_size - OLD.compressed_size
