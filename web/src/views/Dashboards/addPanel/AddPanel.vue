@@ -39,7 +39,7 @@
     <q-separator></q-separator>
     <div class="row" style="height: calc(100vh - 115px); overflow-y: auto">
       <div class="col scroll" style="overflow-y: auto; height: 100%; min-width: 90px; max-width: 90px">
-        <ChartSelection v-model:selectedChartType="dashboardPanelData.data.type" />
+        <ChartSelection v-model:selectedChartType="dashboardPanelData.data.type" @update:selected-chart-type="resetAggregationFunction"/>
       </div>
       <q-separator vertical />
       <div class="col" style="width: 100%; height:100%;">
@@ -158,7 +158,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
+    const { dashboardPanelData, promqlMode, resetDashboardPanelData, resetAggregationFunction } =
       useDashboardPanelData();
     const editMode = ref(false);
     const selectedDate = ref()
@@ -545,7 +545,8 @@ export default defineComponent({
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
-      saveVariableApiCall
+      saveVariableApiCall,
+      resetAggregationFunction
     };
   },
   methods: {

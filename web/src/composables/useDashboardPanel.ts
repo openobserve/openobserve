@@ -289,6 +289,16 @@ const removeQuery = (index: number) => {
     return newColor[0]
   }
 
+  const resetAggregationFunction = () => {
+    if (dashboardPanelData.data.type === "heatmap") {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.y.forEach((itemY) => {
+        itemY.aggregationFunction = null;
+      });
+    }
+  };
+
   // update X or Y axis aliases when new value pushes into the X and Y axes arrays
   const updateArrayAlias = () => {
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ? 'x_axis_' + (index + 1) : it.column )
@@ -532,7 +542,8 @@ const loadFilterItem = (name:any)=>{
     isAddZAxisNotAllowed,
     promqlMode,
     addQuery,
-    removeQuery
+    removeQuery,
+    resetAggregationFunction,
   };
 };
 export default useDashboardPanelData;
