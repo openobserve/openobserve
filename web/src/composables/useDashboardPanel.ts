@@ -291,14 +291,42 @@ const removeQuery = (index: number) => {
   }
 
   const resetAggregationFunction = () => {
-    if (dashboardPanelData.data.type === "heatmap") {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.y.forEach((itemY) => {
-        itemY.aggregationFunction = null;
-      });
-    }
-  };
+    switch (dashboardPanelData.data.type) {
+      case "heatmap":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.forEach((itemY) => {
+          itemY.aggregationFunction = null;
+        })
+        break;
+
+        case "area":
+        case "area-stacked":
+        case "bar":
+        case "line":
+        case "scatter":
+        case "pie":
+        case "donut":
+        case "h-bar":
+        case "stacked":
+        case "h-stacked":
+        case "metric":
+        case "table":
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.y.forEach((itemY) => {
+            if (itemY.aggregationFunction === null) {
+              itemY.aggregationFunction = "count";
+            }
+          });
+      break;
+
+      default:
+        break;
+    };
+    
+    // aggregation null then count 
+    };
 
   // update X or Y axis aliases when new value pushes into the X and Y axes arrays
   const updateArrayAlias = () => {
