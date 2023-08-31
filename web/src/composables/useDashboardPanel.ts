@@ -108,6 +108,7 @@ const addQuery = () => {
       stream_type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type,
       x: [],
       y: [],
+      z:[],
       filter: [],
     },
     config: {

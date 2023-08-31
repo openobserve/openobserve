@@ -146,6 +146,7 @@ export default defineComponent({
         })
 
         onActivated(() => {
+            activeTab.value=dashboardPanelData?.layout?.currentQueryIndex||0;
             dashboardPanelData.meta.errors.queryErrors = []
         })
 
