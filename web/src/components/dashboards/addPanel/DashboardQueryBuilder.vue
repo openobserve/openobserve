@@ -36,7 +36,7 @@
         <q-btn-group class="q-mr-sm" v-for="(itemX,index) in dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x" :key="index">
           <q-btn  
             icon-right="arrow_drop_down" no-caps color="primary" dense rounded size="sm"
-            :label="itemX.column" class="q-pl-sm">
+            :label="xLabel[index]" class="q-pl-sm">
               <q-menu class="q-pa-md">
                 <div>
                   <div class="">
@@ -111,7 +111,7 @@
         v-mutation="handler2">
         <q-btn-group class="q-mr-sm" v-for="(itemY,index) in dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y" :key="index">
           <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm"
-            :label="itemY.column" class="q-pl-sm">
+            :label="yLabel[index]" class="q-pl-sm">
             <q-menu class="q-pa-md">
                 <div>
                   <div class="row q-mb-sm" style="align-items: center;">
@@ -194,7 +194,7 @@
           v-mutation="handler2">
           <q-btn-group class="q-mr-sm" v-for="(itemZ, index) in dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z" :key="index">
             <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm"
-              :label="itemZ.column" class="q-pl-sm">
+              :label="zLabel[index]" class="q-pl-sm">
               <q-menu class="q-pa-md">
                   <div>
                     <div class="row q-mb-sm" style="align-items: center;">
@@ -571,6 +571,29 @@ export default defineComponent({
           return "Add one or more fields here";
       }
     })
+    const commonBtnLabel = (field: any) => {
+      if (field.aggregationFunction) {
+        const aggregation = field.aggregationFunction.toUpperCase();
+        return `${aggregation}(${field.column})`;
+      } else {
+        return field.column;
+      }
+    };
+
+    const xLabel = computed(() => {
+      const xFields = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x;
+      return xFields.map(commonBtnLabel);
+    });
+
+    const yLabel = computed(() => {
+      const yFields = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y;
+      return yFields.map(commonBtnLabel);
+    });
+
+    const zLabel = computed(() => {
+      const zFields = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z;
+      return zFields.map(commonBtnLabel);
+    });
 
     return {
       showXAxis,
@@ -603,7 +626,10 @@ export default defineComponent({
       xAxisHint,
       yAxisHint,
       zAxisHint,
-      promqlMode
+      promqlMode,
+      xLabel,
+      yLabel,
+      zLabel,
     };
   },
 });
