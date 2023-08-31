@@ -249,7 +249,7 @@ export const convertPromQLData = (
     show: props.data.value.config?.show_legends,
     type: "scroll",
     orient: legendPosition,
-    padding: [10, 20, 0, 10],
+    padding: [10, 20, 10, 10],
     tooltip: {
       show: true,
       padding: 10,
