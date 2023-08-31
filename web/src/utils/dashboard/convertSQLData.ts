@@ -750,11 +750,21 @@ const formatDate =(date:any)=>{
             return xAxisZerothPositionUniqueValue.map((i:any,j:number)=>{
               return [j,index,it[j]]
             })
-          }).flat()
+          }).flat(),
+          label:{
+            show:true,
+            fontSize:12,
+            formatter:(params:any)=>{
+              return formatUnitValue(getUnitValue(params.value[2]))||params.value[2];
+            }
+          }
         }]
         // option.yAxis.data=xAxisFirstPositionUniqueValue;
         option.tooltip= {
           position: 'top',
+          textStyle:{
+            fontSize:12
+          },
         },
         option.tooltip.axisPointer={
           type: 'cross',
@@ -762,6 +772,7 @@ const formatDate =(date:any)=>{
             fontsize:12,
             },    
         }
+        option.grid.bottom=60;
         option.xAxis= {
           type: 'category',
           data: xAxisZerothPositionUniqueValue,
