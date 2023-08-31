@@ -73,6 +73,10 @@
                   <!-- <div style="flex:1;">
                     <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                   </div> -->
+                  <div v-if="isOutDated" style="border: 1px solid #c3920d; background-color: #faf2da; padding: 1%; margin: 1%; border-radius: 5px;" >
+                    <div style="font-weight: 700;">Your chart is not up to date</div>
+                    <div>Chart configuration has been updated, but the chart was not updated automatically. Click on the "Apply" button to run the query again</div>
+                  </div>
                   <div style="flex:1;">
                     <PanelSchemaRenderer :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                   </div>
@@ -133,6 +137,7 @@ import DashboardQueryEditor from "../../../components/dashboards/addPanel/Dashbo
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import { useLoading } from "@/composables/useLoading";
+import _ from "lodash-es";
 
 export default defineComponent({
   name: "AddPanel",
@@ -233,6 +238,12 @@ export default defineComponent({
       }
 
     };
+
+
+    const isOutDated = computed(() => {
+      //compare chartdata and dashboardpaneldata
+      return !_.isEqual(chartData.value, dashboardPanelData.data);
+    })
 
     const currentXLabel = computed(() => {
       return dashboardPanelData.data.type == 'table' ? 'First Column' : dashboardPanelData.data.type == 'h-bar' ? 'Y-Axis' : 'X-Axis'
@@ -546,7 +557,8 @@ export default defineComponent({
       currentDashboardData,
       variablesData,
       saveVariableApiCall,
-      resetAggregationFunction
+      resetAggregationFunction,
+      isOutDated
     };
   },
   methods: {
