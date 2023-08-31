@@ -727,8 +727,11 @@ const formatDate =(date:any)=>{
         }]
         // option.yAxis.data=xAxisFirstPositionUniqueValue;
         option.tooltip= {
-          position: 'top'
+          position: 'top',
         },
+        option.tooltip.axisPointer={
+          type: 'cross'
+        }
         option.xAxis= {
           type: 'category',
           data: xAxisZerothPositionUniqueValue,
