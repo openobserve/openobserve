@@ -202,6 +202,7 @@ export const convertPromQLData = (
       case "area-stacked":
         return {
           type: "line",
+          smooth:true,
           stack: 'Total',
           areaStyle: {},
           showSymbol: false,

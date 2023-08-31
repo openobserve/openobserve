@@ -570,7 +570,7 @@ const formatDate =(date:any)=>{
       option.yAxis=temp;
       
       option.yAxis.map((it:any)=>{
-        it.nameGap = calculateWidthText(largestLabel(it.data))+8;
+        it.nameGap = calculateWidthText(largestLabel(it.data))+14;
       })
       option.xAxis.name= props.data.queries[0]?.fields?.y?.length >= 1
         ? props.data.queries[0]?.fields?.y[0]?.label
