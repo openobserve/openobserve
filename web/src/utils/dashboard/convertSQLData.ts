@@ -403,8 +403,11 @@ const formatDate =(date:any)=>{
           show:true,
           formatter: function (params:any) {
             let lineBreaks="";
-            if(props.data.type==="h-bar"){
-              if(params.axisDimension=="x") return formatUnitValue(getUnitValue(params.value));              
+            if(props.data.type==="h-bar" || props.data.type==="h-stacked"){
+              if(params.axisDimension=="x") return formatUnitValue(getUnitValue(params.value));
+              
+              //we does not required any linebreaks for h-stacked because we only use one x axis
+              if(props.data.type==="h-stacked")return params.value.toString();              
               for(let i=0;i<(xAxisKeys.length-params.axisIndex-1);i++){
                 lineBreaks+=" \n \n";              
               }
@@ -478,7 +481,7 @@ const formatDate =(date:any)=>{
           ? props.data.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
-      nameGap: calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys[0])))+8,
+      nameGap: calculateWidthText(props.data.type == "h-bar" || props.data.type == "h-stacked" ? largestLabel(getAxisDataFromKey(yAxisKeys[0])): formatUnitValue(getUnitValue(largestLabel(getAxisDataFromKey(yAxisKeys[0])))))+8,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
@@ -629,7 +632,11 @@ const formatDate =(date:any)=>{
       option.xAxis[0].data = Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
       option.xAxis = option.xAxis.slice(0,1);
       option.tooltip.axisPointer.label= {
-        show:true
+        show:true,
+        formatter: function (params:any) {
+          if(params.axisDimension=="y") return formatUnitValue(getUnitValue(params.value));
+          return params.value.toString();
+        }
       };
       option.xAxis[0].axisLabel={};
       option.xAxis[0].axisTick={};
@@ -656,7 +663,11 @@ const formatDate =(date:any)=>{
       option.xAxis[0].data=Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
       option.xAxis = option.xAxis.slice(0,1);
       option.tooltip.axisPointer.label= {
-        show:true
+        show:true,
+        formatter: function (params:any) {
+          if(params.axisDimension=="y") return formatUnitValue(getUnitValue(params.value));
+          return params.value.toString();
+        }
       };
       option.xAxis[0].axisLabel.margin=5;
       option.xAxis[0].axisLabel={};
@@ -788,7 +799,10 @@ const formatDate =(date:any)=>{
       const temp = option.xAxis;
       option.xAxis = option.yAxis;
       option.yAxis = temp;
-
+      option.yAxis.map((it:any)=>{
+        it.nameGap = calculateWidthText(largestLabel(it.data))+8;
+      })
+      option.xAxis.nameGap = 20;
       break;
     }
     case "metric": {
