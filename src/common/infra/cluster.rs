@@ -15,16 +15,17 @@
 use etcd_client::PutOptions;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
-use std::str::FromStr;
-use std::sync::Arc;
+use std::{net::IpAddr, str::FromStr, sync::Arc};
 use uuid::Uuid;
 
-use super::config::{RwHashMap, CONFIG, INSTANCE_ID};
-use super::db::ETCD_CLIENT;
-use super::errors::{Error, Result};
-use crate::common::infra::db::{etcd, Event};
-use crate::common::utils::json;
+use crate::common::{
+    infra::{
+        config::{RwHashMap, CONFIG, INSTANCE_ID},
+        db::{etcd, Event},
+        errors::{Error, Result},
+    },
+    utils::json,
+};
 use crate::service::db;
 
 static LOCAL_NODE_KEY_TTL: i64 = 10; // node ttl, seconds
@@ -134,7 +135,7 @@ pub async fn register_and_keepalive() -> Result<()> {
             }
             log::error!("[CLUSTER] keepalive lease id expired or revoked, set node online again.");
             // get new lease id
-            let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+            let mut client = etcd::ETCD_CLIENT.get().await.clone().unwrap();
             let resp = match client.lease_grant(LOCAL_NODE_KEY_TTL, None).await {
                 Ok(resp) => resp,
                 Err(e) => {
@@ -202,7 +203,7 @@ pub async fn register() -> Result<()> {
     NODES.insert(LOCAL_NODE_UUID.clone(), val.clone());
     let val = json::to_string(&val).unwrap();
     // register node to cluster
-    let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+    let mut client = etcd::ETCD_CLIENT.get().await.clone().unwrap();
     let resp = client.lease_grant(LOCAL_NODE_KEY_TTL, None).await?;
     let id = resp.id();
     // update local node key lease id
@@ -255,7 +256,7 @@ pub async fn set_online() -> Result<()> {
     NODES.insert(LOCAL_NODE_UUID.clone(), val.clone());
     let val = json::to_string(&val).unwrap();
 
-    let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+    let mut client = etcd::ETCD_CLIENT.get().await.clone().unwrap();
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let _resp = client.put(key, val, Some(opt)).await?;
@@ -273,7 +274,7 @@ pub async fn leave() -> Result<()> {
         LOCAL_NODE_STATUS = NodeStatus::Offline;
     }
 
-    let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+    let mut client = etcd::ETCD_CLIENT.get().await.clone().unwrap();
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let _resp = client.delete(key, None).await?;
 
@@ -327,7 +328,7 @@ pub fn get_internal_grpc_token() -> String {
 /// List nodes from cluster or local cache
 pub async fn list_nodes() -> Result<Vec<Node>> {
     let mut nodes = Vec::new();
-    let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+    let mut client = etcd::ETCD_CLIENT.get().await.clone().unwrap();
     let key = format!("{}nodes/", &CONFIG.etcd.prefix);
     let opt = etcd_client::GetOptions::new().with_prefix();
     let ret = client.get(key.clone(), Some(opt)).await.map_err(|e| {
@@ -390,6 +391,7 @@ async fn watch_node_list() -> Result<()> {
                 log::info!("[CLUSTER] leave {:?}", item_value.clone());
                 NODES.remove(item_key);
             }
+            Event::Empty => {}
         }
     }
 

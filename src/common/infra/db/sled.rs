@@ -15,45 +15,43 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
+use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::{sync::mpsc, task::JoinHandle};
 
 use super::{Event, EventData};
-use crate::common::infra::cluster;
-use crate::common::infra::{config::CONFIG, errors::*};
+use crate::common::infra::{cluster, config::CONFIG, errors::*};
 
-lazy_static! {
-    pub static ref SLED_CLIENT: Option<::sled::Db> = connect_sled();
-}
+pub static SLED_CLIENT: Lazy<Option<::sled::Db>> = Lazy::new(connect_sled);
 
-pub struct Sled {
+pub struct SledDb {
     prefix: String,
 }
 
-impl Sled {
-    pub fn new(prefix: &str) -> Sled {
+impl SledDb {
+    pub fn new(prefix: &str) -> SledDb {
         let prefix = prefix.trim_end_matches(|v| v == '/');
-        Sled {
+        Self {
             prefix: prefix.to_string(),
         }
     }
 }
 
-impl Default for Sled {
+impl Default for SledDb {
     fn default() -> Self {
         Self::new(&CONFIG.sled.prefix)
     }
 }
 
 #[async_trait]
-impl super::Db for Sled {
+impl super::Db for SledDb {
     async fn stats(&self) -> Result<super::Stats> {
         let client = SLED_CLIENT.clone().unwrap();
         let bytes_len = client.size_on_disk()?;
         let keys_count = client.len();
         Ok(super::Stats {
-            bytes_len,
-            keys_count,
+            bytes_len: bytes_len as i64,
+            keys_count: keys_count as i64,
         })
     }
 
@@ -119,36 +117,6 @@ impl super::Db for Sled {
         Ok(result)
     }
 
-    /*  async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>> {
-        let (tx, rx) = mpsc::channel(CONFIG.etcd.load_page_size as usize);
-        let key = format!("{}{}", self.prefix, prefix);
-        let prefix_key = self.prefix.to_string();
-        let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            let client = SLED_CLIENT.clone().unwrap();
-            let mut resp = client.scan_prefix(key);
-            let mut load_num = 0;
-            loop {
-                let item = resp.next();
-                if item.is_none() {
-                    break;
-                }
-                let item = item.unwrap();
-                let (k, v) = item.unwrap();
-                let item_key = std::str::from_utf8(k.as_ref()).unwrap();
-                let item_key = item_key.strip_prefix(&prefix_key).unwrap();
-                tx.send((item_key.to_string(), Bytes::from(v.as_ref().to_vec())))
-                    .await
-                    .unwrap();
-                load_num += 1;
-                if load_num % CONFIG.etcd.load_page_size == 0 {
-                    tokio::task::yield_now().await; // yield to other tasks
-                }
-            }
-            Ok(())
-        });
-        Ok(Arc::new(rx))
-    } */
-
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let mut result = Vec::new();
         let key = format!("{}{}", self.prefix, prefix);
@@ -185,11 +153,11 @@ impl super::Db for Sled {
         Ok(result)
     }
 
-    async fn count(&self, prefix: &str) -> Result<usize> {
+    async fn count(&self, prefix: &str) -> Result<i64> {
         let key = format!("{}{}", self.prefix, prefix);
         let client = SLED_CLIENT.clone().unwrap();
         let resp = client.scan_prefix(key);
-        Ok(resp.into_iter().count())
+        Ok(resp.into_iter().count() as i64)
     }
 
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
@@ -233,71 +201,6 @@ impl super::Db for Sled {
 
         Ok(Arc::new(rx))
     }
-
-    /* async fn transaction(
-        &self,
-        check_key: &str,
-        and_ops: Vec<Event>,
-        else_ops: Vec<Event>,
-    ) -> Result<()> {
-        let client = SLED_CLIENT.clone().unwrap();
-        let mut check_result = false;
-        let key = format!("{}{}", self.prefix, check_key);
-        let ret = client.get(key);
-        if ret.is_err() {
-            return Err(Error::from(ret.err().unwrap()));
-        }
-        let ret = ret.unwrap();
-        if ret.is_some() {
-            check_result = true;
-        }
-        match client.transaction(|db| {
-            match check_result {
-                true => {
-                    for op in &and_ops {
-                        match op {
-                            Event::Put(data) => {
-                                let key = format!("{}{}", self.prefix, data.key);
-                                let value = data.value.clone().unwrap();
-                                if let Err(e) = db.insert(key.as_str(), value.to_vec()) {
-                                    return Err(ConflictableTransactionError::Abort(e));
-                                }
-                            }
-                            Event::Delete(data) => {
-                                let key = format!("{}{}", self.prefix, data.key);
-                                if let Err(e) = db.remove(key.as_str()) {
-                                    return Err(ConflictableTransactionError::Abort(e));
-                                }
-                            }
-                        }
-                    }
-                }
-                false => {
-                    for op in &else_ops {
-                        match op {
-                            Event::Put(data) => {
-                                let key = format!("{}{}", self.prefix, data.key);
-                                let value = data.value.clone().unwrap();
-                                if let Err(e) = db.insert(key.as_str(), value.to_vec()) {
-                                    return Err(ConflictableTransactionError::Abort(e));
-                                }
-                            }
-                            Event::Delete(data) => {
-                                let key = format!("{}{}", self.prefix, data.key);
-                                if let Err(e) = db.remove(key.as_str()) {
-                                    return Err(ConflictableTransactionError::Abort(e));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Ok(())
-        }) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error::Message(e.to_string())),
-        }
-    } */
 }
 
 pub fn connect_sled() -> Option<::sled::Db> {
@@ -307,4 +210,8 @@ pub fn connect_sled() -> Option<::sled::Db> {
 
     let db = ::sled::open(&CONFIG.sled.data_dir).expect("sled db dir create failed");
     Some(db)
+}
+
+pub async fn create_table() -> Result<()> {
+    Ok(())
 }

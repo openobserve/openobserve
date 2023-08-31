@@ -550,7 +550,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && cfg.common.meta_store_postgres_dsn.is_empty()
     {
         return Err(anyhow::anyhow!(
-            "Meta store is Postgres, you must set ZO_META_STORE_POSTGRES_DSN"
+            "Meta store is PostgreSQL, you must set ZO_META_STORE_POSTGRES_DSN"
         ));
     }
 
@@ -606,6 +606,10 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if !cfg.etcd.prefix.is_empty() && !cfg.etcd.prefix.ends_with('/') {
+        cfg.etcd.prefix = format!("{}/", cfg.etcd.prefix);
+    }
+
     if !cfg.etcd.cert_auth {
         return Ok(());
     }
@@ -629,10 +633,6 @@ fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             name = name.split(':').collect::<Vec<&str>>()[0].to_string();
         }
         cfg.etcd.domain_name = name;
-    }
-
-    if !cfg.etcd.prefix.is_empty() && !cfg.etcd.prefix.ends_with('/') {
-        cfg.etcd.prefix = format!("{}/", cfg.etcd.prefix);
     }
 
     Ok(())

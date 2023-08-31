@@ -178,6 +178,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     STREAM_ALERTS.remove(item_key);
                 }
             }
+            Event::Empty => {}
         }
     }
     Ok(())

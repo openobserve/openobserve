@@ -20,7 +20,6 @@ use crate::common::meta::meta_store::MetaStore;
 use crate::common::meta::user::{DBUser, User, UserRole};
 use crate::common::utils::json;
 
-#[tracing::instrument]
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
     let user = match org_id {
         None => ROOT_USER.get("root"),
@@ -40,7 +39,6 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
     Ok(db_user.get_user(org_id.to_string()))
 }
 
-#[tracing::instrument]
 pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/user/{name}");
@@ -48,7 +46,6 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
     Ok(json::from_slice::<DBUser>(&val).unwrap())
 }
 
-#[tracing::instrument(skip_all)]
 pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/user/{}", user.email);
@@ -89,7 +86,6 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[tracing::instrument]
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/user/{name}");
@@ -156,6 +152,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                 }
             }
+            Event::Empty => {}
         }
     }
     Ok(())

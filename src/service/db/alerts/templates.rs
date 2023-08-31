@@ -119,6 +119,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 ALERTS_TEMPLATES.remove(item_key);
             }
+            Event::Empty => {}
         }
     }
     Ok(())

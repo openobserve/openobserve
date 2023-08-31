@@ -89,6 +89,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 KVS.remove(item_key);
             }
+            Event::Empty => {}
         }
     }
 }

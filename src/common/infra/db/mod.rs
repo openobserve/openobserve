@@ -26,46 +26,47 @@ use super::errors::Result;
 
 pub mod dynamo;
 pub mod etcd;
+pub mod postgres;
 pub mod sled;
-
-pub use self::etcd::ETCD_CLIENT;
-pub use self::sled::SLED_CLIENT;
+pub mod sqlite;
 
 pub static DEFAULT: Lazy<Box<dyn Db>> = Lazy::new(default);
 pub static CLUSTER_COORDINATOR: Lazy<Box<dyn Db>> = Lazy::new(cluster_coordinator);
 
 pub fn default() -> Box<dyn Db> {
+    if !CONFIG.common.local_mode
+        && (CONFIG.common.meta_store == "sled" || CONFIG.common.meta_store == "sqlite")
+    {
+        panic!("cluster mode is not supported for ZO_META_STORE=sled/sqlite");
+    }
+
     match CONFIG.common.meta_store.as_str().into() {
-        MetaStore::Sled => Box::<sled::Sled>::default(),
+        MetaStore::Sled => Box::<sled::SledDb>::default(),
+        MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
         MetaStore::Etcd => Box::<etcd::Etcd>::default(),
         MetaStore::DynamoDB => Box::<dynamo::DynamoDb>::default(),
+        MetaStore::PostgreSQL => Box::<postgres::PostgresDb>::default(),
+    }
+}
+
+pub async fn create_table() -> Result<()> {
+    // check db dir
+    std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
+    match CONFIG.common.meta_store.as_str().into() {
+        MetaStore::Sled => sled::create_table().await,
+        MetaStore::Sqlite => sqlite::create_table().await,
+        MetaStore::Etcd => etcd::create_table().await,
+        MetaStore::DynamoDB => dynamo::create_table().await,
+        MetaStore::PostgreSQL => postgres::create_table().await,
     }
 }
 
 pub fn cluster_coordinator() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
-        Box::<sled::Sled>::default()
+        Box::<sled::SledDb>::default()
     } else {
         Box::<etcd::Etcd>::default()
     }
-}
-
-#[derive(Debug, Default)]
-pub struct Stats {
-    pub bytes_len: u64,
-    pub keys_count: usize,
-}
-
-#[derive(Debug)]
-pub enum Event {
-    Put(EventData),
-    Delete(EventData),
-}
-
-#[derive(Debug)]
-pub struct EventData {
-    pub key: String,
-    pub value: Option<Bytes>,
 }
 
 #[async_trait]
@@ -86,17 +87,37 @@ pub trait Db: Sync + Send + 'static {
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>>;
-    //async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>>;
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>>;
-    async fn count(&self, prefix: &str) -> Result<usize>;
+    async fn count(&self, prefix: &str) -> Result<i64>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
-    /*  async fn transaction(
-        &self,
-        check_key: &str, // check the key exists
-        and_ops: Vec<Event>,
-        else_ops: Vec<Event>,
-    ) -> Result<()>; */
+}
+
+#[derive(Debug, Default)]
+pub struct Stats {
+    pub bytes_len: i64,
+    pub keys_count: i64,
+}
+
+#[derive(Debug)]
+pub enum Event {
+    Put(EventData),
+    Delete(EventData),
+    Empty,
+}
+
+#[derive(Debug)]
+pub struct EventData {
+    pub key: String,
+    pub value: Option<Bytes>,
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct MetaRecord {
+    pub module: String,
+    pub key1: String,
+    pub key2: String,
+    pub value: Vec<u8>,
 }
 
 #[cfg(test)]
@@ -137,10 +158,5 @@ mod tests {
         db.put("/foo/bar3", hello).await.unwrap();
         assert_eq!(db.list_keys("/foo/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/").await.unwrap().len(), 3);
-
-        /*  let mut events = db.list_use_channel("/foo/").await.unwrap();
-               let events = Arc::get_mut(&mut events).unwrap();
-               assert_eq!(events.recv().await.unwrap().0, "/foo/bar1");
-        */
     }
 }

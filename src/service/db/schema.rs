@@ -372,6 +372,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                 }
             }
+            Event::Empty => {}
         }
     }
     Ok(())

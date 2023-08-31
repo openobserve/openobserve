@@ -150,6 +150,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 CACHE.remove(item_key);
             }
+            Event::Empty => {}
         }
     }
     Ok(())

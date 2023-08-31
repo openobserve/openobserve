@@ -98,17 +98,12 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     async fn remove(&self, file: &str) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-        sqlx::query(
-            r#"
-DELETE FROM file_list 
-    WHERE stream = $1 AND date = $2 AND file = $3;
-            "#,
-        )
-        .bind(stream_key)
-        .bind(date_key)
-        .bind(file_name)
-        .execute(&pool)
-        .await?;
+        sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
+            .bind(stream_key)
+            .bind(date_key)
+            .bind(file_name)
+            .execute(&pool)
+            .await?;
         Ok(())
     }
 
@@ -207,12 +202,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
         let pool = CLIENT.clone();
-        let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
-    FROM file_list;
-            "#,
-        )
+        let ret = sqlx::query_as::<_, super::FileRecord>(r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size FROM file_list;"#)
         .fetch_all(&pool)
         .await?;
         Ok(ret
@@ -430,15 +420,11 @@ UPDATE stream_stats
         min_ts: i64,
     ) -> Result<()> {
         let pool = CLIENT.clone();
-        sqlx::query(
-            r#"
-UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;
-            "#,
-        )
-        .bind(min_ts)
-        .bind(stream)
-        .execute(&pool)
-        .await?;
+        sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
+            .bind(min_ts)
+            .bind(stream)
+            .execute(&pool)
+            .await?;
         Ok(())
     }
 

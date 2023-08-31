@@ -94,6 +94,7 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 METRIC_CLUSTER_LEADER.write().await.remove(item_key);
             }
+            Event::Empty => {}
         }
     }
     Ok(())

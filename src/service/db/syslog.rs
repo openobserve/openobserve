@@ -88,6 +88,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 SYSLOG_ROUTES.remove(item_key);
             }
+            Event::Empty => {}
         }
     }
     Ok(())
@@ -127,6 +128,7 @@ pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
                 let mut syslog_enabled = SYSLOG_ENABLED.write();
                 *syslog_enabled = false;
             }
+            Event::Empty => {}
         }
     }
     Ok(())
