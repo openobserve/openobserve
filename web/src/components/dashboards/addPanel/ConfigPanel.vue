@@ -1,11 +1,11 @@
 <template>
   <div>
-    <q-toggle v-if="dashboardPanelData.data.type != 'table'" v-model="dashboardPanelData.data.config.show_legends"
+    <q-toggle v-if="dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'heatmap'" v-model="dashboardPanelData.data.config.show_legends"
       label="Show Legends" />
 
     <div class="space"></div>
 
-    <q-select v-if="dashboardPanelData.data.type != 'table'" outlined
+    <q-select v-if="dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'heatmap'" outlined
       v-model="dashboardPanelData.data.config.legends_position" :options="legendsPositionOptions" dense
       label="Legends Positions" class="showLabelOnTop" stack-label emit-value
       :display-value="`${dashboardPanelData.data.config.legends_position ?? 'Auto'}`">
