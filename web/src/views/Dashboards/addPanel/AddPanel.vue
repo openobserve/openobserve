@@ -59,6 +59,7 @@
             </div>
           </template>
           <template #separator>
+            <div class="splitter-vertical splitter-enabled"></div>
             <q-avatar color="primary" text-color="white" size="20px" icon="drag_indicator"
               style="top: 10px; left: 3.5px;" />
           </template>
@@ -633,7 +634,10 @@ export default defineComponent({
   height: 4px;
   width: 100%;
 }
-
+.splitter-vertical{
+  width: 4px;
+  height: 100%;
+}
 .splitter-enabled {
   background-color: #ffffff00;
   transition: 0.3s;
