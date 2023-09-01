@@ -127,7 +127,13 @@
                         emit-value
                         map-options
                         label="Aggregation"
-                      ></q-select>
+                      >
+                      <template v-slot:append>
+                          <div v-if="dashboardPanelData.data.type == 'heatmap'">
+                          <q-icon name="close" size="small" @click.stop.prevent="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index].aggregationFunction = null" class="cursor-pointer" />
+                        </div>
+                        </template>
+                    </q-select>
                     </div>
                     <div class="color-input-wrapper" v-if="!['table', 'pie'].includes(dashboardPanelData.data.type)">
                       <input
