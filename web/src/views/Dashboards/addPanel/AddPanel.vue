@@ -73,7 +73,7 @@
                   <!-- <div style="flex:1;">
                     <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                   </div> -->
-                  <div v-if="isOutDated" style="border: 1px solid #c3920d; background-color: #faf2da; padding: 1%; margin: 1%; border-radius: 5px;" >
+                  <div v-if="isOutDated" :style="{borderColor:'#c3920d',borderWidth: '1px', borderStyle: 'solid', backgroundColor: store.state.theme=='dark' ? '#2a1f03' : '#faf2da', padding: '1%', margin: '1%', borderRadius: '5px'}" >
                     <div style="font-weight: 700;">Your chart is not up to date</div>
                     <div>Chart configuration has been updated, but the chart was not updated automatically. Click on the "Apply" button to run the query again</div>
                   </div>
@@ -577,7 +577,8 @@ export default defineComponent({
       variablesData,
       saveVariableApiCall,
       resetAggregationFunction,
-      isOutDated
+      isOutDated,
+      store
     };
   },
   methods: {
