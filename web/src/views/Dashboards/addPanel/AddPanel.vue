@@ -71,7 +71,7 @@
                     @update:model-value="layoutSplitterUpdated" 
                     reverse 
                     unit="px" 
-                    :limits="!dashboardPanelData.layout.showQueryBar ? [41, 400] : [100, 400]"
+                    :limits="!dashboardPanelData.layout.showQueryBar ? [41, 400] : [130, 400]"
                     :disable="!dashboardPanelData.layout.showQueryBar"
                     style="height: 100%;" 
                   >
