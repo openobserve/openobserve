@@ -211,6 +211,10 @@ export default defineComponent({
       resetDashboardPanelData();
     });
 
+    watch(()=>isOutDated.value,()=>{
+      window.dispatchEvent(new Event('resize'))
+    });
+
     onMounted(async () => {
       errorData.errors = []
 
