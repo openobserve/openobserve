@@ -23,7 +23,7 @@
                 </div>
                 <q-space />
                 <div style="max-width: 600px">
-                <q-tabs v-if="promqlMode" v-model="activeTab" narrow-indicator dense inline-label outside-arrows mobile-arrows>
+                <q-tabs v-if="promqlMode" v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows mobile-arrows>
                     <q-tab no-caps :ripple="false" v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
                         :label="'Query ' + (index + 1)">
                         <q-icon
@@ -101,36 +101,26 @@ export default defineComponent({
         const confirmQueryModeChangeDialog = ref(false)
         const parser = new Parser();
         let streamName = "";
-        const activeTab = ref(0);
-
-        // watch(activeTab, () => {
-        //     console.log('activeTab', activeTab.value);
-        // })
-
-        // const handleActiveTab=(index)=>{
-        //     activeTab.value=index;
-        // }
         
         const addTab = () => {         
             addQuery();
-            activeTab.value = dashboardPanelData.data.queries.length - 1;
+            dashboardPanelData.layout.currentQueryIndex = dashboardPanelData.data.queries.length - 1;
         };
 
         const removeTab = async (index) => {
-            if (activeTab.value >= dashboardPanelData.data.queries.length-1) activeTab.value -=1;
-            dashboardPanelData.layout.currentQueryIndex=activeTab.value;
+            if (dashboardPanelData.layout.currentQueryIndex >= dashboardPanelData.data.queries.length-1) dashboardPanelData.layout.currentQueryIndex -=1;
             removeQuery(index);
         };
 
         const currentQuery = computed({
             get: () => {
                 console.log('query getter accessed');
-                return promqlMode.value ? dashboardPanelData.data.queries[activeTab.value].query : dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query
+                return promqlMode.value ? dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query : dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query
             },
             set: (value) => {
                 console.log('value', value);
                 if (promqlMode.value) {
-                    dashboardPanelData.data.queries[activeTab.value].query = value
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = value
                 } else {
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = value
                 }
@@ -147,7 +137,6 @@ export default defineComponent({
         })
 
         onMounted(() => {
-            activeTab.value=dashboardPanelData?.layout?.currentQueryIndex||0;
             dashboardPanelData.meta.errors.queryErrors = []
         })
 
@@ -160,7 +149,6 @@ export default defineComponent({
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter,
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery
         ], () => {
-            activeTab.value=dashboardPanelData.layout.currentQueryIndex;
             // only continue if current mode is auto query generation
             if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
                 console.log("Updating query");
@@ -366,7 +354,6 @@ console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQu
             dashboardPanelData,
             confirmQueryModeChangeDialog,
             onUpdateToggle,
-            activeTab,
             addTab,
             removeTab,
             currentQuery
