@@ -89,7 +89,7 @@ impl super::Db for PostgresDb {
         Ok(Bytes::from(value))
     }
 
-    async fn put(&self, key: &str, value: Bytes) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()> {
         let (module, key_1, key_2) = parse_key(key);
         let pool = CLIENT.clone();
 
@@ -113,18 +113,21 @@ impl super::Db for PostgresDb {
             .bind(value.as_ref())
             .execute(&pool)
             .await?;
+
+        // TODO: event watch
+        if !need_watch {
+            return Ok(());
+        }
+
         Ok(())
     }
 
-    async fn delete(&self, key: &str, _with_prefix: bool) -> Result<()> {
-        let (module, key_1, key_2) = parse_key(key);
-        let pool = CLIENT.clone();
-        sqlx::query(r#"DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3;"#)
-            .bind(module)
-            .bind(key_1)
-            .bind(key_2)
-            .execute(&pool)
-            .await?;
+    async fn delete(&self, _key: &str, _with_prefix: bool, need_watch: bool) -> Result<()> {
+        // TODO: event watch
+        if !need_watch {
+            return Ok(());
+        }
+
         Ok(())
     }
 

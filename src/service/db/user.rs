@@ -14,11 +14,14 @@
 
 use std::sync::Arc;
 
-use crate::common::infra::config::{CONFIG, ROOT_USER, USERS};
-use crate::common::infra::db::{Event, CLUSTER_COORDINATOR};
-use crate::common::meta::meta_store::MetaStore;
-use crate::common::meta::user::{DBUser, User, UserRole};
-use crate::common::utils::json;
+use crate::common::{
+    infra::{
+        config::{ROOT_USER, USERS},
+        db as infra_db,
+    },
+    meta::user::{DBUser, User, UserRole},
+    utils::json,
+};
 
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
     let user = match org_id {
@@ -32,7 +35,7 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
 
     let org_id = org_id.expect("BUG");
 
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = format!("/user/{name}");
     let val = db.get(&key).await?;
     let db_user: DBUser = json::from_slice(&val).unwrap();
@@ -40,65 +43,37 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
 }
 
 pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = format!("/user/{name}");
     let val = db.get(&key).await?;
     Ok(json::from_slice::<DBUser>(&val).unwrap())
 }
 
 pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = format!("/user/{}", user.email);
-    match db.put(&key, json::to_vec(&user).unwrap().into()).await {
-        Ok(_) => {
-            if CONFIG
-                .common
-                .meta_store
-                .eq(&MetaStore::DynamoDB.to_string())
-            {
-                CLUSTER_COORDINATOR
-                    .put(&key, CONFIG.common.meta_store.clone().into())
-                    .await?
-            }
-        }
+    match db
+        .put(
+            &key,
+            json::to_vec(&user).unwrap().into(),
+            infra_db::NEED_WATCH,
+        )
+        .await
+    {
+        Ok(_) => {}
         Err(e) => {
             log::error!("Error saving user: {}", e);
             return Err(anyhow::anyhow!("Error saving user: {}", e));
         }
     }
-
-    // cache user
-    /*   for org in user.organizations {
-        USERS.insert(
-            format!("{}/{}", org.name, user.email),
-            User {
-                email: user.email.clone(),
-                first_name: user.first_name.clone(),
-                last_name: user.last_name.clone(),
-                password: user.password.clone(),
-                role: org.role,
-                org: org.name,
-                token: org.token,
-                salt: user.salt.clone(),
-            },
-        );
-    } */
     Ok(())
 }
 
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = format!("/user/{name}");
-    match db.delete(&key, false).await {
-        Ok(_) => {
-            if CONFIG
-                .common
-                .meta_store
-                .eq(&MetaStore::DynamoDB.to_string())
-            {
-                CLUSTER_COORDINATOR.delete(&key, false).await?
-            }
-        }
+    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+        Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting user: {}", e);
             return Err(anyhow::anyhow!("Error deleting user: {}", e));
@@ -108,8 +83,8 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::CLUSTER_COORDINATOR;
     let key = "/user/";
+    let db = &infra_db::CLUSTER_COORDINATOR;
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching user");
@@ -122,19 +97,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            Event::Put(ev) => {
+            infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: DBUser = if CONFIG
-                    .common
-                    .meta_store
-                    .eq(&MetaStore::DynamoDB.to_string())
-                {
-                    let dynamo = &crate::common::infra::db::DEFAULT;
-                    let ret = dynamo.get(&ev.key).await?;
-                    json::from_slice(&ret).unwrap()
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
-                };
+                let item_value: DBUser = json::from_slice(&ev.value.unwrap()).unwrap();
                 let users = item_value.get_all_users();
                 for user in users {
                     if user.role.eq(&UserRole::Root) {
@@ -143,7 +108,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     USERS.insert(format!("{}/{}", user.org, item_key), user);
                 }
             }
-            Event::Delete(ev) => {
+            infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 for user in USERS.clone() {
                     if user.1.email.eq(item_key) {
@@ -152,14 +117,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                 }
             }
-            Event::Empty => {}
+            infra_db::Event::Empty => {}
         }
     }
     Ok(())
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/user/";
     let ret = db.list(key).await?;
     for (_, item_value) in ret {
@@ -178,7 +143,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn root_user_exists() -> bool {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/user/";
     let mut ret = db.list_values(key).await.unwrap();
     ret.retain(|item| {
@@ -194,9 +159,9 @@ pub async fn root_user_exists() -> bool {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/user/";
-    db.delete(key, true).await?;
+    db.delete(key, true, infra_db::NO_NEED_WATCH).await?;
     Ok(())
 }
 

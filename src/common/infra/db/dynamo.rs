@@ -116,7 +116,7 @@ impl super::Db for DynamoDb {
         }
     }
 
-    async fn put(&self, in_key: &str, value: Bytes) -> Result<()> {
+    async fn put(&self, in_key: &str, value: Bytes, need_watch: bool) -> Result<()> {
         let table: DynamoTableDetails = get_dynamo_key(in_key, DbOperation::Put);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
@@ -131,15 +131,22 @@ impl super::Db for DynamoDb {
             .send()
             .await
         {
-            Ok(_output) => Ok(()),
+            Ok(_output) => {}
             Err(err) => {
                 log::error!("db save error: {:?}", err);
-                Ok(())
+                return Err(Error::from(DbError::KeyNotExists(in_key.to_string())));
             }
         }
+
+        // TODO: event watch
+        if !need_watch {
+            return Ok(());
+        }
+
+        Ok(())
     }
 
-    async fn delete(&self, in_key: &str, _with_prefix: bool) -> Result<()> {
+    async fn delete(&self, in_key: &str, _with_prefix: bool, need_watch: bool) -> Result<()> {
         let table = get_dynamo_key(in_key, DbOperation::Delete);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
@@ -155,17 +162,13 @@ impl super::Db for DynamoDb {
                 return Err(Error::from(DbError::KeyNotExists(in_key.to_string())));
             }
         }
-        Ok(())
-    }
 
-    /// Contrary to `delete`, this call won't fail if `key` is missing.
-    async fn delete_if_exists(&self, in_key: &str, with_prefix: bool) -> Result<()> {
-        use crate::common::infra::errors::{DbError, Error};
-
-        match self.delete(in_key, with_prefix).await {
-            Ok(()) | Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(()),
-            Err(e) => Err(e),
+        // TODO: event watch
+        if !need_watch {
+            return Ok(());
         }
+
+        Ok(())
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {

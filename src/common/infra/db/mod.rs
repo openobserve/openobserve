@@ -30,6 +30,9 @@ pub mod postgres;
 pub mod sled;
 pub mod sqlite;
 
+pub static NEED_WATCH: bool = true;
+pub static NO_NEED_WATCH: bool = false;
+
 pub static DEFAULT: Lazy<Box<dyn Db>> = Lazy::new(default);
 pub static CLUSTER_COORDINATOR: Lazy<Box<dyn Db>> = Lazy::new(cluster_coordinator);
 
@@ -63,7 +66,10 @@ pub async fn create_table() -> Result<()> {
 
 pub fn cluster_coordinator() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
-        Box::<sled::SledDb>::default()
+        match CONFIG.common.meta_store.as_str().into() {
+            MetaStore::Sled => Box::<sled::SledDb>::default(),
+            _ => Box::<sqlite::SqliteDb>::default(),
+        }
     } else {
         Box::<etcd::Etcd>::default()
     }
@@ -73,14 +79,14 @@ pub fn cluster_coordinator() -> Box<dyn Db> {
 pub trait Db: Sync + Send + 'static {
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
-    async fn put(&self, key: &str, value: Bytes) -> Result<()>;
-    async fn delete(&self, key: &str, with_prefix: bool) -> Result<()>;
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()>;
+    async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()>;
 
     /// Contrary to `delete`, this call won't fail if `key` is missing.
-    async fn delete_if_exists(&self, key: &str, with_prefix: bool) -> Result<()> {
+    async fn delete_if_exists(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
         use crate::common::infra::errors::{DbError, Error};
 
-        match self.delete(key, with_prefix).await {
+        match self.delete(key, with_prefix, need_watch).await {
             Ok(()) | Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(()),
             Err(e) => Err(e),
         }
@@ -99,14 +105,14 @@ pub struct Stats {
     pub keys_count: i64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Put(EventData),
     Delete(EventData),
     Empty,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EventData {
     pub key: String,
     pub value: Option<Bytes>,
@@ -129,7 +135,9 @@ mod tests {
     #[actix_web::test]
     async fn test_put() {
         let db = default();
-        db.put("/foo/bar", Bytes::from("hello")).await.unwrap();
+        db.put("/foo/bar", Bytes::from("hello"), false)
+            .await
+            .unwrap();
     }
 
     #[actix_web::test]
@@ -137,7 +145,7 @@ mod tests {
         let db = default();
         let hello = Bytes::from("hello");
 
-        db.put("/foo/bar", hello.clone()).await.unwrap();
+        db.put("/foo/bar", hello.clone(), false).await.unwrap();
         assert_eq!(db.get("/foo/bar").await.unwrap(), hello);
     }
 
@@ -146,16 +154,16 @@ mod tests {
         let db = default();
         let hello = Bytes::from("hello");
 
-        db.put("/foo/bar1", hello.clone()).await.unwrap();
-        db.put("/foo/bar2", hello.clone()).await.unwrap();
-        db.put("/foo/bar3", hello.clone()).await.unwrap();
-        db.delete("/foo/bar1", false).await.unwrap();
-        assert!(db.delete("/foo/bar4", false).await.is_err());
-        db.delete("/foo/", true).await.unwrap();
+        db.put("/foo/bar1", hello.clone(), false).await.unwrap();
+        db.put("/foo/bar2", hello.clone(), false).await.unwrap();
+        db.put("/foo/bar3", hello.clone(), false).await.unwrap();
+        db.delete("/foo/bar1", false, false).await.unwrap();
+        assert!(db.delete("/foo/bar4", false, false).await.is_err());
+        db.delete("/foo/", true, false).await.unwrap();
 
-        db.put("/foo/bar1", hello.clone()).await.unwrap();
-        db.put("/foo/bar2", hello.clone()).await.unwrap();
-        db.put("/foo/bar3", hello).await.unwrap();
+        db.put("/foo/bar1", hello.clone(), false).await.unwrap();
+        db.put("/foo/bar2", hello.clone(), false).await.unwrap();
+        db.put("/foo/bar3", hello, false).await.unwrap();
         assert_eq!(db.list_keys("/foo/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/").await.unwrap().len(), 3);
     }

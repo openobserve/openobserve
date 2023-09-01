@@ -17,7 +17,7 @@ use std::sync::Arc;
 use crate::common::{
     infra::{
         config::{SYSLOG_ENABLED, SYSLOG_ROUTES},
-        db::{self, Event},
+        db as infra_db,
     },
     meta::syslog::SyslogRoute,
     utils::json,
@@ -25,17 +25,18 @@ use crate::common::{
 
 #[tracing::instrument(name = "service:db:syslog:toggle_syslog_setting")]
 pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
-    Ok(db::DEFAULT
+    Ok(infra_db::DEFAULT
         .put(
             "/syslog/enabled",
             json::to_vec(&json::Value::Bool(enabled)).unwrap().into(),
+            infra_db::NEED_WATCH,
         )
         .await?)
 }
 
 #[tracing::instrument(name = "service:db:syslog:list")]
 pub async fn list() -> Result<Vec<SyslogRoute>, anyhow::Error> {
-    Ok(db::DEFAULT
+    Ok(infra_db::DEFAULT
         .list("/syslog/route/")
         .await?
         .values()
@@ -45,30 +46,34 @@ pub async fn list() -> Result<Vec<SyslogRoute>, anyhow::Error> {
 
 #[tracing::instrument(name = "service:db:syslog:set", skip_all)]
 pub async fn set(route: &SyslogRoute) -> Result<(), anyhow::Error> {
-    Ok(db::DEFAULT
+    Ok(infra_db::DEFAULT
         .put(
             &format!("/syslog/route/{}", route.id),
             json::to_vec(route).unwrap().into(),
+            infra_db::NEED_WATCH,
         )
         .await?)
 }
 
 #[tracing::instrument(name = "service:db:syslog:get")]
 pub async fn get(id: &str) -> Result<SyslogRoute, anyhow::Error> {
-    let val = db::DEFAULT.get(&format!("/syslog/route/{id}")).await?;
+    let val = infra_db::DEFAULT
+        .get(&format!("/syslog/route/{id}"))
+        .await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
 #[tracing::instrument(name = "service:db:syslog:delete")]
 pub async fn delete(id: &str) -> Result<(), anyhow::Error> {
-    Ok(db::DEFAULT
-        .delete(&format!("/syslog/route/{id}"), false)
+    Ok(infra_db::DEFAULT
+        .delete(&format!("/syslog/route/{id}"), false, infra_db::NEED_WATCH)
         .await?)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/syslog/route/";
-    let mut events = db::DEFAULT.watch(key).await?;
+    let db = &infra_db::CLUSTER_COORDINATOR;
+    let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching syslog routes");
     loop {
@@ -80,15 +85,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            Event::Put(ev) => {
+            infra_db::Event::Put(ev) => {
                 let item_value: SyslogRoute = json::from_slice(&ev.value.unwrap()).unwrap();
                 SYSLOG_ROUTES.insert(item_value.id.to_owned(), item_value);
             }
-            Event::Delete(ev) => {
+            infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 SYSLOG_ROUTES.remove(item_key);
             }
-            Event::Empty => {}
+            infra_db::Event::Empty => {}
         }
     }
     Ok(())
@@ -96,7 +101,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/syslog/route/";
-    let ret = db::DEFAULT.list(key).await?;
+    let ret = infra_db::DEFAULT.list(key).await?;
     for (_, item_value) in ret {
         let json_val: SyslogRoute = json::from_slice(&item_value).unwrap();
         SYSLOG_ROUTES.insert(json_val.id.to_owned(), json_val);
@@ -107,7 +112,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
 pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
     let key = "/syslog/enabled";
-    let mut events = db::DEFAULT.watch(key).await?;
+    let db = &infra_db::CLUSTER_COORDINATOR;
+    let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching SyslogServer settings");
     loop {
@@ -119,16 +125,16 @@ pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            Event::Put(ev) => {
+            infra_db::Event::Put(ev) => {
                 let item_value: bool = json::from_slice(&ev.value.unwrap()).unwrap();
                 let mut syslog_enabled = SYSLOG_ENABLED.write();
                 *syslog_enabled = item_value;
             }
-            Event::Delete(_) => {
+            infra_db::Event::Delete(_) => {
                 let mut syslog_enabled = SYSLOG_ENABLED.write();
                 *syslog_enabled = false;
             }
-            Event::Empty => {}
+            infra_db::Event::Empty => {}
         }
     }
     Ok(())
@@ -136,7 +142,7 @@ pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
 
 pub async fn cache_syslog_settings() -> Result<(), anyhow::Error> {
     let key = "/syslog/enabled";
-    if let Ok(val) = db::DEFAULT.get(key).await {
+    if let Ok(val) = infra_db::DEFAULT.get(key).await {
         let item_value: bool = json::from_slice(&val).unwrap();
         let mut syslog_enabled = SYSLOG_ENABLED.write();
         *syslog_enabled = item_value;

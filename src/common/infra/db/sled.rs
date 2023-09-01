@@ -66,14 +66,14 @@ impl super::Db for SledDb {
         }
     }
 
-    async fn put(&self, key: &str, value: Bytes) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, _need_watch: bool) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let client = SLED_CLIENT.clone().unwrap();
         client.insert(key.as_str(), value.to_vec())?;
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool) -> Result<()> {
+    async fn delete(&self, key: &str, with_prefix: bool, _need_watch: bool) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let client = SLED_CLIENT.clone().unwrap();
         if !with_prefix {

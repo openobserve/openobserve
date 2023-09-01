@@ -14,7 +14,7 @@
 
 use once_cell::sync::Lazy;
 
-use crate::common::infra::config::RwHashMap;
+use crate::common::infra::{config::RwHashMap, db as infra_db};
 
 pub static STREAMS: Lazy<RwHashMap<String, RwHashMap<String, i64>>> = Lazy::new(Default::default);
 
@@ -23,7 +23,7 @@ fn mk_key(org_id: &str) -> String {
 }
 
 pub async fn get_offset(org_id: &str) -> (i64, String) {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = mk_key(org_id);
     let value = match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
@@ -44,25 +44,27 @@ pub async fn set_offset(
     offset: i64,
     node: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = mk_key(org_id);
     let val = if let Some(node) = node {
         format!("{};{}", offset, node)
     } else {
         offset.to_string()
     };
-    Ok(db.put(&key, val.into()).await?)
+    Ok(db.put(&key, val.into(), infra_db::NO_NEED_WATCH).await?)
 }
 
 pub async fn del_offset(org_id: &str) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = mk_key(org_id);
-    db.delete_if_exists(&key, false).await.map_err(Into::into)
+    db.delete_if_exists(&key, false, infra_db::NO_NEED_WATCH)
+        .await
+        .map_err(Into::into)
 }
 
 pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
     let mut items = Vec::new();
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/compact/organization/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {

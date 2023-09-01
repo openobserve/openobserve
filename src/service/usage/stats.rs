@@ -14,24 +14,24 @@
 
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use crate::common::infra::{
-    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-    config::CONFIG,
-    dist_lock,
-};
-use crate::common::meta::{
-    self,
-    search::Request,
-    usage::{Stats, UsageEvent, STATS_STREAM, USAGE_STREAM},
-};
-use crate::common::utils::json;
-use crate::handler::grpc::cluster_rpc;
-use crate::service::{db, search as SearchService};
+use std::{collections::HashMap, sync::Arc};
 
 use super::ingestion_service;
+use crate::common::{
+    infra::{
+        cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+        config::CONFIG,
+        db as infra_db, dist_lock,
+    },
+    meta::{
+        self,
+        search::Request,
+        usage::{Stats, UsageEvent, STATS_STREAM, USAGE_STREAM},
+    },
+    utils::json,
+};
+use crate::handler::grpc::cluster_rpc;
+use crate::service::{db, search as SearchService};
 
 pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
@@ -231,7 +231,7 @@ async fn report_stats(
 }
 
 async fn get_last_stats_offset(org_id: &str) -> (i64, String) {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = format!("/stats/last_updated/org/{org_id}");
     let value = match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
@@ -252,21 +252,22 @@ pub async fn set_last_stats_offset(
     offset: i64,
     node: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let val = if let Some(node) = node {
         format!("{};{}", offset, node)
     } else {
         offset.to_string()
     };
     let key = format!("/stats/last_updated/org/{org_id}");
-    db.put(&key, val.into()).await?;
+    db.put(&key, val.into(), infra_db::NO_NEED_WATCH).await?;
     Ok(())
 }
 
 pub async fn _set_cache_expiry(offset: i64) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = format!("/stats/cache_expiry");
-    db.put(&key, offset.to_string().into()).await?;
+    db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
+        .await?;
     Ok(())
 }
 

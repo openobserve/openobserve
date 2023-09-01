@@ -21,11 +21,20 @@ use sqlx::{
     ConnectOptions, Pool, Sqlite,
 };
 use std::{str::FromStr, sync::Arc};
-use tokio::{sync::mpsc, task::JoinHandle, time};
+use tokio::sync::{mpsc, RwLock};
 
-use crate::common::infra::{cluster, config::CONFIG, errors::*};
+use crate::common::infra::{
+    cluster,
+    config::{FxIndexMap, CONFIG},
+    errors::*,
+};
 
 pub(crate) static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
+
+static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
+    Lazy::new(|| RwLock::new(Default::default()));
+
+type EventChannel = Arc<mpsc::Sender<super::Event>>;
 
 fn connect() -> Pool<Sqlite> {
     let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
@@ -45,11 +54,52 @@ fn connect() -> Pool<Sqlite> {
     pool_opts.connect_lazy_with(db_opts)
 }
 
-pub struct SqliteDb {}
+pub struct SqliteDb {
+    event_tx: EventChannel,
+}
 
 impl SqliteDb {
     pub fn new() -> Self {
-        Self {}
+        let (tx, mut rx) = mpsc::channel::<super::Event>(1024);
+        tokio::task::spawn(async move {
+            loop {
+                if cluster::is_offline() {
+                    break;
+                }
+                match rx.recv().await {
+                    Some(v) => {
+                        log::info!("[SQLITE] watch channel receive: {:?}", &v);
+                        for (prefix, tx) in WATCHERS.read().await.iter() {
+                            println!("prefix: {}", prefix);
+                            match v.clone() {
+                                super::Event::Put(e) => {
+                                    if e.key.starts_with(prefix) {
+                                        if let Err(e) = tx.send(super::Event::Put(e)).await {
+                                            log::error!("[SQLITE] send event error: {}", e);
+                                        }
+                                    }
+                                }
+                                super::Event::Delete(e) => {
+                                    if e.key.starts_with(prefix) {
+                                        if let Err(e) = tx.send(super::Event::Delete(e)).await {
+                                            log::error!("[SQLITE] send event error: {}", e);
+                                        }
+                                    }
+                                }
+                                super::Event::Empty => {}
+                            }
+                        }
+                    }
+                    None => {
+                        log::info!("[SQLITE] watch channel closed");
+                        break;
+                    }
+                };
+            }
+        });
+        Self {
+            event_tx: Arc::new(tx),
+        }
     }
 }
 
@@ -96,7 +146,7 @@ impl super::Db for SqliteDb {
         Ok(Bytes::from(value))
     }
 
-    async fn put(&self, key: &str, value: Bytes) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()> {
         let (module, key1, key2) = parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
@@ -112,25 +162,79 @@ impl super::Db for SqliteDb {
             .bind(&module)
             .bind(&key1)
             .bind(&key2)
-            .bind(value.to_vec())
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .execute(&mut *tx)
             .await?;
         if let Err(e) = tx.commit().await {
             log::error!("[SQLITE] commit stream stats error: {}", e);
         }
 
+        // event watch
+        if !need_watch {
+            return Ok(());
+        }
+
+        self.event_tx
+            .clone()
+            .send(super::Event::Put(super::EventData {
+                key: key.to_string(),
+                value: Some(value),
+            }))
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+
         Ok(())
     }
 
-    async fn delete(&self, key: &str, _with_prefix: bool) -> Result<()> {
+    async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
+        // event watch
+        if need_watch {
+            // find all keys then send event
+            let items = if with_prefix {
+                self.list_keys(key).await?
+            } else {
+                vec![key.to_string()]
+            };
+            let tx = self.event_tx.clone();
+            tokio::task::spawn(async move {
+                for key in items {
+                    if let Err(e) = tx
+                        .send(super::Event::Delete(super::EventData {
+                            key: key.to_string(),
+                            value: None,
+                        }))
+                        .await
+                    {
+                        log::error!("[SQLITE] send event error: {}", e);
+                    }
+                }
+            });
+        }
+
         let (module, key1, key2) = parse_key(key);
+        let sql = if with_prefix {
+            if key1.is_empty() {
+                format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
+            } else if key2.is_empty() {
+                format!(
+                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}';"#,
+                    module, key1
+                )
+            } else {
+                format!(
+                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%';"#,
+                    module, key1, key2
+                )
+            }
+        } else {
+            format!(
+                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
+                module, key1, key2
+            )
+        };
         let pool = CLIENT.clone();
-        sqlx::query(r#"DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3;"#)
-            .bind(module)
-            .bind(key1)
-            .bind(key2)
-            .execute(&pool)
-            .await?;
+        sqlx::query(&sql).execute(&pool).await?;
+
         Ok(())
     }
 
@@ -146,7 +250,6 @@ impl super::Db for SqliteDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        println!("[SQLITE] list sql: {}", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -203,19 +306,12 @@ impl super::Db for SqliteDb {
         Ok(count)
     }
 
-    async fn watch(&self, _prefix: &str) -> Result<Arc<mpsc::Receiver<super::Event>>> {
+    async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<super::Event>>> {
         let (tx, rx) = mpsc::channel(1024);
-        let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            loop {
-                if cluster::is_offline() {
-                    break;
-                }
-                tx.send(super::Event::Empty).await.unwrap();
-                time::sleep(time::Duration::from_secs(10)).await;
-            }
-            Ok(())
-        });
-
+        WATCHERS
+            .write()
+            .await
+            .insert(prefix.to_string(), Arc::new(tx));
         Ok(Arc::new(rx))
     }
 }
@@ -275,7 +371,7 @@ CREATE TABLE IF NOT EXISTS meta
     module  VARCHAR  not null,
     key1    VARCHAR not null,
     key2    VARCHAR not null,
-    value   BLOB not null
+    value   TEXT not null
 );
         "#,
     )

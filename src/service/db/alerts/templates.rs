@@ -14,12 +14,11 @@
 
 use std::sync::Arc;
 
-use crate::common::infra::config::{ALERTS_TEMPLATES, CONFIG};
-use crate::common::infra::db::Event;
-use crate::common::meta::alert::DestinationTemplate;
-use crate::common::meta::meta_store::MetaStore;
-use crate::common::meta::organization::DEFAULT_ORG;
-use crate::common::utils::json;
+use crate::common::{
+    infra::{config::ALERTS_TEMPLATES, db as infra_db},
+    meta::{alert::DestinationTemplate, organization::DEFAULT_ORG},
+    utils::json,
+};
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<DestinationTemplate>, anyhow::Error> {
     let map_key = format!("{org_id}/{name}");
@@ -32,7 +31,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<DestinationTemplate>
             None => Some(ALERTS_TEMPLATES.get(&default_org_key).unwrap().clone()),
         }
     } else {
-        let db = &crate::common::infra::db::DEFAULT;
+        let db = &infra_db::DEFAULT;
         let key = format!("/templates/{org_id}/{name}");
         match db.get(&key).await {
             Ok(val) => json::from_slice(&val).unwrap(),
@@ -53,28 +52,28 @@ pub async fn set(
     name: &str,
     mut template: DestinationTemplate,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     template.is_default = Some(org_id == DEFAULT_ORG);
     let key = format!("/templates/{org_id}/{name}");
     Ok(db
-        .put(&key, json::to_vec(&template).unwrap().into())
+        .put(
+            &key,
+            json::to_vec(&template).unwrap().into(),
+            infra_db::NEED_WATCH,
+        )
         .await?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = format!("/templates/{org_id}/{name}");
-    Ok(db.delete(&key, false).await?)
+    Ok(db.delete(&key, false, infra_db::NEED_WATCH).await?)
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Error> {
-    if !CONFIG
-        .common
-        .meta_store
-        .eq(&MetaStore::DynamoDB.to_string())
-    {
-        Ok(ALERTS_TEMPLATES
-            .clone()
+    let cache = ALERTS_TEMPLATES.clone();
+    if !cache.is_empty() {
+        Ok(cache
             .iter()
             .filter_map(|template| {
                 let k = template.key();
@@ -83,7 +82,7 @@ pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Erro
             })
             .collect())
     } else {
-        let db = &crate::common::infra::db::DEFAULT;
+        let db = &infra_db::DEFAULT;
         let key = format!("/templates/{org_id}/", org_id = org_id);
         let ret = db.list(key.as_str()).await?;
         let mut templates = Vec::new();
@@ -96,8 +95,8 @@ pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Erro
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
     let key = "/templates/";
+    let db = &infra_db::CLUSTER_COORDINATOR;
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching alert templates");
@@ -110,23 +109,23 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            Event::Put(ev) => {
+            infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: DestinationTemplate = json::from_slice(&ev.value.unwrap()).unwrap();
                 ALERTS_TEMPLATES.insert(item_key.to_owned(), item_value);
             }
-            Event::Delete(ev) => {
+            infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 ALERTS_TEMPLATES.remove(item_key);
             }
-            Event::Empty => {}
+            infra_db::Event::Empty => {}
         }
     }
     Ok(())
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/templates/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {

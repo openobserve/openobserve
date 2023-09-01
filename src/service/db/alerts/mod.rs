@@ -14,12 +14,14 @@
 
 use std::sync::Arc;
 
-use crate::common::infra::config::{CONFIG, STREAM_ALERTS, TRIGGERS_IN_PROCESS};
-use crate::common::infra::db::{Event, CLUSTER_COORDINATOR};
-use crate::common::meta::alert::{Alert, AlertList};
-use crate::common::meta::meta_store::MetaStore;
-use crate::common::meta::StreamType;
-use crate::common::utils::json;
+use crate::common::{
+    infra::{config::STREAM_ALERTS, db as infra_db},
+    meta::{
+        alert::{Alert, AlertList},
+        StreamType,
+    },
+    utils::json,
+};
 
 pub mod destinations;
 pub mod templates;
@@ -36,7 +38,7 @@ pub async fn get(
         val.list.retain(|alert| alert.name.eq(name));
         val.list.first().cloned()
     } else {
-        let db = &crate::common::infra::db::DEFAULT;
+        let db = &infra_db::DEFAULT;
         let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
         match db.get(&key).await {
             Ok(val) => json::from_slice(&val).unwrap(),
@@ -53,20 +55,17 @@ pub async fn set(
     name: &str,
     alert: Alert,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
-    match db.put(&key, json::to_vec(&alert).unwrap().into()).await {
-        Ok(_) => {
-            if CONFIG
-                .common
-                .meta_store
-                .eq(&MetaStore::DynamoDB.to_string())
-            {
-                CLUSTER_COORDINATOR
-                    .put(&key, CONFIG.common.meta_store.clone().into())
-                    .await?
-            }
-        }
+    match db
+        .put(
+            &key,
+            json::to_vec(&alert).unwrap().into(),
+            infra_db::NEED_WATCH,
+        )
+        .await
+    {
+        Ok(_) => {}
         Err(e) => {
             log::error!("Error putting schema: {}", e);
             return Err(anyhow::anyhow!("Error putting schema: {}", e));
@@ -81,23 +80,11 @@ pub async fn delete(
     stream_type: StreamType,
     name: &str,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
-    match db.delete(&key, false).await {
-        Ok(_) => {
-            // Remove trigger from in-process list as alert is deleted
-            TRIGGERS_IN_PROCESS.remove(name);
-            if CONFIG
-                .common
-                .meta_store
-                .eq(&MetaStore::DynamoDB.to_string())
-            {
-                CLUSTER_COORDINATOR.delete(&key, false).await?
-            }
-            Ok(())
-        }
-        Err(e) => Err(anyhow::anyhow!(e)),
-    }
+    db.delete(&key, false, infra_db::NEED_WATCH)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error deleting alert: {}", e))
 }
 
 pub async fn list(
@@ -105,7 +92,7 @@ pub async fn list(
     stream_name: Option<&str>,
     stream_type: Option<StreamType>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
 
     let loc_stream_type = if stream_type.is_some() {
         stream_type.unwrap()
@@ -127,8 +114,8 @@ pub async fn list(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::CLUSTER_COORDINATOR;
     let key = "/alerts/";
+    let db = &infra_db::CLUSTER_COORDINATOR;
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching alerts");
@@ -141,21 +128,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            Event::Put(ev) => {
+            infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let alert_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
-                let item_value: Alert = if CONFIG
-                    .common
-                    .meta_store
-                    .eq(&MetaStore::DynamoDB.to_string())
-                {
-                    let dynamo = &crate::common::infra::db::DEFAULT;
-                    let ret = dynamo.get(&ev.key).await?;
-                    json::from_slice(&ret).unwrap()
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
-                };
-
+                let item_value: Alert = json::from_slice(&ev.value.unwrap()).unwrap();
                 let mut group = STREAM_ALERTS
                     .entry(alert_key.to_string())
                     .or_insert(AlertList { list: vec![] });
@@ -166,7 +142,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     group.list.push(item_value);
                 }
             }
-            Event::Delete(ev) => {
+            infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let alert_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
                 let item_name = item_key[item_key.rfind('/').unwrap() + 1..].to_string();
@@ -178,14 +154,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     STREAM_ALERTS.remove(item_key);
                 }
             }
-            Event::Empty => {}
+            infra_db::Event::Empty => {}
         }
     }
     Ok(())
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/alerts/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
@@ -203,7 +179,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/alerts/";
-    Ok(db.delete(key, true).await?)
+    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH).await?)
 }
