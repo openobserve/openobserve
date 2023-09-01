@@ -159,6 +159,7 @@ export default defineComponent({
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter,
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery
         ], () => {
+            activeTab.value=dashboardPanelData.layout.currentQueryIndex;
             // only continue if current mode is auto query generation
             if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
                 console.log("Updating query");

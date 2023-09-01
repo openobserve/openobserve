@@ -302,6 +302,14 @@ export default defineComponent({
         }
       }
 
+      //check each query is empty or not for promql
+      if(dashboardData.data.queryType=="promql"){
+        dashboardData.data.queries.map((q:any,index:number)=>{
+          if(q && q.query==""){
+            errors.push(`Query-${index+1} is empty`)
+          }
+        })
+      }
       if (promqlMode.value) {
         // 1. chart type: only line chart is supported
         const allowedChartTypes = ['area','line','bar','scatter','area-stacked','metric']

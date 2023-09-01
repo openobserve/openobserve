@@ -115,6 +115,8 @@ export default defineComponent({
             await nextTick() // let the watchers execute first
             removeXYFilters()
             updateXYFieldsForCustomQueryMode()
+            dashboardPanelData.layout.currentQueryIndex=0;
+            dashboardPanelData.data.queries=dashboardPanelData.data.queries.slice(0,1);
             dashboardPanelData.layout.showQueryBar = true
         };
 
