@@ -110,7 +110,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, watch, onActivated, computed } from "vue";
+import { defineComponent, reactive, ref, watch, onActivated, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -137,7 +137,7 @@ export default defineComponent({
     const { dashboardPanelData, addXAxisItem, addYAxisItem, addZAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, isAddZAxisNotAllowed, promqlMode } =
       useDashboardPanelData();
 
-    onActivated(() => {
+    onMounted(() => {
       getStreamList();
     });
 

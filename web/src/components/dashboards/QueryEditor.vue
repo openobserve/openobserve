@@ -273,12 +273,12 @@ export default defineComponent({
       );
     });
 
-    onActivated(async () => {
+    onMounted(async () => {
       provider.value?.dispose();
       registerAutoCompleteProvider();
     });
 
-    onDeactivated(() => {
+    onUnmounted(() => {
       provider.value?.dispose();
     });
 

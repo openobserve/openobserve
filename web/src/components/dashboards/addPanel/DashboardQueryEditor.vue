@@ -68,7 +68,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, reactive, toRaw, onActivated, computed } from "vue";
+import { defineComponent, ref, watch, reactive, toRaw, onActivated, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -145,7 +145,7 @@ export default defineComponent({
             window.dispatchEvent(new Event("resize"))
         })
 
-        onActivated(() => {
+        onMounted(() => {
             activeTab.value=dashboardPanelData?.layout?.currentQueryIndex||0;
             dashboardPanelData.meta.errors.queryErrors = []
         })

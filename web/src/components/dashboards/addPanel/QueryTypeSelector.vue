@@ -82,9 +82,9 @@ export default defineComponent({
             initializeSelectedButtonType()
         })
 
-        onActivated(async () => {
-            initializeSelectedButtonType()
-        })
+        // onActivated(async () => {
+        //     initializeSelectedButtonType()
+        // })
 
         // when the data is loaded, initialize the selectedButtonType
         watch(() => [dashboardPanelData.data.queryType, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery], () => {

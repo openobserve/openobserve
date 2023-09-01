@@ -111,6 +111,8 @@ import {
   watch,
   reactive,
   onDeactivated,
+onUnmounted,
+onMounted,
 } from "vue";
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
 import ConfigPanel from "../../../components/dashboards/addPanel/ConfigPanel.vue";
@@ -183,12 +185,12 @@ export default defineComponent({
       await savePanelChangesToDashboard(dashboardId);
     })
 
-    onDeactivated(async () => {
+    onUnmounted(async () => {
       // clear a few things
       resetDashboardPanelData();
     });
 
-    onActivated(async () => {
+    onMounted(async () => {
       errorData.errors = []
 
       // todo check for the edit more
