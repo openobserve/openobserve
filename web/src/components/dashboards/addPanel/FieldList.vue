@@ -21,7 +21,7 @@
         class="q-mb-xs"></q-select>
       <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream" :label="t('dashboard.selectIndex')"
         :options="filteredStreams" data-cy="index-dropdown" input-debounce="0" behavior="menu" use-input filled borderless
-        dense hide-selected fill-input @filter="filterStreamFn">
+        dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value">
         <template #no-option>
           <q-item>
             <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -117,6 +117,7 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import IndexService from "../../../services/index";
+import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "FieldList",
@@ -136,9 +137,13 @@ export default defineComponent({
     const $q = useQuasar();
     const { dashboardPanelData, addXAxisItem, addYAxisItem, addZAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, isAddZAxisNotAllowed, promqlMode } =
       useDashboardPanelData();
+      
+    const streamDataLoading = useLoading(async ()=>{
+      await getStreamList();
+    });
 
     onMounted(() => {
-      getStreamList();
+      streamDataLoading.execute();
     });
 
     // update the selected stream fields list
@@ -194,8 +199,8 @@ export default defineComponent({
     );
 
     // get the stream list by making an API call
-    const getStreamList = () => {
-      IndexService.nameList(
+    const getStreamList = async() => {
+     await IndexService.nameList(
         store.state.selectedOrganization.identifier,
         "",
         true
@@ -275,7 +280,8 @@ export default defineComponent({
       isAddXAxisNotAllowed,
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
-      promqlMode
+      promqlMode,
+      streamDataLoading
     };
   },
 });
