@@ -211,10 +211,6 @@ export default defineComponent({
       resetDashboardPanelData();
     });
 
-    watch(()=>isOutDated.value,()=>{
-      window.dispatchEvent(new Event('resize'))
-    });
-
     onMounted(async () => {
       errorData.errors = []
 
@@ -280,6 +276,11 @@ export default defineComponent({
       //compare chartdata and dashboardpaneldata
       return !_.isEqual(chartData.value, dashboardPanelData.data);
     })
+
+    watch(isOutDated ,()=>{
+      console.log("isOutDated",isOutDated);
+      window.dispatchEvent(new Event('resize'))
+    });
 
     const currentXLabel = computed(() => {
       return dashboardPanelData.data.type == 'table' ? 'First Column' : dashboardPanelData.data.type == 'h-bar' ? 'Y-Axis' : 'X-Axis'
