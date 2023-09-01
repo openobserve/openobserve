@@ -242,7 +242,16 @@ export default defineComponent({
     };
 
 
+    const isInitailDashboardPanelData = ()=>{
+      return dashboardPanelData.data.config.description==""&&(!dashboardPanelData.data.config.unit)&&(!dashboardPanelData.data.config.unit_custom)&&dashboardPanelData.data.queries[0].fields.x.length==0&&
+      dashboardPanelData.data.queries[0].fields.y.length==0&&dashboardPanelData.data.queries[0].fields.z.length==0&&dashboardPanelData.data.queries[0].fields.filter.length==0&&
+      dashboardPanelData.data.queries.length==1;
+    }
+
+
     const isOutDated = computed(() => {
+      //check that is it addpanel initial call
+      if(isInitailDashboardPanelData())return false;
       //compare chartdata and dashboardpaneldata
       return !_.isEqual(chartData.value, dashboardPanelData.data);
     })
