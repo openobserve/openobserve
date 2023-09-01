@@ -14,10 +14,10 @@
 -->
 
 <template>
-    <div>
-        <q-bar class="row sql-bar" style="display: flex; justify-content: space-between;">
+    <div class="col-auto">
+        <q-bar class="row sql-bar" style="display: flex; justify-content: space-between;" @click="onDropDownClick">
             <div style="display: flex ; flex-direction: row; align-items: center;">
-                <div @click="onDropDownClick">
+                <div>
                     <q-icon flat :name="!dashboardPanelData.layout.showQueryBar ? 'arrow_right' : 'arrow_drop_down'"
                         text-color="black" class="q-mr-sm" />
                 </div>
@@ -54,7 +54,7 @@
         </q-bar>
 
     </div>
-    <div class="row" :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'"
+    <div class="row col" :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: 100%;'"
         style="overflow: hidden;">
         <div class="col">
             <query-editor ref="queryEditorRef" class="monaco-editor" v-model:query="currentQuery"

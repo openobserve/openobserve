@@ -66,6 +66,7 @@ const getDefaultDashboardPanelData = () => ({
     },
     layout: {
       splitter: 20,
+      querySplitter: 20,
       showQueryBar: false,
       isConfigPanelOpen: false,
       currentQueryIndex: 0

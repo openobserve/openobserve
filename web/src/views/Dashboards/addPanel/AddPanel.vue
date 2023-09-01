@@ -64,27 +64,48 @@
           </template>
           <template #after>
             <div class="row" style="height: calc(100vh - 115px); overflow-y: auto; ">
-              <div class="col">
-                <div class="layout-panel-container col scroll" style="height:100%;">
-                  <DashboardQueryBuilder />
-                  <q-separator />
-                  <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables"
-                    :selectedTimeDate="dashboardPanelData.meta.dateTime" @variablesData="variablesDataUpdated" />
+              <div class="col" style="height: 100%">
+                  <q-splitter 
+                    v-model="dashboardPanelData.layout.querySplitter" 
+                    horizontal 
+                    @update:model-value="layoutSplitterUpdated" 
+                    reverse 
+                    unit="px" 
+                    :limits="!dashboardPanelData.layout.showQueryBar ? [41, 400] : [100, 400]"
+                    :disable="!dashboardPanelData.layout.showQueryBar"
+                    style="height: 100%;" 
+                  >
+                   <template #before>
+                    <div class="layout-panel-container col" style="height:100%;">
+
+                    <DashboardQueryBuilder />
+                    <q-separator />
+                    <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables"
+                      :selectedTimeDate="dashboardPanelData.meta.dateTime" @variablesData="variablesDataUpdated" />
                   <!-- <div style="flex:1;">
                     <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                   </div> -->
-                  <div v-if="isOutDated" :style="{borderColor:'#c3920d',borderWidth: '1px', borderStyle: 'solid', backgroundColor: store.state.theme=='dark' ? '#2a1f03' : '#faf2da', padding: '1%', margin: '1%', borderRadius: '5px'}" >
-                    <div style="font-weight: 700;">Your chart is not up to date</div>
-                    <div>Chart configuration has been updated, but the chart was not updated automatically. Click on the "Apply" button to run the query again</div>
-                  </div>
-                  <div style="flex:1;">
-                    <PanelSchemaRenderer :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
-                  </div>
-                  <DashboardErrorsComponent :errors="errorData" />
-                  <q-separator />
-                  <DashboardQueryEditor />
-                </div>
 
+                    <div v-if="isOutDated" :style="{ borderColor: '#c3920d', borderWidth: '1px', borderStyle: 'solid', backgroundColor: store.state.theme == 'dark' ? '#2a1f03' : '#faf2da', padding: '1%', margin: '1%', borderRadius: '5px' }">
+                      <div style="font-weight: 700;">Your chart is not up to date</div>
+                      <div>Chart configuration has been updated, but the chart was not updated automatically. Click on the "Apply" button to run the query again</div>
+                    </div>
+
+                    <div style="flex:1;">
+                      <PanelSchemaRenderer :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
+                    </div>
+                    <DashboardErrorsComponent :errors="errorData" />
+                    </div>
+                  </template>
+                  <template #separator>
+                    <div class="splitter" :class="dashboardPanelData.layout.showQueryBar ? 'splitter-enabled' : ''"></div>
+                  </template>
+                  <template #after>
+                    <div style="height: 100%; width: 100%;" class="column">
+                      <DashboardQueryEditor />
+                    </div>
+                  </template>
+                </q-splitter>
               </div>
               <q-separator vertical />
               <div class="col-auto">
@@ -275,6 +296,14 @@ export default defineComponent({
     // resize the chart when config panel is opened and closed
     watch(() => dashboardPanelData.layout.isConfigPanelOpen, () => {
       window.dispatchEvent(new Event("resize"));
+    })
+
+    
+    // resize the chart when config panel is opened and closed
+    watch(() => dashboardPanelData.layout.showQueryBar, () => {
+      if(!dashboardPanelData.layout.showQueryBar){
+        dashboardPanelData.layout.querySplitter = 41
+      }
     })
 
     const runQuery = () => {
@@ -593,5 +622,20 @@ export default defineComponent({
 .layout-panel-container {
   display: flex;
   flex-direction: column;
+}
+
+.splitter {
+  height: 4px;
+  width: 100%;
+}
+
+.splitter-enabled {
+  background-color: #ffffff00;
+  transition: 0.3s;
+  transition-delay: 0.2s;
+}
+
+.splitter-enabled:hover {
+  background-color: orange;
 }
 </style>

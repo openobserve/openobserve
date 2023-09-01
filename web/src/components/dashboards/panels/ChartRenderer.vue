@@ -22,6 +22,7 @@ export default defineComponent({
         const store = useStore();
         const windowResizeEventCallback = async () => {
             await nextTick();
+            await nextTick();
             chart.resize();
         }
 
