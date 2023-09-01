@@ -118,6 +118,7 @@ export default defineComponent({
 
         const removeTab = async (index) => {
             if (activeTab.value >= dashboardPanelData.data.queries.length-1) activeTab.value -=1;
+            dashboardPanelData.layout.currentQueryIndex=activeTab.value;
             removeQuery(index);
         };
 
