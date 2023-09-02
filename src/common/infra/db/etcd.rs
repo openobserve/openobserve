@@ -468,7 +468,7 @@ impl Locker {
         Ok(())
     }
 
-    pub async fn unlock(&mut self) -> Result<()> {
+    pub async fn unlock(&self) -> Result<()> {
         if self.state.load(Ordering::SeqCst) != 1 {
             return Ok(());
         }

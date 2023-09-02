@@ -26,7 +26,7 @@ pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<etcd::Locker>> {
 }
 
 #[inline(always)]
-pub async fn unlock(locker: &mut Option<etcd::Locker>) -> Result<()> {
+pub async fn unlock(locker: &Option<etcd::Locker>) -> Result<()> {
     if let Some(locker) = locker {
         locker.unlock().await
     } else {

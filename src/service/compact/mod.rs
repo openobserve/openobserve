@@ -149,12 +149,12 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 
         // before start merging, set current node to lock the organization
         let lock_key = format!("compact/organization/{org_id}");
-        let mut locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+        let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
         // check the working node for the organization again, maybe other node locked it first
         let (_, node) = db::compact::organization::get_offset(&org_id).await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
             log::error!("[COMPACT] organization {org_id} is merging by {node}");
-            dist_lock::unlock(&mut locker).await?;
+            dist_lock::unlock(&locker).await?;
             continue;
         }
         if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
@@ -162,7 +162,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                 .await?;
         }
         // already bind to this node, we can unlock now
-        dist_lock::unlock(&mut locker).await?;
+        dist_lock::unlock(&locker).await?;
         drop(locker);
 
         for stream_type in stream_types {

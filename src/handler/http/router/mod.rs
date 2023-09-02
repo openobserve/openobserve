@@ -13,35 +13,29 @@
 // limitations under the License.
 
 use actix_cors::Cors;
-use actix_web::dev::{Service, ServiceResponse};
-use actix_web::{body::MessageBody, http::header, web, HttpResponse};
+use actix_web::{
+    body::MessageBody,
+    dev::{Service, ServiceResponse},
+    http::header,
+    web, HttpResponse,
+};
 use actix_web_httpauth::middleware::HttpAuthentication;
 use futures::FutureExt;
-use std::sync::Arc;
+use std::rc::Rc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use super::auth::{validator, validator_aws, validator_gcp};
-use super::request::dashboards::*;
-use super::request::functions;
-use super::request::kv;
-use super::request::logs;
-use super::request::metrics;
-use super::request::organization;
-use super::request::prom;
-use super::request::search;
-use super::request::status;
-use super::request::stream;
-use super::request::syslog;
-use super::request::traces::*;
-use super::request::users;
-use super::request::{alerts::*, enrichment_table};
+use super::request::{
+    alerts::*, dashboards::*, enrichment_table, functions, kv, logs, metrics, organization, prom,
+    search, status, stream, syslog, traces::*, users,
+};
 use crate::common::infra::config::CONFIG;
 
 pub mod openapi;
 pub mod ui;
 
-fn get_cors() -> Arc<Cors> {
+fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
         .send_wildcard()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
@@ -52,7 +46,7 @@ fn get_cors() -> Arc<Cors> {
         ])
         .allow_any_origin()
         .max_age(3600);
-    Arc::new(cors)
+    Rc::new(cors)
 }
 
 pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {

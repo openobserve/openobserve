@@ -48,7 +48,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         }
 
         // get lock
-        let mut locker = dist_lock::lock(&format!("/stats/publish_stats/org/{org_id}"), 0).await?;
+        let locker = dist_lock::lock(&format!("/stats/publish_stats/org/{org_id}"), 0).await?;
 
         let (last_query_ts, node) = get_last_stats_offset(&org_id).await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
@@ -56,7 +56,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             continue;
         }
         // release lock
-        dist_lock::unlock(&mut locker).await?;
+        dist_lock::unlock(&locker).await?;
         drop(locker);
         let current_ts = chrono::Utc::now().timestamp_micros();
 

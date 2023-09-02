@@ -124,7 +124,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     let meta = sql::Sql::new(&req).await?;
 
     // get a cluster search queue lock
-    let mut locker = dist_lock::lock("search/cluster_queue", 0).await?;
+    let locker = dist_lock::lock("search/cluster_queue", 0).await?;
     let took_wait = start.elapsed().as_millis() as usize;
 
     // get nodes from cluster
@@ -269,13 +269,13 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             Ok(res) => results.push(res),
             Err(err) => {
                 // search done, release lock
-                dist_lock::unlock(&mut locker).await?;
+                dist_lock::unlock(&locker).await?;
                 return Err(err);
             }
         }
     }
     // search done, release lock
-    dist_lock::unlock(&mut locker).await?;
+    dist_lock::unlock(&locker).await?;
 
     // merge multiple instances data
     let mut scan_stats = ScanStats::new();
