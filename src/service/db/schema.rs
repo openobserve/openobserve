@@ -308,7 +308,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 log::error!("watch_stream_schema: event channel closed");
                 break;
             }
-        }; 
+        };
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();

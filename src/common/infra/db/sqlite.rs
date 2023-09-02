@@ -68,9 +68,7 @@ impl SqliteDb {
                 }
                 match rx.recv().await {
                     Some(v) => {
-                        log::info!("[SQLITE] watch channel receive: {:?}", &v);
                         for (prefix, tx) in WATCHERS.read().await.iter() {
-                            println!("prefix: {}", prefix);
                             match v.clone() {
                                 super::Event::Put(e) => {
                                     if e.key.starts_with(prefix) {
@@ -272,7 +270,6 @@ impl super::Db for SqliteDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        println!("[SQLITE] list sql: {}", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -300,7 +297,6 @@ impl super::Db for SqliteDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        println!("[SQLITE] list sql: {}", sql);
         let pool = CLIENT.clone();
         let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
         Ok(count)
