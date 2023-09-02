@@ -19,7 +19,7 @@ use crate::common::infra::{config::CONFIG, db as infra_db};
 static LOCAL_OFFSET: atomic::AtomicI64 = atomic::AtomicI64::new(0);
 
 pub async fn get_offset() -> (i64, String) {
-    if CONFIG.common.local_mode || !CONFIG.common.meta_store_external {
+    if !CONFIG.common.meta_store_external {
         let offset = LOCAL_OFFSET.load(atomic::Ordering::Relaxed);
         return (offset, String::from(""));
     }
@@ -41,7 +41,7 @@ pub async fn get_offset() -> (i64, String) {
 }
 
 pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
-    if CONFIG.common.local_mode || !CONFIG.common.meta_store_external {
+    if !CONFIG.common.meta_store_external {
         LOCAL_OFFSET.store(offset, atomic::Ordering::Relaxed);
         return Ok(());
     }
