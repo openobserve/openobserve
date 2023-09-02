@@ -11,8 +11,8 @@ FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
 # RUN apt-get install -y protobuf-compiler
 # RUN apt-get install -y cmake curl
 
-# RUN rustup toolchain install nightly-2023-05-21
-# RUN rustup default nightly-2023-05-21
+# RUN rustup toolchain install nightly-2023-08-01
+# RUN rustup default nightly-2023-08-01
 # RUN rustup target add aarch64-unknown-linux-gnu
 
 WORKDIR /app

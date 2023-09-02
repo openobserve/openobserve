@@ -6,7 +6,7 @@ RUN apt-get install -y protobuf-compiler
 RUN apt-get install -y cmake curl
 
 # RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-RUN rustup toolchain install nightly-2023-05-21
-RUN rustup default nightly-2023-05-21
+RUN rustup toolchain install nightly-2023-08-01
+RUN rustup default nightly-2023-08-01
 RUN rustup target add x86_64-unknown-linux-gnu
 

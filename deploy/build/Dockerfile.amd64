@@ -11,8 +11,8 @@ FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
 ARG AWS_DEFAULT_REGION
 ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 
-# RUN rustup toolchain install nightly-2023-05-21
-# RUN rustup default nightly-2023-05-21
+# RUN rustup toolchain install nightly-2023-08-01
+# RUN rustup default nightly-2023-08-01
 # RUN rustup target add x86_64-unknown-linux-gnu
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 # ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
