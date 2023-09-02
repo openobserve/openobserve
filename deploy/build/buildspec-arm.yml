@@ -26,35 +26,35 @@ phases:
       - docker buildx install
 
       # build for sccache image
-      - docker build -t public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64 -f deploy/build/Dockerfile.sccache.aarch64 .
-      - docker push public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64
-      - echo 'Pull amd64 image'
-      - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64
-      - echo 'Create manifests'
-      - docker manifest create public.ecr.aws/zinclabs/rust:bullseye-sccache --amend public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64 --amend public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64
-      - echo 'Push manifests'
-      - docker manifest push public.ecr.aws/zinclabs/rust:bullseye-sccache
+      # - docker build -t public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64 -f deploy/build/Dockerfile.sccache.aarch64 .
+      # - docker push public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64
+      # - echo 'Pull amd64 image'
+      # - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64
+      # - echo 'Create manifests'
+      # - docker manifest create public.ecr.aws/zinclabs/rust:bullseye-sccache --amend public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64 --amend public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64
+      # - echo 'Push manifests'
+      # - docker manifest push public.ecr.aws/zinclabs/rust:bullseye-sccache
 
       # build openobserve
       - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
       # - docker build -t openobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
-      # - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI -t openobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
-      # - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
-      # - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
-      # - docker push public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
-      # - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+      - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI -t openobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
+      - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
+      - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+      - docker push public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
+      - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
 
-      # - echo 'Pull amd64 image'
-      # - docker pull public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
-      # - docker pull public.ecr.aws/zinclabs/openobserve-dev:latest-amd64
+      - echo 'Pull amd64 image'
+      - docker pull public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
+      - docker pull public.ecr.aws/zinclabs/openobserve-dev:latest-amd64
 
-      # - echo 'Create manifests'
-      # - docker manifest create public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH --amend public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64 --amend public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
-      # - docker manifest create public.ecr.aws/zinclabs/openobserve-dev:latest --amend public.ecr.aws/zinclabs/openobserve-dev:latest-amd64 --amend public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
+      - echo 'Create manifests'
+      - docker manifest create public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH --amend public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64 --amend public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+      - docker manifest create public.ecr.aws/zinclabs/openobserve-dev:latest --amend public.ecr.aws/zinclabs/openobserve-dev:latest-amd64 --amend public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
 
-      # - echo 'Push manifests'
-      # - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH
-      # - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:latest
+      - echo 'Push manifests'
+      - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH
+      - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:latest
 
 cache:
   paths:
