@@ -21,9 +21,9 @@ use sqlx::{
     ConnectOptions, Pool, Postgres,
 };
 use std::{str::FromStr, sync::Arc};
-use tokio::{sync::mpsc, task::JoinHandle, time};
+use tokio::sync::mpsc;
 
-use crate::common::infra::{cluster, config::CONFIG, errors::*};
+use crate::common::infra::{config::CONFIG, errors::*};
 
 pub(crate) static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
 
@@ -60,24 +60,21 @@ impl super::Db for PostgresDb {
             .fetch_one(&pool)
             .await
             .unwrap_or_default();
-        let bytes_len: i64 =   sqlx::query_scalar(r#"SELECT (page_count * page_size)::BIGINT as size FROM pragma_page_count(), pragma_page_size();"#)
-        .fetch_one(&pool)
-        .await.unwrap_or_default();
         Ok(super::Stats {
-            bytes_len,
+            bytes_len: 0,
             keys_count,
         })
     }
 
     async fn get(&self, key: &str) -> Result<Bytes> {
-        let (module, key_1, key_2) = parse_key(key);
+        let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
-        let value: Vec<u8> = match sqlx::query_scalar(
+        let value: String = match sqlx::query_scalar(
             r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
         )
         .bind(module)
-        .bind(key_1)
-        .bind(key_2)
+        .bind(key1)
+        .bind(key2)
         .fetch_one(&pool)
         .await
         {
@@ -90,141 +87,193 @@ impl super::Db for PostgresDb {
     }
 
     async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()> {
-        let (module, key_1, key_2) = parse_key(key);
+        let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
-
         let mut tx = pool.begin().await?;
-        if let Err(e) = sqlx::query(
-            r#"INSERT INTO meta (module, key_1, key_2, value) VALUES ($1, $2, $3, '');"#,
+        sqlx::query(
+            r#"
+INSERT INTO meta (module, key1, key2, value) 
+    VALUES ($1, $2, $3, '')
+    ON CONFLICT DO NOTHING;"#,
         )
         .bind(&module)
-        .bind(&key_1)
-        .bind(&key_2)
+        .bind(&key1)
+        .bind(&key2)
         .execute(&mut *tx)
-        .await
-        {
-            log::error!("[POSTGRES] insert meta error: {}, key: {}", e, key);
-        }
-
+        .await?;
         sqlx::query(r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#)
             .bind(&module)
-            .bind(&key_1)
-            .bind(&key_2)
-            .bind(value.as_ref())
-            .execute(&pool)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
             .await?;
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit stream stats error: {}", e);
+        }
 
-        // TODO: event watch
-        if !need_watch {
-            return Ok(());
+        // event watch
+        if need_watch {
+            let tx = &super::CLUSTER_COORDINATOR;
+            tx.put(key, value, true).await?;
         }
 
         Ok(())
     }
 
-    async fn delete(&self, _key: &str, _with_prefix: bool, need_watch: bool) -> Result<()> {
-        // TODO: event watch
-        if !need_watch {
-            return Ok(());
+    async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
+        // event watch
+        if need_watch {
+            // find all keys then send event
+            let items = if with_prefix {
+                self.list_keys(key).await?
+            } else {
+                vec![key.to_string()]
+            };
+            let tx = &super::CLUSTER_COORDINATOR;
+            tokio::task::spawn(async move {
+                for key in items {
+                    if let Err(e) = tx.delete(&key, false, true).await {
+                        log::error!("[POSTGRES] send event error: {}", e);
+                    }
+                }
+            });
         }
+
+        let (module, key1, key2) = super::parse_key(key);
+        let sql = if with_prefix {
+            if key1.is_empty() {
+                format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
+            } else if key2.is_empty() {
+                format!(
+                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}';"#,
+                    module, key1
+                )
+            } else {
+                format!(
+                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%';"#,
+                    module, key1, key2
+                )
+            }
+        } else {
+            format!(
+                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
+                module, key1, key2
+            )
+        };
+        let pool = CLIENT.clone();
+        sqlx::query(&sql).execute(&pool).await?;
 
         Ok(())
     }
 
-    async fn list(&self, _prefix: &str) -> Result<HashMap<String, Bytes>> {
-        let result = HashMap::default();
-        Ok(result)
+    async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
+        let (module, key1, key2) = super::parse_key(prefix);
+        let mut sql = "SELECT module, key1, key2, value FROM meta".to_string();
+        if !module.is_empty() {
+            sql = format!("{} WHERE module = '{}'", sql, module);
+        }
+        if !key1.is_empty() {
+            sql = format!("{} AND key1 = '{}'", sql, key1);
+        }
+        if !key2.is_empty() {
+            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+        }
+        let pool = CLIENT.clone();
+        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
+            .fetch_all(&pool)
+            .await?;
+        Ok(ret
+            .into_iter()
+            .map(|r| {
+                (
+                    super::build_key(&r.module, &r.key1, &r.key2),
+                    Bytes::from(r.value),
+                )
+            })
+            .collect())
     }
 
-    async fn list_keys(&self, _prefix: &str) -> Result<Vec<String>> {
-        Ok(Vec::new())
+    async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
+        let (module, key1, key2) = super::parse_key(prefix);
+        let mut sql = "SELECT module, key1, key2 FROM meta".to_string();
+        if !module.is_empty() {
+            sql = format!("{} WHERE module = '{}'", sql, module);
+        }
+        if !key1.is_empty() {
+            sql = format!("{} AND key1 = '{}'", sql, key1);
+        }
+        if !key2.is_empty() {
+            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+        }
+        let pool = CLIENT.clone();
+        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
+            .fetch_all(&pool)
+            .await?;
+        Ok(ret
+            .into_iter()
+            .map(|r| format!("/{}/{}/{}", r.module, r.key1, r.key2))
+            .collect())
     }
 
-    async fn list_values(&self, _prefix: &str) -> Result<Vec<Bytes>> {
-        Ok(Vec::new())
+    async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
+        let items = self.list(prefix).await?;
+        Ok(items.into_values().collect())
     }
 
-    async fn count(&self, _prefix: &str) -> Result<i64> {
-        Ok(0)
+    async fn count(&self, prefix: &str) -> Result<i64> {
+        let (module, key1, key2) = super::parse_key(prefix);
+        let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
+        if !module.is_empty() {
+            sql = format!("{} WHERE module = '{}'", sql, module);
+        }
+        if !key1.is_empty() {
+            sql = format!("{} AND key1 = '{}'", sql, key1);
+        }
+        if !key2.is_empty() {
+            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+        }
+        let pool = CLIENT.clone();
+        let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
+        Ok(count)
     }
 
     async fn watch(&self, _prefix: &str) -> Result<Arc<mpsc::Receiver<super::Event>>> {
-        let (tx, rx) = mpsc::channel(1024);
-        let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            loop {
-                if cluster::is_offline() {
-                    break;
-                }
-                tx.send(super::Event::Empty).await.unwrap();
-                time::sleep(time::Duration::from_secs(10)).await;
-            }
-            Ok(())
-        });
-
-        Ok(Arc::new(rx))
+        Err(Error::NotImplemented)
     }
-}
-
-fn parse_key(mut key: &str) -> (String, String, String) {
-    let mut module = "".to_string();
-    let mut key_1 = "".to_string();
-    let mut key_2 = "".to_string();
-    if key.starts_with('/') {
-        key = &key[1..];
-    }
-    if key.is_empty() {
-        return (module, key_1, key_2);
-    }
-    let columns = key.split('/').collect::<Vec<&str>>();
-    match columns.len() {
-        0 => {}
-        1 => {
-            module = columns[0].to_string();
-        }
-        2 => {
-            module = columns[0].to_string();
-            key_1 = columns[1].to_string();
-        }
-        3 => {
-            module = columns[0].to_string();
-            key_1 = columns[1].to_string();
-            key_2 = columns[2].to_string();
-        }
-        _ => {
-            module = columns[0].to_string();
-            key_1 = columns[1].to_string();
-            key_2 = columns[2..].join("/");
-        }
-    }
-    (module, key_1, key_2)
 }
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
+    let mut tx = pool.begin().await?;
     // create table
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS meta
 (
-    id      INTEGER  not null primary key autoincrement,
+    id      BIGINT GENERATED ALWAYS AS IDENTITY,
     module  VARCHAR  not null,
     key1    VARCHAR not null,
     key2    VARCHAR not null,
-    value   BLOB not null
+    value   TEXT not null
 );
         "#,
     )
-    .execute(&pool)
+    .execute(&mut *tx)
     .await?;
     // create table index
+    sqlx::query("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);")
+        .execute(&mut *tx)
+        .await?;
     sqlx::query(
-        r#"
-CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);
-CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);
-CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (module, key1, key2);
-        "#,
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (module, key1, key2);",
     )
-    .execute(&pool)
+    .execute(&mut *tx)
     .await?;
+    tx.commit().await?;
+
     Ok(())
 }

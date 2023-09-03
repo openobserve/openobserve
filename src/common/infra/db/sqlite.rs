@@ -125,9 +125,9 @@ impl super::Db for SqliteDb {
     }
 
     async fn get(&self, key: &str) -> Result<Bytes> {
-        let (module, key1, key2) = parse_key(key);
+        let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
-        let value: Vec<u8> = match sqlx::query_scalar(
+        let value: String = match sqlx::query_scalar(
             r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
         )
         .bind(module)
@@ -145,7 +145,7 @@ impl super::Db for SqliteDb {
     }
 
     async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()> {
-        let (module, key1, key2) = parse_key(key);
+        let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         sqlx::query(
@@ -168,18 +168,16 @@ impl super::Db for SqliteDb {
         }
 
         // event watch
-        if !need_watch {
-            return Ok(());
+        if need_watch {
+            self.event_tx
+                .clone()
+                .send(super::Event::Put(super::EventData {
+                    key: key.to_string(),
+                    value: Some(value),
+                }))
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
         }
-
-        self.event_tx
-            .clone()
-            .send(super::Event::Put(super::EventData {
-                key: key.to_string(),
-                value: Some(value),
-            }))
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
 
         Ok(())
     }
@@ -209,7 +207,7 @@ impl super::Db for SqliteDb {
             });
         }
 
-        let (module, key1, key2) = parse_key(key);
+        let (module, key1, key2) = super::parse_key(key);
         let sql = if with_prefix {
             if key1.is_empty() {
                 format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
@@ -237,7 +235,7 @@ impl super::Db for SqliteDb {
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
-        let (module, key1, key2) = parse_key(prefix);
+        let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT module, key1, key2, value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
@@ -254,12 +252,17 @@ impl super::Db for SqliteDb {
             .await?;
         Ok(ret
             .into_iter()
-            .map(|r| (build_key(&r.module, &r.key1, &r.key2), Bytes::from(r.value)))
+            .map(|r| {
+                (
+                    super::build_key(&r.module, &r.key1, &r.key2),
+                    Bytes::from(r.value),
+                )
+            })
             .collect())
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
-        let (module, key1, key2) = parse_key(prefix);
+        let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT module, key1, key2 FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
@@ -286,7 +289,7 @@ impl super::Db for SqliteDb {
     }
 
     async fn count(&self, prefix: &str) -> Result<i64> {
-        let (module, key1, key2) = parse_key(prefix);
+        let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
@@ -310,50 +313,6 @@ impl super::Db for SqliteDb {
             .insert(prefix.to_string(), Arc::new(tx));
         Ok(Arc::new(rx))
     }
-}
-
-fn parse_key(mut key: &str) -> (String, String, String) {
-    let mut module = "".to_string();
-    let mut key1 = "".to_string();
-    let mut key2 = "".to_string();
-    if key.starts_with('/') {
-        key = &key[1..];
-    }
-    if key.is_empty() {
-        return (module, key1, key2);
-    }
-    let columns = key.split('/').collect::<Vec<&str>>();
-    match columns.len() {
-        0 => {}
-        1 => {
-            module = columns[0].to_string();
-        }
-        2 => {
-            module = columns[0].to_string();
-            key1 = columns[1].to_string();
-        }
-        3 => {
-            module = columns[0].to_string();
-            key1 = columns[1].to_string();
-            key2 = columns[2].to_string();
-        }
-        _ => {
-            module = columns[0].to_string();
-            key1 = columns[1].to_string();
-            key2 = columns[2..].join("/");
-        }
-    }
-    (module, key1, key2)
-}
-
-fn build_key(module: &str, key1: &str, key2: &str) -> String {
-    if key1.is_empty() {
-        return module.to_string();
-    }
-    if key2.is_empty() {
-        return format!("/{}/{}", module, key1);
-    }
-    format!("/{}/{}/{}", module, key1, key2)
 }
 
 pub async fn create_table() -> Result<()> {

@@ -15,16 +15,11 @@
 use ahash::AHashMap as HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
-use once_cell::sync::Lazy;
-use sqlx::{
-    postgres::{PgConnectOptions, PgPoolOptions},
-    ConnectOptions, Pool, Postgres, QueryBuilder, Row,
-};
-use std::str::FromStr;
+use sqlx::{Postgres, QueryBuilder, Row};
 
 use crate::common::{
     infra::{
-        config::CONFIG,
+        db::postgres::CLIENT,
         errors::{Error, Result},
     },
     meta::{
@@ -33,19 +28,6 @@ use crate::common::{
         StreamType,
     },
 };
-
-static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
-
-fn connect() -> Pool<Postgres> {
-    let db_opts = PgConnectOptions::from_str(&CONFIG.common.meta_store_postgres_dsn)
-        .expect("postgres connect options create failed")
-        .disable_statement_logging();
-
-    let pool_opts = PgPoolOptions::new();
-    let pool_opts = pool_opts.min_connections(CONFIG.limit.cpu_num as u32);
-    let pool_opts = pool_opts.max_connections(CONFIG.limit.query_thread_num as u32);
-    pool_opts.connect_lazy_with(db_opts)
-}
 
 pub struct PostgresFileList {}
 
@@ -70,7 +52,8 @@ impl super::FileList for PostgresFileList {
         match  sqlx::query(
             r#"
 INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    ON CONFLICT DO NOTHING;
             "#,
         )
         .bind(org_id)

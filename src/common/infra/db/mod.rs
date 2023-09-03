@@ -55,6 +55,11 @@ pub fn default() -> Box<dyn Db> {
 pub async fn create_table() -> Result<()> {
     // check db dir
     std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
+    // create for cluster_coordinator
+    if CONFIG.common.local_mode {
+        sqlite::create_table().await?;
+    }
+    // create for meta store
     match CONFIG.common.meta_store.as_str().into() {
         MetaStore::Sled => sled::create_table().await,
         MetaStore::Sqlite => sqlite::create_table().await,
@@ -99,6 +104,50 @@ pub trait Db: Sync + Send + 'static {
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
 }
 
+pub(crate) fn parse_key(mut key: &str) -> (String, String, String) {
+    let mut module = "".to_string();
+    let mut key1 = "".to_string();
+    let mut key2 = "".to_string();
+    if key.starts_with('/') {
+        key = &key[1..];
+    }
+    if key.is_empty() {
+        return (module, key1, key2);
+    }
+    let columns = key.split('/').collect::<Vec<&str>>();
+    match columns.len() {
+        0 => {}
+        1 => {
+            module = columns[0].to_string();
+        }
+        2 => {
+            module = columns[0].to_string();
+            key1 = columns[1].to_string();
+        }
+        3 => {
+            module = columns[0].to_string();
+            key1 = columns[1].to_string();
+            key2 = columns[2].to_string();
+        }
+        _ => {
+            module = columns[0].to_string();
+            key1 = columns[1].to_string();
+            key2 = columns[2..].join("/");
+        }
+    }
+    (module, key1, key2)
+}
+
+pub(crate) fn build_key(module: &str, key1: &str, key2: &str) -> String {
+    if key1.is_empty() {
+        return module.to_string();
+    }
+    if key2.is_empty() {
+        return format!("/{}/{}", module, key1);
+    }
+    format!("/{}/{}/{}", module, key1, key2)
+}
+
 #[derive(Debug, Default)]
 pub struct Stats {
     pub bytes_len: i64,
@@ -123,7 +172,7 @@ pub struct MetaRecord {
     pub module: String,
     pub key1: String,
     pub key2: String,
-    pub value: Vec<u8>,
+    pub value: String,
 }
 
 #[cfg(test)]

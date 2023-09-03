@@ -97,8 +97,8 @@ pub async fn create_table() -> Result<()> {
         MetaStore::Sled => sqlite::create_table().await,
         MetaStore::Sqlite => sqlite::create_table().await,
         MetaStore::Etcd => sqlite::create_table().await,
-        MetaStore::DynamoDB => postgres::create_table().await,
-        MetaStore::PostgreSQL => dynamo::create_table().await,
+        MetaStore::DynamoDB => dynamo::create_table().await,
+        MetaStore::PostgreSQL => postgres::create_table().await,
     }
 }
 
@@ -107,8 +107,8 @@ pub async fn create_table_index() -> Result<()> {
         MetaStore::Sled => sqlite::create_table_index().await,
         MetaStore::Sqlite => sqlite::create_table_index().await,
         MetaStore::Etcd => sqlite::create_table_index().await,
-        MetaStore::DynamoDB => postgres::create_table_index().await,
-        MetaStore::PostgreSQL => dynamo::create_table_index().await,
+        MetaStore::DynamoDB => dynamo::create_table_index().await,
+        MetaStore::PostgreSQL => postgres::create_table_index().await,
     }
 }
 
