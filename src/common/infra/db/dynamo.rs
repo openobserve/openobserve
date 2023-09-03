@@ -138,15 +138,25 @@ impl super::Db for DynamoDb {
             }
         }
 
-        // TODO: event watch
-        if !need_watch {
-            return Ok(());
+        // event watch
+        if need_watch {
+            let tx = &super::CLUSTER_COORDINATOR;
+            tx.put(in_key, value, true).await?;
         }
 
         Ok(())
     }
 
+    // TODO: support prefix mode
     async fn delete(&self, in_key: &str, _with_prefix: bool, need_watch: bool) -> Result<()> {
+        // event watch
+        if need_watch {
+            let tx = &super::CLUSTER_COORDINATOR;
+            if let Err(e) = tx.delete(in_key, false, true).await {
+                log::error!("[DYNAMODB] send event error: {}", e);
+            }
+        }
+
         let table = get_dynamo_key(in_key, DbOperation::Delete);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         match client
@@ -161,11 +171,6 @@ impl super::Db for DynamoDb {
             Err(_) => {
                 return Err(Error::from(DbError::KeyNotExists(in_key.to_string())));
             }
-        }
-
-        // TODO: event watch
-        if !need_watch {
-            return Ok(());
         }
 
         Ok(())
@@ -273,14 +278,6 @@ impl super::Db for DynamoDb {
         Ok(result)
     }
 
-    async fn count(&self, _prefix: &str) -> Result<i64> {
-        Ok(0)
-    }
-
-    async fn watch(&self, _prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        Ok(Arc::new(mpsc::channel(1).1))
-    }
-
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let mut result = Vec::new();
         let table = get_dynamo_key(prefix, DbOperation::List);
@@ -375,6 +372,14 @@ impl super::Db for DynamoDb {
         }
 
         Ok(result)
+    }
+
+    async fn count(&self, _prefix: &str) -> Result<i64> {
+        Ok(0)
+    }
+
+    async fn watch(&self, _prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
+        Err(Error::NotImplemented)
     }
 }
 
