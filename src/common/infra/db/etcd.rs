@@ -92,10 +92,7 @@ impl super::Db for Etcd {
         let key = format!("{}{}", self.prefix, key);
         let mut client = ETCD_CLIENT.get().await.clone().unwrap();
         let opt = with_prefix.then(|| DeleteOptions::new().with_prefix());
-        let nr_deleted_keys = client.delete(key.as_str(), opt).await?.deleted();
-        if nr_deleted_keys <= 0 {
-            return Err(Error::from(DbError::KeyNotExists(key)));
-        }
+        let _ = client.delete(key.as_str(), opt).await?.deleted();
         Ok(())
     }
 

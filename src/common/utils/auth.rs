@@ -14,10 +14,9 @@
 
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
 
-use crate::common::meta::organization::DEFAULT_ORG;
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
-    meta::user::UserRole,
+    meta::{organization::DEFAULT_ORG, user::UserRole},
 };
 
 pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
@@ -53,7 +52,10 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::users};
+    use crate::{
+        common::{infra::db as infra_db, meta::user::UserRequest},
+        service::users,
+    };
 
     #[actix_web::test]
     async fn test_is_root_user() {
@@ -62,6 +64,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_is_root_user2() {
+        infra_db::create_table().await.unwrap();
         let _ = users::post_user(
             DEFAULT_ORG,
             UserRequest {

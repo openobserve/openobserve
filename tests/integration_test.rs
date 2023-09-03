@@ -1047,7 +1047,6 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        log::info!("{:?}", resp.status());
         assert!(resp.status().is_success());
     }
 

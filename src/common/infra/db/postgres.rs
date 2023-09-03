@@ -196,7 +196,7 @@ INSERT INTO meta (module, key1, key2, value)
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2 FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, '' AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }

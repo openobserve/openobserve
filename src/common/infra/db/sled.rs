@@ -77,10 +77,7 @@ impl super::Db for SledDb {
         let key = format!("{}{}", self.prefix, key);
         let client = SLED_CLIENT.clone().unwrap();
         if !with_prefix {
-            let result = client.remove(&key)?;
-            if result.is_none() {
-                return Err(Error::from(DbError::KeyNotExists(key)));
-            }
+            let _ = client.remove(&key)?;
             return Ok(());
         }
 

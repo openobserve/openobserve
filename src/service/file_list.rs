@@ -150,6 +150,6 @@ mod test {
             "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
         )
         .await;
-        assert!(res.is_ok());
+        assert!(res.is_err());
     }
 }

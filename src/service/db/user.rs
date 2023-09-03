@@ -52,19 +52,27 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
 pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
     let db = &infra_db::DEFAULT;
     let key = format!("/user/{}", user.email);
-    match db
-        .put(
-            &key,
-            json::to_vec(&user).unwrap().into(),
-            infra_db::NEED_WATCH,
-        )
-        .await
-    {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("Error saving user: {}", e);
-            return Err(anyhow::anyhow!("Error saving user: {}", e));
-        }
+    db.put(
+        &key,
+        json::to_vec(&user).unwrap().into(),
+        infra_db::NEED_WATCH,
+    )
+    .await?;
+    // cache user
+    for org in user.organizations {
+        USERS.insert(
+            format!("{}/{}", org.name, user.email),
+            User {
+                email: user.email.clone(),
+                first_name: user.first_name.clone(),
+                last_name: user.last_name.clone(),
+                password: user.password.clone(),
+                role: org.role,
+                org: org.name,
+                token: org.token,
+                salt: user.salt.clone(),
+            },
+        );
     }
     Ok(())
 }

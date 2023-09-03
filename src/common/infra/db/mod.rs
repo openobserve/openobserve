@@ -183,6 +183,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_put() {
+        create_table().await.unwrap();
         let db = default();
         db.put("/foo/bar", Bytes::from("hello"), false)
             .await
@@ -191,6 +192,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get() {
+        create_table().await.unwrap();
         let db = default();
         let hello = Bytes::from("hello");
 
@@ -200,6 +202,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_delete() {
+        create_table().await.unwrap();
         let db = default();
         let hello = Bytes::from("hello");
 
@@ -207,7 +210,7 @@ mod tests {
         db.put("/foo/bar2", hello.clone(), false).await.unwrap();
         db.put("/foo/bar3", hello.clone(), false).await.unwrap();
         db.delete("/foo/bar1", false, false).await.unwrap();
-        assert!(db.delete("/foo/bar4", false, false).await.is_err());
+        assert!(db.delete("/foo/bar4", false, false).await.is_ok());
         db.delete("/foo/", true, false).await.unwrap();
 
         db.put("/foo/bar1", hello.clone(), false).await.unwrap();

@@ -169,14 +169,17 @@ impl super::Db for SqliteDb {
 
         // event watch
         if need_watch {
-            self.event_tx
+            if let Err(e) = self
+                .event_tx
                 .clone()
                 .send(super::Event::Put(super::EventData {
                     key: key.to_string(),
                     value: Some(value),
                 }))
                 .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+            {
+                log::error!("[SQLITE] send event error: {}", e);
+            }
         }
 
         Ok(())
@@ -263,7 +266,7 @@ impl super::Db for SqliteDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2 FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, '' AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }

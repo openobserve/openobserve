@@ -673,7 +673,7 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.release_size *= 1024 * 1024;
     }
     if cfg.memory_cache.datafusion_max_size == 0 {
-        cfg.memory_cache.datafusion_max_size = mem_total / 2; // 50%
+        cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size;
     } else {
         cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
     }
