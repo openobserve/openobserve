@@ -72,7 +72,7 @@
                     @update:model-value="querySplitterUpdated" 
                     reverse 
                     unit="px" 
-                    :limits="!dashboardPanelData.layout.showQueryBar ? [41, 400] : [130, 400]"
+                    :limits="!dashboardPanelData.layout.showQueryBar ? [41, 400] : [140, 400]"
                     :disable="!dashboardPanelData.layout.showQueryBar"
                     style="height: 100%;" 
                   >
@@ -201,7 +201,10 @@ export default defineComponent({
     const currentDashboardData : any = reactive({
       data: {},
     });
-    const isUpdated = ref(false);
+    
+    // this is used to activate the watcher only after on mounted
+    let isPanelConfigWatcherActivated = false
+    const isPanelConfigChanged = ref(false);
 
     const saveVariableApiCall = useLoading(async()=>{
       const dashboardId = route.query.dashboard + "";
@@ -236,6 +239,11 @@ export default defineComponent({
         // set the value of the date time after the reset
         updateDateTime(selectedDate.value)
       }
+
+      // let it call the wathcers and then mark the panel config watcher as activated
+      await nextTick()
+      isPanelConfigWatcherActivated = true
+
       loadDashboard();
     });
 
@@ -340,12 +348,15 @@ export default defineComponent({
 
     //watch dashboardpaneldata when changes, isUpdated will be true
     watch(() => dashboardPanelData.data, () => {
-      isUpdated.value = true;   
+      console.log("dashboardPanelData.data updated ........", dashboardPanelData.data);
+      if(isPanelConfigWatcherActivated) {
+        isPanelConfigChanged.value = true;
+      }
     },{deep:true})
 
     const beforeUnloadHandler= (e:any) => {
       //check is data updated or not
-      if(isUpdated.value){
+      if(isPanelConfigChanged.value){
         // Display a confirmation message
         const confirmMessage = 'You have unsaved changes. Are you sure you want to leave?';        // Some browsers require a return statement to display the message
         e.returnValue = confirmMessage;
@@ -363,7 +374,7 @@ export default defineComponent({
     });
 
   onBeforeRouteLeave((to, from, next) => {
-  if (from.path === '/dashboards/add_panel' && isUpdated.value) {
+  if (from.path === '/dashboards/add_panel' && isPanelConfigChanged.value) {
     const confirmMessage = 'You have unsaved changes. Are you sure you want to leave?';
     if (window.confirm(confirmMessage)) {
       // User confirmed, allow navigation
