@@ -220,7 +220,7 @@ pub struct Common {
     pub ui_sql_base64_enabled: bool,
     #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
     pub metrics_dedup_enabled: bool,
-    #[env_config(name = "ZO_TRACES_BLOOM_FILTER_ENABLED", default = true)]
+    #[env_config(name = "ZO_TRACES_BLOOM_FILTER_ENABLED", default = false)]
     pub traces_bloom_filter_enabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
