@@ -32,28 +32,16 @@ export function convertDashboardSchemaVersion(data: any) {
         ...convertPanelSchemaVersion(panelItem),
         layout: layoutsObjBasedOnPanelId[panelItem.id], // Use the layout item from the mapping
       }));
+
+      // update the version
+      data.version = 2;
+
+      // remove layouts key from data
+      delete data.layouts
       break;
     }
   }
-  //return whole data except layout
-  const {
-    created,
-    dashboardId,
-    description,
-    owner,
-    panels,
-    role,
-    title,
-    variables,
-  } = data;
-  return {
-    created,
-    dashboardId,
-    description,
-    owner,
-    panels,
-    role,
-    title,
-    variables,
-  };
+
+  // return converted data 
+  return data;
 }
