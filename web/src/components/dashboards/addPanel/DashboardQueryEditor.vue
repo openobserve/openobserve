@@ -25,7 +25,7 @@
                 <div style="max-width: 600px">
                 <q-tabs v-if="promqlMode" v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows mobile-arrows>
                     <q-tab no-caps :ripple="false" v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
-                        :label="'Query ' + (index + 1)">
+                        :label="'Query ' + (index + 1)" @click.stop>
                         <q-icon
                             v-if="index > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)"
                             name="close"
