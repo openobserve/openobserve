@@ -28,9 +28,6 @@ use tokio::{sync::mpsc, task::JoinHandle, time};
 use super::{Event, EventData};
 use crate::common::infra::{cluster, config::CONFIG, errors::*};
 
-/// max operations in txn request
-pub const MAX_OPS_PER_TXN: usize = 120; // etcd hard coded limit is 128
-
 lazy_static! {
     pub static ref ETCD_CLIENT: AsyncOnce<Option<etcd_client::Client>> =
         AsyncOnce::new(async { connect_etcd().await });
@@ -60,14 +57,14 @@ impl super::Db for Etcd {
     async fn stats(&self) -> Result<super::Stats> {
         let mut client = ETCD_CLIENT.get().await.clone().unwrap();
         let stats = client.status().await?;
-        let bytes_len = stats.db_size() as u64;
+        let bytes_len = stats.db_size();
         let resp = client
             .get(
                 "",
                 Some(GetOptions::new().with_all_keys().with_count_only()),
             )
             .await?;
-        let keys_count = resp.count() as usize;
+        let keys_count = resp.count();
         Ok(super::Stats {
             bytes_len,
             keys_count,
@@ -84,21 +81,18 @@ impl super::Db for Etcd {
         Ok(Bytes::from(ret.kvs()[0].value().to_vec()))
     }
 
-    async fn put(&self, key: &str, value: Bytes) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, _need_watch: bool) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = ETCD_CLIENT.get().await.clone().unwrap();
         let _ = client.put(key, value, None).await?;
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool) -> Result<()> {
+    async fn delete(&self, key: &str, with_prefix: bool, _need_watch: bool) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = ETCD_CLIENT.get().await.clone().unwrap();
         let opt = with_prefix.then(|| DeleteOptions::new().with_prefix());
-        let nr_deleted_keys = client.delete(key.as_str(), opt).await?.deleted();
-        if nr_deleted_keys <= 0 {
-            return Err(Error::from(DbError::KeyNotExists(key)));
-        }
+        let _ = client.delete(key.as_str(), opt).await?.deleted();
         Ok(())
     }
 
@@ -145,62 +139,6 @@ impl super::Db for Etcd {
         }
         Ok(result)
     }
-
-    /* async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>> {
-        let (tx, rx) = mpsc::channel(CONFIG.etcd.load_page_size as usize);
-        let key = format!("{}{}", self.prefix, prefix);
-        let prefix_key = self.prefix.to_string();
-        let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            let mut client = ETCD_CLIENT.get().await.clone().unwrap();
-            let mut opt = GetOptions::new()
-                .with_prefix()
-                .with_sort(SortTarget::Key, SortOrder::Ascend)
-                .with_limit(CONFIG.etcd.load_page_size);
-            let mut resp = match client.get(key.clone(), Some(opt.clone())).await {
-                Ok(resp) => resp,
-                Err(err) => {
-                    log::error!("get prefix error: {}", err);
-                    return Err(Error::from(err));
-                }
-            };
-            let mut first_call = true;
-            let mut have_next = true;
-            let mut last_key = String::new();
-            loop {
-                let kvs_num = resp.kvs().len() as i64;
-                if kvs_num < CONFIG.etcd.load_page_size {
-                    have_next = false;
-                }
-                for kv in resp.kvs() {
-                    let item_key = kv.key_str().unwrap();
-                    if !item_key.starts_with(&key) {
-                        have_next = false;
-                        break;
-                    }
-                    if item_key.eq(last_key.as_str()) {
-                        continue;
-                    }
-                    let item_key = item_key.strip_prefix(&prefix_key).unwrap();
-                    tx.send((item_key.to_string(), Bytes::from(kv.value().to_vec())))
-                        .await
-                        .unwrap();
-                }
-                tokio::task::yield_now().await; // yield to other tasks
-
-                if !have_next {
-                    break;
-                }
-                if first_call {
-                    first_call = false;
-                    opt = opt.with_from_key();
-                }
-                last_key = resp.kvs().last().unwrap().key_str().unwrap().to_string();
-                resp = client.get(last_key.clone(), Some(opt.clone())).await?;
-            }
-            Ok(())
-        });
-        Ok(Arc::new(rx))
-    } */
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let mut result = Vec::new();
@@ -289,12 +227,12 @@ impl super::Db for Etcd {
         Ok(result)
     }
 
-    async fn count(&self, prefix: &str) -> Result<usize> {
+    async fn count(&self, prefix: &str) -> Result<i64> {
         let key = format!("{}{}", self.prefix, prefix);
         let mut client = ETCD_CLIENT.get().await.clone().unwrap();
         let opt = GetOptions::new().with_prefix().with_count_only();
         let resp = client.get(key.clone(), Some(opt)).await?;
-        Ok(resp.count() as usize)
+        Ok(resp.count())
     }
 
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
@@ -354,52 +292,10 @@ impl super::Db for Etcd {
         });
         Ok(Arc::new(rx))
     }
+}
 
-    /* async fn transaction(
-        &self,
-        check_key: &str,
-        and_ops: Vec<Event>,
-        else_ops: Vec<Event>,
-    ) -> Result<()> {
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
-        let mut txn = etcd_client::Txn::new();
-        let compares = vec![Compare::value(
-            check_key.to_string(),
-            CompareOp::NotEqual,
-            "",
-        )];
-        txn = txn.when(compares);
-        let mut txn_and_ops = Vec::new();
-        for op in and_ops {
-            match op {
-                Event::Put(data) => {
-                    let key = format!("{}{}", self.prefix, data.key);
-                    txn_and_ops.push(TxnOp::put(key, data.value.unwrap(), None));
-                }
-                Event::Delete(data) => {
-                    let key = format!("{}{}", self.prefix, data.key);
-                    txn_and_ops.push(TxnOp::delete(key, None));
-                }
-            }
-        }
-        let mut txn_else_ops = Vec::new();
-        for op in else_ops {
-            match op {
-                Event::Put(data) => {
-                    let key = format!("{}{}", self.prefix, data.key);
-                    txn_else_ops.push(TxnOp::put(key, data.value.unwrap(), None));
-                }
-                Event::Delete(data) => {
-                    let key = format!("{}{}", self.prefix, data.key);
-                    txn_else_ops.push(TxnOp::delete(key, None));
-                }
-            }
-        }
-        txn = txn.and_then(txn_and_ops);
-        txn = txn.or_else(txn_else_ops);
-        let _ = client.txn(txn).await?;
-        Ok(())
-    } */
+pub async fn create_table() -> Result<()> {
+    Ok(())
 }
 
 pub async fn connect_etcd() -> Option<etcd_client::Client> {
@@ -569,7 +465,7 @@ impl Locker {
         Ok(())
     }
 
-    pub async fn unlock(&mut self) -> Result<()> {
+    pub async fn unlock(&self) -> Result<()> {
         if self.state.load(Ordering::SeqCst) != 1 {
             return Ok(());
         }
@@ -604,15 +500,15 @@ mod tests {
         }
         let client = Etcd::default();
         client
-            .put("/test/count/1", bytes::Bytes::from("1"))
+            .put("/test/count/1", bytes::Bytes::from("1"), false)
             .await
             .unwrap();
         client
-            .put("/test/count/2", bytes::Bytes::from("2"))
+            .put("/test/count/2", bytes::Bytes::from("2"), false)
             .await
             .unwrap();
         client
-            .put("/test/count/3", bytes::Bytes::from("3"))
+            .put("/test/count/3", bytes::Bytes::from("3"), false)
             .await
             .unwrap();
         let count = client.count("/test/count").await.unwrap();

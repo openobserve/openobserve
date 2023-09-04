@@ -26,77 +26,153 @@ use super::errors::Result;
 
 pub mod dynamo;
 pub mod etcd;
+pub mod postgres;
 pub mod sled;
+pub mod sqlite;
 
-pub use self::etcd::ETCD_CLIENT;
-pub use self::sled::SLED_CLIENT;
+pub static NEED_WATCH: bool = true;
+pub static NO_NEED_WATCH: bool = false;
 
 pub static DEFAULT: Lazy<Box<dyn Db>> = Lazy::new(default);
 pub static CLUSTER_COORDINATOR: Lazy<Box<dyn Db>> = Lazy::new(cluster_coordinator);
 
 pub fn default() -> Box<dyn Db> {
+    if !CONFIG.common.local_mode
+        && (CONFIG.common.meta_store == "sled" || CONFIG.common.meta_store == "sqlite")
+    {
+        panic!("cluster mode is not supported for ZO_META_STORE=sled/sqlite");
+    }
+
     match CONFIG.common.meta_store.as_str().into() {
-        MetaStore::Sled => Box::<sled::Sled>::default(),
+        MetaStore::Sled => Box::<sled::SledDb>::default(),
+        MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
         MetaStore::Etcd => Box::<etcd::Etcd>::default(),
         MetaStore::DynamoDB => Box::<dynamo::DynamoDb>::default(),
+        MetaStore::PostgreSQL => Box::<postgres::PostgresDb>::default(),
+    }
+}
+
+pub async fn create_table() -> Result<()> {
+    // check db dir
+    std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
+    // create for cluster_coordinator
+    if CONFIG.common.local_mode {
+        sqlite::create_table().await?;
+    }
+    // create for meta store
+    match CONFIG.common.meta_store.as_str().into() {
+        MetaStore::Sled => sled::create_table().await,
+        MetaStore::Sqlite => sqlite::create_table().await,
+        MetaStore::Etcd => etcd::create_table().await,
+        MetaStore::DynamoDB => dynamo::create_table().await,
+        MetaStore::PostgreSQL => postgres::create_table().await,
     }
 }
 
 pub fn cluster_coordinator() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
-        Box::<sled::Sled>::default()
+        match CONFIG.common.meta_store.as_str().into() {
+            MetaStore::Sled => Box::<sled::SledDb>::default(),
+            _ => Box::<sqlite::SqliteDb>::default(),
+        }
     } else {
         Box::<etcd::Etcd>::default()
     }
-}
-
-#[derive(Debug, Default)]
-pub struct Stats {
-    pub bytes_len: u64,
-    pub keys_count: usize,
-}
-
-#[derive(Debug)]
-pub enum Event {
-    Put(EventData),
-    Delete(EventData),
-}
-
-#[derive(Debug)]
-pub struct EventData {
-    pub key: String,
-    pub value: Option<Bytes>,
 }
 
 #[async_trait]
 pub trait Db: Sync + Send + 'static {
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
-    async fn put(&self, key: &str, value: Bytes) -> Result<()>;
-    async fn delete(&self, key: &str, with_prefix: bool) -> Result<()>;
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()>;
+    async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()>;
 
     /// Contrary to `delete`, this call won't fail if `key` is missing.
-    async fn delete_if_exists(&self, key: &str, with_prefix: bool) -> Result<()> {
+    async fn delete_if_exists(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
         use crate::common::infra::errors::{DbError, Error};
 
-        match self.delete(key, with_prefix).await {
+        match self.delete(key, with_prefix, need_watch).await {
             Ok(()) | Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(()),
             Err(e) => Err(e),
         }
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>>;
-    //async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>>;
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>>;
-    async fn count(&self, prefix: &str) -> Result<usize>;
+    async fn count(&self, prefix: &str) -> Result<i64>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
-    /*  async fn transaction(
-        &self,
-        check_key: &str, // check the key exists
-        and_ops: Vec<Event>,
-        else_ops: Vec<Event>,
-    ) -> Result<()>; */
+}
+
+pub(crate) fn parse_key(mut key: &str) -> (String, String, String) {
+    let mut module = "".to_string();
+    let mut key1 = "".to_string();
+    let mut key2 = "".to_string();
+    if key.starts_with('/') {
+        key = &key[1..];
+    }
+    if key.is_empty() {
+        return (module, key1, key2);
+    }
+    let columns = key.split('/').collect::<Vec<&str>>();
+    match columns.len() {
+        0 => {}
+        1 => {
+            module = columns[0].to_string();
+        }
+        2 => {
+            module = columns[0].to_string();
+            key1 = columns[1].to_string();
+        }
+        3 => {
+            module = columns[0].to_string();
+            key1 = columns[1].to_string();
+            key2 = columns[2].to_string();
+        }
+        _ => {
+            module = columns[0].to_string();
+            key1 = columns[1].to_string();
+            key2 = columns[2..].join("/");
+        }
+    }
+    (module, key1, key2)
+}
+
+pub(crate) fn build_key(module: &str, key1: &str, key2: &str) -> String {
+    if key1.is_empty() {
+        return module.to_string();
+    }
+    if key2.is_empty() {
+        return format!("/{}/{}", module, key1);
+    }
+    format!("/{}/{}/{}", module, key1, key2)
+}
+
+#[derive(Debug, Default)]
+pub struct Stats {
+    pub bytes_len: i64,
+    pub keys_count: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Event {
+    Put(EventData),
+    Delete(EventData),
+    Empty,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EventData {
+    pub key: String,
+    pub value: Option<Bytes>,
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct MetaRecord {
+    pub module: String,
+    pub key1: String,
+    pub key2: String,
+    pub value: String,
 }
 
 #[cfg(test)]
@@ -107,40 +183,40 @@ mod tests {
 
     #[actix_web::test]
     async fn test_put() {
+        create_table().await.unwrap();
         let db = default();
-        db.put("/foo/bar", Bytes::from("hello")).await.unwrap();
+        db.put("/foo/bar", Bytes::from("hello"), false)
+            .await
+            .unwrap();
     }
 
     #[actix_web::test]
     async fn test_get() {
+        create_table().await.unwrap();
         let db = default();
         let hello = Bytes::from("hello");
 
-        db.put("/foo/bar", hello.clone()).await.unwrap();
+        db.put("/foo/bar", hello.clone(), false).await.unwrap();
         assert_eq!(db.get("/foo/bar").await.unwrap(), hello);
     }
 
     #[actix_web::test]
     async fn test_delete() {
+        create_table().await.unwrap();
         let db = default();
         let hello = Bytes::from("hello");
 
-        db.put("/foo/bar1", hello.clone()).await.unwrap();
-        db.put("/foo/bar2", hello.clone()).await.unwrap();
-        db.put("/foo/bar3", hello.clone()).await.unwrap();
-        db.delete("/foo/bar1", false).await.unwrap();
-        assert!(db.delete("/foo/bar4", false).await.is_err());
-        db.delete("/foo/", true).await.unwrap();
+        db.put("/foo/bar1", hello.clone(), false).await.unwrap();
+        db.put("/foo/bar2", hello.clone(), false).await.unwrap();
+        db.put("/foo/bar3", hello.clone(), false).await.unwrap();
+        db.delete("/foo/bar1", false, false).await.unwrap();
+        assert!(db.delete("/foo/bar4", false, false).await.is_ok());
+        db.delete("/foo/", true, false).await.unwrap();
 
-        db.put("/foo/bar1", hello.clone()).await.unwrap();
-        db.put("/foo/bar2", hello.clone()).await.unwrap();
-        db.put("/foo/bar3", hello).await.unwrap();
+        db.put("/foo/bar1", hello.clone(), false).await.unwrap();
+        db.put("/foo/bar2", hello.clone(), false).await.unwrap();
+        db.put("/foo/bar3", hello, false).await.unwrap();
         assert_eq!(db.list_keys("/foo/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/").await.unwrap().len(), 3);
-
-        /*  let mut events = db.list_use_channel("/foo/").await.unwrap();
-               let events = Arc::get_mut(&mut events).unwrap();
-               assert_eq!(events.recv().await.unwrap().0, "/foo/bar1");
-        */
     }
 }

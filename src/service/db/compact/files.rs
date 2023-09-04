@@ -14,7 +14,10 @@
 
 use once_cell::sync::Lazy;
 
-use crate::common::{infra::config::RwHashMap, meta::StreamType};
+use crate::common::{
+    infra::{config::RwHashMap, db as infra_db},
+    meta::StreamType,
+};
 
 static CACHES: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
 
@@ -28,7 +31,7 @@ pub async fn get_offset(org_id: &str, stream_name: &str, stream_type: StreamType
         return (*offset, "".to_string());
     }
 
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let value = match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
@@ -63,13 +66,15 @@ pub async fn del_offset(
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
     CACHES.remove(&key);
-    let db = &crate::common::infra::db::DEFAULT;
-    db.delete_if_exists(&key, false).await.map_err(Into::into)
+    let db = &infra_db::DEFAULT;
+    db.delete_if_exists(&key, false, infra_db::NO_NEED_WATCH)
+        .await
+        .map_err(Into::into)
 }
 
 pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
     let mut items = Vec::new();
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/compact/files/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
@@ -87,12 +92,13 @@ pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
 }
 
 pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     for item in CACHES.clone().iter() {
         let key = item.key().to_string();
         let offset = item.value();
         if *offset > 0 {
-            db.put(&key, offset.to_string().into()).await?;
+            db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
+                .await?;
         }
     }
     Ok(())

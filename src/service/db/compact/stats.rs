@@ -12,8 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::atomic;
+
+use crate::common::infra::{config::CONFIG, db as infra_db};
+
+static LOCAL_OFFSET: atomic::AtomicI64 = atomic::AtomicI64::new(0);
+
 pub async fn get_offset() -> (i64, String) {
-    let db = &crate::common::infra::db::DEFAULT;
+    if !CONFIG.common.meta_store_external {
+        let offset = LOCAL_OFFSET.load(atomic::Ordering::Relaxed);
+        return (offset, String::from(""));
+    }
+
+    let db = &infra_db::DEFAULT;
     let key = "/compact/stream_stats/offset";
     let value = match db.get(key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
@@ -30,12 +41,17 @@ pub async fn get_offset() -> (i64, String) {
 }
 
 pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    if !CONFIG.common.meta_store_external {
+        LOCAL_OFFSET.store(offset, atomic::Ordering::Relaxed);
+        return Ok(());
+    }
+
+    let db = &infra_db::DEFAULT;
     let key = "/compact/stream_stats/offset";
     let val = if let Some(node) = node {
         format!("{};{}", offset, node)
     } else {
         offset.to_string()
     };
-    Ok(db.put(key, val.into()).await?)
+    Ok(db.put(key, val.into(), infra_db::NO_NEED_WATCH).await?)
 }

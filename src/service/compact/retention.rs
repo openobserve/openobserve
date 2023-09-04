@@ -69,11 +69,11 @@ pub async fn delete_all(
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
     let lock_key = format!("compact/retention/{org_id}/{stream_type}/{stream_name}");
-    let mut locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
     let node = db::compact::retention::get_stream(org_id, stream_name, stream_type, None).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
         log::error!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
-        dist_lock::unlock(&mut locker).await?;
+        dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }
 
@@ -87,7 +87,7 @@ pub async fn delete_all(
     )
     .await?;
     // already bind to this node, we can unlock now
-    dist_lock::unlock(&mut locker).await?;
+    dist_lock::unlock(&locker).await?;
     drop(locker);
 
     if is_local_disk_storage() {
@@ -164,7 +164,7 @@ pub async fn delete_by_date(
     date_range: (&str, &str),
 ) -> Result<(), anyhow::Error> {
     let lock_key = format!("compact/retention/{org_id}/{stream_type}/{stream_name}");
-    let mut locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
     let node =
         db::compact::retention::get_stream(org_id, stream_name, stream_type, Some(date_range))
             .await;
@@ -173,7 +173,7 @@ pub async fn delete_by_date(
             "[COMPACT] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
             date_range
         );
-        dist_lock::unlock(&mut locker).await?;
+        dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }
 
@@ -187,7 +187,7 @@ pub async fn delete_by_date(
     )
     .await?;
     // already bind to this node, we can unlock now
-    dist_lock::unlock(&mut locker).await?;
+    dist_lock::unlock(&locker).await?;
     drop(locker);
 
     let mut date_start =

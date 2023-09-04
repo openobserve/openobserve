@@ -79,10 +79,14 @@ pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPa
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::users};
+    use crate::{
+        common::{infra::db as infra_db, meta::user::UserRequest},
+        service::users,
+    };
 
     #[actix_web::test]
     async fn test_organization() {
+        infra_db::create_table().await.unwrap();
         let org_id = "dummy";
         let user_id = "userone@example.com";
         //let passcode = "samplePassCode";

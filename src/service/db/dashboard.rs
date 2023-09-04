@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::{infra::db, meta::dashboards::Dashboard, utils::json};
+use crate::common::{infra::db as infra_db, meta::dashboards::Dashboard, utils::json};
 
 #[tracing::instrument]
 pub(crate) async fn get(org_id: &str, dashboard_id: &str) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{dashboard_id}");
-    let bytes = db::DEFAULT.get(&key).await?;
+    let bytes = infra_db::DEFAULT.get(&key).await?;
     json::from_slice(&bytes).map_err(|_| {
         anyhow::anyhow!("Failed to deserialize the value for key {key:?} as `Dashboard`")
     })
@@ -26,15 +26,19 @@ pub(crate) async fn get(org_id: &str, dashboard_id: &str) -> Result<Dashboard, a
 #[tracing::instrument(skip(dashboard))]
 pub(crate) async fn put(org_id: &str, dashboard: &Dashboard) -> Result<(), anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{}", dashboard.dashboard_id);
-    Ok(db::DEFAULT
-        .put(&key, json::to_vec(dashboard)?.into())
+    Ok(infra_db::DEFAULT
+        .put(
+            &key,
+            json::to_vec(dashboard)?.into(),
+            infra_db::NO_NEED_WATCH,
+        )
         .await?)
 }
 
 #[tracing::instrument]
 pub(crate) async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
     let db_key = format!("/dashboard/{org_id}/");
-    db::DEFAULT
+    infra_db::DEFAULT
         .list(&db_key)
         .await?
         .into_values()
@@ -49,11 +53,15 @@ pub(crate) async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> 
 #[tracing::instrument]
 pub(crate) async fn delete(org_id: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{dashboard_id}");
-    Ok(db::DEFAULT.delete(&key, false).await?)
+    Ok(infra_db::DEFAULT
+        .delete(&key, false, infra_db::NO_NEED_WATCH)
+        .await?)
 }
 
 #[tracing::instrument]
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/dashboard/";
-    Ok(db::DEFAULT.delete(key, true).await?)
+    Ok(infra_db::DEFAULT
+        .delete(key, true, infra_db::NO_NEED_WATCH)
+        .await?)
 }

@@ -24,6 +24,7 @@ use crate::common::{
     },
     meta::{
         common::{FileKey, FileMeta},
+        meta_store::MetaStore,
         stream::{PartitionTimeLevel, StreamStats},
         StreamType,
     },
@@ -36,11 +37,12 @@ pub mod sqlite;
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn FileList> {
-    match CONFIG.common.meta_store.as_str() {
-        "sqlite" => Box::<sqlite::SqliteFileList>::default(),
-        "postgres" | "postgresql" => Box::<postgres::PostgresFileList>::default(),
-        "dynamo" | "dynamodb" => Box::<dynamo::DynamoFileList>::default(),
-        _ => Box::<sqlite::SqliteFileList>::default(),
+    match CONFIG.common.meta_store.as_str().into() {
+        MetaStore::Sled => Box::<sqlite::SqliteFileList>::default(),
+        MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
+        MetaStore::Etcd => Box::<sqlite::SqliteFileList>::default(),
+        MetaStore::DynamoDB => Box::<dynamo::DynamoFileList>::default(),
+        MetaStore::PostgreSQL => Box::<postgres::PostgresFileList>::default(),
     }
 }
 
@@ -91,20 +93,22 @@ pub trait FileList: Sync + Send + 'static {
 pub async fn create_table() -> Result<()> {
     // check cache dir
     std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
-    match CONFIG.common.meta_store.as_str() {
-        "sqlite" => sqlite::create_table().await,
-        "postgres" | "postgresql" => postgres::create_table().await,
-        "dynamo" | "dynamodb" => dynamo::create_table().await,
-        _ => sqlite::create_table().await,
+    match CONFIG.common.meta_store.as_str().into() {
+        MetaStore::Sled => sqlite::create_table().await,
+        MetaStore::Sqlite => sqlite::create_table().await,
+        MetaStore::Etcd => sqlite::create_table().await,
+        MetaStore::DynamoDB => dynamo::create_table().await,
+        MetaStore::PostgreSQL => postgres::create_table().await,
     }
 }
 
 pub async fn create_table_index() -> Result<()> {
-    match CONFIG.common.meta_store.as_str() {
-        "sqlite" => sqlite::create_table_index().await,
-        "postgres" | "postgresql" => postgres::create_table_index().await,
-        "dynamo" | "dynamodb" => dynamo::create_table_index().await,
-        _ => sqlite::create_table_index().await,
+    match CONFIG.common.meta_store.as_str().into() {
+        MetaStore::Sled => sqlite::create_table_index().await,
+        MetaStore::Sqlite => sqlite::create_table_index().await,
+        MetaStore::Etcd => sqlite::create_table_index().await,
+        MetaStore::DynamoDB => dynamo::create_table_index().await,
+        MetaStore::PostgreSQL => postgres::create_table_index().await,
     }
 }
 

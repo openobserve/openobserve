@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::utils::json;
+use crate::common::{infra::db as infra_db, utils::json};
 
 pub mod alerts;
 pub mod compact;
@@ -29,7 +29,7 @@ pub mod user;
 pub mod version;
 
 pub async fn get_instance() -> Result<Option<String>, anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/instance/";
     let ret = db.get(key).await?;
     let loc_value = json::from_slice(&ret).unwrap();
@@ -38,9 +38,16 @@ pub async fn get_instance() -> Result<Option<String>, anyhow::Error> {
 }
 
 pub async fn set_instance(id: &str) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/instance/";
-    match db.put(key, json::to_vec(&id).unwrap().into()).await {
+    match db
+        .put(
+            key,
+            json::to_vec(&id).unwrap().into(),
+            infra_db::NO_NEED_WATCH,
+        )
+        .await
+    {
         Ok(_) => Ok(()),
         Err(e) => Err(anyhow::anyhow!(e)),
     }

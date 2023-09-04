@@ -374,6 +374,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::infra::db as infra_db;
 
     async fn set_up() {
         USERS.insert(
@@ -411,6 +412,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_post_user() {
+        infra_db::create_table().await.unwrap();
         let resp = post_user(
             "dummy",
             UserRequest {
@@ -427,6 +429,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_user() {
+        infra_db::create_table().await.unwrap();
         let _ = post_user(
             "test_org",
             UserRequest {

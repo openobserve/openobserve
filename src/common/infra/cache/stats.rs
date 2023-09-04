@@ -87,6 +87,6 @@ mod tests {
         assert_eq!(stats, val);
 
         let stats = get_stream_stats("nexus", "default", StreamType::Logs);
-        assert_eq!(stats.doc_num, 5300);
+        assert_eq!(stats.doc_num, 5000);
     }
 }

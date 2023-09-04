@@ -15,16 +15,11 @@
 use ahash::AHashMap as HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
-use once_cell::sync::Lazy;
-use sqlx::{
-    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
-    ConnectOptions, Pool, QueryBuilder, Row, Sqlite,
-};
-use std::str::FromStr;
+use sqlx::{QueryBuilder, Row, Sqlite};
 
 use crate::common::{
     infra::{
-        config::CONFIG,
+        db::sqlite::CLIENT,
         errors::{Error, Result},
     },
     meta::{
@@ -33,26 +28,6 @@ use crate::common::{
         StreamType,
     },
 };
-
-static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
-
-fn connect() -> Pool<Sqlite> {
-    let url = format!("{}{}", CONFIG.common.data_db_dir, "file_list.sqlite");
-    if !CONFIG.common.local_mode && std::path::Path::new(&url).exists() {
-        std::fs::remove_file(&url).expect("remove file failed");
-    }
-    let db_opts = SqliteConnectOptions::from_str(&url)
-        .expect("sqlite connect options create failed")
-        .journal_mode(SqliteJournalMode::Memory)
-        .synchronous(SqliteSynchronous::Off)
-        .disable_statement_logging()
-        .create_if_missing(true);
-
-    let pool_opts = SqlitePoolOptions::new();
-    let pool_opts = pool_opts.min_connections(CONFIG.limit.cpu_num as u32);
-    let pool_opts = pool_opts.max_connections(CONFIG.limit.query_thread_num as u32);
-    pool_opts.connect_lazy_with(db_opts)
-}
 
 pub struct SqliteFileList {}
 
@@ -105,17 +80,12 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     async fn remove(&self, file: &str) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-        sqlx::query(
-            r#"
-DELETE FROM file_list 
-    WHERE stream = $1 AND date = $2 AND file = $3;
-            "#,
-        )
-        .bind(stream_key)
-        .bind(date_key)
-        .bind(file_name)
-        .execute(&pool)
-        .await?;
+        sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
+            .bind(stream_key)
+            .bind(date_key)
+            .bind(file_name)
+            .execute(&pool)
+            .await?;
         Ok(())
     }
 
@@ -161,16 +131,20 @@ DELETE FROM file_list
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
-            let mut sqls = Vec::with_capacity(files.len() + 2);
-            sqls.push("BEGIN TRANSACTION;".to_string());
+            let mut tx = pool.begin().await?;
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                sqls.push(format!("DELETE FROM file_list WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';"));
+                sqlx::query(
+                    r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
+                )
+                .bind(stream_key)
+                .bind(date_key)
+                .bind(file_name)
+                .execute(&mut *tx)
+                .await?;
             }
-            sqls.push("END TRANSACTION;".to_string());
-            match sqlx::query(&sqls.join("\n")).execute(&pool).await {
-                Ok(_) => {}
-                Err(e) => return Err(e.into()),
+            if let Err(e) = tx.commit().await {
+                log::error!("[SQLITE] commit file_list delete error: {}", e);
             }
         }
         Ok(())
@@ -215,12 +189,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
         let pool = CLIENT.clone();
-        let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
-    FROM file_list;
-            "#,
-        )
+        let ret = sqlx::query_as::<_, super::FileRecord>(r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size FROM file_list;"#)
         .fetch_all(&pool)
         .await?;
         Ok(ret
@@ -437,15 +406,11 @@ UPDATE stream_stats
         min_ts: i64,
     ) -> Result<()> {
         let pool = CLIENT.clone();
-        sqlx::query(
-            r#"
-UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;
-            "#,
-        )
-        .bind(min_ts)
-        .bind(stream)
-        .execute(&pool)
-        .await?;
+        sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
+            .bind(min_ts)
+            .bind(stream)
+            .execute(&pool)
+            .await?;
         Ok(())
     }
 
@@ -550,21 +515,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (strea
     .await?;
 
     // create trigger
-    sqlx::query(
-        r#"
-CREATE TRIGGER IF NOT EXISTS update_stream_stats_insert
-    AFTER INSERT ON file_list
-BEGIN
-    INSERT OR IGNORE INTO stream_stats (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
-        VALUES (NEW.org, NEW.stream, 0, 32492800506000000, 0, 0, 0, 0);
-    UPDATE stream_stats SET file_num = file_num + 1, min_ts = min(NEW.min_ts, min_ts), max_ts = max(NEW.max_ts, max_ts), records = records + NEW.records, original_size = original_size + NEW.original_size, compressed_size = compressed_size + NEW.compressed_size
-        WHERE stream = NEW.stream;
-END;
-        "#,
-    )
-    .execute(&pool)
-    .await?;
-
     sqlx::query(
     r#"
 CREATE TRIGGER IF NOT EXISTS update_stream_stats_delete

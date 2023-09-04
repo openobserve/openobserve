@@ -87,7 +87,7 @@ pub async fn sql(
     result.insert(
         "query".to_string(),
         exec_query(
-            &mut ctx,
+            &ctx,
             session,
             schema.clone(),
             rules,
@@ -164,7 +164,7 @@ pub async fn sql(
 }
 
 async fn exec_query(
-    ctx: &mut SessionContext,
+    ctx: &SessionContext,
     session: &SearchSession,
     schema: Arc<Schema>,
     rules: &HashMap<String, DataType>,

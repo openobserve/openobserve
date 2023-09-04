@@ -519,9 +519,12 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::infra::db as infra_db;
 
     #[tokio::test]
     async fn test_compact() {
+        infra_db::create_table().await.unwrap();
+        infra_file_list::create_table().await.unwrap();
         let off_set = Duration::hours(2).num_microseconds().unwrap();
         let _ = db::compact::files::set_offset("nexus", "default", "logs".into(), off_set).await;
         let resp = merge_by_stream("nexus", "default", "logs".into()).await;
