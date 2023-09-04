@@ -334,7 +334,7 @@ export const updatePanel = async (
   currentDashboard.panels[panelIndex] = panelData;
   currentDashboard.panels = currentDashboard.panels;
 
-  await updateDashboard(
+  return await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
@@ -354,6 +354,8 @@ export const updateDashboard = async (
     .then(async (res) => {
       // update dashboardList
       await getAllDashboards(store);
+    }).catch((error) => {
+      return error
     });
 };
 

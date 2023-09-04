@@ -604,11 +604,15 @@ export default defineComponent({
         return
       }
       if (editMode.value) {
-        await updatePanel(
+        const errorMessageOnSave = await updatePanel(
           store,
           dashId,
           dashboardPanelData.data
         );
+        if (errorMessageOnSave instanceof Error) { 
+          errorData.errors.push(errorMessageOnSave.message); 
+          return; 
+        }
       } else {
         const panelId =
           "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
@@ -616,11 +620,15 @@ export default defineComponent({
         dashboardPanelData.data.id = panelId;
         console.log(dashboardPanelData.data,"dashboardPanelData.data AddPanel");
         
-        await addPanel(
+        const errorMessageOnSave = await addPanel(
           store,
           dashId,
           dashboardPanelData.data
         );
+        if (errorMessageOnSave instanceof Error) {
+          errorData.errors.push(errorMessageOnSave.message);
+          return;
+        }
       }
 
       await nextTick();
