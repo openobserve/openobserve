@@ -46,6 +46,7 @@ pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 pub const HAS_FUNCTIONS: bool = true;
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
+pub const COLUMN_TRACE_ID: &str = "trace_id";
 
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
@@ -219,6 +220,8 @@ pub struct Common {
     pub ui_sql_base64_enabled: bool,
     #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
     pub metrics_dedup_enabled: bool,
+    #[env_config(name = "ZO_TRACES_BLOOM_FILTER_ENABLED", default = false)]
+    pub traces_bloom_filter_enabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]

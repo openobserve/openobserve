@@ -17,9 +17,14 @@ use datafusion::arrow::json::{reader::infer_json_schema, ReaderBuilder};
 use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::infra::{config::CONFIG, metrics, storage, wal};
-use crate::common::meta::{common::FileMeta, StreamType};
-use crate::common::utils::{json, stream::populate_file_meta};
+use crate::common::{
+    infra::{
+        config::{COLUMN_TRACE_ID, CONFIG},
+        metrics, storage, wal,
+    },
+    meta::{common::FileMeta, StreamType},
+    utils::{json, stream::populate_file_meta},
+};
 use crate::service::{
     db, schema::schema_evolution, search::datafusion::new_writer, usage::report_compression_stats,
 };
@@ -188,7 +193,14 @@ async fn upload_file(
 
     let mut meta_batch = vec![];
     let mut buf_parquet = Vec::new();
-    let mut writer = new_writer(&mut buf_parquet, &arrow_schema, None);
+
+    let bf_fields =
+        if CONFIG.common.traces_bloom_filter_enabled && stream_type == StreamType::Traces {
+            Some(vec![COLUMN_TRACE_ID])
+        } else {
+            None
+        };
+    let mut writer = new_writer(&mut buf_parquet, &arrow_schema, None, bf_fields);
 
     if res_records.is_empty() {
         let json_reader = BufReader::new(buf.as_ref());

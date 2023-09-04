@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use arrow_schema::{Field, Schema};
+use datafusion::arrow::datatypes::{Field, Schema};
+
 /// SchemaExt helper...
 pub trait SchemaExt {
     fn to_cloned_fields(&self) -> Vec<Field>;

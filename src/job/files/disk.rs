@@ -21,11 +21,17 @@ use std::{
 };
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::infra::{config::CONFIG, metrics, storage, wal};
-use crate::common::meta::{common::FileMeta, StreamType};
-use crate::common::utils::{file::scan_files, json, stream::populate_file_meta};
-use crate::service::usage::report_compression_stats;
-use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
+use crate::common::{
+    infra::{
+        config::{COLUMN_TRACE_ID, CONFIG},
+        metrics, storage, wal,
+    },
+    meta::{common::FileMeta, StreamType},
+    utils::{file::scan_files, json, stream::populate_file_meta},
+};
+use crate::service::{
+    db, schema::schema_evolution, search::datafusion::new_writer, usage::report_compression_stats,
+};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
@@ -64,6 +70,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let columns = file_path.splitn(5, '/').collect::<Vec<&str>>();
 
         // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
+        // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingestter/7104328279989026816guOA4t.json
         // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);
@@ -224,7 +231,14 @@ async fn upload_file(
 
     let mut meta_batch = vec![];
     let mut buf_parquet = Vec::new();
-    let mut writer = new_writer(&mut buf_parquet, &arrow_schema, None);
+
+    let bf_fields =
+        if CONFIG.common.traces_bloom_filter_enabled && stream_type == StreamType::Traces {
+            Some(vec![COLUMN_TRACE_ID])
+        } else {
+            None
+        };
+    let mut writer = new_writer(&mut buf_parquet, &arrow_schema, None, bf_fields);
 
     if res_records.is_empty() {
         file.seek(SeekFrom::Start(0)).unwrap();
