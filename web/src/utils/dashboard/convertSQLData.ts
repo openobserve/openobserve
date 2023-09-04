@@ -523,6 +523,10 @@ const formatDate =(date:any)=>{
           name: props.data?.queries[0]?.fields?.y.find(
             (it: any) => it.alias == key
           )?.label,
+          color:
+            props.data.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.color ||
+            "#5960b2",
+          opacity: 0.8,
           ...getPropsByChartTypeForTraces(),
           data: getAxisDataFromKey(key),
         };
@@ -545,6 +549,10 @@ const formatDate =(date:any)=>{
           name: props.data?.queries[0]?.fields?.y.find(
             (it: any) => it.alias == key
           )?.label,
+          color:
+            props.data.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+              ?.color || "#5960b2",
+          opacity: 0.8,
           ...getPropsByChartTypeForTraces(),
           data:getAxisDataFromKey(key).map((it:any,i:number)=>{return [option.xAxis[0].data[i],it]}),
         };
@@ -559,6 +567,10 @@ const formatDate =(date:any)=>{
           name: props.data?.queries[0]?.fields?.y.find(
             (it: any) => it.alias == key
           )?.label,
+          color:
+            props.data.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+              ?.color || "#5960b2",
+          opacity: 0.8,
           ...getPropsByChartTypeForTraces(),
           data:getAxisDataFromKey(key)
         };
