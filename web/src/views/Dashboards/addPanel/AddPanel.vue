@@ -150,7 +150,7 @@ import {
   getPanel,
   updatePanel,
 } from "../../../utils/commons";
-import { useRoute, useRouter } from "vue-router";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DashboardQueryBuilder from "../../../components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -201,6 +201,7 @@ export default defineComponent({
     const currentDashboardData : any = reactive({
       data: {},
     });
+    const isUpdated = ref(false);
 
     const saveVariableApiCall = useLoading(async()=>{
       const dashboardId = route.query.dashboard + "";
@@ -332,6 +333,47 @@ export default defineComponent({
         query: {org_identifier: store.state.selectedOrganization.identifier, dashboard: route.query.dashboard },
       });
     };
+
+    //watch dashboardpaneldata when changes, isUpdated will be true
+    watch(() => dashboardPanelData.data, () => {
+      isUpdated.value = true;   
+    },{deep:true})
+
+    const beforeUnloadHandler= (e:any) => {
+      //check is data updated or not
+      if(isUpdated.value){
+        // Display a confirmation message
+        const confirmMessage = 'You have unsaved changes. Are you sure you want to leave?';        // Some browsers require a return statement to display the message
+        e.returnValue = confirmMessage;
+        return confirmMessage;
+      }
+      return ;
+    };
+
+    //event listener before unload and data is updated
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    
+    //ondeactivated remove beforeUnloadHandler event listener
+    onUnmounted(() => {
+      window.removeEventListener('beforeunload', beforeUnloadHandler);
+    });
+
+  onBeforeRouteLeave((to, from, next) => {
+  if (from.path === '/dashboards/add_panel' && isUpdated.value) {
+    const confirmMessage = 'You have unsaved changes. Are you sure you want to leave?';
+    if (window.confirm(confirmMessage)) {
+      // User confirmed, allow navigation
+      next();
+    } else {
+      // User canceled, prevent navigation
+      next(false);
+    }
+  } else {
+    // No unsaved changes or not leaving the edit route, allow navigation
+    next();
+  }
+});
+
 
     //validate the data
     const isValid = (onlyChart = false) => {
