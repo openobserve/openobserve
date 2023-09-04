@@ -153,31 +153,42 @@ export const addPanel = async (
   if (!currentDashboard.panels) {
     currentDashboard.panels = [];
   }
-  currentDashboard.panels.push(panelData);
 
-  const maxI =
-    currentDashboard.layouts?.length > 0
-      ? Math.max(...currentDashboard.layouts?.map((obj: any) => obj.i))
-      : 0;
-  const maxY =
-    currentDashboard.layouts?.length > 0
-      ? Math.max(...currentDashboard.layouts?.map((obj: any) => obj.y))
-      : 0;
+  let maxI=0;
+  let maxY=0;
+  
+  currentDashboard.panels.map((it: any) => {
+    maxI = Math.max(it.layout?.i||0,maxI);
+    maxY = Math.max(it.layout?.y||0,maxY);    
+  })
+
+  // maxI =
+  //   currentDashboard.layouts?.length > 0
+  //     ? Math.max(...currentDashboard.layouts?.map((obj: any) => obj.i))
+  //     : 0;
+  // maxY =
+  //   currentDashboard.layouts?.length > 0
+  //     ? Math.max(...currentDashboard.layouts?.map((obj: any) => obj.y))
+  //     : 0;
 
   const newLayoutObj = {
     x: 0,
-    y: currentDashboard.layouts?.length > 0 ? maxY + 10 : 0,
+    y: currentDashboard.panels?.length > 0 ? maxY + 10 : 0,
     w: 12,
     h: 13,
     i: maxI + 1,
     panelId: panelData.id,
     static: false,
-  };
+  };  
 
-  if (!currentDashboard.layouts) {
-    currentDashboard.layouts = [];
-  }
-  currentDashboard.layouts.push(newLayoutObj);
+  // if (!currentDashboard.layouts) {
+  //   currentDashboard.layouts = [];
+  // }
+  // currentDashboard.layouts.push(newLayoutObj);
+
+  //set layout of new panel
+  panelData.layout = newLayoutObj;
+  currentDashboard.panels.push(panelData);
 
   return await updateDashboard(
     store,
@@ -269,11 +280,11 @@ export const deletePanel = async (
   currentDashboard.panels = currentDashboard.panels;
 
   //remove layout from current dashboard
-  const layoutIndex = currentDashboard.layouts.findIndex(
-    (layout: any) => layout.panelId == panelId
-  );
-  currentDashboard.layouts.splice(layoutIndex, 1);
-  currentDashboard.layouts = currentDashboard.layouts;
+  // const layoutIndex = currentDashboard.layouts.findIndex(
+  //   (layout: any) => layout.panelId == panelId
+  // );
+  // currentDashboard.layouts.splice(layoutIndex, 1);
+  // currentDashboard.layouts = currentDashboard.layouts;
 
   await updateDashboard(
     store,
