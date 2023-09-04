@@ -224,7 +224,7 @@ pub async fn handle_trace_request(
                 let mut hour_key = super::ingestion::get_wal_time_key(
                     timestamp.try_into().unwrap(),
                     &partition_keys,
-                    PartitionTimeLevel::Hourly,
+                    PartitionTimeLevel::from(CONFIG.limit.traces_file_retention.as_str()),
                     value.as_object().unwrap(),
                     None,
                 );
