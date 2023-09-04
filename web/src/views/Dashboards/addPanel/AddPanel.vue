@@ -102,7 +102,7 @@
                     <div class="splitter" :class="dashboardPanelData.layout.showQueryBar ? 'splitter-enabled' : ''"></div>
                   </template>
                   <template #after>
-                    <div style="height: 100%; width: 100%;" class="column">
+                    <div style="height: 100%; width: 100%;" class="col">
                       <DashboardQueryEditor />
                     </div>
                   </template>
