@@ -68,7 +68,7 @@ export default defineComponent({
       if ( newPanelSchema.value?.queryType == "promql") {
         // console.log("inside no Data if");
         // console.log("PanelSchemaRenderer: noData:" , data.value[0].result?.length);
-        return data.value.every((item) => item.result?.length) ? "" : "No Data"
+        return data.value.length && data.value.every((item) => item.result?.length) ? "" : "No Data"
       } else {
         // console.log("inside no Data else");
         return !data.value.length ? "No Data" : ""
