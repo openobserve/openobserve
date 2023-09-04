@@ -350,14 +350,14 @@ impl super::Db for DynamoDb {
                                 }
                             }
                         }
+                        if last_evaluated_key.is_none() {
+                            return Ok(result);
+                        }
                     }
                     Err(err) => {
                         log::error!("err: {:?}", err);
                         return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
                     }
-                }
-                if last_evaluated_key.is_none() {
-                    return Ok(result);
                 }
             }
         } else {
@@ -401,14 +401,14 @@ impl super::Db for DynamoDb {
                                 }
                             }
                         }
+                        if last_evaluated_key.is_none() {
+                            return Ok(result);
+                        }
                     }
                     Err(err) => {
                         log::error!("err: {:?}", err);
                         return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
                     }
-                }
-                if last_evaluated_key.is_none() {
-                    return Ok(result);
                 }
             }
         }
@@ -478,14 +478,14 @@ async fn scan_prefix(
                         None => return Err(Error::from(DbError::KeyNotExists(prefix.to_string()))),
                     }
                 }
+                if last_evaluated_key.is_none() {
+                    return Ok(result);
+                }
             }
             Err(err) => {
                 log::error!("err: {:?}", err);
                 return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
             }
-        }
-        if last_evaluated_key.is_none() {
-            return Ok(result);
         }
     }
 }
