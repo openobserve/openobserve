@@ -941,6 +941,9 @@ pub fn create_session_config() -> SessionConfig {
     options.execution.parquet.pushdown_filters = true;
     options.execution.parquet.reorder_filters = true;
     options.optimizer.repartition_sorts = true;
+    if CONFIG.common.traces_bloom_filter_enabled {
+        options.execution.parquet.bloom_filter_enabled = true;
+    }
 
     SessionConfig::from(options)
         .with_batch_size(PARQUET_BATCH_SIZE)
