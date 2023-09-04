@@ -69,7 +69,7 @@
                   <q-splitter 
                     v-model="dashboardPanelData.layout.querySplitter" 
                     horizontal 
-                    @update:model-value="layoutSplitterUpdated" 
+                    @update:model-value="querySplitterUpdated" 
                     reverse 
                     unit="px" 
                     :limits="!dashboardPanelData.layout.showQueryBar ? [41, 400] : [130, 400]"
@@ -307,11 +307,15 @@ export default defineComponent({
 
     
     // resize the chart when config panel is opened and closed
-    watch(() => dashboardPanelData.layout.showQueryBar, () => {
-      if(!dashboardPanelData.layout.showQueryBar){
-        dashboardPanelData.layout.querySplitter = 41
+    watch(() => dashboardPanelData.layout.showQueryBar, (newValue) => {
+      if (!newValue) {
+        dashboardPanelData.layout.querySplitter = 41;
+      } else {
+        if (expandedSplitterHeight.value !== null) {
+          dashboardPanelData.layout.querySplitter = expandedSplitterHeight.value;
+        }
       }
-    })
+    });
 
     const runQuery = () => {
       console.log("query change detected to run");
@@ -629,6 +633,16 @@ export default defineComponent({
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"))
     }
+
+    const expandedSplitterHeight = ref(null);
+
+    const querySplitterUpdated = (newHeight: any) => {
+      window.dispatchEvent(new Event("resize"));
+      if (dashboardPanelData.layout.showQueryBar) {
+        expandedSplitterHeight.value = newHeight;
+      }
+    };
+
     const handleChartApiError = (errorMessage: any) => {
       const errorList = errorData.errors;
       errorList.splice(0);
@@ -641,6 +655,8 @@ export default defineComponent({
       savePanelChangesToDashboard,
       runQuery,
       layoutSplitterUpdated,
+      expandedSplitterHeight,
+      querySplitterUpdated,
       currentDashboard,
       list,
       dashboardPanelData,
