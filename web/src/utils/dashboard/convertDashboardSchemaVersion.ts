@@ -12,9 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-import { PanelSchemaVersionConverted } from "./PanelSchemaVersionConverted";
+import { convertPanelSchemaVersion } from "./convertPanelSchemaVersion";
 
-export function dashboardDataVersionConverted(data: any) {
+export function convertDashboardSchemaVersion(data: any) {
   if (!data) {
     return;
   }
@@ -29,7 +29,7 @@ export function dashboardDataVersionConverted(data: any) {
 
       // add layout object in panels array and also migrate panels schema using panelschemaversionconverted function
       data.panels = data?.panels?.map((panelItem: any) => ({
-        ...PanelSchemaVersionConverted(panelItem),
+        ...convertPanelSchemaVersion(panelItem),
         layout: layoutsObjBasedOnPanelId[panelItem.id], // Use the layout item from the mapping
       }));
       break;

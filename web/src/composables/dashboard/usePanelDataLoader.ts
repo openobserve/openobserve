@@ -12,15 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-import {
-  ref,
-  watch,
-  reactive,
-  toRefs,
-  onMounted,
-  onUnmounted,
-  nextTick,
-} from "vue";
+import { ref, watch, reactive, toRefs, onMounted, onUnmounted } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 
@@ -36,6 +28,16 @@ export const usePanelDataLoader = (
     errorDetail: "",
   });
 
+  // observer for checking if panel is visible on the screen
+  let observer: any = null;
+
+  // is query needs to be called or not
+  const isDirty: any = ref(true);
+
+  // is panel currently visible or not
+  const isVisible: any = ref(false);
+
+  // currently dependent variables data
   let currentDependentVariablesData = variablesData.value?.values
     ? JSON.parse(JSON.stringify(variablesData.value?.values))
     : [];
@@ -96,16 +98,15 @@ export const usePanelDataLoader = (
     state.loading = true;
     // console.log("Calling search API");
 
-    if (
-      // panelSchema.value.queries[0]?.fields.stream_type == "metrics" &&
-      // panelSchema.value.customQuery &&
-      panelSchema.value.queryType == "promql"
-    ) {
+    // Check if the query type is "promql"
+    if (panelSchema.value.queryType == "promql") {
       console.log("usePanelDataLoader: ", JSON.stringify(panelSchema));
-      // console.log("Calling metrics_query_range API");
+
+      // Iterate through each query in the panel schema
       const queryPromises = panelSchema.value.queries?.map(async (it: any) => {
         console.log("usePanelDataLoader: querypromises map", it.query);
 
+        // Call the metrics_query_range API
         return queryService
           .metrics_query_range({
             org_identifier: store.state.selectedOrganization.identifier,
@@ -117,7 +118,6 @@ export const usePanelDataLoader = (
             // Set searchQueryData.data to the API response data
             state.errorDetail = "";
             return res.data.data;
-            // Clear errorDetail
           })
           .catch((error) => {
             console.log("oops, error", error);
@@ -125,29 +125,29 @@ export const usePanelDataLoader = (
             // Process API error for "promql"
             processApiError(error, "promql");
           });
-        // .finally(() => {
-        //   state.loading = false;
-        // });
       });
+
       console.log("usePanelDataLoader: querypromises", queryPromises);
 
+      // Wait for all query promises to resolve
       const queryResults = await Promise.all(queryPromises);
       state.loading = false;
       state.data = queryResults;
     } else {
-      // console.log("Calling search APiii");
-
       // Call search API
+
+      // Get the page type from the first query in the panel schema
+      const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
+
       await queryService
         .search({
           org_identifier: store.state.selectedOrganization.identifier,
           query: query,
-          page_type: panelSchema.value.queries[0]?.fields?.stream_type,
+          page_type: pageType,
         })
         .then((res) => {
           // Set searchQueryData.data to the API response hits
           state.data = res.data.hits;
-          // Clear errorDetail
           state.errorDetail = "";
         })
         .catch((error) => {
@@ -161,22 +161,28 @@ export const usePanelDataLoader = (
   };
 
   watch(
+    // Watching for changes in panelSchema and selectedTimeObj
     () => [panelSchema?.value, selectedTimeObj?.value],
     async () => {
       isDirty.value = true;
 
       // TODO: check for query OR queries array for promql
       if (
-        isVisible.value &&
-        isDirty.value &&
-        panelSchema.value.queries?.length &&
-        panelSchema.value.queries[0]?.query
+        isVisible.value && // Checking if the panel is visible
+        isDirty.value && // Checking if the data is dirty
+        panelSchema.value.queries?.length && // Checking if there are queries
+        panelSchema.value.queries[0]?.query // Checking if the first query exists
       ) {
-        loadData();
+        loadData(); // Loading the data
       }
     }
   );
 
+  /**
+   * Checks if the query is dependent on any of the variables.
+   *
+   * @return {boolean} Returns true if the query is dependent on any variables, false otherwise.
+   */
   const isQueryDependentOnTheVariables = () => {
     const dependentVariables = variablesData.value?.values?.filter((it: any) =>
       panelSchema?.value?.queries
@@ -186,6 +192,11 @@ export const usePanelDataLoader = (
     return dependentVariables?.length > 0;
   };
 
+  /**
+   * Checks if the query can be executed based on the available variables.
+   *
+   * @return {boolean} Whether the query can be executed based on the variables.
+   */
   const canRunQueryBasedOnVariables = () => {
     console.log(variablesData.value?.values);
 
@@ -217,6 +228,12 @@ export const usePanelDataLoader = (
     }
   };
 
+  /**
+   * Replaces the query with the corresponding variable values.
+   *
+   * @param {any} query - The query to be modified.
+   * @return {any} The modified query with replaced values.
+   */
   const replaceQueryValue = (query: any) => {
     if (currentDependentVariablesData?.length) {
       console.log("inside replaceQueryValue");
@@ -232,6 +249,12 @@ export const usePanelDataLoader = (
     }
   };
 
+  /**
+   * Processes an API error based on the given error and type.
+   *
+   * @param {any} error - The error object to be processed.
+   * @param {any} type - The type of error being processed.
+   */
   const processApiError = async (error: any, type: any) => {
     switch (type) {
       case "promql": {
@@ -260,10 +283,6 @@ export const usePanelDataLoader = (
     }
   };
 
-  let observer: any = null;
-  const isDirty: any = ref(true);
-  const isVisible: any = ref(false);
-
   watch(
     () => isVisible.value,
     async () => {
@@ -278,13 +297,6 @@ export const usePanelDataLoader = (
       }
     }
   );
-
-  // remove intersection observer
-  onUnmounted(() => {
-    if (observer) {
-      observer.disconnect();
-    }
-  });
 
   // [START] variables management
 
@@ -349,6 +361,13 @@ export const usePanelDataLoader = (
     });
 
     observer.observe(chartPanelRef.value);
+  });
+
+  // remove intersection observer
+  onUnmounted(() => {
+    if (observer) {
+      observer.disconnect();
+    }
   });
 
   return {

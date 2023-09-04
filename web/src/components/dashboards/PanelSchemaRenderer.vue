@@ -14,24 +14,35 @@
 -->
 
 <template>
-  <div ref="chartPanelRef"  style="height: 100%; position: relative;">
-    <div v-show="!errorDetail" class="plotlycontainer" style="height: 100%; width: 100%;">
+  <div ref="chartPanelRef" style="height: 100%; position: relative">
+    <div
+      v-show="!errorDetail"
+      class="plotlycontainer"
+      style="height: 100%; width: 100%"
+    >
       <ChartRenderer v-if="panelSchema.type != 'table'" :data="panelData" />
-      <TableRenderer v-else-if="panelSchema.type == 'table'" :data="panelData" />
+      <TableRenderer
+        v-else-if="panelSchema.type == 'table'"
+        :data="panelData"
+      />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div v-if="errorDetail" class="errorMessage">
       <q-icon size="md" name="warning" />
-      <div style="height: 80%; width: 100%;">{{ errorDetail }}</div>
+      <div style="height: 80%; width: 100%">{{ errorDetail }}</div>
     </div>
-    <div v-if="loading" class="row" style="position: absolute; top:0px; width:100%;">
-      <q-spinner-dots color="primary" size="40px" style="margin: 0 auto;" />
+    <div
+      v-if="loading"
+      class="row"
+      style="position: absolute; top: 0px; width: 100%"
+    >
+      <q-spinner-dots color="primary" size="40px" style="margin: 0 auto" />
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, watch, ref, onMounted, watchEffect, toRef, toRefs, onUnmounted, nextTick, computed } from "vue";
+import { defineComponent, watch, ref, toRefs, computed } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
@@ -58,37 +69,48 @@ export default defineComponent({
     const store = useStore();
 
     // stores the converted data which can be directly used for rendering different types of panels
-    const panelData: any = ref({});
-    const chartPanelRef = ref(null);
-    const {panelSchema, selectedTimeObj, variablesData } = toRefs(props)
-    
+    const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config
+    const chartPanelRef = ref(null); // holds the ref to the whole div
+    // get refs from props
+    const { panelSchema, selectedTimeObj, variablesData } = toRefs(props);
+
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail } = usePanelDataLoader(panelSchema, selectedTimeObj, variablesData,chartPanelRef);
+    let { data, loading, errorDetail } = usePanelDataLoader(
+      panelSchema,
+      selectedTimeObj,
+      variablesData,
+      chartPanelRef
+    );
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(data, async () => {
-      console.log("PanelSchemaRenderer: new data received from the api, let's convert the data");
+      console.log(
+        "PanelSchemaRenderer: new data received from the api, let's convert the data"
+      );
       console.log("PanelSchemaRenderer: data: ", data.value);
-      panelData.value = convertPanelData(panelSchema, data.value, store);
+      panelData.value = convertPanelData(panelSchema.value, data.value, store);
     });
 
+    // Compute the value of the 'noData' variable
     const noData = computed(() => {
-      // console.log("inside no Data computed");
-      if ( panelSchema.value?.queryType == "promql") {
-        // console.log("inside no Data if");
-        // console.log("PanelSchemaRenderer: noData:" , data.value[0].result?.length);
-        return data.value.length && data.value.every((item) => item.result?.length) ? "" : "No Data"
+      // Check if the queryType is 'promql'
+      if (panelSchema.value?.queryType == "promql") {
+        // Check if the 'data' array has elements and every item has a non-empty 'result' array
+        return data.value.length &&
+          data.value.every((item) => item.result?.length)
+          ? "" // Return an empty string if there is data
+          : "No Data"; // Return "No Data" if there is no data
       } else {
-        // console.log("inside no Data else");
-        return !data.value.length ? "No Data" : ""
+        // The queryType is not 'promql'
+        return !data.value.length ? "No Data" : ""; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
       }
-    })
+    });
 
     // when the error changes, emit the error
     watch(errorDetail, () => {
       emit("error", errorDetail);
-    })
-    
+    });
+
     return {
       chartPanelRef,
       data,
@@ -100,7 +122,7 @@ export default defineComponent({
   },
 });
 </script>
-  
+
 <style lang="scss" scoped>
 .errorMessage {
   position: absolute;
@@ -113,10 +135,10 @@ export default defineComponent({
   text-overflow: ellipsis;
 }
 
-.noData{
-    position: absolute; 
-    top:20%;
-    width:100%;
-    text-align:center;
+.noData {
+  position: absolute;
+  top: 20%;
+  width: 100%;
+  text-align: center;
 }
 </style>

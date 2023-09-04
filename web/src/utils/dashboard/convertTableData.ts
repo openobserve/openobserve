@@ -12,36 +12,19 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+/**
+ * Converts table data based on the panel schema and search query data.
+ *
+ * @param {any} panelSchema - The panel schema containing queries and fields.
+ * @param {any} searchQueryData - The search query data.
+ * @return {object} An object containing rows and columns.
+ */
 export const convertTableData = (
   panelSchema: any,
-  searchQueryDataTemp: any
+  searchQueryData: any
 ) => {
-  const searchQueryData = {
-    data: searchQueryDataTemp,
-  };
-
-  const props = {
-    data: panelSchema,
-  };
-
-  const isSampleValuesNumbers = (arr: any, key: string, sampleSize: number) => {
-    if (!Array.isArray(arr)) {
-      return false;
-    }
-    const sample = arr.slice(0, Math.min(sampleSize, arr.length));
-    return sample.every((obj) => {
-      const value = obj[key];
-      return (
-        value === undefined ||
-        value === null ||
-        value === "" ||
-        typeof value === "number"
-      );
-    });
-  };
-
-  const x = props.data?.value?.queries[0].fields?.x || [];
-  const y = props.data?.value?.queries[0].fields?.y || [];
+  const x = panelSchema?.queries[0].fields?.x || [];
+  const y = panelSchema?.queries[0].fields?.y || [];
   const columnData = [...x, ...y];
 
   const columns = columnData.map((it: any) => {
@@ -49,7 +32,7 @@ export const convertTableData = (
     obj["name"] = it.label;
     obj["field"] = it.alias;
     obj["label"] = it.label;
-    obj["align"] = !isSampleValuesNumbers(searchQueryData.data, it.alias, 20)
+    obj["align"] = !isSampleValuesNumbers(searchQueryData, it.alias, 20)
       ? "left"
       : "right";
     obj["sortable"] = true;
@@ -57,7 +40,31 @@ export const convertTableData = (
   });
 
   return {
-    rows: searchQueryData.data,
+    rows: searchQueryData,
     columns,
   };
+};
+
+/**
+ * Checks if the sample values of a given array are numbers based on a specified key.
+ *
+ * @param {any[]} arr - The array to check.
+ * @param {string} key - The key to access the values.
+ * @param {number} sampleSize - The number of sample values to check.
+ * @return {boolean} True if all sample values are numbers or are undefined, null, or empty strings; otherwise, false.
+ */
+const isSampleValuesNumbers = (arr: any, key: string, sampleSize: number) => {
+  if (!Array.isArray(arr)) {
+    return false;
+  }
+  const sample = arr.slice(0, Math.min(sampleSize, arr.length));
+  return sample.every((obj) => {
+    const value = obj[key];
+    return (
+      value === undefined ||
+      value === null ||
+      value === "" ||
+      typeof value === "number"
+    );
+  });
 };

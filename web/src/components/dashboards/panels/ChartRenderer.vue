@@ -28,7 +28,7 @@ export default defineComponent({
         data: {
             required: true,
             type: Object,
-            default: () => ({ option: {} })
+            default: () => ({ options: {} })
         },
     },
     setup(props: any) {
@@ -45,7 +45,7 @@ export default defineComponent({
           const theme = newTheme === 'dark' ? 'dark' : 'light';
           chart.dispose();  
           chart = echarts.init(chartRef.value, theme);
-          const options = props.data.option || {}
+          const options = props.data.options || {}
           options.animation = false
           chart.setOption(options, true);
           chart.setOption({animation: true});
@@ -63,15 +63,15 @@ export default defineComponent({
             await nextTick();
             const theme = store.state.theme === 'dark' ? 'dark' : 'light';
             chart = echarts.init(chartRef.value, theme);
-            chart.setOption(props?.data?.option || {}, true);
+            chart.setOption(props?.data?.options || {}, true);
             window.addEventListener("resize", windowResizeEventCallback);
         });
         onUnmounted(() => {
             window.removeEventListener("resize", windowResizeEventCallback);
         });
-        watch(() => props.data.option, () => {
+        watch(() => props.data.options, () => {
             console.log("ChartRenderer: props.data updated", props.data);
-            chart.setOption(props?.data?.option || {}, true);
+            chart.setOption(props?.data?.options || {}, true);
         }, { deep: true });
         return { chartRef };
     },

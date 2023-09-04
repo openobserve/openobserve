@@ -18,7 +18,7 @@ import dashboardService from "../services/dashboards";
 import { toRaw } from "vue";
 import { date } from "quasar";
 import moment from "moment";
-import { dashboardDataVersionConverted } from "./dashboard/dashboardDataVersionConverted";
+import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 
 export const modifySQLQuery = (
   currentTimeObj: any,
@@ -131,7 +131,7 @@ function findDashboard(dashboardId: string, store: any) {
   const dashboards = store.state.organizationData.allDashboardList;
   const dashboard = dashboards.find((it: any) => it.dashboardId === dashboardId);
   // return the deep cody of the dashboard object to prevent it from being modified
-  return typeof dashboard === 'object' ? JSON.parse(JSON.stringify(dashboardDataVersionConverted(dashboard))) : dashboard;
+  return typeof dashboard === 'object' ? JSON.parse(JSON.stringify(convertDashboardSchemaVersion(dashboard))) : dashboard;
 }
 
 export const addPanel = async (

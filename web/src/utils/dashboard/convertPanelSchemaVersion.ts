@@ -18,7 +18,7 @@
  * @param {any} data - The data object to convert.
  * @return {any} The converted data object.
  */
-export function PanelSchemaVersionConverted(data: any) {
+export function convertPanelSchemaVersion(data: any) {
   if (!data || (typeof data === "object" && Object.keys(data).length === 0)) {
     return;
   }

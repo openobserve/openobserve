@@ -109,7 +109,7 @@ import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue"
 import ExportDashboard from "../../components/dashboards/ExportDashboard.vue"
 import DashboardSettings from "./DashboardSettings.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
-import { dashboardDataVersionConverted } from "@/utils/dashboard/dashboardDataVersionConverted";
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 export default defineComponent({
   name: "ViewDashboard",
