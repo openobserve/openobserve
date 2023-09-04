@@ -848,7 +848,7 @@ pub async fn convert_parquet_file(
     let schema: Schema = df.schema().into();
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
-    let mut writer = super::new_writer(buf, &schema, None);
+    let mut writer = super::new_writer(buf, &schema, None, None);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -919,7 +919,7 @@ pub async fn merge_parquet_files(
     let schema: Schema = df.schema().into();
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
-    let mut writer = super::new_writer(buf, &schema, None);
+    let mut writer = super::new_writer(buf, &schema, None, None);
     for batch in batches {
         writer.write(&batch)?;
     }

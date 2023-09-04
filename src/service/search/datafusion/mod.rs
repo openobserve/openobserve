@@ -13,14 +13,19 @@
 // limitations under the License.
 
 use datafusion::arrow::datatypes::Schema;
-use parquet::{arrow::ArrowWriter, file::properties::WriterProperties, format::SortingColumn};
+use parquet::{
+    arrow::ArrowWriter, file::properties::WriterProperties, format::SortingColumn,
+    schema::types::ColumnPath,
+};
 use std::sync::Arc;
 
-use crate::common::infra::config::{
-    get_parquet_compression, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
-    PARQUET_PAGE_SIZE,
+use crate::common::{
+    infra::config::{
+        get_parquet_compression, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
+        PARQUET_PAGE_SIZE,
+    },
+    meta::functions::ZoFunction,
 };
-use crate::common::meta::functions::ZoFunction;
 
 mod date_format_udf;
 pub mod exec;
@@ -71,20 +76,27 @@ pub fn new_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
     sort_field: Option<&str>,
+    bf_fields: Option<Vec<&str>>,
 ) -> ArrowWriter<&'a mut Vec<u8>> {
     let sort_column_id = if let Some(v) = sort_field {
         schema.index_of(v).unwrap()
     } else {
         schema.index_of(&CONFIG.common.column_timestamp).unwrap()
     };
-    let writer_props = WriterProperties::builder()
+    let mut writer_props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
         .set_write_batch_size(PARQUET_BATCH_SIZE)
         .set_data_page_size_limit(PARQUET_PAGE_SIZE)
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE)
         .set_sorting_columns(Some(
             [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),
-        ))
-        .build();
+        ));
+    if let Some(fields) = bf_fields {
+        for field in fields {
+            writer_props = writer_props
+                .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
+        }
+    }
+    let writer_props = writer_props.build();
     ArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }
