@@ -15,7 +15,7 @@
 
 <template>
     <div class="col-auto">
-        <q-bar class="row sql-bar" style="display: flex; justify-content: space-between;" @click="onDropDownClick">
+        <q-bar class="row sql-bar" style="display: flex; justify-content: space-between;" @click.stop="onDropDownClick">
             <div style="display: flex ; flex-direction: row; align-items: center;">
                 <div>
                     <q-icon flat :name="!dashboardPanelData.layout.showQueryBar ? 'arrow_right' : 'arrow_drop_down'"
@@ -46,7 +46,7 @@
                 </div> -->
                 </div>
                 <span v-if="!promqlMode" class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
-                <q-btn v-if="promqlMode" round flat @click="addTab" icon="add" style="margin-right: 10px;"></q-btn>
+                <q-btn v-if="promqlMode" round flat @click.stop="addTab" icon="add" style="margin-right: 10px;"></q-btn>
             </div>
             <div>
                 <QueryTypeSelector></QueryTypeSelector>
