@@ -327,7 +327,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .long("component")
                         .help("view data of the component: version, user"),
                 ),
-            clap::Command::new("file-list")
+            clap::Command::new("migrate-file-list")
                 .about("migrate file-list from s3 to dynamo db")
                 .arg(
                     clap::Arg::new("prefix")
@@ -407,7 +407,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                 }
             }
         }
-        "file-list" => {
+        "migrate-file-list" => {
             let prefix = command.get_one::<String>("prefix").unwrap();
             println!("Running migration with prefix: {}", prefix);
             if !prefix.is_empty() {

@@ -3,7 +3,7 @@ use crate::common::infra::db::etcd::Etcd;
 use crate::common::infra::db::{self, Db};
 use crate::common::migration::load_meta::db::sled::SledDb;
 
-const ITEM_PREFIXS: [&str; 11] = [
+/* const ITEM_PREFIXS: [&str; 12] = [
     "/function",
     "/templates",
     "/destinations",
@@ -15,7 +15,9 @@ const ITEM_PREFIXS: [&str; 11] = [
     "/alerts",
     "/schema",
     "/compact",
-];
+    "/user",
+]; */
+const ITEM_PREFIXS: [&str; 1] = ["/"];
 
 pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
     let src;
