@@ -159,7 +159,7 @@ export default defineComponent({
         store,
         route.query.dashboard
       )))
-      currentDashboardData.data = dashboardDataVersionConverted(data);
+      currentDashboardData.data = data;
 
       // if variables data is null, set it to empty list
       if(!(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)) {

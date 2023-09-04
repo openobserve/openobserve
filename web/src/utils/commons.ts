@@ -18,7 +18,7 @@ import dashboardService from "../services/dashboards";
 import { toRaw } from "vue";
 import { date } from "quasar";
 import moment from "moment";
-import { PanelSchemaVersionConverted } from "./dashboard/PanelSchemaVersionConverted";
+import { dashboardDataVersionConverted } from "./dashboard/dashboardDataVersionConverted";
 
 export const modifySQLQuery = (
   currentTimeObj: any,
@@ -131,7 +131,7 @@ function findDashboard(dashboardId: string, store: any) {
   const dashboards = store.state.organizationData.allDashboardList;
   const dashboard = dashboards.find((it: any) => it.dashboardId === dashboardId);
   // return the deep cody of the dashboard object to prevent it from being modified
-  return typeof dashboard === 'object' ? JSON.parse(JSON.stringify(dashboard)) : dashboard;
+  return typeof dashboard === 'object' ? JSON.parse(JSON.stringify(dashboardDataVersionConverted(dashboard))) : dashboard;
 }
 
 export const addPanel = async (
@@ -379,8 +379,7 @@ export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
   
   const paneldata = currentDashboard.panels?.find((it: any) => it.id == panelId);
   console.log("commons: paneldata", paneldata);
-  // return paneldata;
-  return PanelSchemaVersionConverted(paneldata);
+  return paneldata;
 };
 
 export const getPanelId = () => {

@@ -22,7 +22,6 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
-import {PanelSchemaVersionConverted} from "./../../utils/dashboard/PanelSchemaVersionConverted"
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: { ChartRenderer, TableRenderer },
@@ -47,25 +46,20 @@ export default defineComponent({
     const panelData: any = ref({});
     const chartPanelRef = ref(null);
     const {panelSchema, selectedTimeObj, variablesData } = toRefs(props)
-    const newPanelSchema:any=ref(PanelSchemaVersionConverted(panelSchema.value))
-
+    
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail } = usePanelDataLoader(newPanelSchema, selectedTimeObj, variablesData,chartPanelRef);
+    let { data, loading, errorDetail } = usePanelDataLoader(panelSchema, selectedTimeObj, variablesData,chartPanelRef);
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(data, async () => {
       console.log("PanelSchemaRenderer: new data received from the api, let's convert the data");
       console.log("PanelSchemaRenderer: data: ", data.value);
-      panelData.value = convertPanelData(newPanelSchema, data.value, store);
+      panelData.value = convertPanelData(panelSchema, data.value, store);
     });
-
-    watch(()=>panelSchema?.value,async()=>{
-      newPanelSchema.value = PanelSchemaVersionConverted(panelSchema.value);
-    })
 
     const noData = computed(() => {
       // console.log("inside no Data computed");
-      if ( newPanelSchema.value?.queryType == "promql") {
+      if ( panelSchema.value?.queryType == "promql") {
         // console.log("inside no Data if");
         // console.log("PanelSchemaRenderer: noData:" , data.value[0].result?.length);
         return data.value.length && data.value.every((item) => item.result?.length) ? "" : "No Data"
