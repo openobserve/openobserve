@@ -24,7 +24,14 @@ export function convertDashboardSchemaVersion(data: any) {
       // Create a object with key as a panel id and value will be its layout.
       const layoutsObjBasedOnPanelId: any = {};
       data?.layouts?.forEach((layout: any) => {
-        layoutsObjBasedOnPanelId[layout.panelId] = layout;
+        layoutsObjBasedOnPanelId[layout.panelId] = {
+          x: layout.x,
+          y: layout.y,
+          h: layout.h,
+          w: layout.w,
+          i: layout.i,
+          // only include above fields
+        };
       });
 
       // add layout object in panels array and also migrate panels schema using panelschemaversionconverted function
@@ -37,11 +44,11 @@ export function convertDashboardSchemaVersion(data: any) {
       data.version = 2;
 
       // remove layouts key from data
-      delete data.layouts
+      delete data.layouts;
       break;
     }
   }
 
-  // return converted data 
+  // return converted data
   return data;
 }
