@@ -39,11 +39,9 @@ use crate::common::{
 };
 use crate::service::{
     db, format_partition_key, format_stream_name,
-    schema::{add_stream_schema, stream_schema_exists},
-};
-
-use super::{
     ingestion::{grpc::get_val, write_file},
+    schema::{add_stream_schema, stream_schema_exists},
+    stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
 };
 
@@ -92,6 +90,7 @@ pub async fn handle_trace_request(
     .await;
 
     let mut partition_keys: Vec<String> = vec![];
+    let mut partition_time_level = PartitionTimeLevel::Hourly;
     if stream_schema.has_partition_keys {
         let partition_det = crate::service::ingestion::get_stream_partition_keys(
             traces_stream_name,
@@ -99,6 +98,8 @@ pub async fn handle_trace_request(
         )
         .await;
         partition_keys = partition_det.partition_keys;
+        partition_time_level =
+            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Traces);
     }
 
     // Start get stream alerts
@@ -224,7 +225,7 @@ pub async fn handle_trace_request(
                 let mut hour_key = super::ingestion::get_wal_time_key(
                     timestamp.try_into().unwrap(),
                     &partition_keys,
-                    PartitionTimeLevel::from(CONFIG.limit.traces_file_retention.as_str()),
+                    partition_time_level,
                     value.as_object().unwrap(),
                     None,
                 );
