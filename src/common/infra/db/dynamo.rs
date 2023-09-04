@@ -182,7 +182,6 @@ impl super::Db for DynamoDb {
         let table = get_dynamo_key(prefix, DbOperation::List);
         let mut last_evaluated_key: Option<std::collections::HashMap<String, AttributeValue>> =
             None;
-
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         if table.operation == "query" {
             loop {
@@ -199,11 +198,11 @@ impl super::Db for DynamoDb {
                 if last_evaluated_key.is_some() {
                     query = query.set_exclusive_start_key(last_evaluated_key.clone());
                 }
+
                 query_resp = query.send().await;
                 match query_resp {
                     Ok(q_resp) => {
                         last_evaluated_key = q_resp.last_evaluated_key;
-
                         let items = q_resp.items.unwrap();
                         if items.is_empty() {
                             return Ok(result);
@@ -254,139 +253,165 @@ impl super::Db for DynamoDb {
         let mut result = Vec::new();
         let table = get_dynamo_key(prefix, DbOperation::List);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
-        match client
-            .query()
-            .table_name(&table.name)
-            .key_condition_expression("#pk = :pk and begins_with(#rk , :rk)")
-            .expression_attribute_names("#pk", &table.pk)
-            .expression_attribute_values(":pk", AttributeValue::S(table.pk_value))
-            .expression_attribute_names("#rk", &table.rk)
-            .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
-            .select(Select::AllAttributes)
-            .send()
-            .await
-        {
-            Ok(resp) => {
-                let items = resp.items().unwrap();
-                if items.is_empty() {
-                    return Ok(result);
-                }
-                for item in items {
-                    match item.get("value") {
-                        Some(attr) => match attr.as_s() {
-                            Ok(s) => {
-                                let res = s.as_bytes().to_vec().into();
-                                result.push(res);
+        let mut last_evaluated_key: Option<std::collections::HashMap<String, AttributeValue>> =
+            None;
+        loop {
+            let mut query = client
+                .query()
+                .table_name(&table.name)
+                .key_condition_expression("#pk = :pk and begins_with(#rk , :rk)")
+                .expression_attribute_names("#pk", &table.pk)
+                .expression_attribute_values(":pk", AttributeValue::S(table.pk_value.clone()))
+                .expression_attribute_names("#rk", &table.rk)
+                .expression_attribute_values(":rk", AttributeValue::S(table.rk_value.clone()))
+                .select(Select::AllAttributes);
+            if last_evaluated_key.is_some() {
+                query = query.set_exclusive_start_key(last_evaluated_key.clone());
+            }
+            match query.send().await {
+                Ok(resp) => {
+                    last_evaluated_key = resp.last_evaluated_key;
+                    let items = resp.items.unwrap();
+                    if items.is_empty() {
+                        return Ok(result);
+                    }
+                    for item in items {
+                        match item.get("value") {
+                            Some(attr) => match attr.as_s() {
+                                Ok(s) => {
+                                    let res = s.as_bytes().to_vec().into();
+                                    result.push(res);
+                                }
+                                Err(_) => continue,
+                            },
+                            None => {
+                                return Err(Error::from(DbError::KeyNotExists(prefix.to_string())))
                             }
-                            Err(_) => continue,
-                        },
-                        None => return Err(Error::from(DbError::KeyNotExists(prefix.to_string()))),
+                        }
+                    }
+                    if last_evaluated_key.is_none() {
+                        return Ok(result);
                     }
                 }
-            }
-            Err(err) => {
-                log::error!("err: {:?}", err);
-                return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+                Err(err) => {
+                    log::error!("err: {:?}", err);
+                    return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+                }
             }
         }
-
-        Ok(result)
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let mut result = Vec::new();
         let table = get_dynamo_key(prefix, DbOperation::List);
         let client = DYNAMO_DB_CLIENT.get().await.clone();
+        let mut last_evaluated_key: Option<std::collections::HashMap<String, AttributeValue>> =
+            None;
         if table.operation == "query" {
-            match client
-                .query()
-                .table_name(&table.name)
-                .key_condition_expression("#pk = :pk and begins_with(#rk , :rk)")
-                .expression_attribute_names("#pk", &table.pk)
-                .expression_attribute_values(":pk", AttributeValue::S(table.pk_value))
-                .expression_attribute_names("#rk", &table.rk)
-                .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
-                .select(Select::AllAttributes)
-                .send()
-                .await
-            {
-                Ok(resp) => {
-                    //log::error!("table: {:?}", table);
-                    let items = resp.items().unwrap();
-                    if items.is_empty() {
-                        return Ok(result);
-                    }
-                    for item in items {
-                        match item.get("value") {
-                            Some(_) => {
-                                let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
-                                let key = if table.name != CONFIG.dynamo.meta_table {
-                                    let org = item.get(&table.pk).unwrap().as_s().unwrap();
-                                    local_key.replace(
-                                        &format!("{}/", table.entity),
-                                        &format!("/{}/{}/", table.entity, org),
-                                    )
-                                } else {
-                                    (&local_key).to_string()
-                                };
-                                result.push(key);
-                            }
-                            None => {
-                                return Err(Error::from(DbError::KeyNotExists(prefix.to_string())))
+            loop {
+                let mut query = client
+                    .query()
+                    .table_name(&table.name)
+                    .key_condition_expression("#pk = :pk and begins_with(#rk , :rk)")
+                    .expression_attribute_names("#pk", &table.pk)
+                    .expression_attribute_values(":pk", AttributeValue::S(table.pk_value.clone()))
+                    .expression_attribute_names("#rk", &table.rk)
+                    .expression_attribute_values(":rk", AttributeValue::S(table.rk_value.clone()))
+                    .select(Select::AllAttributes);
+                if last_evaluated_key.is_some() {
+                    query = query.set_exclusive_start_key(last_evaluated_key.clone());
+                }
+                match query.send().await {
+                    Ok(resp) => {
+                        last_evaluated_key = resp.last_evaluated_key;
+                        let items = resp.items.unwrap();
+                        if items.is_empty() {
+                            return Ok(result);
+                        }
+                        for item in items {
+                            match item.get("value") {
+                                Some(_) => {
+                                    let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
+                                    let key = if table.name != CONFIG.dynamo.meta_table {
+                                        let org = item.get(&table.pk).unwrap().as_s().unwrap();
+                                        local_key.replace(
+                                            &format!("{}/", table.entity),
+                                            &format!("/{}/{}/", table.entity, org),
+                                        )
+                                    } else {
+                                        (&local_key).to_string()
+                                    };
+                                    result.push(key);
+                                }
+                                None => {
+                                    return Err(Error::from(DbError::KeyNotExists(
+                                        prefix.to_string(),
+                                    )))
+                                }
                             }
                         }
                     }
+                    Err(err) => {
+                        log::error!("err: {:?}", err);
+                        return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+                    }
                 }
-                Err(err) => {
-                    log::error!("err: {:?}", err);
-                    return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+                if last_evaluated_key.is_none() {
+                    return Ok(result);
                 }
             }
         } else {
-            match client
-                .scan()
-                .table_name(&table.name)
-                .filter_expression("begins_with(#rk , :rk)")
-                .expression_attribute_names("#rk", &table.rk)
-                .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
-                .select(Select::AllAttributes)
-                .send()
-                .await
-            {
-                Ok(resp) => {
-                    let items = resp.items().unwrap();
-                    if items.is_empty() {
-                        return Ok(result);
-                    }
-                    for item in items {
-                        match item.get("value") {
-                            Some(_) => {
-                                let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
-                                let key = if table.name != CONFIG.dynamo.meta_table {
-                                    let org = item.get(&table.pk).unwrap().as_s().unwrap();
-                                    local_key.replace(
-                                        &format!("{}/", table.entity),
-                                        &format!("/{}/{}/", table.entity, org),
-                                    )
-                                } else {
-                                    (&local_key).to_string()
-                                };
-                                result.push(key);
-                            }
-                            None => {
-                                return Err(Error::from(DbError::KeyNotExists(prefix.to_string())))
+            loop {
+                let mut query = client
+                    .scan()
+                    .table_name(&table.name)
+                    .filter_expression("begins_with(#rk , :rk)")
+                    .expression_attribute_names("#rk", &table.rk)
+                    .expression_attribute_values(":rk", AttributeValue::S(table.rk_value.clone()))
+                    .select(Select::AllAttributes);
+                if last_evaluated_key.is_some() {
+                    query = query.set_exclusive_start_key(last_evaluated_key.clone());
+                }
+                match query.send().await {
+                    Ok(resp) => {
+                        last_evaluated_key = resp.last_evaluated_key;
+                        let items = resp.items.unwrap();
+                        if items.is_empty() {
+                            return Ok(result);
+                        }
+                        for item in items {
+                            match item.get("value") {
+                                Some(_) => {
+                                    let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
+                                    let key = if table.name != CONFIG.dynamo.meta_table {
+                                        let org = item.get(&table.pk).unwrap().as_s().unwrap();
+                                        local_key.replace(
+                                            &format!("{}/", table.entity),
+                                            &format!("/{}/{}/", table.entity, org),
+                                        )
+                                    } else {
+                                        (&local_key).to_string()
+                                    };
+                                    result.push(key);
+                                }
+                                None => {
+                                    return Err(Error::from(DbError::KeyNotExists(
+                                        prefix.to_string(),
+                                    )))
+                                }
                             }
                         }
                     }
+                    Err(err) => {
+                        log::error!("err: {:?}", err);
+                        return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+                    }
                 }
-                Err(err) => {
-                    log::error!("err: {:?}", err);
-                    return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+                if last_evaluated_key.is_none() {
+                    return Ok(result);
                 }
             }
         }
-
-        Ok(result)
     }
 
     async fn count(&self, _prefix: &str) -> Result<i64> {
@@ -404,58 +429,65 @@ async fn scan_prefix(
     prefix: &str,
 ) -> Result<HashMap<String, Bytes>> {
     let mut result = HashMap::default();
-    match client
-        .clone()
-        .scan()
-        .table_name(&table.name)
-        .filter_expression("begins_with(#rk , :rk)")
-        .expression_attribute_names("#rk", &table.rk)
-        .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
-        .select(Select::AllAttributes)
-        .send()
-        .await
-    {
-        Ok(resp) => {
-            let items = resp.items().unwrap();
-            if items.is_empty() {
-                return Ok(result);
-            }
-            for item in items {
-                match item.get("value") {
-                    Some(attr) => match attr.as_s() {
-                        Ok(s) => {
-                            let res = s.as_bytes().to_vec().into();
-                            let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
-                            let key = if local_key.starts_with("compact/delete/") {
-                                let org = item.get(&table.pk).unwrap().as_s().unwrap();
-                                local_key.replace(
-                                    "compact/delete/",
-                                    &format!("/{}/{}/", "compact/delete", org),
-                                )
-                            } else if table.name != CONFIG.dynamo.meta_table {
-                                let org = item.get(&table.pk).unwrap().as_s().unwrap();
-                                local_key.replace(
-                                    &format!("{}/", table.entity),
-                                    &format!("/{}/{}/", table.entity, org),
-                                )
-                            } else {
-                                (&local_key).to_string()
-                            };
+    let mut last_evaluated_key: Option<std::collections::HashMap<String, AttributeValue>> = None;
+    loop {
+        let mut query = client
+            .clone()
+            .scan()
+            .table_name(&table.name)
+            .filter_expression("begins_with(#rk , :rk)")
+            .expression_attribute_names("#rk", &table.rk)
+            .expression_attribute_values(":rk", AttributeValue::S(table.rk_value.clone()))
+            .select(Select::AllAttributes);
+        if last_evaluated_key.is_some() {
+            query = query.set_exclusive_start_key(last_evaluated_key.clone());
+        }
+        match query.send().await {
+            Ok(resp) => {
+                last_evaluated_key = resp.last_evaluated_key;
+                let items = resp.items.unwrap();
+                if items.is_empty() {
+                    return Ok(result);
+                }
+                for item in items {
+                    match item.get("value") {
+                        Some(attr) => match attr.as_s() {
+                            Ok(s) => {
+                                let res = s.as_bytes().to_vec().into();
+                                let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
+                                let key = if local_key.starts_with("compact/delete/") {
+                                    let org = item.get(&table.pk).unwrap().as_s().unwrap();
+                                    local_key.replace(
+                                        "compact/delete/",
+                                        &format!("/{}/{}/", "compact/delete", org),
+                                    )
+                                } else if table.name != CONFIG.dynamo.meta_table {
+                                    let org = item.get(&table.pk).unwrap().as_s().unwrap();
+                                    local_key.replace(
+                                        &format!("{}/", table.entity),
+                                        &format!("/{}/{}/", table.entity, org),
+                                    )
+                                } else {
+                                    (&local_key).to_string()
+                                };
 
-                            result.insert(key, res);
-                        }
-                        Err(_) => continue,
-                    },
-                    None => return Err(Error::from(DbError::KeyNotExists(prefix.to_string()))),
+                                result.insert(key, res);
+                            }
+                            Err(_) => continue,
+                        },
+                        None => return Err(Error::from(DbError::KeyNotExists(prefix.to_string()))),
+                    }
                 }
             }
+            Err(err) => {
+                log::error!("err: {:?}", err);
+                return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+            }
         }
-        Err(err) => {
-            log::error!("err: {:?}", err);
-            return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+        if last_evaluated_key.is_none() {
+            return Ok(result);
         }
     }
-    Ok(result)
 }
 
 pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetails {
