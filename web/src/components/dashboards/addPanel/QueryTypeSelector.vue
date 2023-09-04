@@ -3,19 +3,19 @@
         <div class="row button-group">
             <div>
                 <button :class="selectedButtonType === 'auto' ? 'selected' : ''" class='button button-left'
-                    @click="onUpdateButton('auto')">
+                    @click="onUpdateButton('auto',$event)">
                     {{ t('panel.auto') }}
                 </button>
             </div>
             <div>
                 <button class="button" :class="selectedButtonType === 'promql' ? 'selected' : ''"
-                    v-show="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'" @click="onUpdateButton('promql')">
+                    v-show="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'" @click="onUpdateButton('promql',$event)">
                     {{ t('panel.promQL') }}
                 </button>
             </div>
             <div>
                 <button :class="selectedButtonType === 'custom-sql' ? 'selected' : ''" class='button button-right'
-                    @click="onUpdateButton('custom-sql')">
+                    @click="onUpdateButton('custom-sql',$event)">
                     {{ t('panel.customSql') }}
                 </button>
             </div>
@@ -91,9 +91,9 @@ export default defineComponent({
             initializeSelectedButtonType()
         })
 
-        const onUpdateButton = (selectedQueryType: any) => {
+        const onUpdateButton = (selectedQueryType: any,event?:any) => {
+            event.stopPropagation();
             if (selectedQueryType != selectedButtonType.value) {
-
                 // some exceptions
                 // If user is switching from auto to custom, promql to auto, or propmql to custom-sql no need for the popup,
                 // else show the popup
