@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ahash::AHashMap as HashMap;
+use ahash::HashMap;
 use bytes::{Bytes, BytesMut};
 use itertools::chain;
 use once_cell::sync::Lazy;
@@ -23,15 +23,17 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard},
 };
 
-use crate::common::infra::{
-    config::{CONFIG, FILE_EXT_JSON},
-    ider, metrics,
+use crate::common::{
+    infra::{
+        config::{CONFIG, FILE_EXT_JSON},
+        ider, metrics,
+    },
+    meta::{
+        stream::{PartitionTimeLevel, StreamParams},
+        StreamType,
+    },
+    utils::file::get_file_contents,
 };
-use crate::common::meta::{
-    stream::{PartitionTimeLevel, StreamParams},
-    StreamType,
-};
-use crate::common::utils::file::get_file_contents;
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
@@ -177,30 +179,22 @@ impl Manager {
         key: &str,
     ) -> Option<Arc<RwFile>> {
         let full_key = format!("{org_id}/{stream_type}/{stream_name}/{key}");
-        let file = match self
-            .data
-            .get(thread_id)
-            .unwrap()
-            .read()
-            .unwrap()
-            .get(&full_key)
-        {
+        let manager = self.data.get(thread_id).unwrap().read().unwrap();
+        let file = match manager.get(&full_key) {
             Some(file) => file.clone(),
             None => {
                 return None;
             }
         };
+        drop(manager);
 
         // check size & ttl
         if file.size() >= (CONFIG.limit.max_file_size_on_disk as i64)
             || file.expired() <= chrono::Utc::now().timestamp()
         {
-            self.data
-                .get(thread_id)
-                .unwrap()
-                .write()
-                .unwrap()
-                .remove(&full_key);
+            let mut manager = self.data.get(thread_id).unwrap().write().unwrap();
+            manager.remove(&full_key);
+            manager.shrink_to_fit();
             file.sync();
             return None;
         }
