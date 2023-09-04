@@ -177,62 +177,77 @@ impl super::Db for DynamoDb {
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
+        let mut query_resp;
         let mut result = HashMap::default();
         let table = get_dynamo_key(prefix, DbOperation::List);
+        let mut last_evaluated_key: Option<std::collections::HashMap<String, AttributeValue>> =
+            None;
+
         let client = DYNAMO_DB_CLIENT.get().await.clone();
         if table.operation == "query" {
-            match client
-                .query()
-                .table_name(&table.name)
-                .key_condition_expression("#pk = :pk and begins_with(#rk , :rk)")
-                .expression_attribute_names("#pk", &table.pk)
-                .expression_attribute_values(":pk", AttributeValue::S(table.pk_value.clone()))
-                .expression_attribute_names("#rk", &table.rk)
-                .expression_attribute_values(":rk", AttributeValue::S(table.rk_value))
-                .select(Select::AllAttributes)
-                .send()
-                .await
-            {
-                Ok(resp) => {
-                    let items = resp.items().unwrap();
-                    if items.is_empty() {
-                        return Ok(result);
-                    }
-                    for item in items {
-                        match item.get("value") {
-                            Some(attr) => match attr.as_s() {
-                                Ok(s) => {
-                                    let res = s.as_bytes().to_vec().into();
-                                    let local_key = item.get(&table.rk).unwrap().as_s().unwrap();
-                                    let key = if table.name != CONFIG.dynamo.meta_table {
-                                        let org = item.get(&table.pk).unwrap().as_s().unwrap();
-                                        local_key.replace(
-                                            &format!("{}/", table.entity),
-                                            &format!("/{}/{}/", table.entity, org),
-                                        )
-                                    } else {
-                                        (&local_key).to_string()
-                                    };
-                                    result.insert(key, res);
+            loop {
+                let mut query = client
+                    .query()
+                    .table_name(&table.name)
+                    .key_condition_expression("#pk = :pk and begins_with(#rk , :rk)")
+                    .expression_attribute_names("#pk", &table.pk)
+                    .expression_attribute_values(":pk", AttributeValue::S(table.pk_value.clone()))
+                    .expression_attribute_names("#rk", &table.rk)
+                    .expression_attribute_values(":rk", AttributeValue::S(table.rk_value.clone()))
+                    .select(Select::AllAttributes);
+
+                if last_evaluated_key.is_some() {
+                    query = query.set_exclusive_start_key(last_evaluated_key.clone());
+                }
+                query_resp = query.send().await;
+                match query_resp {
+                    Ok(q_resp) => {
+                        last_evaluated_key = q_resp.last_evaluated_key;
+
+                        let items = q_resp.items.unwrap();
+                        if items.is_empty() {
+                            return Ok(result);
+                        }
+                        for item in items {
+                            match item.get("value") {
+                                Some(attr) => match attr.as_s() {
+                                    Ok(s) => {
+                                        let res = s.as_bytes().to_vec().into();
+                                        let local_key =
+                                            item.get(&table.rk).unwrap().as_s().unwrap();
+                                        let key = if table.name != CONFIG.dynamo.meta_table {
+                                            let org = item.get(&table.pk).unwrap().as_s().unwrap();
+                                            local_key.replace(
+                                                &format!("{}/", table.entity),
+                                                &format!("/{}/{}/", table.entity, org),
+                                            )
+                                        } else {
+                                            (&local_key).to_string()
+                                        };
+                                        result.insert(key, res);
+                                    }
+                                    Err(_) => continue,
+                                },
+                                None => {
+                                    return Err(Error::from(DbError::KeyNotExists(
+                                        prefix.to_string(),
+                                    )))
                                 }
-                                Err(_) => continue,
-                            },
-                            None => {
-                                return Err(Error::from(DbError::KeyNotExists(prefix.to_string())))
+                            }
+                            if last_evaluated_key.is_none() {
+                                return Ok(result);
                             }
                         }
                     }
-                }
-                Err(err) => {
-                    log::error!("err: {:?}", err);
-                    return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+                    Err(err) => {
+                        log::error!("err: {:?}", err);
+                        return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
+                    }
                 }
             }
         } else {
             return scan_prefix(table, &client, prefix).await;
         }
-
-        Ok(result)
     }
 
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
@@ -481,7 +496,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
 
     match entity {
         "function" | "templates" | "destinations" | "dashboard" | "kv" | "metrics_members"
-        | "metrics_leader" => match operation {
+        | "metrics_leader" | "trigger" => match operation {
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
                 pk_value: parts[1].to_string(),
                 rk_value: format!("{}/{}", parts[0], parts[2]),
