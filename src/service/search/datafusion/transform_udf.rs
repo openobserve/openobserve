@@ -13,28 +13,21 @@
 // limitations under the License.
 
 use ahash::AHashMap;
-use arrow::array::StructArray;
-use arrow_schema::{Field, Fields};
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, StringArray},
-        datatypes::DataType,
+        array::{Array, ArrayRef, StringArray, StructArray},
+        datatypes::{DataType, Field, Fields},
     },
     logical_expr::{ScalarFunctionImplementation, ScalarUDF, Volatility},
     physical_plan::functions::make_scalar_function,
     prelude::create_udf,
 };
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use vector_enrichment::TableRegistry;
-use vrl::compiler::{runtime::Runtime, CompilationResult, Program};
-use vrl::compiler::{TargetValueRef, VrlRuntime};
+use vrl::compiler::{runtime::Runtime, CompilationResult, Program, TargetValueRef, VrlRuntime};
 
-use crate::{
-    common::infra::config::QUERY_FUNCTIONS,
-    common::utils::json,
-    service::{ingestion::compile_vrl_function, logs::get_value},
-};
+use crate::common::{infra::config::QUERY_FUNCTIONS, utils::json};
+use crate::service::{ingestion::compile_vrl_function, logs::get_value};
 
 fn create_user_df(
     fn_name: &str,
