@@ -341,10 +341,10 @@ pub fn unwrap_partition_time_level(
         None => match stream_type {
             StreamType::Logs => PartitionTimeLevel::from(CONFIG.limit.logs_file_retention.as_str()),
             StreamType::Metrics => {
-                PartitionTimeLevel::from(CONFIG.limit.traces_file_retention.as_str())
+                PartitionTimeLevel::from(CONFIG.limit.metrics_file_retention.as_str())
             }
             StreamType::Traces => {
-                PartitionTimeLevel::from(CONFIG.limit.metrics_file_retention.as_str())
+                PartitionTimeLevel::from(CONFIG.limit.traces_file_retention.as_str())
             }
             _ => PartitionTimeLevel::default(),
         },

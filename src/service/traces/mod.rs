@@ -90,7 +90,8 @@ pub async fn handle_trace_request(
     .await;
 
     let mut partition_keys: Vec<String> = vec![];
-    let mut partition_time_level = PartitionTimeLevel::Hourly;
+    let mut partition_time_level =
+        PartitionTimeLevel::from(CONFIG.limit.traces_file_retention.as_str());
     if stream_schema.has_partition_keys {
         let partition_det = crate::service::ingestion::get_stream_partition_keys(
             traces_stream_name,
