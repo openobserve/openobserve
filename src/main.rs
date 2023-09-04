@@ -345,6 +345,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .value_name("file")
                         .help("the parquet file name"),
                 ),
+            clap::Command::new("migrate-meta").about("migrate meta"),
         ])
         .get_matches();
 
@@ -412,6 +413,10 @@ async fn cli() -> Result<bool, anyhow::Error> {
             if !prefix.is_empty() {
                 migration::load_file_list_to_dynamo::load(prefix).await?
             }
+        }
+        "migrate-meta" => {
+            println!("Running migration");
+            migration::load_meta::load().await?
         }
         "delete-parquet" => {
             let file = command.get_one::<String>("file").unwrap();
