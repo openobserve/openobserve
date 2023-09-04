@@ -42,16 +42,18 @@ use parquet::arrow::ArrowWriter;
 use regex::Regex;
 use std::sync::Arc;
 
-use crate::common::infra::{
-    cache::tmpfs,
-    config::{CONFIG, PARQUET_BATCH_SIZE},
+use crate::common::{
+    infra::{
+        cache::tmpfs,
+        config::{COLUMN_TRACE_ID, CONFIG, PARQUET_BATCH_SIZE},
+    },
+    meta::{
+        common::{FileKey, FileMeta},
+        search::Session as SearchSession,
+        sql, StreamType,
+    },
+    utils::{flatten, json},
 };
-use crate::common::meta::{
-    common::{FileKey, FileMeta},
-    search::Session as SearchSession,
-    sql,
-};
-use crate::common::utils::{flatten, json};
 use crate::service::search::sql::Sql;
 
 use super::storage::{file_list, StorageType};
@@ -868,6 +870,7 @@ pub async fn merge_parquet_files(
     session_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
+    stream_type: StreamType,
 ) -> Result<FileMeta> {
     let start = std::time::Instant::now();
     // query data
@@ -919,7 +922,14 @@ pub async fn merge_parquet_files(
     let schema: Schema = df.schema().into();
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
-    let mut writer = super::new_writer(buf, &schema, None, None);
+
+    let bf_fields =
+        if CONFIG.common.traces_bloom_filter_enabled && stream_type == StreamType::Traces {
+            Some(vec![COLUMN_TRACE_ID])
+        } else {
+            None
+        };
+    let mut writer = super::new_writer(buf, &schema, None, bf_fields);
     for batch in batches {
         writer.write(&batch)?;
     }
