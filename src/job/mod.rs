@@ -18,10 +18,9 @@ use crate::common::{
     infra::{
         cluster,
         config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
-        db::dynamo,
-        file_list as infra_file_list, ider,
+        db as infra_db, file_list as infra_file_list, ider,
     },
-    meta::{meta_store::MetaStore, organization::DEFAULT_ORG, user::UserRequest},
+    meta::{organization::DEFAULT_ORG, user::UserRequest},
     utils::file::clean_empty_dirs,
 };
 use crate::service::{db, users};
@@ -37,13 +36,8 @@ pub(crate) mod syslog_server;
 mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    if CONFIG
-        .common
-        .meta_store
-        .eq(&MetaStore::DynamoDB.to_string())
-    {
-        dynamo::create_meta_tables().await?;
-    }
+    // init db
+    infra_db::create_table().await?;
 
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",

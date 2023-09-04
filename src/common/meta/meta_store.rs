@@ -18,17 +18,21 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 pub enum MetaStore {
     Sled,
+    Sqlite,
     Etcd,
     DynamoDB,
+    PostgreSQL,
 }
 
 impl From<&str> for MetaStore {
     fn from(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "sled" => MetaStore::Sled,
+            "sqlite" => MetaStore::Sqlite,
             "etcd" => MetaStore::Etcd,
             "dynamo" | "dynamodb" => MetaStore::DynamoDB,
-            _ => MetaStore::Sled,
+            "postgres" | "postgresql" => MetaStore::PostgreSQL,
+            _ => MetaStore::Sqlite,
         }
     }
 }
@@ -37,9 +41,11 @@ impl From<String> for MetaStore {
     fn from(s: String) -> Self {
         match s.to_lowercase().as_str() {
             "sled" => MetaStore::Sled,
+            "sqlite" => MetaStore::Sqlite,
             "etcd" => MetaStore::Etcd,
             "dynamo" | "dynamodb" => MetaStore::DynamoDB,
-            _ => MetaStore::Sled,
+            "postgres" | "postgresql" => MetaStore::PostgreSQL,
+            _ => MetaStore::Sqlite,
         }
     }
 }
@@ -48,8 +54,10 @@ impl std::fmt::Display for MetaStore {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             MetaStore::Sled => write!(f, "sled"),
+            MetaStore::Sqlite => write!(f, "sqlite"),
             MetaStore::Etcd => write!(f, "etcd"),
             MetaStore::DynamoDB => write!(f, "dynamodb"),
+            MetaStore::PostgreSQL => write!(f, "postgresql"),
         }
     }
 }

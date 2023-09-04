@@ -60,11 +60,11 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
 
 async fn update_stats_lock_node() -> Result<i64, anyhow::Error> {
     let lock_key = format!("compact/stream_stats/offset");
-    let mut locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
     // check the working node for the organization again, maybe other node locked it first
     let (offset, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-        dist_lock::unlock(&mut locker).await?;
+        dist_lock::unlock(&locker).await?;
         return Err(anyhow::anyhow!(
             "[COMPACT] update stats from file_list is merging by {node}"
         ));
@@ -72,11 +72,11 @@ async fn update_stats_lock_node() -> Result<i64, anyhow::Error> {
 
     // bind the job to this node
     if let Err(e) = db::compact::stats::set_offset(offset, Some(&LOCAL_NODE_UUID.clone())).await {
-        dist_lock::unlock(&mut locker).await?;
+        dist_lock::unlock(&locker).await?;
         return Err(e);
     }
 
     // already bind to this node, we can unlock now
-    dist_lock::unlock(&mut locker).await?;
+    dist_lock::unlock(&locker).await?;
     Ok(offset)
 }

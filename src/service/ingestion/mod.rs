@@ -406,7 +406,7 @@ mod tests {
                 &local_val,
                 None
             ),
-            "1970/01/01/00/keeping/country=USA/sport=basketball"
+            "1970/01/01/00/default/country=USA/sport=basketball"
         );
     }
 
@@ -423,7 +423,7 @@ mod tests {
                 &local_val,
                 None
             ),
-            "1970/01/01/00/keeping"
+            "1970/01/01/00/default"
         );
     }
     #[test]
@@ -436,7 +436,7 @@ mod tests {
                 &Map::new(),
                 None
             ),
-            "1970/01/01/00/keeping"
+            "1970/01/01/00/default"
         );
     }
     #[actix_web::test]

@@ -10,9 +10,9 @@ phases:
       - unzip protoc-21.12-linux-x86_64.zip -d protoc && cp protoc/bin/protoc /usr/local/bin/ && cp -r protoc/include/google /usr/local/include/
       - curl https://sh.rustup.rs -sSf | sh -s -- -y
       - . "$HOME/.cargo/env"
-      - rustup toolchain install nightly-2023-05-21
+      - rustup toolchain install nightly-2023-08-01
       - rustup toolchain list
-      - rustup default nightly-2023-05-21  
+      - rustup default nightly-2023-08-01  
       - rustup component add clippy llvm-tools
       - export RUSTFLAGS='-C target-cpu=native'
       - rm -rf ~/.cargo/registry

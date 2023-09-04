@@ -12,18 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::infra::config;
+use crate::common::infra::{config, db as infra_db};
 
 pub async fn get() -> Result<String, anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let ret = db.get("/meta/kv/version").await?;
     let version = std::str::from_utf8(&ret).unwrap();
     Ok(version.to_string())
 }
 
 pub async fn set() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
-    db.put("/meta/kv/version", bytes::Bytes::from(config::VERSION))
-        .await?;
+    let db = &infra_db::DEFAULT;
+    db.put(
+        "/meta/kv/version",
+        bytes::Bytes::from(config::VERSION),
+        infra_db::NO_NEED_WATCH,
+    )
+    .await?;
     Ok(())
 }

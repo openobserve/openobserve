@@ -94,10 +94,10 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     let stats = db.stats().await?;
     metrics::META_STORAGE_BYTES
         .with_label_values(&[])
-        .set(stats.bytes_len as i64);
+        .set(stats.bytes_len);
     metrics::META_STORAGE_KEYS
         .with_label_values(&[])
-        .set(stats.keys_count as i64);
+        .set(stats.keys_count);
 
     if CONFIG.common.local_mode {
         metrics::META_NUM_NODES.with_label_values(&["all"]).set(1);

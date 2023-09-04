@@ -17,15 +17,15 @@ use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
 use std::sync::Arc;
 
-use crate::common::infra::cache;
-use crate::common::infra::config::{
-    is_local_disk_storage, CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS,
+use crate::common::{
+    infra::{
+        cache,
+        config::{is_local_disk_storage, CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS},
+        db as infra_db,
+    },
+    meta::{stream::StreamSchema, StreamType},
+    utils::json,
 };
-use crate::common::infra::db::{Event, CLUSTER_COORDINATOR};
-use crate::common::meta::meta_store::MetaStore;
-use crate::common::meta::stream::StreamSchema;
-use crate::common::meta::StreamType;
-use crate::common::utils::json;
 use crate::service::enrichment::StreamTable;
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
@@ -44,7 +44,7 @@ pub async fn get(
         return Ok(schema.value().clone().last().unwrap().clone());
     }
 
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     Ok(match db.get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
@@ -70,7 +70,7 @@ pub async fn get_from_db(
 ) -> Result<Schema, anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
 
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     Ok(match db.get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
@@ -101,7 +101,7 @@ pub async fn get_versions(
         return Ok(STREAM_SCHEMAS.get(map_key).unwrap().value().clone());
     }
 
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     Ok(match db.get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
@@ -127,7 +127,7 @@ pub async fn set(
     min_ts: Option<i64>,
     new_version: bool,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let mut versions: Vec<Schema>;
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let map_key = key.strip_prefix("/schema/").unwrap();
@@ -147,12 +147,24 @@ pub async fn set(
                 metadata.insert("start_dt".to_string(), min_ts.unwrap().to_string());
                 metadata.insert("created_at".to_string(), created_at);
                 versions.push(schema.clone().with_metadata(metadata));
-                let _ = db.put(&key, json::to_vec(&versions).unwrap().into()).await;
+                let _ = db
+                    .put(
+                        &key,
+                        json::to_vec(&versions).unwrap().into(),
+                        infra_db::NEED_WATCH,
+                    )
+                    .await;
             }
         } else {
             versions.pop().unwrap();
             versions.push(schema.clone());
-            let _ = db.put(&key, json::to_vec(&versions).unwrap().into()).await;
+            let _ = db
+                .put(
+                    &key,
+                    json::to_vec(&versions).unwrap().into(),
+                    infra_db::NEED_WATCH,
+                )
+                .await;
         }
     } else {
         let mut metadata = schema.metadata().clone();
@@ -172,20 +184,11 @@ pub async fn set(
                 json::to_vec(&vec![schema.clone().with_metadata(metadata)])
                     .unwrap()
                     .into(),
+                infra_db::NEED_WATCH,
             )
             .await
         {
-            Ok(_) => {
-                if CONFIG
-                    .common
-                    .meta_store
-                    .eq(&MetaStore::DynamoDB.to_string())
-                {
-                    CLUSTER_COORDINATOR
-                        .put(&key, CONFIG.common.meta_store.clone().into())
-                        .await?
-                }
-            }
+            Ok(_) => {}
             Err(e) => {
                 log::error!("Error putting schema: {}", e);
                 return Err(anyhow::anyhow!("Error putting schema: {}", e));
@@ -202,17 +205,9 @@ pub async fn delete(
 ) -> Result<(), anyhow::Error> {
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
-    let db = &crate::common::infra::db::DEFAULT;
-    match db.delete(&key, false).await {
-        Ok(_) => {
-            if CONFIG
-                .common
-                .meta_store
-                .eq(&MetaStore::DynamoDB.to_string())
-            {
-                CLUSTER_COORDINATOR.delete(&key, false).await?
-            }
-        }
+    let db = &infra_db::DEFAULT;
+    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+        Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting schema: {}", e);
             return Err(anyhow::anyhow!("Error deleting schema: {}", e));
@@ -268,7 +263,7 @@ pub async fn list(
         return Ok(list_stream_schemas(org_id, stream_type, fetch_schema));
     }
 
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let db_key = match stream_type {
         None => format!("/schema/{org_id}/"),
         Some(stream_type) => format!("/schema/{org_id}/{stream_type}/"),
@@ -301,8 +296,8 @@ pub async fn list(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::CLUSTER_COORDINATOR;
     let key = "/schema/";
+    let db = &infra_db::CLUSTER_COORDINATOR;
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching stream schema");
@@ -315,19 +310,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            Event::Put(ev) => {
+            infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Vec<Schema> = if CONFIG
-                    .common
-                    .meta_store
-                    .eq(&MetaStore::DynamoDB.to_string())
-                {
-                    let dynamo = &crate::common::infra::db::DEFAULT;
-                    let ret = dynamo.get(&ev.key).await?;
-                    json::from_slice(&ret).unwrap()
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
-                };
+                let item_value: Vec<Schema> = json::from_slice(&ev.value.unwrap()).unwrap();
                 STREAM_SCHEMAS.insert(item_key.to_owned(), item_value.clone());
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
@@ -347,7 +332,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     );
                 }
             }
-            Event::Delete(ev) => {
+            infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let columns = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = columns[0];
@@ -372,13 +357,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                 }
             }
+            infra_db::Event::Empty => {}
         }
     }
     Ok(())
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/schema/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {

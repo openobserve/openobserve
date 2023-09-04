@@ -142,11 +142,13 @@ mod tests {
         e2e_list_alert_destinations().await;
         e2e_post_alert().await;
         e2e_get_alert().await;
-        e2e_delete_alert().await;
         e2e_list_alerts().await;
         e2e_list_real_time_alerts().await;
-        e2e_delete_alert_template().await;
+        e2e_delete_alert().await;
         e2e_delete_alert_destination().await;
+        e2e_delete_alert_template().await;
+
+        // syslog
         e2e_post_syslog_route().await;
         e2e_list_syslog_routes().await;
 
@@ -1047,7 +1049,6 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        log::info!("{:?}", resp.status());
         assert!(resp.status().is_success());
     }
 

@@ -227,10 +227,12 @@ pub async fn validator_gcp(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::infra::db as infra_db;
     use crate::common::meta::user::UserRequest;
 
     #[actix_web::test]
     async fn test_validate() {
+        infra_db::create_table().await.unwrap();
         let _ = users::post_user(
             "default",
             UserRequest {

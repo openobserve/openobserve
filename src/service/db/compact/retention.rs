@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use dashmap::DashSet;
+use once_cell::sync::Lazy;
 use std::sync::Arc;
 
-use crate::common::{infra::db::Event, meta::StreamType};
+use crate::common::{
+    infra::{config::RwHashSet, db as infra_db},
+    meta::StreamType,
+};
 
-lazy_static! {
-    static ref CACHE: DashSet<String, ahash::RandomState> = DashSet::default();
-}
+static CACHE: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
 
 #[inline]
 fn mk_key(
@@ -43,7 +44,7 @@ pub async fn delete_stream(
     stream_type: StreamType,
     date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name, date_range);
 
     // write in cache
@@ -54,7 +55,7 @@ pub async fn delete_stream(
     let db_key = format!("/compact/delete/{key}");
     CACHE.insert(key);
 
-    Ok(db.put(&db_key, "OK".into()).await?)
+    Ok(db.put(&db_key, "OK".into(), infra_db::NEED_WATCH).await?)
 }
 
 // set the stream is processing by the node
@@ -65,10 +66,12 @@ pub async fn process_stream(
     date_range: Option<(&str, &str)>,
     node: &str,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     let db_key = format!("/compact/delete/{key}");
-    Ok(db.put(&db_key, node.to_string().into()).await?)
+    Ok(db
+        .put(&db_key, node.to_string().into(), infra_db::NEED_WATCH)
+        .await?)
 }
 
 // get the stream processing information
@@ -78,7 +81,7 @@ pub async fn get_stream(
     stream_type: StreamType,
     date_range: Option<(&str, &str)>,
 ) -> String {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     let db_key = format!("/compact/delete/{key}");
     match db.get(&db_key).await {
@@ -103,11 +106,15 @@ pub async fn delete_stream_done(
     stream_type: StreamType,
     date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name, date_range);
-    db.delete_if_exists(&format!("/compact/delete/{key}"), false)
-        .await
-        .map_err(|e| anyhow::anyhow!(e))?;
+    db.delete_if_exists(
+        &format!("/compact/delete/{key}"),
+        false,
+        infra_db::NEED_WATCH,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!(e))?;
 
     // remove in cache
     CACHE.remove(&key);
@@ -117,7 +124,7 @@ pub async fn delete_stream_done(
 
 pub async fn list() -> Result<Vec<String>, anyhow::Error> {
     let mut items = Vec::new();
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = &infra_db::DEFAULT;
     let key = "/compact/delete/";
     let ret = db.list(key).await?;
     for (item_key, _) in ret {
@@ -128,8 +135,8 @@ pub async fn list() -> Result<Vec<String>, anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
     let key = "/compact/delete/";
+    let db = &infra_db::CLUSTER_COORDINATOR;
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching stream deleting");
@@ -142,14 +149,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            Event::Put(ev) => {
+            infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 CACHE.insert(item_key.to_string());
             }
-            Event::Delete(ev) => {
+            infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 CACHE.remove(item_key);
             }
+            infra_db::Event::Empty => {}
         }
     }
     Ok(())

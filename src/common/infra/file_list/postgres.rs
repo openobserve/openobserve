@@ -15,16 +15,11 @@
 use ahash::AHashMap as HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
-use once_cell::sync::Lazy;
-use sqlx::{
-    postgres::{PgConnectOptions, PgPoolOptions},
-    ConnectOptions, Pool, Postgres, QueryBuilder, Row,
-};
-use std::str::FromStr;
+use sqlx::{Postgres, QueryBuilder, Row};
 
 use crate::common::{
     infra::{
-        config::CONFIG,
+        db::postgres::CLIENT,
         errors::{Error, Result},
     },
     meta::{
@@ -33,19 +28,6 @@ use crate::common::{
         StreamType,
     },
 };
-
-static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
-
-fn connect() -> Pool<Postgres> {
-    let db_opts = PgConnectOptions::from_str(&CONFIG.common.meta_store_postgres_dsn)
-        .expect("postgres connect options create failed")
-        .disable_statement_logging();
-
-    let pool_opts = PgPoolOptions::new();
-    let pool_opts = pool_opts.min_connections(CONFIG.limit.cpu_num as u32);
-    let pool_opts = pool_opts.max_connections(CONFIG.limit.query_thread_num as u32);
-    pool_opts.connect_lazy_with(db_opts)
-}
 
 pub struct PostgresFileList {}
 
@@ -70,7 +52,8 @@ impl super::FileList for PostgresFileList {
         match  sqlx::query(
             r#"
 INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    ON CONFLICT DO NOTHING;
             "#,
         )
         .bind(org_id)
@@ -98,17 +81,12 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     async fn remove(&self, file: &str) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-        sqlx::query(
-            r#"
-DELETE FROM file_list 
-    WHERE stream = $1 AND date = $2 AND file = $3;
-            "#,
-        )
-        .bind(stream_key)
-        .bind(date_key)
-        .bind(file_name)
-        .execute(&pool)
-        .await?;
+        sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
+            .bind(stream_key)
+            .bind(date_key)
+            .bind(file_name)
+            .execute(&pool)
+            .await?;
         Ok(())
     }
 
@@ -207,12 +185,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
         let pool = CLIENT.clone();
-        let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
-    FROM file_list;
-            "#,
-        )
+        let ret = sqlx::query_as::<_, super::FileRecord>(r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size FROM file_list;"#)
         .fetch_all(&pool)
         .await?;
         Ok(ret
@@ -430,15 +403,11 @@ UPDATE stream_stats
         min_ts: i64,
     ) -> Result<()> {
         let pool = CLIENT.clone();
-        sqlx::query(
-            r#"
-UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;
-            "#,
-        )
-        .bind(min_ts)
-        .bind(stream)
-        .execute(&pool)
-        .await?;
+        sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
+            .bind(min_ts)
+            .bind(stream)
+            .execute(&pool)
+            .await?;
         Ok(())
     }
 
