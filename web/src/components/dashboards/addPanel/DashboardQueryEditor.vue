@@ -54,14 +54,17 @@
         </q-bar>
 
     </div>
-    <div class="row col" :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: 100%;'"
+    <div class="col" :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'"
         style="overflow: hidden;">
+        <div class="row">
+
         <div class="col">
             <query-editor ref="queryEditorRef" class="monaco-editor" v-model:query="currentQuery"
                 v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
                 v-model:functions="dashboardPanelData.meta.stream.functions" @run-query="searchData"
                 :readOnly="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"></query-editor>
             <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
+        </div>
         </div>
     </div>
 </template>
