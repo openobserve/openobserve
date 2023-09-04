@@ -1,3 +1,17 @@
+// Copyright 2023 Zinc Labs Inc.
+
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+
+//      http:www.apache.org/licenses/LICENSE-2.0
+
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 export const convertSQLData = (
   panelSchema: any,
   searchQueryDataTemp: any,
@@ -35,30 +49,37 @@ export const convertSQLData = (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-
     const data = searchQueryData.data.filter((item: any) => {
-      return xAxisKeys.every((key: any) => {
-        return item[key]!=null;
-      }) && yAxisKeys.every((key: any) => {
-        return item[key]!=null;
-      })
-    })
-        
+      return (
+        xAxisKeys.every((key: any) => {
+          return item[key] != null;
+        }) &&
+        yAxisKeys.every((key: any) => {
+          return item[key] != null;
+        })
+      );
+    });
+
     const keys = Object.keys(data[0]); // Assuming there's at least one object
-    const keyArrays:any = {};
-    
+    const keyArrays: any = {};
+
     for (const key of keys) {
-      keyArrays[key] = data.map((obj:any) => obj[key]);
+      keyArrays[key] = data.map((obj: any) => obj[key]);
     }
-    
-    let result = keyArrays[key]||[];
-    
+
+    let result = keyArrays[key] || [];
 
     // when the key is not available in the data that is not show the default value
-    const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
+    const field = props.data.queries[0].fields?.x.find(
+      (it: any) =>
+        it.aggregationFunction == "histogram" &&
+        it.column == store.state.zoConfig.timestamp_column
+    );
     if (field && field.alias == key) {
       // now we have the format, convert that format
-      result = result.map((it: any) => (new Date(it)-new Date("1970-01-01T00:00:00")));
+      result = result.map(
+        (it: any) => new Date(it) - new Date("1970-01-01T00:00:00")
+      );
     }
     return result;
   };
@@ -91,21 +112,21 @@ export const convertSQLData = (
             itemStyle: {
               shadowBlur: 10,
               shadowOffsetX: 0,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
+              shadowColor: "rgba(0, 0, 0, 0.5)",
             },
-            label:{
-              show:true
-            }
+            label: {
+              show: true,
+            },
           },
-          label:{
-            show:true
+          label: {
+            show: true,
           },
-          radius:"80%"
+          radius: "80%",
         };
       case "donut":
         return {
           type: "pie",
-          radius: ['50%', '80%'],
+          radius: ["50%", "80%"],
           avoidLabelOverlap: false,
           label: {
             show: true,
@@ -115,11 +136,11 @@ export const convertSQLData = (
             label: {
               show: true,
               fontSize: 12,
-              fontWeight: 'bold'
-            }
+              fontWeight: "bold",
+            },
           },
           labelLine: {
-            show: false
+            show: false,
           },
         };
       case "h-bar":
@@ -130,52 +151,52 @@ export const convertSQLData = (
       case "area":
         return {
           type: "line",
-          smooth:true,
+          smooth: true,
           emphasis: { focus: "series" },
           areaStyle: {},
         };
       case "stacked":
         return {
-          type: 'bar',
-          stack: 'total',
+          type: "bar",
+          stack: "total",
           emphasis: {
-            focus: 'series'
+            focus: "series",
           },
-      };
+        };
       case "heatmap":
         return {
-          type:"heatmap",
-          label:{
-            show:true
+          type: "heatmap",
+          label: {
+            show: true,
           },
           emphasis: {
             itemStyle: {
               shadowBlur: 10,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
-            }
+              shadowColor: "rgba(0, 0, 0, 0.5)",
+            },
           },
         };
       case "area-stacked":
         return {
           type: "line",
-          smooth:true,
-          stack: 'Total',
+          smooth: true,
+          stack: "Total",
           areaStyle: {},
           emphasis: {
-            focus: 'series'
+            focus: "series",
           },
         };
       case "metric":
         return {
-          type: 'custom',
-          coordinateSystem: 'polar',
+          type: "custom",
+          coordinateSystem: "polar",
         };
       case "h-stacked":
         return {
-          type: 'bar',
-          stack: 'total',
+          type: "bar",
+          stack: "total",
           emphasis: {
-            focus: 'series'
+            focus: "series",
           },
         };
       default:
@@ -185,116 +206,123 @@ export const convertSQLData = (
     }
   };
 
-const getUnitValue = (value: any) => {  
-  switch (props.data.config?.unit) {
-    case "bytes": {
-      const units = ["B", "KB", "MB", "GB", "TB"];
-      for (let unit of units) {
-        if (value < 1024) {
-          return {
-            value: `${parseFloat(value).toFixed(2)}`,
-            unit: `${unit}`,
-          };
+  const getUnitValue = (value: any) => {
+    switch (props.data.config?.unit) {
+      case "bytes": {
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        for (let unit of units) {
+          if (value < 1024) {
+            return {
+              value: `${parseFloat(value).toFixed(2)}`,
+              unit: `${unit}`,
+            };
+          }
+          value /= 1024;
         }
-        value /= 1024;
+        return {
+          value: `${parseFloat(value).toFixed(2)}`,
+          unit: "PB",
+        };
       }
-      return {
-        value: `${parseFloat(value).toFixed(2)}`,
-        unit: "PB",
-      };
-    }
-    case "custom": {
-      return {
-        value: `${value}`,
-        unit: `${props.data.config.unit_custom ?? ""}`,
-      };
-    }
-    case "seconds": {
-      const units = [
-        { unit: "ms", divisor: 0.001 },
-        { unit: "s", divisor: 1 },
-        { unit: "m", divisor: 60 },
-        { unit: "h", divisor: 3600 },
-        { unit: "D", divisor: 86400 },
-        { unit: "M", divisor: 2592000 }, // Assuming 30 days in a month
-        { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
-      ];
-      for (const unitInfo of units) {
-        const unitValue = value ? value / unitInfo.divisor : 0;
-        if (unitValue >= 1 && unitValue < 1000) {
-          return {
-            value: unitValue.toFixed(2),
-            unit: unitInfo.unit,
-          };
+      case "custom": {
+        return {
+          value: `${value}`,
+          unit: `${props.data.config.unit_custom ?? ""}`,
+        };
+      }
+      case "seconds": {
+        const units = [
+          { unit: "ms", divisor: 0.001 },
+          { unit: "s", divisor: 1 },
+          { unit: "m", divisor: 60 },
+          { unit: "h", divisor: 3600 },
+          { unit: "D", divisor: 86400 },
+          { unit: "M", divisor: 2592000 }, // Assuming 30 days in a month
+          { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
+        ];
+        for (const unitInfo of units) {
+          const unitValue = value ? value / unitInfo.divisor : 0;
+          if (unitValue >= 1 && unitValue < 1000) {
+            return {
+              value: unitValue.toFixed(2),
+              unit: unitInfo.unit,
+            };
+          }
         }
-      }
 
-      // If the value is too large to fit in any unit, return the original seconds
-      return {
-        value: value,
-        unit: "s",
-      };
-    }
-    case "bps": {
-      const units = ["B", "KB", "MB", "GB", "TB"];
-      for (let unit of units) {
-        if (value < 1024) {
-          return {
-            value: `${parseFloat(value).toFixed(2)}`,
-            unit: `${unit}/s`,
-          };
+        // If the value is too large to fit in any unit, return the original seconds
+        return {
+          value: value,
+          unit: "s",
+        };
+      }
+      case "bps": {
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        for (let unit of units) {
+          if (value < 1024) {
+            return {
+              value: `${parseFloat(value).toFixed(2)}`,
+              unit: `${unit}/s`,
+            };
+          }
+          value /= 1024;
         }
-        value /= 1024;
+        return {
+          value: `${parseFloat(value).toFixed(2)}`,
+          unit: "PB/s",
+        };
       }
-      return {
-        value: `${parseFloat(value).toFixed(2)}`,
-        unit: "PB/s",
-      };
+      case "percent-1": {
+        return {
+          value: `${(parseFloat(value) * 100).toFixed(2)}`,
+          unit: "%",
+        };
+        // `${parseFloat(value) * 100}`;
+      }
+      case "percent": {
+        return {
+          value: `${parseFloat(value).toFixed(2)}`,
+          unit: "%",
+        };
+        // ${parseFloat(value)}`;
+      }
+      case "default": {
+        return {
+          value: isNaN(value)
+            ? value
+            : Number.isInteger(value)
+            ? value
+            : value.toFixed(2),
+          unit: "",
+        };
+      }
+      default: {
+        return {
+          value: isNaN(value)
+            ? value
+            : Number.isInteger(value)
+            ? value
+            : value.toFixed(2),
+          unit: "",
+        };
+      }
     }
-    case "percent-1": {
-      return {
-        value: `${(parseFloat(value) * 100).toFixed(2)}`,
-        unit: "%",
-      };
-      // `${parseFloat(value) * 100}`;
-    }
-    case "percent": {
-      return {
-        value: `${parseFloat(value).toFixed(2)}`,
-        unit: "%",
-      };
-      // ${parseFloat(value)}`;
-    }
-    case "default": {
-      return {
-        value: isNaN(value) ? value :Number.isInteger(value) ? value : value.toFixed(2),
-        unit: "",
-      };
-    }
-    default: {
-      return {
-        value: isNaN(value) ? value : Number.isInteger(value) ? value : value.toFixed(2),
-        unit: "",
-      };
-    }
-  }
-};
+  };
 
-const formatUnitValue = (obj: any) => {
-  return `${obj.value}${obj.unit}`;
-};
+  const formatUnitValue = (obj: any) => {
+    return `${obj.value}${obj.unit}`;
+  };
 
+  const formatDate = (date: any) => {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = String(date.getFullYear()).slice(2);
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
 
-const formatDate =(date:any)=>{
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = String(date.getFullYear()).slice(2);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-
-  return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
-}
+    return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
+  };
 
   const getLegendPosition = () => {
     const legendPosition = props.data.config?.legends_position;
@@ -317,10 +345,9 @@ const formatDate =(date:any)=>{
 
   const zAxisKeys = getZAxisKeys();
 
-  
   const legendPosition = getLegendPosition();
 
-  const legendConfig:any = {
+  const legendConfig: any = {
     show: props.data.config?.show_legends,
     type: "scroll",
     orient: legendPosition,
@@ -358,97 +385,117 @@ const formatDate =(date:any)=>{
   const calculateWidthText = (text: string): number => {
     if (!text) return 0;
 
-    const span = document.createElement('span');
+    const span = document.createElement("span");
     document.body.appendChild(span);
 
-    span.style.font = 'sans-serif';
-    span.style.fontSize = '12px';
-    span.style.height = 'auto';
-    span.style.width = 'auto';
-    span.style.top = '0px';
-    span.style.position = 'absolute';
-    span.style.whiteSpace = 'no-wrap';
+    span.style.font = "sans-serif";
+    span.style.fontSize = "12px";
+    span.style.height = "auto";
+    span.style.width = "auto";
+    span.style.top = "0px";
+    span.style.position = "absolute";
+    span.style.whiteSpace = "no-wrap";
     span.innerHTML = text;
 
     const width = Math.ceil(span.clientWidth);
     span.remove();
     return width;
-};
+  };
 
-  // const data = getAxisDataFromKey(yAxisKeys[0]);      
+  // const data = getAxisDataFromKey(yAxisKeys[0]);
   // get the largest label from the data from array of string with reduce
-  const largestLabel =(data:any)=> data.reduce((largest: any, label: any) => {
-    return label?.toString().length > largest?.toString().length ? label : largest;
-  }, '');
+  const largestLabel = (data: any) =>
+    data.reduce((largest: any, label: any) => {
+      return label?.toString().length > largest?.toString().length
+        ? label
+        : largest;
+    }, "");
 
-  // const largestLabel = 
+  // const largestLabel =
   // const nameGap = calculateWidthText(largestLabel) + 8
   // console.log('namegap data:', data, largestLabel, nameGap);
 
-  let option:any = {
+  let option: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
       containLabel: true,
       left: "30",
-      right: legendConfig.orient === "vertical" && props.data.config?.show_legends ? 200 : "20",
+      right:
+        legendConfig.orient === "vertical" && props.data.config?.show_legends
+          ? 200
+          : "20",
       top: "15",
       bottom: "30",
     },
     tooltip: {
       trigger: "axis",
-      textStyle:{
-        fontSize:12
+      textStyle: {
+        fontSize: 12,
       },
       axisPointer: {
         type: "cross",
-        label:{
-          show:true,
-          fontsize:12,
-          formatter: function (params:any) {
-            let lineBreaks="";
-            if(props.data.type==="h-bar" || props.data.type==="h-stacked"){
-              if(params.axisDimension=="x") return formatUnitValue(getUnitValue(params.value));
-              
+        label: {
+          show: true,
+          fontsize: 12,
+          formatter: function (params: any) {
+            let lineBreaks = "";
+            if (
+              props.data.type === "h-bar" ||
+              props.data.type === "h-stacked"
+            ) {
+              if (params.axisDimension == "x")
+                return formatUnitValue(getUnitValue(params.value));
+
               //we does not required any linebreaks for h-stacked because we only use one x axis
-              if(props.data.type==="h-stacked")return params.value.toString();              
-              for(let i=0;i<(xAxisKeys.length-params.axisIndex-1);i++){
-                lineBreaks+=" \n \n";              
+              if (props.data.type === "h-stacked")
+                return params.value.toString();
+              for (
+                let i = 0;
+                i < xAxisKeys.length - params.axisIndex - 1;
+                i++
+              ) {
+                lineBreaks += " \n \n";
               }
-              params.value =params.value.toString();
+              params.value = params.value.toString();
               return `${lineBreaks}  ${params.value}`;
             }
-            if(params.axisDimension=="y") return formatUnitValue(getUnitValue(params.value));
-            for(let i=0;i<(xAxisKeys.length-params.axisIndex-1);i++){
-              lineBreaks+=" \n \n";              
+            if (params.axisDimension == "y")
+              return formatUnitValue(getUnitValue(params.value));
+            for (let i = 0; i < xAxisKeys.length - params.axisIndex - 1; i++) {
+              lineBreaks += " \n \n";
             }
             params.value = params.value.toString();
             return `${lineBreaks}  ${params.value}`;
-        }
-        }
+          },
+        },
       },
       formatter: function (name: any) {
         if (name.length == 0) return "";
 
-        let hoverText = name.map((it:any)=>{
-          return `${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.value))}`;
+        let hoverText = name.map((it: any) => {
+          return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+            getUnitValue(it.value)
+          )}`;
         });
         return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
-    xAxis:xAxisKeys?.map((key: any,index:number) => {
-      const data = getAxisDataFromKey(key);      
+    xAxis: xAxisKeys
+      ?.map((key: any, index: number) => {
+        const data = getAxisDataFromKey(key);
 
-      //unique value index array 
-      const arr:any = [];
-      for(let i=0;i<data.length;i++){
-        if(i==0||data[i]!=data[i-1])arr.push(i)
-      }      
+        //unique value index array
+        const arr: any = [];
+        for (let i = 0; i < data.length; i++) {
+          if (i == 0 || data[i] != data[i - 1]) arr.push(i);
+        }
 
         return {
           type: "category",
           position: props.data.type == "h-bar" ? "left" : "bottom",
-          name: index==0 ? props.data.queries[0]?.fields?.x[index]?.label : "",
+          name:
+            index == 0 ? props.data.queries[0]?.fields?.x[index]?.label : "",
           nameLocation: "middle",
           nameGap: 13 * (xAxisKeys.length - index + 1),
           nameTextStyle: {
@@ -456,28 +503,32 @@ const formatDate =(date:any)=>{
             fontSize: 14,
           },
           axisLabel: {
-             interval: index == xAxisKeys.length-1  ? "auto" : function(i:any){
-              return arr.includes(i);
-            },
-            overflow: index == xAxisKeys.length-1  ? "none" :"truncate",
-            width:100,
-            margin: 18 * (xAxisKeys.length - index -1) + 5
+            interval:
+              index == xAxisKeys.length - 1
+                ? "auto"
+                : function (i: any) {
+                    return arr.includes(i);
+                  },
+            overflow: index == xAxisKeys.length - 1 ? "none" : "truncate",
+            width: 100,
+            margin: 18 * (xAxisKeys.length - index - 1) + 5,
           },
           splitLine: {
             show: false,
           },
-          axisTick:{
+          axisTick: {
             show: xAxisKeys.length == 1 ? false : true,
-            align:"left",
+            align: "left",
             alignWithLabel: false,
             length: 20 * (xAxisKeys.length - index),
-            interval:function(i:any){
+            interval: function (i: any) {
               return arr.includes(i);
-            }
+            },
           },
           data: data,
         };
-      }).flat(),
+      })
+      .flat(),
     yAxis: {
       type: "value",
       name:
@@ -485,26 +536,33 @@ const formatDate =(date:any)=>{
           ? props.data.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
-      nameGap: calculateWidthText(props.data.type == "h-bar" || props.data.type == "h-stacked" ? largestLabel(getAxisDataFromKey(yAxisKeys[0])): formatUnitValue(getUnitValue(largestLabel(getAxisDataFromKey(yAxisKeys[0])))))+8,
+      nameGap:
+        calculateWidthText(
+          props.data.type == "h-bar" || props.data.type == "h-stacked"
+            ? largestLabel(getAxisDataFromKey(yAxisKeys[0]))
+            : formatUnitValue(
+                getUnitValue(largestLabel(getAxisDataFromKey(yAxisKeys[0])))
+              )
+        ) + 8,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
       },
       axisLabel: {
         formatter: function (value: any) {
-            return formatUnitValue(getUnitValue(value));
-        }
-    },
+          return formatUnitValue(getUnitValue(value));
+        },
+      },
       splitLine: {
         show: false,
       },
       axisLine: {
         show: true,
-      }
+      },
     },
     toolbox: {
       orient: "vertical",
-      show: !["pie","donut","metric"].includes(props.data.type),
+      show: !["pie", "donut", "metric"].includes(props.data.type),
       feature: {
         dataZoom: {
           yAxisIndex: "none",
@@ -524,8 +582,8 @@ const formatDate =(date:any)=>{
             (it: any) => it.alias == key
           )?.label,
           color:
-            props.data.queries[0]?.fields?.y.find((it: any) => it.alias == key)?.color ||
-            "#5960b2",
+            props.data.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+              ?.color || "#5960b2",
           opacity: 0.8,
           ...getPropsByChartTypeForTraces(),
           data: getAxisDataFromKey(key),
@@ -534,16 +592,17 @@ const formatDate =(date:any)=>{
       });
       break;
     }
-    case "scatter":
-    {
+    case "scatter": {
       option.tooltip.formatter = function (name: any) {
         //reduce to each name
-        const hoverText = name.reduce((text:any,it:any)=>{
-          return text+=`<br/> ${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.value[1]))}`;
-        },"");
+        const hoverText = name.reduce((text: any, it: any) => {
+          return (text += `<br/> ${it.marker} ${
+            it.seriesName
+          } : ${formatUnitValue(getUnitValue(it.value[1]))}`);
+        }, "");
         //x axis name + hovertext
         return `${name[0].name} ${hoverText}`;
-      }
+      };
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
           name: props.data?.queries[0]?.fields?.y.find(
@@ -554,7 +613,9 @@ const formatDate =(date:any)=>{
               ?.color || "#5960b2",
           opacity: 0.8,
           ...getPropsByChartTypeForTraces(),
-          data:getAxisDataFromKey(key).map((it:any,i:number)=>{return [option.xAxis[0].data[i],it]}),
+          data: getAxisDataFromKey(key).map((it: any, i: number) => {
+            return [option.xAxis[0].data[i], it];
+          }),
         };
         return seriesObj;
       });
@@ -572,69 +633,42 @@ const formatDate =(date:any)=>{
               ?.color || "#5960b2",
           opacity: 0.8,
           ...getPropsByChartTypeForTraces(),
-          data:getAxisDataFromKey(key)
+          data: getAxisDataFromKey(key),
         };
         return seriesObj;
       });
       //swap x and y axis
       const temp = option.xAxis;
       option.xAxis = option.yAxis;
-      option.yAxis=temp;
-      
-      option.yAxis.map((it:any)=>{
-        it.nameGap = calculateWidthText(largestLabel(it.data))+14;
-      })
-      option.xAxis.name= props.data.queries[0]?.fields?.y?.length >= 1
-        ? props.data.queries[0]?.fields?.y[0]?.label
-        : "",
-      option.xAxis.nameGap = 20;
+      option.yAxis = temp;
+
+      option.yAxis.map((it: any) => {
+        it.nameGap = calculateWidthText(largestLabel(it.data)) + 14;
+      });
+      (option.xAxis.name =
+        props.data.queries[0]?.fields?.y?.length >= 1
+          ? props.data.queries[0]?.fields?.y[0]?.label
+          : ""),
+        (option.xAxis.nameGap = 20);
       break;
     }
     case "pie": {
-      option.tooltip={
-        trigger: 'item',
-        textStyle:{
-          fontSize:12,
+      option.tooltip = {
+        trigger: "item",
+        textStyle: {
+          fontSize: 12,
         },
-        formatter: function (name: any) {          
-          return `${name.marker} ${name.name} : <b>${formatUnitValue(getUnitValue(name.value))}</b>`;
-        }
-      }
+        formatter: function (name: any) {
+          return `${name.marker} ${name.name} : <b>${formatUnitValue(
+            getUnitValue(name.value)
+          )}</b>`;
+        },
+      };
       //generate trace based on the y axis keys
       option.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
           ...getPropsByChartTypeForTraces(),
-          data: getAxisDataFromKey(key).map((it:any, i:number) => {
-            return { value: it, name: option.xAxis[0].data[i] };
-          }),
-          label: {
-            show: true,
-            formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
-            position: "inside", // You can adjust the position of the labels
-            fontSize: 10
-          },
-        };
-        return seriesObj;
-      });
-      option.xAxis=[];
-      option.yAxis=[];
-      break;
-    }
-    case "donut": {
-    option.tooltip = {
-      trigger: "item",
-      textStyle:{
-        fontSize:12,
-      },
-      formatter: function (name: any) {
-        return `${name.marker} ${name.name} : <b>${formatUnitValue(getUnitValue(name.value))}<b/>`;
-      }
-    };
-      //generate trace based on the y axis keys
-      option.series = yAxisKeys?.map((key: any) => {
-        const seriesObj = {
-          ...getPropsByChartTypeForTraces(),
-          data: getAxisDataFromKey(key).map((it: any, i:number) => {
+          data: getAxisDataFromKey(key).map((it: any, i: number) => {
             return { value: it, name: option.xAxis[0].data[i] };
           }),
           label: {
@@ -646,62 +680,108 @@ const formatDate =(date:any)=>{
         };
         return seriesObj;
       });
-      option.xAxis=[];
-      option.yAxis=[];
+      option.xAxis = [];
+      option.yAxis = [];
+      break;
+    }
+    case "donut": {
+      option.tooltip = {
+        trigger: "item",
+        textStyle: {
+          fontSize: 12,
+        },
+        formatter: function (name: any) {
+          return `${name.marker} ${name.name} : <b>${formatUnitValue(
+            getUnitValue(name.value)
+          )}<b/>`;
+        },
+      };
+      //generate trace based on the y axis keys
+      option.series = yAxisKeys?.map((key: any) => {
+        const seriesObj = {
+          ...getPropsByChartTypeForTraces(),
+          data: getAxisDataFromKey(key).map((it: any, i: number) => {
+            return { value: it, name: option.xAxis[0].data[i] };
+          }),
+          label: {
+            show: true,
+            formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
+            position: "inside", // You can adjust the position of the labels
+            fontSize: 10,
+          },
+        };
+        return seriesObj;
+      });
+      option.xAxis = [];
+      option.yAxis = [];
       break;
     }
     case "area-stacked": {
-      option.xAxis[0].data = Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
-      option.xAxis = option.xAxis.slice(0,1);
-      option.tooltip.axisPointer.label= {
-        show:true,
-        label:{
-        fontsize:12,
+      option.xAxis[0].data = Array.from(
+        new Set(getAxisDataFromKey(xAxisKeys[0]))
+      );
+      option.xAxis = option.xAxis.slice(0, 1);
+      option.tooltip.axisPointer.label = {
+        show: true,
+        label: {
+          fontsize: 12,
         },
-        formatter: function (params:any) {
-          if(params.axisDimension=="y") return formatUnitValue(getUnitValue(params.value));
+        formatter: function (params: any) {
+          if (params.axisDimension == "y")
+            return formatUnitValue(getUnitValue(params.value));
           return params.value.toString();
-        }
+        },
       };
-      option.xAxis[0].axisLabel={};
-      option.xAxis[0].axisTick={};
-      option.xAxis[0].nameGap=20;
+      option.xAxis[0].axisLabel = {};
+      option.xAxis[0].axisTick = {};
+      option.xAxis[0].nameGap = 20;
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
-      const key1 = xAxisKeys[1]
+      const key1 = xAxisKeys[1];
       // get the unique value of the second xAxis's key
-      const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map((obj: any) => obj[key1]))].filter((it)=> it);
-                  
+      const stackedXAxisUniqueValue = [
+        ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
+      ].filter((it) => it);
+
       // create a trace based on second xAxis's unique values
       option.series = stackedXAxisUniqueValue?.map((key: any) => {
-      const seriesObj = {
-        name: key,
-        ...getPropsByChartTypeForTraces(),
-        data: Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))).map((it: any) => (searchQueryData.data.find((it2:any)=>it2[xAxisKeys[0]] == it && it2[key1] == key))?.[yAxisKeys[0]] || 0),
-      };
-      return seriesObj
-    })
-    break;
+        const seriesObj = {
+          name: key,
+          ...getPropsByChartTypeForTraces(),
+          data: Array.from(
+            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
+          ).map(
+            (it: any) =>
+              searchQueryData.data.find(
+                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+              )?.[yAxisKeys[0]] || 0
+          ),
+        };
+        return seriesObj;
+      });
+      break;
     }
     case "stacked": {
-      option.xAxis[0].data=Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
-      option.xAxis = option.xAxis.slice(0,1);
-      option.tooltip.axisPointer.label= {
-        show:true,
-        label:{
-          fontsize:12,
-          },  
-        formatter: function (params:any) {
-          if(params.axisDimension=="y") return formatUnitValue(getUnitValue(params.value));
+      option.xAxis[0].data = Array.from(
+        new Set(getAxisDataFromKey(xAxisKeys[0]))
+      );
+      option.xAxis = option.xAxis.slice(0, 1);
+      option.tooltip.axisPointer.label = {
+        show: true,
+        label: {
+          fontsize: 12,
+        },
+        formatter: function (params: any) {
+          if (params.axisDimension == "y")
+            return formatUnitValue(getUnitValue(params.value));
           return params.value.toString();
-        }
+        },
       };
-      option.xAxis[0].axisLabel.margin=5;
-      option.xAxis[0].axisLabel={};
-      option.xAxis[0].axisTick={};
-      option.xAxis[0].nameGap=20;
-
+      option.xAxis[0].axisLabel.margin = 5;
+      option.xAxis[0].axisLabel = {};
+      option.xAxis[0].axisTick = {};
+      option.xAxis[0].nameGap = 20;
 
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
@@ -715,8 +795,15 @@ const formatDate =(date:any)=>{
       option.series = stackedXAxisUniqueValue?.map((key: any) => {
         const seriesObj = {
           name: key,
-          ...getPropsByChartTypeForTraces(),    
-          data:  Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))).map((it: any) => (searchQueryData.data.find((it2:any)=>it2[xAxisKeys[0]] == it && it2[key1] == key))?.[yAxisKeys[0]] || 0)
+          ...getPropsByChartTypeForTraces(),
+          data: Array.from(
+            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
+          ).map(
+            (it: any) =>
+              searchQueryData.data.find(
+                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+              )?.[yAxisKeys[0]] || 0
+          ),
         };
         return seriesObj;
       });
@@ -747,62 +834,79 @@ const formatDate =(date:any)=>{
           );
         });
       });
-      console.log("Zvalues=", xAxisZerothPositionUniqueValue,xAxisFirstPositionUniqueValue,Zvalues);
-      option.visualMap= {
+      console.log(
+        "Zvalues=",
+        xAxisZerothPositionUniqueValue,
+        xAxisFirstPositionUniqueValue,
+        Zvalues
+      );
+      (option.visualMap = {
         min: 0,
-        max: Zvalues.reduce((a: any, b: any) => Math.max(a, b.reduce((c: any, d: any) => Math.max(c, +d||0), 0)), 0),
+        max: Zvalues.reduce(
+          (a: any, b: any) =>
+            Math.max(
+              a,
+              b.reduce((c: any, d: any) => Math.max(c, +d || 0), 0)
+            ),
+          0
+        ),
         calculable: true,
-        orient: 'horizontal',
-        left: 'center',
-      },
-      option.series= [{
+        orient: "horizontal",
+        left: "center",
+      }),
+        (option.series = [
+          {
             ...getPropsByChartTypeForTraces(),
             name: props.data?.queries[0]?.fields?.y[0].label,
-          data: Zvalues.map((it:any,index:any)=>{
-            return xAxisZerothPositionUniqueValue.map((i:any,j:number)=>{
-              return [j,index,it[j]]
-            })
-          }).flat(),
-          label:{
-            show:true,
-            fontSize:12,
-            formatter:(params:any)=>{
-              return formatUnitValue(getUnitValue(params.value[2]))||params.value[2];
-            }
-          }
-        }]
-        // option.yAxis.data=xAxisFirstPositionUniqueValue;
-        option.tooltip= {
-          position: 'top',
-          textStyle:{
-            fontSize:12
+            data: Zvalues.map((it: any, index: any) => {
+              return xAxisZerothPositionUniqueValue.map((i: any, j: number) => {
+                return [j, index, it[j]];
+              });
+            }).flat(),
+            label: {
+              show: true,
+              fontSize: 12,
+              formatter: (params: any) => {
+                return (
+                  formatUnitValue(getUnitValue(params.value[2])) ||
+                  params.value[2]
+                );
+              },
+            },
           },
+        ]);
+      // option.yAxis.data=xAxisFirstPositionUniqueValue;
+      (option.tooltip = {
+        position: "top",
+        textStyle: {
+          fontSize: 12,
         },
-        option.tooltip.axisPointer={
-          type: 'cross',
-          label:{
-            fontsize:12,
-            },    
-        }
-        option.grid.bottom=60;
-        option.xAxis= {
-          type: 'category',
-          data: xAxisZerothPositionUniqueValue,
-          splitArea: {
-            show: true
-          }
+      }),
+        (option.tooltip.axisPointer = {
+          type: "cross",
+          label: {
+            fontsize: 12,
+          },
+        });
+      option.grid.bottom = 60;
+      (option.xAxis = {
+        type: "category",
+        data: xAxisZerothPositionUniqueValue,
+        splitArea: {
+          show: true,
         },
-        option.yAxis= {
-          type: 'category',
+      }),
+        (option.yAxis = {
+          type: "category",
           data: xAxisFirstPositionUniqueValue,
           splitArea: {
-            show: true
-          }
-        }
-        option.legend.show=false;
-          // option.xAxis=option.xAxis[0];
-          // option.yAxis.type="category"
-      
+            show: true,
+          },
+        });
+      option.legend.show = false;
+      // option.xAxis=option.xAxis[0];
+      // option.yAxis.type="category"
+
       // const trace = {
       //   x: xAxisZerothPositionUniqueValue,
       //   y: xAxisFirstPositionUniqueValue,
@@ -817,8 +921,10 @@ const formatDate =(date:any)=>{
       break;
     }
     case "h-stacked": {
-      option.xAxis[0].data=Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
-      option.xAxis = option.xAxis.slice(0,1);
+      option.xAxis[0].data = Array.from(
+        new Set(getAxisDataFromKey(xAxisKeys[0]))
+      );
+      option.xAxis = option.xAxis.slice(0, 1);
 
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
@@ -832,8 +938,15 @@ const formatDate =(date:any)=>{
       option.series = stackedXAxisUniqueValue?.map((key: any) => {
         const seriesObj = {
           name: key,
-          ...getPropsByChartTypeForTraces(),    
-          data:  Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))).map((it: any) => (searchQueryData.data.find((it2:any)=>it2[xAxisKeys[0]] == it && it2[key1] == key))?.[yAxisKeys[0]] || 0)
+          ...getPropsByChartTypeForTraces(),
+          data: Array.from(
+            new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))
+          ).map(
+            (it: any) =>
+              searchQueryData.data.find(
+                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+              )?.[yAxisKeys[0]] || 0
+          ),
         };
         return seriesObj;
       });
@@ -841,47 +954,48 @@ const formatDate =(date:any)=>{
       const temp = option.xAxis;
       option.xAxis = option.yAxis;
       option.yAxis = temp;
-      option.yAxis.map((it:any)=>{
-        it.nameGap = calculateWidthText(largestLabel(it.data))+8;
-      })
+      option.yAxis.map((it: any) => {
+        it.nameGap = calculateWidthText(largestLabel(it.data)) + 8;
+      });
       option.xAxis.nameGap = 20;
       break;
     }
     case "metric": {
       const key1 = yAxisKeys[0];
-      const yAxisValue = getAxisDataFromKey(key1);      
-      const unitValue = getUnitValue(yAxisValue.length > 0 ? yAxisValue[0]:0);
-        option.dataset = {source:[[]]};
-        option.tooltip={
-          show:false
-        };
-        option.angleAxis= {
-          show: false,
-        };
-        option.radiusAxis= {
-          show: false
-        };
-        option.polar= {};
-        option.xAxis= [];
-        option.yAxis= [];
-        option.series=[{
+      const yAxisValue = getAxisDataFromKey(key1);
+      const unitValue = getUnitValue(yAxisValue.length > 0 ? yAxisValue[0] : 0);
+      option.dataset = { source: [[]] };
+      option.tooltip = {
+        show: false,
+      };
+      option.angleAxis = {
+        show: false,
+      };
+      option.radiusAxis = {
+        show: false,
+      };
+      option.polar = {};
+      option.xAxis = [];
+      option.yAxis = [];
+      option.series = [
+        {
           ...getPropsByChartTypeForTraces(),
-          renderItem: function(params: any) {            
+          renderItem: function (params: any) {
             return {
-              type: 'text',
+              type: "text",
               style: {
                 text: parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
-                fontSize: Math.min((params.coordSys.cx / 2),90),    //coordSys is relative. so that we can use it to calculate the dynamic size
+                fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
                 fontWeight: 500,
-                align: 'center',
-                verticalAlign: 'middle',
+                align: "center",
+                verticalAlign: "middle",
                 x: params.coordSys.cx,
                 y: params.coordSys.cy,
-                fill:store.state.theme == "dark" ? "#fff" : "#000",
-              }
-            }
-          } 
-        }
+                fill: store.state.theme == "dark" ? "#fff" : "#000",
+              },
+            };
+          },
+        },
       ];
       break;
     }
@@ -890,65 +1004,83 @@ const formatDate =(date:any)=>{
     }
   }
 
-
-//auto SQL: if x axis has time series
-  const field = props.data.queries[0].fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
-    if (field) {
-      option.series.map((seriesObj: any) => {
-      seriesObj.data=seriesObj.data.map((it: any,index:any) => [option.xAxis[0].data[index],it])
-    })
-    option.xAxis[0].type="time";
-    option.xAxis[0].data=[];
-    option.tooltip.formatter=function (name: any) {
+  //auto SQL: if x axis has time series
+  const field = props.data.queries[0].fields?.x.find(
+    (it: any) =>
+      it.aggregationFunction == "histogram" &&
+      it.column == store.state.zoConfig.timestamp_column
+  );
+  if (field) {
+    option.series.map((seriesObj: any) => {
+      seriesObj.data = seriesObj.data.map((it: any, index: any) => [
+        option.xAxis[0].data[index],
+        it,
+      ]);
+    });
+    option.xAxis[0].type = "time";
+    option.xAxis[0].data = [];
+    option.tooltip.formatter = function (name: any) {
       if (name.length == 0) return "";
 
       const date = new Date(name[0].data[0]);
 
-      let hoverText = name.map((it:any)=>{
-        return `${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.data[1]))}`;
+      let hoverText = name.map((it: any) => {
+        return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+          getUnitValue(it.data[1])
+        )}`;
       });
       return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
-    }
-    option.tooltip.axisPointer={
-      type: 'cross',
-      label:{
-        fontsize:12,
-        },
-      formatter: function (params:any) {
-      const date = new Date(params[0].value[0]);
-      return formatDate(date).toString();
-    }
-    }
+    };
+    option.tooltip.axisPointer = {
+      type: "cross",
+      label: {
+        fontsize: 12,
+      },
+      formatter: function (params: any) {
+        const date = new Date(params[0].value[0]);
+        return formatDate(date).toString();
+      },
+    };
   }
 
-//custom SQL: check if it is timeseries or not
-if((props.data.type != "h-bar") && option.xAxis.length>0 && option.xAxis[0].data.length>0){    
-  const sample = option.xAxis[0].data.slice(0, Math.min(20, option.xAxis[0].data.length));
-  
+  //custom SQL: check if it is timeseries or not
+  if (
+    props.data.type != "h-bar" &&
+    option.xAxis.length > 0 &&
+    option.xAxis[0].data.length > 0
+  ) {
+    const sample = option.xAxis[0].data.slice(
+      0,
+      Math.min(20, option.xAxis[0].data.length)
+    );
+
     const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
-    const isTimeSeries = sample.every((value:any) => {
-      return iso8601Pattern.test(value)
+    const isTimeSeries = sample.every((value: any) => {
+      return iso8601Pattern.test(value);
     });
     if (isTimeSeries) {
       option.series.map((seriesObj: any) => {
-        seriesObj.data=seriesObj.data.map((it: any,index:any) => [(new Date(option.xAxis.data[index])-new Date("1970-01-01T00:00:00")),it])
+        seriesObj.data = seriesObj.data.map((it: any, index: any) => [
+          new Date(option.xAxis.data[index]) - new Date("1970-01-01T00:00:00"),
+          it,
+        ]);
       });
-    option.xAxis[0].type="time";
-    option.xAxis[0].data=[];
-    option.tooltip.axisPointer={
-      type: 'cross',
-      label:{
-        fontsize:12,
+      option.xAxis[0].type = "time";
+      option.xAxis[0].data = [];
+      option.tooltip.axisPointer = {
+        type: "cross",
+        label: {
+          fontsize: 12,
         },
-      formatter: function (params:any) {
-        const date = new Date(params[0].value[0]);
-        return formatDate(date).toString();
-      }
+        formatter: function (params: any) {
+          const date = new Date(params[0].value[0]);
+          return formatDate(date).toString();
+        },
+      };
     }
   }
-}
 
-console.log("optionss:", option);
+  console.log("optionss:", option);
 
   return {
     option,

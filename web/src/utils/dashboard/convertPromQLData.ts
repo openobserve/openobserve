@@ -1,3 +1,17 @@
+// Copyright 2023 Zinc Labs Inc.
+
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+
+//      http:www.apache.org/licenses/LICENSE-2.0
+
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import moment from "moment";
 
 export const convertPromQLData = (
@@ -51,104 +65,104 @@ export const convertPromQLData = (
 
   const getUnitValue = (value: any) => {
     // console.log("unit value--", props.data.value.config?.unit);
-    
+
     switch (props.data.value.config?.unit) {
       case "bytes": {
         const units = ["B", "KB", "MB", "GB", "TB"];
-          for (let unit of units) {
-            if (value < 1024) {
-                return {
-                    value: `${parseFloat(value).toFixed(2)}`,
-                    unit: `${unit}`
-                }
-            }
-            value /= 1024;
+        for (let unit of units) {
+          if (value < 1024) {
+            return {
+              value: `${parseFloat(value).toFixed(2)}`,
+              unit: `${unit}`,
+            };
           }
-          return {
-            value:`${parseFloat(value).toFixed(2)}`,
-            unit: 'PB'
-          };
+          value /= 1024;
+        }
+        return {
+          value: `${parseFloat(value).toFixed(2)}`,
+          unit: "PB",
+        };
       }
       case "custom": {
-          return {
-            value: `${value}`,
-            unit: `${props.data.value.config.unit_custom ?? ''}`
-          }
+        return {
+          value: `${value}`,
+          unit: `${props.data.value.config.unit_custom ?? ""}`,
+        };
       }
       case "seconds": {
         const units = [
-            { unit: "ms", divisor: 0.001 },
-            { unit: "s", divisor: 1 },
-            { unit: "m", divisor: 60 },
-            { unit: "h", divisor: 3600 },
-            { unit: "D", divisor: 86400 },
-            { unit: "M", divisor: 2592000 }, // Assuming 30 days in a month
-            { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
+          { unit: "ms", divisor: 0.001 },
+          { unit: "s", divisor: 1 },
+          { unit: "m", divisor: 60 },
+          { unit: "h", divisor: 3600 },
+          { unit: "D", divisor: 86400 },
+          { unit: "M", divisor: 2592000 }, // Assuming 30 days in a month
+          { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
         ];
         for (const unitInfo of units) {
-            const unitValue = value ? value / unitInfo.divisor : 0 ;
-            if (unitValue >= 1 && unitValue < 1000) {
-                return {
-                    value: unitValue.toFixed(2),
-                    unit: unitInfo.unit
-                }
-            }
+          const unitValue = value ? value / unitInfo.divisor : 0;
+          if (unitValue >= 1 && unitValue < 1000) {
+            return {
+              value: unitValue.toFixed(2),
+              unit: unitInfo.unit,
+            };
+          }
         }
 
         // If the value is too large to fit in any unit, return the original seconds
         return {
-            value: value,
-            unit: 's'
-        }
+          value: value,
+          unit: "s",
+        };
       }
       case "bps": {
         const units = ["B", "KB", "MB", "GB", "TB"];
         for (let unit of units) {
           if (value < 1024) {
-              return {
-                  value: `${parseFloat(value).toFixed(2)}`,
-                  unit: `${unit}/s`
-              }
+            return {
+              value: `${parseFloat(value).toFixed(2)}`,
+              unit: `${unit}/s`,
+            };
           }
           value /= 1024;
         }
         return {
-          value:`${parseFloat(value).toFixed(2)}`,
-          unit: 'PB/s'
-        }
+          value: `${parseFloat(value).toFixed(2)}`,
+          unit: "PB/s",
+        };
       }
-      case "percent-1":{
+      case "percent-1": {
         return {
-          value: `${(parseFloat(value)  * 100).toFixed(2)}`,
-          unit: '%'
-        }
+          value: `${(parseFloat(value) * 100).toFixed(2)}`,
+          unit: "%",
+        };
         // `${parseFloat(value) * 100}`;
       }
-      case "percent":{
+      case "percent": {
         return {
           value: `${parseFloat(value).toFixed(2)}`,
-          unit: '%'
-        }
+          unit: "%",
+        };
         // ${parseFloat(value)}`;
       }
-      case "default":{
+      case "default": {
         return {
           value: value,
-          unit: ''
-        }
+          unit: "",
+        };
       }
-      default:{
+      default: {
         return {
           value: value,
-          unit: ''
-        } 
+          unit: "",
+        };
       }
     }
-  }
+  };
 
-  const formatUnitValue = (obj:any) => {
-    return `${obj.value}${obj.unit}`
-  }
+  const formatUnitValue = (obj: any) => {
+    return `${obj.value}${obj.unit}`;
+  };
 
   const getPropsByChartTypeForTraces = () => {
     switch (props.data.value.type) {
@@ -202,18 +216,18 @@ export const convertPromQLData = (
       case "area-stacked":
         return {
           type: "line",
-          smooth:true,
-          stack: 'Total',
+          smooth: true,
+          stack: "Total",
           areaStyle: {},
           showSymbol: false,
           emphasis: {
-            focus: 'series'
-          }, 
+            focus: "series",
+          },
         };
       case "metric":
         return {
-          type: 'custom',
-          coordinateSystem: 'polar',
+          type: "custom",
+          coordinateSystem: "polar",
         };
       case "h-stacked":
         return {
@@ -232,16 +246,16 @@ export const convertPromQLData = (
   // console.log("convertPromQLData: searchQueryData", searchQueryData);
   // console.log("convertPromQLData: searchQueryData.data", searchQueryData.data);
 
-  const formatDate =(date:any)=>{
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
+  const formatDate = (date: any) => {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = String(date.getFullYear()).slice(2);
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
 
     return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
-  }
+  };
 
   const legendPosition = getLegendPosition();
 
@@ -274,7 +288,7 @@ export const convertPromQLData = (
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
 
-  let option:any = {
+  let option: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
@@ -300,8 +314,10 @@ export const convertPromQLData = (
 
         const date = new Date(name[0].data[0]);
 
-        let hoverText = name.map((it:any)=>{
-          return `${it.marker} ${it.seriesName} : ${formatUnitValue(getUnitValue(it.data[1]))}`;
+        let hoverText = name.map((it: any) => {
+          return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+            getUnitValue(it.data[1])
+          )}`;
         });
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       },
@@ -311,13 +327,13 @@ export const convertPromQLData = (
         label: {
           fontSize: 12,
           show: true,
-          formatter: function (name:any) {
-            if(name.axisDimension=="y")
+          formatter: function (name: any) {
+            if (name.axisDimension == "y")
               return formatUnitValue(getUnitValue(name.value));
             const date = new Date(name.value);
             return `${formatDate(date)}`;
-          }
-        }
+          },
+        },
       },
     },
     xAxis: {
@@ -336,20 +352,19 @@ export const convertPromQLData = (
     },
     toolbox: {
       orient: "vertical",
-      show: !["pie","donut","metric"].includes(props.data.value.type),
+      show: !["pie", "donut", "metric"].includes(props.data.value.type),
       feature: {
         dataZoom: {
           yAxisIndex: "none",
         },
       },
     },
-    series:[]
+    series: [],
   };
 
   // console.log("x axis data at promql",option.xAxis);
-  
 
-  option.series= searchQueryData.data.map((it: any, index: number) => {
+  option.series = searchQueryData.data.map((it: any, index: number) => {
     // console.log("inside convertPromQLData");
     // console.log("convertPromQLData: it", it);
 
@@ -377,7 +392,7 @@ export const convertPromQLData = (
               };
             });
             // console.log("seriesObj", seriesObj);
-            
+
             return seriesObj;
           }
           case "vector": {
@@ -403,36 +418,37 @@ export const convertPromQLData = (
                 (a: any, b: any) => a[0] - b[0]
               );
               const unitValue = getUnitValue(values[values.length - 1][1]);
-              option.dataset = {source:[[]]};
-              option.tooltip={
-                show:false
-              };
-              option.angleAxis= {
+              option.dataset = { source: [[]] };
+              option.tooltip = {
                 show: false,
               };
-              option.radiusAxis= {
-                show: false
+              option.angleAxis = {
+                show: false,
               };
-              option.polar= {};
-              option.xAxis= [];
-              option.yAxis= [];
+              option.radiusAxis = {
+                show: false,
+              };
+              option.polar = {};
+              option.xAxis = [];
+              option.yAxis = [];
               return {
                 ...getPropsByChartTypeForTraces(),
-                renderItem: function(params: any) {                              
+                renderItem: function (params: any) {
                   return {
-                    type: 'text',
+                    type: "text",
                     style: {
-                      text: parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
-                      fontSize: Math.min((params.coordSys.cx / 2),90),      //coordSys is relative. so that we can use it to calculate the dynamic size
+                      text:
+                        parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
+                      fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
-                      align: 'center',
-                      verticalAlign: 'middle',
+                      align: "center",
+                      verticalAlign: "middle",
                       x: params.coordSys.cx,
                       y: params.coordSys.cy,
-                      fill:store.state.theme == "dark" ? "#fff" : "#000",
-                    }
-                  }
-                } 
+                      fill: store.state.theme == "dark" ? "#fff" : "#000",
+                    },
+                  };
+                },
               };
             });
             return traces;
@@ -458,7 +474,7 @@ export const convertPromQLData = (
   });
 
   // console.log("option:", option);
-  option.series= option.series.flat();
+  option.series = option.series.flat();
 
   return { option };
 };
