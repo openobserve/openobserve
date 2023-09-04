@@ -44,18 +44,18 @@
     <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables" :selectedTimeDate="currentTimeObj" 
       @variablesData="variablesDataUpdated"/>
     <div class="displayDiv">
-      <grid-layout v-if="currentDashboardData.data.panels?.length > 0" v-model:layout.sync="currentDashboardData.data.layouts" :col-num="12" :row-height="30"
+      <grid-layout v-if="currentDashboardData.data.panels?.length > 0" :layout.sync="getDashboardLayout(currentDashboardData.data)" :col-num="12" :row-height="30"
         :is-draggable="draggable" :is-resizable="draggable" :vertical-compact="true" :autoSize="true"
         :restore-on-drag="true" :use-css-transforms="false">
         <grid-item class="plotlyBackground" v-for="item in currentDashboardData.data.panels" :key="item.id"
-          :x="getPanelLayout(currentDashboardData.data.layouts, item.id, 'x')" :y="getPanelLayout(currentDashboardData.data.layouts, item.id, 'y')"
-          :w="getPanelLayout(currentDashboardData.data.layouts, item.id, 'w')" :h="getPanelLayout(currentDashboardData.data.layouts, item.id, 'h')"
-          :i="getPanelLayout(currentDashboardData.data.layouts, item.id, 'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent"
+          :x="getPanelLayout(item,'x')" :y="getPanelLayout(item,'y')"
+          :w="getPanelLayout(item,'w')" :h="getPanelLayout(item,'h')"
+          :i="getPanelLayout(item,'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent"
           drag-allow-from=".drag-allow">
           <div style="height: 100%;">
             <PanelContainer @updated:chart="onUpdatePanel" @duplicatePanel="onDuplicatePanel" :draggable="draggable" :data="item"
               :selectedTimeDate="currentTimeObj" :variablesData="variablesData"
-              :width="getPanelLayout(currentDashboardData.data.layouts, item.id, 'w')" :height="getPanelLayout(currentDashboardData.data.layouts, item.id, 'h')">
+              :width="getPanelLayout(item,'w')" :height="getPanelLayout(item,'h')">
             </PanelContainer>
           </div>
         </grid-item>
@@ -109,6 +109,7 @@ import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue"
 import ExportDashboard from "../../components/dashboards/ExportDashboard.vue"
 import DashboardSettings from "./DashboardSettings.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
+import { dashboardDataVersionConverted } from "@/utils/dashboard/dashboardDataVersionConverted";
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -158,7 +159,7 @@ export default defineComponent({
         store,
         route.query.dashboard
       )))
-      currentDashboardData.data = data
+      currentDashboardData.data = dashboardDataVersionConverted(data);
 
       // if variables data is null, set it to empty list
       if(!(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)) {
@@ -317,23 +318,23 @@ export default defineComponent({
       saveDashboard()
     }
 
-    const getPanelLayout = (layout, panelId, position) => {
-      for (const element of layout) {
-        if (element.panelId == panelId) {
-          if (position == "x") {
-            return element.x;
-          } else if (position == "y") {
-            return element.y;
-          } else if (position == "w") {
-            return element.w;
-          } else if (position == "h") {
-            return element.h;
-          } else if (position == "i") {
-            return element.i;
-          }
-        }
-      }
+    const getDashboardLayout = (currentDashboardData)=>{
+      //map on each panels and return array of layouts
+      return currentDashboardData.panels?.map((item) => item.layout)||[];
+    }
 
+    const getPanelLayout = (currentDashboardData, position) => {      
+          if (position == "x") {
+            return currentDashboardData.layout?.x;
+          } else if (position == "y") {
+            return currentDashboardData?.layout?.y;
+          } else if (position == "w") {
+            return currentDashboardData?.layout?.w;
+          } else if (position == "h") {
+            return currentDashboardData?.layout?.h;
+          } else if (position == "i") {
+            return currentDashboardData?.layout?.i;
+          }
       return 0;
     }
 
@@ -410,7 +411,8 @@ export default defineComponent({
       variablesDataUpdated,
       addSettingsData,
       showDashboardSettingsDialog,
-      loadDashboard
+      loadDashboard,
+      getDashboardLayout
     };
   }
 });
