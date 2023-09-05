@@ -64,7 +64,14 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA: Lazy<Vec<String>> = Lazy::new(|| {
             .common
             .feature_fulltext_extra_fields
             .split(',')
-            .map(|s| s.to_string()),
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
     )
     .collect()
 });
