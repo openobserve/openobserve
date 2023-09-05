@@ -327,7 +327,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .long("component")
                         .help("view data of the component: version, user"),
                 ),
-            clap::Command::new("file-list")
+            clap::Command::new("migrate-file-list")
                 .about("migrate file-list from s3 to dynamo db")
                 .arg(
                     clap::Arg::new("prefix")
@@ -345,6 +345,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .value_name("file")
                         .help("the parquet file name"),
                 ),
+            clap::Command::new("migrate-meta").about("migrate meta"),
         ])
         .get_matches();
 
@@ -406,12 +407,16 @@ async fn cli() -> Result<bool, anyhow::Error> {
                 }
             }
         }
-        "file-list" => {
+        "migrate-file-list" => {
             let prefix = command.get_one::<String>("prefix").unwrap();
             println!("Running migration with prefix: {}", prefix);
             if !prefix.is_empty() {
                 migration::load_file_list_to_dynamo::load(prefix).await?
             }
+        }
+        "migrate-meta" => {
+            println!("Running migration");
+            migration::load_meta::load().await?
         }
         "delete-parquet" => {
             let file = command.get_one::<String>("file").unwrap();

@@ -56,6 +56,8 @@ pub enum Error {
 pub enum DbError {
     #[error("key {0} does not exist")]
     KeyNotExists(String),
+    #[error("error {0} performing operation on key {1}")]
+    DBOperError(String, String),
 }
 
 #[derive(ThisError, Debug)]

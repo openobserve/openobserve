@@ -27,7 +27,9 @@ pub async fn save_trigger(
     alert_name: &str,
     trigger: &Trigger,
 ) -> Result<HttpResponse, anyhow::Error> {
-    db::triggers::set(alert_name, trigger).await.unwrap();
+    db::triggers::set(format!("{}/{alert_name}", &trigger.org).as_str(), trigger)
+        .await
+        .unwrap();
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
         "Trigger saved".to_string(),

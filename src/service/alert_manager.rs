@@ -47,12 +47,10 @@ pub async fn handle_triggers(trigger: Trigger) {
     {
         Err(_) => log::error!("[ALERT MANAGER] Error fetching alert"),
         Ok(result) => {
+            let key = format!("{}/{}", &trigger.org, &trigger.alert_name);
             if let Some(alert) = result {
-                if TRIGGERS_IN_PROCESS
-                    .clone()
-                    .contains_key(&trigger.alert_name)
-                {
-                    let mut curr_time = TRIGGERS_IN_PROCESS.get_mut(&trigger.alert_name).unwrap();
+                if TRIGGERS_IN_PROCESS.clone().contains_key(&key) {
+                    let mut curr_time = TRIGGERS_IN_PROCESS.get_mut(&key).unwrap();
                     let delay = trigger.timestamp - curr_time.updated_at;
                     if delay > 0 {
                         log::info!(
@@ -67,13 +65,13 @@ pub async fn handle_triggers(trigger: Trigger) {
                         Utc::now().timestamp_micros() + get_micros_from_min(alert.duration); // * 60 * 1000000;
                     log::info!("Setting timeout for trigger to {}", expires_at);
                     TRIGGERS_IN_PROCESS.insert(
-                        trigger.alert_name.clone(),
+                        key.to_owned(),
                         TriggerTimer {
                             updated_at: trigger.timestamp,
                             expires_at,
                         },
                     );
-                    handle_trigger(&trigger.alert_name, alert.frequency).await;
+                    handle_trigger(&key, alert.frequency).await;
                 }
             }
         }
@@ -81,14 +79,14 @@ pub async fn handle_triggers(trigger: Trigger) {
 }
 
 #[cfg_attr(coverage_nightly, no_coverage)]
-async fn handle_trigger(alert_name: &str, frequency: i64) {
+async fn handle_trigger(alert_key: &str, frequency: i64) {
     let mut interval = time::interval(time::Duration::from_secs((frequency * 60) as _));
 
     loop {
         interval.tick().await;
         let loc_triggers = TRIGGERS.clone();
-        let trigger = loc_triggers.get(&alert_name.to_owned()).unwrap();
-        if TRIGGERS_IN_PROCESS.clone().contains_key(alert_name) {
+        let trigger = loc_triggers.get(&alert_key.to_owned()).unwrap();
+        if TRIGGERS_IN_PROCESS.clone().contains_key(alert_key) {
             let alert_resp = super::db::alerts::get(
                 &trigger.org,
                 &trigger.stream,

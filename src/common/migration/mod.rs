@@ -13,3 +13,4 @@
 // limitations under the License.
 
 pub mod load_file_list_to_dynamo;
+pub mod load_meta;
