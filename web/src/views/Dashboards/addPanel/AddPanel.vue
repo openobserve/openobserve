@@ -22,7 +22,7 @@
           {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
         </span>
         <div>
-          <q-input v-model="dashboardPanelData.data.config.title" :label="t('panel.name') + '*'" class="q-ml-xl" filled
+          <q-input v-model="dashboardPanelData.data.title" :label="t('panel.name') + '*'" class="q-ml-xl" filled
             dense />
         </div>
       </div>
@@ -272,7 +272,7 @@ export default defineComponent({
 
 
     const isInitailDashboardPanelData = ()=>{
-      return dashboardPanelData.data.config.description==""&&(!dashboardPanelData.data.config.unit)&&(!dashboardPanelData.data.config.unit_custom)&&dashboardPanelData.data.queries[0].fields.x.length==0&&
+      return dashboardPanelData.data.description==""&&(!dashboardPanelData.data.config.unit)&&(!dashboardPanelData.data.config.unit_custom)&&dashboardPanelData.data.queries[0].fields.x.length==0&&
       dashboardPanelData.data.queries[0].fields.y.length==0&&dashboardPanelData.data.queries[0].fields.z.length==0&&dashboardPanelData.data.queries[0].fields.filter.length==0&&
       dashboardPanelData.data.queries.length==1;
     }
@@ -392,7 +392,7 @@ export default defineComponent({
 
       // check if name of panel is there
       if (!onlyChart) {
-        if (dashboardData.data.config.title == null || dashboardData.data.config.title == '') {
+        if (dashboardData.data.title == null || dashboardData.data.title == '') {
           errors.push("Name of Panel is required")
         }
       }

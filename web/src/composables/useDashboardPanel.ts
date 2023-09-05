@@ -37,9 +37,9 @@ const getDefaultDashboardPanelData = () => ({
       version: 2,
       id: "",
       type: "bar",
+      title: "",
+      description: "",
       config: {
-        title: "",
-        description: "",
         show_legends: true,
         legends_position: null,
         unit: null,

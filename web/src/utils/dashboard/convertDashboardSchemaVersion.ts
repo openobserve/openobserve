@@ -29,9 +29,9 @@ const convertPanelSchemaVersion = (data: any) => {
   return {
     id: data.id,
     type: data.type,
+    title: data.config.title,
+    description: data.config.description,
     config: {
-      title: data.config.title,
-      description: data.config.description,
       show_legends: data.config.show_legends,
       legends_position: data.config.legends_position,
       unit: data.config.unit,
