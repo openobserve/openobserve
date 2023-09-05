@@ -21,19 +21,44 @@ const ITEM_PREFIXES: [&str; 12] = [
 ];
 
 pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
-    let src;
-    let dest;
-    if CONFIG.common.local_mode {
-        src = Box::<SledDb>::default();
-        dest = db::default();
+    let (src, dest) = if CONFIG.common.local_mode {
+        (Box::<SledDb>::default(), db::default())
     } else {
         panic!("enable local mode to migrate from sled");
-    }
+    };
     for item in ITEM_PREFIXES {
+        let time = std::time::Instant::now();
         let res = src.list(item).await?;
+        println!(
+            "resources length for prefix {} from sled is {}",
+            item,
+            res.len()
+        );
+
         for (key, value) in res.iter() {
-            dest.put(key, value.clone(), false).await?;
+            let final_key;
+            let key = if key.starts_with("/trigger") {
+                let local_val: Trigger = json::from_slice(value).unwrap();
+                final_key = format!("/trigger/{}/{}", local_val.org, local_val.alert_name);
+                &final_key
+            } else {
+                key
+            };
+            match dest.put(key, value.clone(), false).await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!(
+                        "error while migrating key {} from sled to sqlite {}",
+                        key, e
+                    );
+                }
+            }
         }
+        println!(
+            "migrated  prefix {} from sled , took {} secs",
+            item,
+            time.elapsed().as_secs()
+        );
     }
 
     Ok(())
@@ -41,16 +66,14 @@ pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
 
 pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
     println!("load meta from etcd");
-    let src;
-    let dest;
-    if !CONFIG.common.local_mode {
-        src = Box::<Etcd>::default();
-        dest = db::default();
+    let (src, dest) = if !CONFIG.common.local_mode {
+        (Box::<Etcd>::default(), db::default())
     } else {
         panic!("disable local mode to migrate from etcd");
-    }
+    };
 
     for item in ITEM_PREFIXES {
+        let time = std::time::Instant::now();
         let res = src.list(item).await?;
         println!(
             "resources length for prefix {} from etcd is {}",
@@ -67,9 +90,18 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
             } else {
                 key
             };
-            dest.put(key, value.clone(), false).await?;
+            match dest.put(key, value.clone(), false).await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("error while migrating key {} from etcd to sled {}", key, e);
+                }
+            }
         }
-        println!("migrated  prefix {} from etcd ", item);
+        println!(
+            "migrated  prefix {} from etcd , took {} secs",
+            item,
+            time.elapsed().as_secs()
+        );
     }
 
     Ok(())
