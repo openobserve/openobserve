@@ -80,7 +80,7 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
             item,
             res.len()
         );
-
+        let mut count = 0;
         for (key, value) in res.iter() {
             let final_key;
             let key = if key.starts_with("/trigger") {
@@ -91,10 +91,20 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
                 key
             };
             match dest.put(key, value.clone(), false).await {
-                Ok(_) => {}
+                Ok(_) => {
+                    count += 1;
+                }
                 Err(e) => {
                     println!("error while migrating key {} from etcd {}", key, e);
                 }
+            }
+            if count % 100 == 0 {
+                println!(
+                    "migrated {} keys for prefix {} at {:?} ",
+                    count,
+                    item,
+                    std::time::Instant::now()
+                );
             }
         }
         println!(
