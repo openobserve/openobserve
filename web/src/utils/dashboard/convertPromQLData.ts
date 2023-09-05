@@ -204,19 +204,6 @@ export const convertPromQLData = (
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom
               );
-              options.dataset = { source: [[]] };
-              options.tooltip = {
-                show: false,
-              };
-              options.angleAxis = {
-                show: false,
-              };
-              options.radiusAxis = {
-                show: false,
-              };
-              options.polar = {};
-              options.xAxis = [];
-              options.yAxis = [];
               return {
                 ...getPropsByChartTypeForSeries(panelSchema.type),
                 renderItem: function (params: any) {
@@ -237,6 +224,19 @@ export const convertPromQLData = (
                 },
               };
             });
+            options.dataset = { source: [[]] };
+            options.tooltip = {
+              show: false,
+            };
+            options.angleAxis = {
+              show: false,
+            };
+            options.radiusAxis = {
+              show: false,
+            };
+            options.polar = {};
+            options.xAxis = [];
+            options.yAxis = [];
             return traces;
           }
           case "vector": {
