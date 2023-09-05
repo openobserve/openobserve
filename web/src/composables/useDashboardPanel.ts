@@ -474,6 +474,14 @@ const loadFilterItem = (name:any)=>{
     if (promqlMode.value || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery == false) {
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.splice(0,dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length);
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.splice(0,dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length);
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z.splice(
+        0,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z.length
+      );
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.splice(0,dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.length);
     }
   }
