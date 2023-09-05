@@ -1,3 +1,5 @@
+use chrono::Utc;
+
 use crate::common::infra::config::CONFIG;
 use crate::common::infra::db::etcd::Etcd;
 use crate::common::infra::db::{self, Db};
@@ -103,7 +105,7 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
                     "migrated {} keys for prefix {} at {:?} ",
                     count,
                     item,
-                    std::time::Instant::now()
+                    Utc::now()
                 );
             }
         }
