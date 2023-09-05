@@ -282,7 +282,7 @@ export default defineComponent({
 
     const isOutDated = computed(() => {
       //check that is it addpanel initial call
-      if(isInitailDashboardPanelData())return false;
+      if(isInitailDashboardPanelData()&&(!editMode.value))return false;
       //compare chartdata and dashboardpaneldata
       return !_.isEqual(chartData.value, dashboardPanelData.data);
     })
