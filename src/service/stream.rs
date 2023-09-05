@@ -164,13 +164,10 @@ pub fn stream_res(
     };
 
     let mut settings = stream_settings(&schema).unwrap_or_default();
-    // special handling for metrics streams
-    if settings.partition_time_level.unwrap_or_default() == PartitionTimeLevel::Unset {
-        settings.partition_time_level = Some(unwrap_partition_time_level(
-            settings.partition_time_level,
-            stream_type,
-        ));
-    }
+    settings.partition_time_level = Some(unwrap_partition_time_level(
+        settings.partition_time_level,
+        stream_type,
+    ));
 
     Stream {
         name: stream_name.to_string(),
@@ -336,9 +333,11 @@ pub fn unwrap_partition_time_level(
     level: Option<PartitionTimeLevel>,
     stream_type: StreamType,
 ) -> PartitionTimeLevel {
-    match level {
-        Some(l) => l,
-        None => match stream_type {
+    let level = level.unwrap_or_default();
+    if level != PartitionTimeLevel::Unset {
+        level
+    } else {
+        match stream_type {
             StreamType::Logs => PartitionTimeLevel::from(CONFIG.limit.logs_file_retention.as_str()),
             StreamType::Metrics => {
                 PartitionTimeLevel::from(CONFIG.limit.metrics_file_retention.as_str())
@@ -347,7 +346,7 @@ pub fn unwrap_partition_time_level(
                 PartitionTimeLevel::from(CONFIG.limit.traces_file_retention.as_str())
             }
             _ => PartitionTimeLevel::default(),
-        },
+        }
     }
 }
 

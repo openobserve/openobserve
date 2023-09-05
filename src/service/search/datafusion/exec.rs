@@ -462,7 +462,7 @@ pub async fn merge(
     // query data
     let mut ctx = prepare_datafusion_context()?;
     // Configure listing options
-    let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
+    let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
@@ -779,7 +779,7 @@ pub async fn convert_parquet_file(
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {
-            let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
+            let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
                 .with_target_partitions(CONFIG.limit.cpu_num)
@@ -850,7 +850,7 @@ pub async fn convert_parquet_file(
     let schema: Schema = df.schema().into();
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
-    let mut writer = super::new_writer(buf, &schema, None, None);
+    let mut writer = super::new_parquet_writer(buf, &schema, 0, None);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -879,7 +879,7 @@ pub async fn merge_parquet_files(
     let ctx = SessionContext::with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
-    let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
+    let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
@@ -929,7 +929,7 @@ pub async fn merge_parquet_files(
         } else {
             None
         };
-    let mut writer = super::new_writer(buf, &schema, None, bf_fields);
+    let mut writer = super::new_parquet_writer(buf, &schema, file_meta.records as u64, bf_fields);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -1029,7 +1029,7 @@ pub async fn register_table(
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {
-            let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
+            let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
                 .with_target_partitions(CONFIG.limit.cpu_num)
