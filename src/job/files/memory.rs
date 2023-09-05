@@ -26,7 +26,8 @@ use crate::common::{
     utils::{json, stream::populate_file_meta},
 };
 use crate::service::{
-    db, schema::schema_evolution, search::datafusion::new_writer, usage::report_compression_stats,
+    db, schema::schema_evolution, search::datafusion::new_parquet_writer,
+    usage::report_compression_stats,
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -191,17 +192,7 @@ async fn upload_file(
     };
     let arrow_schema = Arc::new(inferred_schema);
 
-    let mut meta_batch = vec![];
-    let mut buf_parquet = Vec::new();
-
-    let bf_fields =
-        if CONFIG.common.traces_bloom_filter_enabled && stream_type == StreamType::Traces {
-            Some(vec![COLUMN_TRACE_ID])
-        } else {
-            None
-        };
-    let mut writer = new_writer(&mut buf_parquet, &arrow_schema, None, bf_fields);
-
+    let mut batches = vec![];
     if res_records.is_empty() {
         let json_reader = BufReader::new(buf.as_ref());
         let json = ReaderBuilder::new(arrow_schema.clone())
@@ -209,37 +200,51 @@ async fn upload_file(
             .unwrap();
         for batch in json {
             let batch_write = batch.unwrap();
-            writer.write(&batch_write).expect("Write batch succeeded");
-            meta_batch.push(batch_write);
+            batches.push(batch_write);
         }
     } else {
         let mut json = vec![];
         let mut decoder = ReaderBuilder::new(arrow_schema.clone()).build_decoder()?;
-
         for value in res_records {
             decoder
                 .decode(json::to_string(&value).unwrap().as_bytes())
                 .unwrap();
             json.push(decoder.flush()?.unwrap());
         }
-
         for batch in json {
-            writer.write(&batch).expect("Write batch succeeded");
-            meta_batch.push(batch);
+            batches.push(batch);
         }
     };
-    writer.close().unwrap();
 
-    //let file_name = path.file_name();
+    // write metadata
     let mut file_meta = FileMeta {
         min_ts: 0,
         max_ts: 0,
         records: 0,
         original_size: file_size as i64,
-        compressed_size: buf_parquet.len() as i64,
+        compressed_size: 0,
     };
+    populate_file_meta(arrow_schema.clone(), vec![batches.to_vec()], &mut file_meta).await?;
 
-    populate_file_meta(arrow_schema.clone(), vec![meta_batch], &mut file_meta).await?;
+    // write parquet file
+    let mut buf_parquet = Vec::new();
+    let bf_fields =
+        if CONFIG.common.traces_bloom_filter_enabled && stream_type == StreamType::Traces {
+            Some(vec![COLUMN_TRACE_ID])
+        } else {
+            None
+        };
+    let mut writer = new_parquet_writer(
+        &mut buf_parquet,
+        &arrow_schema,
+        file_meta.records as u64,
+        bf_fields,
+    );
+    for batch in batches {
+        writer.write(&batch)?;
+    }
+    writer.close()?;
+    file_meta.compressed_size = buf_parquet.len() as i64;
 
     schema_evolution(
         org_id,

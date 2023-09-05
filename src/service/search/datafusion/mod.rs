@@ -72,17 +72,15 @@ pub const DEFAULT_FUNCTIONS: [ZoFunction; 6] = [
     },
 ];
 
-pub fn new_writer<'a>(
+pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
-    sort_field: Option<&str>,
+    num_rows: u64,
     bf_fields: Option<Vec<&str>>,
 ) -> ArrowWriter<&'a mut Vec<u8>> {
-    let sort_column_id = if let Some(v) = sort_field {
-        schema.index_of(v).unwrap()
-    } else {
-        schema.index_of(&CONFIG.common.column_timestamp).unwrap()
-    };
+    let sort_column_id = schema
+        .index_of(&CONFIG.common.column_timestamp)
+        .expect("Not found timestamp field");
     let mut writer_props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
         .set_write_batch_size(PARQUET_BATCH_SIZE)
@@ -95,6 +93,12 @@ pub fn new_writer<'a>(
         for field in fields {
             writer_props = writer_props
                 .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
+            if num_rows > 0 {
+                writer_props = writer_props.set_column_bloom_filter_ndv(
+                    ColumnPath::from(vec![field.to_string()]),
+                    num_rows,
+                );
+            }
         }
     }
     let writer_props = writer_props.build();
