@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ahash::AHashMap as HashMap;
+use ahash::HashMap;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 

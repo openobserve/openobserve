@@ -426,7 +426,7 @@ pub(crate) async fn get_metadata(
     req: prom::RequestMetadata,
 ) -> Result<prom::ResponseMetadata> {
     if req.limit == Some(0) {
-        return Ok(AHashMap::new());
+        return Ok(ahash::HashMap::default());
     }
 
     let stream_type = StreamType::Metrics;
@@ -436,13 +436,12 @@ pub(crate) async fn get_metadata(
             .await
             // `db::schema::get` never fails, so it's safe to unwrap
             .unwrap();
-        let resp = if schema == Schema::empty() {
-            AHashMap::new()
-        } else {
-            AHashMap::from([(
+        let mut resp = ahash::HashMap::default();
+        if schema != Schema::empty() {
+            resp.insert(
                 metric_name,
                 get_metadata_object(&schema).map_or_else(Vec::new, |obj| vec![obj]),
-            )])
+            );
         };
         return Ok(resp);
     }

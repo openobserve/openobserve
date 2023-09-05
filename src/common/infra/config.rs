@@ -274,12 +274,16 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
+    #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
+    pub logs_file_retention: String,
+    #[env_config(name = "ZO_TRACES_FILE_RETENTION", default = "hourly")]
+    pub traces_file_retention: String,
+    #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "daily")]
+    pub metrics_file_retention: String,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
-    #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "daily")]
-    pub metrics_file_retention: String,
     #[env_config(name = "ZO_HEARTBEAT_INTERVAL", default = 30)] // in minutes
     pub hb_interval: i64,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 0)]
