@@ -84,10 +84,6 @@ export default defineComponent({
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(data, async () => {
-      console.log(
-        "PanelSchemaRenderer: new data received from the api, let's convert the data"
-      );
-      console.log("PanelSchemaRenderer: data: ", data.value);
       panelData.value = convertPanelData(panelSchema.value, data.value, store);
     });
 

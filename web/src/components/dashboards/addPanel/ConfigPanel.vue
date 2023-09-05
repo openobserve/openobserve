@@ -75,7 +75,6 @@ import { defineComponent, watch } from 'vue';
 export default defineComponent({
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData()
-console.log(dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.promql_legend,"legend position");
 
     // options for legends position
     const legendsPositionOptions = [

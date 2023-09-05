@@ -117,11 +117,9 @@ export default defineComponent({
 
         const currentQuery = computed({
             get: () => {
-                console.log('query getter accessed');
                 return promqlMode.value ? dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query : dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query
             },
             set: (value) => {
-                console.log('value', value);
                 if (promqlMode.value) {
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = value
                 } else {
@@ -154,14 +152,12 @@ export default defineComponent({
         ], () => {
             // only continue if current mode is auto query generation
             if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
-                console.log("Updating query");
 
                 // STEP 1: first check if there is at least 1 field selected
                 if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length == 0 && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length == 0 && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.length == 0) {
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = ""
                     return;
                 }
-console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x",dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z);
 
                 // STEP 2: Now, continue if we have at least 1 field selected
                 // merge the fields list
@@ -232,7 +228,6 @@ console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQu
                     }
                     return selectFilter
                 })
-                // console.log("query: filterData",filterData);
                 const filterItems = filterData.filter((it: any) => it)
                 if (filterItems.length > 0) {
                     query += "WHERE " + filterItems.join(" AND ")
@@ -242,7 +237,6 @@ console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQu
                 const xAxisAlias = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.map((it: any) => it.alias)
                 const yAxisAlias = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.map((it: any) => it.alias)
 
-                // console.log("xAxisAlias",xAxisAlias);
                 if(dashboardPanelData.data.type == "heatmap"){
                     query += xAxisAlias.length && yAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") + ", " + yAxisAlias.join(", ") : '';
                 }
@@ -251,15 +245,12 @@ console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQu
                 }
                 query += xAxisAlias.length ? " ORDER BY " + xAxisAlias.join(", ") : ''
 
-                // console.log('generated query: ', query)
-
                 dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = query
             }
         }, { deep: true })
 
 
         watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery, dashboardPanelData.meta.stream.selectedStreamFields], () => {
-            // console.log("query changes in search bar", dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery);
 
             // Only continue if the current mode is "show custom query"
             if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType == "sql") {
@@ -279,7 +270,6 @@ console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQu
             // dashboardPanelData.data.query = value;
 
             if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType != "promql") {
-                // console.log("query: value", dashboardPanelData.data.query);
 
                 // empty the errors
                 dashboardPanelData.meta.errors.queryErrors = []
@@ -287,10 +277,7 @@ console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQu
                 // Get the parsed query
                 try {
                     dashboardPanelData.meta.parsedQuery = parser.astify(dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query);
-                    // console.log(dashboardPanelData.meta.parsedQuery)
                 } catch (e) {
-                    // console.log("error")
-                    // console.log(e)
                     // exit as there is an invalid query
                     dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax")
                     return null;
@@ -326,7 +313,6 @@ console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQu
 
                 // now check if the correct stream is selected
                 if (dashboardPanelData.meta.parsedQuery.from?.length > 0) {
-                    // console.log("---parsedQuery.from--------",dashboardPanelData.meta.parsedQuery.from);
 
                     const streamFound = dashboardPanelData.meta.stream.streamResults.find(it => it.name == dashboardPanelData.meta.parsedQuery.from[0].table)
                     if (streamFound) {

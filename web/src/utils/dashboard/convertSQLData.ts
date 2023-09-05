@@ -594,12 +594,7 @@ export const convertSQLData = (
           );
         });
       });
-      console.log(
-        "Zvalues=",
-        xAxisZerothPositionUniqueValue,
-        xAxisFirstPositionUniqueValue,
-        Zvalues
-      );
+    
       (options.visualMap = {
         min: 0,
         max: Zvalues.reduce(
@@ -839,7 +834,6 @@ export const convertSQLData = (
       };
     }
   }
-  console.log("optionss:", options);
 
   return {
     options,

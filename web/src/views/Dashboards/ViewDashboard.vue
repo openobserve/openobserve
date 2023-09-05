@@ -299,7 +299,6 @@ export default defineComponent({
     }
 
     const onUpdatePanel = async(panelDataElementValue: any) => {
-      // console.log("on update panel called");
       
       await deletePanel(
         store,

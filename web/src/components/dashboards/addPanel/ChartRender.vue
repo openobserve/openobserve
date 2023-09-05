@@ -579,8 +579,7 @@ export default defineComponent({
 
       // multiple x axis and multiple y axis
       const renderSqlBasedChart = async () => {
-          // console.log("Query: rendering chart");
-          // console.log("Query: chart type", props.data.type);
+
           // Step 1: Get the X-Axis key
           const xAxisKeys = getXAxisKeys();
 
@@ -693,7 +692,6 @@ export default defineComponent({
                       };
                       return trace
                   })
-                //   console.log("multiple:- traces", traces);
                   break;
               }
               case "donut": {
@@ -729,7 +727,6 @@ export default defineComponent({
                       };
                       return trace
                   })
-                //   console.log("multiple:- traces", traces);
                   break;
               }
               case "area-stacked": {
@@ -739,7 +736,6 @@ export default defineComponent({
                   const key1 = xAxisKeys[1]
                   // get the unique value of the second xAxis's key
                   const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map((obj: any) => obj[key1])) ].filter((it)=> it);
-                //   console.log("stacked x axis unique value", stackedXAxisUniqueValue);
                   
                   // create a trace based on second xAxis's unique values
                   traces = stackedXAxisUniqueValue?.map((key: any) => {
@@ -756,7 +752,6 @@ export default defineComponent({
                       };
                       return trace
                   })
-                //   console.log("multiple:- traces", traces);
                   break;
               }
               case "stacked": {
@@ -766,11 +761,9 @@ export default defineComponent({
                   const key1 = xAxisKeys[1]
                   // get the unique value of the second xAxis's key
                   const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map((obj: any) => obj[key1])) ].filter((it)=> it);
-                //   console.log("stacked x axis unique value", stackedXAxisUniqueValue);
                   
                   // create a trace based on second xAxis's unique values
                   traces = stackedXAxisUniqueValue?.map((key: any) => {
-                    //   console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
                       
                       const trace = {
                           name: key,
@@ -783,7 +776,6 @@ export default defineComponent({
                       };
                       return trace
                   })
-                //   console.log("multiple:- traces", traces);
                   break;
               }
               case "h-stacked": {
@@ -793,11 +785,9 @@ export default defineComponent({
                   const key1 = xAxisKeys[1]
                   // get the unique value of the second xAxis's key
                   const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map((obj: any) => obj[key1])) ].filter((it)=> it);
-                //   console.log("stacked x axis unique value", stackedXAxisUniqueValue);
                   
                   // create a trace based on second xAxis's unique values
                   traces = stackedXAxisUniqueValue?.map((key: any) => {
-                    //   console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
                       
                       const trace = {
                           name: key,
@@ -811,13 +801,11 @@ export default defineComponent({
                       };
                       return trace
                   })
-                //   console.log("multiple:- traces", traces);
                   break;
               }
               case "metric": {
                   const key1 = yAxisKeys[0]
                   const yAxisValue= getAxisDataFromKey(key1)
-                //   console.log('metric changed',);
                   traces= []
                   const trace =  {
                     ...getPropsByChartTypeForTraces(),
@@ -831,7 +819,6 @@ export default defineComponent({
               }
           }
 
-        //   console.log("Query: props by layout: ", getPropsByChartTypeForLayout());
 
           //generate the layout value of chart
           const layout: any = {
@@ -852,9 +839,6 @@ export default defineComponent({
               ...getPropsByChartTypeForLayout(),
               ...getThemeLayoutOptions()
           };
-
-        //   console.log('layout', layout);
-        //   console.log('traces', traces);
 
 
           Plotly.react(plotRef.value, traces, layout, {
@@ -1058,7 +1042,6 @@ export default defineComponent({
                     case 'vector': {
                         const traces = searchQueryData.data?.result?.map((metric: any) => {
                             const values = [metric.value]
-                            // console.log('vector',values);
                             
                             return  {
                                 name: JSON.stringify(metric.metric),
@@ -1145,8 +1128,6 @@ export default defineComponent({
                         const traces = searchQueryData.data?.result?.map((metric: any) => {
                             const values = [metric.value]
                             
-                            // console.log('vector',values);
-
                             return {
                                 name: JSON.stringify(metric.metric),
                                 value: metric?.value?.length > 1 ? metric.value[1] : '',
@@ -1336,9 +1317,6 @@ export default defineComponent({
           const xAxisKey = getXAxisKeys().length ? getXAxisKeys()[0] : '';
           const xAxisData = getAxisDataFromKey(xAxisKey)
           const xAxisDataWithTicks = getTickLimits(xAxisData)
-
-        //   console.log("data with tick",xAxisDataWithTicks);
-          
 
           switch (props.data.type) {
               case "bar": {
@@ -1606,7 +1584,6 @@ export default defineComponent({
           }
       };
         const getPropsByChartTypeForLayoutForPromQL = () => {
-            //   console.log("data with tick",xAxisDataWithTicks);
             switch (props.data.type) {
                 case "bar": {
                     const trace = {

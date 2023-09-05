@@ -124,10 +124,8 @@ const removeQuery = (index: number) => {
 }
 
   const resetDashboardPanelData = () => {
-    console.log("resetDashboardPanelData");
     
     Object.assign(dashboardPanelData, getDefaultDashboardPanelData());
-    console.log("updated...",dashboardPanelData);
   };
 
   const generateLabelFromName = (name: string) => {
@@ -381,7 +379,6 @@ const removeQuery = (index: number) => {
   }
 
   const addFilteredItem = (name: string) => {
-    // console.log("name=", name);
     if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter) {
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter = [];
     }
@@ -391,7 +388,6 @@ const removeQuery = (index: number) => {
         (it: any) => it.column == name
       )
     ) {
-      // console.log("data");
 
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.push({
         type: "list",

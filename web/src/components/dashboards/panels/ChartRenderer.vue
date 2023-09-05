@@ -52,8 +52,6 @@ export default defineComponent({
         });
 
         onMounted(async () => {
-            console.log("ChartRenderer: mounted");
-            console.log("props at chartrenderer", { props });
             await nextTick();
             await nextTick();
             await nextTick();
@@ -70,7 +68,6 @@ export default defineComponent({
             window.removeEventListener("resize", windowResizeEventCallback);
         });
         watch(() => props.data.options, () => {
-            console.log("ChartRenderer: props.data updated", props.data);
             chart.setOption(props?.data?.options || {}, true);
         }, { deep: true });
         return { chartRef };

@@ -27,9 +27,6 @@ export const convertPromQLData = (
   searchQueryData: any,
   store: any
 ) => {
-  // console.log("props", props);
-  // console.log("convertPromQLData: searchQueryData", searchQueryData);
-  // console.log("convertPromQLData: searchQueryData", searchQueryData);
 
   const legendPosition = getLegendPosition(
     panelSchema?.config?.legends_position
@@ -84,7 +81,6 @@ export const convertPromQLData = (
         fontSize: 12,
       },
       formatter: function (name: any) {
-        // console.log("name--", name);
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
@@ -153,11 +149,8 @@ export const convertPromQLData = (
     series: [],
   };
 
-  // console.log("x axis data at promql",option.xAxis);
 
   options.series = searchQueryData.map((it: any, index: number) => {
-    // console.log("inside convertPromQLData");
-    // console.log("convertPromQLData: it", it);
 
     switch (panelSchema.type) {
       case "bar":
@@ -165,14 +158,12 @@ export const convertPromQLData = (
       case "area":
       case "scatter":
       case "area-stacked": {
-        // console.log("convertPromQLData: itt", it);
         switch (it.resultType) {
           case "matrix": {
             const seriesObj = it?.result?.map((metric: any) => {
               const values = metric.values.sort(
                 (a: any, b: any) => a[0] - b[0]
               );
-              // console.log("convertPromQLData: values:", values);
               return {
                 name: getPromqlLegendName(
                   metric.metric,
@@ -182,7 +173,6 @@ export const convertPromQLData = (
                 ...getPropsByChartTypeForSeries(panelSchema.type),
               };
             });
-            // console.log("seriesObj", seriesObj);
 
             return seriesObj;
           }
@@ -330,7 +320,6 @@ const getLegendPosition = (legendPosition: string) => {
  * @return {object} An object containing the converted value and its corresponding unit.
  */
 const getUnitValue = (value: any, unit: string, customUnit: string) => {
-  // console.log("unit value--", panelSchema.config?.unit);
 
   switch (unit) {
     case "bytes": {

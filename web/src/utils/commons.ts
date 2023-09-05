@@ -388,10 +388,8 @@ export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
     await getAllDashboards(store);
   }
   const currentDashboard = findDashboard(dashboardId, store);
-  console.log("commons: currentDashboard", currentDashboard);
   
   const paneldata = currentDashboard.panels?.find((it: any) => it.id == panelId);
-  console.log("commons: paneldata", paneldata);
   return paneldata;
 };
 

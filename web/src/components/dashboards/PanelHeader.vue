@@ -102,7 +102,6 @@ export default defineComponent({
         this.$emit('duplicatePanel', this.panelDataElementObject)
       }
       else {
-        // console.log(evt)
       }
       
     },

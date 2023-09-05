@@ -227,9 +227,7 @@ export default defineComponent({
           route.query.dashboard,
           route.query.panelId
         );
-        console.log("panel data", JSON.stringify(panelData, null , 2));
         Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData)));
-        // console.log("dashboard panel data",JSON.stringify(dashboardPanelData.data, null, 2));
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
         updateDateTime(selectedDate.value)
       } else {
@@ -288,7 +286,6 @@ export default defineComponent({
     })
 
     watch(isOutDated ,()=>{
-      console.log("isOutDated",isOutDated);
       window.dispatchEvent(new Event('resize'))
     });
 
@@ -326,11 +323,9 @@ export default defineComponent({
     });
 
     const runQuery = () => {
-      console.log("query change detected to run");
       if (!isValid(true)) {
         return
       }
-      console.log("run query");
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       updateDateTime(selectedDate.value)
@@ -348,7 +343,6 @@ export default defineComponent({
 
     //watch dashboardpaneldata when changes, isUpdated will be true
     watch(() => dashboardPanelData.data, () => {
-      console.log("dashboardPanelData.data updated ........", dashboardPanelData.data);
       if(isPanelConfigWatcherActivated) {
         isPanelConfigChanged.value = true;
       }
@@ -560,8 +554,6 @@ export default defineComponent({
         // check if field selection is from the custom query fields when the custom query mode is ON
         if (dashboardData.data.queries[dashboardData.layout.currentQueryIndex].customQuery) {
 
-          // console.log("-data-",dashboardPanelData.data.fields.x.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column)) );
-
           const customQueryXFieldError = dashboardPanelData.data.queries[dashboardData.layout.currentQueryIndex].fields.x.filter((it: any) => !dashboardPanelData.meta.stream.customQueryFields.find((i: any) => i.name == it.column))
           if (customQueryXFieldError.length) {
             errors.push(...customQueryXFieldError.map((it: any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`))
@@ -629,7 +621,6 @@ export default defineComponent({
           "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 
         dashboardPanelData.data.id = panelId;
-        console.log(dashboardPanelData.data,"dashboardPanelData.data AddPanel");
         
         const errorMessageOnSave = await addPanel(
           store,

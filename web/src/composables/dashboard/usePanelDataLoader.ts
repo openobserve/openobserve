@@ -46,29 +46,20 @@ export const usePanelDataLoader = (
   let controller: AbortController | null = null;
 
   const loadData = async () => {
-    console.log("loadDataaaaaaaaaa", isVisible.value, isDirty.value);
 
     isDirty.value = false;
     const controller = new AbortController();
     state.loading = true;
 
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
-      console.log(
-        "usePanelDataLoader: query dependent on ",
-        isQueryDependentOnTheVariables(),
-        !canRunQueryBasedOnVariables()
-      );
 
       return;
     }
-
-    console.log("queryDataa", panelSchema);
 
     const queryData = panelSchema.value.queries[0].query;
     const timestamps = selectedTimeObj.value;
     let startISOTimestamp: any;
     let endISOTimestamp: any;
-    // console.log("timestamps", timestamps);
     if (
       timestamps?.start_time &&
       timestamps?.end_time &&
@@ -82,8 +73,6 @@ export const usePanelDataLoader = (
     } else {
       return;
     }
-    // console.log("Query data:", queryData);
-    // console.log("Timestamps:", timestamps);
     const query = {
       query: {
         sql: replaceQueryValue(queryData),
@@ -93,18 +82,14 @@ export const usePanelDataLoader = (
         size: 0,
       },
     };
-    // console.log("Query:", query);
 
     state.loading = true;
-    // console.log("Calling search API");
 
     // Check if the query type is "promql"
     if (panelSchema.value.queryType == "promql") {
-      console.log("usePanelDataLoader: ", JSON.stringify(panelSchema));
 
       // Iterate through each query in the panel schema
       const queryPromises = panelSchema.value.queries?.map(async (it: any) => {
-        console.log("usePanelDataLoader: querypromises map", it.query);
 
         // Call the metrics_query_range API
         return queryService
@@ -120,14 +105,12 @@ export const usePanelDataLoader = (
             return res.data.data;
           })
           .catch((error) => {
-            console.log("oops, error", error);
 
             // Process API error for "promql"
             processApiError(error, "promql");
           });
       });
 
-      console.log("usePanelDataLoader: querypromises", queryPromises);
 
       // Wait for all query promises to resolve
       const queryResults = await Promise.all(queryPromises);
@@ -198,25 +181,20 @@ export const usePanelDataLoader = (
    * @return {boolean} Whether the query can be executed based on the variables.
    */
   const canRunQueryBasedOnVariables = () => {
-    console.log(variablesData.value?.values);
 
     const dependentVariables = variablesData.value?.values?.filter((it: any) =>
       panelSchema?.value?.queries
         ?.map((q: any) => {
           const includes = q?.query?.includes(`$${it.name}`);
-          console.log(`Query: ${includes} Includes: `);
           return includes;
         })
         ?.includes(true)
     );
 
-    console.log(dependentVariables);
-
     if (dependentVariables?.length > 0) {
       const dependentAvailableVariables = dependentVariables.filter(
         (it: any) => !it.isLoading
       );
-      console.log("dependentAvailableVariables: ", dependentAvailableVariables);
 
       if (dependentAvailableVariables.length === dependentVariables.length) {
         return true;
@@ -236,7 +214,6 @@ export const usePanelDataLoader = (
    */
   const replaceQueryValue = (query: any) => {
     if (currentDependentVariablesData?.length) {
-      console.log("inside replaceQueryValue");
 
       currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
@@ -258,7 +235,6 @@ export const usePanelDataLoader = (
   const processApiError = async (error: any, type: any) => {
     switch (type) {
       case "promql": {
-        console.log("error message for usePanelDataLoader", error);
 
         const errorDetailValue = error.response?.data?.error || error.message;
         const trimmedErrorMessage =
@@ -286,7 +262,6 @@ export const usePanelDataLoader = (
   watch(
     () => isVisible.value,
     async () => {
-      // console.log("loadDataaaaaaaaaa 3",isVisible.value,isDirty.value);
 
       if (
         isVisible.value &&
@@ -307,7 +282,6 @@ export const usePanelDataLoader = (
   watch(
     () => variablesData.value?.values,
     () => {
-      console.log("variables changed, 1");
       // ensure the query is there
       if (!panelSchema.value.queries?.length) {
         return;
@@ -340,7 +314,6 @@ export const usePanelDataLoader = (
         );
         isDirty.value = true;
         if (isVisible.value) {
-          console.log("variables changed, 2, loading data");
           loadData();
         }
       }
@@ -349,7 +322,6 @@ export const usePanelDataLoader = (
   );
 
   const handleIntersection = async (entries: any) => {
-    // console.log("entries",entries[0]);
     isVisible.value = entries[0].isIntersecting;
   };
 
