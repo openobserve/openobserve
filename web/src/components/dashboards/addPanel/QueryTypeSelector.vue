@@ -121,7 +121,7 @@ export default defineComponent({
                     dashboardPanelData.layout.showQueryBar = true
                 } else {
                     popupSelectedButtonType.value = selectedQueryType;
-                    confirmQueryModeChangeDialog.value = true;
+                    dashboardPanelData.data.queries[0].query != "" ? confirmQueryModeChangeDialog.value = true : changeToggle()
                 }
             }
         };
