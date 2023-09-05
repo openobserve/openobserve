@@ -27,7 +27,6 @@ const convertPanelSchemaVersion = (data: any) => {
   };
 
   return {
-    version: 2,
     id: data.id,
     type: data.type,
     config: {

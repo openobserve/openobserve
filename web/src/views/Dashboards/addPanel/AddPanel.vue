@@ -621,7 +621,7 @@ export default defineComponent({
           dashboardPanelData.data
         );
         if (errorMessageOnSave instanceof Error) { 
-          errorData.errors.push("error saving panel configuration : " + errorMessageOnSave.message); 
+          errorData.errors.push("Error saving panel configuration : " + errorMessageOnSave.message); 
           return; 
         }
       } else {
