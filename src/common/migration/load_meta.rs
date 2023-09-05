@@ -5,19 +5,19 @@ use crate::common::meta::alert::Trigger;
 use crate::common::migration::load_meta::db::sled::SledDb;
 use crate::common::utils::json;
 
-const ITEM_PREFIXES: [&str; 12] = [
-    "/function",        // works fine
-    "/templates",       // works fine
-    "/destinations",    // works fine
-    "/dashboard",       // works fine
-    "/kv",              // works fine , no data
-    "/metrics_members", // data issue , removed data
-    "/metrics_leader",  // data issue , removed data
-    "/trigger",         // works fine
-    "/alerts",          // works fine
-    "/schema",          // works fine
-    "/compact",         // works fine
-    "/user",            // works fine
+const ITEM_PREFIXES: [&str; 10] = [
+    "/function",     // works fine
+    "/templates",    // works fine
+    "/destinations", // works fine
+    "/dashboard",    // works fine
+    "/kv",           // works fine , no data
+    //"/metrics_members", // data issue , removed data
+    //"/metrics_leader",  // data issue , removed data
+    "/trigger", // works fine
+    "/alerts",  // works fine
+    "/schema",  // works fine
+    "/compact", // works fine
+    "/user",    // works fine
 ];
 
 pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
@@ -93,7 +93,7 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
             match dest.put(key, value.clone(), false).await {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("error while migrating key {} from etcd to sled {}", key, e);
+                    println!("error while migrating key {} from etcd {}", key, e);
                 }
             }
         }
