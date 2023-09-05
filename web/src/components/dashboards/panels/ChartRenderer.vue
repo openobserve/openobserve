@@ -67,8 +67,10 @@ export default defineComponent({
         onUnmounted(() => {
             window.removeEventListener("resize", windowResizeEventCallback);
         });
-        watch(() => props.data.options, () => {
+        watch(() => props.data.options, async () => {
             chart.setOption(props?.data?.options || {}, true);
+            await nextTick();
+            chart.resize();
         }, { deep: true });
         return { chartRef };
     },

@@ -104,6 +104,8 @@ export default defineComponent({
 
     // when the error changes, emit the error
     watch(errorDetail, () => {
+      //check if there is an error message or not
+      if(!errorDetail.value)return;
       emit("error", errorDetail);
     });
 
