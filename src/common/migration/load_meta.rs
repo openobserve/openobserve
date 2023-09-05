@@ -5,7 +5,7 @@ use crate::common::meta::alert::Trigger;
 use crate::common::migration::load_meta::db::sled::SledDb;
 use crate::common::utils::json;
 
-const ITEM_PREFIXS: [&str; 12] = [
+const ITEM_PREFIXES: [&str; 12] = [
     "/function",        // works fine
     "/templates",       // works fine
     "/destinations",    // works fine
@@ -29,7 +29,7 @@ pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
     } else {
         panic!("enable local mode to migrate from sled");
     }
-    for item in ITEM_PREFIXS {
+    for item in ITEM_PREFIXES {
         let res = src.list(item).await?;
         for (key, value) in res.iter() {
             dest.put(key, value.clone(), false).await?;
@@ -50,10 +50,10 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
         panic!("disable local mode to migrate from etcd");
     }
 
-    for item in ITEM_PREFIXS {
+    for item in ITEM_PREFIXES {
         let res = src.list(item).await?;
         println!(
-            "resouces length for prefix {} from etcd is {}",
+            "resources length for prefix {} from etcd is {}",
             item,
             res.len()
         );
