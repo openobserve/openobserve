@@ -14,23 +14,26 @@
 
 use actix_web::{http, http::StatusCode, HttpResponse};
 use datafusion::arrow::datatypes::Schema;
-use std::collections::HashMap;
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 
-use crate::common::infra::config::{is_local_disk_storage, CONFIG};
-use crate::common::infra::{cache::stats, config::STREAM_SCHEMAS};
-use crate::common::meta;
-use crate::common::meta::usage::Stats;
-use crate::common::meta::{
-    http::HttpResponse as MetaHttpResponse,
-    prom,
-    stream::{PartitionTimeLevel, Stream, StreamProperty, StreamSettings, StreamStats},
-    StreamType,
+use crate::common::{
+    infra::{
+        cache::stats,
+        config::{
+            is_local_disk_storage, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA, STREAM_SCHEMAS,
+        },
+    },
+    meta::{
+        self,
+        http::HttpResponse as MetaHttpResponse,
+        prom,
+        stream::{PartitionTimeLevel, Stream, StreamProperty, StreamSettings, StreamStats},
+        usage::Stats,
+        StreamType,
+    },
+    utils::json,
 };
-use crate::common::utils::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS};
-use crate::service::{db, search as SearchService};
-
-use super::metrics::get_prom_metadata_from_schema;
+use crate::service::{db, metrics::get_prom_metadata_from_schema, search as SearchService};
 
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
@@ -198,7 +201,7 @@ pub async fn save_stream_settings(
     }
 
     for key in setting.partition_keys.iter() {
-        if SQL_FULL_TEXT_SEARCH_FIELDS.contains(&key.as_str()) {
+        if SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA.contains(key) {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("field [{key}] can't be used for partition key"),

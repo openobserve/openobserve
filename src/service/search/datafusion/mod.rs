@@ -22,7 +22,7 @@ use std::sync::Arc;
 use crate::common::{
     infra::config::{
         get_parquet_compression, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
-        PARQUET_PAGE_SIZE,
+        PARQUET_PAGE_SIZE, SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA,
     },
     meta::functions::ZoFunction,
 };
@@ -86,9 +86,18 @@ pub fn new_parquet_writer<'a>(
         .set_write_batch_size(PARQUET_BATCH_SIZE)
         .set_data_page_size_limit(PARQUET_PAGE_SIZE)
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE)
+        .set_dictionary_enabled(true)
         .set_sorting_columns(Some(
             [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),
         ));
+    for field in SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA.iter() {
+        writer_props = writer_props
+            .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
+    }
+    println!(
+        "dictionary fields: {:?}",
+        SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA.clone()
+    );
     if let Some(fields) = bf_fields {
         for field in fields {
             writer_props = writer_props

@@ -17,20 +17,23 @@ use dashmap::{DashMap, DashSet};
 use datafusion::arrow::datatypes::Schema;
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
+use itertools::chain;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use reqwest::Client;
 use std::{sync::Arc, time::Duration};
 use vector_enrichment::TableRegistry;
 
-use crate::common::meta::{
-    alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer},
-    functions::{StreamFunctionsList, Transform},
-    prom::ClusterLeader,
-    syslog::SyslogRoute,
-    user::User,
+use crate::common::{
+    meta::{
+        alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer},
+        functions::{StreamFunctionsList, Transform},
+        prom::ClusterLeader,
+        syslog::SyslogRoute,
+        user::User,
+    },
+    utils::{cgroup, file::get_file_meta},
 };
-use crate::common::utils::{cgroup, file::get_file_meta};
 use crate::service::enrichment::StreamTable;
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -43,14 +46,28 @@ pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 
+pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
+pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
+pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
+
 pub const HAS_FUNCTIONS: bool = true;
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const COLUMN_TRACE_ID: &str = "trace_id";
 
-pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
-pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
-pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
+const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 5] = ["log", "message", "msg", "content", "data"];
+
+pub static SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA: Lazy<Vec<String>> = Lazy::new(|| {
+    chain(
+        SQL_FULL_TEXT_SEARCH_FIELDS.iter().map(|s| s.to_string()),
+        CONFIG
+            .common
+            .feature_fulltext_extra_fields
+            .split(',')
+            .map(|s| s.to_string()),
+    )
+    .collect()
+});
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
@@ -214,6 +231,8 @@ pub struct Common {
     pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_ON_ALL_FIELDS", default = false)]
     pub feature_fulltext_on_all_fields: bool,
+    #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
+    pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
