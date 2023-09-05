@@ -134,7 +134,10 @@ impl super::Db for DynamoDb {
             Ok(_output) => {}
             Err(err) => {
                 log::error!("db save error: {:?}", err);
-                return Err(Error::from(DbError::KeyNotExists(in_key.to_string())));
+                return Err(Error::from(DbError::DBOperError(
+                    err.to_string(),
+                    in_key.to_string(),
+                )));
             }
         }
 

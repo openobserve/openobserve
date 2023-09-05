@@ -1,23 +1,24 @@
 use crate::common::infra::config::CONFIG;
 use crate::common::infra::db::etcd::Etcd;
 use crate::common::infra::db::{self, Db};
+use crate::common::meta::alert::Trigger;
 use crate::common::migration::load_meta::db::sled::SledDb;
+use crate::common::utils::json;
 
-/* const ITEM_PREFIXS: [&str; 12] = [
-    "/function",
-    "/templates",
-    "/destinations",
-    "/dashboard",
-    "/kv",
-    "/metrics_members",
-    "/metrics_leader",
-    "/trigger",
-    "/alerts",
-    "/schema",
-    "/compact",
-    "/user",
-]; */
-const ITEM_PREFIXS: [&str; 1] = ["/"];
+const ITEM_PREFIXS: [&str; 12] = [
+    "/function",        // works fine
+    "/templates",       // works fine
+    "/destinations",    // works fine
+    "/dashboard",       // works fine
+    "/kv",              // works fine , no data
+    "/metrics_members", // data issue , removed data
+    "/metrics_leader",  // data issue , removed data
+    "/trigger",         // works fine
+    "/alerts",          // works fine
+    "/schema",          // works fine
+    "/compact",         // works fine
+    "/user",            // works fine
+];
 
 pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
     let src;
@@ -51,10 +52,24 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
 
     for item in ITEM_PREFIXS {
         let res = src.list(item).await?;
-        println!("resouces length from etcd is {}", res.len());
+        println!(
+            "resouces length for prefix {} from etcd is {}",
+            item,
+            res.len()
+        );
+
         for (key, value) in res.iter() {
+            let final_key;
+            let key = if key.starts_with("/trigger") {
+                let local_val: Trigger = json::from_slice(value).unwrap();
+                final_key = format!("/trigger/{}/{}", local_val.org, local_val.alert_name);
+                &final_key
+            } else {
+                key
+            };
             dest.put(key, value.clone(), false).await?;
         }
+        println!("migrated  prefix {} from etcd ", item);
     }
 
     Ok(())
