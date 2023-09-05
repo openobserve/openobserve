@@ -575,6 +575,9 @@ export default defineComponent({
       }
     })
     const commonBtnLabel = (field: any) => {
+      if(dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery){
+        return field.column
+      }
       if (field.aggregationFunction) {
         const aggregation = field.aggregationFunction.toUpperCase();
         return `${aggregation}(${field.column})`;
