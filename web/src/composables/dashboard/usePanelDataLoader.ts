@@ -23,7 +23,7 @@ export const usePanelDataLoader = (
   chartPanelRef: any
 ) => {
   const state = reactive({
-    data: [],
+    data: [] as any,
     loading: false,
     errorDetail: "",
   });

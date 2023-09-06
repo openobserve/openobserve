@@ -32,7 +32,7 @@ const colors = [
   '#c4ccd3'
 ]
 
-const getDefaultDashboardPanelData = () => ({
+const getDefaultDashboardPanelData :any = () => ({
     data: {
       version: 2,
       id: "",
@@ -294,7 +294,7 @@ const removeQuery = (index: number) => {
       case "heatmap":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY) => {
+        ].fields.y.forEach((itemY: any) => {
           itemY.aggregationFunction = null;
         })
         break;
@@ -313,7 +313,7 @@ const removeQuery = (index: number) => {
         case "table":
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.y.forEach((itemY) => {
+          ].fields.y.forEach((itemY: any) => {
             if (itemY.aggregationFunction === null) {
               itemY.aggregationFunction = "count";
             }

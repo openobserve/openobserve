@@ -127,7 +127,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const data = reactive({
+    const data = reactive<any>({
       schemaList: [],
       indexOptions: [],
       streamType: ["logs", "metrics", "traces"],
