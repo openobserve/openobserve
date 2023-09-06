@@ -29,4 +29,3 @@ phases:
       - touch web/dist/index.html
       - cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
       - ./coverage.sh
-

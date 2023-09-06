@@ -11,13 +11,12 @@ FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
 ARG AWS_DEFAULT_REGION
 ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 
-# RUN rustup toolchain install nightly-2023-08-01
-# RUN rustup default nightly-2023-08-01
-# RUN rustup target add aarch64-unknown-linux-gnu
-# RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 # ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
 # ENV SCCACHE_REGION=us-west-2
 # ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/arm64/
+# ENV SCCACHE_NO_DAEMON=1
+# ENV SCCACHE_LOG=debug
+
 RUN rustc --version && sccache --version
 
 WORKDIR /app
@@ -28,10 +27,8 @@ RUN mkdir -p /app/target/release/
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
   CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
-RUN --mount=type=cache,target=/root/.cache/sccache du -sh /root/.cache/sccache
 RUN --mount=type=cache,target=/root/.cache/sccache cargo build --release --features mimalloc --target aarch64-unknown-linux-gnu \
-  && sccache --show-stats \
-  && du -sh /root/.cache/sccache
+  && sccache --show-stats
 RUN mv /app/target/aarch64-unknown-linux-gnu/release/openobserve /app/target/release/openobserve
 
 # FROM gcr.io/distroless/cc:latest-arm64 as runtime

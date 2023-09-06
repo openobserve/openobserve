@@ -32,7 +32,7 @@
     <pre ref="content" data-test="curl-content-text">
 curl -u {{ currUserEmail }}:{{ store.state.organizationData.organizationPasscode }} -k {{
         endpoint.url
-      }}/api/{{ currOrgIdentifier }}/default/_json -d [JSON-DATA]
+      }}/api/{{ currOrgIdentifier }}/default/_json -d '[{"level":"info","job":"test","log":"test message for openobserve"}]'
     </pre>
   </div>
 </template>

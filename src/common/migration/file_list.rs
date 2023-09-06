@@ -12,5 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod file_list;
-pub mod meta;
+use crate::service::db;
+
+pub async fn load(prefix: &str) -> Result<(), anyhow::Error> {
+    db::file_list::remote::cache(prefix, false)
+        .await
+        .expect("file list migration failed");
+    db::file_list::remote::cache_stats()
+        .await
+        .expect("file list migration stream stats failed");
+    Ok(())
+}

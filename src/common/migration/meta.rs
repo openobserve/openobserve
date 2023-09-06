@@ -1,30 +1,40 @@
 use chrono::Utc;
 
-use crate::common::infra::config::CONFIG;
-use crate::common::infra::db::etcd::Etcd;
-use crate::common::infra::db::{self, Db};
-use crate::common::meta::alert::Trigger;
-use crate::common::migration::load_meta::db::sled::SledDb;
-use crate::common::utils::json;
+use crate::common::{
+    infra::{
+        config::CONFIG,
+        db::{self, Db},
+    },
+    meta::alert::Trigger,
+    utils::json,
+};
 
-const ITEM_PREFIXES: [&str; 10] = [
-    "/function",     // works fine
-    "/templates",    // works fine
-    "/destinations", // works fine
-    "/dashboard",    // works fine
-    "/kv",           // works fine , no data
-    //"/metrics_members", // data issue , removed data
-    //"/metrics_leader",  // data issue , removed data
-    "/trigger", // works fine
-    "/alerts",  // works fine
-    "/schema",  // works fine
-    "/compact", // works fine
-    "/user",    // works fine
+const ITEM_PREFIXES: [&str; 11] = [
+    "/user",
+    "/schema",
+    "/syslog",
+    "/function",
+    "/dashboard",
+    "/templates",    // alert
+    "/destinations", // alert
+    "/alerts",       // alert
+    "/trigger",      // alert
+    "/compact",
+    "/kv",
 ];
+
+pub async fn load() -> Result<(), anyhow::Error> {
+    println!("local mode is {}", CONFIG.common.local_mode);
+    if CONFIG.common.local_mode {
+        load_meta_from_sled().await
+    } else {
+        load_meta_from_etcd().await
+    }
+}
 
 pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
     let (src, dest) = if CONFIG.common.local_mode {
-        (Box::<SledDb>::default(), db::default())
+        (Box::<db::sled::SledDb>::default(), db::default())
     } else {
         panic!("enable local mode to migrate from sled");
     };
@@ -69,7 +79,7 @@ pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
 pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
     println!("load meta from etcd");
     let (src, dest) = if !CONFIG.common.local_mode {
-        (Box::<Etcd>::default(), db::default())
+        (Box::<db::etcd::Etcd>::default(), db::default())
     } else {
         panic!("disable local mode to migrate from etcd");
     };
@@ -117,13 +127,4 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
-}
-
-pub async fn load() -> Result<(), anyhow::Error> {
-    println!("local mode is {}", CONFIG.common.local_mode);
-    if CONFIG.common.local_mode {
-        load_meta_from_sled().await
-    } else {
-        load_meta_from_etcd().await
-    }
 }
