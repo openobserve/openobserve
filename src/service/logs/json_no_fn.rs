@@ -253,7 +253,7 @@ pub async fn handle_grpc_request(
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
     for resource_log in &request.resource_logs {
-        for instrumentation_logs in &resource_log.instrumentation_library_logs {
+        for instrumentation_logs in &resource_log.scope_logs {
             for log_record in &instrumentation_logs.log_records {
                 let mut rec = json::json!({});
 
@@ -265,7 +265,7 @@ pub async fn handle_grpc_request(
                     }
                     None => {}
                 }
-                match &instrumentation_logs.instrumentation_library {
+                match &instrumentation_logs.scope {
                     Some(lib) => {
                         rec["instrumentation_library_name"] =
                             serde_json::Value::String(lib.name.to_owned());
@@ -401,7 +401,9 @@ pub async fn handle_grpc_request(
         0,
     )
     .await;
-    let res = ExportLogsServiceResponse {};
+    let res = ExportLogsServiceResponse {
+        partial_success: None,
+    };
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
 
@@ -416,10 +418,8 @@ pub mod test {
 
     use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
     use opentelemetry_proto::tonic::common::v1::any_value::Value::{IntValue, StringValue};
-    use opentelemetry_proto::tonic::common::v1::InstrumentationLibrary;
-    use opentelemetry_proto::tonic::common::v1::KeyValue;
-    use opentelemetry_proto::tonic::logs::v1::InstrumentationLibraryLogs;
-    use opentelemetry_proto::tonic::logs::v1::ResourceLogs;
+    use opentelemetry_proto::tonic::common::v1::{InstrumentationScope, KeyValue};
+    use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
     use opentelemetry_proto::tonic::{common::v1::AnyValue, logs::v1::LogRecord};
 
     #[tokio::test]
@@ -455,17 +455,19 @@ pub mod test {
             ..Default::default()
         };
 
-        let ins = InstrumentationLibraryLogs {
-            instrumentation_library: Some(InstrumentationLibrary {
+        let ins = ScopeLogs {
+            scope: Some(InstrumentationScope {
                 name: "test".to_string(),
                 version: "1.0.0".to_string(),
+                attributes: vec![],
+                dropped_attributes_count: 0,
             }),
             log_records: vec![log_rec],
             ..Default::default()
         };
 
         let res_logs = ResourceLogs {
-            instrumentation_library_logs: vec![ins],
+            scope_logs: vec![ins],
             ..Default::default()
         };
 

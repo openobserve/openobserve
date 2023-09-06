@@ -130,6 +130,7 @@ pub async fn traces_json(
     // End Register Transforms for stream */
 
     let mut service_name: String = traces_stream_name.to_string();
+    //let export_req: ExportTraceServiceRequest = json::from_slice(body.as_ref()).unwrap();
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
         Err(e) => {

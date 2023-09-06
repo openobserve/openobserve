@@ -15,10 +15,11 @@
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
-use crate::{common::meta, service::traces::otlp_http};
-
-pub const CONTENT_TYPE_JSON: &str = "application/json";
-pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+use crate::{
+    common::meta,
+    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    service::traces::otlp_http,
+};
 
 /** TracesIngest */
 #[utoipa::path(

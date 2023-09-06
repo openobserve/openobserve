@@ -38,7 +38,7 @@ use crate::{
         usage::report_request_usage_stats,
     },
 };
-use actix_web::{http, HttpResponse};
+use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::Utc;
@@ -57,6 +57,7 @@ pub async fn handle_grpc_request(
     org_id: &str,
     thread_id: usize,
     request: ExportMetricsServiceRequest,
+    _is_grpc: bool,
 ) -> Result<HttpResponse, anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -81,8 +82,8 @@ pub async fn handle_grpc_request(
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     for resource_metric in &request.resource_metrics {
-        for instrumentation_metric in &resource_metric.instrumentation_library_metrics {
-            for metric in &instrumentation_metric.metrics {
+        for scope_metric in &resource_metric.scope_metrics {
+            for metric in &scope_metric.metrics {
                 let metric_name = &metric.name;
                 // check for schema
                 let schema_exists = stream_schema_exists(
@@ -125,7 +126,7 @@ pub async fn handle_grpc_request(
                     }
                     None => {}
                 }
-                match &instrumentation_metric.instrumentation_library {
+                match &scope_metric.scope {
                     Some(lib) => {
                         rec["instrumentation_library_name"] =
                             serde_json::Value::String(lib.name.to_owned());
@@ -322,7 +323,9 @@ pub async fn handle_grpc_request(
         }
     }
 
-    let res = ExportMetricsServiceResponse {};
+    let res = ExportMetricsServiceResponse {
+        partial_success: None,
+    };
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
 
@@ -678,4 +681,24 @@ fn process_aggregation_temporality(rec: &mut json::Value, val: i32) {
         _ => AggregationTemporality::Unspecified.as_str_name(),
     }
     .into();
+}
+
+pub async fn metrics_proto_handler(
+    org_id: &str,
+    thread_id: usize,
+    body: web::Bytes,
+) -> Result<HttpResponse, std::io::Error> {
+    let request = ExportMetricsServiceRequest::decode(body).expect("Invalid protobuf");
+    match handle_grpc_request(org_id, thread_id, request, false).await {
+        Ok(res) => Ok(res),
+        Err(e) => {
+            log::error!("error while handling request: {}", e);
+            Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    }
 }

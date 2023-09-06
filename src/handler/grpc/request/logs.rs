@@ -52,7 +52,9 @@ impl LogsService for LogsServer {
         )
         .await;
         if resp.is_ok() {
-            return Ok(Response::new(ExportLogsServiceResponse {}));
+            return Ok(Response::new(ExportLogsServiceResponse {
+                partial_success: None,
+            }));
         } else {
             Err(Status::internal(resp.err().unwrap().to_string()))
         }

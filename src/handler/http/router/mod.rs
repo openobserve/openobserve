@@ -197,7 +197,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(syslog::delete_route)
             .service(syslog::update_route)
             .service(syslog::toggle_state)
-            .service(enrichment_table::save_enrichment_table),
+            .service(enrichment_table::save_enrichment_table)
+            .service(metrics::ingest::otlp_metrics_write),
     );
 }
 
