@@ -152,6 +152,7 @@ import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import { getDashboard } from "../../utils/commons.ts";
 import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 export default defineComponent({
   name: "Dashboards",
@@ -324,6 +325,8 @@ export default defineComponent({
         )
         .then((res) => {
           resultTotal.value = res.data.dashboards.length;
+          //dashboard version migration
+          res.data.dashboards = res.data.dashboards.map((dashboard: any) => convertDashboardSchemaVersion(dashboard["v"+dashboard.version]));
           store.dispatch("setAllDashboardList", res.data.dashboards.sort((a,b) => b.created.localeCompare(a.created)));
           dismiss();
         })

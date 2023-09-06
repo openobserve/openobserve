@@ -115,6 +115,8 @@ export const getAllDashboards = async (store: any) => {
       store.state.selectedOrganization.identifier
     )
     .then((res) => {
+      //dashboard version migration
+      res.data.dashboards = res.data.dashboards.map((dashboard: any) => convertDashboardSchemaVersion(dashboard["v"+dashboard.version]));
       // save to store
       store.dispatch(
         "setAllDashboardList",
@@ -131,7 +133,7 @@ function findDashboard(dashboardId: string, store: any) {
   const dashboards = store.state.organizationData.allDashboardList;
   const dashboard = dashboards.find((it: any) => it.dashboardId === dashboardId);
   // return the deep cody of the dashboard object to prevent it from being modified
-  return typeof dashboard === 'object' ? JSON.parse(JSON.stringify(convertDashboardSchemaVersion(dashboard))) : dashboard;
+  return typeof dashboard === 'object' ? JSON.parse(JSON.stringify(dashboard)) : dashboard;
 }
 
 export const addPanel = async (
