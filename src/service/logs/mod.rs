@@ -37,7 +37,7 @@ use super::ingestion::get_wal_time_key;
 pub mod bulk;
 pub mod gcs_pub_sub;
 pub mod json;
-pub mod json_no_fn;
+pub mod otlp;
 pub mod kinesis_firehose;
 pub mod multi;
 pub mod syslog;

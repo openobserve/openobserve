@@ -14,7 +14,7 @@
 
 use crate::{
     common::{
-        infra::{cluster, config::CONFIG},
+        infra::{cluster, config::CONFIG, metrics},
         meta::{
             self,
             alert::{Alert, Trigger},
@@ -57,7 +57,7 @@ pub async fn handle_grpc_request(
     org_id: &str,
     thread_id: usize,
     request: ExportMetricsServiceRequest,
-    _is_grpc: bool,
+    is_grpc: bool,
 ) -> Result<HttpResponse, anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -299,6 +299,32 @@ pub async fn handle_grpc_request(
             0,
         )
         .await;
+
+        let ep = if is_grpc {
+            "grpc/export/metrics"
+        } else {
+            "/api/org/v1/metrics"
+        };
+
+        let time = start.elapsed().as_secs_f64();
+        metrics::HTTP_RESPONSE_TIME
+            .with_label_values(&[
+                ep,
+                "200",
+                org_id,
+                &stream_name,
+                StreamType::Metrics.to_string().as_str(),
+            ])
+            .observe(time);
+        metrics::HTTP_INCOMING_REQUESTS
+            .with_label_values(&[
+                ep,
+                "200",
+                org_id,
+                &stream_name,
+                StreamType::Metrics.to_string().as_str(),
+            ])
+            .inc();
     }
 
     // only one trigger per request, as it updates etcd

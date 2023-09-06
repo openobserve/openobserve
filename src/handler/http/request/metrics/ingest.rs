@@ -54,12 +54,12 @@ pub async fn json(
     )
 }
 
-/** TracesIngest */
+/** MetricsIngest */
 #[utoipa::path(
     context_path = "/api",
-    tag = "Traces",
-    operation_id = "PostTraces",
-    request_body(content = String, description = "ExportTraceServiceRequest", content_type = "application/x-protobuf"),
+    tag = "Metrics",
+    operation_id = "PostMetrics",
+    request_body(content = String, description = "ExportMetricsServiceRequest", content_type = "application/x-protobuf"),
     responses(
         (status = 200, description="Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),

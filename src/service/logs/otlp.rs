@@ -204,6 +204,7 @@ pub async fn handle_grpc_request(
     org_id: &str,
     thread_id: usize,
     request: ExportLogsServiceRequest,
+    is_grpc: bool,
 ) -> Result<HttpResponse, anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -370,10 +371,16 @@ pub async fn handle_grpc_request(
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
 
+    let ep = if is_grpc {
+        "grpc/export/logs"
+    } else {
+        "/api/org/v1/logs"
+    };
+
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/api/org/ingest/logs/_json",
+            ep,
             "200",
             org_id,
             stream_name,
@@ -382,7 +389,7 @@ pub async fn handle_grpc_request(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/api/org/ingest/logs/_json",
+            ep,
             "200",
             org_id,
             stream_name,
@@ -421,6 +428,8 @@ pub mod test {
     use opentelemetry_proto::tonic::common::v1::{InstrumentationScope, KeyValue};
     use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
     use opentelemetry_proto::tonic::{common::v1::AnyValue, logs::v1::LogRecord};
+
+    use crate::service::logs::otlp::handle_grpc_request;
 
     #[tokio::test]
     async fn test_handle_logs_request() {
@@ -475,7 +484,27 @@ pub mod test {
             resource_logs: vec![res_logs],
         };
 
-        let result = super::handle_grpc_request(org_id, thread_id, request).await;
+        let result = handle_grpc_request(org_id, thread_id, request, true).await;
         assert!(result.is_ok());
+    }
+}
+
+pub async fn logs_proto_handler(
+    org_id: &str,
+    thread_id: usize,
+    body: web::Bytes,
+) -> Result<HttpResponse, std::io::Error> {
+    let request = ExportLogsServiceRequest::decode(body).expect("Invalid protobuf");
+    match handle_grpc_request(org_id, thread_id, request, false).await {
+        Ok(res) => Ok(res),
+        Err(e) => {
+            log::error!("error while handling request: {}", e);
+            Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    e.to_string(),
+                )),
+            )
+        }
     }
 }
