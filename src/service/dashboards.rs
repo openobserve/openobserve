@@ -12,52 +12,60 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use actix_web::web;
 use actix_web::{http::StatusCode, HttpResponse};
 use std::io;
 
-use crate::common::meta::{self, dashboards::Dashboard, http::HttpResponse as MetaHttpResponse};
+use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse};
 use crate::service::db::dashboard;
 
-#[tracing::instrument(skip(dashboard))]
-pub async fn create_dashboard(
-    org_id: &str,
-    mut dashboard: Dashboard,
-) -> Result<HttpResponse, io::Error> {
+#[tracing::instrument(skip(body))]
+pub async fn create_dashboard(org_id: &str, body: web::Bytes) -> Result<HttpResponse, io::Error> {
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
-    dashboard.dashboard_id = crate::common::infra::ider::generate();
-    if let Err(e) = dashboard::put(org_id, &dashboard).await {
-        return Ok(Response::InternalServerError(e).into());
+    let dashboard_id = crate::common::infra::ider::generate();
+    match dashboard::put(org_id, &dashboard_id, body).await {
+        Ok(dashboard) => {
+            tracing::info!(dashboard_id, "Dashboard updated");
+            Ok(HttpResponse::Ok().json(dashboard))
+        }
+        Err(error) => {
+            tracing::error!(%error, dashboard_id, "Failed to store the dashboard");
+            Ok(Response::InternalServerError(error).into())
+        }
     }
-    tracing::info!(dashboard_id = dashboard.dashboard_id, "Dashboard created");
-    Ok(HttpResponse::Created().json(dashboard))
 }
 
-#[tracing::instrument(skip(dashboard))]
+#[tracing::instrument(skip(body))]
 pub async fn update_dashboard(
     org_id: &str,
     dashboard_id: &str,
-    dashboard: &Dashboard,
+    body: web::Bytes,
 ) -> Result<HttpResponse, io::Error> {
-    // Try to find this dashboard in the database
+    /*     // Try to find this dashboard in the database
     let old_dashboard = match dashboard::get(org_id, dashboard_id).await {
         Ok(dashboard) => dashboard,
         Err(error) => {
             tracing::info!(%error, dashboard_id, "Dashboard not found");
-            return Ok(Response::NotFound.into());
+            Ok(Response::NotFound.into());
         }
     };
 
     if dashboard == &old_dashboard {
         // There is no need to update the database
-        return Ok(HttpResponse::Ok().json(dashboard));
-    }
+        Ok(HttpResponse::Ok().json(dashboard));
+    } */
 
     // Store new dashboard in the database
-    if let Err(error) = dashboard::put(org_id, dashboard).await {
-        tracing::error!(%error, dashboard_id, "Failed to store the dashboard");
-        return Ok(Response::InternalServerError(error).into());
+    match dashboard::put(org_id, dashboard_id, body).await {
+        Ok(dashboard) => {
+            tracing::info!(dashboard_id, "Dashboard updated");
+            Ok(HttpResponse::Ok().json(dashboard))
+        }
+        Err(error) => {
+            tracing::error!(%error, dashboard_id, "Failed to store the dashboard");
+            Ok(Response::InternalServerError(error).into())
+        }
     }
-    Ok(HttpResponse::Ok().json(dashboard))
 }
 
 #[tracing::instrument]
