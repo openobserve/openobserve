@@ -36,6 +36,7 @@ use std::{
 };
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
+use uaparser::UserAgentParser;
 
 use openobserve::{
     common::{
@@ -86,6 +87,11 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/ua_regex/regexes.yaml"
+));
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
@@ -100,6 +106,11 @@ async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
     let agent_running = agent.start().expect("Failed to start pyroscope agent");
 
+    let ua_parser = web::Data::new(
+        UserAgentParser::builder()
+            .build_from_bytes(USER_AGENT_REGEX_FILE)
+            .expect("User Agent Parser creation failed"),
+    );
     if cli().await? {
         return Ok(());
     }
@@ -189,6 +200,7 @@ async fn main() -> Result<(), anyhow::Error> {
         if CONFIG.common.feature_per_thread_lock {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
+
         log::info!(
             "starting HTTP server at: {}, thread_id: {}",
             haddr,
@@ -203,6 +215,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     .service(router::api)
                     .service(router::aws)
                     .service(router::gcp)
+                    .service(router::rum)
                     .configure(get_basic_routes),
             )
         } else {
@@ -217,6 +230,7 @@ async fn main() -> Result<(), anyhow::Error> {
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
+            .app_data(ua_parser.clone())
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,

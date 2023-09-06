@@ -60,6 +60,13 @@ pub struct OrgSummary {
     pub alerts: Vec<Alert>,
 }
 
+/// A container for passcodes and rumtokens
+#[derive(Serialize, ToSchema)]
+pub enum IngestionTokensContainer {
+    Passcode(IngestionPasscode),
+    RumToken(RumIngestionToken),
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct IngestionPasscode {
     pub passcode: String,
@@ -69,4 +76,15 @@ pub struct IngestionPasscode {
 #[derive(Serialize, ToSchema)]
 pub struct PasscodeResponse {
     pub data: IngestionPasscode,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct RumIngestionToken {
+    pub user: String,
+    pub rum_token: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct RumIngestionResponse {
+    pub data: RumIngestionToken,
 }

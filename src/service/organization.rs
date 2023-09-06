@@ -15,7 +15,9 @@
 use rand::distributions::{Alphanumeric, DistString};
 
 use super::stream::get_streams;
-use crate::common::meta::organization::{IngestionPasscode, OrgSummary};
+use crate::common::meta::organization::{
+    IngestionPasscode, IngestionTokensContainer, OrgSummary, RumIngestionToken,
+};
 use crate::common::meta::user::UserOrg;
 use crate::common::utils::auth::is_root_user;
 use crate::service::db;
@@ -42,7 +44,38 @@ pub async fn get_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPassc
 }
 
 #[tracing::instrument]
+pub async fn get_rum_token(org_id: Option<&str>, user_id: &str) -> RumIngestionToken {
+    let user = db::user::get(org_id, user_id).await.unwrap().unwrap();
+    RumIngestionToken {
+        user: user.email,
+        rum_token: user.rum_token,
+    }
+}
+
+#[tracing::instrument]
+pub async fn update_rum_token(org_id: Option<&str>, user_id: &str) -> RumIngestionToken {
+    let is_rum_update = true;
+    match update_passcode_inner(org_id, user_id, is_rum_update).await {
+        IngestionTokensContainer::RumToken(response) => response,
+        _ => panic!("This shouldn't have happened, we were expecting rum token updates"),
+    }
+}
+
+#[tracing::instrument]
 pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPasscode {
+    let is_rum_update = false;
+    match update_passcode_inner(org_id, user_id, is_rum_update).await {
+        IngestionTokensContainer::Passcode(response) => response,
+        _ => panic!("This shouldn't have happened, we were expecting ingestion token updates"),
+    }
+}
+
+#[tracing::instrument]
+async fn update_passcode_inner(
+    org_id: Option<&str>,
+    user_id: &str,
+    is_rum_update: bool,
+) -> IngestionTokensContainer {
     let mut local_org_id = "dummy";
     let mut db_user = db::user::get_db_user(user_id).await.unwrap();
 
@@ -50,29 +83,57 @@ pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPa
         local_org_id = org_id.unwrap();
     }
     let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+    let rum_token = format!(
+        "rum{}",
+        Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
+    );
+
+    let updated_org = |existing_org: &UserOrg| {
+        if is_rum_update {
+            UserOrg {
+                rum_token: Some(rum_token.clone()),
+                ..existing_org.clone()
+            }
+        } else {
+            UserOrg {
+                token: token.clone(),
+                ..existing_org.clone()
+            }
+        }
+    };
+
     let mut orgs = db_user.clone().organizations;
     let new_orgs = if !is_root_user(user_id) {
         let mut existing_org = orgs.clone();
 
+        // Find the org which we need to update
         existing_org.retain(|org| org.name.eq(&local_org_id));
+
+        // Filter out the org which needs to be updated, so that we can modify and insert it back.
         orgs.retain(|org| !org.name.eq(&local_org_id));
 
-        orgs.push(UserOrg {
-            name: local_org_id.to_string(),
-            token: token.clone(),
-            role: existing_org.first().unwrap().role.clone(),
-        });
+        let updated_org = updated_org(&existing_org[0]);
+        orgs.push(updated_org);
         orgs
     } else {
-        let mut existing_org = orgs.first().unwrap().clone();
-        existing_org.token = token.clone();
-        vec![existing_org]
+        // This is a root-user, so pick up the first/default org.
+        let existing_org = orgs.first().unwrap().clone();
+        let updated_org = updated_org(&existing_org);
+        vec![updated_org]
     };
     db_user.organizations = new_orgs;
     let _ = db::user::set(db_user.clone()).await;
-    IngestionPasscode {
-        user: db_user.email,
-        passcode: token,
+
+    if is_rum_update {
+        IngestionTokensContainer::RumToken(RumIngestionToken {
+            user: db_user.email,
+            rum_token: Some(rum_token),
+        })
+    } else {
+        IngestionTokensContainer::Passcode(IngestionPasscode {
+            user: db_user.email,
+            passcode: token,
+        })
     }
 }
 
