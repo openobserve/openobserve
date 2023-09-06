@@ -212,11 +212,6 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>> {
         let (time_start, mut time_end) = time_range;
-        if time_start == 0 {
-            return Err(Error::Message(
-                "Disallow empty time range query".to_string(),
-            ));
-        }
         if time_end == 0 {
             time_end = Utc::now().timestamp_micros();
         }

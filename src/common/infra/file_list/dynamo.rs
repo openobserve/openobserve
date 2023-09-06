@@ -32,6 +32,7 @@ use crate::common::{
         stream::{PartitionTimeLevel, StreamStats},
         StreamType,
     },
+    utils::time::BASE_TIME,
 };
 
 pub struct DynamoFileList {
@@ -188,11 +189,9 @@ impl super::FileList for DynamoFileList {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>> {
-        let (time_start, mut time_end) = time_range;
+        let (mut time_start, mut time_end) = time_range;
         if time_start == 0 {
-            return Err(Error::Message(
-                "Disallow empty time range query".to_string(),
-            ));
+            time_start = BASE_TIME.timestamp_micros();
         }
         if time_end == 0 {
             time_end = Utc::now().timestamp_micros();
