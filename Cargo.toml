@@ -42,7 +42,7 @@ codegen-units = 4
 
 [dependencies]
 actix-cors = "0.6"
-actix-multipart = "0.6"
+actix-multipart = { version = "0.6", features = ["derive"] }
 actix-web = "4.4"
 actix-web-httpauth = "0.8"
 actix-web-opentelemetry = { version = "0.15", features = ["metrics"] }
@@ -164,6 +164,8 @@ vrl = { version = "0.6.0", features = [
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.12"
+uaparser = "0.6.1"
+actix-web-lab = "0.19.1"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

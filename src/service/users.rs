@@ -21,8 +21,11 @@ use std::io::Error;
 use uuid::Uuid;
 
 use super::db;
-use crate::common::meta::user::{User, UserList, UserResponse, UserRole};
 use crate::common::{infra::config::USERS, meta::user::UpdateUser};
+use crate::common::{
+    infra::config::USERS_RUM_TOKEN,
+    meta::user::{User, UserList, UserResponse, UserRole},
+};
 use crate::{
     common::infra::config::ROOT_USER,
     common::meta::{
@@ -43,7 +46,12 @@ pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpRespons
         let salt = Uuid::new_v4().to_string();
         let password = get_hash(&usr_req.password, &salt);
         let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-        let user = usr_req.to_new_dbuser(password, salt, org_id.replace(' ', "_"), token);
+        let rum_token = format!(
+            "rum{}",
+            Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
+        );
+        let user =
+            usr_req.to_new_dbuser(password, salt, org_id.replace(' ', "_"), token, rum_token);
         db::user::set(user).await.unwrap();
         Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
@@ -152,6 +160,7 @@ pub async fn update_user(
                                     vec![UserOrg {
                                         name: org_id.to_string(),
                                         token: new_user.token,
+                                        rum_token: new_user.rum_token,
                                         role: new_user.role,
                                     }]
                                 } else {
@@ -159,6 +168,7 @@ pub async fn update_user(
                                     orgs.push(UserOrg {
                                         name: org_id.to_string(),
                                         token: new_user.token,
+                                        rum_token: new_user.rum_token,
                                         role: new_user.role,
                                     });
                                     orgs
@@ -223,11 +233,16 @@ pub async fn add_user_to_org(
         };
         if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
             let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+            let rum_token = format!(
+                "rum{}",
+                Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
+            );
             let mut orgs = db_user.clone().organizations;
             let new_orgs = if orgs.is_empty() {
                 vec![UserOrg {
                     name: local_org.to_string(),
                     token,
+                    rum_token: Some(rum_token),
                     role,
                 }]
             } else {
@@ -235,6 +250,7 @@ pub async fn add_user_to_org(
                 orgs.push(UserOrg {
                     name: local_org.to_string(),
                     token,
+                    rum_token: Some(rum_token),
                     role,
                 });
                 orgs
@@ -278,6 +294,27 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
                     Some(user) => Some(user),
                     None => None,
                 } */
+            }
+        }
+    }
+}
+
+pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
+    let root_user = USERS_RUM_TOKEN.get(&format!("{DEFAULT_ORG}/{token}"));
+    if let Some(user) = root_user {
+        return Some(user.value().clone());
+    }
+
+    let key = format!("{org_id}/{token}");
+    let user = USERS_RUM_TOKEN.get(&key);
+    match user {
+        Some(loc_user) => Some(loc_user.value().clone()),
+        None => {
+            let res = db::user::get_by_token(Some(org_id), token).await;
+            if res.is_err() {
+                None
+            } else {
+                res.unwrap()
             }
         }
     }
@@ -385,6 +422,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Admin,
                 salt: String::new(),
                 token: "token".to_string(),
+                rum_token: Some("rum_token".to_string()),
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
                 org: "dummy".to_string(),
@@ -450,6 +488,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Admin,
                 salt: String::new(),
                 token: "token".to_string(),
+                rum_token: Some("rum_token".to_string()),
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
                 org: "dummy".to_string(),

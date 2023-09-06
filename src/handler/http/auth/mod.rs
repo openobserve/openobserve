@@ -12,15 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{
-    dev::ServiceRequest,
-    error::{ErrorForbidden, ErrorUnauthorized},
-    http::header,
-    http::Method,
-    web, Error,
-};
-use actix_web_httpauth::extractors::basic::BasicAuth;
-
 use crate::common::infra::config::CONFIG;
 use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::meta::user::UserRole;
@@ -29,6 +20,14 @@ use crate::common::utils::{
     base64,
 };
 use crate::service::{db, users};
+use actix_web::{
+    dev::ServiceRequest,
+    error::{ErrorForbidden, ErrorUnauthorized},
+    http::header,
+    http::Method,
+    web, Error,
+};
+use actix_web_httpauth::extractors::basic::BasicAuth;
 
 pub async fn validator(
     req: ServiceRequest,
@@ -65,6 +64,19 @@ pub async fn validator(
             }
         }
         Err(err) => Err((err, req)),
+    }
+}
+
+/// `validate_token` validates the endpoints which are token only.
+/// This includes endpoints like `rum` etc.
+///
+/// ### Args:
+/// - token: The token to validate
+///  
+pub async fn validate_token(token: &str, org_id: &str) -> Result<bool, Error> {
+    match users::get_user_by_token(org_id, token).await {
+        Some(_user) => Ok(true),
+        None => Err(ErrorForbidden("Not allowed")),
     }
 }
 
@@ -220,6 +232,45 @@ pub async fn validator_gcp(
                 Err(err) => Err((err, req)),
             }
         }
+        None => Err((ErrorUnauthorized("Unauthorized Access"), req)),
+    }
+}
+
+pub async fn validator_rum(
+    req: ServiceRequest,
+    _credentials: Option<BasicAuth>,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let path = req
+        .request()
+        .path()
+        .strip_prefix(format!("{}/rum/v1/", CONFIG.common.base_uri).as_str())
+        .unwrap_or(req.request().path());
+
+    // After this previous path clean we should get only the
+    // remaining `org_id/rum` or `org_id/replay` or `org_id/logs`
+    let org_id_end_point: Vec<&str> = path.split('/').collect();
+    if org_id_end_point.len() != 2 {
+        return Err((
+            ErrorUnauthorized("Unauthorized Access. Please pass a valid org_id."),
+            req,
+        ));
+    }
+
+    let query =
+        web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
+            .unwrap();
+
+    match query.get("oo-api-key") {
+        Some(token) => match validate_token(token, org_id_end_point[0]).await {
+            Ok(res) => {
+                if res {
+                    Ok(req)
+                } else {
+                    Err((ErrorUnauthorized("Unauthorized Access"), req))
+                }
+            }
+            Err(err) => Err((err, req)),
+        },
         None => Err((ErrorUnauthorized("Unauthorized Access"), req)),
     }
 }
