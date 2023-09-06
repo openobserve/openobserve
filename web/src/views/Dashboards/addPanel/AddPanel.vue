@@ -208,6 +208,7 @@ export default defineComponent({
 
     const saveVariableApiCall = useLoading(async()=>{
       const dashboardId = route.query.dashboard + "";
+      isPanelConfigChanged.value=false;
       await savePanelChangesToDashboard(dashboardId);
     })
 
