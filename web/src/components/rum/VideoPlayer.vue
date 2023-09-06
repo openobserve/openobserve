@@ -387,7 +387,7 @@ defineExpose({
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .player {
   height: calc(100% - 153px);
 }
@@ -399,7 +399,7 @@ defineExpose({
 }
 </style>
 
-<style>
+<style lang="scss">
 .speed-selector {
   .q-field__control {
     padding: 0 8px !important;
