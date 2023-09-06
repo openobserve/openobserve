@@ -68,9 +68,9 @@ export default defineComponent({
             window.removeEventListener("resize", windowResizeEventCallback);
         });
         watch(() => props.data.options, async () => {
-            chart.setOption(props?.data?.options || {}, true);
             await nextTick();
             chart.resize();
+            chart.setOption(props?.data?.options || {}, true);
         }, { deep: true });
         return { chartRef };
     },
