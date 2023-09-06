@@ -18,6 +18,7 @@ import dashboardService from "../services/dashboards";
 import { toRaw } from "vue";
 import { date } from "quasar";
 import moment from "moment";
+import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 
 export const modifySQLQuery = (
   currentTimeObj: any,
@@ -114,6 +115,8 @@ export const getAllDashboards = async (store: any) => {
       store.state.selectedOrganization.identifier
     )
     .then((res) => {
+      //dashboard version migration
+      res.data.dashboards = res.data.dashboards.map((dashboard: any) => convertDashboardSchemaVersion(dashboard["v"+dashboard.version]));
       // save to store
       store.dispatch(
         "setAllDashboardList",
@@ -128,7 +131,9 @@ export const getAllDashboards = async (store: any) => {
 
 function findDashboard(dashboardId: string, store: any) {
   const dashboards = store.state.organizationData.allDashboardList;
-  return dashboards.find((it: any) => it.dashboardId === dashboardId);
+  const dashboard = dashboards.find((it: any) => it.dashboardId === dashboardId);
+  // return the deep cody of the dashboard object to prevent it from being modified
+  return typeof dashboard === 'object' ? JSON.parse(JSON.stringify(dashboard)) : dashboard;
 }
 
 export const addPanel = async (
@@ -150,31 +155,42 @@ export const addPanel = async (
   if (!currentDashboard.panels) {
     currentDashboard.panels = [];
   }
-  currentDashboard.panels.push(panelData);
 
-  const maxI =
-    currentDashboard.layouts?.length > 0
-      ? Math.max(...currentDashboard.layouts?.map((obj: any) => obj.i))
-      : 0;
-  const maxY =
-    currentDashboard.layouts?.length > 0
-      ? Math.max(...currentDashboard.layouts?.map((obj: any) => obj.y))
-      : 0;
+  let maxI=0;
+  let maxY=0;
+  
+  currentDashboard.panels.map((it: any) => {
+    maxI = Math.max(it.layout?.i||0,maxI);
+    maxY = Math.max(it.layout?.y||0,maxY);    
+  })
+
+  // maxI =
+  //   currentDashboard.layouts?.length > 0
+  //     ? Math.max(...currentDashboard.layouts?.map((obj: any) => obj.i))
+  //     : 0;
+  // maxY =
+  //   currentDashboard.layouts?.length > 0
+  //     ? Math.max(...currentDashboard.layouts?.map((obj: any) => obj.y))
+  //     : 0;
 
   const newLayoutObj = {
     x: 0,
-    y: currentDashboard.layouts?.length > 0 ? maxY + 10 : 0,
+    y: currentDashboard.panels?.length > 0 ? maxY + 10 : 0,
     w: 12,
     h: 13,
     i: maxI + 1,
     panelId: panelData.id,
     static: false,
-  };
+  };  
 
-  if (!currentDashboard.layouts) {
-    currentDashboard.layouts = [];
-  }
-  currentDashboard.layouts.push(newLayoutObj);
+  // if (!currentDashboard.layouts) {
+  //   currentDashboard.layouts = [];
+  // }
+  // currentDashboard.layouts.push(newLayoutObj);
+
+  //set layout of new panel
+  panelData.layout = newLayoutObj;
+  currentDashboard.panels.push(panelData);
 
   return await updateDashboard(
     store,
@@ -266,11 +282,11 @@ export const deletePanel = async (
   currentDashboard.panels = currentDashboard.panels;
 
   //remove layout from current dashboard
-  const layoutIndex = currentDashboard.layouts.findIndex(
-    (layout: any) => layout.panelId == panelId
-  );
-  currentDashboard.layouts.splice(layoutIndex, 1);
-  currentDashboard.layouts = currentDashboard.layouts;
+  // const layoutIndex = currentDashboard.layouts.findIndex(
+  //   (layout: any) => layout.panelId == panelId
+  // );
+  // currentDashboard.layouts.splice(layoutIndex, 1);
+  // currentDashboard.layouts = currentDashboard.layouts;
 
   await updateDashboard(
     store,
@@ -331,7 +347,7 @@ export const updatePanel = async (
   currentDashboard.panels[panelIndex] = panelData;
   currentDashboard.panels = currentDashboard.panels;
 
-  await updateDashboard(
+  return await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
@@ -351,6 +367,8 @@ export const updateDashboard = async (
     .then(async (res) => {
       // update dashboardList
       await getAllDashboards(store);
+    }).catch((error) => {
+      return error
     });
 };
 
@@ -372,7 +390,9 @@ export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
     await getAllDashboards(store);
   }
   const currentDashboard = findDashboard(dashboardId, store);
-  return currentDashboard.panels?.find((it: any) => it.id == panelId);
+  
+  const paneldata = currentDashboard.panels?.find((it: any) => it.id == panelId);
+  return paneldata;
 };
 
 export const getPanelId = () => {

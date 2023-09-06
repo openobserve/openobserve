@@ -151,6 +151,14 @@ export default defineComponent({
 
     // import multiple files
     const importFiles = async () => {
+      if (!jsonFiles.value || !jsonFiles.value.length) {
+        $q.notify({
+          type: "negative",
+          message: 'No JSON file(s) selected for import',
+        });
+        isLoading.value = false;
+        return;
+      }
       isLoading.value = ImportType.FILES
 
       const data = jsonFiles?.value?.map((it: any, index: number) => {
@@ -253,7 +261,7 @@ export default defineComponent({
       } catch (error) {
         $q.notify({
           type: "negative",
-          message: 'Invalid JSON format',
+          message: 'Please Enter a URL for import',
         });
         
       } finally {
@@ -278,7 +286,7 @@ export default defineComponent({
       } catch (error) {
         $q.notify({
           type: "negative",
-          message: 'Invalid JSON format',
+          message: 'Please Enter a JSON object for import',
         });
        
       } finally {
@@ -288,7 +296,7 @@ export default defineComponent({
 
     // back button to render dashboard List page
     const goBack = () => {
-      jsonFiles.value = ''
+      jsonFiles.value = []
       url.value = ''
       jsonStr.value = ''
       filesImportResults.value = []

@@ -158,7 +158,7 @@ const useRoutes = () => {
       component: AddPanel,
       props: true,
       meta: {
-        keepAlive: true,
+        // keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuardPendingSubscriptions(to, from, next);

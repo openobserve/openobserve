@@ -65,7 +65,7 @@ export default defineComponent({
     const route = useRoute()
 
     const renderTitle = computed(() => {
-      return props.panelDataElement.config?.title
+      return props.panelDataElement.title
     })
     //for edit panel
     const addNewPanel = () => {
@@ -102,7 +102,6 @@ export default defineComponent({
         this.$emit('duplicatePanel', this.panelDataElementObject)
       }
       else {
-        // console.log(evt)
       }
       
     },

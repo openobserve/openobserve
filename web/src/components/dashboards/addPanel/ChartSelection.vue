@@ -88,6 +88,11 @@ export default defineComponent({
         id: "stacked",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
+        title: "Heatmap",
+        id: "heatmap",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
         title: "H-Stacked",
         id: "h-stacked",

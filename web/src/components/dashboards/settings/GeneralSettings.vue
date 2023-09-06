@@ -105,7 +105,6 @@ import { useQuasar } from "quasar";
         dashboardData.title = data.title;
         dashboardData.description = data.description;
       };
-      // console.log("dashboardDataget", getDashboardData());
       onMounted(async () => {
         await getDashboardData();
       })
