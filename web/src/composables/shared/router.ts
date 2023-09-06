@@ -35,8 +35,11 @@ const Settings = () => import("@/components/settings/index.vue");
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
-const AssociatedStreamFunction = () => import("@/components/functions/AssociatedStreamFunction.vue");
-const EnrichmentTableList = () => import("@/components/functions/EnrichmentTableList.vue");
+const AssociatedStreamFunction = () =>
+  import("@/components/functions/AssociatedStreamFunction.vue");
+const EnrichmentTableList = () =>
+  import("@/components/functions/EnrichmentTableList.vue");
+const RealUserMonitoring = () => import("@/views/RealUserMonitoring.vue");
 
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
@@ -254,6 +257,11 @@ const useRoutes = () => {
           component: TemplateList,
         },
       ],
+    },
+    {
+      path: "rum",
+      name: "RUM",
+      component: RealUserMonitoring,
     },
     ...useIngestionRoutes(),
     {

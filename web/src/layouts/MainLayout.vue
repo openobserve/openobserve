@@ -401,6 +401,11 @@ export default defineComponent({
         link: "/traces",
       },
       {
+        title: t("menu.rum"),
+        icon: "devices",
+        link: "/rum",
+      },
+      {
         title: t("menu.dashboard"),
         icon: outlinedDashboard,
         link: "/dashboards",
