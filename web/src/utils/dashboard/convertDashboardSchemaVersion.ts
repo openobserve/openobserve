@@ -44,7 +44,7 @@ const convertPanelSchemaVersion = (data: any) => {
         customQuery: data.customQuery,
         fields: queryFields,
           config: {
-            promql_legend: data.config.promql_legend,
+            promql_legend: data.config.promql_legend||"",
           },
       },
     ],
