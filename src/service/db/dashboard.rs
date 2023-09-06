@@ -12,27 +12,73 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::{infra::db as infra_db, meta::dashboards::Dashboard, utils::json};
+use actix_web::web;
+
+use crate::common::{
+    infra::db as infra_db,
+    meta::dashboards::{v1, v2, Dashboard, DashboardVersion},
+    utils::json,
+};
 
 #[tracing::instrument]
 pub(crate) async fn get(org_id: &str, dashboard_id: &str) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{dashboard_id}");
     let bytes = infra_db::DEFAULT.get(&key).await?;
-    json::from_slice(&bytes).map_err(|_| {
-        anyhow::anyhow!("Failed to deserialize the value for key {key:?} as `Dashboard`")
-    })
+    let d_version: DashboardVersion = json::from_slice(&bytes)?;
+    if d_version.version == 1 {
+        let dash: v1::Dashboard = json::from_slice(&bytes)?;
+        Ok(Dashboard {
+            v1: Some(dash),
+            version: 1,
+            ..Default::default()
+        })
+    } else {
+        let dash: v2::Dashboard = json::from_slice(&bytes)?;
+        Ok(Dashboard {
+            v2: Some(dash),
+            version: 2,
+            ..Default::default()
+        })
+    }
 }
 
-#[tracing::instrument(skip(dashboard))]
-pub(crate) async fn put(org_id: &str, dashboard: &Dashboard) -> Result<(), anyhow::Error> {
-    let key = format!("/dashboard/{org_id}/{}", dashboard.dashboard_id);
-    Ok(infra_db::DEFAULT
-        .put(
-            &key,
-            json::to_vec(dashboard)?.into(),
-            infra_db::NO_NEED_WATCH,
-        )
-        .await?)
+#[tracing::instrument(skip(body))]
+pub(crate) async fn put(
+    org_id: &str,
+    dashboard_id: &str,
+    body: web::Bytes,
+) -> Result<Dashboard, anyhow::Error> {
+    let key = format!("/dashboard/{org_id}/{}", dashboard_id);
+    let d_version: DashboardVersion = json::from_slice(&body)?;
+    if d_version.version == 1 {
+        let mut dash: v1::Dashboard = json::from_slice(&body)?;
+        dash.dashboard_id = dashboard_id.to_string();
+        match infra_db::DEFAULT
+            .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
+            .await
+        {
+            Ok(_) => Ok(Dashboard {
+                v1: Some(dash),
+                version: 1,
+                ..Default::default()
+            }),
+            Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
+        }
+    } else {
+        let mut dash: v2::Dashboard = json::from_slice(&body)?;
+        dash.dashboard_id = dashboard_id.to_string();
+        match infra_db::DEFAULT
+            .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
+            .await
+        {
+            Ok(_) => Ok(Dashboard {
+                v2: Some(dash),
+                version: 2,
+                ..Default::default()
+            }),
+            Err(_) => Err(anyhow::anyhow!("Failed to save Dashboard")),
+        }
+    }
 }
 
 #[tracing::instrument]
@@ -43,9 +89,22 @@ pub(crate) async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> 
         .await?
         .into_values()
         .map(|val| {
-            json::from_slice(&val).map_err(|_| {
-                anyhow::anyhow!("Failed to deserialize the value for key {db_key:?} as `Dashboard`")
-            })
+            let d_version: DashboardVersion = json::from_slice(&val).unwrap();
+            if d_version.version == 1 {
+                let dash: v1::Dashboard = json::from_slice(&val).unwrap();
+                Ok(Dashboard {
+                    v1: Some(dash),
+                    version: 1,
+                    ..Default::default()
+                })
+            } else {
+                let dash: v2::Dashboard = json::from_slice(&val).unwrap();
+                Ok(Dashboard {
+                    v2: Some(dash),
+                    version: 2,
+                    ..Default::default()
+                })
+            }
         })
         .collect()
 }
