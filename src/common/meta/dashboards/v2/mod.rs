@@ -52,9 +52,6 @@ pub struct Layout {
     pub w: i64,
     pub h: i64,
     pub i: i64,
-    pub panel_id: String,
-    #[serde(rename = "static")]
-    pub is_static: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -77,7 +74,6 @@ pub struct Query {
     pub query: String,
     pub custom_query: String,
     pub fields: PanelFields,
-    pub description: String,
     pub config: QueryConfig,
 }
 
@@ -129,11 +125,8 @@ pub struct PanelFilter {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct PanelConfig {
-    title: String,
-    description: String,
     show_legends: bool,
     legends_position: Option<String>,
-    promql_legend: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
