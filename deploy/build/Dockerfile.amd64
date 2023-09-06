@@ -8,8 +8,8 @@ RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 # FROM public.ecr.aws/docker/library/rust:bullseye as builder
 FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
-ARG AWS_DEFAULT_REGION
-ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
+ARG AWS_ACCESS_KEY_ID
+ARG AWS_SECRET_ACCESS_KEY
 
 ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
 ENV SCCACHE_REGION=us-west-2
@@ -18,8 +18,6 @@ ENV SCCACHE_NO_DAEMON=1
 ENV SCCACHE_LOG=debug
 
 RUN rustc --version && sccache --version
-RUN set -x ; echo ${AWS_DEFAULT_REGION}
-RUN set -x ; echo ${AWS_CONTAINER_CREDENTIALS_RELATIVE_URI}
 
 WORKDIR /app
 COPY . /app
