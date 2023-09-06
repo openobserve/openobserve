@@ -11,10 +11,6 @@ FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
 ARG AWS_DEFAULT_REGION
 ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 
-# RUN rustup toolchain install nightly-2023-08-01
-# RUN rustup default nightly-2023-08-01
-# RUN rustup target add x86_64-unknown-linux-gnu
-# RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 # ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
 # ENV SCCACHE_REGION=us-west-2
 # ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/amd64/
@@ -28,10 +24,8 @@ COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 RUN mkdir -p /app/target/release/
 
-RUN --mount=type=cache,target=/root/.cache/sccache du -sh /root/.cache/sccache
 RUN --mount=type=cache,target=/root/.cache/sccache cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu \
-  && sccache --show-stats \
-  && du -sh /root/.cache/sccache
+  && sccache --show-stats
 RUN mv /app/target/x86_64-unknown-linux-gnu/release/openobserve /app/target/release/openobserve
 
 # FROM gcr.io/distroless/cc as runtime
