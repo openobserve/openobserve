@@ -27,8 +27,7 @@ RUN mkdir -p /app/target/release/
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
   CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
-RUN --mount=type=cache,target=/root/.cache/sccache \
-  && cargo build --release --features mimalloc --target aarch64-unknown-linux-gnu \
+RUN --mount=type=cache,target=/root/.cache/sccache cargo build --release --features mimalloc --target aarch64-unknown-linux-gnu \
   && sccache --show-stats
 RUN mv /app/target/aarch64-unknown-linux-gnu/release/openobserve /app/target/release/openobserve
 
