@@ -24,29 +24,29 @@
         :draggable="props.draggable"
       />
     </div>
-    <ChartRender
-      :data="props.data"
-      :selectedTimeDate="props.selectedTimeDate"
+    <PanelSchemaRenderer
+      :panelSchema="props.data"
+      :selectedTimeObj="props.selectedTimeDate"
       :width="props.width"
       :height="props.height"
       :variablesData="props.variablesData"
-    ></ChartRender>
+    ></PanelSchemaRenderer>
   </div>
 </template>
 
 <script  lang="ts">
 import { defineComponent } from "vue";
-import ChartRender from "./addPanel/ChartRender.vue";
 import PanelHeader from "./PanelHeader.vue";
+import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 
 export default defineComponent({
   name: "PanelContainer",
   emits: ["updated:chart", "duplicatePanel"],
   props: ["data", "selectedTimeDate", "draggable","width", "height", "variablesData"],
   components: {
-    ChartRender,
     PanelHeader,
-  },
+    PanelSchemaRenderer
+},
   setup(props) {
     //get props data
     const getPanelDataElement = () => {
@@ -74,6 +74,6 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .plotlycontainer {
-  height: 100%;
+  height: calc(100% - 24px);
 }
 </style>

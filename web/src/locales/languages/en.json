@@ -309,6 +309,7 @@
     "editPanel": "Edit Panel",
     "addPanel": "Add Panel",
     "firstColumn": "First Column",
+    "zAxis" : "Z-Axis",
     "yAxis": "Y-Axis (Columns)",
     "xAxis": "X-Axis (Row)",
     "otherColumn": "Other Columns",

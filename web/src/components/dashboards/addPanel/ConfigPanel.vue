@@ -1,11 +1,26 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http:www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License. 
+-->
+
 <template>
   <div>
-    <q-toggle v-if="dashboardPanelData.data.type != 'table'" v-model="dashboardPanelData.data.config.show_legends"
+    <q-toggle v-if="dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'heatmap'" v-model="dashboardPanelData.data.config.show_legends"
       label="Show Legends" />
 
     <div class="space"></div>
 
-    <q-select v-if="dashboardPanelData.data.type != 'table'" outlined
+    <q-select v-if="dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'heatmap'" outlined
       v-model="dashboardPanelData.data.config.legends_position" :options="legendsPositionOptions" dense
       label="Legends Positions" class="showLabelOnTop" stack-label emit-value
       :display-value="`${dashboardPanelData.data.config.legends_position ?? 'Auto'}`">
@@ -13,7 +28,30 @@
 
     <div class="space"></div>
 
-    <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
+    <q-select outlined
+      v-model="dashboardPanelData.data.config.unit" :options="unitOptions" dense
+      label="Unit" class="showLabelOnTop" stack-label emit-value
+      :display-value="`${dashboardPanelData.data.config.unit ? unitOptions.find(it => it.value == dashboardPanelData.data.config.unit)?.label : 'Default'}`">
+    </q-select>
+    <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
+    <q-input v-if="dashboardPanelData.data.config.unit == 'custom'" v-model="dashboardPanelData.data.config.unit_custom" label="Custom unit" color="input-border"
+    bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label filled dense label-slot/>
+
+    <div class="space"></div>
+
+    <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
+      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
+      <div v-if="promqlMode"  class="q-py-md showLabelOnTop">Query
+    <q-tabs v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows mobile-arrows>
+      <q-tab no-caps v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
+        :label="'Query ' + (index + 1)">
+      </q-tab>
+    </q-tabs>
+  </div>
+    <!-- </q-input> -->
+   <div class="space"></div>
+
+    <q-input v-if="promqlMode" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot>
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
@@ -27,20 +65,12 @@
         </div>
       </template>
     </q-input>
-     <q-select v-if="promqlMode" outlined
-        v-model="dashboardPanelData.data.config.unit" :options="unitOptions" dense
-        label="Unit" class="showLabelOnTop" stack-label emit-value
-        :display-value="`${dashboardPanelData.data.config.unit ? unitOptions.find(it => it.value == dashboardPanelData.data.config.unit)?.label : 'Default'}`">
-      </q-select>
-      <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
-      <q-input v-if="promqlMode && dashboardPanelData.data.config.unit == 'custom'" v-model="dashboardPanelData.data.config.unit_custom" label="Custom unit" color="input-border"
-        bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label filled dense label-slot/>
   </div>
 </template>
 
 <script lang="ts">
 import useDashboardPanelData from '@/composables/useDashboardPanel';
-import { defineComponent } from 'vue';
+import { defineComponent, watch } from 'vue';
 
 export default defineComponent({
   setup() {
