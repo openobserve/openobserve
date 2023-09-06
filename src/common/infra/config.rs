@@ -55,7 +55,8 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const COLUMN_TRACE_ID: &str = "trace_id";
 
-const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 5] = ["log", "message", "msg", "content", "data"];
+const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
+    ["log", "message", "msg", "content", "data", "events", "json"];
 
 pub static SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA: Lazy<Vec<String>> = Lazy::new(|| {
     chain(
