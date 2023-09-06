@@ -334,6 +334,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .short('p')
                         .long("prefix")
                         .value_name("prefix")
+                        .required(false)
                         .help("only migrate specified prefix, default is all"),
                 ),
             clap::Command::new("delete-parquet")
@@ -352,6 +353,8 @@ async fn cli() -> Result<bool, anyhow::Error> {
     if app.subcommand().is_none() {
         return Ok(false);
     }
+
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
     let (name, command) = app.subcommand().unwrap();
     match name {
@@ -408,15 +411,16 @@ async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "migrate-file-list" => {
-            let prefix = command.get_one::<String>("prefix").unwrap();
+            let prefix = match command.get_one::<String>("prefix") {
+                Some(prefix) => prefix.to_string(),
+                None => "".to_string(),
+            };
             println!("Running migration with prefix: {}", prefix);
-            if !prefix.is_empty() {
-                migration::load_file_list_to_dynamo::load(prefix).await?
-            }
+            migration::file_list::load(&prefix).await?
         }
         "migrate-meta" => {
             println!("Running migration");
-            migration::load_meta::load().await?
+            migration::meta::load().await?
         }
         "delete-parquet" => {
             let file = command.get_one::<String>("file").unwrap();
