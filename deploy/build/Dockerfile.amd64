@@ -18,6 +18,8 @@ ENV SCCACHE_NO_DAEMON=1
 ENV SCCACHE_LOG=debug
 
 RUN rustc --version && sccache --version
+RUN set -x ; echo ${AWS_DEFAULT_REGION}
+RUN set -x ; echo ${AWS_CONTAINER_CREDENTIALS_RELATIVE_URI}
 
 WORKDIR /app
 COPY . /app
