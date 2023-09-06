@@ -1,3 +1,4 @@
+use crate::common::infra::config::MAXMIND_DB_CLIENT;
 use actix_web::Error as ActixErr;
 use actix_web::{
     body::MessageBody,
@@ -6,8 +7,17 @@ use actix_web::{
 };
 use actix_web_lab::middleware::Next;
 use ahash::HashMap;
+use maxminddb::geoip2::city::Location;
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
 use uaparser::{Parser, UserAgentParser};
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct GeoInfoData<'a> {
+    pub city: Option<&'a str>,
+    pub country: Option<&'a str>,
+    pub location: Option<Location<'a>>,
+}
 
 /// This is the custom data which is provided by `browser-sdk`
 /// in form of query-parameters.
@@ -22,6 +32,7 @@ impl RumExtraData {
         req: ServiceRequest,
         next: Next<impl MessageBody>,
     ) -> Result<ServiceResponse<impl MessageBody>, ActixErr> {
+        let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
         let mut data =
             web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
         data.retain(|k, _| {
@@ -59,24 +70,56 @@ impl RumExtraData {
                 true => conn_info.realip_remote_addr().unwrap(),
                 false => conn_info.peer_addr().unwrap(),
             };
+
             user_agent_hashmap.insert("ip".into(), ip_address.into());
+
+            let ip: IpAddr = ip_address.parse().unwrap();
+
+            let geo_info = if let Some(client) = &(*maxminddb_client) {
+                if let Ok(city_info) = client.city_reader.lookup::<maxminddb::geoip2::City>(ip) {
+                    let country = city_info
+                        .country
+                        .and_then(|c| c.names.and_then(|map| map.get("en").copied()));
+                    let city = city_info
+                        .city
+                        .and_then(|c| c.names.and_then(|map| map.get("en").copied()));
+
+                    GeoInfoData {
+                        city,
+                        country,
+                        location: city_info.location,
+                    }
+                } else {
+                    GeoInfoData::default()
+                }
+            } else {
+                GeoInfoData::default()
+            };
+
+            user_agent_hashmap.insert(
+                "geo_info".into(),
+                serde_json::to_value(geo_info).unwrap_or_default(),
+            );
         }
 
-        let user_agent = req
-            .headers()
-            .get("User-Agent")
-            .map(|v| v.to_str().unwrap_or(""))
-            .unwrap_or_default();
+        // User-agent parsing
+        {
+            let user_agent = req
+                .headers()
+                .get("User-Agent")
+                .map(|v| v.to_str().unwrap_or(""))
+                .unwrap_or_default();
 
-        let ua_parser = web::Data::<UserAgentParser>::extract(req.request())
-            .await
-            .unwrap();
-        let parsed_user_agent = ua_parser.parse(user_agent);
+            let ua_parser = web::Data::<UserAgentParser>::extract(req.request())
+                .await
+                .unwrap();
+            let parsed_user_agent = ua_parser.parse(user_agent);
 
-        user_agent_hashmap.insert(
-            "user_agent".into(),
-            serde_json::to_value(&parsed_user_agent).unwrap_or_default(),
-        );
+            user_agent_hashmap.insert(
+                "user_agent".into(),
+                serde_json::to_value(parsed_user_agent).unwrap_or_default(),
+            );
+        }
 
         let rum_extracted_data = RumExtraData {
             data: user_agent_hashmap,

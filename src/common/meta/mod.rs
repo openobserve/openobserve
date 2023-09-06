@@ -21,6 +21,7 @@ pub mod dashboards;
 pub mod functions;
 pub mod http;
 pub mod ingestion;
+pub mod maxmind;
 pub mod meta_store;
 pub mod middleware_data;
 pub mod organization;

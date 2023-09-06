@@ -111,6 +111,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .build_from_bytes(USER_AGENT_REGEX_FILE)
             .expect("User Agent Parser creation failed"),
     );
+
     if cli().await? {
         return Ok(());
     }
