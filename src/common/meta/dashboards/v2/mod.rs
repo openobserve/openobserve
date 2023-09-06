@@ -129,11 +129,8 @@ pub struct PanelFilter {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct PanelConfig {
-    title: String,
-    description: String,
     show_legends: bool,
     legends_position: Option<String>,
-    promql_legend: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
