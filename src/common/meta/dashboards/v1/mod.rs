@@ -16,12 +16,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::StreamType;
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct Dashboards {
-    pub dashboards: Vec<Dashboard>,
-}
+use crate::common::meta::StreamType;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

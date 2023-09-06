@@ -15,7 +15,7 @@
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use std::io::Error;
 
-use crate::{common::meta::dashboards::Dashboard, service::dashboards};
+use crate::service::dashboards;
 
 /** CreateDashboard */
 #[utoipa::path(
@@ -44,10 +44,10 @@ use crate::{common::meta::dashboards::Dashboard, service::dashboards};
 #[post("/{org_id}/dashboards")]
 pub async fn create_dashboard(
     path: web::Path<String>,
-    details: web::Json<Dashboard>,
+    body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    dashboards::create_dashboard(&org_id, details.into_inner()).await
+    dashboards::create_dashboard(&org_id, body).await
 }
 
 /// UpdateDashboard
@@ -73,12 +73,9 @@ pub async fn create_dashboard(
     ),
 )]
 #[put("/{org_id}/dashboards/{dashboard_id}")]
-async fn update_dashboard(
-    path: web::Path<(String, String)>,
-    details: web::Json<Dashboard>,
-) -> impl Responder {
+async fn update_dashboard(path: web::Path<(String, String)>, body: web::Bytes) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    dashboards::update_dashboard(&org_id, &dashboard_id, &details.into_inner()).await
+    dashboards::update_dashboard(&org_id, &dashboard_id, body).await
 }
 
 /// ListDashboards
