@@ -23,14 +23,13 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::common::meta::{sql::Sql as MetaSql, stream::StreamParams, StreamType};
-use crate::common::utils::str::find;
 use crate::common::{
     infra::{
-        config::CONFIG,
+        config::{CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA},
         errors::{Error, ErrorCodes},
     },
-    meta::common::FileKey,
+    meta::{common::FileKey, sql::Sql as MetaSql, stream::StreamParams, StreamType},
+    utils::str::find,
 };
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, search::match_source, stream::get_stream_setting_fts_fields};
@@ -366,7 +365,7 @@ impl Sql {
         let match_all_fields = if !fts_fields.is_empty() {
             fts_fields.iter().map(|v| v.to_lowercase()).collect()
         } else {
-            crate::common::utils::stream::SQL_FULL_TEXT_SEARCH_FIELDS
+            SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA
                 .iter()
                 .map(|v| v.to_string())
                 .collect::<String>()
