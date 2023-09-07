@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use sysinfo::SystemExt;
+
 /// Get cpu limit by cgroup or return the node cpu cores
 pub fn get_cpu_limit() -> usize {
     let cpu_num = if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu.max") {
@@ -32,8 +34,9 @@ pub fn get_cpu_limit() -> usize {
     if cpu_num > 0 {
         cpu_num
     } else {
-        let cpu_num = sys_info::cpu_num().expect("Failed to get cpu info");
-        cpu_num as usize
+        let mut system = sysinfo::System::new();
+        system.refresh_cpu();
+        system.cpus().len()
     }
 }
 
@@ -51,7 +54,8 @@ pub fn get_memory_limit() -> usize {
     if mem_size > 0 {
         mem_size
     } else {
-        let meminfo = sys_info::mem_info().expect("Failed to get memory info");
-        meminfo.total as usize * 1024 // the meminfo.total is in KB
+        let mut system = sysinfo::System::new();
+        system.refresh_memory();
+        system.total_memory() as usize
     }
 }

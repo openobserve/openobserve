@@ -80,7 +80,6 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        let start = std::time::Instant::now();
         let orgs = db::schema::list_organizations_from_cache();
         for org_id in orgs {
             let ret = infra_file_list::get_stream_stats(&org_id, None, None).await;
@@ -100,9 +99,5 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
             }
             time::sleep(time::Duration::from_millis(100)).await;
         }
-        log::info!(
-            "[STATS] cache stream stats in {}s",
-            start.elapsed().as_secs()
-        );
     }
 }

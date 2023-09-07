@@ -21,7 +21,8 @@ use itertools::chain;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use reqwest::Client;
-use std::{sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc, time::Duration};
+use sysinfo::{DiskExt, SystemExt};
 use vector_enrichment::TableRegistry;
 
 use crate::common::{
@@ -373,7 +374,7 @@ pub struct MemoryCache {
 pub struct DiskCache {
     #[env_config(name = "ZO_DISK_CACHE_ENABLED", default = true)]
     pub enabled: bool,
-    // MB, default is 50% of local volume and maximum 100GB
+    // MB, default is 50% of local volume available space and maximum 100GB
     #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
     // MB, will skip the cache when a query need cache great than this value, default is 80% of max_size
@@ -520,6 +521,11 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
+    // check data path config
+    if let Err(e) = check_path_config(&mut cfg) {
+        panic!("data path config error: {e}");
+    }
+
     // check memeory cache
     if let Err(e) = check_memory_cache_config(&mut cfg) {
         panic!("memory cache config error: {e}");
@@ -528,11 +534,6 @@ pub fn init() -> Config {
     // check disk cache
     if let Err(e) = check_disk_cache_config(&mut cfg) {
         panic!("disk cache config error: {e}");
-    }
-
-    // check data path config
-    if let Err(e) = check_path_config(&mut cfg) {
-        panic!("data path config error: {e}");
     }
 
     // check etcd config
@@ -570,7 +571,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
-        cfg.common.instance_name = sys_info::hostname().unwrap();
+        cfg.common.instance_name = sysinfo::System::new().host_name().unwrap();
     }
 
     // HACK for tracing, always disable tracing except ingester and querier
@@ -746,11 +747,33 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    let disk_info = sys_info::disk_info()?;
-    cfg.limit.disk_total = disk_info.total as usize;
-    cfg.limit.disk_free = disk_info.free as usize;
+    let mut system = sysinfo::System::new();
+    system.refresh_disks_list();
+    let mut disks: Vec<(&str, u64, u64)> = system
+        .disks()
+        .iter()
+        .map(|d| {
+            (
+                d.mount_point().to_str().unwrap(),
+                d.total_space(),
+                d.available_space(),
+            )
+        })
+        .collect();
+    disks.sort_by(|a, b| b.0.cmp(a.0));
+    let cache_dir = Path::new(&cfg.common.data_cache_dir)
+        .canonicalize()
+        .unwrap();
+    let cache_dir = cache_dir.to_str().unwrap();
+    let disk = disks.iter().find(|d| cache_dir.starts_with(d.0));
+    let (disk_total, disk_free) = match disk {
+        Some(d) => (d.1, d.2),
+        None => (0, 0),
+    };
+    cfg.limit.disk_total = disk_total as usize;
+    cfg.limit.disk_free = disk_free as usize;
     if cfg.disk_cache.max_size == 0 {
-        cfg.disk_cache.max_size = disk_info.free as usize / 2; // 50%
+        cfg.disk_cache.max_size = cfg.limit.disk_free / 2; // 50%
         if cfg.disk_cache.max_size > 1024 * 1024 * 1024 * 100 {
             cfg.disk_cache.max_size = 1024 * 1024 * 1024 * 100; // 100GB
         }
