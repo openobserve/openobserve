@@ -112,8 +112,8 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     stats.insert(
         "FILE_DATA",
         json::json!({
-            "memory":{"cache_files":mem_file_num, "cache_limit":mem_max_size,"mem_size": mem_cur_size},
-            "disk":{"cache_files":disk_file_num, "cache_limit":disk_max_size,"disk_size": disk_cur_size}
+            "memory":{"cache_files":mem_file_num, "cache_limit":mem_max_size,"cache_bytes": mem_cur_size},
+            "disk":{"cache_files":disk_file_num, "cache_limit":disk_max_size,"cache_bytes": disk_cur_size}
         }),
     );
 
