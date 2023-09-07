@@ -15,14 +15,12 @@
 use thiserror::Error as ThisError;
 
 pub mod file_list;
-pub mod memory; // fsm: File system with memory cache
-pub mod nocache; // fsn: File system without memory cahce
+pub mod memory;
 pub mod tmpfs;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StorageType {
-    FsMemory,  // fsm
-    FsNoCache, // fsn
+    Memory,
     Tmpfs,
 }
 

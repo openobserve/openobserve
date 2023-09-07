@@ -963,13 +963,9 @@ pub fn create_session_config() -> SessionConfig {
 pub fn create_runtime_env() -> Result<RuntimeEnv> {
     let object_store_registry = DefaultObjectStoreRegistry::new();
 
-    let fsm = super::storage::memory::FS::new();
-    let fsm_url = url::Url::parse("fsm:///").unwrap();
-    object_store_registry.register_store(&fsm_url, Arc::new(fsm));
-
-    let fsn = super::storage::nocache::FS::new();
-    let fsn_url = url::Url::parse("fsn:///").unwrap();
-    object_store_registry.register_store(&fsn_url, Arc::new(fsn));
+    let memory = super::storage::memory::FS::new();
+    let memory_url = url::Url::parse("memory:///").unwrap();
+    object_store_registry.register_store(&memory_url, Arc::new(memory));
 
     let tmpfs = super::storage::tmpfs::Tmpfs::new();
     let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
@@ -1047,12 +1043,9 @@ pub async fn register_table(
         }
     };
 
-    let prefix = if session.storage_type.eq(&StorageType::FsMemory) {
+    let prefix = if session.storage_type.eq(&StorageType::Memory) {
         file_list::set(&session.id, files).await;
-        format!("fsm:///{}/", session.id)
-    } else if session.storage_type.eq(&StorageType::FsNoCache) {
-        file_list::set(&session.id, files).await;
-        format!("fsn:///{}/", session.id)
+        format!("memory:///{}/", session.id)
     } else if session.storage_type.eq(&StorageType::Tmpfs) {
         format!("tmpfs:///{}/", session.id)
     } else {

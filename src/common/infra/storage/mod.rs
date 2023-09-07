@@ -27,6 +27,7 @@ pub mod remote;
 pub const CONCURRENT_REQUESTS: usize = 1000;
 
 pub static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
+pub static LOCAL_CACHE: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_cache);
 
 fn default() -> Box<dyn ObjectStore> {
     if is_local_disk_storage() {
@@ -36,6 +37,11 @@ fn default() -> Box<dyn ObjectStore> {
     } else {
         Box::<remote::Remote>::default()
     }
+}
+
+fn local_cache() -> Box<dyn ObjectStore> {
+    std::fs::create_dir_all(&CONFIG.common.data_cache_dir).expect("create cache dir success");
+    Box::new(local::Local::new(&CONFIG.common.data_cache_dir))
 }
 
 pub async fn list(prefix: &str) -> Result<Vec<String>, anyhow::Error> {

@@ -29,11 +29,17 @@ pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
 }
 
+impl Local {
+    pub fn new(root_dir: &str) -> Self {
+        Self {
+            client: LimitStore::new(init_client(root_dir), CONCURRENT_REQUESTS),
+        }
+    }
+}
+
 impl Default for Local {
     fn default() -> Self {
-        Self {
-            client: LimitStore::new(init_client(), CONCURRENT_REQUESTS),
-        }
+        Local::new(&CONFIG.common.data_stream_dir)
     }
 }
 
@@ -205,13 +211,9 @@ impl ObjectStore for Local {
     }
 }
 
-fn init_client() -> Box<dyn object_store::ObjectStore> {
+fn init_client(root_dir: &str) -> Box<dyn object_store::ObjectStore> {
     Box::new(
-        LocalFileSystem::new_with_prefix(
-            std::path::Path::new(&CONFIG.common.data_stream_dir)
-                .to_str()
-                .unwrap(),
-        )
-        .unwrap(),
+        LocalFileSystem::new_with_prefix(std::path::Path::new(root_dir).to_str().unwrap())
+            .expect("Error creating local file system"),
     )
 }

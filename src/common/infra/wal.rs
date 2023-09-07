@@ -63,9 +63,10 @@ pub struct RwFile {
     expired: i64,
 }
 
-pub fn init() {
+pub fn init() -> Result<(), anyhow::Error> {
     _ = MANAGER.data.len();
     _ = MEMORY_FILES.list().len();
+    Ok(())
 }
 
 pub fn get_or_create(

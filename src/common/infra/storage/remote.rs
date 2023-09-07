@@ -90,6 +90,7 @@ impl ObjectStore for Remote {
     }
 
     async fn get(&self, location: &Path) -> Result<GetResult> {
+        log::info!("storage->s3 get: {}", location.to_string());
         let start = std::time::Instant::now();
         let file = location.to_string();
         let result = self.client.get(&(format_key(&file).into())).await?;
@@ -115,6 +116,11 @@ impl ObjectStore for Remote {
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+        log::info!(
+            "storage->s3 get_opts: {}, opts: {:?}",
+            location.to_string(),
+            &options
+        );
         let start = std::time::Instant::now();
         let file = location.to_string();
         let result = self
@@ -143,6 +149,11 @@ impl ObjectStore for Remote {
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+        log::info!(
+            "storage->s3 get_range: {}, range: {:?}",
+            location.to_string(),
+            range
+        );
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data = self
