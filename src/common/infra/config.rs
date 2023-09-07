@@ -762,6 +762,8 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         })
         .collect();
     disks.sort_by(|a, b| b.0.cmp(a.0));
+
+    std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
     let cache_dir = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
         .unwrap();
