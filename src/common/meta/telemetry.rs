@@ -19,8 +19,6 @@ use sysinfo::SystemExt;
 use crate::common::infra::{cache::stats, config::*};
 use crate::common::utils::json;
 
-const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
-
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {
     pub instance_id: String,

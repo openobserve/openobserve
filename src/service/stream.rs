@@ -20,7 +20,8 @@ use crate::common::{
     infra::{
         cache::stats,
         config::{
-            is_local_disk_storage, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA, STREAM_SCHEMAS,
+            is_local_disk_storage, CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA,
+            STREAM_SCHEMAS,
         },
     },
     meta::{
@@ -37,7 +38,6 @@ use crate::service::{db, metrics::get_prom_metadata_from_schema, search as Searc
 
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
-const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 
 pub async fn get_stream(
     org_id: &str,
