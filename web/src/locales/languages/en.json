@@ -96,7 +96,7 @@
     "ok": "Ok",
     "updatenotallowed": "Update not allowed for owner",
     "sendInvite": "Send Invite",
-    "inviteByEmail": "Invite by email. Multiple emails seperated by semicolon(;)",
+    "inviteByEmail": "Invite by email. Multiple emails seperated by semicolon(;) or comma(,)",
     "inviteByEmailHint": "You'll be charged a prorated amount for adding a member.",
     "admin": "admin",
     "member": "member",
