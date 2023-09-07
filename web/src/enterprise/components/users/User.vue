@@ -306,6 +306,7 @@ export default defineComponent({
     const inviteUser = () => {
       const emailArray = userEmail.value
         .split(";")
+        .split(",")
         .filter((email: any) => email)
         .map((email: any) => email.trim());
       const validationArray = emailArray.map((email: any) =>
