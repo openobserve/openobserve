@@ -84,6 +84,7 @@ const defaultObject = {
     showHistogram: true,
     showDetailTab: false,
     toggleFunction: true,
+    histogramDirtyFlag: false,
     sqlMode: false,
     resultGrid: {
       wrapCells: false,
@@ -366,8 +367,8 @@ const useLogs = () => {
       const timestamps: any =
         searchObj.data.datetime.type === "relative"
           ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod
-            )
+            searchObj.data.datetime.relativeTimePeriod
+          )
           : cloneDeep(searchObj.data.datetime);
 
       if (
@@ -497,8 +498,19 @@ const useLogs = () => {
         // console.log(unparsedSQL);
       }
 
-      if (searchObj.data.resultGrid.currentPage > 0) {
+      if (
+        searchObj.data.resultGrid.currentPage > 0 ||
+        searchObj.meta.showHistogram === false
+      ) {
         delete req.aggs;
+
+        if (searchObj.meta.showHistogram === false) {
+          // delete searchObj.data.histogram;
+          searchObj.data.histogram = { xData: [], yData: [], chartParams: {} };
+          searchObj.meta.histogramDirtyFlag = true;
+        } else {
+          searchObj.meta.histogramDirtyFlag = false;
+        }
       }
 
       if (store.state.zoConfig.sql_base64_enabled) {
@@ -522,7 +534,7 @@ const useLogs = () => {
 
   const getQueryData = (isPagination = false) => {
     return new Promise((resolve, reject) => {
-      let dismiss = () => {};
+      let dismiss = () => { };
       try {
         searchObj.meta.showDetailTab = false;
 
@@ -713,7 +725,7 @@ const useLogs = () => {
           : {};
       const logFieldSelectedValue =
         logFilterField[
-          `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
+        `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
         ];
       const selectedFields = (logFilterField && logFieldSelectedValue) || [];
       if (

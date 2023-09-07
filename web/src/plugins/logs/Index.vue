@@ -297,6 +297,7 @@ export default defineComponent({
       loadLogsData,
       updateStreams,
       restoreUrlQueryParams,
+      handleRunQuery,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -471,6 +472,7 @@ export default defineComponent({
       updateUrlQueryParams,
       refreshHistogramChart,
       onChangeInterval,
+      handleRunQuery,
     };
   },
   computed: {
@@ -528,13 +530,17 @@ export default defineComponent({
         : 0;
     },
     showHistogram() {
-      if (
-        this.searchObj.meta.showHistogram == true &&
-        this.searchObj.meta.sqlMode == false
-      ) {
-        setTimeout(() => {
-          if (this.searchResultRef) this.searchResultRef.reDrawChart();
-        }, 100);
+      if (this.searchObj.meta.showHistogram == true) {
+        if (this.searchObj.meta.sqlMode == false) {
+          setTimeout(() => {
+            if (this.searchResultRef) this.searchResultRef.reDrawChart();
+          }, 100);
+        }
+
+        if (this.searchObj.meta.histogramDirtyFlag == true) {
+          this.searchObj.meta.histogramDirtyFlag = false;
+          this.handleRunQuery();
+        }
       }
     },
     moveSplitter() {
