@@ -12,23 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod cache;
-pub mod cluster;
-pub mod config;
-pub mod db;
-pub mod dist_lock;
-pub mod errors;
-pub mod file_list;
-pub mod ider;
-pub mod metrics;
-pub mod storage;
-pub mod wal;
+pub mod disk;
+pub mod memory;
 
-pub async fn init() -> Result<(), anyhow::Error> {
-    ider::init()?;
-    wal::init()?;
-    cache::init()?;
-    // init db
-    db::create_table().await?;
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum CacheType {
+    Disk,
+    Memory,
+    None,
+}
+
+pub fn init() -> Result<(), anyhow::Error> {
+    disk::init()?;
+    memory::init()?;
     Ok(())
 }

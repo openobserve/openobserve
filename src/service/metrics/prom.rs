@@ -71,7 +71,7 @@ pub async fn remote_write(
     let mut last_received: i64 = 0;
     let mut has_entry = false;
     let mut accept_record = false;
-    let mut cluster_name: String = String::new();
+    let mut cluster_name = String::new();
     let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -111,13 +111,13 @@ pub async fn remote_write(
 
     // parse timeseries
     let mut first_line = true;
-    for event in request.timeseries {
+    for mut event in request.timeseries {
         // get labels
         let mut replica_label = String::new();
 
         let labels: FxIndexMap<String, String> = event
             .labels
-            .iter()
+            .drain(..)
             .filter(|label| {
                 if label.name == CONFIG.prom.ha_replica_label {
                     if !has_entry {
@@ -133,7 +133,7 @@ pub async fn remote_write(
                     true
                 }
             })
-            .map(|label| (label.name.clone(), label.value.clone()))
+            .map(|label| (label.name, label.value))
             .collect();
 
         let metric_name = match labels.get(NAME_LABEL) {
@@ -810,7 +810,7 @@ async fn prom_ha_handler(
 
     let mut lock = METRIC_CLUSTER_MAP.write().await;
     let replica_list = lock.entry(cluster_name.to_owned()).or_default();
-    let replica_list_db = if !replica_list.contains(&replica_label.to_string()) {
+    let replica_list_db = if !replica_list.contains(&replica_label.to_owned()) {
         replica_list.push(replica_label.to_owned());
         replica_list.clone()
     } else {
@@ -819,16 +819,8 @@ async fn prom_ha_handler(
     drop(lock);
 
     if !replica_list_db.is_empty() {
-        let _ = db::metrics::set_prom_cluster_info(cluster_name, &replica_list_db.to_vec()).await;
+        let _ = db::metrics::set_prom_cluster_info(cluster_name, &replica_list_db).await;
     }
 
     _accept_record
-}
-
-// binary_search_by_key works on sorted slice , since it is not , it fails to return __replica__ label value , hence commenting out
-fn _labels_value(labels: &[prometheus::Label], name: &str) -> Option<String> {
-    labels
-        .binary_search_by_key(&name, |label| label.name.as_str())
-        .ok()
-        .map(|index| labels[index].value.clone())
 }

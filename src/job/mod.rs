@@ -18,7 +18,7 @@ use crate::common::{
     infra::{
         cluster,
         config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
-        db as infra_db, file_list as infra_file_list, ider,
+        file_list as infra_file_list, ider,
     },
     meta::{organization::DEFAULT_ORG, user::UserRequest},
     utils::file::clean_empty_dirs,
@@ -36,9 +36,6 @@ pub(crate) mod syslog_server;
 mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    // init db
-    infra_db::create_table().await?;
-
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
     )

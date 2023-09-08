@@ -18,13 +18,18 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::common::meta::usage::{STATS_STREAM, USAGE_STREAM};
-use crate::common::utils::json;
 use crate::common::{
-    infra::{config::CONFIG, metrics},
-    meta::{
-        usage::{AggregatedData, GroupKey, RequestStats, UsageData, UsageEvent, UsageType},
-        StreamType,
+    meta::usage::{STATS_STREAM, USAGE_STREAM},
+    utils::json,
+    {
+        infra::{
+            config::{CONFIG, SIZE_IN_MB},
+            metrics,
+        },
+        meta::{
+            usage::{AggregatedData, GroupKey, RequestStats, UsageData, UsageEvent, UsageType},
+            StreamType,
+        },
     },
 };
 use crate::handler::grpc::cluster_rpc;
@@ -48,7 +53,7 @@ pub async fn report_request_usage_stats(
         .inc_by(stats.records as u64);
     metrics::INGEST_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-        .inc_by(stats.size as u64);
+        .inc_by((stats.size * SIZE_IN_MB) as u64);
     let event: UsageEvent = usage_type.into();
 
     if !CONFIG.common.usage_enabled {

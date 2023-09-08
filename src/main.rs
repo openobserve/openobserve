@@ -39,9 +39,9 @@ use tracing_subscriber::{prelude::*, Registry};
 
 use openobserve::{
     common::infra::{
-        cluster,
+        self, cluster,
         config::{CONFIG, USERS, VERSION},
-        ider, metrics, wal,
+        metrics, wal,
     },
     common::meta,
     common::migration,
@@ -115,9 +115,11 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
-        "System info: CPU cores {}, MEM total {} MB",
+        "System info: CPU cores {}, MEM total {} MB, Disk total {} GB, free {} GB",
         CONFIG.limit.cpu_num,
-        CONFIG.limit.mem_total / 1024 / 1024
+        CONFIG.limit.mem_total / 1024 / 1024,
+        CONFIG.limit.disk_total / 1024 / 1024 / 1024,
+        CONFIG.limit.disk_free / 1024 / 1024 / 1024,
     );
 
     // init jobs
@@ -125,10 +127,8 @@ async fn main() -> Result<(), anyhow::Error> {
     cluster::register_and_keepalive()
         .await
         .expect("cluster init failed");
-    // init ider
-    ider::init();
-    // init wal
-    wal::init();
+    // init infra
+    infra::init().await.expect("infra init failed");
     // init job
     job::init().await.expect("job init failed");
 

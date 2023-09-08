@@ -160,21 +160,24 @@ pub static INGEST_WAL_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// querier stats
-pub static QUERY_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+// querier memory cache stats
+pub static QUERY_MEMORY_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
-        Opts::new("query_cache_limit_bytes", "Querier cache limit bytes")
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
+        Opts::new(
+            "query_memory_cache_limit_bytes",
+            "Querier memory cache limit bytes",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
         &[],
     )
     .expect("Metric created")
 });
-pub static QUERY_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static QUERY_MEMORY_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
-            "query_cache_used_bytes",
-            "Querier cache used bytes. ".to_owned() + HELP_SUFFIX,
+            "query_memory_cache_used_bytes",
+            "Querier memory cache used bytes. ".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -182,11 +185,11 @@ pub static QUERY_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-pub static QUERY_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static QUERY_MEMORY_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
-            "query_cache_files",
-            "Querier cached files. ".to_owned() + HELP_SUFFIX,
+            "query_memory_cache_files",
+            "Querier memory cached files. ".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -194,11 +197,37 @@ pub static QUERY_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-pub static QUERY_CACHE_RECORDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+
+// querier disk cache stats
+pub static QUERY_DISK_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
-            "query_cache_records",
-            "Querier cached records. ".to_owned() + HELP_SUFFIX,
+            "query_disk_cache_limit_bytes",
+            "Querier disk cache limit bytes",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_DISK_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_disk_cache_used_bytes",
+            "Querier diskcache used bytes. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream", "stream_type"],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_DISK_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_disk_cache_files",
+            "Querier disk cached files. ".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -475,16 +504,22 @@ fn register_metrics(registry: &Registry) {
 
     // querier stats
     registry
-        .register(Box::new(QUERY_CACHE_LIMIT_BYTES.clone()))
+        .register(Box::new(QUERY_MEMORY_CACHE_LIMIT_BYTES.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(QUERY_CACHE_USED_BYTES.clone()))
+        .register(Box::new(QUERY_MEMORY_CACHE_USED_BYTES.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(QUERY_CACHE_FILES.clone()))
+        .register(Box::new(QUERY_MEMORY_CACHE_FILES.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(QUERY_CACHE_RECORDS.clone()))
+        .register(Box::new(QUERY_DISK_CACHE_LIMIT_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_DISK_CACHE_USED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_DISK_CACHE_FILES.clone()))
         .expect("Metric registered");
 
     // compactor stats

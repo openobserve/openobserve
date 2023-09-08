@@ -14,6 +14,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::common::infra::config::SIZE_IN_MB;
+
 use super::{common::FileMeta, StreamType};
 
 pub const USAGE_STREAM: &str = "usage";
@@ -188,11 +190,11 @@ impl Default for RequestStats {
 impl From<FileMeta> for RequestStats {
     fn from(meta: FileMeta) -> RequestStats {
         RequestStats {
-            size: meta.original_size as f64 / (1024.0 * 1024.0),
+            size: meta.original_size as f64 / SIZE_IN_MB,
             records: meta.records,
             response_time: 0.0,
             request_body: None,
-            compressed_size: Some(meta.compressed_size as f64 / (1024.0 * 1024.0)),
+            compressed_size: Some(meta.compressed_size as f64 / SIZE_IN_MB),
             min_ts: Some(meta.min_ts),
             max_ts: Some(meta.max_ts),
         }

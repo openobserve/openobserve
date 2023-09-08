@@ -14,11 +14,10 @@
 
 use segment::{message::Track, Client, Message};
 use std::collections::HashMap;
+use sysinfo::SystemExt;
 
 use crate::common::infra::{cache::stats, config::*};
 use crate::common::utils::json;
-
-const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {
@@ -90,24 +89,12 @@ impl Telemetry {
 }
 
 pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String, json::Value> {
-    data.insert("cpu_count".to_string(), sys_info::cpu_num().unwrap().into());
-    data.insert(
-        "total_memory".to_string(),
-        sys_info::mem_info().unwrap().total.into(),
-    );
-    data.insert(
-        "free_memory".to_string(),
-        sys_info::mem_info().unwrap().free.into(),
-    );
-    data.insert(
-        "avail_memory".to_string(),
-        sys_info::mem_info().unwrap().avail.into(),
-    );
-    data.insert("os".to_string(), sys_info::os_type().unwrap().into());
-    data.insert(
-        "os_release".to_string(),
-        sys_info::os_release().unwrap().into(),
-    );
+    let system = sysinfo::System::new_all();
+    data.insert("cpu_count".to_string(), system.cpus().len().into());
+    data.insert("total_memory".to_string(), system.total_memory().into());
+    data.insert("free_memory".to_string(), system.free_memory().into());
+    data.insert("os".to_string(), system.name().into());
+    data.insert("os_release".to_string(), system.os_version().into());
     data.insert(
         "time_zone".to_string(),
         chrono::Local::now().offset().local_minus_utc().into(),

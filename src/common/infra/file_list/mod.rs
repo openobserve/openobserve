@@ -91,8 +91,6 @@ pub trait FileList: Sync + Send + 'static {
 }
 
 pub async fn create_table() -> Result<()> {
-    // check cache dir
-    std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
     match CONFIG.common.meta_store.as_str().into() {
         MetaStore::Sled => sqlite::create_table().await,
         MetaStore::Sqlite => sqlite::create_table().await,
