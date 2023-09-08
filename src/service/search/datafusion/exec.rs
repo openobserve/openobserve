@@ -205,6 +205,11 @@ async fn exec_query(
         };
     }
 
+    println!("fast_mode: {}", fast_mode);
+    println!("field_fns: {:?}", field_fns);
+    println!("sql_parts: {:?}", sql_parts);
+    println!("sql.query_fn: {:?}", sql.query_fn);
+
     // query
     let query = if !&sql.query_context.is_empty() {
         sql.query_context.replace(&sql.stream_name, "tbl").clone()
