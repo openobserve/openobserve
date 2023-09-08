@@ -15,12 +15,15 @@
 use datafusion::arrow::datatypes::Schema;
 
 use crate::common;
-use crate::common::meta::prom::{Metadata, METADATA_LABEL};
+use crate::common::infra::config::CONFIG;
+use crate::common::meta::prom::{Metadata, METADATA_LABEL, VALUE_LABEL};
 
 pub mod json;
 pub mod otlp_grpc;
 pub mod otlp_http;
 pub mod prom;
+
+const EXCLUDE_LABELS: [&str; 5] = [VALUE_LABEL, "start_time", "is_monotonic", "exemplars", "le"];
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
@@ -56,4 +59,10 @@ pub fn signature_without_labels(
         hasher.update(value.as_bytes());
     });
     Signature(hasher.finalize().into())
+}
+
+fn get_exclude_labels() -> Vec<&'static str> {
+    let mut vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
+    vec.push(&CONFIG.common.column_timestamp);
+    vec
 }

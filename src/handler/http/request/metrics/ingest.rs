@@ -18,7 +18,7 @@ use std::io::Error;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
 use crate::service::metrics::otlp_http::{metrics_json_handler, metrics_proto_handler};
-use crate::service::metrics::{self, otlp_grpc};
+use crate::service::metrics::{self};
 
 /** _json ingestion API */
 #[utoipa::path(

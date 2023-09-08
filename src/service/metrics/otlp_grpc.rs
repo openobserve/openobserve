@@ -38,7 +38,7 @@ use crate::{
         usage::report_request_usage_stats,
     },
 };
-use actix_web::{http, web, HttpResponse};
+use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::Utc;
@@ -51,7 +51,7 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
-const EXCLUDE_LABELS: [&str; 5] = [VALUE_LABEL, "start_time", "is_monotonic", "exemplars", "le"];
+use super::get_exclude_labels;
 
 pub async fn handle_grpc_request(
     org_id: &str,
@@ -403,22 +403,17 @@ fn process_sum(
     process_aggregation_temporality(rec, sum.aggregation_temporality);
     rec["is_monotonic"] = sum.is_monotonic.into();
     for data_point in &sum.data_points {
-        process_data_point(rec, data_point);
-        let val_map = rec.as_object_mut().unwrap();
+        let mut dp_rec = rec.clone();
+        process_data_point(&mut dp_rec, data_point);
+        let val_map = dp_rec.as_object_mut().unwrap();
 
         let vec: Vec<&str> = get_exclude_labels();
 
         let hash = super::signature_without_labels(val_map, &vec);
         val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
-        records.push(rec.clone());
+        records.push(dp_rec.clone());
     }
     records
-}
-
-fn get_exclude_labels() -> Vec<&'static str> {
-    let mut vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
-    vec.push(&CONFIG.common.column_timestamp);
-    vec
 }
 
 fn process_histogram(
@@ -437,7 +432,8 @@ fn process_histogram(
     let mut records = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
     for data_point in &hist.data_points {
-        for mut bucket_rec in process_hist_data_point(rec, data_point) {
+        let mut dp_rec = rec.clone();
+        for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let vec: Vec<&str> = get_exclude_labels();
             let hash = super::signature_without_labels(val_map, &vec);
@@ -463,7 +459,8 @@ fn process_exponential_histogram(
     let mut records = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
     for data_point in &hist.data_points {
-        for mut bucket_rec in process_exp_hist_data_point(rec, data_point) {
+        let mut dp_rec = rec.clone();
+        for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let vec: Vec<&str> = get_exclude_labels();
             let hash = super::signature_without_labels(val_map, &vec);
@@ -489,7 +486,8 @@ fn process_summary(
 
     let mut records = vec![];
     for data_point in &summary.data_points {
-        for mut bucket_rec in process_summary_data_point(rec, data_point) {
+        let mut dp_rec = rec.clone();
+        for mut bucket_rec in process_summary_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let vec: Vec<&str> = get_exclude_labels();
             let hash = super::signature_without_labels(val_map, &vec);
