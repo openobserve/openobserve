@@ -45,7 +45,7 @@ impl LogsService for LogsServer {
             return Err(Status::invalid_argument(msg));
         }
 
-        let resp = crate::service::logs::otlp::handle_grpc_request(
+        let resp = crate::service::logs::otlp_grpc::handle_grpc_request(
             org_id.unwrap().to_str().unwrap(),
             0,
             in_req,

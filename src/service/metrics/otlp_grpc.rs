@@ -708,23 +708,3 @@ fn process_aggregation_temporality(rec: &mut json::Value, val: i32) {
     }
     .into();
 }
-
-pub async fn metrics_proto_handler(
-    org_id: &str,
-    thread_id: usize,
-    body: web::Bytes,
-) -> Result<HttpResponse, std::io::Error> {
-    let request = ExportMetricsServiceRequest::decode(body).expect("Invalid protobuf");
-    match handle_grpc_request(org_id, thread_id, request, false).await {
-        Ok(res) => Ok(res),
-        Err(e) => {
-            log::error!("error while handling request: {}", e);
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            )
-        }
-    }
-}

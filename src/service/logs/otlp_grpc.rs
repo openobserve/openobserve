@@ -218,7 +218,7 @@ pub async fn handle_grpc_request(
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
-            "Quota exceeded for this organisation".to_string(),
+            "Quota exceeded for this organization".to_string(),
         )));
     }
     let start = std::time::Instant::now();
@@ -429,7 +429,7 @@ pub mod test {
     use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
     use opentelemetry_proto::tonic::{common::v1::AnyValue, logs::v1::LogRecord};
 
-    use crate::service::logs::otlp::handle_grpc_request;
+    use crate::service::logs::otlp_grpc::handle_grpc_request;
 
     #[tokio::test]
     async fn test_handle_logs_request() {
@@ -486,25 +486,5 @@ pub mod test {
 
         let result = handle_grpc_request(org_id, thread_id, request, true).await;
         assert!(result.is_ok());
-    }
-}
-
-pub async fn logs_proto_handler(
-    org_id: &str,
-    thread_id: usize,
-    body: web::Bytes,
-) -> Result<HttpResponse, std::io::Error> {
-    let request = ExportLogsServiceRequest::decode(body).expect("Invalid protobuf");
-    match handle_grpc_request(org_id, thread_id, request, false).await {
-        Ok(res) => Ok(res),
-        Err(e) => {
-            log::error!("error while handling request: {}", e);
-            Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            )
-        }
     }
 }

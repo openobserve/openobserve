@@ -17,7 +17,8 @@ use std::io::Error;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
-use crate::service::metrics::{self, otlp};
+use crate::service::metrics::otlp_http::{metrics_json_handler, metrics_proto_handler};
+use crate::service::metrics::{self, otlp_grpc};
 
 /** _json ingestion API */
 #[utoipa::path(
@@ -76,10 +77,10 @@ pub async fn otlp_metrics_write(
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type.eq(CONTENT_TYPE_PROTO) {
         log::info!("otlp::metrics_proto_handler");
-        otlp::metrics_proto_handler(&org_id, **thread_id, body).await
+        metrics_proto_handler(&org_id, **thread_id, body).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        Ok(HttpResponse::Ok().into())
-        //otlp_http::traces_json(&org_id, **thread_id, body).await
+        log::info!("otlp::metrics_json_handler");
+        metrics_json_handler(&org_id, **thread_id, body).await
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),

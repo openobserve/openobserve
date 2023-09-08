@@ -330,6 +330,22 @@ pub fn write_file(
     req_stats
 }
 
+pub fn get_value(value: &Value) -> String {
+    if value.is_boolean() {
+        value.as_bool().unwrap().to_string()
+    } else if value.is_f64() {
+        value.as_f64().unwrap().to_string()
+    } else if value.is_i64() {
+        value.as_i64().unwrap().to_string()
+    } else if value.is_u64() {
+        value.as_u64().unwrap().to_string()
+    } else if value.is_string() {
+        value.as_str().unwrap().to_string()
+    } else {
+        "".to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
