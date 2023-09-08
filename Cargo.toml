@@ -142,7 +142,7 @@ sqlx = { version = "0.7", features = [
   "chrono",
 ] }
 strum = { version = "0.24", features = ["derive"] }
-sys-info = "0.9"
+sysinfo = "0.29"
 syslog_loose = "0.18.0"
 thiserror = "1.0"
 time = "0.3"

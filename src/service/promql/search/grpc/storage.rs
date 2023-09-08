@@ -21,7 +21,10 @@ use datafusion::{
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 
-use crate::common::infra::{cache::file_data, config::CONFIG};
+use crate::common::infra::{
+    cache::file_data,
+    config::{is_local_disk_storage, CONFIG},
+};
 use crate::common::meta::{
     common::FileKey,
     search::Session as SearchSession,
@@ -104,27 +107,16 @@ pub(crate) async fn create_context(
         scan_stats.compressed_size
     );
 
-    // if scan_compressed_size > 80% of total memory cache, skip memory cache
-    let storage_type = if !CONFIG.memory_cache.enabled
-        || scan_stats.compressed_size > CONFIG.memory_cache.skip_size as i64
-    {
-        StorageType::FsNoCache
-    } else {
-        StorageType::FsMemory
-    };
-
     // load files to local cache
-    if storage_type == StorageType::FsMemory {
-        let deleted_files = cache_parquet_files(&files).await?;
-        if !deleted_files.is_empty() {
-            // remove deleted files
-            files.retain(|f| !deleted_files.contains(&f.key));
-        }
-        log::info!(
-            "promql->search->storage: load files {}, into memory cache done",
-            scan_stats.files
-        );
+    let deleted_files = cache_parquet_files(&files, &scan_stats).await?;
+    if !deleted_files.is_empty() {
+        // remove deleted files
+        files.retain(|f| !deleted_files.contains(&f.key));
     }
+    log::info!(
+        "promql->search->storage: load files {}, into memory cache done",
+        scan_stats.files
+    );
 
     let schema = Arc::new(
         schema
@@ -134,7 +126,7 @@ pub(crate) async fn create_context(
 
     let session = SearchSession {
         id: session_id.to_string(),
-        storage_type,
+        storage_type: StorageType::Memory,
     };
 
     let ctx = register_table(
@@ -199,28 +191,56 @@ async fn get_file_list(
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:cache_parquet_files", skip_all)]
-async fn cache_parquet_files(files: &[FileKey]) -> Result<Vec<String>> {
+async fn cache_parquet_files(files: &[FileKey], scan_stats: &ScanStats) -> Result<Vec<String>> {
+    let cache_type = if CONFIG.memory_cache.enabled
+        && scan_stats.compressed_size < CONFIG.memory_cache.skip_size as i64
+    {
+        // if scan_compressed_size < 80% of total memory cache, use memory cache
+        file_data::CacheType::Memory
+    } else if !is_local_disk_storage()
+        && CONFIG.disk_cache.enabled
+        && scan_stats.compressed_size < CONFIG.disk_cache.skip_size as i64
+    {
+        // if scan_compressed_size < 80% of total disk cache, use disk cache
+        file_data::CacheType::Disk
+    } else {
+        // no cache
+        return Ok(vec![]);
+    };
+
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
         let file_name = file.key.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
-            if !file_data::exist(&file_name) {
-                if let Err(e) = file_data::download(&file_name).await {
-                    log::info!("promql->search->storage: download file err: {}", e);
-                    if e.to_string().to_lowercase().contains("not found") {
-                        // delete file from file list
-                        if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                            log::error!(
-                                "promql->search->storage: delete from file_list err: {}",
-                                e
-                            );
-                        }
-                        return Some(file_name);
+            let ret = match cache_type {
+                file_data::CacheType::Memory => {
+                    if !file_data::memory::exist(&file_name) {
+                        file_data::memory::download(&file_name).await.err()
+                    } else {
+                        None
                     }
                 }
+                file_data::CacheType::Disk => {
+                    if !file_data::disk::exist(&file_name) {
+                        file_data::disk::download(&file_name).await.err()
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
             };
+            if let Some(e) = ret {
+                log::info!("promql->search->storage: download file to cache err: {}", e);
+                if e.to_string().to_lowercase().contains("not found") {
+                    // delete file from file list
+                    if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
+                        log::error!("promql->search->storage: delete from file_list err: {}", e);
+                    }
+                    return Some(file_name);
+                }
+            }
             drop(permit);
             None
         });

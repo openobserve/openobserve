@@ -15,12 +15,9 @@
 use bytes::Bytes;
 use lru::LruCache;
 use once_cell::sync::Lazy;
-use std::cmp::max;
-use std::sync::RwLock;
+use std::{cmp::max, sync::RwLock};
 
-use crate::common::infra::config::CONFIG;
-use crate::common::infra::metrics;
-use crate::common::infra::storage;
+use crate::common::infra::{config::CONFIG, metrics, storage};
 
 static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
 
@@ -38,11 +35,7 @@ impl Default for FileData {
 
 impl FileData {
     pub fn new() -> FileData {
-        FileData {
-            max_size: CONFIG.memory_cache.max_size,
-            cur_size: 0,
-            data: LruCache::unbounded(),
-        }
+        FileData::with_capacity(CONFIG.memory_cache.max_size)
     }
 
     pub fn with_capacity(max_size: usize) -> FileData {
@@ -61,7 +54,7 @@ impl FileData {
         let data_size = file.len() + data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "File cache is full {}/{}, can't cache {} bytes",
+                "File memory cache is full {}/{}, can't cache {} bytes",
                 self.cur_size,
                 self.max_size,
                 data_size
@@ -78,10 +71,10 @@ impl FileData {
                 // metrics
                 let columns = key.split('/').collect::<Vec<&str>>();
                 if columns[0] == "files" {
-                    metrics::QUERY_CACHE_FILES
+                    metrics::QUERY_MEMORY_CACHE_FILES
                         .with_label_values(&[columns[1], columns[3], columns[2]])
                         .dec();
-                    metrics::QUERY_CACHE_USED_BYTES
+                    metrics::QUERY_MEMORY_CACHE_USED_BYTES
                         .with_label_values(&[columns[1], columns[3], columns[2]])
                         .sub(val.len() as i64);
                 }
@@ -98,10 +91,10 @@ impl FileData {
         // metrics
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
-            metrics::QUERY_CACHE_FILES
+            metrics::QUERY_MEMORY_CACHE_FILES
                 .with_label_values(&[columns[1], columns[3], columns[2]])
                 .inc();
-            metrics::QUERY_CACHE_USED_BYTES
+            metrics::QUERY_MEMORY_CACHE_USED_BYTES
                 .with_label_values(&[columns[1], columns[3], columns[2]])
                 .add(data_size as i64);
         }
@@ -119,6 +112,12 @@ impl FileData {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+}
+
+pub fn init() -> Result<(), anyhow::Error> {
+    let mut files = FILES.write().unwrap();
+    _ = files.get("");
+    Ok(())
 }
 
 #[inline]

@@ -47,9 +47,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn load_query_cache_limit_bytes() -> Result<(), anyhow::Error> {
-    metrics::QUERY_CACHE_LIMIT_BYTES
+    metrics::QUERY_MEMORY_CACHE_LIMIT_BYTES
         .with_label_values(&[])
         .set(CONFIG.memory_cache.max_size as i64);
+    metrics::QUERY_DISK_CACHE_LIMIT_BYTES
+        .with_label_values(&[])
+        .set(CONFIG.disk_cache.max_size as i64);
     Ok(())
 }
 

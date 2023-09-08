@@ -21,7 +21,8 @@ use itertools::chain;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use reqwest::Client;
-use std::{sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc, time::Duration};
+use sysinfo::{DiskExt, SystemExt};
 use vector_enrichment::TableRegistry;
 
 use crate::common::{
@@ -46,6 +47,7 @@ pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 
+pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
@@ -128,6 +130,7 @@ pub struct Config {
     pub limit: Limit,
     pub compact: Compact,
     pub memory_cache: MemoryCache,
+    pub disk_cache: DiskCache,
     pub log: Log,
     pub etcd: Etcd,
     pub sled: Sled,
@@ -221,6 +224,8 @@ pub struct Common {
     pub data_stream_dir: String,
     #[env_config(name = "ZO_DATA_DB_DIR", default = "")] // ./data/openobserve/db/
     pub data_db_dir: String,
+    #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
+    pub data_cache_dir: String,
     #[env_config(name = "ZO_BASE_URI", default = "")]
     pub base_uri: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
@@ -285,6 +290,8 @@ pub struct Limit {
     // no need set by environment
     pub cpu_num: usize,
     pub mem_total: usize,
+    pub disk_total: usize,
+    pub disk_free: usize,
     #[env_config(name = "ZO_JSON_LIMIT", default = 209715200)]
     pub req_json_limit: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
@@ -362,6 +369,21 @@ pub struct MemoryCache {
     pub datafusion_max_size: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MEMORY_POOL", default = "")]
     pub datafusion_memory_pool: String,
+}
+
+#[derive(EnvConfig)]
+pub struct DiskCache {
+    #[env_config(name = "ZO_DISK_CACHE_ENABLED", default = true)]
+    pub enabled: bool,
+    // MB, default is 50% of local volume available space and maximum 100GB
+    #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
+    pub max_size: usize,
+    // MB, will skip the cache when a query need cache great than this value, default is 80% of max_size
+    #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
+    pub skip_size: usize,
+    // MB, when cache is full will release how many data once time, default is 1% of max_size
+    #[env_config(name = "ZO_DISK_CACHE_RELEASE_SIZE", default = 0)]
+    pub release_size: usize,
 }
 
 #[derive(EnvConfig)]
@@ -500,14 +522,19 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
+    // check data path config
+    if let Err(e) = check_path_config(&mut cfg) {
+        panic!("data path config error: {e}");
+    }
+
     // check memeory cache
     if let Err(e) = check_memory_cache_config(&mut cfg) {
         panic!("memory cache config error: {e}");
     }
 
-    // check data path config
-    if let Err(e) = check_path_config(&mut cfg) {
-        panic!("data path config error: {e}");
+    // check disk cache
+    if let Err(e) = check_disk_cache_config(&mut cfg) {
+        panic!("disk cache config error: {e}");
     }
 
     // check etcd config
@@ -545,7 +572,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
-        cfg.common.instance_name = sys_info::hostname().unwrap();
+        cfg.common.instance_name = sysinfo::System::new().host_name().unwrap();
     }
 
     // HACK for tracing, always disable tracing except ingester and querier
@@ -626,6 +653,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_db_dir.ends_with('/') {
         cfg.common.data_db_dir = format!("{}/", cfg.common.data_db_dir);
+    }
+    if cfg.common.data_cache_dir.is_empty() {
+        cfg.common.data_cache_dir = format!("{}cache/", cfg.common.data_dir);
+    }
+    if !cfg.common.data_cache_dir.ends_with('/') {
+        cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
     }
     if cfg.common.base_uri.ends_with('/') {
         cfg.common.base_uri = cfg.common.base_uri.trim_end_matches('/').to_string();
@@ -710,6 +743,57 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size;
     } else {
         cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
+    }
+    Ok(())
+}
+
+fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    let mut system = sysinfo::System::new();
+    system.refresh_disks_list();
+    let mut disks: Vec<(&str, u64, u64)> = system
+        .disks()
+        .iter()
+        .map(|d| {
+            (
+                d.mount_point().to_str().unwrap(),
+                d.total_space(),
+                d.available_space(),
+            )
+        })
+        .collect();
+    disks.sort_by(|a, b| b.0.cmp(a.0));
+
+    std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
+    let cache_dir = Path::new(&cfg.common.data_cache_dir)
+        .canonicalize()
+        .unwrap();
+    let cache_dir = cache_dir.to_str().unwrap();
+    let disk = disks.iter().find(|d| cache_dir.starts_with(d.0));
+    let (disk_total, disk_free) = match disk {
+        Some(d) => (d.1, d.2),
+        None => (0, 0),
+    };
+    cfg.limit.disk_total = disk_total as usize;
+    cfg.limit.disk_free = disk_free as usize;
+    if cfg.disk_cache.max_size == 0 {
+        cfg.disk_cache.max_size = cfg.limit.disk_free / 2; // 50%
+        if cfg.disk_cache.max_size > 1024 * 1024 * 1024 * 100 {
+            cfg.disk_cache.max_size = 1024 * 1024 * 1024 * 100; // 100GB
+        }
+    } else {
+        cfg.disk_cache.max_size *= 1024 * 1024;
+    }
+    if cfg.disk_cache.skip_size == 0 {
+        // will skip the cache when a query need cache great than this value, default is 80% of max_size
+        cfg.disk_cache.skip_size = cfg.disk_cache.max_size / 10 * 8;
+    } else {
+        cfg.disk_cache.skip_size *= 1024 * 1024;
+    }
+    if cfg.disk_cache.release_size == 0 {
+        // when cache is full will release how many data once time, default is 1% of max_size
+        cfg.disk_cache.release_size = cfg.disk_cache.max_size / 100;
+    } else {
+        cfg.disk_cache.release_size *= 1024 * 1024;
     }
     Ok(())
 }
