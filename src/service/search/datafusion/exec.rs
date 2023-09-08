@@ -188,7 +188,7 @@ async fn exec_query(
     let mut field_fns = vec![];
     let mut sql_parts = vec![];
     for fn_name in crate::common::utils::functions::get_all_transform_keys(&sql.org_id).await {
-        if sql.origin_sql.contains(&fn_name) {
+        if sql.origin_sql.contains(&format!("{}(", fn_name)) {
             field_fns.push(fn_name.clone());
         }
     }
@@ -204,11 +204,6 @@ async fn exec_query(
             sql_parts.insert(1, caps.get(1).unwrap().as_str());
         };
     }
-
-    println!("fast_mode: {}", fast_mode);
-    println!("field_fns: {:?}", field_fns);
-    println!("sql_parts: {:?}", sql_parts);
-    println!("sql.query_fn: {:?}", sql.query_fn);
 
     // query
     let query = if !&sql.query_context.is_empty() {
