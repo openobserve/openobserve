@@ -12,7 +12,7 @@
 <script lang="ts" setup>
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
-import { events } from "./events.js";
+import { events } from "@/components/rum/events.js";
 import { cloneDeep } from "lodash-es";
 
 const defaultEvent = {

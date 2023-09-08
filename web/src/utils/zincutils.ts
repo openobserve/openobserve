@@ -400,3 +400,22 @@ export const mergeRoutes: any = (route1: any, route2: any) => {
 
   return mergedRoutes;
 };
+
+export function formatDuration(ms: number) {
+  const seconds = (ms / 1000).toFixed(2);
+  const minutes = (seconds / 60).toFixed(2);
+  const hours = (minutes / 60).toFixed(2);
+  const days = (hours / 24).toFixed(2);
+
+  let formatted = `${seconds} sec`;
+
+  if (ms > 86400000) {
+    formatted = `${days} days ${hours} hr`;
+  } else if (ms > 3600000) {
+    formatted = `${hours} hr `;
+  } else if (ms > 60000) {
+    formatted = `${minutes} min`;
+  }
+
+  return formatted.trim();
+}

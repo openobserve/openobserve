@@ -39,7 +39,9 @@ const AssociatedStreamFunction = () =>
   import("@/components/functions/AssociatedStreamFunction.vue");
 const EnrichmentTableList = () =>
   import("@/components/functions/EnrichmentTableList.vue");
-const RealUserMonitoring = () => import("@/views/RealUserMonitoring.vue");
+const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
+const AppSessions = () => import("@/views/RUM/AppSessions.vue");
+const SessionViewer = () => import("@/views/RUM/SessionViewer.vue");
 
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
@@ -262,6 +264,22 @@ const useRoutes = () => {
       path: "rum",
       name: "RUM",
       component: RealUserMonitoring,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
+      children: [
+        {
+          path: "sessions",
+          name: "Sessions",
+          component: AppSessions,
+        },
+        {
+          path: "sessions/view/:id",
+          name: "SessionViewer",
+          component: SessionViewer,
+          props: true,
+        },
+      ],
     },
     ...useIngestionRoutes(),
     {
