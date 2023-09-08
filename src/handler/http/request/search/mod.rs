@@ -521,7 +521,7 @@ pub async fn values(
     let default_sql = format!("SELECT * FROM \"{stream_name}\"");
     let query_sql = match query.get("filter") {
         None => default_sql,
-        Some(v) => default_sql + " WHERE " + &v,
+        Some(v) => format!("{default_sql} WHERE {v}"),
     };
 
     let query_context = match query.get("sql") {
