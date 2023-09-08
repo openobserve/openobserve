@@ -122,7 +122,7 @@ pub async fn search(
     req.query.query_fn = req.query.query_fn.and_then(|v| base64::decode(&v).ok());
 
     for fn_name in functions::get_all_transform_keys(&org_id).await {
-        if req.query.sql.contains(&fn_name) {
+        if req.query.sql.contains(&format!("{}(", fn_name)) {
             req.query.uses_zo_fn = true;
             break;
         }
@@ -281,7 +281,7 @@ pub async fn around(
                 uses_fn = functions::get_all_transform_keys(&org_id)
                     .await
                     .iter()
-                    .any(|fn_name| v.contains(fn_name));
+                    .any(|fn_name| v.contains(&format!("{}(", fn_name)));
                 if uses_fn {
                     v
                 } else {
@@ -479,6 +479,7 @@ pub async fn around(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "stream_name name"),
         ("fields" = String, Query, description = "fields, split by comma"),
+        ("filter" = Option<String>, Query, description = "filter, eg: a=b"),
         ("size" = i64, Query, description = "size"), // topN
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
@@ -518,6 +519,11 @@ pub async fn values(
     let query_fn = query.get("query_fn").and_then(|v| base64::decode(v).ok());
 
     let default_sql = format!("SELECT * FROM \"{stream_name}\"");
+    let query_sql = match query.get("filter") {
+        None => default_sql,
+        Some(v) => default_sql + " WHERE " + &v,
+    };
+
     let query_context = match query.get("sql") {
         None => None,
         Some(v) => match base64::decode(v) {
@@ -526,7 +532,7 @@ pub async fn values(
                 uses_fn = functions::get_all_transform_keys(&org_id)
                     .await
                     .iter()
-                    .any(|fn_name| v.contains(fn_name));
+                    .any(|fn_name| v.contains(&format!("{}(", fn_name)));
                 uses_fn.then_some(v)
             }
         },
@@ -555,7 +561,7 @@ pub async fn values(
     // search
     let mut req = meta::search::Request {
         query: meta::search::Query {
-            sql: default_sql.clone(),
+            sql: query_sql,
             from: 0,
             size: 0,
             start_time,
