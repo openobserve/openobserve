@@ -70,12 +70,11 @@ export default defineComponent({
   },
   emits: ["toggleCollapse"],
   setup(props, { emit }) {
-    function formatTimeWithSuffix(ns: number) {
-      if (ns < 10000) {
-        return `${ns}ms`;
-      } else {
-        return `${(ns / 1000).toFixed(2)}s`;
+    function formatTimeWithSuffix(us: number) {
+      if (us >= 1000 * 1000) {
+        return `${(us / 1000 / 1000).toFixed(2)}s`;
       }
+      return `${(us / 1000).toFixed(2)}ms`;
     }
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);

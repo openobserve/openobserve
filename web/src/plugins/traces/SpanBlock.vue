@@ -110,12 +110,11 @@ export default defineComponent({
     const spanBlock: any = ref(null);
     const spanBlockWidth = ref(0);
     const onePixelPercent = ref(0);
-    function formatTimeWithSuffix(ns: number) {
-      if (ns < 10000) {
-        return `${ns}ms`;
-      } else {
-        return `${(ns / 1000).toFixed(2)}s`;
+    function formatTimeWithSuffix(us: number) {
+      if (us >= 1000 * 1000) {
+        return `${(us / 1000 / 1000).toFixed(2)}s`;
       }
+      return `${(us / 1000).toFixed(2)}ms`;
     }
     const isSpanSelected = computed(() => {
       if (!searchObj.data.traceDetails.selectedSpanId) return true;
