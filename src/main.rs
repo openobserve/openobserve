@@ -111,8 +111,21 @@ async fn main() -> Result<(), anyhow::Error> {
     } else if CONFIG.common.tracing_enabled {
         enable_tracing()?;
     } else {
-        env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
+        let mut log_builder = env_logger::Builder::from_env(
+            env_logger::Env::new().default_filter_or(&CONFIG.log.level),
+        );
+        if !CONFIG.log.file.is_empty() {
+            let target = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .append(true)
+                .open(&CONFIG.log.file)
+                .expect(&format!("open log file [{}] error", CONFIG.log.file));
+            log_builder.target(env_logger::Target::Pipe(Box::new(target)));
+        }
+        log_builder.init();
     }
+
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
         "System info: CPU cores {}, MEM total {} MB, Disk total {} GB, free {} GB",
