@@ -943,8 +943,10 @@ export default defineComponent({
     function formatTimeWithSuffix(ms) {
       if (ms >= 1000 * 1000 * 1000) {
         return `${(ms / 1000 / 1000 / 1000).toFixed(2)}s`;
+      } else if (ms >= 1000 * 1000) {
+        return `${(ms / 1000 / 1000).toFixed(2)}ms`;
       }
-      return `${(ms / 1000 / 1000).toFixed(2)}ms`;
+      return `${(ms / 1000).toFixed(2)}us`;
     }
 
     function generateHistogramData() {

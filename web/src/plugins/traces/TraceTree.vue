@@ -104,8 +104,10 @@ export default defineComponent({
     function formatTimeWithSuffix(ms: number) {
       if (ms >= 1000 * 1000 * 1000) {
         return `${(ms / 1000 / 1000 / 1000).toFixed(2)}s`;
+      } else if (ms >= 1000 * 1000) {
+        return `${(ms / 1000 / 1000).toFixed(2)}ms`;
       }
-      return `${(ms / 1000 / 1000).toFixed(2)}ms`;
+      return `${(ms / 1000).toFixed(2)}us`;
     }
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
