@@ -512,12 +512,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (strea
     // create trigger
     sqlx::query(
     r#"
-CREATE TRIGGER IF NOT EXISTS update_stream_stats_delete
-    AFTER DELETE ON file_list
-BEGIN
-    UPDATE stream_stats SET file_num = file_num - 1, records = records - OLD.records, original_size = original_size - OLD.original_size, compressed_size = compressed_size - OLD.compressed_size
-        WHERE stream = OLD.stream;
-END;
+CREATE TRIGGER IF NOT EXISTS update_stream_stats_delete AFTER DELETE ON file_list
+    BEGIN
+        UPDATE stream_stats SET file_num = file_num - 1, records = records - OLD.records, original_size = original_size - OLD.original_size, compressed_size = compressed_size - OLD.compressed_size WHERE stream = OLD.stream;
+    END;
         "#,
     )
     .execute(&pool)

@@ -23,7 +23,7 @@ use crate::common::{
     meta::{organization::DEFAULT_ORG, user::UserRequest},
     utils::file::clean_empty_dirs,
 };
-use crate::service::{db, users};
+use crate::service::{compact::stats::update_stats_from_file_list, db, users};
 
 mod alert_manager;
 mod compact;
@@ -138,6 +138,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         db::file_list::remote::cache("", false)
             .await
             .expect("file list remote cache failed");
+        update_stats_from_file_list()
+            .await
+            .expect("file list remote calculate stats failed");
         db::file_list::remote::cache_stats()
             .await
             .expect("file list remote cache stats failed");
