@@ -235,12 +235,12 @@ export default defineComponent({
       if (
         this.searchObj.meta.refreshInterval == 0 &&
         this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.from &&
+        this.searchObj.data.queryResults.from &&
         this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.size &&
+        this.searchObj.data.queryResults.size &&
         this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.size +
-            this.searchObj.data.queryResults.from
+        this.searchObj.data.queryResults.size +
+        this.searchObj.data.queryResults.from
       ) {
         this.searchObj.loading = true;
         this.getQueryData();
@@ -478,8 +478,8 @@ export default defineComponent({
           } else {
             start = new Date(
               searchObj.data.datetime.absolute.date.from +
-                " " +
-                searchObj.data.datetime.absolute.startTime
+              " " +
+              searchObj.data.datetime.absolute.startTime
             );
           }
           if (
@@ -490,8 +490,8 @@ export default defineComponent({
           } else {
             end = new Date(
               searchObj.data.datetime.absolute.date.to +
-                " " +
-                searchObj.data.datetime.absolute.endTime
+              " " +
+              searchObj.data.datetime.absolute.endTime
             );
           }
           const rVal = {
@@ -583,8 +583,8 @@ export default defineComponent({
         let timestamps: any =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod
-              )
+              searchObj.data.datetime.relativeTimePeriod
+            )
             : cloneDeep(searchObj.data.datetime);
 
         req.query.start_time = timestamps.startTime;
@@ -941,11 +941,10 @@ export default defineComponent({
     }
 
     function formatTimeWithSuffix(ms) {
-      if (ms < 1000) {
-        return `${ms}ms`;
-      } else {
-        return `${(ms / 1000).toFixed(2)}s`;
+      if (ms >= 1000 * 1000 * 1000) {
+        return `${(ms / 1000 / 1000 / 1000).toFixed(2)}s`;
       }
+      return `${(ms / 1000 / 1000).toFixed(2)}ms`;
     }
 
     function generateHistogramData() {
