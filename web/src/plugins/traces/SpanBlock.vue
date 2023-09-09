@@ -113,10 +113,8 @@ export default defineComponent({
     function formatTimeWithSuffix(us: number) {
       if (us >= 1000 * 1000) {
         return `${(us / 1000 / 1000).toFixed(2)}s`;
-      } else if (us >= 1000) {
-        return `${(us / 1000).toFixed(2)}ms`;
       }
-      return `${us}us`;
+      return `${(us / 1000).toFixed(2)}ms`;
     }
     const isSpanSelected = computed(() => {
       if (!searchObj.data.traceDetails.selectedSpanId) return true;

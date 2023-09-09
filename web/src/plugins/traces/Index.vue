@@ -943,10 +943,8 @@ export default defineComponent({
     function formatTimeWithSuffix(us: number) {
       if (us >= 1000 * 1000) {
         return `${(us / 1000 / 1000).toFixed(2)}s`;
-      } else if (us >= 1000) {
-        return `${(us / 1000).toFixed(2)}ms`;
       }
-      return `${us}us`;
+      return `${(us / 1000).toFixed(2)}ms`;
     }
 
     function generateHistogramData() {
@@ -1001,7 +999,7 @@ export default defineComponent({
             unparsed_x_data.push(bucket.zo_sql_timestamp);
             let histDate = new Date(Math.floor(bucket.zo_sql_timestamp / 1000));
             xData.push(Math.floor(histDate.getTime()));
-            yData.push(Number(bucket.duration.toFixed(2)));
+            yData.push(Number((bucket.duration / 1000).toFixed(2)));
           }
         );
       }
