@@ -41,7 +41,6 @@ use openobserve::{
     common::infra::{
         self, cluster,
         config::{CONFIG, USERS, VERSION},
-        metrics, wal,
     },
     common::meta,
     common::migration,
@@ -65,7 +64,7 @@ use openobserve::{
         http::router::*,
     },
     job,
-    service::{db, file_list, router, users},
+    service::{compact, db, file_list, router, users},
 };
 
 #[cfg(feature = "profiling")]
@@ -159,7 +158,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .expect("EnrichmentTables cache failed");
 
     // metrics
-    let prometheus = metrics::create_prometheus_handler();
+    let prometheus = infra::metrics::create_prometheus_handler();
 
     // HTTP server
     let thread_id = Arc::new(AtomicU16::new(0));
@@ -230,7 +229,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // leave the cluster
     let _ = cluster::leave().await;
     // flush WAL cache to disk
-    wal::flush_all_to_disk();
+    infra::wal::flush_all_to_disk();
     // flush compact offset cache to disk disk
     let _ = db::compact::files::sync_cache_to_db().await;
 
@@ -329,7 +328,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .short('c')
                         .long("component")
                         .help(
-                            "reset data of the component: root, user, alert, dashboard, function",
+                            "reset data of the component: root, user, alert, dashboard, function, stream-stats",
                         ),
                 ),
             clap::Command::new("view")
@@ -350,6 +349,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .required(false)
                         .help("only migrate specified prefix, default is all"),
                 ),
+            clap::Command::new("migrate-meta").about("migrate meta"),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
                 .arg(
@@ -359,7 +359,6 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .value_name("file")
                         .help("the parquet file name"),
                 ),
-            clap::Command::new("migrate-meta").about("migrate meta"),
         ])
         .get_matches();
 
@@ -398,6 +397,18 @@ async fn cli() -> Result<bool, anyhow::Error> {
                 }
                 "function" => {
                     db::functions::reset().await?;
+                }
+                "stream-stats" => {
+                    // reset stream stats update offset
+                    db::compact::stats::set_offset(0, None).await?;
+                    // reset stream stats table data
+                    infra::file_list::reset_stream_stats().await?;
+                    // load stream list
+                    db::schema::cache().await?;
+                    // update stats from file list
+                    compact::stats::update_stats_from_file_list()
+                        .await
+                        .expect("file list remote calculate stats failed");
                 }
                 _ => {
                     return Err(anyhow::anyhow!("unsupport reset component: {}", component));

@@ -79,6 +79,7 @@ pub trait FileList: Sync + Send + 'static {
     ) -> Result<Vec<(String, StreamStats)>>;
     async fn set_stream_stats(&self, org_id: &str, streams: &[(String, StreamStats)])
         -> Result<()>;
+    async fn reset_stream_stats(&self) -> Result<()>;
     async fn reset_stream_stats_min_ts(
         &self,
         org_id: &str,
@@ -189,6 +190,11 @@ pub async fn get_stream_stats(
 #[inline]
 pub async fn set_stream_stats(org_id: &str, streams: &[(String, StreamStats)]) -> Result<()> {
     CLIENT.set_stream_stats(org_id, streams).await
+}
+
+#[inline]
+pub async fn reset_stream_stats() -> Result<()> {
+    CLIENT.reset_stream_stats().await
 }
 
 #[inline]

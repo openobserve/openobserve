@@ -26,8 +26,8 @@ use crate::service::db;
 
 mod file_list;
 mod merge;
-pub(crate) mod retention;
-pub(crate) mod stats;
+pub mod retention;
+pub mod stats;
 
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));

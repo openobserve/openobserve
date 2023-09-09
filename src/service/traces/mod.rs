@@ -197,7 +197,7 @@ pub async fn handle_trace_request(
                     operation_name: span.name.clone(),
                     start_time,
                     end_time,
-                    duration: end_time - start_time,
+                    duration: (end_time - start_time) / 1000, // microseconds
                     reference: span_ref,
                     service_name: service_name.clone(),
                     attributes: span_att_map,
