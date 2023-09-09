@@ -465,6 +465,10 @@ impl super::FileList for DynamoFileList {
         Ok(())
     }
 
+    async fn reset_stream_stats(&self) -> Result<()> {
+        Ok(()) // TODO
+    }
+
     async fn reset_stream_stats_min_ts(
         &self,
         org_id: &str,

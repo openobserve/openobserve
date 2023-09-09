@@ -394,6 +394,14 @@ UPDATE stream_stats
         Ok(())
     }
 
+    async fn reset_stream_stats(&self) -> Result<()> {
+        let pool = CLIENT.clone();
+        sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0;"#)
+             .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
     async fn reset_stream_stats_min_ts(
         &self,
         _org_id: &str,

@@ -141,11 +141,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         update_stats_from_file_list()
             .await
             .expect("file list remote calculate stats failed");
-        db::file_list::remote::cache_stats()
-            .await
-            .expect("file list remote cache stats failed");
     }
     infra_file_list::create_table_index().await?;
+    db::file_list::remote::cache_stats()
+        .await
+        .expect("Load stream stats failed");
 
     // check wal directory
     if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
