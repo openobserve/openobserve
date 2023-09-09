@@ -940,13 +940,13 @@ export default defineComponent({
       }
     }
 
-    function formatTimeWithSuffix(ms) {
-      if (ms >= 1000 * 1000 * 1000) {
-        return `${(ms / 1000 / 1000 / 1000).toFixed(2)}s`;
-      } else if (ms >= 1000 * 1000) {
-        return `${(ms / 1000 / 1000).toFixed(2)}ms`;
+    function formatTimeWithSuffix(us: number) {
+      if (us >= 1000 * 1000) {
+        return `${(us / 1000 / 1000).toFixed(2)}s`;
+      } else if (us >= 1000) {
+        return `${(us / 1000).toFixed(2)}ms`;
       }
-      return `${(ms / 1000).toFixed(2)}us`;
+      return `${us}us`;
     }
 
     function generateHistogramData() {
@@ -1065,7 +1065,7 @@ export default defineComponent({
       if (searchObj.loading == false) {
         // eslint-disable-next-line no-prototype-builtins
         if (!router.currentRoute.value.query.hasOwnProperty("query")) {
-          searchObj.data.editorValue = "duration>10";
+          searchObj.data.editorValue = "duration>1000";
         }
         loadPageData();
         restoreUrlQueryParams();
