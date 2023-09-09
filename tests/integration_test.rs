@@ -67,6 +67,7 @@ mod tests {
             .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
 
         setup();
+        let _ = openobserve::common::infra::init().await;
         let _ = openobserve::job::init().await;
 
         for _i in 0..3 {
