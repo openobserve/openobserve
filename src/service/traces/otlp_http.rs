@@ -269,7 +269,7 @@ pub async fn traces_json(
                         operation_name: span.get("name").unwrap().as_str().unwrap().to_string(),
                         start_time,
                         end_time,
-                        duration: (end_time - start_time) / 1000000,
+                        duration: end_time - start_time,
                         reference: span_ref,
                         service_name: service_name.clone(),
                         attributes: span_att_map,
