@@ -135,7 +135,6 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache_stats() -> Result<(), anyhow::Error> {
-    let start = std::time::Instant::now();
     let orgs = db::schema::list_organizations_from_cache();
     for org_id in orgs {
         let ret = infra_file_list::get_stream_stats(&org_id, None, None).await;
@@ -152,7 +151,6 @@ pub async fn cache_stats() -> Result<(), anyhow::Error> {
         }
         time::sleep(time::Duration::from_millis(100)).await;
     }
-    log::info!("Load stream stats in {}s", start.elapsed().as_secs());
     Ok(())
 }
 
