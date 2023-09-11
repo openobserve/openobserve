@@ -176,8 +176,6 @@ pub struct Grpc {
     pub port: u16,
     #[env_config(name = "ZO_GRPC_ADDR", default = "")]
     pub addr: String,
-    #[env_config(name = "ZO_GRPC_TIMEOUT", default = 600)]
-    pub timeout: u64,
     #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "zinc-org-id")]
     pub org_header_key: String,
     #[env_config(name = "ZO_INTERNAL_GRPC_TOKEN", default = "")]
@@ -306,6 +304,8 @@ pub struct Limit {
     pub file_move_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
+    #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
+    pub query_timeout: u64,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]

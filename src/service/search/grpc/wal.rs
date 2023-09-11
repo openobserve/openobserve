@@ -17,17 +17,21 @@ use datafusion::{
     arrow::{datatypes::Schema, json::reader::infer_json_schema, record_batch::RecordBatch},
     common::FileType,
 };
+use futures::future::try_join_all;
 use std::{io::BufReader, path::Path, sync::Arc, time::UNIX_EPOCH};
+use tokio::time::Duration;
 use tracing::{info_span, Instrument};
 
-use crate::common::infra::{
-    cache::tmpfs,
-    config::CONFIG,
-    errors::{Error, ErrorCodes},
-    wal,
+use crate::common::{
+    infra::{
+        cache::tmpfs,
+        config::CONFIG,
+        errors::{Error, ErrorCodes},
+        wal,
+    },
+    meta::{self, common::FileKey, stream::ScanStats},
+    utils::file::{get_file_contents, get_file_meta, scan_files},
 };
-use crate::common::meta::{self, common::FileKey, stream::ScanStats};
-use crate::common::utils::file::{get_file_contents, get_file_meta, scan_files};
 use crate::service::{
     db,
     search::{
@@ -42,6 +46,7 @@ pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
     stream_type: meta::StreamType,
+    timeout: u64,
 ) -> super::SearchResult {
     // get file list
     let mut files = get_file_list(&sql, stream_type).await?;
@@ -184,7 +189,8 @@ pub async fn search(
             stream_type = ?stream_type
         );
         let task =
-            tokio::task::spawn(
+            tokio::time::timeout(
+                Duration::from_secs(timeout),
                 async move {
                     exec::sql(&session, schema, &diff_fields, &sql, &files, FileType::JSON).await
                 }
@@ -194,24 +200,20 @@ pub async fn search(
     }
 
     let mut results: HashMap<String, Vec<RecordBatch>> = HashMap::new();
-    for task in tasks {
-        match task.await {
-            Ok(ret) => match ret {
-                Ok(ret) => {
-                    for (k, v) in ret {
-                        let group = results.entry(k).or_insert_with(Vec::new);
-                        group.extend(v);
-                    }
+    let task_results = try_join_all(tasks)
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    for ret in task_results {
+        match ret {
+            Ok(ret) => {
+                for (k, v) in ret {
+                    let group = results.entry(k).or_insert_with(Vec::new);
+                    group.extend(v);
                 }
-                Err(err) => {
-                    log::error!("datafusion execute error: {}", err);
-                    return Err(super::handle_datafusion_error(err));
-                }
-            },
+            }
             Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
+                log::error!("datafusion execute error: {}", err);
+                return Err(super::handle_datafusion_error(err));
             }
         };
     }

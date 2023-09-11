@@ -19,7 +19,7 @@ use datafusion::{
     prelude::SessionContext,
 };
 use futures::future::try_join_all;
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -126,7 +126,7 @@ async fn get_file_list(
                     .parse()
                     .map_err(|_| DataFusionError::Execution("invalid org_id".to_string()))?;
                 let mut request = tonic::Request::new(req);
-                request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(

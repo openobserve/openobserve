@@ -15,7 +15,7 @@
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
 use once_cell::sync::Lazy;
-use std::{cmp::min, io::Cursor, sync::Arc, time::Duration};
+use std::{cmp::min, io::Cursor, sync::Arc};
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
@@ -200,7 +200,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                     .parse()
                     .map_err(|_| Error::Message("invalid org_id".to_string()))?;
                 let mut request = tonic::Request::new(req);
-                request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(

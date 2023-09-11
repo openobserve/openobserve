@@ -62,6 +62,7 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
             aggs,
             file_list: vec![],
             stream_type: "".to_string(),
+            timeout: req.timeout,
         }
     }
 }
@@ -132,6 +133,7 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
             stype: cluster_rpc::SearchType::User.into(),
             need_wal: false,
             query: Some(req_query),
+            timeout: 0,
         }
     }
 }
@@ -239,6 +241,7 @@ mod test {
             },
             aggs: HashMap::new(),
             encoding: "base64".into(),
+            timeout: 0,
         };
         req.aggs
             .insert("test".to_string(), "SELECT * FROM test".to_string());

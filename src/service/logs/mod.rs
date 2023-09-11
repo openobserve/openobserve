@@ -32,7 +32,7 @@ use crate::common::{
 };
 use crate::service::schema::check_for_schema;
 
-use super::ingestion::{get_wal_time_key, get_value};
+use super::ingestion::{get_value, get_wal_time_key};
 
 pub mod bulk;
 pub mod gcs_pub_sub;

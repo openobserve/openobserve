@@ -24,6 +24,7 @@ use super::datafusion;
 use crate::common::{
     infra::{
         cluster,
+        config::CONFIG,
         errors::{Error, ErrorCodes},
     },
     meta::{common::FileKey, stream::ScanStats, StreamType},
@@ -44,6 +45,11 @@ pub async fn search(
     let sql = Arc::new(super::sql::Sql::new(req).await?);
     let stream_type = StreamType::from(req.stream_type.as_str());
     let session_id = Arc::new(req.job.as_ref().unwrap().session_id.to_string());
+    let timeout = if req.timeout > 0 {
+        req.timeout as u64
+    } else {
+        CONFIG.limit.query_timeout
+    };
 
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(&sql.org_id, &sql.stream_name, stream_type, None)
@@ -64,7 +70,7 @@ pub async fn search(
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search(&session_id1, sql1, stream_type).await
+                wal::search(&session_id1, sql1, stream_type, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
             }
@@ -83,7 +89,7 @@ pub async fn search(
             if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
                 Ok((HashMap::new(), ScanStats::default()))
             } else {
-                storage::search(&session_id2, sql2, &file_list, stream_type).await
+                storage::search(&session_id2, sql2, &file_list, stream_type, timeout).await
             }
         }
         .instrument(storage_span),

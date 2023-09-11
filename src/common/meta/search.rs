@@ -34,6 +34,8 @@ pub struct Request {
     pub aggs: HashMap<String, String>,
     #[serde(default)]
     pub encoding: RequestEncoding,
+    #[serde(default)]
+    pub timeout: i64,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

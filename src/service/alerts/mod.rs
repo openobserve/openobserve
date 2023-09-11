@@ -106,6 +106,7 @@ pub async fn save_alert(
             query: alert.clone().query.unwrap(),
             aggs: HashMap::new(),
             encoding: meta::search::RequestEncoding::Empty,
+            timeout: 0,
         };
         let req: cluster_rpc::SearchRequest = meta_req.into();
         let sql = Sql::new(&req).await;
