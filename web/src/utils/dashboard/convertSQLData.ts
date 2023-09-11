@@ -315,8 +315,8 @@ export const convertSQLData = (
     case "scatter": 
        {
       //if area stacked then continue
-      //or if area or line, then check x and y length
-      if((panelSchema.type == "area-stacked")||((panelSchema.type == "line" ||panelSchema.type == "area" || panelSchema.type == "scatter")&& panelSchema.queries[0].fields.y.length == 1 && panelSchema.queries[0].fields.x.length == 2)){
+      //or if area or line or scatter, then check x axis length
+      if((panelSchema.type == "area-stacked")||((panelSchema.type == "line" ||panelSchema.type == "area" || panelSchema.type == "scatter") && panelSchema.queries[0].fields.x.length == 2)){
         options.xAxis = options.xAxis.slice(0, 1);
         options.tooltip.axisPointer.label = {
           show: true,
@@ -338,6 +338,8 @@ export const convertSQLData = (
         options.xAxis[0].axisLabel = {};
         options.xAxis[0].axisTick = {};
         options.xAxis[0].nameGap = 20;
+        options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
+        
         // stacked with xAxis's second value
         // allow 2 xAxis and 1 yAxis value for stack chart
         // get second x axis key
@@ -348,22 +350,29 @@ export const convertSQLData = (
         ].filter((it) => it);
   
         // create a trace based on second xAxis's unique values
-        options.series = stackedXAxisUniqueValue?.map((key: any) => {
-          const seriesObj = {
-            name: key,
-            ...getPropsByChartTypeForSeries(panelSchema.type),
-            data: Array.from(
-              new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
-            ).map(
-              (it: any) =>
-                searchQueryData.find(
-                  (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-                )?.[yAxisKeys[0]] || 0
-            ),
-          };
-          return seriesObj;
-        });
-      }else if(panelSchema.type == "line" ||panelSchema.type == "area"){
+        options.series = yAxisKeys.map((yAxis: any) => {
+          const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == yAxis
+          ).label;
+          
+          return stackedXAxisUniqueValue?.map((key: any) => {
+            const seriesObj = {
+              name: yAxisName + "-" + key,
+              ...getPropsByChartTypeForSeries(panelSchema.type),
+              data: Array.from(
+                  new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
+                ).map(
+                  (it: any) =>
+                    searchQueryData.find(
+                      (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+                    )?.[yAxis] || 0
+                ),
+              };
+            return seriesObj;
+          });
+        }).flat();
+      }
+      else if(panelSchema.type == "line" ||panelSchema.type == "area"){        
         //if x and y length is not 2 and 1 respectively then do following
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
