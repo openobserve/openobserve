@@ -134,7 +134,7 @@ export const convertSQLData = (
           ? 200
           : "20",
       top: "15",
-      bottom: "30",
+      bottom: "40",
     },
     tooltip: {
       trigger: "axis",
@@ -221,7 +221,7 @@ export const convertSQLData = (
           name:
             index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
           nameLocation: "middle",
-          nameGap: 13 * (xAxisKeys.length - index + 1),
+          nameGap: 10 * (xAxisKeys.length - index + 1),
           nameTextStyle: {
             fontWeight: "bold",
             fontSize: 14,
@@ -358,7 +358,7 @@ export const convertSQLData = (
           return stackedXAxisUniqueValue?.map((key: any) => {
             const seriesObj = {
               //only append if yaxiskeys length is more than 1
-              name: yAxisKeys.length == 1 ? key : key + "(" + yAxisName +")",
+              name: yAxisKeys.length == 1 ? key : key + " (" + yAxisName +")",
               ...getPropsByChartTypeForSeries(panelSchema.type),
               data: Array.from(
                   new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
