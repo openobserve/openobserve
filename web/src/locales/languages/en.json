@@ -45,7 +45,8 @@
     "alerts": "Alerts",
     "openapi": "OpenAPI",
     "docs": "Docs",
-    "billings": "Billing"
+    "billings": "Billing",
+    "settings": "Settings"
   },
   "about": {
     "name": "OpenObserve",
@@ -460,5 +461,11 @@
     "searchLabel": "Search metric label",
     "add": "Add",
     "cancel": "Cancel"
+  },
+  "settings": {
+    "header": "Settings",
+    "userKeyLabel": "User Key",
+    "rumKeyLabel": "RUM Key",
+    "newUserKeyBtnLbl": "Generate User Key"
   }
 }
