@@ -33,7 +33,7 @@ impl Usage for UsageServerImpl {
         let report_to_org_id = metadata.get(&CONFIG.grpc.org_header_key);
         let in_data = req.data.unwrap_or_default();
         log::info!("UsageServer: report_usage received data");
-        let resp = crate::service::logs::json_no_fn::ingest(
+        let resp = crate::service::logs::otlp_grpc::ingest(
             report_to_org_id.unwrap().to_str().unwrap(),
             &report_to_stream,
             in_data.data.into(),

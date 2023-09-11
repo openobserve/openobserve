@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::{
-    trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
+    trace_service_server::TraceService, ExportTraceServiceResponse,
 };
 use tonic::Status;
 use tonic::{codegen::*, Response};
@@ -46,7 +47,9 @@ impl TraceService for TraceServer {
 
         let resp = handle_trace_request(org_id.unwrap().to_str().unwrap(), 0, in_req, true).await;
         if resp.is_ok() {
-            return Ok(Response::new(ExportTraceServiceResponse {}));
+            return Ok(Response::new(ExportTraceServiceResponse {
+                partial_success: None,
+            }));
         } else {
             Err(Status::internal(resp.err().unwrap().to_string()))
         }

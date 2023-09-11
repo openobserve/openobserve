@@ -204,6 +204,7 @@ pub async fn handle_grpc_request(
     org_id: &str,
     thread_id: usize,
     request: ExportLogsServiceRequest,
+    is_grpc: bool,
 ) -> Result<HttpResponse, anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -217,7 +218,7 @@ pub async fn handle_grpc_request(
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
-            "Quota exceeded for this organisation".to_string(),
+            "Quota exceeded for this organization".to_string(),
         )));
     }
     let start = std::time::Instant::now();
@@ -253,7 +254,7 @@ pub async fn handle_grpc_request(
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
     for resource_log in &request.resource_logs {
-        for instrumentation_logs in &resource_log.instrumentation_library_logs {
+        for instrumentation_logs in &resource_log.scope_logs {
             for log_record in &instrumentation_logs.log_records {
                 let mut rec = json::json!({});
 
@@ -265,7 +266,7 @@ pub async fn handle_grpc_request(
                     }
                     None => {}
                 }
-                match &instrumentation_logs.instrumentation_library {
+                match &instrumentation_logs.scope {
                     Some(lib) => {
                         rec["instrumentation_library_name"] =
                             serde_json::Value::String(lib.name.to_owned());
@@ -370,10 +371,16 @@ pub async fn handle_grpc_request(
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
 
+    let ep = if is_grpc {
+        "grpc/export/logs"
+    } else {
+        "/api/org/v1/logs"
+    };
+
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/api/org/ingest/logs/_json",
+            ep,
             "200",
             org_id,
             stream_name,
@@ -382,7 +389,7 @@ pub async fn handle_grpc_request(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/api/org/ingest/logs/_json",
+            ep,
             "200",
             org_id,
             stream_name,
@@ -401,7 +408,9 @@ pub async fn handle_grpc_request(
         0,
     )
     .await;
-    let res = ExportLogsServiceResponse {};
+    let res = ExportLogsServiceResponse {
+        partial_success: None,
+    };
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
 
@@ -416,11 +425,11 @@ pub mod test {
 
     use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
     use opentelemetry_proto::tonic::common::v1::any_value::Value::{IntValue, StringValue};
-    use opentelemetry_proto::tonic::common::v1::InstrumentationLibrary;
-    use opentelemetry_proto::tonic::common::v1::KeyValue;
-    use opentelemetry_proto::tonic::logs::v1::InstrumentationLibraryLogs;
-    use opentelemetry_proto::tonic::logs::v1::ResourceLogs;
+    use opentelemetry_proto::tonic::common::v1::{InstrumentationScope, KeyValue};
+    use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
     use opentelemetry_proto::tonic::{common::v1::AnyValue, logs::v1::LogRecord};
+
+    use crate::service::logs::otlp_grpc::handle_grpc_request;
 
     #[tokio::test]
     async fn test_handle_logs_request() {
@@ -455,17 +464,19 @@ pub mod test {
             ..Default::default()
         };
 
-        let ins = InstrumentationLibraryLogs {
-            instrumentation_library: Some(InstrumentationLibrary {
+        let ins = ScopeLogs {
+            scope: Some(InstrumentationScope {
                 name: "test".to_string(),
                 version: "1.0.0".to_string(),
+                attributes: vec![],
+                dropped_attributes_count: 0,
             }),
             log_records: vec![log_rec],
             ..Default::default()
         };
 
         let res_logs = ResourceLogs {
-            instrumentation_library_logs: vec![ins],
+            scope_logs: vec![ins],
             ..Default::default()
         };
 
@@ -473,7 +484,7 @@ pub mod test {
             resource_logs: vec![res_logs],
         };
 
-        let result = super::handle_grpc_request(org_id, thread_id, request).await;
+        let result = handle_grpc_request(org_id, thread_id, request, true).await;
         assert!(result.is_ok());
     }
 }

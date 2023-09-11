@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, post, web, HttpResponse};
+use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::service::metrics;
+use crate::handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
+use crate::service::metrics::otlp_http::{metrics_json_handler, metrics_proto_handler};
+use crate::service::metrics::{self};
 
 /** _json ingestion API */
 #[utoipa::path(
@@ -51,4 +53,38 @@ pub async fn json(
             )),
         },
     )
+}
+
+/** MetricsIngest */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PostMetrics",
+    request_body(content = String, description = "ExportMetricsServiceRequest", content_type = "application/x-protobuf"),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
+        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/v1/metrics")]
+pub async fn otlp_metrics_write(
+    org_id: web::Path<String>,
+    thread_id: web::Data<usize>,
+    req: HttpRequest,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
+    let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
+    if content_type.eq(CONTENT_TYPE_PROTO) {
+        log::info!("otlp::metrics_proto_handler");
+        metrics_proto_handler(&org_id, **thread_id, body).await
+    } else if content_type.starts_with(CONTENT_TYPE_JSON) {
+        log::info!("otlp::metrics_json_handler");
+        metrics_json_handler(&org_id, **thread_id, body).await
+    } else {
+        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Bad Request".to_string(),
+        )))
+    }
 }

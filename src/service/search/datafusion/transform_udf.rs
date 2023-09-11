@@ -26,8 +26,11 @@ use std::{collections::BTreeMap, sync::Arc};
 use vector_enrichment::TableRegistry;
 use vrl::compiler::{runtime::Runtime, CompilationResult, Program, TargetValueRef, VrlRuntime};
 
-use crate::common::{infra::config::QUERY_FUNCTIONS, utils::json};
-use crate::service::{ingestion::compile_vrl_function, logs::get_value};
+use crate::service::ingestion::compile_vrl_function;
+use crate::{
+    common::{infra::config::QUERY_FUNCTIONS, utils::json},
+    service::ingestion::get_value,
+};
 
 fn create_user_df(
     fn_name: &str,
