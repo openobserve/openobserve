@@ -358,7 +358,7 @@ export const convertSQLData = (
           return stackedXAxisUniqueValue?.map((key: any) => {
             const seriesObj = {
               //only append if yaxiskeys length is more than 1
-              name: yAxisKeys.length == 1 ? key : yAxisName + "-" + key,
+              name: yAxisKeys.length == 1 ? key : key + "(" + yAxisName +")",
               ...getPropsByChartTypeForSeries(panelSchema.type),
               data: Array.from(
                   new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
