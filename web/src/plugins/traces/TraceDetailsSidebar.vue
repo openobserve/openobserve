@@ -16,7 +16,7 @@
 <template>
   <div
     class="flex justify-start items-center q-px-sm hearder_bg border border-bottom border-top"
-    :style="{ height: '30px'}"
+    :style="{ height: '30px' }"
   >
     <div :style="{ width: 'calc(100% - 22px)' }" class="q-pb-none ellipsis">
       Span Details
@@ -57,9 +57,7 @@
     <q-tab-panel name="tags">
       <div v-for="key in Object.keys(spanDetails.attrs)" :key="key">
         <div class="row q-py-xs q-px-sm border-bottom">
-          <span class="attr-text  q-pr-sm text-bold"
-            >{{ key }}:</span
-          >
+          <span class="attr-text q-pr-sm text-bold">{{ key }}:</span>
           <span class="attr-text">{{ spanDetails.attrs[key] }}</span>
         </div>
       </div>
@@ -232,7 +230,7 @@ export default defineComponent({
 
       if (spanDetails.attrs.events) delete spanDetails.attrs.events;
 
-      spanDetails.attrs.duration = spanDetails.attrs.duration + "ms";
+      spanDetails.attrs.duration = spanDetails.attrs.duration + "ns";
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
           Math.floor(
@@ -363,7 +361,7 @@ export default defineComponent({
   position: sticky;
   opacity: 1;
   z-index: 1;
-   background: #f5f5f5;
+  background: #f5f5f5;
 }
 
 .q-table--dark .thead-sticky tr > *,
@@ -424,9 +422,9 @@ export default defineComponent({
   overflow-x: hidden;
 }
 
-.hearder_bg{
-  border-top:1px solid $border-color;
-  background-color: color-mix(in srgb, currentColor 5%, transparent)
+.hearder_bg {
+  border-top: 1px solid $border-color;
+  background-color: color-mix(in srgb, currentColor 5%, transparent);
 }
 </style>
 
