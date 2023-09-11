@@ -357,7 +357,8 @@ export const convertSQLData = (
           
           return stackedXAxisUniqueValue?.map((key: any) => {
             const seriesObj = {
-              name: yAxisName + "-" + key,
+              //only append if yaxiskeys length is more than 1
+              name: yAxisKeys.length == 1 ? key : yAxisName + "-" + key,
               ...getPropsByChartTypeForSeries(panelSchema.type),
               data: Array.from(
                   new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
@@ -784,51 +785,53 @@ export const convertSQLData = (
   }
 
   // auto SQL: if x axis has time series
-  const field = panelSchema.queries[0].fields?.x.find(
-    (it: any) =>
-      it.aggregationFunction == "histogram" &&
-      it.column == store.state.zoConfig.timestamp_column
-  );
-  if (field) {
-    options.series.map((seriesObj: any) => {
-      seriesObj.data = seriesObj.data.map((it: any, index: any) => [
-        options.xAxis[0].data[index],
-        it,
-      ]);
-    });
-    options.xAxis[0].type = "time";
-    options.xAxis[0].data = [];
-    options.tooltip.formatter = function (name: any) {
-      if (name.length == 0) return "";
-
-      const date = new Date(name[0].data[0]);
-
-      let hoverText = name.map((it: any) => {
-        return `${it.marker} ${it.seriesName} : ${formatUnitValue(
-          getUnitValue(
-            it.data[1],
-            panelSchema.config?.unit,
-            panelSchema.config?.unit_custom
-          )
-        )}`;
+  if(panelSchema.type != "h-bar"&& panelSchema.type != "h-stacked"){ 
+    const field = panelSchema.queries[0].fields?.x.find(
+      (it: any) =>
+        it.aggregationFunction == "histogram" &&
+        it.column == store.state.zoConfig.timestamp_column
+    );
+    if (field) {
+      options.series.map((seriesObj: any) => {
+        seriesObj.data = seriesObj.data.map((it: any, index: any) => [
+          options.xAxis[0].data[index],
+          it,
+        ]);
       });
-      return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
-    };
-    options.tooltip.axisPointer = {
-      type: "cross",
-      label: {
-        fontsize: 12,
-      },
-      formatter: function (params: any) {
-        const date = new Date(params[0].value[0]);
-        return formatDate(date).toString();
-      },
-    };
+      options.xAxis[0].type = "time";
+      options.xAxis[0].data = [];
+      options.tooltip.formatter = function (name: any) {
+        if (name.length == 0) return "";
+  
+        const date = new Date(name[0].data[0]);
+  
+        let hoverText = name.map((it: any) => {
+          return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+            getUnitValue(
+              it.data[1],
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom
+            )
+          )}`;
+        });
+        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+      };
+      options.tooltip.axisPointer = {
+        type: "cross",
+        label: {
+          fontsize: 12,
+        },
+        formatter: function (params: any) {
+          const date = new Date(params[0].value[0]);
+          return formatDate(date).toString();
+        },
+      };
+    }
   }
 
   //custom SQL: check if it is timeseries or not
   if (
-    panelSchema.type != "h-bar" &&
+    (panelSchema.type != "h-bar"&&panelSchema.type != "h-stacked") &&
     options.xAxis.length > 0 &&
     options.xAxis[0].data.length > 0
   ) {
