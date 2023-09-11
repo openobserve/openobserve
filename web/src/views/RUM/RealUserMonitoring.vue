@@ -5,7 +5,7 @@
         <div
           class="q-px-lg q-py-sm rum-tab text-center"
           :class="activeTab === tab.value ? 'active' : ''"
-          @click="() => (activeTab = tab.value)"
+          @click="changeTab(tab.value)"
         >
           {{ tab.label }}
         </div>
@@ -22,8 +22,10 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 const showTabs = computed(() => {
-  return router.currentRoute.value.name === "Sessions";
+  const routes = ["Sessions", "ErrorTracking", "Dashboard"];
+  return routes.includes(router.currentRoute.value.name);
 });
+
 const activeTab = ref<string>("sessions");
 const tabs = [
   {
@@ -38,19 +40,30 @@ const tabs = [
     label: "Dashboard",
     value: "dashboard",
   },
-
-  onMounted(() => {
-    console.log(router.currentRoute.value.name);
-
-    if (router.currentRoute.value.name === "SessionViewer") {
-      activeTab.value = "sessions";
-    } else {
-      router.push({
-        name: "Sessions",
-      });
-    }
-  }),
 ];
+
+onMounted(() => {
+  const routes = ["SessionViewer", "ErrorTracking", "Dashboard"];
+  const routeNameMapping = {
+    SessionViewer: "sessions",
+    ErrorTracking: "error_tracking",
+    Dashboard: "dashboard",
+  };
+  if (routes.includes(router.currentRoute.value.name)) {
+    activeTab.value = routeNameMapping[router.currentRoute.value.name];
+  } else {
+    router.push({
+      name: "Sessions",
+    });
+  }
+});
+
+const changeTab = (tab: string) => {
+  activeTab.value = tab;
+  router.push({
+    name: tab === "sessions" ? "Sessions" : "ErrorTracking",
+  });
+};
 </script>
 
 <style scoped lang="scss">

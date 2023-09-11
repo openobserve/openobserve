@@ -24,7 +24,8 @@
           :columns="columns"
           :rows="rows"
           @event-emitted="handleTableEvents"
-        />
+        >
+        </AppTable>
       </template>
     </q-splitter>
   </div>
@@ -78,6 +79,8 @@ const columns = ref([
     label: "Timestamp",
     align: "left",
     sortable: true,
+    slot: true,
+    slotName: "Error",
   },
   {
     name: "type",
@@ -129,6 +132,13 @@ onMounted(() => {
       id: session.event_id,
     });
   });
+
+  try {
+    console.log("rows -----", rows.value.string.a);
+    console.log("columns -----", columns.value);
+  } catch (err) {
+    console.error("error", err);
+  }
 });
 
 const handleTableEvents = (event, payload) => {
