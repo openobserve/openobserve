@@ -101,7 +101,7 @@ const columns = ref([
 const rows = ref<Session[]>([]);
 </script>
 
-<style>
+<style lang="scss">
 .sessions_page {
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
