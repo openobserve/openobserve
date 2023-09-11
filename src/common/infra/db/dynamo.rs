@@ -514,6 +514,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
             entity: entity.to_string(),
         };
     } else if db_key.starts_with("/compact/file_list")
+        || db_key.starts_with("/compact/stream_stats")
         || db_key.starts_with("/instance")
         || db_key.starts_with("/meta/kv/version")
         || db_key.starts_with("/syslog")

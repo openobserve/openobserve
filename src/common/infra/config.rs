@@ -320,7 +320,7 @@ pub struct Limit {
     pub metrics_leader_election_interval: i64,
     #[env_config(name = "ZO_HEARTBEAT_INTERVAL", default = 30)] // in minutes
     pub hb_interval: i64,
-    #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 0)]
+    #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
     pub http_worker_num: usize,
