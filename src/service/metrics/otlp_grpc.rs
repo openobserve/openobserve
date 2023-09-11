@@ -14,7 +14,7 @@
 
 use crate::{
     common::{
-        infra::{cluster, config::CONFIG},
+        infra::{cluster, config::CONFIG, metrics},
         meta::{
             self,
             alert::{Alert, Trigger},
@@ -51,12 +51,13 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
-const EXCLUDE_LABELS: [&str; 5] = [VALUE_LABEL, "start_time", "is_monotonic", "exemplars", "le"];
+use super::get_exclude_labels;
 
 pub async fn handle_grpc_request(
     org_id: &str,
     thread_id: usize,
     request: ExportMetricsServiceRequest,
+    is_grpc: bool,
 ) -> Result<HttpResponse, anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -81,8 +82,8 @@ pub async fn handle_grpc_request(
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     for resource_metric in &request.resource_metrics {
-        for instrumentation_metric in &resource_metric.instrumentation_library_metrics {
-            for metric in &instrumentation_metric.metrics {
+        for scope_metric in &resource_metric.scope_metrics {
+            for metric in &scope_metric.metrics {
                 let metric_name = &metric.name;
                 // check for schema
                 let schema_exists = stream_schema_exists(
@@ -125,7 +126,7 @@ pub async fn handle_grpc_request(
                     }
                     None => {}
                 }
-                match &instrumentation_metric.instrumentation_library {
+                match &scope_metric.scope {
                     Some(lib) => {
                         rec["instrumentation_library_name"] =
                             serde_json::Value::String(lib.name.to_owned());
@@ -161,7 +162,7 @@ pub async fn handle_grpc_request(
                             &mut prom_meta,
                         ),
                         Data::Summary(summary) => {
-                            process_summary(&mut rec, summary, &mut metadata, &mut prom_meta)
+                            process_summary(&rec, summary, &mut metadata, &mut prom_meta)
                         }
                     },
                     None => vec![],
@@ -298,6 +299,32 @@ pub async fn handle_grpc_request(
             0,
         )
         .await;
+
+        let ep = if is_grpc {
+            "grpc/export/metrics"
+        } else {
+            "/api/org/v1/metrics"
+        };
+
+        let time = start.elapsed().as_secs_f64();
+        metrics::HTTP_RESPONSE_TIME
+            .with_label_values(&[
+                ep,
+                "200",
+                org_id,
+                &stream_name,
+                StreamType::Metrics.to_string().as_str(),
+            ])
+            .observe(time);
+        metrics::HTTP_INCOMING_REQUESTS
+            .with_label_values(&[
+                ep,
+                "200",
+                org_id,
+                &stream_name,
+                StreamType::Metrics.to_string().as_str(),
+            ])
+            .inc();
     }
 
     // only one trigger per request, as it updates etcd
@@ -322,7 +349,9 @@ pub async fn handle_grpc_request(
         }
     }
 
-    let res = ExportMetricsServiceResponse {};
+    let res = ExportMetricsServiceResponse {
+        partial_success: None,
+    };
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
 
@@ -374,22 +403,17 @@ fn process_sum(
     process_aggregation_temporality(rec, sum.aggregation_temporality);
     rec["is_monotonic"] = sum.is_monotonic.into();
     for data_point in &sum.data_points {
-        process_data_point(rec, data_point);
-        let val_map = rec.as_object_mut().unwrap();
+        let mut dp_rec = rec.clone();
+        process_data_point(&mut dp_rec, data_point);
+        let val_map = dp_rec.as_object_mut().unwrap();
 
         let vec: Vec<&str> = get_exclude_labels();
 
         let hash = super::signature_without_labels(val_map, &vec);
         val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
-        records.push(rec.clone());
+        records.push(dp_rec.clone());
     }
     records
-}
-
-fn get_exclude_labels() -> Vec<&'static str> {
-    let mut vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
-    vec.push(&CONFIG.common.column_timestamp);
-    vec
 }
 
 fn process_histogram(
@@ -408,7 +432,8 @@ fn process_histogram(
     let mut records = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
     for data_point in &hist.data_points {
-        for mut bucket_rec in process_hist_data_point(rec, data_point) {
+        let mut dp_rec = rec.clone();
+        for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let vec: Vec<&str> = get_exclude_labels();
             let hash = super::signature_without_labels(val_map, &vec);
@@ -434,7 +459,8 @@ fn process_exponential_histogram(
     let mut records = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
     for data_point in &hist.data_points {
-        for mut bucket_rec in process_exp_hist_data_point(rec, data_point) {
+        let mut dp_rec = rec.clone();
+        for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let vec: Vec<&str> = get_exclude_labels();
             let hash = super::signature_without_labels(val_map, &vec);
@@ -446,7 +472,7 @@ fn process_exponential_histogram(
 }
 
 fn process_summary(
-    rec: &mut json::Value,
+    rec: &json::Value,
     summary: &Summary,
     metadata: &mut prom::Metadata,
     prom_meta: &mut AHashMap<String, String>,
@@ -460,7 +486,8 @@ fn process_summary(
 
     let mut records = vec![];
     for data_point in &summary.data_points {
-        for mut bucket_rec in process_summary_data_point(rec, data_point) {
+        let mut dp_rec = rec.clone();
+        for mut bucket_rec in process_summary_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let vec: Vec<&str> = get_exclude_labels();
             let hash = super::signature_without_labels(val_map, &vec);
