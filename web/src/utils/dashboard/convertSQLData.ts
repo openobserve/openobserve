@@ -227,7 +227,7 @@ export const convertSQLData = (
             fontSize: 14,
           },
           axisLabel: {
-            interval:
+            interval: panelSchema.type =="h-stacked" ? "auto" : 
               index == xAxisKeys.length - 1
                 ? "auto"
                 : function (i: any) {
@@ -245,7 +245,7 @@ export const convertSQLData = (
             align: "left",
             alignWithLabel: false,
             length: 20 * (xAxisKeys.length - index),
-            interval: function (i: any) {
+            interval: panelSchema.type =="h-stacked" ? "auto" : function (i: any) {
               return arr.includes(i);
             },
           },
