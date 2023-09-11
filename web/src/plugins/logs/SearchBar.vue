@@ -166,7 +166,7 @@
             ></query-editor>
           </template>
           <template #after>
-            <div v-show="searchObj.meta.toggleFunction" style="height: 100%">
+            <div data-test="logs-vrl-function-editor" v-show="searchObj.meta.toggleFunction" style="height: 100%">
               <b>VRL Function Editor:</b>
               <div ref="fnEditorRef" id="fnEditor" style="height: 100%"></div>
             </div>

@@ -22,7 +22,7 @@
           {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
         </span>
         <div>
-          <q-input v-model="dashboardPanelData.data.title" :label="t('panel.name') + '*'" class="q-ml-xl" filled
+          <q-input data-test="dashboard-panel-name" v-model="dashboardPanelData.data.title" :label="t('panel.name') + '*'" class="q-ml-xl" filled
             dense />
         </div>
       </div>
@@ -31,8 +31,8 @@
         <q-btn class="q-ml-md text-bold" outline padding="sm lg" color="red" no-caps :label="t('panel.discard')"
           @click="goBackToDashboardList" />
         <q-btn class="q-ml-md text-bold" outline padding="sm lg"  no-caps
-          :label="t('panel.save')"  @click="saveVariableApiCall.execute()" :loading="saveVariableApiCall.isLoading.value"  />
-        <q-btn class="q-ml-md text-bold no-border" padding="sm lg" color="secondary" no-caps :label="t('panel.apply')"
+          :label="t('panel.save')" data-test="dashboard-panel-save" @click="saveVariableApiCall.execute()" :loading="saveVariableApiCall.isLoading.value"  />
+        <q-btn class="q-ml-md text-bold no-border" data-test="dashboard-apply" padding="sm lg" color="secondary" no-caps :label="t('panel.apply')"
           @click="runQuery" />
       </div>
     </div>
