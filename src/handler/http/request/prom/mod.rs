@@ -150,6 +150,17 @@ async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpRespon
     };
     let end = start;
 
+    let timeout = match req.timeout {
+        None => 0,
+        Some(v) => match parse_milliseconds(&v) {
+            Ok(v) => (v / 1000) as i64, // seconds
+            Err(e) => {
+                log::error!("parse timeout error: {}", e);
+                0
+            }
+        },
+    };
+
     let req = promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
         start,
@@ -157,7 +168,7 @@ async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpRespon
         step: 300_000_000, // 5m
     };
 
-    match promql::search::search(org_id, &req).await {
+    match promql::search::search(org_id, &req, timeout).await {
         Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {
@@ -313,6 +324,16 @@ async fn query_range(
     if step < promql::micros(promql::MINIMAL_INTERVAL) {
         step = promql::micros(promql::MINIMAL_INTERVAL);
     }
+    let timeout = match req.timeout {
+        None => 0,
+        Some(v) => match parse_milliseconds(&v) {
+            Ok(v) => (v / 1000) as i64, // seconds
+            Err(e) => {
+                log::error!("parse timeout error: {}", e);
+                0
+            }
+        },
+    };
 
     let req = promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
@@ -320,7 +341,7 @@ async fn query_range(
         end,
         step,
     };
-    match promql::search::search(org_id, &req).await {
+    match promql::search::search(org_id, &req, timeout).await {
         Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {

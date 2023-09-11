@@ -105,6 +105,7 @@ async fn handle_trigger(alert_key: &str, frequency: i64) {
                         query,
                         aggs: HashMap::new(),
                         encoding: meta::search::RequestEncoding::Empty,
+                        timeout: 0,
                     };
                     // do search
                     match SearchService::search(&trigger.org, alert.stream_type.unwrap(), &req)

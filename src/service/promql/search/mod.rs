@@ -17,7 +17,6 @@ use futures::future::try_join_all;
 use std::{
     cmp::{max, min},
     sync::Arc,
-    time::Duration,
 };
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
@@ -48,10 +47,11 @@ use crate::{
 pub mod grpc;
 
 #[tracing::instrument(skip_all, fields(org_id = org_id))]
-pub async fn search(org_id: &str, req: &MetricsQueryRequest) -> Result<Value> {
+pub async fn search(org_id: &str, req: &MetricsQueryRequest, timeout: i64) -> Result<Value> {
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as _;
+    req.timeout = timeout;
     search_in_cluster(req).await
 }
 
@@ -146,7 +146,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                     .parse()
                     .map_err(|_| Error::Message(format!("invalid org_id: {}", req.org_id)))?;
                 let mut request = tonic::Request::new(req);
-                request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(

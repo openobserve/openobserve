@@ -41,10 +41,11 @@ pub struct Query {
     /// key — metric name; value — time series data
     pub data_cache: Arc<RwLock<HashMap<String, Value>>>,
     pub scan_stats: Arc<RwLock<ScanStats>>,
+    pub timeout: u64, // seconds, query timeout
 }
 
 impl Query {
-    pub fn new<P>(org_id: &str, provider: P) -> Self
+    pub fn new<P>(org_id: &str, provider: P, timeout: u64) -> Self
     where
         P: TableProvider,
     {
@@ -59,6 +60,7 @@ impl Query {
             lookback_delta: five_min,
             data_cache: Arc::new(RwLock::new(HashMap::default())),
             scan_stats: Arc::new(RwLock::new(ScanStats::default())),
+            timeout,
         }
     }
 
