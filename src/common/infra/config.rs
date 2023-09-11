@@ -448,7 +448,7 @@ pub struct Sled {
 
 #[derive(EnvConfig)]
 pub struct Dynamo {
-    #[env_config(name = "ZO_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
+    #[env_config(name = "ZO_META_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
     pub prefix: String,
     pub file_list_table: String,
     pub stream_stats_table: String,
