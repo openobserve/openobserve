@@ -91,7 +91,8 @@ impl From<UsageType> for UsageEvent {
             | UsageType::GCPSubscription
             | UsageType::EnrichmentTable
             | UsageType::Syslog
-            | UsageType::JsonMetrics => UsageEvent::Ingestion,
+            | UsageType::JsonMetrics
+            | UsageType::Logs => UsageEvent::Ingestion,
             UsageType::Search
             | UsageType::SearchAround
             | UsageType::SearchTopNValues
@@ -110,6 +111,8 @@ pub enum UsageType {
     Json,
     #[serde(rename = "logs/_multi")]
     Multi,
+    #[serde(rename = "/v1/logs")]
+    Logs,
     #[serde(rename = "/traces")]
     Traces,
     #[serde(rename = "/v1/write")]
@@ -155,6 +158,7 @@ impl ToString for UsageType {
             UsageType::SearchTopNValues => "/_values".to_owned(),
             UsageType::GCPSubscription => "/gcp/_sub".to_owned(),
             UsageType::MetricSearch => "/metrics/_search".to_owned(),
+            UsageType::Logs => "/v1/logs".to_owned(),
         }
     }
 }

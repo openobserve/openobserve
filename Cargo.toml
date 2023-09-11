@@ -105,13 +105,12 @@ opentelemetry-otlp = { version = "0.11", features = [
   "serialize",
   "reqwest-client",
 ] }
-opentelemetry-proto = { version = "0.1", features = [
+opentelemetry-proto = { version = "0.2", features = [
   "gen-tonic",
   "traces",
   "logs",
   "metrics",
   "with-serde",
-  "build-server",
 ] }
 parking_lot = "0.12"
 prometheus = "0.13"

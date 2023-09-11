@@ -32,14 +32,15 @@ use crate::common::{
 };
 use crate::service::schema::check_for_schema;
 
-use super::ingestion::get_wal_time_key;
+use super::ingestion::{get_wal_time_key, get_value};
 
 pub mod bulk;
 pub mod gcs_pub_sub;
 pub mod json;
-pub mod json_no_fn;
 pub mod kinesis_firehose;
 pub mod multi;
+pub mod otlp_grpc;
+pub mod otlp_http;
 pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
@@ -195,22 +196,6 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Opt
         (Some(utils::json::to_string(&local_map).unwrap()), None)
     } else {
         (None, Some(parse_error))
-    }
-}
-
-pub fn get_value(value: &Value) -> String {
-    if value.is_boolean() {
-        value.as_bool().unwrap().to_string()
-    } else if value.is_f64() {
-        value.as_f64().unwrap().to_string()
-    } else if value.is_i64() {
-        value.as_i64().unwrap().to_string()
-    } else if value.is_u64() {
-        value.as_u64().unwrap().to_string()
-    } else if value.is_string() {
-        value.as_str().unwrap().to_string()
-    } else {
-        "".to_string()
     }
 }
 

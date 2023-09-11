@@ -134,7 +134,7 @@ pub async fn handle_trace_request(
                 );
             }
         }
-        let inst_resources = res_span.instrumentation_library_spans;
+        let inst_resources = res_span.scope_spans;
         for inst_span in inst_resources {
             let spans = inst_span.spans;
             for span in spans {
@@ -379,7 +379,9 @@ pub async fn handle_trace_request(
         }
     }
 
-    let res = ExportTraceServiceResponse {};
+    let res = ExportTraceServiceResponse {
+        partial_success: None,
+    };
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
 

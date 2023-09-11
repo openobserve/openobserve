@@ -18,6 +18,8 @@ use opentelemetry_proto::tonic::{
     metrics::v1::{exemplar, number_data_point},
 };
 
+use super::get_value;
+
 pub fn get_val(attr_val: &Option<AnyValue>) -> json::Value {
     match attr_val {
         Some(local_val) => match &local_val.value {
@@ -110,6 +112,14 @@ pub fn get_exemplar_val(attr_val: &Option<exemplar::Value>) -> json::Value {
         },
         None => json::Value::Null,
     }
+}
+
+pub fn get_val_for_attr(attr_val: json::Value) -> json::Value {
+    let local_val = attr_val.as_object().unwrap();
+    if let Some((_key, value)) = local_val.into_iter().next() {
+        return serde_json::Value::String(get_value(value));
+    };
+    ().into()
 }
 
 #[cfg(test)]

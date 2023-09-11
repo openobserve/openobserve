@@ -20,25 +20,27 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
-    meta::{
-        alert::{Alert, Evaluate, Trigger},
-        http::HttpResponse as MetaHttpResponse,
-        stream::{PartitionTimeLevel, StreamParams},
-        traces::{Event, Span, SpanRefType},
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{flatten, json},
-};
 use crate::service::{
     db, format_partition_key, format_stream_name,
     ingestion::write_file,
-    logs::get_value,
     schema::{add_stream_schema, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
+};
+use crate::{
+    common::{
+        infra::{cluster, config::CONFIG, metrics},
+        meta::{
+            alert::{Alert, Evaluate, Trigger},
+            http::HttpResponse as MetaHttpResponse,
+            stream::{PartitionTimeLevel, StreamParams},
+            traces::{Event, Span, SpanRefType},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json},
+    },
+    service::ingestion::grpc::get_val_for_attr,
 };
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
@@ -130,6 +132,7 @@ pub async fn traces_json(
     // End Register Transforms for stream */
 
     let mut service_name: String = traces_stream_name.to_string();
+    //let export_req: ExportTraceServiceRequest = json::from_slice(body.as_ref()).unwrap();
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
         Err(e) => {
@@ -469,14 +472,6 @@ pub async fn traces_json(
     )))
 
     //Ok(HttpResponse::Ok().into())
-}
-
-fn get_val_for_attr(attr_val: json::Value) -> json::Value {
-    let local_val = attr_val.as_object().unwrap();
-    if let Some((_key, value)) = local_val.into_iter().next() {
-        return serde_json::Value::String(get_value(value));
-    };
-    ().into()
 }
 
 #[cfg(test)]
