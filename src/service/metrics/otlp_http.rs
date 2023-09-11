@@ -38,7 +38,7 @@ use crate::{
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -91,7 +91,6 @@ pub async fn metrics_json_handler(
             "Quota exceeded for this organization".to_string(),
         )));
     }
-    let start = std::time::Instant::now();
 
     let start = std::time::Instant::now();
     let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
@@ -99,8 +98,6 @@ pub async fn metrics_json_handler(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
-    let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
@@ -132,12 +129,8 @@ pub async fn metrics_json_handler(
 
     for res_metric in res_metrics.iter() {
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
-        if res_metric.get("resourceMetrics").is_some() {
-            let resource = res_metric
-                .get("resourceMetrics")
-                .unwrap()
-                .as_object()
-                .unwrap();
+        if res_metric.get("resource").is_some() {
+            let resource = res_metric.get("resource").unwrap().as_object().unwrap();
             if resource.get("attributes").is_some() {
                 let attributes = resource.get("attributes").unwrap().as_array().unwrap();
                 for res_attr in attributes {
@@ -202,6 +195,10 @@ pub async fn metrics_json_handler(
 
                     rec[NAME_LABEL] = metric_name.to_owned().into();
 
+                    for (key, value) in &service_att_map {
+                        rec[key] = value.clone();
+                    }
+
                     if let Some(lib) = inst_metrics.get("scope") {
                         let lib = lib.as_object().unwrap();
                         if let Some(v) = lib.get("name") {
@@ -240,7 +237,7 @@ pub async fn metrics_json_handler(
                         )
                     } else if metric.get("summary").is_some() {
                         let summary = metric.get("summary").unwrap().as_object().unwrap();
-                        process_summary(&mut rec, summary, &mut metadata.clone(), &mut prom_meta)
+                        process_summary(&rec, summary, &mut metadata.clone(), &mut prom_meta)
                     } else if metric.get("gauge").is_some() {
                         let gauge = metric.get("gauge").unwrap().as_object().unwrap();
                         process_gauge(&mut rec, gauge, &mut metadata.clone(), &mut prom_meta)
@@ -529,7 +526,7 @@ fn process_histogram(
 }
 
 fn process_summary(
-    rec: &mut json::Value,
+    rec: &json::Value,
     summary: &json::Map<String, json::Value>,
     metadata: &mut prom::Metadata,
     prom_meta: &mut AHashMap<String, String>,
@@ -653,7 +650,7 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
     rec["start_time"] = data_point.get("startTimeUnixNano").unwrap().clone();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
 
-    set_data_point_value(rec, &data_point);
+    set_data_point_value(rec, data_point);
 
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -701,7 +698,7 @@ fn process_hist_data_point(
         }
         .into();
     }
-    process_exemplars(rec, &data_point);
+    process_exemplars(rec, data_point);
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = data_point.get("count").unwrap().as_str().into();
@@ -726,10 +723,10 @@ fn process_hist_data_point(
     for i in 0..last_index {
         let mut bucket_rec = rec.clone();
         if let Some(val) = buckets.get(i) {
-            bucket_rec[VALUE_LABEL] = (*val).clone().into()
+            bucket_rec[VALUE_LABEL] = (*val).clone()
         }
         if let Some(val) = explicit_bounds.get(i) {
-            bucket_rec["le"] = (*val).clone().into()
+            bucket_rec["le"] = (*val).clone()
         }
         if i == last_index {
             bucket_rec["le"] = std::f64::INFINITY.into();
@@ -752,11 +749,8 @@ fn process_exp_hist_data_point(
         .unwrap_or(&vec![])
     {
         let attr = attr.as_object().unwrap();
-        match attr.get("value") {
-            Some(v) => {
-                rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v);
-            }
-            None => {}
+        if let Some(v) = attr.get("value") {
+            rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v);
         }
     }
     let ts = data_point
@@ -768,18 +762,15 @@ fn process_exp_hist_data_point(
         .unwrap();
     rec["start_time"] = data_point.get("startTimeUnixNano").unwrap().clone();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
-    match data_point.get("flags") {
-        Some(v) => {
-            rec["flag"] = if v.as_u64().unwrap() == 1 {
-                DataPointFlags::FlagNoRecordedValue.as_str_name()
-            } else {
-                DataPointFlags::FlagNone.as_str_name()
-            }
-            .into();
+    if let Some(v) = data_point.get("flags") {
+        rec["flag"] = if v.as_u64().unwrap() == 1 {
+            DataPointFlags::FlagNoRecordedValue.as_str_name()
+        } else {
+            DataPointFlags::FlagNone.as_str_name()
         }
-        None => {}
+        .into();
     }
-    process_exemplars(rec, &data_point);
+    process_exemplars(rec, data_point);
 
     // add count record
     let mut count_rec = rec.clone();
@@ -795,25 +786,22 @@ fn process_exp_hist_data_point(
 
     let base = 2 ^ (2 ^ -data_point.get("scale").unwrap().as_i64().unwrap());
     // add negative bucket records
-    match data_point.get("negative") {
-        Some(buckets) => {
-            let buckets = buckets.as_object().unwrap();
-            let offset = buckets.get("offset").unwrap().as_i64().unwrap();
-            for (i, val) in buckets
-                .get("bucket_counts")
-                .unwrap()
-                .as_array()
-                .unwrap()
-                .iter()
-                .enumerate()
-            {
-                let mut bucket_rec = rec.clone();
-                bucket_rec[VALUE_LABEL] = (*val).clone();
-                bucket_rec["le"] = (base ^ (offset + (i as i64) + 1)).into();
-                bucket_recs.push(bucket_rec);
-            }
+    if let Some(buckets) = data_point.get("negative") {
+        let buckets = buckets.as_object().unwrap();
+        let offset = buckets.get("offset").unwrap().as_i64().unwrap();
+        for (i, val) in buckets
+            .get("bucket_counts")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
+            let mut bucket_rec = rec.clone();
+            bucket_rec[VALUE_LABEL] = (*val).clone();
+            bucket_rec["le"] = (base ^ (offset + (i as i64) + 1)).into();
+            bucket_recs.push(bucket_rec);
         }
-        None => {}
     }
     // add positive bucket records
     if let Some(buckets) = data_point.get("positive") {
@@ -933,39 +921,39 @@ fn process_exemplars(rec: &mut json::Value, data_point: &json::Map<String, json:
         {
             let attr = attr.as_object().unwrap();
             if let Some(v) = attr.get("value") {
-                exemplar_rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v);
+                exemplar_rec[attr.get("key").unwrap().as_str().unwrap()] =
+                    get_metric_value(v).into();
             }
         }
         set_data_point_value(&mut exemplar_rec, exemp);
         exemplar_rec[&CONFIG.common.column_timestamp] =
             (exemplar.get("timeUnixNano").unwrap().as_u64().unwrap() / 1000).into();
 
-        let trace_id = exemplar
-            .get("traceId")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .as_bytes();
+        let trace_id_bytes = hex::decode(exemplar.get("traceId").unwrap().as_str().unwrap())
+            .expect("Failed to decode hex string");
 
-        /* match TraceId::from_bytes(trace_id) {
+        let mut trace_id_array = [0u8; 16];
+        trace_id_array.copy_from_slice(&trace_id_bytes);
+
+        match TraceId::from_bytes(trace_id_array) {
             TraceId::INVALID => {}
             _ => {
-                exemplar_rec["trace_id"] =
-                    TraceId::from_bytes(exemplar.trace_id.as_slice().try_into().unwrap())
-                        .to_string()
-                        .into();
+                exemplar_rec["trace_id"] = TraceId::from_bytes(trace_id_array).to_string().into();
             }
         };
 
-        match SpanId::from_bytes(exemplar.span_id.as_slice().try_into().unwrap_or_default()) {
+        let span_id_bytes = hex::decode(exemplar.get("spanId").unwrap().as_str().unwrap())
+            .expect("Failed to decode hex string");
+
+        let mut span_id_array = [0u8; 8];
+        span_id_array.copy_from_slice(&span_id_bytes);
+
+        match SpanId::from_bytes(span_id_array) {
             SpanId::INVALID => {}
             _ => {
-                exemplar_rec["span_id"] =
-                    SpanId::from_bytes(exemplar.span_id.as_slice().try_into().unwrap())
-                        .to_string()
-                        .into();
+                exemplar_rec["span_id"] = SpanId::from_bytes(span_id_array).to_string().into();
             }
-        }; */
+        };
 
         exemplar_coll.push(exemplar_rec)
     }
@@ -974,7 +962,7 @@ fn process_exemplars(rec: &mut json::Value, data_point: &json::Map<String, json:
 
 fn set_data_point_value(rec: &mut json::Value, data_point: &json::Map<String, json::Value>) {
     if data_point.get("asInt").is_some() {
-        rec[VALUE_LABEL] = data_point.get("asInt").unwrap().clone();
+        rec[VALUE_LABEL] = (data_point.get("asInt").unwrap().as_i64().unwrap() as f64).into();
     } else {
         rec[VALUE_LABEL] = data_point.get("asDouble").unwrap().clone();
     }
@@ -997,5 +985,22 @@ fn get_attribute_value(val: &json::Value) -> json::Value {
         val.get("bytesValue").unwrap().clone()
     } else {
         json::Value::Null
+    }
+}
+
+fn get_metric_value(val: &json::Value) -> f64 {
+    if val.get("stringValue").is_some() {
+        val.get("stringValue")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .parse::<f64>()
+            .unwrap()
+    } else if val.get("intValue").is_some() {
+        val.get("intValue").unwrap().as_i64().unwrap() as f64
+    } else if val.get("doubleValue").is_some() {
+        val.get("doubleValue").unwrap().as_f64().unwrap()
+    } else {
+        0.0
     }
 }

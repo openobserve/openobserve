@@ -162,7 +162,7 @@ pub async fn handle_grpc_request(
                             &mut prom_meta,
                         ),
                         Data::Summary(summary) => {
-                            process_summary(&mut rec, summary, &mut metadata, &mut prom_meta)
+                            process_summary(&rec, summary, &mut metadata, &mut prom_meta)
                         }
                     },
                     None => vec![],
@@ -472,7 +472,7 @@ fn process_exponential_histogram(
 }
 
 fn process_summary(
-    rec: &mut json::Value,
+    rec: &json::Value,
     summary: &Summary,
     metadata: &mut prom::Metadata,
     prom_meta: &mut AHashMap<String, String>,
