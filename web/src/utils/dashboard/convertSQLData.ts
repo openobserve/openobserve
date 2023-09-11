@@ -221,7 +221,7 @@ export const convertSQLData = (
           name:
             index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
           nameLocation: "middle",
-          nameGap: 10 * (xAxisKeys.length - index + 1),
+          nameGap: 13 * (xAxisKeys.length - index + 1),
           nameTextStyle: {
             fontWeight: "bold",
             fontSize: 14,
