@@ -202,25 +202,16 @@ pub async fn metrics_json_handler(
 
                     rec[NAME_LABEL] = metric_name.to_owned().into();
 
-                    match inst_metrics.get("scope") {
-                        Some(lib) => {
-                            let lib = lib.as_object().unwrap();
-                            match lib.get("name") {
-                                Some(v) => {
-                                    rec["instrumentation_library_name"] =
-                                        serde_json::Value::String(v.as_str().unwrap().to_string());
-                                }
-                                None => {}
-                            }
-                            match lib.get("version") {
-                                Some(v) => {
-                                    rec["instrumentation_library_version"] =
-                                        serde_json::Value::String(v.as_str().unwrap().to_string());
-                                }
-                                None => {}
-                            }
+                    if let Some(lib) = inst_metrics.get("scope") {
+                        let lib = lib.as_object().unwrap();
+                        if let Some(v) = lib.get("name") {
+                            rec["instrumentation_library_name"] =
+                                serde_json::Value::String(v.as_str().unwrap().to_string());
                         }
-                        None => {}
+                        if let Some(v) = lib.get("version") {
+                            rec["instrumentation_library_version"] =
+                                serde_json::Value::String(v.as_str().unwrap().to_string());
+                        }
                     };
 
                     let metadata = prom::Metadata {
@@ -247,15 +238,25 @@ pub async fn metrics_json_handler(
                             &mut metadata.clone(),
                             &mut prom_meta,
                         )
-                    }
-                    /*else if metric.get("summary").is_some() {
-                        process_sum(&mut rec, sum, &mut metadata.clone(), &mut prom_meta)
+                    } else if metric.get("summary").is_some() {
+                        let summary = metric.get("summary").unwrap().as_object().unwrap();
+                        process_summary(&mut rec, summary, &mut metadata.clone(), &mut prom_meta)
                     } else if metric.get("gauge").is_some() {
-                        process_sum(&mut rec, sum, &mut metadata.clone(), &mut prom_meta)
+                        let gauge = metric.get("gauge").unwrap().as_object().unwrap();
+                        process_gauge(&mut rec, gauge, &mut metadata.clone(), &mut prom_meta)
                     } else if metric.get("exponentialHistogram").is_some() {
-                        process_sum(&mut rec, sum, &mut metadata.clone(), &mut prom_meta)
-                    }  */
-                    else {
+                        let exp = metric
+                            .get("exponentialHistogram")
+                            .unwrap()
+                            .as_object()
+                            .unwrap();
+                        process_exponential_histogram(
+                            &mut rec,
+                            exp,
+                            &mut metadata.clone(),
+                            &mut prom_meta,
+                        )
+                    } else {
                         continue;
                     };
 
@@ -264,7 +265,7 @@ pub async fn metrics_json_handler(
                         METADATA_LABEL.to_string(),
                         json::to_string(&metadata).unwrap(),
                     );
-                    set_schema_metadata(org_id, &metric_name, StreamType::Metrics, extra_metadata)
+                    set_schema_metadata(org_id, metric_name, StreamType::Metrics, extra_metadata)
                         .await
                         .unwrap();
 
@@ -527,6 +528,109 @@ fn process_histogram(
     records
 }
 
+fn process_summary(
+    rec: &mut json::Value,
+    summary: &json::Map<String, json::Value>,
+    metadata: &mut prom::Metadata,
+    prom_meta: &mut AHashMap<String, String>,
+) -> Vec<serde_json::Value> {
+    // set metadata
+    metadata.metric_type = MetricType::Summary;
+    prom_meta.insert(
+        meta::prom::METADATA_LABEL.to_string(),
+        json::to_string(&metadata).unwrap(),
+    );
+
+    let mut records = vec![];
+    for data_point in summary
+        .get("dataPoints")
+        .unwrap()
+        .as_array()
+        .unwrap_or(&vec![])
+    {
+        let dp = data_point.as_object().unwrap();
+        let mut dp_rec = rec.clone();
+        for mut bucket_rec in process_summary_data_point(&mut dp_rec, dp) {
+            let val_map = bucket_rec.as_object_mut().unwrap();
+            let vec: Vec<&str> = get_exclude_labels();
+            let hash = super::signature_without_labels(val_map, &vec);
+            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            records.push(bucket_rec);
+        }
+    }
+    records
+}
+
+fn process_gauge(
+    rec: &mut json::Value,
+    gauge: &json::Map<String, json::Value>,
+    metadata: &mut prom::Metadata,
+    prom_meta: &mut AHashMap<String, String>,
+) -> Vec<serde_json::Value> {
+    let mut records = vec![];
+
+    // set metadata
+    metadata.metric_type = MetricType::Gauge;
+    prom_meta.insert(
+        meta::prom::METADATA_LABEL.to_string(),
+        json::to_string(&metadata).unwrap(),
+    );
+
+    for data_point in gauge
+        .get("dataPoints")
+        .unwrap()
+        .as_array()
+        .unwrap_or(&vec![])
+    {
+        let dp = data_point.as_object().unwrap();
+        process_data_point(rec, dp);
+        let val_map = rec.as_object_mut().unwrap();
+        let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
+        val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+        records.push(rec.clone());
+    }
+    records
+}
+
+fn process_exponential_histogram(
+    rec: &mut json::Value,
+    hist: &json::Map<String, json::Value>,
+    metadata: &mut prom::Metadata,
+    prom_meta: &mut AHashMap<String, String>,
+) -> Vec<serde_json::Value> {
+    // set metadata
+    metadata.metric_type = MetricType::ExponentialHistogram;
+    prom_meta.insert(
+        meta::prom::METADATA_LABEL.to_string(),
+        json::to_string(&metadata).unwrap(),
+    );
+    let mut records = vec![];
+    process_aggregation_temporality(
+        rec,
+        hist.get("aggregationTemporality")
+            .unwrap()
+            .as_u64()
+            .unwrap(),
+    );
+    for data_point in hist
+        .get("dataPoints")
+        .unwrap()
+        .as_array()
+        .unwrap_or(&vec![])
+    {
+        let mut dp_rec = rec.clone();
+        let dp = data_point.as_object().unwrap();
+        for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, dp) {
+            let val_map = bucket_rec.as_object_mut().unwrap();
+            let vec: Vec<&str> = get_exclude_labels();
+            let hash = super::signature_without_labels(val_map, &vec);
+            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            records.push(bucket_rec);
+        }
+    }
+    records
+}
+
 fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json::Value>) {
     for attr in data_point
         .get("attributes")
@@ -535,9 +639,8 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
         .unwrap_or(&vec![])
     {
         let attr = attr.as_object().unwrap();
-        match attr.get("value") {
-            Some(v) => rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v),
-            None => {}
+        if let Some(v) = attr.get("value") {
+            rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v)
         }
     }
     let ts = data_point
@@ -552,22 +655,91 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
 
     set_data_point_value(rec, &data_point);
 
-    match data_point.get("flags") {
-        Some(v) => {
-            rec["flag"] = if v.as_u64().unwrap() == 1 {
-                DataPointFlags::FlagNoRecordedValue.as_str_name()
-            } else {
-                DataPointFlags::FlagNone.as_str_name()
-            }
-            .into();
+    if let Some(v) = data_point.get("flags") {
+        rec["flag"] = if v.as_u64().unwrap() == 1 {
+            DataPointFlags::FlagNoRecordedValue.as_str_name()
+        } else {
+            DataPointFlags::FlagNone.as_str_name()
         }
-        None => {}
+        .into();
     }
 
-    process_exemplars(rec, &data_point);
+    process_exemplars(rec, data_point);
 }
 
 fn process_hist_data_point(
+    rec: &mut json::Value,
+    data_point: &json::Map<String, json::Value>,
+) -> Vec<serde_json::Value> {
+    let mut bucket_recs = vec![];
+
+    for attr in data_point
+        .get("attributes")
+        .unwrap()
+        .as_array()
+        .unwrap_or(&vec![])
+    {
+        let attr = attr.as_object().unwrap();
+        if let Some(v) = attr.get("value") {
+            rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v);
+        }
+    }
+    let ts = data_point
+        .get("timeUnixNano")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .parse::<u64>()
+        .unwrap();
+    rec["start_time"] = data_point.get("startTimeUnixNano").unwrap().clone();
+    rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
+    if let Some(v) = data_point.get("flags") {
+        rec["flag"] = if v.as_u64().unwrap() == 1 {
+            DataPointFlags::FlagNoRecordedValue.as_str_name()
+        } else {
+            DataPointFlags::FlagNone.as_str_name()
+        }
+        .into();
+    }
+    process_exemplars(rec, &data_point);
+    // add count record
+    let mut count_rec = rec.clone();
+    count_rec[VALUE_LABEL] = data_point.get("count").unwrap().as_str().into();
+    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
+    bucket_recs.push(count_rec);
+
+    // add sum record
+    let mut sum_rec = rec.clone();
+    sum_rec[VALUE_LABEL] = data_point.get("sum").unwrap().as_str().into();
+    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
+    bucket_recs.push(sum_rec);
+
+    // add bucket records
+
+    let buckets = data_point.get("bucketCounts").unwrap().as_array().unwrap();
+    let explicit_bounds = data_point
+        .get("explicitBounds")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    let last_index = buckets.len() - 1;
+    for i in 0..last_index {
+        let mut bucket_rec = rec.clone();
+        if let Some(val) = buckets.get(i) {
+            bucket_rec[VALUE_LABEL] = (*val).clone().into()
+        }
+        if let Some(val) = explicit_bounds.get(i) {
+            bucket_rec["le"] = (*val).clone().into()
+        }
+        if i == last_index {
+            bucket_rec["le"] = std::f64::INFINITY.into();
+        }
+        bucket_recs.push(bucket_rec);
+    }
+    bucket_recs
+}
+
+fn process_exp_hist_data_point(
     rec: &mut json::Value,
     data_point: &json::Map<String, json::Value>,
 ) -> Vec<serde_json::Value> {
@@ -608,6 +780,97 @@ fn process_hist_data_point(
         None => {}
     }
     process_exemplars(rec, &data_point);
+
+    // add count record
+    let mut count_rec = rec.clone();
+    count_rec[VALUE_LABEL] = data_point.get("count").unwrap().as_str().into();
+    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
+    bucket_recs.push(count_rec);
+
+    // add sum record
+    let mut sum_rec = rec.clone();
+    sum_rec[VALUE_LABEL] = data_point.get("sum").unwrap().as_str().into();
+    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
+    bucket_recs.push(sum_rec);
+
+    let base = 2 ^ (2 ^ -data_point.get("scale").unwrap().as_i64().unwrap());
+    // add negative bucket records
+    match data_point.get("negative") {
+        Some(buckets) => {
+            let buckets = buckets.as_object().unwrap();
+            let offset = buckets.get("offset").unwrap().as_i64().unwrap();
+            for (i, val) in buckets
+                .get("bucket_counts")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .iter()
+                .enumerate()
+            {
+                let mut bucket_rec = rec.clone();
+                bucket_rec[VALUE_LABEL] = (*val).clone();
+                bucket_rec["le"] = (base ^ (offset + (i as i64) + 1)).into();
+                bucket_recs.push(bucket_rec);
+            }
+        }
+        None => {}
+    }
+    // add positive bucket records
+    if let Some(buckets) = data_point.get("positive") {
+        let buckets = buckets.as_object().unwrap();
+        let offset = buckets.get("offset").unwrap().as_i64().unwrap();
+        for (i, val) in buckets
+            .get("bucket_counts")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
+            let mut bucket_rec = rec.clone();
+            bucket_rec[VALUE_LABEL] = (*val).clone();
+            bucket_rec["le"] = (base ^ (offset + (i as i64) + 1)).into();
+            bucket_recs.push(bucket_rec);
+        }
+    }
+
+    bucket_recs
+}
+
+fn process_summary_data_point(
+    rec: &mut json::Value,
+    data_point: &json::Map<String, json::Value>,
+) -> Vec<serde_json::Value> {
+    let mut bucket_recs = vec![];
+
+    for attr in data_point
+        .get("attributes")
+        .unwrap()
+        .as_array()
+        .unwrap_or(&vec![])
+    {
+        let attr = attr.as_object().unwrap();
+        if let Some(v) = attr.get("value") {
+            rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v)
+        }
+    }
+    let ts = data_point
+        .get("timeUnixNano")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .parse::<u64>()
+        .unwrap();
+    rec["start_time"] = data_point.get("startTimeUnixNano").unwrap().clone();
+    rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
+    if let Some(v) = data_point.get("flags") {
+        rec["flag"] = if v.as_u64().unwrap() == 1 {
+            DataPointFlags::FlagNoRecordedValue.as_str_name()
+        } else {
+            DataPointFlags::FlagNone.as_str_name()
+        }
+        .into();
+    }
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = data_point.get("count").unwrap().as_str().into();
@@ -621,25 +884,16 @@ fn process_hist_data_point(
     bucket_recs.push(sum_rec);
 
     // add bucket records
-
-    let buckets = data_point.get("bucketCounts").unwrap().as_array().unwrap();
-    let explicit_bounds = data_point
-        .get("explicitBounds")
+    let buckets = data_point
+        .get("quantileValues")
         .unwrap()
         .as_array()
         .unwrap();
-    let last_index = buckets.len() - 1;
-    for i in 0..last_index {
+    for value in buckets {
         let mut bucket_rec = rec.clone();
-        if let Some(val) = buckets.get(i) {
-            bucket_rec[VALUE_LABEL] = (*val).clone().into()
-        }
-        if let Some(val) = explicit_bounds.get(i) {
-            bucket_rec["le"] = (*val).clone().into()
-        }
-        if i == last_index {
-            bucket_rec["le"] = std::f64::INFINITY.into();
-        }
+        let value = value.as_object().unwrap();
+        bucket_rec[VALUE_LABEL] = value.get("value").unwrap().clone();
+        bucket_rec["quantile"] = value.get("quantile").unwrap().clone();
         bucket_recs.push(bucket_rec);
     }
     bucket_recs
@@ -678,15 +932,11 @@ fn process_exemplars(rec: &mut json::Value, data_point: &json::Map<String, json:
             .unwrap_or(&vec![])
         {
             let attr = attr.as_object().unwrap();
-            match attr.get("value") {
-                Some(v) => {
-                    exemplar_rec[attr.get("key").unwrap().as_str().unwrap()] =
-                        get_attribute_value(v);
-                }
-                None => {}
+            if let Some(v) = attr.get("value") {
+                exemplar_rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v);
             }
         }
-        set_data_point_value(&mut exemplar_rec, &exemp);
+        set_data_point_value(&mut exemplar_rec, exemp);
         exemplar_rec[&CONFIG.common.column_timestamp] =
             (exemplar.get("timeUnixNano").unwrap().as_u64().unwrap() / 1000).into();
 
