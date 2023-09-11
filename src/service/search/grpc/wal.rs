@@ -46,6 +46,7 @@ pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
     stream_type: meta::StreamType,
+    timeout: u64,
 ) -> super::SearchResult {
     // get file list
     let mut files = get_file_list(&sql, stream_type).await?;
@@ -189,7 +190,7 @@ pub async fn search(
         );
         let task =
             tokio::time::timeout(
-                Duration::from_secs(CONFIG.limit.query_timeout),
+                Duration::from_secs(timeout),
                 async move {
                     exec::sql(&session, schema, &diff_fields, &sql, &files, FileType::JSON).await
                 }

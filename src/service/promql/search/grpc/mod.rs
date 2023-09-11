@@ -20,8 +20,10 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
-use crate::common::infra::{cache::tmpfs, errors::Result};
-use crate::common::meta::stream::ScanStats;
+use crate::common::{
+    infra::{cache::tmpfs, config::CONFIG, errors::Result},
+    meta::stream::ScanStats,
+};
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{
     promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
@@ -88,12 +90,19 @@ pub async fn search(
         lookback_delta: DEFAULT_LOOKBACK,
     };
 
+    let timeout = if req.timeout > 0 {
+        req.timeout as u64
+    } else {
+        CONFIG.limit.query_timeout
+    };
+
     let mut engine = Query::new(
         org_id,
         StorageProvider {
             session_id: session_id.to_string(),
             need_wal: req.need_wal,
         },
+        timeout,
     );
 
     let (value, result_type, mut scan_stats) = engine.exec(eval_stmt).await?;

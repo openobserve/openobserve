@@ -389,6 +389,7 @@ async fn get_stream_stats(
         query,
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
+        timeout: 0,
     };
     match SearchService::search(&CONFIG.common.usage_org, meta::StreamType::Logs, &req).await {
         Ok(res) => {

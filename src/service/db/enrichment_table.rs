@@ -41,6 +41,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         query,
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
+        timeout: 0,
     };
     // do search
     match SearchService::search(org_id, meta::StreamType::EnrichmentTables, &req).await {

@@ -37,6 +37,7 @@ message SearchRequest {
     SearchQuery              query = 5;
     repeated FileKey     file_list = 6;
     repeated SearchAggRequest aggs = 7;
+    int64                  timeout = 8;
 }
 
 // The response message containing the greetings

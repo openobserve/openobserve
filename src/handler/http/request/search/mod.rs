@@ -222,6 +222,7 @@ pub async fn search(
         ("stream_name" = String, Path, description = "stream_name name"),
         ("key" = i64, Query, description = "around key"),
         ("size" = i64, Query, description = "around size"),
+        ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
         (status = 200, description="Success", content_type = "application/json", body = SearchResponse, example = json!({
@@ -304,6 +305,10 @@ pub async fn around(
         None
     };
 
+    let timeout = query
+        .get("timeout")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+
     // search forward
     let req = meta::search::Request {
         query: meta::search::Query {
@@ -322,6 +327,7 @@ pub async fn around(
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
+        timeout,
     };
     let resp_forward = match SearchService::search(&org_id, stream_type, &req).await {
         Ok(res) => res,
@@ -375,6 +381,7 @@ pub async fn around(
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
+        timeout,
     };
     let resp_backward = match SearchService::search(&org_id, stream_type, &req).await {
         Ok(res) => res,
@@ -483,6 +490,7 @@ pub async fn around(
         ("size" = i64, Query, description = "size"), // topN
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
+        ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
         (status = 200, description="Success", content_type = "application/json", body = SearchResponse, example = json!({
@@ -560,6 +568,10 @@ pub async fn values(
         end_time = chrono::Utc::now().timestamp_micros();
     }
 
+    let timeout = query
+        .get("timeout")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+
     // get a local search queue lock
     let locker = SearchService::QUEUE_LOCKER.clone();
     let _locker = locker.lock().await;
@@ -582,6 +594,7 @@ pub async fn values(
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
+        timeout,
     };
 
     for field in &fields {

@@ -47,6 +47,7 @@ pub async fn search(
     sql: Arc<Sql>,
     file_list: &[FileKey],
     stream_type: meta::StreamType,
+    timeout: u64,
 ) -> super::SearchResult {
     // fetch all schema versions, group files by version
     let schema_versions =
@@ -181,7 +182,7 @@ pub async fn search(
         }
         let datafusion_span = info_span!("service:search:grpc:storage:datafusion", org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
         let task = tokio::time::timeout(
-            Duration::from_secs(CONFIG.limit.query_timeout),
+            Duration::from_secs(timeout),
             async move {
                 exec::sql(
                     &session,

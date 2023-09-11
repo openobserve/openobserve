@@ -417,12 +417,9 @@ impl Engine {
         let mut tasks = Vec::new();
         for (ctx, schema, scan_stats) in ctxs {
             let selector = selector.clone();
-            let task = tokio::time::timeout(
-                Duration::from_secs(CONFIG.limit.query_timeout),
-                async move {
-                    selector_load_data_from_datafusion(ctx, schema, selector, start, end).await
-                },
-            );
+            let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
+                selector_load_data_from_datafusion(ctx, schema, selector, start, end).await
+            });
             tasks.push(task);
             // update stats
             let mut ctx_scan_stats = self.ctx.scan_stats.write().await;

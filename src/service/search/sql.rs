@@ -809,6 +809,7 @@ mod tests {
             query,
             aggs: HashMap::new(),
             encoding: crate::common::meta::search::RequestEncoding::Empty,
+            timeout: 0,
         };
 
         let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
@@ -892,6 +893,7 @@ mod tests {
                 query: query.clone(),
                 aggs: HashMap::new(),
                 encoding: crate::common::meta::search::RequestEncoding::Empty,
+                timeout: 0,
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
             rpc_req.org_id = org_id.to_string();
@@ -979,6 +981,7 @@ mod tests {
                 query: query.clone(),
                 aggs: HashMap::new(),
                 encoding: crate::common::meta::search::RequestEncoding::Empty,
+                timeout: 0,
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
             rpc_req.org_id = org_id.to_string();
