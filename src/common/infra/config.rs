@@ -206,7 +206,7 @@ pub struct Common {
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     pub meta_store_external: bool, // external storage no need sync file_list to s3
-    #[env_config(name = "ZO_META_STORE_POSTGRES_DSN", default = "")]
+    #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
     pub meta_store_postgres_dsn: String,
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
@@ -613,7 +613,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && cfg.common.meta_store_postgres_dsn.is_empty()
     {
         return Err(anyhow::anyhow!(
-            "Meta store is PostgreSQL, you must set ZO_META_STORE_POSTGRES_DSN"
+            "Meta store is PostgreSQL, you must set ZO_META_POSTGRES_DSN"
         ));
     }
 
