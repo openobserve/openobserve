@@ -20,11 +20,12 @@
       class="plotlycontainer"
       style="height: 100%; width: 100%"
     >
-      <ChartRenderer v-if="panelSchema.type != 'table'" :data="panelData" />
-      <TableRenderer
-        v-else-if="panelSchema.type == 'table'"
-        :data="panelData"
-      />
+    <ChartRenderer v-if="panelSchema.type != 'table'&& panelSchema.type != 'map'" :data="panelData" />
+    <TableRenderer
+    v-else-if="panelSchema.type == 'table'"
+    :data="panelData"
+    />
+    <GeoMapRenderer v-else :data="panelData" />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div v-if="errorDetail" class="errorMessage">
@@ -48,9 +49,10 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
+import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
 export default defineComponent({
   name: "PanelSchemaRenderer",
-  components: { ChartRenderer, TableRenderer },
+  components: { ChartRenderer, TableRenderer, GeoMapRenderer },
   props: {
     selectedTimeObj: {
       required: true,
