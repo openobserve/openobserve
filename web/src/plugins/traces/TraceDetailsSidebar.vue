@@ -230,7 +230,7 @@ export default defineComponent({
 
       if (spanDetails.attrs.events) delete spanDetails.attrs.events;
 
-      spanDetails.attrs.duration = spanDetails.attrs.duration + "ns";
+      spanDetails.attrs.duration = spanDetails.attrs.duration + "us";
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
           Math.floor(

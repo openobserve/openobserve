@@ -53,7 +53,7 @@
         }"
         class="text-caption"
       >
-        {{ formatTimeWithSuffix(span.durationNs) }}
+        {{ formatTimeWithSuffix(span.durationUs) }}
       </div>
       <q-resize-observer debounce="300" @resize="onResize" />
     </div>
@@ -110,19 +110,15 @@ export default defineComponent({
     const spanBlock: any = ref(null);
     const spanBlockWidth = ref(0);
     const onePixelPercent = ref(0);
-    function formatTimeWithSuffix(ns: number) {
-      // ns, us, ms, s
-      if (ns >= 1000 * 1000 * 1000) {
-        return `${(ns / 1000000000).toFixed(2)}s`;
+    function formatTimeWithSuffix(us: number) {
+      if (us >= 1000 * 1000) {
+        return `${(us / 1000000).toFixed(2)}s`;
       }
-      if (ns >= 1000 * 1000) {
-        return `${(ns / 1000000).toFixed(2)}ms`;
-      }
-      if (ns >= 1000) {
-        return `${(ns / 1000).toFixed(2)}us`;
+      if (us >= 1000) {
+        return `${(us / 1000).toFixed(2)}ms`;
       }
 
-      return `${ns}ns`;
+      return `${us}us`;
     }
     const isSpanSelected = computed(() => {
       if (!searchObj.data.traceDetails.selectedSpanId) return true;
