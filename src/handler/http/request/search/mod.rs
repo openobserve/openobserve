@@ -119,7 +119,14 @@ pub async fn search(
         return Ok(bad_request(e));
     }
 
-    req.query.query_fn = req.query.query_fn.and_then(|v| base64::decode(&v).ok());
+    let mut query_fn = req.query.query_fn.and_then(|v| base64::decode(&v).ok());
+
+    if let Some(vrl_function) = &query_fn {
+        if !vrl_function.trim().ends_with('.') {
+            query_fn = Some(format!("{} \n .", vrl_function));
+        }
+    }
+    req.query.query_fn = query_fn;
 
     for fn_name in functions::get_all_transform_keys(&org_id).await {
         if req.query.sql.contains(&format!("{}(", fn_name)) {
@@ -524,16 +531,21 @@ pub async fn values(
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return Ok(bad_request("fields is empty")),
     };
-    let query_fn = query.get("query_fn").and_then(|v| base64::decode(v).ok());
+    let mut query_fn = query.get("query_fn").and_then(|v| base64::decode(v).ok());
+    if let Some(vrl_function) = &query_fn {
+        if !vrl_function.trim().ends_with('.') {
+            query_fn = Some(format!("{} \n .", vrl_function));
+        }
+    }
 
     let default_sql = format!("SELECT * FROM \"{stream_name}\"");
-    let query_sql = match query.get("filter") {
+    let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {
             if v.is_empty() {
                 default_sql
             } else {
-                format!("{default_sql} WHERE {v}")
+                format!("{} WHERE {v}", default_sql)
             }
         }
     };
@@ -547,10 +559,14 @@ pub async fn values(
                     .await
                     .iter()
                     .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-                uses_fn.then_some(v)
+                Some(v)
             }
         },
     };
+
+    if query_context.is_some() {
+        query_sql = query_context.clone().unwrap();
+    }
 
     let size = query
         .get("size")
