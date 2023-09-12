@@ -17,10 +17,10 @@
   <div class="column index-menu" :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
     <div class="col-auto">
       <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type" :label="t('dashboard.selectStreamType')"
-        :options="data.streamType" data-cy="index-dropdown" input-debounce="0" behavior="menu" filled borderless dense
+        :options="data.streamType" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
         class="q-mb-xs"></q-select>
       <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream" :label="t('dashboard.selectIndex')"
-        :options="filteredStreams" data-cy="index-dropdown" input-debounce="0" behavior="menu" use-input filled borderless
+        :options="filteredStreams" data-test="index-dropdown-stream" input-debounce="0" behavior="menu" use-input filled borderless
         dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value">
         <template #no-option>
           <q-item>
@@ -56,13 +56,13 @@
             <q-td class="field_list" :props="props" v-mutation="mutationHandler" @dragenter="onDragEnter"
               @dragleave="onDragLeave" @dragover="onDragOver" @drop="onDrop"
               :style="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex == dashboardPanelData.meta.stream.customQueryFields.length ? 'border: 1px solid black' : ''">
-              <div class="field_overlay" :title="props.row.name">
+              <div class="field_overlay" :title="props.row.name" :data-test="`field-list-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.stream_type}-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.stream}-${props.row.name}`">
                 <div class="field_label"
                   :draggable="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))"
                   @dragstart="onDragStart($event, props.row)">
                   <q-icon name="drag_indicator" color="grey-13"
                     :class="['q-mr-xs', !(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length)) ? 'drag_indicator' : 'drag_disabled']"
-                    v-if="!promqlMode" />
+                    v-if="!promqlMode" data-test="dashboard-add-data-indicator"/>
 
                   <q-icon
                     :name="props.row.type == 'Utf8' ? 'text_fields' : props.row.type == 'Int64' ? 'tag' : 'toggle_off'"
@@ -71,14 +71,14 @@
                 </div>
                 <div class="field_icons"
                   v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))">
-                  <q-btn padding="sm" :disabled="isAddXAxisNotAllowed" @click="addXAxisItem(props.row)">
+                  <q-btn padding="sm" :disabled="isAddXAxisNotAllowed" @click="addXAxisItem(props.row)"  data-test="dashboard-add-x-data">
                     <div>
                       {{
                         dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y"
                       }}
                     </div>
                   </q-btn>
-                  <q-btn padding="sm" :disabled="isAddYAxisNotAllowed" @click="addYAxisItem(props.row)">
+                  <q-btn padding="sm" :disabled="isAddYAxisNotAllowed" @click="addYAxisItem(props.row)" data-test="dashboard-add-y-data">
                     <div>
                       {{
                         dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X"
@@ -88,7 +88,7 @@
                   <q-btn v-if="dashboardPanelData.data.type == 'heatmap'" padding="sm" :disabled="isAddZAxisNotAllowed" @click="addZAxisItem(props.row)">
                      <div>+Z</div>
                     </q-btn>
-                  <q-btn padding="sm" @click="addFilteredItem(props.row.name)">
+                  <q-btn padding="sm" @click="addFilteredItem(props.row.name)" data-test="dashboard-add-filter-data">
                     <div>+F</div>
                   </q-btn>
                 </div>
@@ -97,7 +97,7 @@
           </q-tr>
         </template>
         <template #top-right>
-          <q-input v-model="dashboardPanelData.meta.stream.filterField" data-cy="index-field-search-input" filled
+          <q-input v-model="dashboardPanelData.meta.stream.filterField" data-test="index-field-search-input" filled
             borderless dense clearable debounce="1" :placeholder="t('search.searchField')">
             <template #prepend>
               <q-icon name="search" />

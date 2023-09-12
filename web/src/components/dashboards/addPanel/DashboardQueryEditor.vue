@@ -14,9 +14,9 @@
 -->
 
 <template>
-    <div class="col-auto">
+    <div class="col-auto"  data-test="dashboard-panel-searchbar">
         <q-bar class="row sql-bar" style="display: flex; justify-content: space-between;" @click.stop="onDropDownClick">
-            <div style="display: flex ; flex-direction: row; align-items: center;">
+            <div style="display: flex ; flex-direction: row; align-items: center;" data-test="dashboard-query-data">
                 <div>
                     <q-icon flat :name="!dashboardPanelData.layout.showQueryBar ? 'arrow_right' : 'arrow_drop_down'"
                         text-color="black" class="q-mr-sm" />
@@ -55,11 +55,11 @@
 
     </div>
     <div class="col" :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'"
-        style="overflow: hidden;">
+        style="overflow: hidden;" data-test="dashboard-query">
         <div class="row">
 
         <div class="col">
-            <query-editor ref="queryEditorRef" class="monaco-editor" v-model:query="currentQuery"
+            <query-editor data-test="dashboard-panel-query-editor" ref="queryEditorRef" class="monaco-editor" v-model:query="currentQuery"
                 v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
                 v-model:functions="dashboardPanelData.meta.stream.functions" @run-query="searchData"
                 :readOnly="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"></query-editor>

@@ -117,6 +117,7 @@
                   size="xs"
                   flat
                   class="q-mr-xs"
+                  data-test="table-row-expand-menu"
                   @click.stop="expandLog(row, index)"
                 ></q-btn>
                 <high-light
@@ -151,6 +152,7 @@
                   store.state.theme === 'dark' ? 'field_overlay_dark' : ''
                 "
                 :title="row.name"
+                :data-test="`log-add-data-from-column-${row[column.name]}`"
               >
                 <q-btn
                   class="q-mr-xs"
@@ -168,6 +170,7 @@
                   @click.prevent.stop="
                     addSearchTerm(`${column.name}='${row[column.name]}'`)
                   "
+                  :data-test="`log-details-include-field-${row[column.name]}`"
                   title="Include Term"
                   round
                 >
@@ -181,6 +184,7 @@
                     addSearchTerm(`${column.name}!='${row[column.name]}'`)
                   "
                   title="Exclude Term"
+                  :data-test="`log-details-exclude-field-${row[column.name]}`"
                   round
                 >
                   <q-icon color="currentColor">

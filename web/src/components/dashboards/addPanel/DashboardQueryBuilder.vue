@@ -32,12 +32,12 @@
         @dragleave="onDragLeave($event, 'x')"
         @dragover="onDragOver($event, 'x')"
         @drop="onDrop($event, 'x')"
-        v-mutation="handler2">
+        v-mutation="handler2" data-test="dashboard-x-layout">
         <q-btn-group class="q-mr-sm" v-for="(itemX,index) in dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x" :key="index">
           <q-btn  
             icon-right="arrow_drop_down" no-caps color="primary" dense rounded size="sm"
-            :label="xLabel[index]" class="q-pl-sm">
-              <q-menu class="q-pa-md">
+            :label="xLabel[index]" class="q-pl-sm" :data-test="`dashboard-x-item-${itemX.column}`">
+              <q-menu class="q-pa-md" :data-test="`dashboard-x-item-${itemX.column}-menu`">
                 <div>
                   <div class="">
                     <div v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery" class="q-mr-xs q-mb-sm">
@@ -52,6 +52,7 @@
                         emit-value
                         map-options
                         label="Aggregation"
+                        data-test="dashboard-x-item-dropdown"
                       >
                         <template v-slot:append>
                           <q-icon name="close" size="small" @click.stop.prevent="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index].aggregationFunction = null" class="cursor-pointer" />
@@ -62,6 +63,7 @@
                   <q-input
                     dense
                     filled
+                    data-test="dashboard-x-item-input"
                     label="Label"
                     v-model="
                       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index]
@@ -77,6 +79,7 @@
             round
             flat
             dense
+            :data-test="`dashboard-x-item-${itemX.column}-remove`"
             @click="removeXAxisItem(itemX.column)"
             icon="close"
           />
@@ -108,11 +111,11 @@
         @dragleave="onDragLeave($event, 'y')"
         @dragover="onDragOver($event, 'y')"
         @drop="onDrop($event, 'y')"
-        v-mutation="handler2">
+        v-mutation="handler2" data-test="dashboard-y-layout">
         <q-btn-group class="q-mr-sm" v-for="(itemY,index) in dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y" :key="index">
           <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm"
-            :label="yLabel[index]" class="q-pl-sm">
-            <q-menu class="q-pa-md">
+            :label="yLabel[index]" :data-test="`dashboard-y-item-${itemY.column}`" class="q-pl-sm">
+            <q-menu class="q-pa-md" :data-test="`dashboard-y-item-${itemY.column}-menu`">
                 <div>
                   <div class="row q-mb-sm" style="align-items: center;">
                     <div v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery" class="q-mr-xs" style="width: 160px">
@@ -127,6 +130,7 @@
                         emit-value
                         map-options
                         label="Aggregation"
+                        data-test="dashboard-y-item-dropdown"
                       >
                       <template v-slot:append>
                           <div v-if="dashboardPanelData.data.type == 'heatmap'">
@@ -138,6 +142,7 @@
                     <div class="color-input-wrapper" v-if="!['table', 'pie'].includes(dashboardPanelData.data.type)">
                       <input
                         type="color"
+                        data-test="dashboard-y-item-color"
                         v-model="
                           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index]
                             .color
@@ -149,6 +154,7 @@
                     dense
                     filled
                     label="Label"
+                    data-test="dashboard-y-item-input"
                     v-model="
                       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index]
                         .label
@@ -163,6 +169,7 @@
             round
             flat
             dense
+            :data-test="`dashboard-y-item-${itemY.column}-remove`"
             @click="removeYAxisItem(itemY.column)"
             icon="close"
           />
@@ -265,10 +272,10 @@
         @dragleave="onDragLeave($event, 'f')"
         @dragover="onDragOver($event, 'f')"
         @drop="onDrop($event, 'f')"
-        v-mutation="handler2">
+        v-mutation="handler2" data-test="dashboard-filter-layout">
         <q-btn-group class="q-mr-sm" v-for="(filteredItem,index) in dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter" :key="index">
-        <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="filteredItem.column"  class="q-pl-sm">
-          <q-menu class="q-pa-md" @show="(e)=>loadFilterItem(filteredItem.column)">
+        <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="filteredItem.column" :data-test="`dashboard-filter-item-${filteredItem.column}`"  class="q-pl-sm">
+          <q-menu class="q-pa-md" @show="(e)=>loadFilterItem(filteredItem.column)" :data-test="`dashboard-filter-item-${filteredItem.column}-menu`">
               <div>
                 <div class="q-pa-xs">
                   <div class="q-gutter-xs">
@@ -284,12 +291,14 @@
                         name="list"
                         label="List"
                         style="width: auto"
+                        data-test="dashboard-filter-list-tab"
                       ></q-tab>
                       <q-tab
                         dense
                         name="condition"
                         label="Condition"
                         style="width: auto"
+                        data-test="dashboard-filter-condition-tab"
                       ></q-tab>
                     </q-tabs>
                     <q-separator></q-separator>
@@ -301,7 +310,7 @@
                       "
                       animated
                     >
-                      <q-tab-panel dense name="condition" class="q-pa-none">
+                      <q-tab-panel data-test="dashboard-filter-condition-panel" dense name="condition" class="q-pa-none">
                         <div class="flex justify-between">
                           <q-select
                             dense
@@ -313,6 +322,7 @@
                             "
                             :options="options"
                             label="Operator"
+                            data-test="dashboard-filter-condition-dropdown"
                             style="width: 100%"
                             :rules="[ val => !!val || 'Required' ]"
                           />
@@ -327,13 +337,14 @@
                                 index
                               ].value
                             "
+                            data-test="dashboard-filter-condition-input"
                             label="Value"
                             style="width: 100%; margin-top: 5px"
                             :rules="[ val => val.length > 0 || 'Required' ]"
                           />
                         </div>
                       </q-tab-panel>
-                      <q-tab-panel dense name="list" class="q-pa-none">
+                      <q-tab-panel data-test="dashboard-filter-list-panel" dense name="list" class="q-pa-none">
                         <q-select
                           dense
                           filled
@@ -342,6 +353,7 @@
                               index
                             ].values
                           "
+                          data-test="dashboard-filter-list-dropdown"
                           :options="dashboardPanelData.meta.filterValue.find((it: any)=>it.column == filteredItem.column)?.value"
                           label="Select Filter"
                           multiple
@@ -387,6 +399,7 @@
                                 <q-checkbox
                                   dense
                                   :model-value="selected"
+                                  data-test="dashboard-filter-item-input"
                                   @update:model-value="toggleOption(opt)"
                                 ></q-checkbox>
                               </q-item-section>

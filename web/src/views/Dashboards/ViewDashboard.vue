@@ -23,7 +23,7 @@
         <span class="q-table__title q-mx-md q-mt-xs">{{ currentDashboardData.data.title }}</span>
       </div>
       <div class="flex">
-        <q-btn outline padding="xs" no-caps icon="add" @click="addPanelData">
+        <q-btn outline padding="xs" no-caps icon="add" @click="addPanelData" data-test="dashboard-panel-add">
           <q-tooltip>{{ t('panel.add') }}</q-tooltip>
         </q-btn>
         <q-btn outline padding="xs" class="q-ml-sm" no-caps icon="settings" @click="addSettingsData">
@@ -52,7 +52,7 @@
           :w="getPanelLayout(item,'w')" :h="getPanelLayout(item,'h')"
           :i="getPanelLayout(item,'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent"
           drag-allow-from=".drag-allow">
-          <div style="height: 100%;">
+          <div style="height: 100%;" :data-test="`dashboard-panel-${item?.title}`">
             <PanelContainer @updated:chart="onUpdatePanel" @duplicatePanel="onDuplicatePanel" :draggable="draggable" :data="item"
               :selectedTimeDate="currentTimeObj" :variablesData="variablesData"
               :width="getPanelLayout(item,'w')" :height="getPanelLayout(item,'h')">

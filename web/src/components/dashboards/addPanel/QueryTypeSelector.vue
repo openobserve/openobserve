@@ -17,19 +17,19 @@
     <div class="q-py-sm">
         <div class="row button-group">
             <div>
-                <button :class="selectedButtonType === 'auto' ? 'selected' : ''" class='button button-left'
+                <button data-test="dashboard-auto" :class="selectedButtonType === 'auto' ? 'selected' : ''" class='button button-left'
                     @click="onUpdateButton('auto',$event)">
                     {{ t('panel.auto') }}
                 </button>
             </div>
             <div>
-                <button class="button" :class="selectedButtonType === 'promql' ? 'selected' : ''"
+                <button data-test="dashboard-promQL" class="button" :class="selectedButtonType === 'promql' ? 'selected' : ''"
                     v-show="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'" @click="onUpdateButton('promql',$event)">
                     {{ t('panel.promQL') }}
                 </button>
             </div>
             <div>
-                <button :class="selectedButtonType === 'custom-sql' ? 'selected' : ''" class='button button-right'
+                <button data-test="dashboard-customSql" :class="selectedButtonType === 'custom-sql' ? 'selected' : ''" class='button button-right'
                     @click="onUpdateButton('custom-sql',$event)">
                     {{ t('panel.customSql') }}
                 </button>
