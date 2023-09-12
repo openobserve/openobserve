@@ -111,9 +111,6 @@ export default defineComponent({
     const spanBlockWidth = ref(0);
     const onePixelPercent = ref(0);
     function formatTimeWithSuffix(us: number) {
-      if (us >= 1000 * 1000) {
-        return `${(us / 1000000).toFixed(2)}s`;
-      }
       if (us >= 1000) {
         return `${(us / 1000).toFixed(2)}ms`;
       }
