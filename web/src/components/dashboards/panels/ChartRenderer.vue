@@ -24,6 +24,7 @@ import { useStore } from "vuex";
 
 export default defineComponent({
     name: "ChartRenderer",
+    emits: ["updated:chart"],
     props: {
         data: {
             required: true,
@@ -31,7 +32,7 @@ export default defineComponent({
             default: () => ({ options: {} })
         },
     },
-    setup(props: any) {
+    setup(props: any,{ emit }) {
         const chartRef: any = ref(null);
         let chart: any;
         const store = useStore();
@@ -117,6 +118,14 @@ export default defineComponent({
             chart.on("mouseover", mouseHoverEffectFn);
             chart.on("globalout", () => {mouseHoverEffectFn({})});
             chart.on("legendselectchanged",legendSelectChangedFn);
+
+            //on dataZoom emit an event of start x and end x
+            chart.on('dataZoom', function (params:any) {                
+                emit("updated:chart", {
+                    start: params.batch[0].startValue,
+                    end: params.batch[0].endValue,
+                });
+            });
             window.addEventListener("resize", windowResizeEventCallback);
         });
         onUnmounted(() => {
