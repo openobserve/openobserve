@@ -60,7 +60,7 @@ pub async fn metrics_proto_handler(
     match handle_grpc_request(org_id, thread_id, request, false).await {
         Ok(res) => Ok(res),
         Err(e) => {
-            log::error!("error while handling request: {}", e);
+            log::error!("error processing request: {}", e);
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
