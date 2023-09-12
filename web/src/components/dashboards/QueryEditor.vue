@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div ref="editorRef" id="editor"></div>
+  <div data-test="dashboard-panel-query-editor-div" ref="editorRef" id="editor"></div>
 </template>
 
 <script lang="ts">

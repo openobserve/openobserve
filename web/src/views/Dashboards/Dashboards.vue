@@ -28,6 +28,7 @@
       :filter-method="filterData"
       :loading="loading"
       @row-click="onRowClick"
+      data-test="dashboard-table"
     >
       <!-- if data not available show nodata component -->
       <template #no-data>
@@ -57,6 +58,7 @@
             unelevated
             size="sm"
             round
+            data-test="dashboard-delete"
             flat
             @click.stop="showDeleteDialogFn(props)"
           ></q-btn>
@@ -90,6 +92,7 @@
           padding="sm lg"
           color="secondary"
           no-caps
+          data-test="dashboard-add"
           :label="t(`dashboard.add`)"
           @click="addDashboard"
         />
@@ -127,6 +130,7 @@
     </q-dialog>
     <ConfirmDialog
       title="Delete dashboard"
+      data-test="dashboard-confirm-dialog"
       message="Are you sure you want to delete the dashboard?"
       @update:ok="deleteDashboard"
       @update:cancel="confirmDeleteDialog = false"

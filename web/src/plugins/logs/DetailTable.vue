@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <q-card class="column full-height no-wrap searchdetaildialog">
+  <q-card class="column full-height no-wrap searchdetaildialog" data-test="dialog-box">
     <q-card-section class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap">
         <div class="col">
@@ -23,7 +23,7 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup round flat icon="cancel" />
+          <q-btn v-close-popup round flat icon="cancel" data-test="close-dialog"/>
         </div>
       </div>
     </q-card-section>
@@ -115,7 +115,7 @@
                   style="display: inline;relative"
                 >
                   <q-btn-dropdown
-                    data-test="log-details-include-exclude-field-btn"
+                    :data-test="`log-details-include-exclude-field-btn-${value}`"
                     size="6px"
                     outlined
                     filled
@@ -123,7 +123,7 @@
                     class="q-mr-sm pointer"
                     name="'img:' + getImageURL('images/common/add_icon.svg')"
                   >
-                    <q-list>
+                    <q-list data-test="field-list-modal">
                       <q-item clickable v-close-popup>
                         <q-item-section>
                           <q-item-label
@@ -189,6 +189,7 @@
       <div class="row items-center no-wrap justify-between">
         <div class="col-2">
           <q-btn
+            data-test="log-detail-previous-detail-btn"
             class="text-bold"
             text-color="light-text"
             no-caps

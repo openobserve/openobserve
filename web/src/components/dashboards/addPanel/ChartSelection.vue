@@ -30,7 +30,7 @@
           v-ripple
           @click="$emit('update:selectedChartType', item.id)"
         >
-          <q-item-section class="">
+          <q-item-section :data-test="`selected-chart-${item.id}-item`" class="">
             <q-icon
               size="sm"
               color="primary"
