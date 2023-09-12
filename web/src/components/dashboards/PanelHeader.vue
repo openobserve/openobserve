@@ -21,11 +21,11 @@
         {{ renderTitle }}
     </div>
       <q-space />
-      <q-btn-dropdown dense flat label="" no-caps >
+      <q-btn-dropdown  :data-test="`dashboard-edit-panel-${renderTitle}-dropdown`"  dense flat label="" no-caps >
         <q-list dense>
           <q-item clickable v-close-popup @click="onPanelModifyClick('EditPanel')">
             <q-item-section>
-              <q-item-label class="q-pa-sm">Edit Panel</q-item-label>
+              <q-item-label data-test="dashboard-edit-panel" class="q-pa-sm">Edit Panel</q-item-label>
             </q-item-section>
           </q-item>
           <q-item clickable v-close-popup @click="onPanelModifyClick('DuplicatePanel')">
@@ -35,7 +35,7 @@
           </q-item>
           <q-item clickable v-close-popup @click="onPanelModifyClick('DeletePanel')">
             <q-item-section>
-              <q-item-label class="q-pa-sm">Delete Panel</q-item-label>
+              <q-item-label data-test="dashboard-delete-panel" class="q-pa-sm">Delete Panel</q-item-label>
             </q-item-section>
           </q-item>
         </q-list>

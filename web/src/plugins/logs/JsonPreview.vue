@@ -70,7 +70,7 @@
           <q-item clickable v-close-popup>
             <q-item-section>
               <q-item-label
-                data-test="log-details-exclude-field-btn"
+                data-test="log-details-add-field-btn"
                 @click.stop="addFieldToTable(key)"
                 v-close-popup
                 ><q-btn

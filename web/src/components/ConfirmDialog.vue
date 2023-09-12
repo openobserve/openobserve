@@ -15,7 +15,7 @@
 
 <template>
   <q-dialog>
-    <q-card style="width: 240px">
+    <q-card style="width: 240px" data-test="dialog-box">
       <q-card-section class="confirmBody">
         <div class="head">{{ title }}</div>
         <div class="para">{{ message }}</div>
