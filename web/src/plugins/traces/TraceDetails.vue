@@ -146,7 +146,7 @@ import TraceChart from "./TraceChart.vue";
 import { useStore } from "vuex";
 import { duration } from "moment";
 import D3Chart from "@/components/D3Chart.vue";
-import { getImageURL } from "@/utils/zincutils";
+import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 import { convertTimelineData,convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
@@ -250,7 +250,7 @@ export default defineComponent({
       for (let i = 0; i <= 4; i++) {
         tics.push({
           value: Number(time.toFixed(2)),
-          label: `${time.toFixed(2)}ms`,
+          label: `${formatTimeWithSuffix(time * 1000)}`,
           left: `${25 * i}%`,
         });
         time += quarterMs;
