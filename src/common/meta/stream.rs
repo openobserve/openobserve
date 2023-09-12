@@ -274,8 +274,8 @@ impl PartitionTimeLevel {
     pub fn duration(self) -> i64 {
         match self {
             PartitionTimeLevel::Unset => 0,
-            PartitionTimeLevel::Hourly => 3600000,
-            PartitionTimeLevel::Daily => 86400000,
+            PartitionTimeLevel::Hourly => 0,
+            PartitionTimeLevel::Daily => 3600, // seconds, 1 hour
         }
     }
 }
