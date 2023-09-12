@@ -221,17 +221,8 @@ export default defineComponent({
       },
     ]);
     const userEmail: any = ref("");
-    const options = [
-      {
-        label: t("user.admin"),
-        value: "admin",
-      },
-      {
-        label: t("user.member"),
-        value: "member",
-      },
-    ];
-    const selectedRole = ref(options[0].value);
+    const options = ["admin", "member"];
+    const selectedRole = ref(options[0]);
     const currentUserRole = ref("");
 
     const getOrgMembers = () => {
@@ -331,7 +322,7 @@ export default defineComponent({
 
         organizationsService
           .add_members(
-            { member_lists: emailArray, role: selectedRole.value.value },
+            { member_lists: emailArray, role: selectedRole.value },
             store.state.selectedOrganization.identifier
           )
           .then((res: { data: any }) => {
@@ -391,7 +382,7 @@ export default defineComponent({
         .update_member_role(
           {
             id: parseInt(row.orgMemberId ? row.orgMemberId : row.org_member_id),
-            role: row.role.value,
+            role: row.role,
             email: row.email,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
