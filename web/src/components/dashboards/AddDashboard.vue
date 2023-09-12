@@ -51,6 +51,7 @@
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
+          data-test="dashboard-name"
           stack-label
           outlined
           filled
@@ -80,6 +81,7 @@
             no-caps
           />
           <q-btn
+            data-test="dashboard-add-submit"
             :disable="dashboardData.name === ''"
             :label="t('dashboard.save')"
             class="q-mb-md text-bold no-border q-ml-md"

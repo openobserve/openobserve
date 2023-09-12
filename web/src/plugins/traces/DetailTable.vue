@@ -67,9 +67,9 @@
                 <q-item-section :data-test="`log-detail-${value}-key`" class="col-3">{{ value }}</q-item-section>
                 <q-item-section class="col-9" :class="!shouldWrapValues ? 'ellipsis' : ''"
                   style="display: inline;relative">
-                  <q-btn-dropdown :data-test="`log-details-include-exclude-field-btn-${key}`" size="0.5rem" outlined filled dense
-                    class="q-mr-sm pointer" :name="'img:' + getImageURL('images/common/add_icon.svg')">
-                    <q-list data-test="field-list-modal">
+                  <q-btn-dropdown data-test="log-details-include-exclude-field-btn" size="0.5rem" outlined filled dense
+                      class="q-mr-sm pointer" :name="'img:' + getImageURL('images/common/add_icon.svg')">
+                      <q-list>
                       <q-item clickable v-close-popup>
                         <q-item-section>
                           <q-item-label data-test="log-details-include-field-btn" @click="
