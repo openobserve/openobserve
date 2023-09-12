@@ -303,7 +303,7 @@ export default defineComponent({
         value: "member",
       },
     ];
-    const selectedRole = ref(options[0]);
+    const selectedRole = ref(options[0].value);
     const currentUserRole = ref("");
     let deleteUserEmail = "";
 
@@ -542,7 +542,7 @@ export default defineComponent({
         .update_member_role(
           {
             id: parseInt(row.orgMemberId ? row.orgMemberId : row.org_member_id),
-            role: row.role,
+            role: row.role.value,
             email: row.email,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
