@@ -53,7 +53,7 @@
         }"
         class="text-caption"
       >
-        {{ formatTimeWithSuffix(span.durationMs) }}
+        {{ formatTimeWithSuffix(span.durationUs) }}
       </div>
       <q-resize-observer debounce="300" @resize="onResize" />
     </div>
@@ -61,16 +61,9 @@
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  computed,
-  ref,
-  watch,
-  onMounted,
-  watchEffect,
-} from "vue";
+import { defineComponent, computed, ref } from "vue";
 import useTraces from "@/composables/useTraces";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -110,12 +103,6 @@ export default defineComponent({
     const spanBlock: any = ref(null);
     const spanBlockWidth = ref(0);
     const onePixelPercent = ref(0);
-    function formatTimeWithSuffix(us: number) {
-      if (us >= 1000 * 1000) {
-        return `${(us / 1000 / 1000).toFixed(2)}s`;
-      }
-      return `${(us / 1000).toFixed(2)}ms`;
-    }
     const isSpanSelected = computed(() => {
       if (!searchObj.data.traceDetails.selectedSpanId) return true;
       return searchObj.data.traceDetails.selectedSpanId === props.span.spanId;

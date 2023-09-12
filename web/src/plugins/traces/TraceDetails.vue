@@ -146,7 +146,7 @@ import TraceChart from "./TraceChart.vue";
 import { useStore } from "vuex";
 import { duration } from "moment";
 import D3Chart from "@/components/D3Chart.vue";
-import { getImageURL } from "@/utils/zincutils";
+import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 
@@ -243,10 +243,11 @@ export default defineComponent({
         traceTree.value[0].startTimeMs + timeRange.value.start;
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
+      console.log(time);
       for (let i = 0; i <= 4; i++) {
         tics.push({
           value: Number(time.toFixed(2)),
-          label: `${time.toFixed(2)}ms`,
+          label: `${formatTimeWithSuffix(time * 1000)}`,
           left: `${25 * i}%`,
         });
         time += quarterMs;
@@ -422,7 +423,8 @@ export default defineComponent({
           span[store.state.zoConfig.timestamp_column],
         startTimeMs: converTimeFromNsToMs(span.start_time),
         endTimeMs: converTimeFromNsToMs(span.end_time),
-        durationMs: Number(span.duration.toFixed(2)),
+        durationMs: Number((span.duration / 1000).toFixed(2)), // This key is standard, we use for calculating width of span block. This should always be in ms
+        durationUs: span.duration, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: convertTime(span.idle_ns),
         busyMs: convertTime(span.busy_ns),
         spanId: span.span_id,
