@@ -353,6 +353,21 @@ export const formatSizeFromMB = (sizeInMB: string) => {
   return `${size.toFixed(2)} ${units[index]}`;
 };
 
+/**
+ * @param us : Time in microseconds
+ */
+export const formatTimeWithSuffix = (us: number) => {
+  if (us >= 1000 * 1000) {
+    return `${(us / 1000 / 1000).toFixed(2)}s`;
+  }
+
+  if (us >= 1000) {
+    return `${(us / 1000).toFixed(2)}ms`;
+  }
+
+  return `${us.toFixed(2)}us`;
+};
+
 export const ooNotify = (timeout: number = 0) => {
   const $q = useQuasar();
 

@@ -52,7 +52,7 @@
             />
           </div>
           <div
-            class=" ellipsis q-ml-xs"
+            class="ellipsis q-ml-xs"
             :style="{
               paddingLeft: '4px',
               borderLeft: `3px solid ${span.style.color}`,
@@ -69,7 +69,6 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import { getImageURL } from "@/utils/zincutils";
-import { computed } from "vue";
 
 export default defineComponent({
   name: "TraceTree",
@@ -101,18 +100,11 @@ export default defineComponent({
   },
   emits: ["toggleCollapse"],
   setup(props, { emit }) {
-    function formatTimeWithSuffix(us: number) {
-      if (us >= 1000 * 1000) {
-        return `${(us / 1000 / 1000).toFixed(2)}s`;
-      }
-      return `${(us / 1000).toFixed(2)}ms`;
-    }
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
     }
 
     return {
-      formatTimeWithSuffix,
       toggleSpanCollapse,
       getImageURL,
     };
