@@ -44,6 +44,9 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             FN_ALREADY_EXIST.to_string(),
         )))
     } else {
+        if !func.function.as_str().trim().ends_with('.') {
+            func.function = format!("{} \n .", func.function);
+        }
         if func.trans_type.unwrap() == 0 {
             match compile_vrl_function(func.function.as_str(), &org_id) {
                 Ok(_) => {}
