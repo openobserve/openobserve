@@ -540,12 +540,12 @@ pub async fn values(
 
     let default_sql = format!("SELECT * FROM \"{stream_name}\"");
     let mut query_sql = match query.get("filter") {
-        None => default_sql.to_string(),
+        None => default_sql,
         Some(v) => {
             if v.is_empty() {
-                default_sql.to_string()
+                default_sql
             } else {
-                format!("{} WHERE {v}", default_sql.to_string())
+                format!("{} WHERE {v}", default_sql)
             }
         }
     };
@@ -564,7 +564,7 @@ pub async fn values(
         },
     };
 
-    if query_sql.eq(&default_sql) && query_context.is_some() {
+    if query_context.is_some() {
         query_sql = query_context.clone().unwrap();
     }
 
