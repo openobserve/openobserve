@@ -134,7 +134,7 @@ export const convertSQLData = (
           ? 200
           : "20",
       top: "15",
-      bottom: "30",
+      bottom: "40",
     },
     tooltip: {
       trigger: "axis",
@@ -227,7 +227,7 @@ export const convertSQLData = (
             fontSize: 14,
           },
           axisLabel: {
-            interval:
+            interval: panelSchema.type =="h-stacked" ? "auto" : 
               index == xAxisKeys.length - 1
                 ? "auto"
                 : function (i: any) {
@@ -245,7 +245,7 @@ export const convertSQLData = (
             align: "left",
             alignWithLabel: false,
             length: 20 * (xAxisKeys.length - index),
-            interval: function (i: any) {
+            interval: panelSchema.type =="h-stacked" ? "auto" : function (i: any) {
               return arr.includes(i);
             },
           },
@@ -309,9 +309,124 @@ export const convertSQLData = (
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
   switch (panelSchema.type) {
-    case "bar":
+    case "area-stacked": 
     case "line":
-    case "area": {
+    case "area":
+    case "scatter": 
+       {
+      //if area stacked then continue
+      //or if area or line or scatter, then check x axis length
+      if((panelSchema.type == "area-stacked")||((panelSchema.type == "line" ||panelSchema.type == "area" || panelSchema.type == "scatter") && panelSchema.queries[0].fields.x.length == 2)){
+        options.xAxis = options.xAxis.slice(0, 1);
+        options.tooltip.axisPointer.label = {
+          show: true,
+          label: {
+            fontsize: 12,
+          },
+          formatter: function (params: any) {
+            if (params.axisDimension == "y")
+              return formatUnitValue(
+                getUnitValue(
+                  params.value,
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom
+                )
+              );
+            return params.value.toString();
+          },
+        };
+        options.xAxis[0].axisLabel = {};
+        options.xAxis[0].axisTick = {};
+        options.xAxis[0].nameGap = 20;
+        options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
+        
+        // stacked with xAxis's second value
+        // allow 2 xAxis and 1 yAxis value for stack chart
+        // get second x axis key
+        const key1 = xAxisKeys[1];
+        // get the unique value of the second xAxis's key
+        const stackedXAxisUniqueValue = [
+          ...new Set(searchQueryData.map((obj: any) => obj[key1])),
+        ].filter((it) => it);
+  
+        // create a trace based on second xAxis's unique values
+        options.series = yAxisKeys.map((yAxis: any) => {
+          const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == yAxis
+          ).label;
+          
+          return stackedXAxisUniqueValue?.map((key: any) => {
+            const seriesObj = {
+              //only append if yaxiskeys length is more than 1
+              name: yAxisKeys.length == 1 ? key : key + " (" + yAxisName +")",
+              ...getPropsByChartTypeForSeries(panelSchema.type),
+              data: Array.from(
+                  new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
+                ).map(
+                  (it: any) =>
+                    searchQueryData.find(
+                      (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+                    )?.[yAxis] || 0
+                ),
+              };
+            return seriesObj;
+          });
+        }).flat();
+      }
+      else if(panelSchema.type == "line" ||panelSchema.type == "area"){        
+        //if x and y length is not 2 and 1 respectively then do following
+        options.series = yAxisKeys?.map((key: any) => {
+          const seriesObj = {
+            name: panelSchema?.queries[0]?.fields?.y.find(
+              (it: any) => it.alias == key
+            )?.label,
+            color:
+              panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+                ?.color || "#5960b2",
+            opacity: 0.8,
+            ...getPropsByChartTypeForSeries(panelSchema.type),
+            data: getAxisDataFromKey(key),
+          };
+          return seriesObj;
+        });
+      }
+      else{
+        options.tooltip.formatter = function (name: any) {
+          //reduce to each name
+          const hoverText = name.reduce((text: any, it: any) => {
+            return (text += `<br/> ${it.marker} ${
+              it.seriesName
+            } : ${formatUnitValue(
+              getUnitValue(
+                it.value[1],
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom
+              )
+            )}`);
+          }, "");
+          //x axis name + hovertext
+          return `${name[0].name} ${hoverText}`;
+        };
+        options.series = yAxisKeys?.map((key: any) => {
+          const seriesObj = {
+            name: panelSchema?.queries[0]?.fields?.y.find(
+              (it: any) => it.alias == key
+            )?.label,
+            color:
+              panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+                ?.color || "#5960b2",
+            opacity: 0.8,
+            ...getPropsByChartTypeForSeries(panelSchema.type),
+            data: getAxisDataFromKey(key).map((it: any, i: number) => {
+              return [options.xAxis[0].data[i], it];
+            }),
+          };
+          return seriesObj;
+        });
+      } 
+      break;
+    }
+    case "bar":{
       options.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
           name: panelSchema?.queries[0]?.fields?.y.find(
@@ -323,41 +438,6 @@ export const convertSQLData = (
           opacity: 0.8,
           ...getPropsByChartTypeForSeries(panelSchema.type),
           data: getAxisDataFromKey(key),
-        };
-        return seriesObj;
-      });
-      break;
-    }
-    case "scatter": {
-      options.tooltip.formatter = function (name: any) {
-        //reduce to each name
-        const hoverText = name.reduce((text: any, it: any) => {
-          return (text += `<br/> ${it.marker} ${
-            it.seriesName
-          } : ${formatUnitValue(
-            getUnitValue(
-              it.value[1],
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom
-            )
-          )}`);
-        }, "");
-        //x axis name + hovertext
-        return `${name[0].name} ${hoverText}`;
-      };
-      options.series = yAxisKeys?.map((key: any) => {
-        const seriesObj = {
-          name: panelSchema?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key
-          )?.label,
-          color:
-            panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-              ?.color || "#5960b2",
-          opacity: 0.8,
-          ...getPropsByChartTypeForSeries(panelSchema.type),
-          data: getAxisDataFromKey(key).map((it: any, i: number) => {
-            return [options.xAxis[0].data[i], it];
-          }),
         };
         return seriesObj;
       });
@@ -464,58 +544,6 @@ export const convertSQLData = (
       });
       options.xAxis = [];
       options.yAxis = [];
-      break;
-    }
-    case "area-stacked": {
-      options.xAxis[0].data = Array.from(
-        new Set(getAxisDataFromKey(xAxisKeys[0]))
-      );
-      options.xAxis = options.xAxis.slice(0, 1);
-      options.tooltip.axisPointer.label = {
-        show: true,
-        label: {
-          fontsize: 12,
-        },
-        formatter: function (params: any) {
-          if (params.axisDimension == "y")
-            return formatUnitValue(
-              getUnitValue(
-                params.value,
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
-              )
-            );
-          return params.value.toString();
-        },
-      };
-      options.xAxis[0].axisLabel = {};
-      options.xAxis[0].axisTick = {};
-      options.xAxis[0].nameGap = 20;
-      // stacked with xAxis's second value
-      // allow 2 xAxis and 1 yAxis value for stack chart
-      // get second x axis key
-      const key1 = xAxisKeys[1];
-      // get the unique value of the second xAxis's key
-      const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData.map((obj: any) => obj[key1])),
-      ].filter((it) => it);
-
-      // create a trace based on second xAxis's unique values
-      options.series = stackedXAxisUniqueValue?.map((key: any) => {
-        const seriesObj = {
-          name: key,
-          ...getPropsByChartTypeForSeries(panelSchema.type),
-          data: Array.from(
-            new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
-          ).map(
-            (it: any) =>
-              searchQueryData.find(
-                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-              )?.[yAxisKeys[0]] || 0
-          ),
-        };
-        return seriesObj;
-      });
       break;
     }
     case "stacked": {
@@ -757,51 +785,53 @@ export const convertSQLData = (
   }
 
   // auto SQL: if x axis has time series
-  const field = panelSchema.queries[0].fields?.x.find(
-    (it: any) =>
-      it.aggregationFunction == "histogram" &&
-      it.column == store.state.zoConfig.timestamp_column
-  );
-  if (field) {
-    options.series.map((seriesObj: any) => {
-      seriesObj.data = seriesObj.data.map((it: any, index: any) => [
-        options.xAxis[0].data[index],
-        it,
-      ]);
-    });
-    options.xAxis[0].type = "time";
-    options.xAxis[0].data = [];
-    options.tooltip.formatter = function (name: any) {
-      if (name.length == 0) return "";
-
-      const date = new Date(name[0].data[0]);
-
-      let hoverText = name.map((it: any) => {
-        return `${it.marker} ${it.seriesName} : ${formatUnitValue(
-          getUnitValue(
-            it.data[1],
-            panelSchema.config?.unit,
-            panelSchema.config?.unit_custom
-          )
-        )}`;
+  if(panelSchema.type != "h-bar"&& panelSchema.type != "h-stacked"){ 
+    const field = panelSchema.queries[0].fields?.x.find(
+      (it: any) =>
+        it.aggregationFunction == "histogram" &&
+        it.column == store.state.zoConfig.timestamp_column
+    );
+    if (field) {
+      options.series.map((seriesObj: any) => {
+        seriesObj.data = seriesObj.data.map((it: any, index: any) => [
+          options.xAxis[0].data[index],
+          it,
+        ]);
       });
-      return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
-    };
-    options.tooltip.axisPointer = {
-      type: "cross",
-      label: {
-        fontsize: 12,
-      },
-      formatter: function (params: any) {
-        const date = new Date(params[0].value[0]);
-        return formatDate(date).toString();
-      },
-    };
+      options.xAxis[0].type = "time";
+      options.xAxis[0].data = [];
+      options.tooltip.formatter = function (name: any) {
+        if (name.length == 0) return "";
+  
+        const date = new Date(name[0].data[0]);
+  
+        let hoverText = name.map((it: any) => {
+          return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+            getUnitValue(
+              it.data[1],
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom
+            )
+          )}`;
+        });
+        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+      };
+      options.tooltip.axisPointer = {
+        type: "cross",
+        label: {
+          fontsize: 12,
+        },
+        formatter: function (params: any) {
+          const date = new Date(params[0].value[0]);
+          return formatDate(date).toString();
+        },
+      };
+    }
   }
 
   //custom SQL: check if it is timeseries or not
   if (
-    panelSchema.type != "h-bar" &&
+    (panelSchema.type != "h-bar"&&panelSchema.type != "h-stacked") &&
     options.xAxis.length > 0 &&
     options.xAxis[0].data.length > 0
   ) {
