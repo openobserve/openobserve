@@ -302,6 +302,12 @@ const useRoutes = () => {
           component: ErrorViewer,
           props: true,
         },
+        {
+          path: "errors/view/:id",
+          name: "ErrorViewer",
+          component: ErrorViewer,
+          props: true,
+        },
       ],
     },
     ...useIngestionRoutes(),
