@@ -42,6 +42,7 @@ const EnrichmentTableList = () =>
 const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
 const AppSessions = () => import("@/views/RUM/AppSessions.vue");
 const SessionViewer = () => import("@/views/RUM/SessionViewer.vue");
+const ErrorViewer = () => import("@/views/RUM/ErrorViewer.vue");
 const AppErrors = () => import("@/views/RUM/AppErrors.vue");
 
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
@@ -284,6 +285,12 @@ const useRoutes = () => {
           path: "errors",
           name: "ErrorTracking",
           component: AppErrors,
+          props: true,
+        },
+        {
+          path: "errors/view/:id",
+          name: "ErrorViewer",
+          component: ErrorViewer,
           props: true,
         },
       ],

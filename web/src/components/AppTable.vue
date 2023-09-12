@@ -8,7 +8,7 @@
     5. Component should have highlight property to highlight search text
     6. Rows should have boolean property to expand row. expandable: true
    -->
-  <div class="q-pa-md">
+  <div>
     <q-table
       style="height: calc(100vh - 240px)"
       flat

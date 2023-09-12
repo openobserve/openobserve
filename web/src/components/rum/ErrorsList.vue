@@ -20,11 +20,10 @@
         />
       </template>
       <template #after>
-        <AppTable
-          :columns="columns"
-          :rows="rows"
-          @event-emitted="handleTableEvents"
-        >
+        <AppTable :columns="columns" :rows="rows">
+          <template v-slot:error_details="slotProps">
+            <ErrorDetail :userData="slotProps"></ErrorDetail>
+          </template>
         </AppTable>
       </template>
     </q-splitter>
@@ -59,28 +58,21 @@ import SearchBar from "./SearchBar.vue";
 import IndexList from "@/plugins/traces/IndexList.vue";
 import { useRouter } from "vue-router";
 import userActivityTracking from "./composables/activityTracking";
+import ErrorDetail from "./ErrorDetail.vue";
 
 const { t } = useI18n();
 
 const splitterModel = ref(250);
 const columns = ref([
   {
-    name: "action_play",
-    field: "",
-    label: "",
-    type: "action",
-    icon: "play_circle_filled",
-    style: { width: "56px" },
-  },
-  {
-    name: "timestamp",
-    field: (row: any) => row["timestamp"],
-    prop: (row: any) => row["timestamp"],
-    label: "Timestamp",
+    name: "error",
+    field: (row: any) => row["error"],
+    prop: (row: any) => row["error"],
+    label: "Error",
     align: "left",
     sortable: true,
     slot: true,
-    slotName: "Error",
+    slotName: "error_details",
   },
   {
     name: "type",

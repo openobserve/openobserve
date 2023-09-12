@@ -43,11 +43,12 @@ const tabs = [
 ];
 
 onMounted(() => {
-  const routes = ["SessionViewer", "ErrorTracking", "Dashboard"];
+  const routes = ["SessionViewer", "ErrorTracking", "Dashboard", "ErrorViewer"];
   const routeNameMapping = {
     SessionViewer: "sessions",
     ErrorTracking: "error_tracking",
     Dashboard: "dashboard",
+    ErrorViewer: "error_tracking",
   };
   if (routes.includes(router.currentRoute.value.name)) {
     activeTab.value = routeNameMapping[router.currentRoute.value.name];
