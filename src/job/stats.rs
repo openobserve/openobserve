@@ -47,7 +47,7 @@ async fn usage_report_stats() -> Result<(), anyhow::Error> {
 
 // get stats from file_list to update stream_stats
 async fn file_list_update_stats() -> Result<(), anyhow::Error> {
-    if !is_querier(&super::cluster::LOCAL_NODE_ROLE)
+    if (CONFIG.common.meta_store_external || !is_querier(&super::cluster::LOCAL_NODE_ROLE))
         && !is_compactor(&super::cluster::LOCAL_NODE_ROLE)
     {
         return Ok(());

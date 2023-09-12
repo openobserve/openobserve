@@ -206,8 +206,8 @@ pub struct Common {
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     pub meta_store_external: bool, // external storage no need sync file_list to s3
-    #[env_config(name = "ZO_META_STORE_POSTGRES_DSN", default = "")]
-    pub meta_store_postgres_dsn: String,
+    #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
+    pub meta_postgres_dsn: String,
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]
@@ -320,7 +320,7 @@ pub struct Limit {
     pub metrics_leader_election_interval: i64,
     #[env_config(name = "ZO_HEARTBEAT_INTERVAL", default = 30)] // in minutes
     pub hb_interval: i64,
-    #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 0)]
+    #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
     pub http_worker_num: usize,
@@ -448,7 +448,7 @@ pub struct Sled {
 
 #[derive(EnvConfig)]
 pub struct Dynamo {
-    #[env_config(name = "ZO_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
+    #[env_config(name = "ZO_META_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
     pub prefix: String,
     pub file_list_table: String,
     pub stream_stats_table: String,
@@ -609,11 +609,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     {
         cfg.common.meta_store_external = true;
     }
-    if cfg.common.meta_store.starts_with("postgres")
-        && cfg.common.meta_store_postgres_dsn.is_empty()
-    {
+    if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
         return Err(anyhow::anyhow!(
-            "Meta store is PostgreSQL, you must set ZO_META_STORE_POSTGRES_DSN"
+            "Meta store is PostgreSQL, you must set ZO_META_POSTGRES_DSN"
         ));
     }
 
