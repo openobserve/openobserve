@@ -18,6 +18,9 @@ const apiKeys = {
   list: () => {
     return http().get(`/api/api_keys`);
   },
+  listRUMTokens: (org_id: string) => {
+    return http().get(`/api/${org_id}/organizations/rumtoken`);
+  },
   createUserAPIKey: (data: object) => {
     return http().post(`/api/user_api_key`, data);
   },
