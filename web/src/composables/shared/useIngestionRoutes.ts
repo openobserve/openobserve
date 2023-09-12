@@ -31,6 +31,7 @@ import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
 import IngestLogs from "@/components/ingestion/logs/Index.vue";
 import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
 import IngestTraces from "@/components/ingestion/traces/Index.vue";
+import RUM from "@/components/ingestion/rum/Index.vue";
 
 const useIngestionRoutes = () => {
   const ingestionRoutes: any = [
@@ -117,6 +118,11 @@ const useIngestionRoutes = () => {
               component: OpenTelemetry,
             },
           ],
+        },
+        {
+          path: "rum",
+          name: "rumMonitoring",
+          component: RUM,
         },
       ],
     },

@@ -84,6 +84,17 @@
             label="Traces"
             content-class="tab_content"
           />
+          <q-route-tab
+            name="rumMonitoring"
+            :to="{
+              name: 'rumMonitoring',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            label="RUM"
+            content-class="tab_content"
+          />
         </q-tabs>
       </template>
 
@@ -106,6 +117,10 @@
           </q-tab-panel>
 
           <q-tab-panel name="ingestTraces">
+            <router-view :currOrgIdentifier="currentOrgIdentifier">
+            </router-view>
+          </q-tab-panel>
+          <q-tab-panel name="rumMonitoring">
             <router-view :currOrgIdentifier="currentOrgIdentifier">
             </router-view>
           </q-tab-panel>
