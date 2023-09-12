@@ -15,6 +15,7 @@
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { convertSQLData } from "@/utils/dashboard/convertSQLData";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
+import { convertMapData } from "@/utils/dashboard/convertMapData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -31,7 +32,7 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
     case "h-bar":
     case "stacked":
     case "heatmap":
-    case "map":
+    // case "map":
     case "h-stacked":
     case "line":
     case "pie":
@@ -51,8 +52,8 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
     case "table": {
       return convertTableData(panelSchema, data);
     }
-    case "geomap": {
-      return convertMapData();
+    case "map": {
+      return convertMapData(panelSchema, data);
     }
     default: {
       console.log("No Chart Type found, skipping");
@@ -61,4 +62,3 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
   }
 };
 
-const convertMapData = () => {};
