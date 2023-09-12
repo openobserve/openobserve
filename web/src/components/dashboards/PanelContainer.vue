@@ -18,7 +18,7 @@
     <div class="drag-allow">
       <q-bar :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'" dense class="q-px-xs" style="border-top-left-radius: 3px; border-top-right-radius: 3px;">
         <q-icon v-if="draggable" name="drag_indicator" />
-        <div :title="props.data.title">
+        <div :title="props.data.title" class="panelHeader">
           {{ props.data.title }}
         </div>
         <q-space />
@@ -153,5 +153,10 @@ export default defineComponent({
 <style lang="scss" scoped>
 .plotlycontainer {
   height: calc(100% - 24px);
+}
+.panelHeader{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

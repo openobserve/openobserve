@@ -67,7 +67,10 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import DateTimePicker from "../../components/DateTimePicker.vue";
 import { useRouter } from "vue-router";
-import {getDashboard} from "../../utils/commons.ts";
+import {
+  getConsumableDateTime,
+  getDashboard
+} from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel, getDurationObjectFromParams, getQueryParamsForDuration } from "../../utils/date"
 import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
