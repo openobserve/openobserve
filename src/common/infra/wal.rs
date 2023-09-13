@@ -14,6 +14,7 @@
 
 use ahash::HashMap;
 use bytes::{Bytes, BytesMut};
+use chrono::{DateTime, Datelike, TimeZone, Utc};
 use itertools::chain;
 use once_cell::sync::Lazy;
 use std::{
@@ -191,7 +192,7 @@ impl Manager {
 
         // check size & ttl
         if file.size() >= (CONFIG.limit.max_file_size_on_disk as i64)
-            || file.expired() <= chrono::Utc::now().timestamp()
+            || file.expired() <= Utc::now().timestamp()
         {
             let mut manager = self.data.get(thread_id).unwrap().write().unwrap();
             manager.remove(&full_key);
@@ -336,11 +337,29 @@ impl RwFile {
             (Some(RwLock::new(f)), None)
         };
 
+        let time_now: DateTime<Utc> = Utc::now();
         let level_duration = partition_time_level.unwrap_or_default().duration();
         let ttl = if level_duration > 0 {
-            chrono::Utc::now().timestamp() + level_duration
+            let time_end_day = Utc
+                .with_ymd_and_hms(
+                    time_now.year(),
+                    time_now.month(),
+                    time_now.day(),
+                    23,
+                    59,
+                    59,
+                )
+                .unwrap()
+                .timestamp();
+            let expired = time_now.timestamp() + level_duration;
+            if expired > time_end_day {
+                // if the file expired time is tomorrow, it should be deleted at 23:59:59 + 10min
+                time_end_day + CONFIG.limit.max_file_retention_time as i64
+            } else {
+                expired
+            }
         } else {
-            chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64
+            time_now.timestamp() + CONFIG.limit.max_file_retention_time as i64
         };
 
         RwFile {
