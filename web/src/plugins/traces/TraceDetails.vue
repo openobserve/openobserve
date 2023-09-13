@@ -73,6 +73,12 @@
           ref="plotChart"
           :chart="traceChart"
           @updated:chart="updateChart"
+          />
+          <ChartRenderer
+          class="trace-details-chart"
+          id="trace_details_gantt_chart"
+          :data="ChartData"
+          style="max-height: 200px;"
         />
       </div>
       <div class="col-12" v-else>
@@ -149,6 +155,8 @@ import D3Chart from "@/components/D3Chart.vue";
 import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
+import { convertTimelineData } from "@/utils/traces/convertTraceData";
+import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -167,6 +175,7 @@ export default defineComponent({
     D3Chart,
     TraceTimelineIcon,
     ServiceMapIcon,
+    ChartRenderer
   },
 
   setup() {
@@ -209,6 +218,7 @@ export default defineComponent({
     });
 
     const plotChart: any = ref(null);
+    const ChartData: any = ref({});
 
     const spanList: any = computed(() => {
       return searchObj.data.traceDetails.spanList;
@@ -559,6 +569,7 @@ export default defineComponent({
       layout.xaxis.range = [0, endTime > 0 ? endTime : 1];
       traceChart.value.layout = layout;
       if (plotChart.value) plotChart.value?.reDraw();
+      ChartData.value = convertTimelineData(traceChart.value);
     };
     const updateChart = ({ data }: { data: any }) => {
       let range1 = 0;
@@ -692,6 +703,7 @@ export default defineComponent({
       spanDimensions,
       splitterModel,
       plotChart,
+      ChartData,
       traceChart,
       updateChart,
       traceServiceMap,
