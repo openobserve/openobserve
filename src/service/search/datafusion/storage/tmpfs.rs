@@ -17,13 +17,14 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
-    path::Path, GetOptions, GetResult, ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
+    path::Path, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, ObjectMeta,
+    ObjectStore, Result,
 };
 use std::ops::Range;
 use thiserror::Error as ThisError;
 use tokio::io::AsyncWrite;
 
-use crate::common::infra::cache::tmpfs;
+use crate::common::{infra::cache::tmpfs, utils::time::BASE_TIME};
 
 /// A specialized `Error` for in-memory object store-related errors
 #[derive(ThisError, Debug)]
@@ -60,19 +61,45 @@ impl ObjectStore for Tmpfs {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         // log::info!("get: {}", location);
         let data = self.get_bytes(location).await?;
-
-        Ok(GetResult::Stream(
-            futures::stream::once(async move { Ok(data) }).boxed(),
-        ))
+        let meta = ObjectMeta {
+            location: location.clone(),
+            last_modified: *BASE_TIME,
+            size: data.len(),
+            e_tag: None,
+        };
+        let range = Range {
+            start: 0,
+            end: data.len(),
+        };
+        Ok(GetResult {
+            payload: GetResultPayload::Stream(
+                futures::stream::once(async move { Ok(data) }).boxed(),
+            ),
+            meta,
+            range,
+        })
     }
 
-    async fn get_opts(&self, location: &Path, _options: GetOptions) -> Result<GetResult> {
+    async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         // log::info!("get_opts: {}", location);
         let data = self.get_bytes(location).await?;
-
-        Ok(GetResult::Stream(
-            futures::stream::once(async move { Ok(data) }).boxed(),
-        ))
+        let meta = ObjectMeta {
+            location: location.clone(),
+            last_modified: *BASE_TIME,
+            size: data.len(),
+            e_tag: None,
+        };
+        let (range, data) = match options.range {
+            Some(range) => (range.clone(), data.slice(range)),
+            None => (0..data.len(), data),
+        };
+        Ok(GetResult {
+            payload: GetResultPayload::Stream(
+                futures::stream::once(async move { Ok(data) }).boxed(),
+            ),
+            meta,
+            range,
+        })
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {

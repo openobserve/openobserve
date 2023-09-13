@@ -83,9 +83,9 @@ pub fn new_parquet_writer<'a>(
         .expect("Not found timestamp field");
     let mut writer_props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
-        .set_write_batch_size(PARQUET_BATCH_SIZE)
-        .set_data_page_size_limit(PARQUET_PAGE_SIZE)
-        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE)
+        .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
+        .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
+        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
         .set_dictionary_enabled(true)
         .set_sorting_columns(Some(
             [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),

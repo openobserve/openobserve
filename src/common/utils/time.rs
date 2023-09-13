@@ -74,11 +74,11 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
 
     let ret = if s.contains(' ') && s.len() == 19 {
         let fmt = "%Y-%m-%d %H:%M:%S";
-        Utc.datetime_from_str(s, fmt)?
+        DateTime::parse_from_str(s, fmt)?.with_timezone(&Utc)
     } else if s.contains('T') && !s.contains(' ') {
         if s.len() == 19 {
             let fmt = "%Y-%m-%dT%H:%M:%S";
-            Utc.datetime_from_str(s, fmt)?
+            DateTime::parse_from_str(s, fmt)?.with_timezone(&Utc)
         } else {
             let t = chrono::DateTime::parse_from_rfc3339(s)?;
             t.into()

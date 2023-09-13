@@ -16,8 +16,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
-    limit::LimitStore, path::Path, Error, GetOptions, GetResult, ListResult, MultipartId,
-    ObjectMeta, ObjectStore, Result,
+    limit::LimitStore, path::Path, Error, GetOptions, GetResult, GetResultPayload, ListResult,
+    MultipartId, ObjectMeta, ObjectStore, Result,
 };
 use std::ops::Range;
 use tokio::io::AsyncWrite;
@@ -95,6 +95,8 @@ impl ObjectStore for Remote {
         let result = self.client.get(&(format_key(&file).into())).await?;
 
         // metrics
+        let meta = result.meta.clone();
+        let range = result.range.clone();
         let data = result.bytes().await?;
         let data_len = data.len();
         let columns = file.split('/').collect::<Vec<&str>>();
@@ -109,9 +111,13 @@ impl ObjectStore for Remote {
                 .inc_by(time);
         }
 
-        Ok(GetResult::Stream(
-            futures::stream::once(async move { Ok(data) }).boxed(),
-        ))
+        Ok(GetResult {
+            payload: GetResultPayload::Stream(
+                futures::stream::once(async move { Ok(data) }).boxed(),
+            ),
+            meta,
+            range,
+        })
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
@@ -123,6 +129,8 @@ impl ObjectStore for Remote {
             .await?;
 
         // metrics
+        let meta = result.meta.clone();
+        let range = result.range.clone();
         let data = result.bytes().await?;
         let data_len = data.len();
         let columns = file.split('/').collect::<Vec<&str>>();
@@ -137,9 +145,13 @@ impl ObjectStore for Remote {
                 .inc_by(time);
         }
 
-        Ok(GetResult::Stream(
-            futures::stream::once(async move { Ok(data) }).boxed(),
-        ))
+        Ok(GetResult {
+            payload: GetResultPayload::Stream(
+                futures::stream::once(async move { Ok(data) }).boxed(),
+            ),
+            meta,
+            range,
+        })
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
