@@ -57,7 +57,7 @@ impl Telemetry {
             }
         }
         if send_zo_data {
-            add_zo_info(&mut props).await;
+            props = add_zo_info(props).await;
         }
         self.add_event(Track {
             user: segment::message::User::UserId {
@@ -110,7 +110,7 @@ pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String,
     data.clone()
 }
 
-pub async fn add_zo_info(data: &mut HashMap<String, json::Value>) {
+pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<String, json::Value> {
     let db = &db::DEFAULT;
     let iter = STREAM_SCHEMAS.iter().clone();
     let mut num_streams = 0;
@@ -118,7 +118,7 @@ pub async fn add_zo_info(data: &mut HashMap<String, json::Value>) {
     let mut metrics_streams = 0;
     for item in iter {
         num_streams += item.value().len();
-        let stream_type = item.key().split("/").collect::<Vec<&str>>();
+        let stream_type = item.key().split('/').collect::<Vec<&str>>();
         if stream_type.len() < 2 {
             continue;
         }
@@ -176,7 +176,7 @@ pub async fn add_zo_info(data: &mut HashMap<String, json::Value>) {
         streams_orig_size += stats.storage_size;
         streams_compressed_size += stats.compressed_size;
 
-        let stream_type = stats.key().split("/").collect::<Vec<&str>>();
+        let stream_type = stats.key().split('/').collect::<Vec<&str>>();
         if stream_type.len() < 2 {
             continue;
         }
@@ -255,6 +255,7 @@ pub async fn add_zo_info(data: &mut HashMap<String, json::Value>) {
     }
     data.insert("real_time_alerts".to_string(), rt_alerts.into());
     data.insert("scheduled_alerts".to_string(), scheduled_alerts.into());
+    data
 }
 
 #[cfg(test)]
@@ -264,8 +265,8 @@ mod test_telemetry {
     #[actix_web::test]
     async fn test_telemetry_new() {
         let tel = Telemetry::new();
-        let mut props = tel.base_info.clone();
-        add_zo_info(&mut props).await;
+        let props = tel.base_info.clone();
+        add_zo_info(props).await;
         assert!(tel.base_info.len() > 0)
     }
 }
