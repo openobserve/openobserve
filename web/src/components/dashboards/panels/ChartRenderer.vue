@@ -24,7 +24,7 @@ import { useStore } from "vuex";
 
 export default defineComponent({
     name: "ChartRenderer",
-    emits: ["updated:chart"],
+    emits: ["updated:chart","click"],
     props: {
         data: {
             required: true,
@@ -125,6 +125,9 @@ export default defineComponent({
                     start: params.batch[0].startValue,
                     end: params.batch[0].endValue,
                 });
+            });
+            chart.on('click', function (params:any) {                                
+                emit("click", params);
             });
             window.addEventListener("resize", windowResizeEventCallback);
         });
