@@ -45,19 +45,18 @@ impl LogsService for LogsServer {
             return Err(Status::invalid_argument(msg));
         }
 
-        let resp = crate::service::logs::otlp_grpc::handle_grpc_request(
+        match crate::service::logs::otlp_grpc::handle_grpc_request(
             org_id.unwrap().to_str().unwrap(),
             0,
             in_req,
             true,
         )
-        .await;
-        if resp.is_ok() {
-            return Ok(Response::new(ExportLogsServiceResponse {
+        .await
+        {
+            Ok(_) => Ok(Response::new(ExportLogsServiceResponse {
                 partial_success: None,
-            }));
-        } else {
-            Err(Status::internal(resp.err().unwrap().to_string()))
+            })),
+            Err(e) => Err(Status::internal(e.to_string())),
         }
     }
 }

@@ -23,7 +23,7 @@ const ITEM_PREFIXES: [&str; 11] = [
     "/kv",
 ];
 
-pub async fn load() -> Result<(), anyhow::Error> {
+pub async fn run() -> Result<(), anyhow::Error> {
     println!("local mode is {}", CONFIG.common.local_mode);
     if CONFIG.common.local_mode {
         load_meta_from_sled().await

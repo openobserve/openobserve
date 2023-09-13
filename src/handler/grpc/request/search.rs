@@ -41,33 +41,33 @@ impl Search for Searcher {
         let req = req.get_ref().to_owned();
         let org_id = req.org_id.clone();
         let stream_type = req.stream_type.clone();
-        let result = tokio::task::spawn(async move { SearchService::grpc::search(&req).await })
-            .await
-            .map_err(|e| Status::internal(e.to_string()))?;
-        let result = result.map_err(|err| {
-            let time = start.elapsed().as_secs_f64();
-            metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
-                .observe(time);
-            metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
-                .inc();
-            let message = if let errors::Error::ErrorCode(code) = err {
-                code.to_json()
-            } else {
-                err.to_string()
-            };
-            Status::internal(message)
-        })?;
+        match SearchService::grpc::search(&req).await {
+            Ok(res) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::GRPC_RESPONSE_TIME
+                    .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
+                    .observe(time);
+                metrics::GRPC_INCOMING_REQUESTS
+                    .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
+                    .inc();
 
-        let time = start.elapsed().as_secs_f64();
-        metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
-            .observe(time);
-        metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
-            .inc();
-
-        Ok(Response::new(result))
+                Ok(Response::new(res))
+            }
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::GRPC_RESPONSE_TIME
+                    .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
+                    .observe(time);
+                metrics::GRPC_INCOMING_REQUESTS
+                    .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
+                    .inc();
+                let message = if let errors::Error::ErrorCode(code) = err {
+                    code.to_json()
+                } else {
+                    err.to_string()
+                };
+                Err(Status::internal(message))
+            }
+        }
     }
 }

@@ -339,16 +339,18 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .long("component")
                         .help("view data of the component: version, user"),
                 ),
-            clap::Command::new("migrate-file-list")
-                .about("migrate file-list from s3 to dynamo db")
-                .arg(
-                    clap::Arg::new("prefix")
-                        .short('p')
-                        .long("prefix")
-                        .value_name("prefix")
-                        .required(false)
-                        .help("only migrate specified prefix, default is all"),
-                ),
+                clap::Command::new("migrate-file-list")
+                    .about("migrate file-list from s3 to dynamo db")
+                    .arg(
+                        clap::Arg::new("prefix")
+                            .short('p')
+                            .long("prefix")
+                            .value_name("prefix")
+                            .required(false)
+                            .help("only migrate specified prefix, default is all"),
+                    ),
+                    clap::Command::new("migrate-file-list-from-dynamo")
+                        .about("migrate file-list from dynamo to dynamo db"),
             clap::Command::new("migrate-meta").about("migrate meta"),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
@@ -440,11 +442,15 @@ async fn cli() -> Result<bool, anyhow::Error> {
                 None => "".to_string(),
             };
             println!("Running migration with prefix: {}", prefix);
-            migration::file_list::load(&prefix).await?
+            migration::file_list::run(&prefix).await?
+        }
+        "migrate-file-list-from-dynamo" => {
+            println!("Running migration from DynamoDB");
+            migration::file_list::run_for_dynamo().await?
         }
         "migrate-meta" => {
             println!("Running migration");
-            migration::meta::load().await?
+            migration::meta::run().await?
         }
         "delete-parquet" => {
             let file = command.get_one::<String>("file").unwrap();
