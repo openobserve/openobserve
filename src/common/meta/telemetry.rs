@@ -16,6 +16,7 @@ use segment::{message::Track, Client, Message};
 use std::collections::HashMap;
 use sysinfo::SystemExt;
 
+use crate::common::infra::db;
 use crate::common::infra::{cache::stats, config::*};
 use crate::common::utils::json;
 
@@ -56,7 +57,7 @@ impl Telemetry {
             }
         }
         if send_zo_data {
-            add_zo_info(&mut props)
+            props = add_zo_info(props).await;
         }
         self.add_event(Track {
             user: segment::message::User::UserId {
@@ -109,14 +110,28 @@ pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String,
     data.clone()
 }
 
-pub fn add_zo_info(data: &mut HashMap<String, json::Value>) {
+pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<String, json::Value> {
+    let db = &db::DEFAULT;
     let iter = STREAM_SCHEMAS.iter().clone();
     let mut num_streams = 0;
+    let mut logs_streams = 0;
+    let mut metrics_streams = 0;
     for item in iter {
-        num_streams += item.value().len()
+        num_streams += item.value().len();
+        let stream_type = item.key().split('/').collect::<Vec<&str>>();
+        if stream_type.len() < 2 {
+            continue;
+        }
+        match stream_type[1] {
+            "logs" => logs_streams += 1,
+            "metrics" => metrics_streams += 1,
+            _ => (),
+        }
     }
     data.insert("num_org".to_string(), STREAM_SCHEMAS.len().into());
     data.insert("num_streams".to_string(), num_streams.into());
+    data.insert("num_logs_streams".to_string(), logs_streams.into());
+    data.insert("num_metrics_streams".to_string(), metrics_streams.into());
     data.insert("num_users".to_string(), USERS.len().into());
     data.insert(
         "is_local_mode".to_string(),
@@ -127,6 +142,14 @@ pub fn add_zo_info(data: &mut HashMap<String, json::Value>) {
             "local_mode_storage".to_string(),
             CONFIG.common.local_mode_storage.clone().into(),
         );
+    }
+    match db.list_keys("/dashboard/").await {
+        Ok(keys) => {
+            data.insert("num_dashboards".to_string(), keys.len().into());
+        }
+        Err(e) => {
+            log::error!("Error getting dashboards {}", e);
+        }
     }
 
     let roles = crate::common::infra::cluster::load_local_node_role();
@@ -143,9 +166,35 @@ pub fn add_zo_info(data: &mut HashMap<String, json::Value>) {
     }
     let mut streams_orig_size: f64 = 0.0;
     let mut streams_compressed_size: f64 = 0.0;
+    let mut logs_orig_size: f64 = 0.0;
+    let mut logs_compressed_size: f64 = 0.0;
+    let mut metrics_orig_size: f64 = 0.0;
+    let mut metrics_compressed_size: f64 = 0.0;
+    let mut traces_orig_size: f64 = 0.0;
+    let mut traces_compressed_size: f64 = 0.0;
     for stats in stats::get_stats().iter() {
         streams_orig_size += stats.storage_size;
-        streams_compressed_size += stats.compressed_size
+        streams_compressed_size += stats.compressed_size;
+
+        let stream_type = stats.key().split('/').collect::<Vec<&str>>();
+        if stream_type.len() < 2 {
+            continue;
+        }
+        match stream_type[1] {
+            "logs" => {
+                logs_orig_size += stats.storage_size;
+                logs_compressed_size += stats.compressed_size;
+            }
+            "metrics" => {
+                metrics_orig_size += stats.storage_size;
+                metrics_compressed_size += stats.compressed_size;
+            }
+            "traces" => {
+                traces_orig_size += stats.storage_size;
+                traces_compressed_size += stats.compressed_size;
+            }
+            _ => (),
+        }
     }
     data.insert(
         "streams_total_size_mb".to_string(),
@@ -154,6 +203,30 @@ pub fn add_zo_info(data: &mut HashMap<String, json::Value>) {
     data.insert(
         "streams_compressed_size_mb".to_string(),
         format!("{:.0}", (streams_compressed_size / SIZE_IN_MB)).into(),
+    );
+    data.insert(
+        "metrics_orig_size".to_string(),
+        format!("{:.0}", (metrics_orig_size / SIZE_IN_MB)).into(),
+    );
+    data.insert(
+        "metrics_compressed_size".to_string(),
+        format!("{:.0}", (metrics_compressed_size / SIZE_IN_MB)).into(),
+    );
+    data.insert(
+        "logs_orig_size".to_string(),
+        format!("{:.0}", (logs_orig_size / SIZE_IN_MB)).into(),
+    );
+    data.insert(
+        "logs_compressed_size".to_string(),
+        format!("{:.0}", (logs_compressed_size / SIZE_IN_MB)).into(),
+    );
+    data.insert(
+        "traces_orig_size".to_string(),
+        format!("{:.0}", (traces_orig_size / SIZE_IN_MB)).into(),
+    );
+    data.insert(
+        "traces_compressed_size".to_string(),
+        format!("{:.0}", (traces_compressed_size / SIZE_IN_MB)).into(),
     );
 
     let iter = STREAM_FUNCTIONS.iter().clone();
@@ -182,17 +255,18 @@ pub fn add_zo_info(data: &mut HashMap<String, json::Value>) {
     }
     data.insert("real_time_alerts".to_string(), rt_alerts.into());
     data.insert("scheduled_alerts".to_string(), scheduled_alerts.into());
+    data
 }
 
 #[cfg(test)]
 mod test_telemetry {
     use super::*;
 
-    #[test]
-    fn test_telemetry_new() {
+    #[actix_web::test]
+    async fn test_telemetry_new() {
         let tel = Telemetry::new();
-        let mut props = tel.base_info.clone();
-        add_zo_info(&mut props);
+        let props = tel.base_info.clone();
+        add_zo_info(props).await;
         assert!(tel.base_info.len() > 0)
     }
 }
