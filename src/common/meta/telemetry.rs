@@ -59,7 +59,6 @@ impl Telemetry {
         if send_zo_data {
             add_zo_info(&mut props).await;
         }
-        println!("props {:?}", props);
         self.add_event(Track {
             user: segment::message::User::UserId {
                 user_id: segment::message::User::AnonymousId {
