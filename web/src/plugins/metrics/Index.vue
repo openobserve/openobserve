@@ -592,14 +592,13 @@ export default defineComponent({
     function runQuery() {
       try {
         
-        // if (
-        //   !searchObj.data.metrics.selectedMetric?.value ||
-        //   !searchObj.data.query
-        // ) {
-        //   return false;
-        // }
+        if (
+          !searchObj.data.metrics.selectedMetric?.value ||
+          !searchObj.data.query
+        ) {
+          return false;
+        }
         
-        console.log("runQuery",searchObj.data);
         searchObj.data.errorMsg = "";
         const timestamps: any =
           searchObj.data.datetime.type === "relative"
