@@ -337,9 +337,9 @@ impl RwFile {
             (Some(RwLock::new(f)), None)
         };
 
+        let time_now: DateTime<Utc> = Utc::now();
         let level_duration = partition_time_level.unwrap_or_default().duration();
         let ttl = if level_duration > 0 {
-            let time_now: DateTime<Utc> = Utc::now();
             let time_end_day = Utc
                 .with_ymd_and_hms(
                     time_now.year(),
@@ -359,7 +359,7 @@ impl RwFile {
                 expired
             }
         } else {
-            Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64
+            time_now.timestamp() + CONFIG.limit.max_file_retention_time as i64
         };
 
         RwFile {
