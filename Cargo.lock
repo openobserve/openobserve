@@ -2652,7 +2652,7 @@ dependencies = [
 [[package]]
 name = "enrichment"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vector?rev=8eb52562#8eb52562f034930b83eb4416a667bea1381dd9c8"
+source = "git+https://github.com/openobserve/vector?rev=8eb52562#8eb52562f034930b83eb4416a667bea1381dd9c8"
 dependencies = [
  "arc-swap",
  "chrono",

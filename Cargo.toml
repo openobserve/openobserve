@@ -157,7 +157,7 @@ url = "2.2"
 utoipa = { version = "3", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
-vector-enrichment = { package = "enrichment", git = "https://github.com/vectordotdev/vector", rev = "8eb52562" }
+vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "8eb52562" }
 vrl = { version = "0.6.0", features = [
   "value","compiler"
 ] }
