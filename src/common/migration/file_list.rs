@@ -42,12 +42,12 @@ pub async fn run_for_dynamo() -> Result<(), anyhow::Error> {
     let start_time = BASE_TIME.timestamp_micros();
     let end_time = chrono::Utc::now().timestamp_micros();
     let orgs = db::schema::list_organizations_from_cache();
-    for org_id in &orgs {
+    for org_id in orgs.iter() {
         for stream_type in stream_types {
             let streams = db::schema::list_streams_from_cache(org_id, stream_type);
             for stream_name in streams.iter() {
                 let files = infra_file_list::query(
-                    &org_id,
+                    org_id,
                     stream_type,
                     stream_name,
                     PartitionTimeLevel::Unset,
