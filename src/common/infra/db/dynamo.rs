@@ -236,9 +236,9 @@ impl super::Db for DynamoDb {
                                     )))
                                 }
                             }
-                            if last_evaluated_key.is_none() {
-                                return Ok(result);
-                            }
+                        }
+                        if last_evaluated_key.is_none() {
+                            return Ok(result);
                         }
                     }
                     Err(err) => {
