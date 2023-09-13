@@ -107,7 +107,6 @@ impl Query {
             let time = self.start + (self.interval * i);
             let mut engine = super::Engine::new(ctx.clone(), time);
             let expr = expr.clone();
-            // let task = tokio::task::spawn(async move { (time, engine.exec(&expr).await) });
             let task = (time, engine.exec(&expr).await);
             tasks.push(task);
         }

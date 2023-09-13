@@ -55,9 +55,7 @@ pub async fn search(
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as i32;
     req.stream_type = stream_type.to_string();
-    tokio::task::spawn(async move { search_in_cluster(req).await })
-        .await
-        .map_err(server_internal_error)?
+    search_in_cluster(req).await
 }
 
 async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {

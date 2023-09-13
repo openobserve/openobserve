@@ -602,6 +602,66 @@ pub async fn create_table_file_list() -> Result<()> {
     Ok(())
 }
 
+pub async fn create_table_file_list_org_crated_at_index() -> Result<()> {
+    let client = DYNAMO_DB_CLIENT.get().await.clone();
+    let table_name = &CONFIG.dynamo.file_list_table;
+
+    let attribute_definitions = vec![
+        AttributeDefinition::builder()
+            .attribute_name("org")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("stream")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("file")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("created_at")
+            .attribute_type(ScalarAttributeType::N)
+            .build(),
+    ];
+    let index_created = GlobalSecondaryIndexUpdate::builder()
+        .create(
+            CreateGlobalSecondaryIndexAction::builder()
+                .index_name("org-created-at-index")
+                .set_key_schema(Some(vec![
+                    KeySchemaElement::builder()
+                        .attribute_name("org")
+                        .key_type(KeyType::Hash)
+                        .build(),
+                    KeySchemaElement::builder()
+                        .attribute_name("created_at")
+                        .key_type(KeyType::Range)
+                        .build(),
+                ]))
+                .set_projection(Some(
+                    Projection::builder()
+                        .projection_type(ProjectionType::All)
+                        .build(),
+                ))
+                .build(),
+        )
+        .build();
+
+    client
+        .update_table()
+        .table_name(table_name)
+        .set_attribute_definitions(Some(attribute_definitions))
+        .set_global_secondary_index_updates(Some(vec![index_created]))
+        .billing_mode(BillingMode::PayPerRequest)
+        .send()
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+
+    log::info!("Table {} index created successfully", table_name);
+
+    Ok(())
+}
+
 pub async fn create_table_stream_stats() -> Result<()> {
     let client = DYNAMO_DB_CLIENT.get().await.clone();
     let table_name = &CONFIG.dynamo.stream_stats_table;
