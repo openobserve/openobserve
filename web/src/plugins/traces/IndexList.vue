@@ -229,7 +229,11 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useTraces from "../../composables/useTraces";
-import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
+import {
+  b64EncodeUnicode,
+  formatLargeNumber,
+  getImageURL,
+} from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
@@ -308,37 +312,97 @@ export default defineComponent({
         isLoading: true,
         values: [],
       };
-      streamService
-        .fieldValues({
-          org_identifier: store.state.selectedOrganization.identifier,
-          stream_name: searchObj.data.stream.selectedStream.value,
-          start_time: searchObj.data.datetime.startTime,
-          end_time: searchObj.data.datetime.endTime,
-          fields: [name],
-          size: 10,
-          type: "traces",
-        })
-        .then((res: any) => {
-          if (res.data.hits.length) {
-            fieldValues.value[name]["values"] = res.data.hits
-              .find((field: any) => field.field === name)
-              .values.map((value: any) => {
-                return {
-                  key: value.zo_sql_key ? value.zo_sql_key : "null",
-                  count: formatLargeNumber(value.zo_sql_num),
-                };
-              });
-          }
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: `Error while fetching values for ${name}`,
+
+      try {
+        let query_context = "";
+        let query = searchObj.data.editorValue;
+        let parseQuery = query.split("|");
+        let whereClause = "";
+        if (parseQuery.length > 1) {
+          whereClause = parseQuery[1].trim();
+        } else {
+          whereClause = parseQuery[0].trim();
+        }
+
+        query_context =
+          `SELECT * FROM "` +
+          searchObj.data.stream.selectedStream.value +
+          `" [WHERE_CLAUSE]`;
+
+        if (whereClause.trim() != "") {
+          whereClause = whereClause
+            .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
+            .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
+            .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
+
+          whereClause = whereClause
+            .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+            .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+            .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
+            .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
+
+          const parsedSQL = whereClause.split(" ");
+          searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
+            parsedSQL.forEach((node: any, index: any) => {
+              if (node == field.name) {
+                node = node.replaceAll('"', "");
+                parsedSQL[index] = '"' + node + '"';
+              }
+            });
           });
-        })
-        .finally(() => {
-          fieldValues.value[name]["isLoading"] = false;
-        });
+
+          whereClause = parsedSQL.join(" ");
+
+          query_context = query_context.replace(
+            "[WHERE_CLAUSE]",
+            " WHERE " + whereClause
+          );
+        } else {
+          query_context = query_context.replace("[WHERE_CLAUSE]", "");
+        }
+        query_context = b64EncodeUnicode(query_context) || "";
+
+        fieldValues.value[name] = {
+          isLoading: true,
+          values: [],
+        };
+
+        streamService
+          .fieldValues({
+            org_identifier: store.state.selectedOrganization.identifier,
+            stream_name: searchObj.data.stream.selectedStream.value,
+            start_time: searchObj.data.datetime.startTime,
+            end_time: searchObj.data.datetime.endTime,
+            fields: [name],
+            size: 10,
+            type: "traces",
+            query_context,
+          })
+          .then((res: any) => {
+            if (res.data.hits.length) {
+              fieldValues.value[name]["values"] = res.data.hits
+                .find((field: any) => field.field === name)
+                .values.map((value: any) => {
+                  return {
+                    key: value.zo_sql_key ? value.zo_sql_key : "null",
+                    count: formatLargeNumber(value.zo_sql_num),
+                  };
+                });
+            }
+          })
+          .catch(() => {
+            $q.notify({
+              type: "negative",
+              message: `Error while fetching values for ${name}`,
+            });
+          })
+          .finally(() => {
+            fieldValues.value[name]["isLoading"] = false;
+          });
+      } catch (e) {
+        fieldValues.value[name]["isLoading"] = false;
+        console.log("Error while fetching field values");
+      }
     };
 
     const addSearchTerm = (term: string) => {
