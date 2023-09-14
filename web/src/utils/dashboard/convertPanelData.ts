@@ -53,7 +53,9 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
       return convertTableData(panelSchema, data);
     }
     case "map": {
-      return convertMapData(panelSchema, data);
+      console.log("map");
+      
+      return convertMapData(data);
     }
     default: {
       console.log("No Chart Type found, skipping");

@@ -62,7 +62,7 @@ export default defineComponent({
             await nextTick();
             const theme = store.state.theme === 'dark' ? 'dark' : 'light';
             chart = echarts.init(chartRef.value, theme);
-            echarts.registerMap('USA', map);
+            echarts.registerMap('world', map);
             chart.setOption(props?.data?.options || {}, true);
             window.addEventListener("resize", windowResizeEventCallback);
         });
