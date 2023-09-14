@@ -89,6 +89,11 @@ export const convertTimelineData = (props:any)=>{
       type: 'value',
       axisTick: { show: false },
       splitLine: { show: false },
+      axisLabel: {
+        formatter:(params:any)=>{          
+          return params+"ms"
+        }
+      }
     },
     series: [
       {
@@ -105,14 +110,14 @@ export const convertTimelineData = (props:any)=>{
             color: 'transparent'
           }
         },
-        data: props.value.layout.shapes.map((it:any)=>(it.x0*1000))
+        data: props.value.layout.shapes.map((it:any)=>(it.x0))
       },
       {
         type: 'bar',
         stack: 'Total',
         barWidth:"100%",
         barCategoryGap:"0%",
-        data: props.value.layout.shapes.map((it:any)=>({value:it.x1*1000,itemStyle:{color:it.fillcolor}}))
+        data: props.value.layout.shapes.map((it:any)=>({value:it.x1,itemStyle:{color:it.fillcolor}})),
       }
     ]
   };
@@ -136,7 +141,7 @@ export const convertTraceServiceMapData = (data:any)=>{
           fontSize: 12
         },
       }
-    ]
+    ],
   };
   return {options};
 }

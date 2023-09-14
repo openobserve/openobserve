@@ -394,7 +394,11 @@ export default defineComponent({
             duration: span.durationMs,
             children: children,
             itemStyle: {
-              color: serviceColors[span.serviceName]},
+              color: serviceColors[span.serviceName]
+            },
+            emphasis:{
+              disabled: true
+            }
           });
           if (span.spans && span.spans.length) {
             span.spans.forEach((_span: any) =>
