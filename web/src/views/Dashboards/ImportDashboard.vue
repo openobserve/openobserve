@@ -103,6 +103,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import dashboardService from "../../services/dashboards";
 import axios from 'axios';
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 export default defineComponent({
   name: "Import Dashboard",
@@ -166,7 +167,11 @@ export default defineComponent({
           let reader = new FileReader();
           reader.onload = function (readerResult) {
             try {
-              importDashboardFromJSON(readerResult.target.result)
+
+              const oldImportedSchema = JSON.parse(readerResult.target.result);
+              const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
+
+              importDashboardFromJSON(convertedSchema)
                 .then((res) => {
                   jsonFiles.value = null
                   resolve({ file: it.name, result: res })
@@ -249,7 +254,11 @@ export default defineComponent({
         const urlData = url.value ? url.value : ''
 
         const res = await axios.get(urlData);
-        await importDashboardFromJSON(res.data)
+
+        const oldImportedSchema = (res.data);
+        const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
+
+        await importDashboardFromJSON(convertedSchema)
           .then((res) => {
             resetAndRefresh(ImportType.URL);
             filesImportResults.value = []
@@ -274,7 +283,11 @@ export default defineComponent({
       isLoading.value = ImportType.JSON_STRING
       try {
         // get the dashboard
-        await importDashboardFromJSON(jsonStr.value)
+        
+        const oldImportedSchema = JSON.parse(jsonStr.value);
+        const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
+
+        await importDashboardFromJSON(convertedSchema)
           .then((res) => {
             resetAndRefresh(ImportType.JSON_STRING);
             filesImportResults.value = []
