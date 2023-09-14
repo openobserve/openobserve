@@ -29,7 +29,7 @@
         :data="plotChart"
         v-show="searchObj.meta.showHistogram"
         style="height: 150px;"
-        @updated:chart="onChartUpdate"
+        @updated:dataZoom="onChartUpdate"
         @click="onChartClick"
       />
 

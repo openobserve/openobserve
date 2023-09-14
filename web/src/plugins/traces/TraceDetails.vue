@@ -569,8 +569,8 @@ export default defineComponent({
       ChartData.value = convertTimelineData(traceChart);
     };
     const updateChart = (data:any) => {
-      timeRange.value.start = data.start/1000 || 0;
-      timeRange.value.end = data.end/1000 || 0;
+      timeRange.value.start = data.start || 0;
+      timeRange.value.end = data.end || 0;
       calculateTracePosition();
     };
     const mockServiceMap = [
