@@ -117,12 +117,12 @@ export default defineComponent({
     const getLeftPosition = computed(() => {
       const left =
         props.span.startTimeMs - props.baseTracePosition["startTimeMs"];
-      return (left / (props.baseTracePosition?.durationMs*1000)) * 100;
+      return (left / props.baseTracePosition?.durationMs) * 100;
     });
     const getWidth = computed(() => {
       return Number(
         (
-          (props.span?.durationMs / (props.baseTracePosition?.durationMs*1000)) *
+          (props.span?.durationMs / props.baseTracePosition?.durationMs) *
           100
         ).toFixed(2)
       );

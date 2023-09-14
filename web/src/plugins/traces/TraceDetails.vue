@@ -146,7 +146,7 @@ import TraceChart from "./TraceChart.vue";
 import { useStore } from "vuex";
 import { duration } from "moment";
 import D3Chart from "@/components/D3Chart.vue";
-import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
+import { getImageURL } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 import { convertTimelineData,convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
@@ -250,7 +250,7 @@ export default defineComponent({
       for (let i = 0; i <= 4; i++) {
         tics.push({
           value: Number(time.toFixed(2)),
-          label: `${formatTimeWithSuffix(time * 1000)}`,
+          label: `${time.toFixed(2)}ms`,
           left: `${25 * i}%`,
         });
         time += quarterMs;
@@ -428,7 +428,7 @@ export default defineComponent({
         startTimeMs: converTimeFromNsToMs(span.start_time),
         endTimeMs: converTimeFromNsToMs(span.end_time),
         durationMs: Number((span.duration / 1000).toFixed(2)), // This key is standard, we use for calculating width of span block. This should always be in ms
-        durationUs: span.duration, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
+        durationUs: Number(span.duration.toFixed(2)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: convertTime(span.idle_ns),
         busyMs: convertTime(span.busy_ns),
         spanId: span.span_id,

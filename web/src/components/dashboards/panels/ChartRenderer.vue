@@ -121,14 +121,20 @@ export default defineComponent({
 
             //on dataZoom emit an event of start x and end x
             chart.on('dataZoom', function (params:any) {
-                emit("updated:dataZoom", {
-                    start: params?.batch[0]?.startValue,
-                    end: params?.batch[0]?.endValue,
-                });
-                emit("updated:chart", {
-                    start: chart?.getOption()?.dataZoom[0]?.startValue,
-                    end: chart?.getOption()?.dataZoom[0]?.endValue,
-                });
+                //if batch then emit dataZoom event
+                if(params?.batch){
+                    emit("updated:dataZoom", {
+                        start: params?.batch[0]?.startValue||0,
+                        end: params?.batch[0]?.endValue||0,
+                    });
+                }
+                //else if daatazoom then emit dataZoom event
+                else if(chart.getOption()?.dataZoom){
+                    emit("updated:chart", {
+                        start: chart?.getOption()?.dataZoom[0]?.startValue||0,
+                        end: chart?.getOption()?.dataZoom[0]?.endValue||0,
+                    });
+                }
             });
             chart.on('click', function (params:any) {                                
                 emit("click", params);
