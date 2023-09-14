@@ -31,7 +31,7 @@
           searchObj.data.stream.streamType !== 'enrichment_tables'
         "
         style="max-height: 150px;"
-        @updated:chart="onChartUpdate"
+        @updated:dataZoom="onChartUpdate"
       />
 
       <q-virtual-scroll

@@ -62,22 +62,13 @@ export const convertTraceData = (
 
 export const convertTimelineData = (props:any)=>{  
   const options =  {
-    title: {
-      text: 'Trace Timeline',
-      textStyle: {
-        fontSize: 13,
-        fontWeight: "600",
-      },
-    },
     dataZoom: [
       {
         type: 'slider',
         xAxisIndex: 0,
-        filterMode: 'weakFilter',
+        filterMode: 'none',
         height: 20,
-        bottom: 0,
-        start: 0,
-        end:  props.layout.shapes.reduce((it:any,max:any)=>Math.max(it.x0||0,max),0),
+        bottom: 20,
         showDetail: false
       }
     ],
@@ -92,11 +83,12 @@ export const convertTimelineData = (props:any)=>{
       type: 'category',
        axisTick: { show: false },
         splitLine: { show: false },
-        axisLine: { show: false },
         axisLabel: { show: false }
     },
     xAxis: {
-      type: 'value'
+      type: 'value',
+      axisTick: { show: false },
+      splitLine: { show: false },
     },
     series: [
       {
@@ -113,14 +105,36 @@ export const convertTimelineData = (props:any)=>{
             color: 'transparent'
           }
         },
-        data: props.layout.shapes.map((it:any)=>(it.x0))
+        data: props.value.layout.shapes.map((it:any)=>(it.x0*1000))
       },
       {
         type: 'bar',
         stack: 'Total',
         barWidth:"100%",
         barCategoryGap:"0%",
-        data: props.layout.shapes.map((it:any)=>({value:it.x1,itemStyle:{color:it.fillcolor}}))
+        data: props.value.layout.shapes.map((it:any)=>({value:it.x1,itemStyle:{color:it.fillcolor}}))
+      }
+    ]
+  };
+  return {options};
+}
+
+export const convertTraceServiceMapData = (data:any)=>{    
+  const options =  {
+    tooltip: {
+      show:false
+    },
+    series: [
+      {
+        type: 'tree',
+        data: data,
+        symbolSize: 20,
+        label: {
+          position: "bottom",
+          verticalAlign: 'bottom',
+          distance:25,
+          fontSize: 12
+        },
       }
     ]
   };

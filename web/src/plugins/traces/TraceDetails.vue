@@ -67,22 +67,16 @@
         </div>
       </div>
       <div class="col-12" v-if="activeVisual === 'timeline'">
-        <trace-chart
-          class="trace-details-chart"
-          id="trace_details_gantt_chart"
-          ref="plotChart"
-          :chart="traceChart"
-          @updated:chart="updateChart"
-          />
           <ChartRenderer
           class="trace-details-chart"
           id="trace_details_gantt_chart"
           :data="ChartData"
-          style="max-height: 200px;"
+          @updated:chart="updateChart"
+          style="height: 200px;"
         />
       </div>
       <div class="col-12" v-else>
-        <d3-chart :data="traceServiceMap" />
+        <ChartRenderer :data="traceServiceMap" style="height: 200px;"/>
       </div>
       <q-separator style="width: 100%" class="q-mb-sm" />
       <div
@@ -155,7 +149,7 @@ import D3Chart from "@/components/D3Chart.vue";
 import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
-import { convertTimelineData } from "@/utils/traces/convertTraceData";
+import { convertTimelineData,convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 
 export default defineComponent({
@@ -189,7 +183,7 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
-    const traceServiceMap: Ref<any[]> = ref([]);
+    const traceServiceMap: any = ref({});
     const spanDimensions = {
       height: 25,
       barHeight: 8,
@@ -217,7 +211,6 @@ export default defineComponent({
       layout: {},
     });
 
-    const plotChart: any = ref(null);
     const ChartData: any = ref({});
 
     const spanList: any = computed(() => {
@@ -396,11 +389,12 @@ export default defineComponent({
         if (serviceName !== span.serviceName) {
           const children: any[] = [];
           currentColumn.push({
-            name: span.serviceName,
+            name: `${span.serviceName} \n (${span.durationMs}ms)`,
             parent: serviceName,
             duration: span.durationMs,
             children: children,
-            color: serviceColors[span.serviceName],
+            itemStyle: {
+              color: serviceColors[span.serviceName]},
           });
           if (span.spans && span.spans.length) {
             span.spans.forEach((_span: any) =>
@@ -422,7 +416,7 @@ export default defineComponent({
       traceTree.value.forEach((span: any) => {
         getService(span, serviceTree, "", 1, 1);
       });
-      traceServiceMap.value = cloneDeep(serviceTree);
+      traceServiceMap.value = convertTraceServiceMapData(cloneDeep(serviceTree));      
     };
 
     // Convert span object to required format
@@ -568,29 +562,11 @@ export default defineComponent({
       );
       layout.xaxis.range = [0, endTime > 0 ? endTime : 1];
       traceChart.value.layout = layout;
-      if (plotChart.value) plotChart.value?.reDraw();
-      ChartData.value = convertTimelineData(traceChart.value);
+      ChartData.value = convertTimelineData(traceChart);
     };
-    const updateChart = ({ data }: { data: any }) => {
-      let range1 = 0;
-      let range2 = 0;
-      if (data["xaxis.range[0]"] && data["xaxis.range[1]"]) {
-        range1 = data["xaxis.range[0]"];
-        range2 = data["xaxis.range[1]"];
-      } else if (data["xaxis.range"]?.length) {
-        range1 = data["xaxis.range"][0];
-        range2 = data["xaxis.range"][1];
-      } else {
-        timeRange.value.start = 0;
-        range2 = Number(
-          (
-            traceTree.value[0].highestEndTime -
-            traceTree.value[0].lowestStartTime
-          ).toFixed(2)
-        );
-      }
-      timeRange.value.start = range1;
-      timeRange.value.end = range2;
+    const updateChart = (data:any) => {
+      timeRange.value.start = data.start/1000 || 0;
+      timeRange.value.end = data.end/1000 || 0;
       calculateTracePosition();
     };
     const mockServiceMap = [
@@ -702,7 +678,6 @@ export default defineComponent({
       spanPositionList,
       spanDimensions,
       splitterModel,
-      plotChart,
       ChartData,
       traceChart,
       updateChart,

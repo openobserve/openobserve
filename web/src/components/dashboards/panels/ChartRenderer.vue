@@ -24,7 +24,7 @@ import { useStore } from "vuex";
 
 export default defineComponent({
     name: "ChartRenderer",
-    emits: ["updated:chart","click"],
+    emits: ["updated:chart","click","updated:dataZoom"],
     props: {
         data: {
             required: true,
@@ -120,10 +120,14 @@ export default defineComponent({
             chart.on("legendselectchanged",legendSelectChangedFn);
 
             //on dataZoom emit an event of start x and end x
-            chart.on('dataZoom', function (params:any) {                
+            chart.on('dataZoom', function (params:any) {
+                emit("updated:dataZoom", {
+                    start: params?.batch[0]?.startValue,
+                    end: params?.batch[0]?.endValue,
+                });
                 emit("updated:chart", {
-                    start: params.batch[0].startValue,
-                    end: params.batch[0].endValue,
+                    start: chart?.getOption()?.dataZoom[0]?.startValue,
+                    end: chart?.getOption()?.dataZoom[0]?.endValue,
                 });
             });
             chart.on('click', function (params:any) {                                
