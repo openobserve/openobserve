@@ -117,7 +117,7 @@ export const convertTimelineData = (props:any)=>{
         stack: 'Total',
         barWidth:"100%",
         barCategoryGap:"0%",
-        data: props.value.layout.shapes.map((it:any)=>({value:it.x1,itemStyle:{color:it.fillcolor}})),
+        data: props.value.layout.shapes.map((it:any)=>({value:it.x1-it.x0,itemStyle:{color:it.fillcolor}})),
       }
     ]
   };
