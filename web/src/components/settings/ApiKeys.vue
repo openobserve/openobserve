@@ -31,7 +31,8 @@
           round
           size="sm"
           class="float-right btn-copy"
-          :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
+          color="grey"
+          icon="content_copy"
           @click="copyToClipboardFn(key.key)"
         />
       </div>
@@ -73,7 +74,8 @@
           round
           size="sm"
           class="float-right btn-copy"
-          :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
+          color="grey"
+          icon="content_copy"
           @click="copyToClipboardFn(key.key)"
         />
       </div>

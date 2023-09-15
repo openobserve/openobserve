@@ -24,7 +24,8 @@
           round
           size="0.5rem"
           padding="0.6rem"
-          :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
+          color="grey"
+          icon="content_copy"
           @click="$emit('copy-to-clipboard-fn', fluentbitContent)"
         />
       </div>
@@ -101,7 +102,7 @@ export default defineComponent({
 <style scoped lang="scss">
 .tabContent {
   background-color: rgba(136, 136, 136, 0.103);
- // tab content bg color
+  // tab content bg color
   padding: 1rem 1.25rem 0.5rem;
   border-radius: 0.5rem;
   &__head {

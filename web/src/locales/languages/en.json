@@ -236,7 +236,12 @@
   },
   "ingestion": {
     "header": "Ingestion",
-    "passwordLabel": "Reset Token"
+    "passwordLabel": "Reset Token",
+    "resetTokenBtnLabel": "Reset Token",
+    "resetRUMTokenLabel": "Reset RUM Token",
+    "generateRUMTokenLabel": "Generate RUM Token",
+    "generateRUMTokenMessage": "Generate RUM Token to enable RUM for your organization.",
+    "npmStepTitle": "NPM Installation Method"
   },
   "syslog": {
     "stream": "Stream",

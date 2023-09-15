@@ -13,87 +13,182 @@
  limitations under the License. 
 -->
 
+<!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tabContent q-ma-md">
-    <div class="tabContent__head">
-      <div class="title" data-test="vector-title-text">RUM</div>
-      <div class="copy_action">
-        <q-btn
-          data-test="rum-copy-btn"
-          flat
-          round
-          size="0.5rem"
-          padding="0.6rem"
-          :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
-          @click="$emit('copy-to-clipboard-fn', copyContent)"
+  <q-splitter
+    v-model="splitterModel"
+    unit="px"
+    style="min-height: calc(100vh - 130px)"
+  >
+    <template v-slot:before>
+      <q-tabs
+        v-model="rumtabs"
+        indicator-color="transparent"
+        inline-label
+        vertical
+      >
+        <q-route-tab
+          name="rumWebTab"
+          :to="{
+            name: 'rumWeb',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          icon="web"
+          label="Browser"
+          content-class="tab_content"
         />
-      </div>
-    </div>
-    <pre ref="copyContent" data-test="traces-content-text">Content</pre>
-  </div>
+      </q-tabs>
+    </template>
+
+    <template v-slot:after>
+      <router-view
+        title="Web"
+        :currOrgIdentifier="currOrgIdentifier"
+        :currUserEmail="currentUserEmail"
+        @copy-to-clipboard-fn="copyToClipboardFn"
+      >
+      </router-view>
+    </template>
+  </q-splitter>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
+// @ts-ignore
+import { defineComponent, ref, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { getImageURL } from "../../../utils/zincutils";
-// import apiKeysService from "@/services/api_keys";
+import { useRouter } from "vue-router";
+import { copyToClipboard, useQuasar } from "quasar";
+// import { config } from "../constants/config";
+import config from "../../../aws-exports";
+import segment from "@/services/segment_analytics";
+import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+
 export default defineComponent({
-  name: "rum-page",
+  name: "IngestRum",
+  components: {},
+  data() {
+    return {
+      rumtabs: "rumWebTab",
+    };
+  },
   props: {
     currOrgIdentifier: {
       type: String,
-    },
-    currUserEmail: {
-      type: String,
+      default: "",
     },
   },
-  setup(props) {
+  setup() {
+    const { t } = useI18n();
     const store = useStore();
-    const copyContent: Ref<string> = ref("");
+    const q = useQuasar();
+    const router: any = useRouter();
+    const rowData: any = ref({});
+    const confirmUpdate = ref<boolean>(false);
 
-    onBeforeMount(() => {
-      // apiKeysService.listRumAPIKeys().then((res) => {
-      //   copyContent.value = res.data[0].key;
-      // })
+    onMounted(() => {
+      const ingestRoutes = ["rumWeb"];
+
+      if (ingestRoutes.includes(router.currentRoute.value.name)) {
+        router.push({
+          name: router.currentRoute.value.name,
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+      if (router.currentRoute.value.name === "rumMonitoring") {
+        router.push({
+          name: "rumWeb",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
     });
 
+    const copyToClipboardFn = (content: any) => {
+      copyToClipboard(content.innerText)
+        .then(() => {
+          q.notify({
+            type: "positive",
+            message: "Content Copied Successfully!",
+            timeout: 5000,
+          });
+        })
+        .catch(() => {
+          q.notify({
+            type: "negative",
+            message: "Error while copy content.",
+            timeout: 5000,
+          });
+        });
+
+      segment.track("Button Click", {
+        button: "Copy to Clipboard",
+        ingestion: router.currentRoute.value.name,
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "RUM Ingestion",
+      });
+    };
+
+    const showUpdateDialogFn = () => {
+      confirmUpdate.value = true;
+    };
+
     return {
+      t,
       store,
+      router,
+      config,
+      rowData,
+      splitterModel: ref(200),
+      currentUserEmail: store.state.userInfo.email,
+      copyToClipboardFn,
+      showUpdateDialogFn,
+      confirmUpdate,
       getImageURL,
-      copyContent,
+      verifyOrganizationStatus,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
-.tabContent {
-  background-color: rgba(136, 136, 136, 0.103);
-  // tab content bg color
-  padding: 1rem 1.25rem 0.5rem;
-  border-radius: 0.5rem;
-  &__head {
-    justify-content: space-between;
-    text-transform: uppercase;
-    align-items: center;
-    display: flex;
-    .title {
-      font-size: 0.75rem;
-      line-height: 1rem;
-      font-weight: 600;
-    }
-    .copy_action {
-      .q-btn {
-        // background-color: white;
+.ingestionPage {
+  padding: 1.5rem 0 0;
+  .head {
+    padding-bottom: 1rem;
+  }
+  .q-tabs {
+    &--vertical {
+      margin: 1.5rem 1rem 0 1rem;
+      .q-tab {
+        justify-content: flex-start;
+        padding: 0 0.6rem 0 0.6rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+        text-transform: capitalize;
+
+        &__content.tab_content {
+          .q-tab {
+            &__icon + &__label {
+              padding-left: 0.875rem;
+              font-weight: 600;
+            }
+          }
+        }
+        &--active {
+          color: black;
+          background-color: $accent;
+        }
       }
     }
-  }
-  pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    font-size: 0.75rem;
-    margin-bottom: 0;
   }
 }
 </style>
