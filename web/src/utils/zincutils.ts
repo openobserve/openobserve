@@ -13,8 +13,7 @@
 //  limitations under the License.
 
 import config from "../aws-exports";
-import { ref, onMounted, onUnmounted } from "vue";
-import { useQuasar, type QNotifyCreateOptions } from "quasar";
+import { ref } from "vue";
 
 const useLocalStorage = (
   key: string,
@@ -265,8 +264,8 @@ export const getPath = () => {
     window.location.origin == "http://localhost:8081"
       ? "/"
       : pos > -1
-      ? window.location.pathname.slice(0, pos + 5)
-      : "";
+        ? window.location.pathname.slice(0, pos + 5)
+        : "";
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };
@@ -366,25 +365,4 @@ export const formatTimeWithSuffix = (us: number) => {
   }
 
   return `${us.toFixed(2)}us`;
-};
-
-export const ooNotify = (timeout: number = 0) => {
-  const $q = useQuasar();
-
-  const notify: QNotifyCreateOptions = {
-    type: "positive",
-    message: "Waiting for response...",
-    timeout: timeout,
-    actions: [
-      {
-        icon: "close",
-        color: "white",
-        handler: () => {
-          /* ... */
-        },
-      },
-    ],
-  };
-
-  return $q.notify(notify);
 };

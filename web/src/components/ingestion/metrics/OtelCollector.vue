@@ -24,7 +24,8 @@
           round
           size="0.5rem"
           padding="0.6rem"
-          :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
+          color="grey"
+          icon="content_copy"
           @click="$emit('copy-to-clipboard-fn', copyTracesContent)"
         />
       </div>

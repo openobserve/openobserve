@@ -33,7 +33,6 @@ import { logsErrorMessage } from "@/utils/common";
 //   b64EncodeUnicode,
 //   useLocalLogFilterField,
 //   b64DecodeUnicode,
-//   ooNotify,
 // } from "@/utils/zincutils";
 
 import useFunctions from "@/composables/useFunctions";

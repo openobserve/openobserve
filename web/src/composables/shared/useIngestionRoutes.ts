@@ -32,6 +32,7 @@ import IngestLogs from "@/components/ingestion/logs/Index.vue";
 import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
 import IngestTraces from "@/components/ingestion/traces/Index.vue";
 import RUM from "@/components/ingestion/rum/Index.vue";
+import RUMWeb from "@/components/ingestion/rum/Web.vue";
 
 const useIngestionRoutes = () => {
   const ingestionRoutes: any = [
@@ -123,6 +124,13 @@ const useIngestionRoutes = () => {
           path: "rum",
           name: "rumMonitoring",
           component: RUM,
+          children: [
+            {
+              path: "web",
+              name: "rumWeb",
+              component: RUMWeb,
+            },
+          ],
         },
       ],
     },
