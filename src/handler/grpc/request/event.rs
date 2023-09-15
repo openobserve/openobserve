@@ -16,11 +16,11 @@ use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::infra::metrics;
-use crate::common::meta::common::FileMeta;
-use crate::handler::grpc::cluster_rpc::event_server::Event;
-use crate::handler::grpc::cluster_rpc::EmptyResponse;
-use crate::handler::grpc::cluster_rpc::FileList;
+use crate::common::{
+    infra::{config::CONFIG, metrics},
+    meta::common::FileMeta,
+};
+use crate::handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
 use crate::service::db::file_list;
 
 pub struct Eventer;
@@ -39,7 +39,13 @@ impl Event for Eventer {
 
         let req = req.get_ref();
         for file in req.items.iter() {
-            // log::info!("received event:file {:?}", file);
+            if CONFIG.common.print_key_event {
+                log::info!(
+                    "Received event:file {}, deleted: {}",
+                    file.key,
+                    file.deleted
+                );
+            }
             if let Err(e) = file_list::progress(
                 &file.key,
                 FileMeta::from(file.meta.as_ref().unwrap()),

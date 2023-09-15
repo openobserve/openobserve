@@ -17,11 +17,10 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
-use crate::common::infra::cluster::{
-    self, get_cached_nodes, get_internal_grpc_token, get_node_by_uuid,
+use crate::common::{
+    infra::{cluster, config::CONFIG},
+    meta::common::FileKey,
 };
-use crate::common::infra::config::CONFIG;
-use crate::common::meta::common::FileKey;
 use crate::handler::grpc::cluster_rpc;
 
 static EVENTS: Lazy<RwLock<ahash::AHashMap<String, EventChannel>>> =
@@ -35,14 +34,14 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
         return Ok(());
     }
     let nodes = if node_uuid.is_none() {
-        get_cached_nodes(|node| {
+        cluster::get_cached_nodes(|node| {
             (node.status == cluster::NodeStatus::Prepare
                 || node.status == cluster::NodeStatus::Online)
                 && (cluster::is_querier(&node.role) || cluster::is_compactor(&node.role))
         })
         .unwrap()
     } else {
-        get_node_by_uuid(&node_uuid.unwrap())
+        cluster::get_node_by_uuid(&node_uuid.unwrap())
             .map(|node| vec![node])
             .unwrap_or_default()
     };
@@ -56,6 +55,9 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
             continue;
         }
         let node_id = node.uuid.clone();
+        if CONFIG.common.print_key_event {
+            log::info!("[broadcast] send event to node[{}]: {:?}", &node_id, items);
+        }
         // retry 5 times
         let mut ok = false;
         for _i in 0..5 {
@@ -121,7 +123,7 @@ async fn send_to_node(
             tokio::task::yield_now().await;
         }
         // connect to the node
-        let token: MetadataValue<_> = get_internal_grpc_token()
+        let token: MetadataValue<_> = cluster::get_internal_grpc_token()
             .parse()
             .expect("parse internal grpc token faile");
         let channel = match Channel::from_shared(node.grpc_addr.clone())

@@ -94,6 +94,8 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
     stats.insert("LOCAL_NODE_NAME", json::json!(&CONFIG.common.instance_name));
     stats.insert("LOCAL_NODE_ROLE", json::json!(&CONFIG.common.node_role));
+    let nodes = cluster::get_cached_online_nodes();
+    stats.insert("NODE_LIST", json::json!(nodes));
 
     let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status();
     stats.insert("STREAM_SCHEMA", json::json!({"stream_num": stream_num,"stream_schema_num": stream_schema_num, "mem_size": mem_size}));

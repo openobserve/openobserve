@@ -271,6 +271,8 @@ pub struct Common {
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
     pub print_key_config: bool,
+    #[env_config(name = "ZO_PRINT_KEY_EVENT", default = false)]
+    pub print_key_event: bool,
     #[env_config(name = "ZO_PRINT_KEY_SQL", default = false)]
     pub print_key_sql: bool,
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
