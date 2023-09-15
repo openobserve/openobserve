@@ -75,7 +75,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
                     let node_id = node.uuid.clone();
                     if let Err(e) = send_to_node(node, &mut rx).await {
                         log::error!(
-                            "[broadcast] send event to node[{}] channel closed: {}",
+                            "[broadcast] send event to node[{}] channel failed, channel closed: {}",
                             &node_id,
                             e
                         );
@@ -87,7 +87,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
             if let Err(e) = channel.clone().send(items.to_vec()) {
                 events.remove(&node_id);
                 log::error!(
-                    "[broadcast] send event to node[{}] failed: {}, retrying...",
+                    "[broadcast] send event to node[{}] channel failed, {}, retrying...",
                     node_id,
                     e
                 );
@@ -99,7 +99,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
         }
         if !ok {
             log::error!(
-                "[broadcast] send event to node[{}] failed, dropping event",
+                "[broadcast] send event to node[{}] channel failed, dropping events",
                 node_id
             );
         }
@@ -118,6 +118,10 @@ async fn send_to_node(
             match cluster::get_node_by_uuid(&node.uuid) {
                 None => {
                     EVENTS.write().await.remove(&node.uuid);
+                    log::error!(
+                        "[broadcast] node[{}] leaved cluster, dropping events",
+                        &node.uuid,
+                    );
                     return Ok(());
                 }
                 Some(v) => {
@@ -170,11 +174,12 @@ async fn send_to_node(
             for item in items.iter() {
                 req_query.items.push(cluster_rpc::FileKey::from(item));
             }
-            let mut ttl = 1;
+            let mut wait_ttl = 1;
+            let mut retry_ttl = 0;
             loop {
-                if ttl > 3600 {
+                if retry_ttl >= 1800 {
                     log::error!(
-                        "[broadcast] to node[{}] timeout, dropping event, already retried for 1 hour",
+                        "[broadcast] to node[{}] timeout, dropping event, already retried for 30 minutes",
                         &node.uuid
                     );
                     break;
@@ -185,11 +190,22 @@ async fn send_to_node(
                     Err(e) => {
                         if cluster::get_node_by_uuid(&node.uuid).is_none() {
                             EVENTS.write().await.remove(&node.uuid);
+                            log::error!(
+                                "[broadcast] node[{}] leaved cluster, dropping events",
+                                &node.uuid,
+                            );
                             return Ok(());
                         }
-                        log::error!("[broadcast] to node[{}] error: {}", &node.uuid, e);
-                        tokio::time::sleep(tokio::time::Duration::from_secs(ttl)).await;
-                        ttl *= 2;
+                        log::error!(
+                            "[broadcast] send event to node[{}] failed: {}, retrying...",
+                            &node.uuid,
+                            e
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(wait_ttl)).await;
+                        retry_ttl += wait_ttl;
+                        if wait_ttl < 60 {
+                            wait_ttl *= 2
+                        };
                         continue;
                     }
                 }
