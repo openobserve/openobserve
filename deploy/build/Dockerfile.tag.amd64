@@ -23,7 +23,7 @@ RUN mkdir -p /app/data && chmod 777 /app/data
 
 # RUN cargo build --release
 RUN cargo build --profile dev --features mimalloc --target x86_64-unknown-linux-gnu
-RUN mv /app/target/x86_64-unknown-linux-gnu/release-prod/openobserve /app/target/release/openobserve
+RUN mv /app/target/x86_64-unknown-linux-gnu/debug/openobserve /app/target/release/openobserve
 
 FROM gcr.io/distroless/cc as runtime
 # FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
