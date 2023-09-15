@@ -20,24 +20,18 @@ WORKDIR /app
 COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 RUN mkdir -p /app/target/release/
-RUN mkdir -p /app/data/ && chmod 777 /app/data/
-RUN touch /app/data/empty
 
 # RUN cargo build --release
 RUN cargo build --profile dev --features mimalloc --target x86_64-unknown-linux-gnu
 RUN mv /app/target/x86_64-unknown-linux-gnu/debug/openobserve /app/target/release/openobserve
 
-# FROM gcr.io/distroless/cc as runtime
-FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
+FROM gcr.io/distroless/cc as runtime
+# FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
 # RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 # RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 # RUN update-ca-certificates
 COPY --from=builder /app/target/release/openobserve /
-COPY --from=builder --chown=openobserve:openobserve --chmod=777 /app/data /data
-COPY --from=builder --chown=openobserve:openobserve --chmod=777 /app/data/empty /data/empty
 COPY --from=builder /lib/x86_64-linux-gnu/liblzma.so.5 /lib/x86_64-linux-gnu/liblzma.so.5
 COPY --from=builder /lib/x86_64-linux-gnu/libz.so.1 /lib/x86_64-linux-gnu/libz.so.1
-RUN ls -l /
-RUN ls -l /data
-USER openobserve:openobserve
+RUN ["/openobserve", "reset", "-c", "user"]
 CMD ["/openobserve"]
