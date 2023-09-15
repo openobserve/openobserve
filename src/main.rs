@@ -431,6 +431,13 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         println!("{id}\t{:?}\n{:?}", user.key(), user.value());
                     }
                 }
+                "path" => {
+                    println!("data_dir: {:?}", CONFIG.common.data_dir);
+                    println!("db_dir: {:?}", CONFIG.common.data_db_dir);
+                    println!("cache_dir: {:?}", CONFIG.common.data_cache_dir);
+                    println!("stream_dir: {:?}", CONFIG.common.data_stream_dir);
+                    println!("wal_dir: {:?}", CONFIG.common.data_wal_dir);
+                }
                 _ => {
                     return Err(anyhow::anyhow!("unsupport reset component: {component}"));
                 }
