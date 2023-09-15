@@ -19,15 +19,17 @@ use datafusion::arrow::{datatypes::Schema, json::reader::infer_json_schema};
 use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
-use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::{
-    ingestion::{IngestionResponse, StreamStatus},
-    prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
-    stream::{PartitioningDetails, StreamParams},
-    usage::UsageType,
-    StreamType,
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        ingestion::{IngestionResponse, StreamStatus},
+        prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+        stream::{PartitioningDetails, StreamParams},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json, time},
 };
-use crate::common::utils::{flatten, json, time};
 use crate::service::{
     db, ingestion::get_wal_time_key, ingestion::write_file, stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
@@ -247,14 +249,11 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         let mut req_stats = write_file(
             stream_data,
             thread_id,
-            StreamParams {
-                org_id,
-                stream_name: &stream_name,
-                stream_type: StreamType::Metrics,
-            },
+            StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
-        );
+        )
+        .await;
         req_stats.response_time = time;
 
         report_request_usage_stats(

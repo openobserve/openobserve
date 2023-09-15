@@ -19,19 +19,21 @@ use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
 use super::StreamMeta;
-use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::{
-    alert::{Alert, Trigger},
-    functions::{StreamTransform, VRLRuntimeConfig},
-    ingestion::{
-        BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
-        StreamSchemaChk,
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        alert::{Alert, Trigger},
+        functions::{StreamTransform, VRLRuntimeConfig},
+        ingestion::{
+            BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
+            StreamSchemaChk,
+        },
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
     },
-    stream::StreamParams,
-    usage::UsageType,
-    StreamType,
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
-use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::{
     db, ingestion::write_file, schema::stream_schema_exists, usage::report_request_usage_stats,
 };
@@ -295,14 +297,11 @@ pub async fn ingest(
         let mut req_stats = write_file(
             stream_data.data,
             thread_id,
-            StreamParams {
-                org_id,
-                stream_name: &stream_name,
-                stream_type: StreamType::Logs,
-            },
+            StreamParams::new(org_id, &stream_name, StreamType::Logs),
             &mut stream_file_name,
             None,
-        );
+        )
+        .await;
         req_stats.response_time += time;
         //metric + data usage
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();

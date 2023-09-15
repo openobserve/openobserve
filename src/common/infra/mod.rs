@@ -26,8 +26,8 @@ pub mod wal;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     ider::init()?;
-    wal::init()?;
-    cache::init()?;
+    wal::init().await?;
+    cache::init().await?;
     // init db
     db::create_table().await?;
     Ok(())

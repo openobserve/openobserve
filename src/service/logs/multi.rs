@@ -18,15 +18,17 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
-use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::{
-    alert::{Alert, Trigger},
-    ingestion::{IngestionResponse, StreamStatus},
-    stream::StreamParams,
-    usage::UsageType,
-    StreamType,
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        alert::{Alert, Trigger},
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
-use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::{
     db, format_stream_name, ingestion::write_file, logs::StreamMeta, schema::stream_schema_exists,
     usage::report_request_usage_stats,
@@ -179,14 +181,11 @@ pub async fn ingest(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        StreamParams {
-            org_id,
-            stream_name,
-            stream_type: StreamType::Logs,
-        },
+        StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
-    );
+    )
+    .await;
 
     if stream_file_name.is_empty() {
         return Ok(IngestionResponse::new(

@@ -29,7 +29,7 @@ use crate::common::infra::{
     errors::*,
 };
 
-pub(crate) static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
+pub static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
 
 static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
     Lazy::new(|| RwLock::new(Default::default()));

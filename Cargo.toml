@@ -83,6 +83,7 @@ dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
 etcd-client = { version = "0.11", features = ["tls"] }
+faststr = "0.2"
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 get_if_addrs = "0.5"
@@ -158,9 +159,7 @@ utoipa = { version = "3", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "8eb52562" }
-vrl = { version = "0.6.0", features = [
-  "value","compiler"
-] }
+vrl = { version = "0.6.0", features = ["value", "compiler"] }
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.12"

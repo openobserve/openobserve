@@ -22,26 +22,24 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
-use crate::{
-    common::{
-        infra::{cluster, config::CONFIG, metrics},
-        meta::{
-            alert::{Alert, Trigger},
-            http::HttpResponse as MetaHttpResponse,
-            ingestion::StreamStatus,
-            stream::StreamParams,
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json},
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        alert::{Alert, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        ingestion::StreamStatus,
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
     },
-    handler::http::request::CONTENT_TYPE_JSON,
-    service::{
-        db,
-        ingestion::{grpc::get_val_for_attr, write_file},
-        schema::stream_schema_exists,
-        usage::report_request_usage_stats,
-    },
+    utils::{flatten, json},
+};
+use crate::handler::http::request::CONTENT_TYPE_JSON;
+use crate::service::{
+    db,
+    ingestion::{grpc::get_val_for_attr, write_file},
+    schema::stream_schema_exists,
+    usage::report_request_usage_stats,
 };
 
 use super::StreamMeta;
@@ -292,21 +290,11 @@ pub async fn logs_json_handler(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        StreamParams {
-            org_id,
-            stream_name,
-            stream_type: StreamType::Logs,
-        },
+        StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
-    );
-
-    /*     if stream_file_name.is_empty() {
-        return Ok(IngestionResponse::new(
-            http::StatusCode::OK.into(),
-            vec![stream_status],
-        ));
-    } */
+    )
+    .await;
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;

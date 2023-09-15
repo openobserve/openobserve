@@ -50,7 +50,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
  */
 async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     // need to clone here, to avoid thread boundry issues across awaits
-    let files = wal::MEMORY_FILES.list().clone();
+    let files = wal::MEMORY_FILES.list("").await;
     // use multiple threads to upload files
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
@@ -76,7 +76,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 &stream_name,
                 file
             );
-            wal::MEMORY_FILES.remove(&file);
+            wal::MEMORY_FILES.remove(&file).await;
             continue;
         }
 
@@ -110,7 +110,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             }
 
             // delete files
-            wal::MEMORY_FILES.remove(&local_file);
+            wal::MEMORY_FILES.remove(&local_file).await;
 
             // metrics
             let columns = key.split('/').collect::<Vec<&str>>();
@@ -146,7 +146,7 @@ async fn upload_file(
     let file_size = buf.len() as u64;
     log::info!("[JOB] File upload begin: memory: {}", path_str);
     if file_size == 0 {
-        wal::MEMORY_FILES.remove(path_str);
+        wal::MEMORY_FILES.remove(path_str).await;
         return Err(anyhow::anyhow!("file is empty: {}", path_str));
     }
 

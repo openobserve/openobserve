@@ -286,14 +286,14 @@ async fn cache_parquet_files(
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = match cache_type {
                 file_data::CacheType::Memory => {
-                    if !file_data::memory::exist(&file_name) {
+                    if !file_data::memory::exist(&file_name).await {
                         file_data::memory::download(&file_name).await.err()
                     } else {
                         None
                     }
                 }
                 file_data::CacheType::Disk => {
-                    if !file_data::disk::exist(&file_name) {
+                    if !file_data::disk::exist(&file_name).await {
                         file_data::disk::download(&file_name).await.err()
                     } else {
                         None

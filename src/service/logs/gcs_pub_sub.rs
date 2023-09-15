@@ -5,17 +5,19 @@ use flate2::read::GzDecoder;
 use std::io::Read;
 
 use super::StreamMeta;
-use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::{
-    alert::{Alert, Trigger},
-    ingestion::{
-        AWSRecordType, GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus,
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        alert::{Alert, Trigger},
+        ingestion::{
+            AWSRecordType, GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus,
+        },
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
     },
-    stream::StreamParams,
-    usage::UsageType,
-    StreamType,
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
-use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::{
     db, format_stream_name, ingestion::write_file, usage::report_request_usage_stats,
 };
@@ -172,14 +174,11 @@ pub async fn process(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        StreamParams {
-            org_id,
-            stream_name,
-            stream_type: StreamType::Logs,
-        },
+        StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
-    );
+    )
+    .await;
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;

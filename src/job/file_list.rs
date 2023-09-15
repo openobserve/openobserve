@@ -15,9 +15,11 @@
 use std::{fs, path::Path};
 use tokio::time;
 
-use crate::common::infra::{cluster, config::CONFIG, storage, wal};
-use crate::common::meta::StreamType;
-use crate::common::utils::file::scan_files;
+use crate::common::{
+    infra::{cluster, config::CONFIG, storage, wal},
+    meta::{stream::StreamParams, StreamType},
+    utils::file::scan_files,
+};
 use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -77,7 +79,7 @@ async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
         }
 
         // check the file is using for write
-        if wal::check_in_use("", "", StreamType::Filelist, &file_name) {
+        if wal::check_in_use(StreamParams::new("", "", StreamType::Filelist), &file_name).await {
             continue;
         }
         log::info!("[JOB] convert file_list: {}", file);

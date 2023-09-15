@@ -26,7 +26,7 @@ use crate::common::{
         config::{COLUMN_TRACE_ID, CONFIG},
         metrics, storage, wal,
     },
-    meta::{common::FileMeta, StreamType},
+    meta::{common::FileMeta, stream::StreamParams, StreamType},
     utils::{file::scan_files, json, stream::populate_file_meta},
 };
 use crate::service::{
@@ -84,7 +84,12 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         }
 
         // check the file is using for write
-        if wal::check_in_use(&org_id, &stream_name, stream_type, &file_name) {
+        if wal::check_in_use(
+            StreamParams::new(&org_id, &stream_name, stream_type),
+            &file_name,
+        )
+        .await
+        {
             // println!("file is using for write, skip, {}", file_name);
             continue;
         }

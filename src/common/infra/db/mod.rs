@@ -104,7 +104,7 @@ pub trait Db: Sync + Send + 'static {
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
 }
 
-pub(crate) fn parse_key(mut key: &str) -> (String, String, String) {
+pub fn parse_key(mut key: &str) -> (String, String, String) {
     let mut module = "".to_string();
     let mut key1 = "".to_string();
     let mut key2 = "".to_string();
@@ -138,7 +138,7 @@ pub(crate) fn parse_key(mut key: &str) -> (String, String, String) {
     (module, key1, key2)
 }
 
-pub(crate) fn build_key(module: &str, key1: &str, key2: &str) -> String {
+pub fn build_key(module: &str, key1: &str, key2: &str) -> String {
     if key1.is_empty() {
         return module.to_string();
     }

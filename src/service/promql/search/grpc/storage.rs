@@ -21,15 +21,17 @@ use datafusion::{
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 
-use crate::common::infra::{
-    cache::file_data,
-    config::{is_local_disk_storage, CONFIG},
-};
-use crate::common::meta::{
-    common::FileKey,
-    search::Session as SearchSession,
-    stream::{PartitionTimeLevel, ScanStats, StreamParams},
-    StreamType,
+use crate::common::{
+    infra::{
+        cache::file_data,
+        config::{is_local_disk_storage, CONFIG},
+    },
+    meta::{
+        common::FileKey,
+        search::Session as SearchSession,
+        stream::{PartitionTimeLevel, ScanStats, StreamParams},
+        StreamType,
+    },
 };
 use crate::service::{
     db, file_list,
@@ -171,11 +173,7 @@ async fn get_file_list(
     let mut files = Vec::new();
     for file in results {
         if match_source(
-            StreamParams {
-                org_id,
-                stream_name,
-                stream_type: StreamType::Metrics,
-            },
+            StreamParams::new(org_id, stream_name, StreamType::Metrics),
             Some(time_range),
             filters,
             &file,
@@ -216,14 +214,14 @@ async fn cache_parquet_files(files: &[FileKey], scan_stats: &ScanStats) -> Resul
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = match cache_type {
                 file_data::CacheType::Memory => {
-                    if !file_data::memory::exist(&file_name) {
+                    if !file_data::memory::exist(&file_name).await {
                         file_data::memory::download(&file_name).await.err()
                     } else {
                         None
                     }
                 }
                 file_data::CacheType::Disk => {
-                    if !file_data::disk::exist(&file_name) {
+                    if !file_data::disk::exist(&file_name).await {
                         file_data::disk::download(&file_name).await.err()
                     } else {
                         None

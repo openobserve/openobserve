@@ -45,7 +45,7 @@ impl FS {
 
     async fn get_cache(&self, location: &Path) -> Option<Bytes> {
         let path = location.to_string();
-        let data = file_data::memory::get(&path);
+        let data = file_data::memory::get(&path).await;
         tokio::task::yield_now().await;
         data
     }
