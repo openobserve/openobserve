@@ -56,7 +56,14 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
         }
         let node_id = node.uuid.clone();
         if CONFIG.common.print_key_event {
-            log::info!("[broadcast] send event to node[{}]: {:?}", &node_id, items);
+            items.iter().for_each(|item| {
+                log::info!(
+                    "[broadcast] send event to node[{}]: file: {}, deleted: {}",
+                    &node_id,
+                    item.key,
+                    item.deleted,
+                );
+            });
         }
         // retry 5 times
         let mut ok = false;
