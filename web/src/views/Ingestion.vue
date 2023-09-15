@@ -23,7 +23,7 @@
       <q-btn
         v-if="
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
-          store.state.organizationData.rumToken != ''
+          store.state.organizationData.rumToken.rum_token != ''
         "
         class="q-ml-md q-mb-xs text-bold no-border right float-right"
         padding="sm lg"
@@ -36,7 +36,7 @@
       <q-btn
         v-else-if="
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
-          store.state.organizationData.rumToken == ''
+          store.state.organizationData.rumToken.rum_token == ''
         "
         class="q-ml-md q-mb-xs text-bold no-border right float-right"
         padding="sm lg"
@@ -328,9 +328,7 @@ export default defineComponent({
       apiKeysService
         .listRUMTokens(store.state.selectedOrganization.identifier)
         .then((res) => {
-          if (res.data.data.rum_token != "") {
-            store.dispatch("setRUMToken", res.data.data);
-          }
+          store.dispatch("setRUMToken", res.data.data);
         });
     };
 

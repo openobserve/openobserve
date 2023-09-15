@@ -30,7 +30,9 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
 const organizationObj = {
   organizationPasscode: "",
   allDashboardList: {},
-  rumToken: "",
+  rumToken: {
+    rum_token: "",
+  },
   quotaThresholdMsg: "",
   functions: [],
   streams: {},
