@@ -20,7 +20,7 @@ WORKDIR /app
 COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 RUN mkdir -p /app/target/release/
-RUN mkdir -p /app/data/
+RUN mkdir -p /app/data/ && chmod 777 /app/data/
 RUN touch /app/data/empty
 
 # RUN cargo build --release
