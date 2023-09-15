@@ -22,7 +22,7 @@ RUN mkdir -p /app/target/release/
 RUN mkdir -p /app/data && chmod 777 /app/data
 
 # RUN cargo build --release
-RUN cargo build --profile release-prod --features mimalloc --target x86_64-unknown-linux-gnu
+RUN cargo build --profile dev --features mimalloc --target x86_64-unknown-linux-gnu
 RUN mv /app/target/x86_64-unknown-linux-gnu/release-prod/openobserve /app/target/release/openobserve
 
 FROM gcr.io/distroless/cc as runtime
@@ -31,7 +31,8 @@ FROM gcr.io/distroless/cc as runtime
 # RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 # RUN update-ca-certificates
 COPY --from=builder /app/target/release/openobserve /
-COPY --from=builder --chown=nonroot:nonroot /app/data /data
+COPY --from=builder /app/data /data
 COPY --from=builder /lib/x86_64-linux-gnu/liblzma.so.5 /lib/x86_64-linux-gnu/liblzma.so.5
 COPY --from=builder /lib/x86_64-linux-gnu/libz.so.1 /lib/x86_64-linux-gnu/libz.so.1
+RUN chmod 777 /data
 CMD ["/openobserve"]
