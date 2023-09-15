@@ -211,7 +211,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
-import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -293,7 +293,7 @@ export default defineComponent({
       },
     ]);
     const userEmail: any = ref("");
-    const options = [t("user.admin"), t("user.member")];
+    const options = ["admin", "member"];
     const selectedRole = ref(options[0]);
     const currentUserRole = ref("");
     let deleteUserEmail = "";

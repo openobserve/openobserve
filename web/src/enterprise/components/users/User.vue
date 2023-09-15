@@ -221,7 +221,7 @@ export default defineComponent({
       },
     ]);
     const userEmail: any = ref("");
-    const options = [t("user.admin"), t("user.member")];
+    const options = ["admin", "member"];
     const selectedRole = ref(options[0]);
     const currentUserRole = ref("");
 
