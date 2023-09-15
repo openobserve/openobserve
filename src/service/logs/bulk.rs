@@ -19,21 +19,18 @@ use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
 use super::StreamMeta;
-use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
-    meta::{
-        alert::{Alert, Trigger},
-        functions::{StreamTransform, VRLRuntimeConfig},
-        ingestion::{
-            BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
-            StreamSchemaChk,
-        },
-        stream::StreamParams,
-        usage::UsageType,
-        StreamType,
+use crate::common::infra::{config::CONFIG, metrics};
+use crate::common::meta::{
+    alert::{Alert, Trigger},
+    functions::{StreamTransform, VRLRuntimeConfig},
+    ingestion::{
+        BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
+        StreamSchemaChk,
     },
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
+use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::service::ingestion::is_ingestion_allowed;
 use crate::service::{
     db, ingestion::write_file, schema::stream_schema_exists, usage::report_request_usage_stats,
 };
@@ -44,16 +41,9 @@ pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 
 pub async fn ingest(
     org_id: &str,
-    body: web::Bytes,
-    thread_id: usize,
 ) -> Result<BulkResponse, anyhow::Error> {
     let start = std::time::Instant::now();
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Err(anyhow::anyhow!("not an ingester"));
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
+        return Err(value);
     }
 
     //let mut errors = false;

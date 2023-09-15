@@ -17,6 +17,7 @@ use std::io::Error;
 
 use crate::common::infra::config::CONFIG;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::meta::ingestion::IngestionRequest;
 use crate::handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
 use crate::service::logs::otlp_http::{logs_json_handler, logs_proto_handler};
 use crate::{
@@ -125,7 +126,14 @@ pub async fn json(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     Ok(
-        match logs::json::ingest(&org_id, &stream_name, body, **thread_id).await {
+        match logs::ingest::ingest(
+            &org_id,
+            &stream_name,
+            IngestionRequest::JSON(body),
+            **thread_id,
+        )
+        .await
+        {
             Ok(v) => HttpResponse::Ok().json(v),
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);

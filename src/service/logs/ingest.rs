@@ -16,9 +16,14 @@ use actix_web::{http, web};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
+use std::io::{BufRead, BufReader};
+use vrl::compiler::runtime::Runtime;
 
 use super::StreamMeta;
 use crate::common::infra::{config::CONFIG, metrics};
+use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
+use crate::common::meta::ingestion::{IngestionData, IngestionRequest};
+use crate::common::meta::stream::Stream;
 use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{IngestionResponse, StreamStatus},
@@ -36,7 +41,7 @@ use crate::service::{
 pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
-    body: web::Bytes,
+    in_req: IngestionRequest,
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
@@ -86,74 +91,62 @@ pub async fn ingest(
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    let reader: Vec<json::Value> = json::from_slice(&body)?;
-    for item in reader.iter() {
-        //JSON Flattening
-        let mut value = flatten::flatten(item)?;
 
-        if !local_trans.is_empty() {
-            value = crate::service::ingestion::apply_stream_transform(
-                &local_trans,
-                &value,
-                &stream_vrl_map,
-                stream_name,
-                &mut runtime,
-            )?;
+    let data = match in_req {
+        IngestionRequest::JSON(req) => {
+            let reader: Vec<json::Value> = json::from_slice(&req)?;
+            reader
         }
 
-        if value.is_null() || !value.is_object() {
-            stream_status.status.failed += 1; // transform failed or dropped
-            continue;
-        }
-        // End row based transform
+        IngestionRequest::KinesisFH(_) => todo!(),
+        IngestionRequest::GCP(_) => todo!(),
+        IngestionRequest::Multi(_) => todo!(),
+    };
 
-        // get json object
-        let local_val = value.as_object_mut().unwrap();
+    //let reader: Vec<json::Value> = json::from_slice(&body)?;
+    for item in data.iter() {
+        match apply_functions(
+            item,
+            &local_trans,
+            &stream_vrl_map,
+            stream_name,
+            &mut runtime,
+        ) {
+            Ok(mut res) => {
+                let local_val = res.as_object_mut().unwrap();
 
-        // handle timestamp
-        let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
-            Some(v) => match parse_timestamp_micro_from_value(v) {
-                Ok(t) => t,
-                Err(e) => {
-                    stream_status.status.failed += 1;
-                    stream_status.status.error = e.to_string();
-                    continue;
+                match handle_ts(local_val, min_ts) {
+                    Ok(t) => min_ts = t,
+                    Err(e) => {
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = e.to_string();
+                        continue;
+                    }
                 }
-            },
-            None => Utc::now().timestamp_micros(),
+                let local_trigger = super::add_valid_record(
+                    StreamMeta {
+                        org_id: org_id.to_string(),
+                        stream_name: stream_name.to_string(),
+                        partition_keys: partition_keys.clone(),
+                        stream_alerts_map: stream_alerts_map.clone(),
+                    },
+                    &mut stream_schema_map,
+                    &mut stream_status.status,
+                    &mut buf,
+                    local_val,
+                )
+                .await;
+
+                if local_trigger.is_some() {
+                    trigger = Some(local_trigger.unwrap());
+                }
+            }
+            Err(e) => {
+                stream_status.status.failed += 1;
+                stream_status.status.error = e.to_string();
+                continue;
+            }
         };
-        // check ingestion time
-        let earliest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
-        if timestamp < earliest_time.timestamp_micros() {
-            stream_status.status.failed += 1; // to old data, just discard
-            stream_status.status.error = super::get_upto_discard_error();
-            continue;
-        }
-        if timestamp < min_ts {
-            min_ts = timestamp;
-        }
-        local_val.insert(
-            CONFIG.common.column_timestamp.clone(),
-            json::Value::Number(timestamp.into()),
-        );
-
-        let local_trigger = super::add_valid_record(
-            StreamMeta {
-                org_id: org_id.to_string(),
-                stream_name: stream_name.to_string(),
-                partition_keys: partition_keys.clone(),
-                stream_alerts_map: stream_alerts_map.clone(),
-            },
-            &mut stream_schema_map,
-            &mut stream_status.status,
-            &mut buf,
-            local_val,
-        )
-        .await;
-
-        if local_trigger.is_some() {
-            trigger = Some(local_trigger.unwrap());
-        }
     }
 
     // write to file
@@ -161,11 +154,14 @@ pub async fn ingest(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        StreamParams::new(org_id, stream_name, StreamType::Logs),
+        StreamParams {
+            org_id,
+            stream_name,
+            stream_type: StreamType::Logs,
+        },
         &mut stream_file_name,
         None,
-    )
-    .await;
+    );
 
     if stream_file_name.is_empty() {
         return Ok(IngestionResponse::new(
@@ -173,7 +169,6 @@ pub async fn ingest(
             vec![stream_status],
         ));
     }
-
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
 
@@ -213,4 +208,57 @@ pub async fn ingest(
         http::StatusCode::OK.into(),
         vec![stream_status],
     ))
+}
+
+fn apply_functions<'a>(
+    item: &'a json::Value,
+    local_trans: &'a Vec<StreamTransform>,
+    stream_vrl_map: &'a AHashMap<String, VRLRuntimeConfig>,
+    stream_name: &'a str,
+    mut runtime: &'a mut Runtime,
+) -> Result<json::Value, anyhow::Error> {
+    let mut value = flatten::flatten(item)?;
+
+    if !local_trans.is_empty() {
+        value = crate::service::ingestion::apply_stream_transform(
+            &local_trans,
+            &value,
+            stream_vrl_map,
+            stream_name,
+            &mut runtime,
+        )?;
+    }
+
+    if value.is_null() || !value.is_object() {
+        Err(anyhow::Error::msg("apply functions failure"))
+    } else {
+        Ok(value)
+    }
+}
+
+fn handle_ts(
+    local_val: &mut json::Map<String, json::Value>,
+    mut min_ts: i64,
+) -> Result<i64, anyhow::Error> {
+    // handle timestamp
+    let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
+        Some(v) => match parse_timestamp_micro_from_value(v) {
+            Ok(t) => t,
+            Err(_) => return Err(anyhow::Error::msg("Cant parse timestamp")),
+        },
+        None => Utc::now().timestamp_micros(),
+    };
+    // check ingestion time
+    let earliest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+    if timestamp < earliest_time.timestamp_micros() {
+        return Err(anyhow::Error::msg(super::get_upto_discard_error()));
+    }
+    if timestamp < min_ts {
+        min_ts = timestamp;
+    }
+    local_val.insert(
+        CONFIG.common.column_timestamp.clone(),
+        json::Value::Number(timestamp.into()),
+    );
+    Ok(min_ts)
 }

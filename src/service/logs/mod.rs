@@ -42,6 +42,7 @@ pub mod multi;
 pub mod otlp_grpc;
 pub mod otlp_http;
 pub mod syslog;
+pub mod ingest;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 

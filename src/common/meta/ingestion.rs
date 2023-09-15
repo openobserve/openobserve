@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io::{self, BufRead};
+
+use actix_web::web;
 use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -277,4 +280,64 @@ pub struct GCPIngestionResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
     pub timestamp: String,
+}
+
+pub enum IngestionRequest {
+    JSON(web::Bytes),
+    Multi(web::Bytes),
+    KinesisFH(KinesisFHRequest),
+    GCP(GCPIngestionRequest),
+}
+
+pub enum IngestionData<'a> {
+    JSON(Vec<json::Value>),
+    Multi(&'a [u8]),
+}
+
+enum IngestionError {
+    IoError(std::io::Error),
+    JsonError(json::Error),
+}
+
+impl From<json::Error> for IngestionError {
+    fn from(err: json::Error) -> Self {
+        IngestionError::JsonError(err)
+    }
+}
+
+impl From<std::io::Error> for IngestionError {
+    fn from(err: std::io::Error) -> Self {
+        IngestionError::IoError(err)
+    }
+}
+
+pub enum IngestionDataIter<'a> {
+    JSONIter(std::slice::Iter<'a, json::Value>),
+    MultiIter(io::Lines<std::io::BufReader<&'a [u8]>>),
+}
+
+impl<'a> Iterator for IngestionDataIter<'a> {
+    type Item = Result<json::Value, IngestionError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            IngestionDataIter::JSONIter(iter) => iter.next().cloned().map(Ok),
+            IngestionDataIter::MultiIter(iter) => iter.next().map(|line_result| {
+                line_result
+                    .map_err(IngestionError::from)
+                    .and_then(|line| json::from_str(&line).map_err(IngestionError::from))
+            }),
+        }
+    }
+}
+
+impl<'a> IngestionData<'a> {
+    pub fn iter(&'a self) -> IngestionDataIter<'a> {
+        match self {
+            IngestionData::JSON(vec) => IngestionDataIter::JSONIter(vec.iter()),
+            IngestionData::Multi(data) => {
+                IngestionDataIter::MultiIter(io::BufReader::new(*data).lines())
+            }
+        }
+    }
 }
