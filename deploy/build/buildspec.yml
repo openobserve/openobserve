@@ -24,7 +24,6 @@ phases:
       - mkdir -p ~/.docker/cli-plugins
       - mv buildx-v0.10.4.linux-amd64 ~/.docker/cli-plugins/docker-buildx
       - docker buildx install
-      - export DOCKER_CLI_EXPERIMENTAL=enabled
       - export DOCKER_BUILDKIT=1
 
       # build for sccache image
