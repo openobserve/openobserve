@@ -130,7 +130,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     // cache file list
-    infra_file_list::create_table().await?;
     if !CONFIG.common.meta_store_external
         && (cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
             || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE))
