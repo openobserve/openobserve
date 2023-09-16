@@ -343,6 +343,14 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .long("component")
                         .help("view data of the component: version, user"),
                 ),
+            clap::Command::new("init-dir")
+                .about("init openobserve data dir")
+                .arg(
+                    clap::Arg::new("path")
+                        .short('p')
+                        .long("path")
+                        .help("init this path as data root dir"),
+                ),
             clap::Command::new("migrate-file-list")
                 .about("migrate file-list from s3 to dynamo db")
                 .arg(
@@ -435,24 +443,20 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         println!("{id}\t{:?}\n{:?}", user.key(), user.value());
                     }
                 }
-                "path" => {
-                    // reset permission for all dirs
-                    println!("data_dir: {:?}", CONFIG.common.data_dir);
-                    _ = set_permission(&CONFIG.common.data_dir, 0o777);
-                    println!("db_dir: {:?}", CONFIG.common.data_db_dir);
-                    _ = set_permission(&CONFIG.common.data_db_dir, 0o777);
-                    println!("cache_dir: {:?}", CONFIG.common.data_cache_dir);
-                    _ = set_permission(&CONFIG.common.data_cache_dir, 0o777);
-                    println!("stream_dir: {:?}", CONFIG.common.data_stream_dir);
-                    _ = set_permission(&CONFIG.common.data_stream_dir, 0o777);
-                    println!("wal_dir: {:?}", CONFIG.common.data_wal_dir);
-                    _ = set_permission(&CONFIG.common.data_wal_dir, 0o777);
-                }
                 _ => {
                     return Err(anyhow::anyhow!("unsupport reset component: {component}"));
                 }
             }
         }
+        "init-dir" => match command.get_one::<String>("path") {
+            Some(path) => {
+                set_permission(&path, 0o777)?;
+                println!("init dir {} succeeded", path);
+            }
+            None => {
+                return Err(anyhow::anyhow!("please set data path"));
+            }
+        },
         "migrate-file-list" => {
             let prefix = match command.get_one::<String>("prefix") {
                 Some(prefix) => prefix.to_string(),
