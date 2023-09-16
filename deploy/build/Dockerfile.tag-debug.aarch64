@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM public.ecr.aws/docker/library/node:18.12.1-bullseye as webBuilder
 WORKDIR /web
 COPY ./web /web/
@@ -19,7 +20,6 @@ WORKDIR /app
 COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 RUN mkdir -p /app/target/release/
-RUN mkdir -p /app/data && chmod 777 /app/data
 
 # RUN cargo build --release
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 RUN update-ca-certificates
 COPY --from=builder /app/target/release/openobserve /
-COPY --from=builder /app/data /data
 COPY --from=builder /lib/aarch64-linux-gnu/liblzma.so.5 /lib/aarch64-linux-gnu/liblzma.so.5
 COPY --from=builder /lib/aarch64-linux-gnu/libz.so.1 /lib/aarch64-linux-gnu/libz.so.1
+RUN ["/openobserve", "init-dir", "-p", "/data/"]
 CMD ["/openobserve"]
