@@ -450,7 +450,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
         }
         "init-dir" => match command.get_one::<String>("path") {
             Some(path) => {
-                set_permission(&path, 0o777)?;
+                set_permission(path, 0o777)?;
                 println!("init dir {} succeeded", path);
             }
             None => {

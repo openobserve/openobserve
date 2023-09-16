@@ -85,7 +85,13 @@ async fn handle_trigger(alert_key: &str, frequency: i64) {
     loop {
         interval.tick().await;
         let loc_triggers = TRIGGERS.clone();
-        let trigger = loc_triggers.get(&alert_key.to_owned()).unwrap();
+        let trigger = match loc_triggers.get(&alert_key.to_owned()) {
+            Some(trigger) => trigger,
+            None => {
+                log::info!("Trigger {} not found", alert_key);
+                break;
+            }
+        };
         if TRIGGERS_IN_PROCESS.clone().contains_key(alert_key) {
             let alert_resp = super::db::alerts::get(
                 &trigger.org,
