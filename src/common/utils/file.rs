@@ -70,6 +70,18 @@ pub fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+#[cfg(unix)]
+pub fn set_permission<P: AsRef<std::path::Path>>(path: P, mode: u32) -> Result<(), std::io::Error> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::create_dir_all(path.as_ref())?;
+    std::fs::set_permissions(path.as_ref(), std::fs::Permissions::from_mode(mode))
+}
+
+#[cfg(not(unix))]
+pub fn set_permission<P: AsRef<std::path::Path>>(path: P, mode: u32) -> Result<(), std::io::Error> {
+    std::fs::create_dir_all(path.as_ref())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
