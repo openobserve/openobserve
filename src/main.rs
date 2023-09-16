@@ -38,13 +38,14 @@ use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
 
 use openobserve::{
-    common::infra::{
-        self, cluster,
-        config::{CONFIG, USERS, VERSION},
+    common::{
+        infra::{
+            self, cluster,
+            config::{CONFIG, USERS, VERSION},
+        },
+        meta, migration,
+        utils::zo_logger::{self, ZoLogger, EVENT_SENDER},
     },
-    common::meta,
-    common::migration,
-    common::utils::zo_logger::{self, ZoLogger, EVENT_SENDER},
     handler::{
         grpc::{
             auth::check_auth,
@@ -339,18 +340,18 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .long("component")
                         .help("view data of the component: version, user"),
                 ),
-                clap::Command::new("migrate-file-list")
-                    .about("migrate file-list from s3 to dynamo db")
-                    .arg(
-                        clap::Arg::new("prefix")
-                            .short('p')
-                            .long("prefix")
-                            .value_name("prefix")
-                            .required(false)
-                            .help("only migrate specified prefix, default is all"),
-                    ),
-                    clap::Command::new("migrate-file-list-from-dynamo")
-                        .about("migrate file-list from dynamo to dynamo db"),
+            clap::Command::new("migrate-file-list")
+                .about("migrate file-list from s3 to dynamo db")
+                .arg(
+                    clap::Arg::new("prefix")
+                        .short('p')
+                        .long("prefix")
+                        .value_name("prefix")
+                        .required(false)
+                        .help("only migrate specified prefix, default is all"),
+                ),
+            clap::Command::new("migrate-file-list-from-dynamo")
+                .about("migrate file-list from dynamo to dynamo db"),
             clap::Command::new("migrate-meta").about("migrate meta"),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")

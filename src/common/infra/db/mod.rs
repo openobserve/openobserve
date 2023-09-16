@@ -19,7 +19,7 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use crate::common::meta::meta_store::MetaStore;
+use crate::common::{meta::meta_store::MetaStore, utils::file::create_dir_all};
 
 use super::config::CONFIG;
 use super::errors::Result;
@@ -42,6 +42,7 @@ pub fn default() -> Box<dyn Db> {
     {
         panic!("cluster mode is not supported for ZO_META_STORE=sled/sqlite");
     }
+    create_dir_all(&CONFIG.common.data_db_dir, 0o777).expect("create db dir failed");
 
     match CONFIG.common.meta_store.as_str().into() {
         MetaStore::Sled => Box::<sled::SledDb>::default(),
@@ -54,7 +55,7 @@ pub fn default() -> Box<dyn Db> {
 
 pub async fn create_table() -> Result<()> {
     // check db dir
-    std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
+    create_dir_all(&CONFIG.common.data_db_dir, 0o777)?;
     // create for cluster_coordinator
     if CONFIG.common.local_mode {
         sqlite::create_table().await?;

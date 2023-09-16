@@ -33,7 +33,10 @@ use crate::common::{
         syslog::SyslogRoute,
         user::User,
     },
-    utils::{cgroup, file::get_file_meta},
+    utils::{
+        cgroup,
+        file::{create_dir_all, get_file_meta},
+    },
 };
 use crate::service::enrichment::StreamTable;
 
@@ -765,7 +768,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         .collect();
     disks.sort_by(|a, b| b.0.cmp(a.0));
 
-    std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
+    create_dir_all(&cfg.common.data_cache_dir, 0o777).expect("create cache dir success");
     let cache_dir = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
         .unwrap();
