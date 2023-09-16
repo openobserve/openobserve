@@ -12,18 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, web};
+use std::io::{BufRead, ErrorKind};
+
+use actix_web::http;
 use ahash::AHashMap;
+use bytes::Bytes;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::io::{BufRead, BufReader};
 use vrl::compiler::runtime::Runtime;
 
 use super::StreamMeta;
 use crate::common::infra::{config::CONFIG, metrics};
 use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
-use crate::common::meta::ingestion::{IngestionData, IngestionRequest};
-use crate::common::meta::stream::Stream;
+use crate::common::meta::ingestion::{
+    AWSRecordType, IngestionData, IngestionDataIter, IngestionError, IngestionRequest,
+    KinesisFHData, KinesisFHIngestionResponse,
+};
 use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{IngestionResponse, StreamStatus},
@@ -60,6 +64,7 @@ pub async fn ingest(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<Trigger> = None;
+    let multi_req: Bytes;
 
     // Start Register Transforms for stream
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
@@ -95,58 +100,63 @@ pub async fn ingest(
     let data = match in_req {
         IngestionRequest::JSON(req) => {
             let reader: Vec<json::Value> = json::from_slice(&req)?;
-            reader
+            IngestionData::JSON(reader)
         }
-
+        IngestionRequest::GCP(req) => IngestionData::GCP(req),
+        IngestionRequest::Multi(req) => {
+            multi_req = req;
+            IngestionData::Multi(&multi_req)
+        }
         IngestionRequest::KinesisFH(_) => todo!(),
-        IngestionRequest::GCP(_) => todo!(),
-        IngestionRequest::Multi(_) => todo!(),
     };
 
-    //let reader: Vec<json::Value> = json::from_slice(&body)?;
     for item in data.iter() {
-        match apply_functions(
-            item,
-            &local_trans,
-            &stream_vrl_map,
-            stream_name,
-            &mut runtime,
-        ) {
-            Ok(mut res) => {
-                let local_val = res.as_object_mut().unwrap();
+        if let Ok(value) = item {
+            match apply_functions(
+                &value,
+                &local_trans,
+                &stream_vrl_map,
+                stream_name,
+                &mut runtime,
+            ) {
+                Ok(mut res) => {
+                    let local_val = res.as_object_mut().unwrap();
 
-                match handle_ts(local_val, min_ts) {
-                    Ok(t) => min_ts = t,
-                    Err(e) => {
-                        stream_status.status.failed += 1;
-                        stream_status.status.error = e.to_string();
-                        continue;
+                    match handle_ts(local_val, min_ts) {
+                        Ok(t) => min_ts = t,
+                        Err(e) => {
+                            stream_status.status.failed += 1;
+                            stream_status.status.error = e.to_string();
+                            continue;
+                        }
+                    }
+                    let local_trigger = super::add_valid_record(
+                        StreamMeta {
+                            org_id: org_id.to_string(),
+                            stream_name: stream_name.to_string(),
+                            partition_keys: partition_keys.clone(),
+                            stream_alerts_map: stream_alerts_map.clone(),
+                        },
+                        &mut stream_schema_map,
+                        &mut stream_status.status,
+                        &mut buf,
+                        local_val,
+                    )
+                    .await;
+
+                    if local_trigger.is_some() {
+                        trigger = Some(local_trigger.unwrap());
                     }
                 }
-                let local_trigger = super::add_valid_record(
-                    StreamMeta {
-                        org_id: org_id.to_string(),
-                        stream_name: stream_name.to_string(),
-                        partition_keys: partition_keys.clone(),
-                        stream_alerts_map: stream_alerts_map.clone(),
-                    },
-                    &mut stream_schema_map,
-                    &mut stream_status.status,
-                    &mut buf,
-                    local_val,
-                )
-                .await;
-
-                if local_trigger.is_some() {
-                    trigger = Some(local_trigger.unwrap());
+                Err(e) => {
+                    stream_status.status.failed += 1;
+                    stream_status.status.error = e.to_string();
+                    continue;
                 }
-            }
-            Err(e) => {
-                stream_status.status.failed += 1;
-                stream_status.status.error = e.to_string();
-                continue;
-            }
-        };
+            };
+        } else {
+            continue;
+        }
     }
 
     // write to file
@@ -261,4 +271,79 @@ fn handle_ts(
         json::Value::Number(timestamp.into()),
     );
     Ok(min_ts)
+}
+
+impl<'a> Iterator for IngestionDataIter<'a> {
+    type Item = Result<json::Value, IngestionError>;
+
+    fn next(&mut self) -> Option<Result<json::Value, IngestionError>> {
+        match self {
+            IngestionDataIter::JSONIter(iter) => iter.next().cloned().map(Ok),
+            IngestionDataIter::MultiIter(iter) => iter.next().map(|line_result| {
+                line_result.map_err(IngestionError::from).and_then(|line| {
+                    if line.is_empty() {
+                        IngestionError::IoError(std::io::Error::new(
+                            ErrorKind::InvalidData,
+                            "Empty line in multi ingestion".to_string(),
+                        ));
+                    }
+                    json::from_str(&line).map_err(IngestionError::from)
+                })
+            }),
+            IngestionDataIter::GCP(iter) => iter.next().map(Ok),
+            IngestionDataIter::KinesisFH(iter) => iter.next().map(Ok),
+        }
+    }
+}
+
+impl<'a> IngestionData<'a> {
+    pub fn iter(&'a self) -> IngestionDataIter<'a> {
+        match self {
+            IngestionData::JSON(vec) => IngestionDataIter::JSONIter(vec.iter()),
+            IngestionData::Multi(data) => {
+                IngestionDataIter::MultiIter(std::io::BufReader::new(*data).lines())
+            }
+            IngestionData::GCP(request) => {
+                let data = &request.message.data;
+                let values = match crate::service::logs::gcs_pub_sub::decode_and_decompress(&data) {
+                    Ok((decompressed_data, _)) => {
+                        let value: json::Value = json::from_str(&decompressed_data).unwrap();
+                        vec![value]
+                    }
+                    Err(_) => vec![],
+                };
+                IngestionDataIter::GCP(values.into_iter())
+            }
+            IngestionData::KinesisFH(request) => {
+                let mut events = Vec::new();
+
+                for record in &request.records {
+                    match super::kinesis_firehose::decode_and_decompress(&record.data) {
+                        Err(err) => {
+                            /*  return Ok(KinesisFHIngestionResponse {
+                                request_id: request.request_id,
+                                error_message: Some(err.to_string()),
+                                timestamp: request
+                                    .timestamp
+                                    .unwrap_or(Utc::now().timestamp_micros()),
+                            }); */
+                        }
+                        Ok((decompressed_data, record_type)) => {
+                            if record_type.eq(&AWSRecordType::Cloudwatch) {
+                                let kfh_data: KinesisFHData =
+                                    json::from_str(&decompressed_data).unwrap();
+
+                                for event in kfh_data.log_events.iter() {
+                                    events.push(event.clone());
+                                }
+                            } else {
+                                events.push(json::from_str(&decompressed_data).unwrap());
+                            }
+                        }
+                    }
+                }
+                IngestionDataIter::KinesisFH(events.into_iter())
+            }
+        }
+    }
 }

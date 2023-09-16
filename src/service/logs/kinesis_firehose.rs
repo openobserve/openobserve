@@ -283,7 +283,7 @@ pub async fn process(
     })
 }
 
-fn decode_and_decompress(
+pub fn decode_and_decompress(
     encoded_data: &str,
 ) -> Result<(String, AWSRecordType), Box<dyn std::error::Error>> {
     let decoded_data = crate::common::utils::base64::decode_raw(encoded_data)?;

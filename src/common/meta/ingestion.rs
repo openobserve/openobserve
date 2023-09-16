@@ -292,9 +292,11 @@ pub enum IngestionRequest {
 pub enum IngestionData<'a> {
     JSON(Vec<json::Value>),
     Multi(&'a [u8]),
+    GCP(GCPIngestionRequest),
+    KinesisFH(KinesisFHRequest),
 }
 
-enum IngestionError {
+pub enum IngestionError {
     IoError(std::io::Error),
     JsonError(json::Error),
 }
@@ -314,30 +316,6 @@ impl From<std::io::Error> for IngestionError {
 pub enum IngestionDataIter<'a> {
     JSONIter(std::slice::Iter<'a, json::Value>),
     MultiIter(io::Lines<std::io::BufReader<&'a [u8]>>),
-}
-
-impl<'a> Iterator for IngestionDataIter<'a> {
-    type Item = Result<json::Value, IngestionError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            IngestionDataIter::JSONIter(iter) => iter.next().cloned().map(Ok),
-            IngestionDataIter::MultiIter(iter) => iter.next().map(|line_result| {
-                line_result
-                    .map_err(IngestionError::from)
-                    .and_then(|line| json::from_str(&line).map_err(IngestionError::from))
-            }),
-        }
-    }
-}
-
-impl<'a> IngestionData<'a> {
-    pub fn iter(&'a self) -> IngestionDataIter<'a> {
-        match self {
-            IngestionData::JSON(vec) => IngestionDataIter::JSONIter(vec.iter()),
-            IngestionData::Multi(data) => {
-                IngestionDataIter::MultiIter(io::BufReader::new(*data).lines())
-            }
-        }
-    }
+    GCP(std::vec::IntoIter<json::Value>),
+    KinesisFH(std::vec::IntoIter<KinesisFHLogEvent>),
 }
