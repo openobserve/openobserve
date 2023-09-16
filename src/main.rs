@@ -44,7 +44,10 @@ use openobserve::{
             config::{CONFIG, USERS, VERSION},
         },
         meta, migration,
-        utils::zo_logger::{self, ZoLogger, EVENT_SENDER},
+        utils::{
+            file::set_permission,
+            zo_logger::{self, ZoLogger, EVENT_SENDER},
+        },
     },
     handler::{
         grpc::{
@@ -433,11 +436,17 @@ async fn cli() -> Result<bool, anyhow::Error> {
                     }
                 }
                 "path" => {
+                    // reset permission for all dirs
                     println!("data_dir: {:?}", CONFIG.common.data_dir);
+                    _ = set_permission(&CONFIG.common.data_dir, 0o777);
                     println!("db_dir: {:?}", CONFIG.common.data_db_dir);
+                    _ = set_permission(&CONFIG.common.data_db_dir, 0o777);
                     println!("cache_dir: {:?}", CONFIG.common.data_cache_dir);
+                    _ = set_permission(&CONFIG.common.data_cache_dir, 0o777);
                     println!("stream_dir: {:?}", CONFIG.common.data_stream_dir);
+                    _ = set_permission(&CONFIG.common.data_stream_dir, 0o777);
                     println!("wal_dir: {:?}", CONFIG.common.data_wal_dir);
+                    _ = set_permission(&CONFIG.common.data_wal_dir, 0o777);
                 }
                 _ => {
                     return Err(anyhow::anyhow!("unsupport reset component: {component}"));

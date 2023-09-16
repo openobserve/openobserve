@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(unix)]
-use std::os::unix::fs::DirBuilderExt;
 use std::{
     fs::{File, Metadata},
     io::{Read, Write},
@@ -73,18 +71,15 @@ pub fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
 }
 
 #[cfg(unix)]
-pub fn create_dir_all<P: AsRef<std::path::Path>>(path: P, mode: u32) -> Result<(), std::io::Error> {
-    std::fs::DirBuilder::new()
-        .mode(mode) // Unix-style permissions: 0o777
-        .recursive(true)
-        .create(path.as_ref())
+pub fn set_permission<P: AsRef<std::path::Path>>(path: P, mode: u32) -> Result<(), std::io::Error> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::create_dir_all(path.as_ref())?;
+    std::fs::set_permissions(path.as_ref(), std::fs::Permissions::from_mode(mode))
 }
 
 #[cfg(not(unix))]
-pub fn create_dir_all<P: AsRef<std::path::Path>>(path: P, _mod: u32) -> Result<(), std::io::Error> {
-    std::fs::DirBuilder::new()
-        .recursive(true)
-        .create(path.as_ref())
+pub fn set_permission<P: AsRef<std::path::Path>>(path: P, mode: u32) -> Result<(), std::io::Error> {
+    std::fs::create_dir_all(path.as_ref())
 }
 
 #[cfg(test)]
