@@ -37,5 +37,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 RUN update-ca-certificates
 COPY --from=builder /app/target/release/openobserve /
-RUN mkdir /data && chmod 777 /data
+RUN ["/openobserve", "init-dir", "-p", "/data/"]
 CMD ["/openobserve"]
