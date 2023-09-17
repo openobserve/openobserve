@@ -48,7 +48,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 /*
  * upload compressed files to storage & delete moved files from local
  */
-async fn move_files_to_storage() -> Result<(), anyhow::Error> {
+pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     // need to clone here, to avoid thread boundry issues across awaits
     let files = wal::MEMORY_FILES.list().clone();
     // use multiple threads to upload files

@@ -6,7 +6,7 @@ use crate::common::{
         db::{self, Db},
     },
     meta::alert::Trigger,
-    utils::json,
+    utils::{file::get_file_meta, json},
 };
 
 const ITEM_PREFIXES: [&str; 11] = [
@@ -24,7 +24,6 @@ const ITEM_PREFIXES: [&str; 11] = [
 ];
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    println!("local mode is {}", CONFIG.common.local_mode);
     if CONFIG.common.local_mode {
         load_meta_from_sled().await
     } else {
@@ -33,6 +32,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
+    if get_file_meta(&format!("{}db", CONFIG.sled.data_dir)).is_err() {
+        // there is no local db, no need upgrade
+        return Ok(());
+    }
     let (src, dest) = if CONFIG.common.local_mode {
         (Box::<db::sled::SledDb>::default(), db::default())
     } else {
