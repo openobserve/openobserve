@@ -145,6 +145,11 @@ async fn main() -> Result<(), anyhow::Error> {
         .expect("cluster init failed");
     // init infra
     infra::init().await.expect("infra init failed");
+
+    // check version upgrade
+    let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
+    migration::check_upgrade(&old_version, VERSION).await?;
+
     // init job
     job::init().await.expect("job init failed");
 

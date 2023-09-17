@@ -27,8 +27,8 @@ use crate::service::{compact::stats::update_stats_from_file_list, db, users};
 
 mod alert_manager;
 mod compact;
-mod file_list;
-mod files;
+pub(crate) mod file_list;
+pub(crate) mod files;
 mod metrics;
 mod prom;
 mod stats;

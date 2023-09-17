@@ -17,8 +17,8 @@ use crate::common::{
     meta::StreamType,
 };
 
-mod disk;
-mod memory;
+pub mod disk;
+pub mod memory;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
