@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - main
-  pull_request: # Autolabel PR's
-    types: [opened, reopened, synchronize]
-  pull_request_target: # Autolabel PR's from forks
+  pull_request_target:
     types: [opened, reopened, synchronize]
 
 permissions:
@@ -15,6 +13,7 @@ permissions:
 jobs:
   update_release_draft:
     permissions:
+      contents: write
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
