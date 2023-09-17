@@ -40,7 +40,7 @@ pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        if let Err(e) = move_file_list_to_storage().await {
+        if let Err(e) = move_file_list_to_storage(true).await {
             log::error!("Error moving file_list to remote: {}", e);
         }
     }
@@ -49,7 +49,7 @@ pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
 /*
  * upload compressed file_list to storage & delete moved files from local
  */
-async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
+pub async fn move_file_list_to_storage(check_in_use: bool) -> Result<(), anyhow::Error> {
     let data_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
         .unwrap();
@@ -77,7 +77,7 @@ async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
         }
 
         // check the file is using for write
-        if wal::check_in_use("", "", StreamType::Filelist, &file_name) {
+        if check_in_use && wal::check_in_use("", "", StreamType::Filelist, &file_name) {
             continue;
         }
         log::info!("[JOB] convert file_list: {}", file);

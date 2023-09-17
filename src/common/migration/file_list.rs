@@ -13,13 +13,34 @@
 // limitations under the License.
 
 use crate::common::{
-    infra::file_list as infra_file_list,
+    infra::{config::CONFIG, file_list as infra_file_list},
     meta::{common::FileKey, stream::PartitionTimeLevel, StreamType},
-    utils::time::BASE_TIME,
+    utils::{file::get_file_meta, time::BASE_TIME},
 };
+use crate::job::{file_list, files};
 use crate::service::{compact::stats::update_stats_from_file_list, db};
 
 pub async fn run(prefix: &str) -> Result<(), anyhow::Error> {
+    if get_file_meta(&CONFIG.common.data_wal_dir).is_err() {
+        // there is no local wal files, no need upgrade
+        return Ok(());
+    }
+
+    // move files from wal for disk
+    if let Err(e) = files::disk::move_files_to_storage().await {
+        log::error!("Error moving disk files to remote: {}", e);
+    }
+
+    // move file_list from wal for disk
+    if let Err(e) = file_list::move_file_list_to_storage(false).await {
+        log::error!("Error moving disk files to remote: {}", e);
+    }
+
+    if get_file_meta(&CONFIG.common.data_stream_dir).is_err() {
+        // there is no local stream files, no need upgrade
+        return Ok(());
+    }
+
     // load stream list
     db::schema::cache().await?;
     // load file list to db
