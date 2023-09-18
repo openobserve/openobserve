@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::{self, BufRead};
+use std::io;
 
 use actix_web::web;
 use ahash::AHashMap as HashMap;
@@ -299,6 +299,8 @@ pub enum IngestionData<'a> {
 pub enum IngestionError {
     IoError(std::io::Error),
     JsonError(json::Error),
+    AWSError(KinesisFHIngestionResponse),
+    GCPError(GCPIngestionResponse),
 }
 
 impl From<json::Error> for IngestionError {
@@ -316,6 +318,12 @@ impl From<std::io::Error> for IngestionError {
 pub enum IngestionDataIter<'a> {
     JSONIter(std::slice::Iter<'a, json::Value>),
     MultiIter(io::Lines<std::io::BufReader<&'a [u8]>>),
-    GCP(std::vec::IntoIter<json::Value>),
-    KinesisFH(std::vec::IntoIter<KinesisFHLogEvent>),
+    GCP(
+        std::vec::IntoIter<json::Value>,
+        Option<GCPIngestionResponse>,
+    ),
+    KinesisFH(
+        std::vec::IntoIter<json::Value>,
+        Option<KinesisFHIngestionResponse>,
+    ),
 }

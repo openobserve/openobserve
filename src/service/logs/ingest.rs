@@ -25,8 +25,8 @@ use super::StreamMeta;
 use crate::common::infra::{config::CONFIG, metrics};
 use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
 use crate::common::meta::ingestion::{
-    AWSRecordType, IngestionData, IngestionDataIter, IngestionError, IngestionRequest,
-    KinesisFHData, KinesisFHIngestionResponse,
+    AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
+    IngestionRequest, KinesisFHData, KinesisFHIngestionResponse,
 };
 use crate::common::meta::{
     alert::{Alert, Trigger},
@@ -282,16 +282,22 @@ impl<'a> Iterator for IngestionDataIter<'a> {
             IngestionDataIter::MultiIter(iter) => iter.next().map(|line_result| {
                 line_result.map_err(IngestionError::from).and_then(|line| {
                     if line.is_empty() {
-                        IngestionError::IoError(std::io::Error::new(
+                        std::io::Error::new(
                             ErrorKind::InvalidData,
                             "Empty line in multi ingestion".to_string(),
-                        ));
+                        );
                     }
                     json::from_str(&line).map_err(IngestionError::from)
                 })
             }),
-            IngestionDataIter::GCP(iter) => iter.next().map(Ok),
-            IngestionDataIter::KinesisFH(iter) => iter.next().map(Ok),
+            IngestionDataIter::GCP(iter, err) => match err {
+                Some(e) => Some(Err(IngestionError::GCPError(e.clone()))),
+                None => iter.next().map(Ok),
+            },
+            IngestionDataIter::KinesisFH(iter, err) => match err {
+                Some(e) => Some(Err(IngestionError::AWSError(e.clone()))),
+                None => iter.next().map(Ok),
+            },
         }
     }
 }
@@ -305,28 +311,39 @@ impl<'a> IngestionData<'a> {
             }
             IngestionData::GCP(request) => {
                 let data = &request.message.data;
-                let values = match crate::service::logs::gcs_pub_sub::decode_and_decompress(&data) {
+                let request_id = &request.message.message_id;
+                let req_timestamp = &request.message.publish_time;
+                match crate::service::logs::gcs_pub_sub::decode_and_decompress(data) {
                     Ok((decompressed_data, _)) => {
                         let value: json::Value = json::from_str(&decompressed_data).unwrap();
-                        vec![value]
+                        IngestionDataIter::GCP(vec![value].into_iter(), None)
                     }
-                    Err(_) => vec![],
-                };
-                IngestionDataIter::GCP(values.into_iter())
+                    Err(e) => IngestionDataIter::GCP(
+                        vec![].into_iter(),
+                        Some(GCPIngestionResponse {
+                            request_id: request_id.to_string(),
+                            error_message: Some(e.to_string()),
+                            timestamp: req_timestamp.to_string(),
+                        }),
+                    ),
+                }
             }
             IngestionData::KinesisFH(request) => {
                 let mut events = Vec::new();
+                let request_id = &request.request_id;
+                let req_timestamp = request.timestamp.unwrap_or(Utc::now().timestamp_micros());
 
                 for record in &request.records {
                     match super::kinesis_firehose::decode_and_decompress(&record.data) {
                         Err(err) => {
-                            /*  return Ok(KinesisFHIngestionResponse {
-                                request_id: request.request_id,
-                                error_message: Some(err.to_string()),
-                                timestamp: request
-                                    .timestamp
-                                    .unwrap_or(Utc::now().timestamp_micros()),
-                            }); */
+                            return IngestionDataIter::KinesisFH(
+                                events.into_iter(),
+                                Some(KinesisFHIngestionResponse {
+                                    request_id: request_id.to_string(),
+                                    error_message: Some(err.to_string()),
+                                    timestamp: req_timestamp,
+                                }),
+                            );
                         }
                         Ok((decompressed_data, record_type)) => {
                             if record_type.eq(&AWSRecordType::Cloudwatch) {
@@ -334,15 +351,15 @@ impl<'a> IngestionData<'a> {
                                     json::from_str(&decompressed_data).unwrap();
 
                                 for event in kfh_data.log_events.iter() {
-                                    events.push(event.clone());
+                                    events.push(json::to_value(event).unwrap());
                                 }
                             } else {
                                 events.push(json::from_str(&decompressed_data).unwrap());
-                            }
+                            };
                         }
                     }
                 }
-                IngestionDataIter::KinesisFH(events.into_iter())
+                return IngestionDataIter::KinesisFH(events.into_iter(), None);
             }
         }
     }
