@@ -65,7 +65,7 @@ autolabeler:
     - '/(improve|update|update|refactor|deprecated|remove|unused|test)/i'
 - label: '🤖 Dependencies'
   title:
-    - '/(bumb|dependencies)/i'
+    - '/(bump|dependencies)/i'
 - label: '✏️ Feature'
   title:
     - '/(feature|feat|create|implement|add)/i'
