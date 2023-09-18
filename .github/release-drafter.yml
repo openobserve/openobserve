@@ -1,0 +1,72 @@
+name-template: '$RESOLVED_VERSION'
+tag-template: '$RESOLVED_VERSION'
+categories:
+  - title: '❗ Breaking Changes:'
+    labels:
+      - '❗ Breaking Change'
+  - title: '🚀 New Features:'
+    labels:
+      - '✏️ Feature'
+  - title: '🐛 Fixes:'
+    labels:
+      - '☢️ Bug'
+  - title: '📚 Documentation:'
+    labels:
+      - '📒 Documentation'
+  - title: '🧹 Updates:'
+    collapse-after: 25
+    labels:
+      - '🧹 Updates'
+      - '🤖 Dependencies'
+change-template: '- $TITLE (#$NUMBER)'
+change-title-escapes: '\<*_&'
+exclude-contributors:
+  - dependabot
+  - dependabot[bot]
+version-resolver:
+  major:
+    labels:
+      - '❗ Breaking Change'
+  minor:
+    labels:
+      - '✏️ Feature'
+  patch:
+    labels:
+      - '📒 Documentation'
+      - '☢️ Bug'
+      - '🤖 Dependencies'
+      - '🧹 Updates'
+  default: patch
+template: |
+    $CHANGES
+
+    ## 🐳 Docker Images
+    - `public.ecr.aws/zinclabs/$REPOSITORY:latest`
+    - `public.ecr.aws/zinclabs/$REPOSITORY:latest-simd`
+    - `public.ecr.aws/zinclabs/$REPOSITORY:$RESOLVED_VERSION`
+    - `public.ecr.aws/zinclabs/$REPOSITORY:$RESOLVED_VERSION-simd`
+
+    **📒 Documentation**: https://openobserve.ai/docs/
+
+    **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$RESOLVED_VERSION
+
+    Thanks to $CONTRIBUTORS for making this release possible.
+autolabeler:
+- label: '📒 Documentation'
+  files:
+    - '*.md'
+  title:
+    - '/(docs|doc:|\[doc\]|typos|comment|documentation)/i'
+- label: '☢️ Bug'
+  title:
+    - '/(fix|race|bug|missing|correct)/i'
+- label: '🧹 Updates'
+  title: 
+    - '/(improve|update|update|refactor|deprecated|remove|unused|test)/i'
+- label: '🤖 Dependencies'
+  title:
+    - '/(bump|dependencies)/i'
+- label: '✏️ Feature'
+  title:
+    - '/(feature|feat|create|implement|add)/i'
+    - 
