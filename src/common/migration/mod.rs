@@ -26,7 +26,7 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     }
     log::info!("Upgrading from {} to {}", old_ver, new_ver);
     match (old_ver, new_ver) {
-        (_, "v0.5.3") | (_, "v0.6.0") | (_, "v0.6.1") => upgrade_052_053().await,
+        (_, "v0.6.0") | (_, "v0.6.1") => upgrade_052_053().await,
         _ => Ok(()),
     }
 }
