@@ -21,10 +21,11 @@
 import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
-import * as map from "./../../../locales/languages/map.json"
+// import * as map from "./../../../locales/languages/map.json"
+import L from 'leaflet';
 
 export default defineComponent({
-    name: "MapRenderer",
+    name: "GeoMapRenderer",
     props: {
         data: {
             required: true,
@@ -62,7 +63,23 @@ export default defineComponent({
             await nextTick();
             const theme = store.state.theme === 'dark' ? 'dark' : 'light';
             chart = echarts.init(chartRef.value, theme);
-            echarts.registerMap('world', map);
+            // echarts.registerMap('world', map);
+        
+            const map = L.map(chartRef.value, {
+                center: [35, 110],
+                zoom: 4,
+                layers: [
+                    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                        attribution:
+                            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    }),
+                ],
+            });
+
+            // Add other Leaflet elements like markers, controls, etc. as needed
+            L.control.scale().addTo(map);
+            L.marker([35, 110]).addTo(map);
+
             chart.setOption(props?.data?.options || {}, true);
             window.addEventListener("resize", windowResizeEventCallback);
         });
