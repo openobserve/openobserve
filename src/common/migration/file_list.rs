@@ -36,11 +36,6 @@ pub async fn run(prefix: &str) -> Result<(), anyhow::Error> {
         log::error!("Error moving disk files to remote: {}", e);
     }
 
-    if get_file_meta(&CONFIG.common.data_stream_dir).is_err() {
-        // there is no local stream files, no need upgrade
-        return Ok(());
-    }
-
     // load stream list
     db::schema::cache().await?;
     // load file list to db
