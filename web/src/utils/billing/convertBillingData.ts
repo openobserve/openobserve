@@ -1,5 +1,40 @@
 export const convertBillingData = (params:any) => {
 
+          let series: any = [];
+          let eventIndexMap: any = [];
+          if (params.data?.length > 0) {
+            params.data.forEach(
+              (data: any) => {
+                let eventIndex = eventIndexMap.indexOf(data.event);
+                if (eventIndex > -1) {
+                  if (series[eventIndex] === undefined) {
+                    series[eventIndex] = {
+                      data:[],
+                      name: data.event,
+                      type: "bar",
+                      emphasis: { focus: "series" }
+                    };
+                  }
+                  series[eventIndex].data.push([data.usage_timestamp,Math.round(parseInt(data.size) / 1024 / 1024)]);
+                } else {
+                  // If the event value is not found, add it to eventIndexMap and chartObj
+                  // let newIndex = eventIndexMap.length;
+                  eventIndexMap.push(data.event);
+                  eventIndex = eventIndexMap.indexOf(data.event);
+                  series[eventIndex] = {
+                    data:[],
+                    name: data.event,
+                    type: "bar",
+                    emphasis: { focus: "series" }
+                  };
+                  
+                  // Update the newly added index with the data values
+                  series[eventIndex].data.push([data.usage_timestamp,Math.round(parseInt(data.size) / 1024 / 1024)]);
+                }
+              }
+            );
+          }
+  
   const options: any = {
     backgroundColor: "transparent",
     grid: {
@@ -46,7 +81,7 @@ export const convertBillingData = (params:any) => {
       formatter: function (name: any) {
         if (name.length == 0) return "";        
         const date = new Date(name[0].data[0]);
-        return `${formatDate(date)} <br/> ${name[0].marker} ${name[0].seriesName} : <b>${name[0].value[1]}${params?.layout?.yaxis?.ticksuffix}</b>`;
+        return `${formatDate(date)} <br/> ${name[0].marker} ${name[0].seriesName} : <b>${name[0].value[1]}MB</b>`;
       },
     },
     xAxis: {
@@ -59,19 +94,12 @@ export const convertBillingData = (params:any) => {
       },
       axisLabel:{
         formatter: function (value: any) {
-          return `${value}${params?.layout?.yaxis?.ticksuffix}`
+          return `${value}MB`
         }
       }
     },
-    series: params?.data?.map((data:any)=>{      
-        return {
-          name:data.name,
-          data: data.x.map((it: any,index: any) => ([it, data.y[index]||0])),
-          type:data.type,
-          emphasis: { focus: "series" }
-        }
-      })
-   }
+    series: series,
+   }   
     return {options};
 }
 

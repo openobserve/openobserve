@@ -60,21 +60,6 @@ let currentDate = new Date(); // Get the current date and time
 // Subtract 30 days from the current date
 let thirtyDaysAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-const blankChartObj: any = {
-  data: [],
-  layout: {
-    xaxis: {
-      type: "date",
-    },
-    yaxis: {
-      ticksuffix: " MB",
-      type: "linear",
-    },
-    autosize: true,
-    barmode: "group",
-  },
-};
-
 export default defineComponent({
   name: "Usage",
   components: {
@@ -87,7 +72,6 @@ export default defineComponent({
     const usageDate = ref("30days");
     const dataLoading = ref(false);
     let chartData:any = ref({});
-    let eventIndexMap: any = [];
     onMounted(() => {
       selectUsageDate();
     });
@@ -102,52 +86,8 @@ export default defineComponent({
         usageDate.value
       )
         .then((res) => {
-          const chartRes = res.data.data;
-          var chartObj: any = JSON.parse(JSON.stringify(blankChartObj));
-          if (chartRes?.length > 0) {
-            chartRes.forEach(
-              (data: {
-                event: string;
-                usage_timestamp: string;
-                size: string;
-              }) => {
-                let eventIndex = eventIndexMap.indexOf(data.event);
-                if (eventIndex > -1) {
-                  if (chartObj.data[eventIndex] === undefined) {
-                    chartObj.data[eventIndex] = {
-                      x: [],
-                      y: [],
-                      name: data.event,
-                      type: "bar",
-                    };
-                  }
-                  chartObj.data[eventIndex].x.push(data.usage_timestamp);
-                  chartObj.data[eventIndex].y.push(
-                    Math.round(parseInt(data.size) / 1024 / 1024)
-                  );
-                } else {
-                  // If the event value is not found, add it to eventIndexMap and chartObj
-                  // let newIndex = eventIndexMap.length;
-                  eventIndexMap.push(data.event);
-                  eventIndex = eventIndexMap.indexOf(data.event);
-                  chartObj.data[eventIndex] = {
-                    x: [],
-                    y: [],
-                    name: data.event,
-                    type: "bar",
-                  };
-
-                  // Update the newly added index with the data values
-                  chartObj.data[eventIndex].x.push(data.usage_timestamp);
-                  chartObj.data[eventIndex].y.push(
-                    Math.round(parseInt(data.size) / 1024 / 1024)
-                  );
-                }
-              }
-            );
-          }
           dataLoading.value = false;
-          chartData.value = convertBillingData(chartObj);
+          chartData.value = convertBillingData(res);
           dismiss();
         })
         .catch((e) => {
