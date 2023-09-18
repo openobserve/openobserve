@@ -34,8 +34,9 @@
             item.id != 'bar' &&
             item.id != 'scatter' &&
             item.id != 'area-stacked' &&
-            item.id != 'metric'
-          "
+            item.id != 'metric' &&
+            item.id != 'gauge' &&
+            item.id != 'table'"
           :key="index"
           clickable
           v-ripple="true"

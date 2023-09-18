@@ -16,6 +16,7 @@ import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { convertSQLData } from "@/utils/dashboard/convertSQLData";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
 import { convertMapData } from "@/utils/dashboard/convertMapData";
+import { convertPromQLTableData } from "./convertPromQLTableData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -50,7 +51,11 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
       }
     }
     case "table": {
-      return {chartType: panelSchema.type, ...convertTableData(panelSchema, data)};
+      if (panelSchema?.queryType == "promql") {
+        return {chartType: panelSchema.type, ...convertPromQLTableData(panelSchema, data)};
+      } else {
+        return {chartType: panelSchema.type, ...convertTableData(panelSchema, data)};
+      }
     }
     case "geomap": {
       return {chartType: panelSchema.type, ...convertMapData(panelSchema, data)};

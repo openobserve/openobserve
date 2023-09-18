@@ -314,11 +314,50 @@ export const convertPromQLData = (
         }
         break;
       }
-      default: {
-        return [];
-      }
+      case "pie":{
+        options.tooltip = {
+        trigger: "item",
+        textStyle: {
+          fontSize: 12,
+        },
+        formatter: function (name: any) {
+          return `${name.marker} ${name.name} : <b>${formatUnitValue(
+            getUnitValue(
+              name.value,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom
+            )
+          )}</b>`;
+        },
+      };
+      console.log(it,index,"switch case::");
+      
+      const seriesObj = {
+        ...getPropsByChartTypeForSeries(panelSchema.type),
+        data: it.result.map((res: any) => {
+          return {
+            value:res.values.reduce((sum: any, val: any) => sum+isNaN(val[1])? 0 :val[1],0)/res.values.length, 
+            name: getPromqlLegendName(
+              res.metric,
+              panelSchema.queries[index].config.promql_legend
+          )};
+        }),
+        label: {
+          show: true,
+          formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
+          position: "inside", // You can adjust the position of the labels
+          fontSize: 10,
+        },
+      };      
+      options.xAxis = [];
+      options.yAxis = [];
+      return seriesObj;
     }
-  });
+    default: {
+      return [];
+    }
+  }
+});
 
   options.series = options.series.flat();
 
