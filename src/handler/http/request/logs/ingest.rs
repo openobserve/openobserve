@@ -108,6 +108,27 @@ pub async fn multi(
     )
 }
 
+#[post("/{org_id}/{stream_name}/v1/_multi")]
+pub async fn multi_v1(
+    path: web::Path<(String, String)>,
+    body: web::Bytes,
+    thread_id: web::Data<usize>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    Ok(
+        match logs::multi::ingest(&org_id, &stream_name, body, **thread_id).await {
+            Ok(v) => HttpResponse::Ok().json(v),
+            Err(e) => {
+                log::error!("Error processing request: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
+}
+
 /** _json ingestion API */
 #[utoipa::path(
     context_path = "/api",
@@ -128,6 +149,35 @@ pub async fn multi(
 )]
 #[post("/{org_id}/{stream_name}/_json")]
 pub async fn json(
+    path: web::Path<(String, String)>,
+    body: web::Bytes,
+    thread_id: web::Data<usize>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    Ok(
+        match logs::ingest::ingest(
+            &org_id,
+            &stream_name,
+            IngestionRequest::JSON(body),
+            //body,
+            **thread_id,
+        )
+        .await
+        {
+            Ok(v) => HttpResponse::Ok().json(v),
+            Err(e) => {
+                log::error!("Error processing request: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
+}
+
+#[post("/{org_id}/{stream_name}/v1/_json")]
+pub async fn json_v1(
     path: web::Path<(String, String)>,
     body: web::Bytes,
     thread_id: web::Data<usize>,
@@ -181,21 +231,21 @@ pub async fn handle_kinesis_request(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     Ok(
-        match logs::kinesis_firehose::process(
+        match logs::ingest::ingest(
             &org_id,
             &stream_name,
-            post_data.into_inner(),
+            IngestionRequest::KinesisFH(post_data.into_inner()),
             **thread_id,
         )
         .await
         {
             Ok(v) => {
-                if v.error_message.is_some() {
+                /* if v.error_message.is_some() {
                     log::error!("Error processing request: {:?}", v);
                     HttpResponse::BadRequest().json(v)
-                } else {
-                    HttpResponse::Ok().json(v)
-                }
+                } else { */
+                HttpResponse::Ok().json(v)
+                //}
             }
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);

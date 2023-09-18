@@ -201,12 +201,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(metrics::ingest::otlp_metrics_write)
             .service(logs::ingest::otlp_logs_write)
             .service(traces::otlp_traces_write)
-            .service(create_folder)
-            .service(list_folders)
-            .service(update_folder)
-            .service(get_folder)
-            .service(delete_folder)
-            .service(move_dashboard),
+            .service(logs::ingest::multi_v1)
+            .service(logs::ingest::json_v1),
     );
 }
 

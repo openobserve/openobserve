@@ -96,66 +96,79 @@ pub async fn ingest(
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+    let ep: &str;
 
     let data = match in_req {
         IngestionRequest::JSON(req) => {
             let reader: Vec<json::Value> = json::from_slice(&req)?;
+            ep = "/api/org/ingest/logs/_json";
             IngestionData::JSON(reader)
         }
-        IngestionRequest::GCP(req) => IngestionData::GCP(req),
+        IngestionRequest::GCP(req) => {
+            ep = "/api/org/ingest/logs/_gcs";
+            IngestionData::GCP(req)
+        }
         IngestionRequest::Multi(req) => {
             multi_req = req;
+            ep = "/api/org/ingest/logs/_multi";
             IngestionData::Multi(&multi_req)
         }
-        IngestionRequest::KinesisFH(_) => todo!(),
+        IngestionRequest::KinesisFH(req) => {
+            ep = "/api/org/ingest/logs/_kinesis";
+            IngestionData::KinesisFH(req)
+        }
     };
 
     for item in data.iter() {
-        if let Ok(value) = item {
-            match apply_functions(
-                &value,
-                &local_trans,
-                &stream_vrl_map,
-                stream_name,
-                &mut runtime,
-            ) {
-                Ok(mut res) => {
-                    let local_val = res.as_object_mut().unwrap();
+        match item {
+            Ok(value) => {
+                match apply_functions(
+                    &value,
+                    &local_trans,
+                    &stream_vrl_map,
+                    stream_name,
+                    &mut runtime,
+                ) {
+                    Ok(mut res) => {
+                        let local_val = res.as_object_mut().unwrap();
 
-                    match handle_ts(local_val, min_ts) {
-                        Ok(t) => min_ts = t,
-                        Err(e) => {
-                            stream_status.status.failed += 1;
-                            stream_status.status.error = e.to_string();
-                            continue;
+                        match handle_ts(local_val, min_ts) {
+                            Ok(t) => min_ts = t,
+                            Err(e) => {
+                                stream_status.status.failed += 1;
+                                stream_status.status.error = e.to_string();
+                                continue;
+                            }
+                        }
+                        let local_trigger = super::add_valid_record(
+                            StreamMeta {
+                                org_id: org_id.to_string(),
+                                stream_name: stream_name.to_string(),
+                                partition_keys: partition_keys.clone(),
+                                stream_alerts_map: stream_alerts_map.clone(),
+                            },
+                            &mut stream_schema_map,
+                            &mut stream_status.status,
+                            &mut buf,
+                            local_val,
+                        )
+                        .await;
+
+                        if local_trigger.is_some() {
+                            trigger = Some(local_trigger.unwrap());
                         }
                     }
-                    let local_trigger = super::add_valid_record(
-                        StreamMeta {
-                            org_id: org_id.to_string(),
-                            stream_name: stream_name.to_string(),
-                            partition_keys: partition_keys.clone(),
-                            stream_alerts_map: stream_alerts_map.clone(),
-                        },
-                        &mut stream_schema_map,
-                        &mut stream_status.status,
-                        &mut buf,
-                        local_val,
-                    )
-                    .await;
-
-                    if local_trigger.is_some() {
-                        trigger = Some(local_trigger.unwrap());
+                    Err(e) => {
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = e.to_string();
+                        continue;
                     }
-                }
-                Err(e) => {
-                    stream_status.status.failed += 1;
-                    stream_status.status.error = e.to_string();
-                    continue;
-                }
-            };
-        } else {
-            continue;
+                };
+            }
+            Err(e) => {
+                println!("Error: {:?}", e);
+                return Err(anyhow::Error::msg("Failed processing"));
+            }
         }
     }
 
@@ -185,7 +198,7 @@ pub async fn ingest(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/api/org/ingest/logs/_json",
+            ep,
             "200",
             org_id,
             stream_name,
@@ -194,7 +207,7 @@ pub async fn ingest(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/api/org/ingest/logs/_json",
+            ep,
             "200",
             org_id,
             stream_name,
@@ -222,20 +235,20 @@ pub async fn ingest(
 
 fn apply_functions<'a>(
     item: &'a json::Value,
-    local_trans: &'a Vec<StreamTransform>,
+    local_trans: &Vec<StreamTransform>,
     stream_vrl_map: &'a AHashMap<String, VRLRuntimeConfig>,
     stream_name: &'a str,
-    mut runtime: &'a mut Runtime,
+    runtime: &mut Runtime,
 ) -> Result<json::Value, anyhow::Error> {
     let mut value = flatten::flatten(item)?;
 
     if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_transform(
-            &local_trans,
+            local_trans,
             &value,
             stream_vrl_map,
             stream_name,
-            &mut runtime,
+            runtime,
         )?;
     }
 
@@ -346,15 +359,81 @@ impl<'a> IngestionData<'a> {
                             );
                         }
                         Ok((decompressed_data, record_type)) => {
+                            let mut value;
+                            //let mut timestamp;
                             if record_type.eq(&AWSRecordType::Cloudwatch) {
                                 let kfh_data: KinesisFHData =
                                     json::from_str(&decompressed_data).unwrap();
 
                                 for event in kfh_data.log_events.iter() {
-                                    events.push(json::to_value(event).unwrap());
+                                    value = json::to_value(event).unwrap();
+                                    let local_val = value.as_object_mut().unwrap();
+
+                                    local_val.insert(
+                                        "requestId".to_owned(),
+                                        request.request_id.clone().into(),
+                                    );
+                                    local_val.insert(
+                                        "messageType".to_owned(),
+                                        kfh_data.message_type.clone().into(),
+                                    );
+                                    local_val
+                                        .insert("owner".to_owned(), kfh_data.owner.clone().into());
+                                    local_val.insert(
+                                        "logGroup".to_owned(),
+                                        kfh_data.log_group.clone().into(),
+                                    );
+                                    local_val.insert(
+                                        "logStream".to_owned(),
+                                        kfh_data.log_stream.clone().into(),
+                                    );
+                                    local_val.insert(
+                                        "subscriptionFilters".to_owned(),
+                                        kfh_data.subscription_filters.clone().into(),
+                                    );
+
+                                    let local_msg = event.message.as_str().unwrap();
+
+                                    if local_msg.starts_with('{') && local_msg.ends_with('}') {
+                                        let result: Result<json::Value, json::Error> =
+                                            json::from_str(local_msg);
+
+                                        match result {
+                                            Err(_e) => {
+                                                local_val.insert(
+                                                    "message".to_owned(),
+                                                    event.message.clone(),
+                                                );
+                                            }
+                                            Ok(message_val) => {
+                                                local_val.insert(
+                                                    "message".to_owned(),
+                                                    message_val.clone(),
+                                                );
+                                            }
+                                        }
+                                    } else {
+                                        local_val.insert("message".to_owned(), local_msg.into());
+                                    }
+
+                                    /*  // handling of timestamp
+                                    timestamp = match event.timestamp {
+                                        Some(v) => parse_i64_to_timestamp_micros(v),
+                                        None => Utc::now().timestamp_micros(),
+                                    }; */
+
+                                    local_val.insert(
+                                        CONFIG.common.column_timestamp.clone(),
+                                        event.timestamp.into(),
+                                    );
+
+                                    value = local_val.clone().into();
+
+                                    events.push(value);
                                 }
                             } else {
-                                events.push(json::from_str(&decompressed_data).unwrap());
+                                value = json::from_str(&decompressed_data).unwrap();
+                                events.push(value);
                             };
                         }
                     }

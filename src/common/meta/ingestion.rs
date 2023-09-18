@@ -296,6 +296,7 @@ pub enum IngestionData<'a> {
     KinesisFH(KinesisFHRequest),
 }
 
+#[derive(Debug)]
 pub enum IngestionError {
     IoError(std::io::Error),
     JsonError(json::Error),
