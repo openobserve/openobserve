@@ -48,7 +48,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 /*
  * upload compressed files to storage & delete moved files from local
  */
-async fn move_files_to_storage() -> Result<(), anyhow::Error> {
+pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
         .unwrap();

@@ -145,6 +145,11 @@ async fn main() -> Result<(), anyhow::Error> {
         .expect("cluster init failed");
     // init infra
     infra::init().await.expect("infra init failed");
+
+    // check version upgrade
+    let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
+    migration::check_upgrade(&old_version, VERSION).await?;
+
     // init job
     job::init().await.expect("job init failed");
 
@@ -383,6 +388,21 @@ async fn cli() -> Result<bool, anyhow::Error> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
     let (name, command) = app.subcommand().unwrap();
+    if name == "init-dir" {
+        match command.get_one::<String>("path") {
+            Some(path) => {
+                set_permission(path, 0o777)?;
+                println!("init dir {} succeeded", path);
+            }
+            None => {
+                return Err(anyhow::anyhow!("please set data path"));
+            }
+        }
+        return Ok(true);
+    }
+
+    // init infra, create data dir & tables
+    infra::init().await.expect("infra init failed");
     match name {
         "reset" => {
             let component = command.get_one::<String>("component").unwrap();
@@ -448,15 +468,6 @@ async fn cli() -> Result<bool, anyhow::Error> {
                 }
             }
         }
-        "init-dir" => match command.get_one::<String>("path") {
-            Some(path) => {
-                set_permission(path, 0o777)?;
-                println!("init dir {} succeeded", path);
-            }
-            None => {
-                return Err(anyhow::anyhow!("please set data path"));
-            }
-        },
         "migrate-file-list" => {
             let prefix = match command.get_one::<String>("prefix") {
                 Some(prefix) => prefix.to_string(),

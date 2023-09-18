@@ -30,5 +30,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     cache::init().await?;
     // init db
     db::create_table().await?;
+    file_list::create_table().await?;
     Ok(())
 }
