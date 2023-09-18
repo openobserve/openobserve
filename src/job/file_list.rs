@@ -79,7 +79,9 @@ pub async fn move_file_list_to_storage(check_in_use: bool) -> Result<(), anyhow:
         }
 
         // check the file is using for write
-        if check_in_use && wal::check_in_use(StreamParams::new("", "", StreamType::Filelist), &file_name).await {
+        if check_in_use
+            && wal::check_in_use(StreamParams::new("", "", StreamType::Filelist), &file_name).await
+        {
             continue;
         }
         log::info!("[JOB] convert file_list: {}", file);
