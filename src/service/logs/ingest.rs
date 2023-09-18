@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::{BufRead, ErrorKind};
+use std::io::BufRead;
 
 use actix_web::http;
 use ahash::AHashMap;
@@ -292,17 +292,26 @@ impl<'a> Iterator for IngestionDataIter<'a> {
     fn next(&mut self) -> Option<Result<json::Value, IngestionError>> {
         match self {
             IngestionDataIter::JSONIter(iter) => iter.next().cloned().map(Ok),
-            IngestionDataIter::MultiIter(iter) => iter.next().map(|line_result| {
-                line_result.map_err(IngestionError::from).and_then(|line| {
-                    if line.is_empty() {
-                        std::io::Error::new(
-                            ErrorKind::InvalidData,
-                            "Empty line in multi ingestion".to_string(),
-                        );
+            IngestionDataIter::MultiIter(iter) => loop {
+                match iter.next() {
+                    Some(Ok(line)) if line.trim().is_empty() => {
+                        // If the line is empty, just continue to the next iteration.
+                        continue;
                     }
-                    json::from_str(&line).map_err(IngestionError::from)
-                })
-            }),
+                    Some(Ok(line)) => {
+                        // If the line is not empty, attempt to parse it as JSON.
+                        return Some(json::from_str(&line).map_err(IngestionError::from));
+                    }
+                    Some(Err(e)) => {
+                        // If there's an error reading the line, return it.
+                        return Some(Err(IngestionError::from(e)));
+                    }
+                    None => {
+                        // If there are no more lines, return None.
+                        return None;
+                    }
+                }
+            },
             IngestionDataIter::GCP(iter, err) => match err {
                 Some(e) => Some(Err(IngestionError::GCPError(e.clone()))),
                 None => iter.next().map(Ok),

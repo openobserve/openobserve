@@ -202,7 +202,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(logs::ingest::otlp_logs_write)
             .service(traces::otlp_traces_write)
             .service(logs::ingest::multi_v1)
-            .service(logs::ingest::json_v1),
+            .service(logs::ingest::json_v1)
+            .service(logs::ingest::handle_kinesis_request_v1),
     );
 }
 

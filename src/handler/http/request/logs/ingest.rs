@@ -258,6 +258,41 @@ pub async fn handle_kinesis_request(
     )
 }
 
+#[post("/{org_id}/{stream_name}/v1/_kinesis_firehose")]
+pub async fn handle_kinesis_request_v1(
+    path: web::Path<(String, String)>,
+    thread_id: web::Data<usize>,
+    post_data: web::Json<KinesisFHRequest>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    Ok(
+        match logs::kinesis_firehose::process(
+            &org_id,
+            &stream_name,
+            post_data.into_inner(),
+            **thread_id,
+        )
+        .await
+        {
+            Ok(v) => {
+                if v.error_message.is_some() {
+                    log::error!("Error processing request: {:?}", v);
+                    HttpResponse::BadRequest().json(v)
+                } else {
+                    HttpResponse::Ok().json(v)
+                }
+            }
+            Err(e) => {
+                log::error!("Error processing request: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
+}
+
 #[post("/{org_id}/{stream_name}/_sub")]
 pub async fn handle_gcp_request(
     path: web::Path<(String, String)>,
