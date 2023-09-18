@@ -31,18 +31,23 @@ export const convertMapData = (mapData: any) => {
     const maxValue = Math.max(...mapDataaa.map((item: any) => item.value));
 
     const options: any = {
-        tooltip: {
+        leaflet: {
+          center: [108.39, 39.9],
+          zoom: 4,
+          roam: true,
+        },
+      tooltip: {
         trigger: "item",
         showDelay: 0,
         transitionDuration: 0.2,
-        },
+      },
 
-        visualMap: {
+      visualMap: {
         left: "right",
         min: minValue,
         max: maxValue,
         inRange: {
-            color: [
+          color: [
             "#313695",
             "#4575b4",
             "#74add1",
@@ -54,31 +59,31 @@ export const convertMapData = (mapData: any) => {
             "#f46d43",
             "#d73027",
             "#a50026",
-            ],
+          ],
         },
         text: ["High", "Low"],
         calculable: true,
-        },
-        toolbox: {
+      },
+      toolbox: {
         show: true,
         left: "left",
         top: "top",
-        },
-        //   xAxis: [],
-        //   yAxis: [],
-        series: [
+      },
+      //   xAxis: [],
+      //   yAxis: [],
+      series: [
         {
-            name: "USA PopEstimates",
-            type: "map",
-            map: "world",
-            emphasis: {
+          name: "USA PopEstimates",
+          type: "scatter",
+          coordinateSystem: "leaflet",
+          emphasis: {
             label: {
-                show: true,
+              show: true,
             },
-            },
-            data: mapDataaa,
+          },
+          data: mapDataaa,
         },
-        ],
+      ],
     };
     return { mapDataaa, options };
 }
