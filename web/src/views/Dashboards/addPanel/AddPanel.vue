@@ -204,11 +204,14 @@ export default defineComponent({
     
     // this is used to activate the watcher only after on mounted
     let isPanelConfigWatcherActivated = false
+    //this is used to know whether panel is saved or not
+    let isPanelSaved = false;
     const isPanelConfigChanged = ref(false);
 
     const saveVariableApiCall = useLoading(async()=>{
       const dashboardId = route.query.dashboard + "";
       isPanelConfigChanged.value=false;
+      isPanelSaved=true;
       await savePanelChangesToDashboard(dashboardId);
     })
 
@@ -229,6 +232,7 @@ export default defineComponent({
           route.query.panelId
         );
         Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData)));
+        await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
         updateDateTime(selectedDate.value)
       } else {
@@ -344,7 +348,7 @@ export default defineComponent({
 
     //watch dashboardpaneldata when changes, isUpdated will be true
     watch(() => dashboardPanelData.data, () => {
-      if(isPanelConfigWatcherActivated) {
+      if(isPanelConfigWatcherActivated&&(!isPanelSaved)) {
         isPanelConfigChanged.value = true;
       }
     },{deep:true})
