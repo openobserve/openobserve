@@ -353,7 +353,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     );
                     let path = std::path::Path::new(&data_dir);
                     if path.exists() {
-                        std::fs::remove_dir_all(path).unwrap();
+                        if let Err(e) = tokio::fs::remove_dir_all(path).await {
+                            log::error!("remove_dir_all: {}", e);
+                        };
                     }
                 }
             }

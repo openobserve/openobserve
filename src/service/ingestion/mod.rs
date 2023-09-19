@@ -295,10 +295,10 @@ pub fn init_functions_runtime() -> Runtime {
     crate::common::utils::functions::init_vrl_runtime()
 }
 
-pub fn write_file(
+pub async fn write_file(
     buf: AHashMap<String, Vec<String>>,
     thread_id: usize,
-    stream_params: StreamParams,
+    stream: StreamParams,
     stream_file_name: &mut String,
     partition_time_level: Option<PartitionTimeLevel>,
 ) -> RequestStats {
@@ -315,15 +315,16 @@ pub fn write_file(
         }
         let file = get_or_create(
             thread_id,
-            stream_params,
+            stream.clone(),
             partition_time_level,
             &key,
             CONFIG.common.wal_memory_mode_enabled,
-        );
+        )
+        .await;
         if stream_file_name.is_empty() {
             *stream_file_name = file.full_name();
         }
-        file.write(write_buf.as_ref());
+        file.write(write_buf.as_ref()).await;
         req_stats.size += write_buf.len() as f64 / SIZE_IN_MB;
         req_stats.records += entry.len() as i64;
     }

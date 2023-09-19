@@ -181,7 +181,7 @@ mod tests {
     #[actix_web::test]
     async fn test_user() {
         let org_id = "dummy".to_string();
-        let email = "user@example.com";
+        let email = "user3@example.com";
         let resp = set(DBUser {
             email: email.to_string(),
             password: "pass".to_string(),

@@ -12,32 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    common::{
-        infra::{cluster, config::CONFIG, metrics},
-        meta::{
-            self,
-            alert::{Alert, Trigger},
-            http::HttpResponse as MetaHttpResponse,
-            prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, StreamParams},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json},
-    },
-    service::{
-        db,
-        ingestion::{
-            chk_schema_by_record,
-            grpc::{get_exemplar_val, get_metric_val, get_val},
-            write_file,
-        },
-        schema::{set_schema_metadata, stream_schema_exists},
-        stream::unwrap_partition_time_level,
-        usage::report_request_usage_stats,
-    },
-};
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
@@ -52,6 +26,26 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use super::get_exclude_labels;
+use crate::common::meta::stream::StreamParams;
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        alert, http::HttpResponse as MetaHttpResponse, prom::*, stream::PartitioningDetails,
+        usage::UsageType, StreamType,
+    },
+    utils::{flatten, json},
+};
+use crate::service::{
+    db,
+    ingestion::{
+        chk_schema_by_record,
+        grpc::{get_exemplar_val, get_metric_val, get_val},
+        write_file,
+    },
+    schema::{set_schema_metadata, stream_schema_exists},
+    stream::unwrap_partition_time_level,
+    usage::report_request_usage_stats,
+};
 
 pub async fn handle_grpc_request(
     org_id: &str,
@@ -77,8 +71,8 @@ pub async fn handle_grpc_request(
     let start = std::time::Instant::now();
     let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
-    let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<alert::Alert>> = AHashMap::new();
+    let mut stream_trigger_map: AHashMap<String, alert::Trigger> = AHashMap::new();
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     for resource_metric in &request.resource_metrics {
@@ -138,7 +132,7 @@ pub async fn handle_grpc_request(
                 rec[NAME_LABEL] = metric_name.to_owned().into();
 
                 //metadata handling
-                let mut metadata = prom::Metadata {
+                let mut metadata = Metadata {
                     metric_family_name: rec[NAME_LABEL].to_string(),
                     metric_type: MetricType::Unknown,
                     help: metric.description.to_owned(),
@@ -220,14 +214,14 @@ pub async fn handle_grpc_request(
                         if let Some(alerts) = stream_alerts_map.get(&key) {
                             for alert in alerts {
                                 if alert.is_real_time {
-                                    let set_trigger = meta::alert::Evaluate::evaluate(
+                                    let set_trigger = alert::Evaluate::evaluate(
                                         &alert.condition,
                                         val_map.clone(),
                                     );
                                     if set_trigger {
                                         stream_trigger_map.insert(
                                             metric_name.to_owned(),
-                                            Trigger {
+                                            alert::Trigger {
                                                 timestamp,
                                                 is_valid: true,
                                                 alert_name: alert.name.clone(),
@@ -280,14 +274,11 @@ pub async fn handle_grpc_request(
         let mut req_stats = write_file(
             stream_data,
             thread_id,
-            StreamParams {
-                org_id,
-                stream_name: &stream_name,
-                stream_type: StreamType::Metrics,
-            },
+            StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
-        );
+        )
+        .await;
 
         req_stats.response_time += time;
         report_request_usage_stats(
@@ -364,7 +355,7 @@ pub async fn handle_grpc_request(
 fn process_gauge(
     rec: &mut json::Value,
     gauge: &Gauge,
-    metadata: &mut prom::Metadata,
+    metadata: &mut Metadata,
     prom_meta: &mut AHashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     let mut records = vec![];
@@ -372,7 +363,7 @@ fn process_gauge(
     // set metadata
     metadata.metric_type = MetricType::Gauge;
     prom_meta.insert(
-        meta::prom::METADATA_LABEL.to_string(),
+        METADATA_LABEL.to_string(),
         json::to_string(&metadata).unwrap(),
     );
 
@@ -389,13 +380,13 @@ fn process_gauge(
 fn process_sum(
     rec: &mut json::Value,
     sum: &Sum,
-    metadata: &mut prom::Metadata,
+    metadata: &mut Metadata,
     prom_meta: &mut AHashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::Counter;
     prom_meta.insert(
-        meta::prom::METADATA_LABEL.to_string(),
+        METADATA_LABEL.to_string(),
         json::to_string(&metadata).unwrap(),
     );
 
@@ -419,13 +410,13 @@ fn process_sum(
 fn process_histogram(
     rec: &mut json::Value,
     hist: &Histogram,
-    metadata: &mut prom::Metadata,
+    metadata: &mut Metadata,
     prom_meta: &mut AHashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::Histogram;
     prom_meta.insert(
-        meta::prom::METADATA_LABEL.to_string(),
+        METADATA_LABEL.to_string(),
         json::to_string(&metadata).unwrap(),
     );
 
@@ -447,13 +438,13 @@ fn process_histogram(
 fn process_exponential_histogram(
     rec: &mut json::Value,
     hist: &ExponentialHistogram,
-    metadata: &mut prom::Metadata,
+    metadata: &mut Metadata,
     prom_meta: &mut AHashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::ExponentialHistogram;
     prom_meta.insert(
-        meta::prom::METADATA_LABEL.to_string(),
+        METADATA_LABEL.to_string(),
         json::to_string(&metadata).unwrap(),
     );
     let mut records = vec![];
@@ -474,13 +465,13 @@ fn process_exponential_histogram(
 fn process_summary(
     rec: &json::Value,
     summary: &Summary,
-    metadata: &mut prom::Metadata,
+    metadata: &mut Metadata,
     prom_meta: &mut AHashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::Summary;
     prom_meta.insert(
-        meta::prom::METADATA_LABEL.to_string(),
+        METADATA_LABEL.to_string(),
         json::to_string(&metadata).unwrap(),
     );
 

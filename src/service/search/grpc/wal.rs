@@ -71,6 +71,7 @@ pub async fn search(
     // check wal memory mode
     if CONFIG.common.wal_memory_mode_enabled {
         let mem_files = wal::get_search_in_memory_files(&sql.org_id, &sql.stream_name, stream_type)
+            .await
             .unwrap_or_default();
         for (file_key, file_data) in mem_files {
             scan_stats.original_size += file_data.len() as i64;

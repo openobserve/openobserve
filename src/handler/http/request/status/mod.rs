@@ -107,10 +107,10 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"stream_num": stream_num, "mem_size": mem_size}),
     );
 
-    let mem_file_num = cache::file_data::memory::len();
-    let (mem_max_size, mem_cur_size) = cache::file_data::memory::stats();
-    let disk_file_num = cache::file_data::disk::len();
-    let (disk_max_size, disk_cur_size) = cache::file_data::disk::stats();
+    let mem_file_num = cache::file_data::memory::len().await;
+    let (mem_max_size, mem_cur_size) = cache::file_data::memory::stats().await;
+    let disk_file_num = cache::file_data::disk::len().await;
+    let (disk_max_size, disk_cur_size) = cache::file_data::disk::stats().await;
     stats.insert(
         "FILE_DATA",
         json::json!({

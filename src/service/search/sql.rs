@@ -633,11 +633,7 @@ impl Sql {
             .map(|(k, v, _)| (k.as_str(), v.as_str()))
             .collect::<Vec<(_, _)>>();
         match_source(
-            StreamParams {
-                org_id: &self.org_id,
-                stream_name: &self.stream_name,
-                stream_type,
-            },
+            StreamParams::new(&self.org_id, &self.stream_name, stream_type),
             self.meta.time_range,
             &filters,
             source,

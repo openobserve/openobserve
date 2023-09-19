@@ -15,13 +15,12 @@
 use ahash::HashMap;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Datelike, TimeZone, Utc};
-use itertools::chain;
 use once_cell::sync::Lazy;
-use std::{
-    fs::{File, OpenOptions},
-    io::Write,
-    path::Path,
-    sync::{Arc, RwLock, RwLockReadGuard},
+use std::{path::Path, sync::Arc};
+use tokio::{
+    fs::{create_dir_all, File, OpenOptions},
+    io::AsyncWriteExt,
+    sync::RwLock,
 };
 
 use crate::common::{
@@ -33,7 +32,7 @@ use crate::common::{
         stream::{PartitionTimeLevel, StreamParams},
         StreamType,
     },
-    utils::file::get_file_contents,
+    utils::asynchronism::file::get_file_contents,
 };
 
 // MANAGER for manage using WAL files, in use, should not move to s3
@@ -64,32 +63,29 @@ pub struct RwFile {
     expired: i64,
 }
 
-pub fn init() -> Result<(), anyhow::Error> {
+pub async fn init() -> Result<(), anyhow::Error> {
     _ = MANAGER.data.len();
-    _ = MEMORY_FILES.list().len();
+    _ = MEMORY_FILES.list("").await.len();
     Ok(())
 }
 
-pub fn get_or_create(
+pub async fn get_or_create(
     thread_id: usize,
     stream: StreamParams,
     partition_time_level: Option<PartitionTimeLevel>,
     key: &str,
     use_cache: bool,
 ) -> Arc<RwFile> {
-    MANAGER.get_or_create(thread_id, stream, partition_time_level, key, use_cache)
+    MANAGER
+        .get_or_create(thread_id, stream, partition_time_level, key, use_cache)
+        .await
 }
 
-pub fn check_in_use(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    file_name: &str,
-) -> bool {
-    MANAGER.check_in_use(org_id, stream_name, stream_type, file_name)
+pub async fn check_in_use(stream: StreamParams, file_name: &str) -> bool {
+    MANAGER.check_in_use(stream, file_name).await
 }
 
-pub fn get_search_in_memory_files(
+pub async fn get_search_in_memory_files(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -98,59 +94,45 @@ pub fn get_search_in_memory_files(
         return Ok(vec![]);
     }
 
-    let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
-
-    Ok(chain(
-        // read usesing files in use
-        MANAGER.data.iter().flat_map(|data| {
-            data.read()
-                .unwrap()
-                .iter()
-                .filter_map(|(_, file)| {
-                    if file.org_id == org_id
-                        && file.stream_name == stream_name
-                        && file.stream_type == stream_type
-                    {
-                        if let Ok(data) = file.read() {
-                            Some((file.wal_name(), data))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<(String, Vec<u8>)>>() // removing `collect()` would have been
-                                                     // even better but can't, due to `data`
-                                                     // getting borrowed beyond its lifetime
-        }),
-        MEMORY_FILES.list().iter().filter_map(|(file, data)| {
-            if file.starts_with(&prefix) {
-                Some((file.clone(), data.to_vec()))
-            } else {
-                None
+    let mut files = Vec::new();
+    for file in MANAGER.data.iter() {
+        for (_key, file) in file.read().await.iter() {
+            if file.org_id == org_id
+                && file.stream_name == stream_name
+                && file.stream_type == stream_type
+            {
+                if let Ok(data) = file.read().await {
+                    files.push((file.wal_name(), data));
+                }
             }
-        }),
-    )
-    .collect())
-}
-
-pub fn flush_all_to_disk() {
-    for data in MANAGER.data.iter() {
-        for (_, file) in data.read().unwrap().iter() {
-            file.sync();
         }
     }
 
-    for (file, data) in MEMORY_FILES.list().iter() {
+    let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
+    for (file, data) in MEMORY_FILES.list(&prefix).await.iter() {
+        files.push((file.to_owned(), data.to_vec()));
+    }
+
+    Ok(files)
+}
+
+pub async fn flush_all_to_disk() {
+    for data in MANAGER.data.iter() {
+        for (_, file) in data.read().await.iter() {
+            file.sync().await;
+        }
+    }
+
+    for (file, data) in MEMORY_FILES.list("").await.iter() {
         let file_path = format!("{}{}", CONFIG.common.data_wal_dir, file);
         let mut f = OpenOptions::new()
             .write(true)
             .create(true)
             .append(true)
             .open(file_path)
+            .await
             .unwrap();
-        f.write_all(data).unwrap();
+        f.write_all(data).await.unwrap();
     }
 }
 
@@ -172,16 +154,17 @@ impl Manager {
         }
     }
 
-    pub fn get(
+    pub async fn get(
         &self,
         thread_id: usize,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
+        stream: StreamParams,
         key: &str,
     ) -> Option<Arc<RwFile>> {
-        let full_key = format!("{org_id}/{stream_type}/{stream_name}/{key}");
-        let manager = self.data.get(thread_id).unwrap().read().unwrap();
+        let full_key = format!(
+            "{}/{}/{}/{key}",
+            stream.org_id, stream.stream_type, stream.stream_name
+        );
+        let manager = self.data.get(thread_id).unwrap().read().await;
         let file = match manager.get(&full_key) {
             Some(file) => file.clone(),
             None => {
@@ -191,20 +174,20 @@ impl Manager {
         drop(manager);
 
         // check size & ttl
-        if file.size() >= (CONFIG.limit.max_file_size_on_disk as i64)
+        if file.size().await >= (CONFIG.limit.max_file_size_on_disk as i64)
             || file.expired() <= Utc::now().timestamp()
         {
-            let mut manager = self.data.get(thread_id).unwrap().write().unwrap();
+            let mut manager = self.data.get(thread_id).unwrap().write().await;
             manager.remove(&full_key);
             manager.shrink_to_fit();
-            file.sync();
+            file.sync().await;
             return None;
         }
 
         Some(file)
     }
 
-    pub fn create(
+    pub async fn create(
         &self,
         thread_id: usize,
         stream: StreamParams,
@@ -212,30 +195,25 @@ impl Manager {
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
-        let org_id = stream.org_id;
-        let stream_name = stream.stream_name;
         let stream_type = stream.stream_type;
-
-        let full_key = format!("{org_id}/{stream_type}/{stream_name}/{key}");
-        let mut data = self.data.get(thread_id).unwrap().write().unwrap();
+        let full_key = format!(
+            "{}/{}/{}/{key}",
+            stream.org_id, stream.stream_type, stream.stream_name
+        );
+        let mut data = self.data.get(thread_id).unwrap().write().await;
         if let Some(f) = data.get(&full_key) {
             return f.clone();
         }
 
-        let file = Arc::new(RwFile::new(
-            thread_id,
-            stream,
-            partition_time_level,
-            key,
-            use_cache,
-        ));
+        let file =
+            Arc::new(RwFile::new(thread_id, stream, partition_time_level, key, use_cache).await);
         if !stream_type.eq(&StreamType::EnrichmentTables) {
             data.insert(full_key, file.clone());
         };
         file
     }
 
-    pub fn get_or_create(
+    pub async fn get_or_create(
         &self,
         thread_id: usize,
         stream: StreamParams,
@@ -243,30 +221,19 @@ impl Manager {
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
-        if let Some(file) = self.get(
-            thread_id,
-            stream.org_id,
-            stream.stream_name,
-            stream.stream_type,
-            key,
-        ) {
+        if let Some(file) = self.get(thread_id, stream.clone(), key).await {
             file
         } else {
             self.create(thread_id, stream, partition_time_level, key, use_cache)
+                .await
         }
     }
 
-    pub fn check_in_use(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-        file_name: &str,
-    ) -> bool {
+    pub async fn check_in_use(&self, stream: StreamParams, file_name: &str) -> bool {
         let columns = file_name.split('/').collect::<Vec<&str>>();
         let thread_id: usize = columns.first().unwrap().parse().unwrap();
         let key = columns[1..columns.len() - 1].join("/");
-        if let Some(file) = self.get(thread_id, org_id, stream_name, stream_type, &key) {
+        if let Some(file) = self.get(thread_id, stream, &key).await {
             if file.name() == file_name {
                 return true;
             }
@@ -288,23 +255,38 @@ impl MemoryFiles {
         }
     }
 
-    pub fn list(&self) -> RwLockReadGuard<'_, HashMap<String, Bytes>> {
-        self.data.read().unwrap()
+    pub async fn list(&self, prefix: &str) -> HashMap<String, Bytes> {
+        if prefix.is_empty() {
+            self.data.read().await.clone()
+        } else {
+            self.data
+                .read()
+                .await
+                .iter()
+                .filter_map(|(k, v)| {
+                    if k.starts_with(prefix) {
+                        Some((k.clone(), v.clone()))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        }
     }
 
-    pub fn insert(&self, file_name: String, data: Bytes) {
-        self.data.write().unwrap().insert(file_name, data);
+    pub async fn insert(&self, file_name: String, data: Bytes) {
+        self.data.write().await.insert(file_name, data);
     }
 
-    pub fn remove(&self, file_name: &str) {
-        let mut data = self.data.write().unwrap();
+    pub async fn remove(&self, file_name: &str) {
+        let mut data = self.data.write().await;
         data.remove(file_name);
         data.shrink_to_fit();
     }
 }
 
 impl RwFile {
-    fn new(
+    async fn new(
         thread_id: usize,
         stream: StreamParams,
         partition_time_level: Option<PartitionTimeLevel>,
@@ -323,7 +305,9 @@ impl RwFile {
         let id = ider::generate();
         let file_name = format!("{thread_id}/{key}/{id}{}", FILE_EXT_JSON);
         let file_path = format!("{dir_path}{file_name}");
-        std::fs::create_dir_all(Path::new(&file_path).parent().unwrap()).unwrap();
+        create_dir_all(Path::new(&file_path).parent().unwrap())
+            .await
+            .unwrap();
 
         let (file, cache) = if use_cache {
             (None, Some(RwLock::new(BytesMut::with_capacity(524288)))) // 512KB
@@ -333,6 +317,7 @@ impl RwFile {
                 .create(true)
                 .append(true)
                 .open(&file_path)
+                .await
                 .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
             (Some(RwLock::new(f)), None)
         };
@@ -376,7 +361,7 @@ impl RwFile {
     }
 
     #[inline]
-    pub fn write(&self, data: &[u8]) {
+    pub async fn write(&self, data: &[u8]) {
         // metrics
         metrics::INGEST_WAL_USED_BYTES
             .with_label_values(&[
@@ -397,70 +382,72 @@ impl RwFile {
                 .as_ref()
                 .unwrap()
                 .write()
-                .unwrap()
+                .await
                 .extend_from_slice(data);
         } else {
             self.file
                 .as_ref()
                 .unwrap()
                 .write()
-                .unwrap()
+                .await
                 .write_all(data)
+                .await
                 .unwrap();
         }
     }
 
     #[inline]
-    pub fn read(&self) -> Result<Vec<u8>, std::io::Error> {
+    pub async fn read(&self) -> Result<Vec<u8>, std::io::Error> {
         if self.use_cache {
-            Ok(self
-                .cache
-                .as_ref()
-                .unwrap()
-                .read()
-                .unwrap()
-                .to_owned()
-                .into())
+            Ok(self.cache.as_ref().unwrap().read().await.to_owned().into())
         } else {
-            get_file_contents(&self.full_name())
+            get_file_contents(&self.full_name()).await
         }
     }
 
     #[inline]
-    pub fn sync(&self) {
+    pub async fn sync(&self) {
         if self.use_cache {
             let file_path = format!("{}{}", self.dir, self.name);
             let file_path = file_path.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
-            MEMORY_FILES.insert(
-                file_path.to_string(),
-                self.cache
-                    .as_ref()
-                    .unwrap()
-                    .read()
-                    .unwrap()
-                    .to_owned()
-                    .freeze(),
-            );
+            MEMORY_FILES
+                .insert(
+                    file_path.to_string(),
+                    self.cache
+                        .as_ref()
+                        .unwrap()
+                        .read()
+                        .await
+                        .to_owned()
+                        .freeze(),
+                )
+                .await;
         } else {
             self.file
                 .as_ref()
                 .unwrap()
                 .write()
-                .unwrap()
+                .await
                 .sync_all()
+                .await
                 .unwrap()
         }
     }
 
     #[inline]
-    pub fn size(&self) -> i64 {
+    pub async fn size(&self) -> i64 {
         if self.use_cache {
-            self.cache.as_ref().unwrap().write().unwrap().len() as i64
+            self.cache.as_ref().unwrap().write().await.len() as i64
         } else {
-            match self.file.as_ref().unwrap().read() {
-                Ok(f) => f.metadata().unwrap().len() as i64,
-                Err(_) => 0,
-            }
+            self.file
+                .as_ref()
+                .unwrap()
+                .read()
+                .await
+                .metadata()
+                .await
+                .unwrap()
+                .len() as i64
         }
     }
 
@@ -492,66 +479,48 @@ impl RwFile {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_wal_manager() {
+    #[tokio::test]
+    async fn test_wal_manager() {
         let thread_id = 1;
         let org_id = "test_org";
         let stream_name = "test_stream";
         let stream_type = StreamType::Logs;
+        let stream = StreamParams::new(org_id, stream_name, stream_type);
         let key = "test_key";
         let use_cache = false;
-        let file = get_or_create(
-            thread_id,
-            StreamParams {
-                org_id,
-                stream_name,
-                stream_type,
-            },
-            None,
-            key,
-            use_cache,
-        );
+        let file = get_or_create(thread_id, stream, None, key, use_cache).await;
         let data = "test_data".to_string().into_bytes();
-        file.write(&data);
-        assert_eq!(file.read().unwrap(), data);
-        assert_eq!(file.size(), data.len() as i64);
+        file.write(&data).await;
+        assert_eq!(file.read().await.unwrap(), data);
+        assert_eq!(file.size().await, data.len() as i64);
         assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
     }
 
-    #[test]
-    fn test_wal_memory_files() {
+    #[tokio::test]
+    async fn test_wal_memory_files() {
         let memory_files = MemoryFiles::new();
         let file_name = "test_file".to_string();
         let data = Bytes::from("test_data".to_string().into_bytes());
-        memory_files.insert(file_name.clone(), data.clone());
-        assert_eq!(memory_files.list().len(), 1);
-        memory_files.remove(&file_name);
-        assert_eq!(memory_files.list().len(), 0);
+        memory_files.insert(file_name.clone(), data.clone()).await;
+        assert_eq!(memory_files.list("").await.len(), 1);
+        memory_files.remove(&file_name).await;
+        assert_eq!(memory_files.list("").await.len(), 0);
     }
 
-    #[test]
-    fn test_wal_rw_file() {
+    #[tokio::test]
+    async fn test_wal_rw_file() {
         let thread_id = 1;
         let org_id = "test_org";
         let stream_name = "test_stream";
         let stream_type = StreamType::Logs;
+        let stream = StreamParams::new(org_id, stream_name, stream_type);
         let key = "test_key";
         let use_cache = false;
-        let file = RwFile::new(
-            thread_id,
-            StreamParams {
-                org_id,
-                stream_name,
-                stream_type,
-            },
-            None,
-            key,
-            use_cache,
-        );
+        let file = RwFile::new(thread_id, stream, None, key, use_cache).await;
         let data = "test_data".to_string().into_bytes();
-        file.write(&data);
-        assert_eq!(file.read().unwrap(), data);
-        assert_eq!(file.size(), data.len() as i64);
+        file.write(&data).await;
+        assert_eq!(file.read().await.unwrap(), data);
+        assert_eq!(file.size().await, data.len() as i64);
         assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
     }
 }

@@ -20,23 +20,25 @@ use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use std::collections::HashMap;
 
-use crate::common::infra::{
-    cache::stats,
-    cluster::{self, LOCAL_NODE_UUID},
-    config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-    errors::{Error, Result},
-    metrics,
+use crate::common::{
+    infra::{
+        cache::stats,
+        cluster::{self, LOCAL_NODE_UUID},
+        config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+        errors::{Error, Result},
+        metrics,
+    },
+    meta::{
+        alert,
+        functions::StreamTransform,
+        prom::*,
+        search,
+        stream::{PartitioningDetails, StreamParams},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{json, time::parse_i64_to_timestamp_micros},
 };
-use crate::common::meta::{
-    self,
-    alert::{Alert, Trigger},
-    functions::StreamTransform,
-    prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
-    stream::{PartitioningDetails, StreamParams},
-    usage::UsageType,
-    StreamType,
-};
-use crate::common::utils::{json, time::parse_i64_to_timestamp_micros};
 use crate::service::{
     db,
     ingestion::{chk_schema_by_record, write_file},
@@ -74,8 +76,8 @@ pub async fn remote_write(
     let mut cluster_name = String::new();
     let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
-    let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<alert::Alert>> = AHashMap::new();
+    let mut stream_trigger_map: AHashMap<String, alert::Trigger> = AHashMap::new();
     let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
@@ -88,7 +90,7 @@ pub async fn remote_write(
     // parse metadata
     for item in request.metadata {
         let metric_name = item.metric_family_name.clone();
-        let metadata = prom::Metadata {
+        let metadata = Metadata {
             metric_family_name: item.metric_family_name.clone(),
             metric_type: item.r#type().into(),
             help: item.help.clone(),
@@ -157,7 +159,7 @@ pub async fn remote_write(
                 // skip the entry from adding to store
                 continue;
             }
-            let metric = prom::Metric {
+            let metric = Metric {
                 labels: &labels,
                 value: sample_val,
             };
@@ -297,14 +299,14 @@ pub async fn remote_write(
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     for alert in alerts {
                         if alert.is_real_time {
-                            let set_trigger = meta::alert::Evaluate::evaluate(
+                            let set_trigger = alert::Evaluate::evaluate(
                                 &alert.condition,
                                 value.as_object().unwrap().clone(),
                             );
                             if set_trigger {
                                 stream_trigger_map.insert(
                                     metric_name.clone(),
-                                    Trigger {
+                                    alert::Trigger {
                                         timestamp,
                                         is_valid: true,
                                         alert_name: alert.name.clone(),
@@ -355,14 +357,11 @@ pub async fn remote_write(
         let mut req_stats = write_file(
             stream_data,
             thread_id,
-            StreamParams {
-                org_id,
-                stream_name: &stream_name,
-                stream_type: StreamType::Metrics,
-            },
+            StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
-        );
+        )
+        .await;
 
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
         req_stats.response_time += time;
@@ -421,10 +420,7 @@ pub async fn remote_write(
     Ok(())
 }
 
-pub(crate) async fn get_metadata(
-    org_id: &str,
-    req: prom::RequestMetadata,
-) -> Result<prom::ResponseMetadata> {
+pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
     if req.limit == Some(0) {
         return Ok(ahash::HashMap::default());
     }
@@ -460,8 +456,8 @@ pub(crate) async fn get_metadata(
                 .filter_map(|v| match super::get_prom_metadata_from_schema(&v.schema) {
                     None => None,
                     Some(v) => {
-                        if v.metric_type == prom::MetricType::Histogram
-                            || v.metric_type == prom::MetricType::Summary
+                        if v.metric_type == MetricType::Histogram
+                            || v.metric_type == MetricType::Summary
                         {
                             Some(v.metric_family_name)
                         } else {
@@ -495,9 +491,9 @@ pub(crate) async fn get_metadata(
 // This differs from Prometheus, which [supports] multiple metadata objects per metric.
 //
 // [supports]: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
-fn get_metadata_object(schema: &Schema) -> Option<prom::MetadataObject> {
+fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
     schema.metadata.get(METADATA_LABEL).map(|s| {
-        serde_json::from_str::<prom::Metadata>(s)
+        serde_json::from_str::<Metadata>(s)
             .unwrap_or_else(|error| {
                 tracing::error!(%error, input = ?s, "failed to parse metadata");
                 panic!("BUG: failed to parse {METADATA_LABEL}")
@@ -568,8 +564,8 @@ pub(crate) async fn get_series(
         }
     }
 
-    let req = meta::search::Request {
-        query: meta::search::Query {
+    let req = search::Request {
+        query: search::Query {
             sql,
             from: 0,
             size: 1000,
@@ -579,7 +575,7 @@ pub(crate) async fn get_series(
             ..Default::default()
         },
         aggs: HashMap::new(),
-        encoding: meta::search::RequestEncoding::Empty,
+        encoding: search::RequestEncoding::Empty,
         timeout: 0,
     };
     let series = match search_service::search(org_id, StreamType::Metrics, &req).await {
@@ -670,8 +666,8 @@ pub(crate) async fn get_label_values(
             let stats = match super::get_prom_metadata_from_schema(&schema.schema) {
                 None => stats::get_stream_stats(org_id, &schema.stream_name, stream_type),
                 Some(metadata) => {
-                    if metadata.metric_type == prom::MetricType::Histogram
-                        || metadata.metric_type == prom::MetricType::Summary
+                    if metadata.metric_type == MetricType::Histogram
+                        || metadata.metric_type == MetricType::Summary
                     {
                         stats::get_stream_stats(
                             org_id,
@@ -710,8 +706,8 @@ pub(crate) async fn get_label_values(
     if schema.field_with_name(&label_name).is_err() {
         return Ok(vec![]);
     }
-    let req = meta::search::Request {
-        query: meta::search::Query {
+    let req = search::Request {
+        query: search::Query {
             sql: format!("SELECT DISTINCT({label_name}) FROM {metric_name}"),
             from: 0,
             size: 1000,
@@ -721,7 +717,7 @@ pub(crate) async fn get_label_values(
             ..Default::default()
         },
         aggs: HashMap::new(),
-        encoding: meta::search::RequestEncoding::Empty,
+        encoding: search::RequestEncoding::Empty,
         timeout: 0,
     };
     let mut label_values = match search_service::search(org_id, stream_type, &req).await {
@@ -774,7 +770,7 @@ async fn prom_ha_handler(
         log::info!("Making {} leader for {} ", replica_label, cluster_name);
         METRIC_CLUSTER_LEADER.write().await.insert(
             cluster_name.to_owned(),
-            prom::ClusterLeader {
+            ClusterLeader {
                 name: replica_label.to_owned(),
                 last_received: curr_ts,
                 updated_by: LOCAL_NODE_UUID.to_string(),

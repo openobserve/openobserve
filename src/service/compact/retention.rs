@@ -97,7 +97,7 @@ pub async fn delete_all(
         );
         let path = std::path::Path::new(&data_dir);
         if path.exists() {
-            std::fs::remove_dir_all(path)?;
+            tokio::fs::remove_dir_all(path).await?;
         }
         log::info!("deleted all files: {:?}", path);
     } else {
@@ -191,9 +191,11 @@ pub async fn delete_by_date(
     drop(locker);
 
     let mut date_start =
-        Utc.datetime_from_str(&format!("{}T00:00:00Z", date_range.0), "%Y-%m-%dT%H:%M:%SZ")?;
+        DateTime::parse_from_str(&format!("{}T00:00:00Z", date_range.0), "%Y-%m-%dT%H:%M:%SZ")?
+            .with_timezone(&Utc);
     let date_end =
-        Utc.datetime_from_str(&format!("{}T23:59:59Z", date_range.1), "%Y-%m-%dT%H:%M:%SZ")?;
+        DateTime::parse_from_str(&format!("{}T23:59:59Z", date_range.1), "%Y-%m-%dT%H:%M:%SZ")?
+            .with_timezone(&Utc);
     let time_range = { (date_start.timestamp_micros(), date_end.timestamp_micros()) };
 
     if is_local_disk_storage() {
@@ -205,7 +207,7 @@ pub async fn delete_by_date(
             );
             let path = std::path::Path::new(&data_dir);
             if path.exists() {
-                std::fs::remove_dir_all(path)?;
+                tokio::fs::remove_dir_all(path).await?;
             }
             date_start += Duration::days(1);
         }
