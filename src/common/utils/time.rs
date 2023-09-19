@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use once_cell::sync::Lazy;
 
 use super::json;
@@ -38,7 +38,7 @@ pub fn parse_i64_to_timestamp_micros(v: i64) -> i64 {
         return Utc::now().timestamp_micros();
     }
     let mut duration = v;
-    if duration > BASE_TIME.timestamp_nanos() {
+    if duration > BASE_TIME.timestamp_nanos_opt().unwrap_or_default() {
         // nanoseconds
         duration /= 1000;
     } else if duration > BASE_TIME.timestamp_micros() {
@@ -74,11 +74,11 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
 
     let ret = if s.contains(' ') && s.len() == 19 {
         let fmt = "%Y-%m-%d %H:%M:%S";
-        Utc.datetime_from_str(s, fmt)?
+        NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
     } else if s.contains('T') && !s.contains(' ') {
         if s.len() == 19 {
             let fmt = "%Y-%m-%dT%H:%M:%S";
-            Utc.datetime_from_str(s, fmt)?
+            NaiveDateTime::parse_from_str(s, fmt)?.and_utc()
         } else {
             let t = DateTime::parse_from_rfc3339(s)?;
             t.into()
