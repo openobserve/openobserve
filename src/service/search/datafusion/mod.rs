@@ -17,7 +17,7 @@ use parquet::{
     arrow::ArrowWriter, file::properties::WriterProperties, format::SortingColumn,
     schema::types::ColumnPath,
 };
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use crate::common::{
     infra::config::{
@@ -33,8 +33,27 @@ pub mod match_udf;
 pub mod regexp_udf;
 pub mod storage;
 mod time_range_udf;
-
 mod transform_udf;
+
+#[derive(PartialEq, Debug)]
+pub enum MemoryPoolType {
+    Greedy,
+    Fair,
+    None,
+}
+
+impl FromStr for MemoryPoolType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "greedy" => Ok(MemoryPoolType::Greedy),
+            "fair" | "" => Ok(MemoryPoolType::Fair), // default is fair
+            "none" | "off" => Ok(MemoryPoolType::None),
+            _ => Err(format!("Invalid memory pool type '{}'", s)),
+        }
+    }
+}
 
 /// The name of the match UDF given to DataFusion.
 pub const MATCH_UDF_NAME: &str = "str_match";
