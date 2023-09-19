@@ -293,8 +293,8 @@ pub async fn handle_kinesis_request_v1(
     )
 }
 
-#[post("/{org_id}/{stream_name}/_sub")]
-pub async fn handle_gcp_request(
+#[post("/{org_id}/{stream_name}/v1/_sub")]
+pub async fn handle_gcp_request_v1(
     path: web::Path<(String, String)>,
     thread_id: web::Data<usize>,
     post_data: web::Json<GCPIngestionRequest>,
@@ -312,6 +312,34 @@ pub async fn handle_gcp_request(
                     HttpResponse::Ok().json(v)
                 }
             }
+            Err(e) => {
+                log::error!("Error processing request: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
+}
+
+#[post("/{org_id}/{stream_name}/_sub")]
+pub async fn handle_gcp_request(
+    path: web::Path<(String, String)>,
+    thread_id: web::Data<usize>,
+    post_data: web::Json<GCPIngestionRequest>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    Ok(
+        match logs::ingest::ingest(
+            &org_id,
+            &stream_name,
+            IngestionRequest::GCP(post_data.into_inner()),
+            **thread_id,
+        )
+        .await
+        {
+            Ok(v) => HttpResponse::Ok().json(v),
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
