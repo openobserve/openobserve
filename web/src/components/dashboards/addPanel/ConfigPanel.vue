@@ -18,7 +18,7 @@
     <q-toggle
       v-if="
         dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap'
+        dashboardPanelData.data.type != 'heatmap' && dashboardPanelData.data.type != 'metric'
       "
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"

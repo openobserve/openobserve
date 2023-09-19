@@ -267,22 +267,36 @@ export const convertPromQLData = (
               );
               return {
                 ...getPropsByChartTypeForSeries(panelSchema.type),
-                renderItem: function (params: any) {
-                  return {
-                    type: "text",
-                    style: {
-                      text:
-                        parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
-                      fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
-                      fontWeight: 500,
-                      align: "center",
-                      verticalAlign: "middle",
-                      x: params.coordSys.cx,
-                      y: params.coordSys.cy,
-                      fill: store.state.theme == "dark" ? "#fff" : "#000",
+                data:[{
+                  value:parseFloat(unitValue.value).toFixed(2),
+                  detail: {
+                    formatter: function (value:any) {
+                      return value + unitValue.unit;
                     },
-                  };
+                  }
+                }],
+                detail: {
+                  valueAnimation: true,
+                  offsetCenter: [0, 0],
+                  // fontSize:50
                 },
+
+                // renderItem: function (params: any) {
+                //   return {
+                //     type: "text",
+                //     style: {
+                //       text:
+                //         parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
+                //       fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
+                //       fontWeight: 500,
+                //       align: "center",
+                //       verticalAlign: "middle",
+                //       x: params.coordSys.cx,
+                //       y: params.coordSys.cy,
+                //       fill: store.state.theme == "dark" ? "#fff" : "#000",
+                //     },
+                //   };
+                // },
               };
             });
             options.dataset = { source: [[]] };
@@ -444,8 +458,38 @@ const getPropsByChartTypeForSeries = (type: string) => {
       };
     case "metric":
       return {
-        type: "custom",
-        coordinateSystem: "polar",
+        // type: "custom",
+        // coordinateSystem: "polar",
+          type: 'gauge',
+          startAngle: 205,
+          endAngle: -25,
+          min: 0,
+          max: 1,
+          // splitNumber: 12,
+          // itemStyle: {
+            // color: '#FFAB91'
+          // },
+          progress: {
+            show: true,
+            width: 10
+          },
+          pointer: {
+            show: false
+          },
+          axisLine: {
+            lineStyle: {
+              width: 10,
+            }
+          },
+          axisTick: {
+            show:false
+          },
+          splitLine: {
+            show:false
+          },
+          axisLabel: {
+            show:false
+          }
       };
     case "h-stacked":
       return {
