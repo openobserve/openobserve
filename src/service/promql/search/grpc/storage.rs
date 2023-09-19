@@ -229,18 +229,22 @@ async fn cache_parquet_files(files: &[FileKey], scan_stats: &ScanStats) -> Resul
                 }
                 _ => None,
             };
-            if let Some(e) = ret {
+            let ret = if let Some(e) = ret {
                 log::info!("promql->search->storage: download file to cache err: {}", e);
                 if e.to_string().to_lowercase().contains("not found") {
                     // delete file from file list
                     if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
                         log::error!("promql->search->storage: delete from file_list err: {}", e);
                     }
-                    return Some(file_name);
+                    Some(file_name)
+                } else {
+                    None
                 }
-            }
+            } else {
+                None
+            };
             drop(permit);
-            None
+            ret
         });
         tasks.push(task);
     }
