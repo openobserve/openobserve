@@ -565,7 +565,7 @@ export const convertSQLData = (
       options.yAxis = temp;
 
       options.yAxis.map((it: any) => {
-        it.nameGap = calculateWidthText(largestLabel(it.data)) + 14;
+        it.nameGap = calculateWidthText(xAxisKeys.reduce((str:any,it: any) => str+largestLabel(getAxisDataFromKey(it)),""));
       });
       (options.xAxis.name =
         panelSchema.queries[0]?.fields?.y?.length >= 1
@@ -900,7 +900,7 @@ export const convertSQLData = (
       options.xAxis = options.yAxis;
       options.yAxis = temp;
       options.yAxis.map((it: any) => {
-        it.nameGap = calculateWidthText(largestLabel(it.data)) + 8;
+        it.nameGap = calculateWidthText(largestLabel(it.data)) + 20;
       });
       options.xAxis.nameGap = 20;
       break;
