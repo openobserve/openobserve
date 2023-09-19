@@ -185,7 +185,7 @@ mod tests {
     async fn test_put() {
         create_table().await.unwrap();
         let db = default();
-        db.put("/foo/bar", Bytes::from("hello"), false)
+        db.put("/foo/put/bar", Bytes::from("hello"), false)
             .await
             .unwrap();
     }
@@ -196,8 +196,8 @@ mod tests {
         let db = default();
         let hello = Bytes::from("hello");
 
-        db.put("/foo/bar", hello.clone(), false).await.unwrap();
-        assert_eq!(db.get("/foo/bar").await.unwrap(), hello);
+        db.put("/foo/get/bar", hello.clone(), false).await.unwrap();
+        assert_eq!(db.get("/foo/get/bar").await.unwrap(), hello);
     }
 
     #[actix_web::test]
@@ -206,17 +206,17 @@ mod tests {
         let db = default();
         let hello = Bytes::from("hello");
 
-        db.put("/foo/bar1", hello.clone(), false).await.unwrap();
-        db.put("/foo/bar2", hello.clone(), false).await.unwrap();
-        db.put("/foo/bar3", hello.clone(), false).await.unwrap();
-        db.delete("/foo/bar1", false, false).await.unwrap();
-        assert!(db.delete("/foo/bar4", false, false).await.is_ok());
-        db.delete("/foo/", true, false).await.unwrap();
+        db.put("/foo/del/bar1", hello.clone(), false).await.unwrap();
+        db.put("/foo/del/bar2", hello.clone(), false).await.unwrap();
+        db.put("/foo/del/bar3", hello.clone(), false).await.unwrap();
+        db.delete("/foo/del/bar1", false, false).await.unwrap();
+        assert!(db.delete("/foo/del/bar4", false, false).await.is_ok());
+        db.delete("/foo/del/", true, false).await.unwrap();
 
-        db.put("/foo/bar1", hello.clone(), false).await.unwrap();
-        db.put("/foo/bar2", hello.clone(), false).await.unwrap();
-        db.put("/foo/bar3", hello, false).await.unwrap();
-        assert_eq!(db.list_keys("/foo/").await.unwrap().len(), 3);
-        assert_eq!(db.list_values("/foo/").await.unwrap().len(), 3);
+        db.put("/foo/del/bar1", hello.clone(), false).await.unwrap();
+        db.put("/foo/del/bar2", hello.clone(), false).await.unwrap();
+        db.put("/foo/del/bar3", hello, false).await.unwrap();
+        assert_eq!(db.list_keys("/foo/del/").await.unwrap().len(), 3);
+        assert_eq!(db.list_values("/foo/del/").await.unwrap().len(), 3);
     }
 }
