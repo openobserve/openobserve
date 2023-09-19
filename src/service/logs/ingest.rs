@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::BufRead;
+use std::io::{BufRead, Read};
 
 use actix_web::http;
 use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
+use flate2::read::GzDecoder;
 use vrl::compiler::runtime::Runtime;
 
 use super::StreamMeta;
@@ -332,7 +333,7 @@ impl<'a> IngestionData<'a> {
                 let data = &request.message.data;
                 let request_id = &request.message.message_id;
                 let req_timestamp = &request.message.publish_time;
-                match crate::service::logs::gcs_pub_sub::decode_and_decompress(data) {
+                match decode_and_decompress(data) {
                     Ok((decompressed_data, _)) => {
                         let value: json::Value = json::from_str(&decompressed_data).unwrap();
                         IngestionDataIter::GCP(vec![value].into_iter(), None)
@@ -353,7 +354,7 @@ impl<'a> IngestionData<'a> {
                 let req_timestamp = request.timestamp.unwrap_or(Utc::now().timestamp_micros());
 
                 for record in &request.records {
-                    match super::kinesis_firehose::decode_and_decompress(&record.data) {
+                    match decode_and_decompress(&record.data) {
                         Err(err) => {
                             return IngestionDataIter::KinesisFH(
                                 events.into_iter(),
@@ -447,5 +448,49 @@ impl<'a> IngestionData<'a> {
                 return IngestionDataIter::KinesisFH(events.into_iter(), None);
             }
         }
+    }
+}
+
+pub fn decode_and_decompress(
+    encoded_data: &str,
+) -> Result<(String, AWSRecordType), Box<dyn std::error::Error>> {
+    let decoded_data = crate::common::utils::base64::decode_raw(encoded_data)?;
+    let mut gz = GzDecoder::new(&decoded_data[..]);
+    let mut decompressed_data = String::new();
+    match gz.read_to_string(&mut decompressed_data) {
+        Ok(_) => Ok((decompressed_data, AWSRecordType::Cloudwatch)),
+        Err(_) => Ok((String::from_utf8(decoded_data)?, AWSRecordType::JSON)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_and_decompress;
+
+    #[test]
+    fn test_decode_and_decompress_success() {
+        let encoded_data = "H4sIAAAAAAAAADWO0QqCMBiFX2XsOkKJZHkXot5YQgpdhMTSPzfSTbaZhPjuzbTLj3M45xtxC1rTGvJPB9jHQXrOL2lyP4VZdoxDvMFyEKDmpJF9NVBTskTW2gaNrGMl+85mC2VGAW0X1P1Dl4p3hksR8caA0ti/Fb9e+AZhZhwxr5a64VbD0NaOuR5xPLJzycEh+81fbxa4JmjVQ6uejwIG5YuLGjGgjWFIPlFll7ig8zOKuAImNWzxVExfL8ipzewAAAA=";
+        let expected = "{\"messageType\":\"CONTROL_MESSAGE\",\"owner\":\"CloudwatchLogs\",\"logGroup\":\"\",\"logStream\":\"\",\"subscriptionFilters\":[],\"logEvents\":[{\"id\":\"\",\"timestamp\":1680683189085,\"message\":\"CWL CONTROL MESSAGE: Checking health of destination Firehose.\"}]}";
+        let result =
+            decode_and_decompress(encoded_data).expect("Failed to decode and decompress data");
+        assert_eq!(result.0, expected);
+    }
+
+    #[test]
+    fn test_decode_success() {
+        let encoded_data = "eyJtZXNzYWdlIjoiMiAwNTg2OTQ4NTY0NzYgZW5pLTAzYzBmNWJhNzlhNjZlZjE3IDEwLjMuMTY2LjcxIDEwLjMuMTQxLjIwOSA0NDMgMzg2MzQgNiAxMDMgNDI5MjYgMTY4MDgzODU1NiAxNjgwODM4NTc4IEFDQ0VQVCBPSyJ9Cg==";
+        let expected = "{\"message\":\"2 058694856476 eni-03c0f5ba79a66ef17 10.3.166.71 10.3.141.209 443 38634 6 103 42926 1680838556 1680838578 ACCEPT OK\"}\n";
+        let result = decode_and_decompress(encoded_data).expect("Failed to decode data");
+        assert_eq!(result.0, expected);
+    }
+
+    #[test]
+    fn test_decode_and_decompress_invalid_base64() {
+        let encoded_data = "H4sIAAAAAAAC/ytJLS4BAAxGw7gNAAA&"; // Invalid base64 string
+        let result = decode_and_decompress(encoded_data);
+        assert!(
+            result.is_err(),
+            "Expected an error due to invalid base64 input"
+        );
     }
 }
