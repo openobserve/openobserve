@@ -24,20 +24,13 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use super::StreamMeta;
-use crate::common::infra::{config::CONFIG, metrics};
-use crate::common::meta::stream::StreamParams;
-use crate::common::meta::{
-    ingestion::{IngestionResponse, StreamStatus},
-    StreamType,
-};
-
-use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::ingestion::grpc::get_val;
-use crate::service::ingestion::is_ingestion_allowed;
-use crate::service::{format_stream_name, ingestion::write_file, schema::stream_schema_exists};
-use crate::{
-    common::meta::{
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
         alert::{Alert, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::StreamParams,
         usage::UsageType,
         StreamType,
     },
@@ -59,8 +52,17 @@ pub async fn ingest(
     let start = std::time::Instant::now();
     let stream_name = &format_stream_name(in_stream_name);
 
-    if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
-        return Err(value);
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        return Err(anyhow::anyhow!("not an ingester"));
+    }
+
+    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
+    }
+
+    // check if we are allowed to ingest
+    if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
+        return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
 
     let mut min_ts =
@@ -202,6 +204,21 @@ pub async fn handle_grpc_request(
     is_grpc: bool,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, anyhow::Error> {
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                "not an ingester".to_string(),
+            )),
+        );
+    }
+
+    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            http::StatusCode::FORBIDDEN.into(),
+            "Quota exceeded for this organization".to_string(),
+        )));
+    }
     let start = std::time::Instant::now();
     let stream_name = match in_stream_name {
         Some(name) => format_stream_name(name),
@@ -209,10 +226,6 @@ pub async fn handle_grpc_request(
     };
 
     let stream_name = &stream_name;
-
-    if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
-        return Err(value);
-    }
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();

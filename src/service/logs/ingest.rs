@@ -177,14 +177,11 @@ pub async fn ingest(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        StreamParams {
-            org_id,
-            stream_name,
-            stream_type: StreamType::Logs,
-        },
+        StreamParams::new(org_id, &stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
-    );
+    )
+    .await;
 
     if stream_file_name.is_empty() {
         return Ok(IngestionResponse::new(

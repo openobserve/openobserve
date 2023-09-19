@@ -19,16 +19,25 @@ use flate2::read::GzDecoder;
 use std::io::Read;
 
 use super::StreamMeta;
-use crate::common::infra::{config::CONFIG, metrics};
-use crate::common::meta::{
-    alert::{Alert, Trigger},
-    ingestion::{
-        AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest, StreamStatus,
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        alert::{Alert, Trigger},
+        ingestion::{
+            AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest,
+            StreamStatus,
+        },
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{
+        flatten, json,
+        time::{parse_i64_to_timestamp_micros, parse_timestamp_micro_from_value},
     },
 };
-use crate::service::ingestion::is_ingestion_allowed;
 use crate::service::{
-    format_stream_name, ingestion::write_file, usage::report_request_usage_stats,
+    db, format_stream_name, ingestion::write_file, usage::report_request_usage_stats,
 };
 
 pub async fn process(
@@ -40,8 +49,13 @@ pub async fn process(
     let start = std::time::Instant::now();
     let stream_name = &format_stream_name(in_stream_name);
 
-    if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
-        return Err(value);
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        return Err(anyhow::anyhow!("not an ingester"));
+    }
+
+    // check if we are allowed to ingest
+    if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
+        return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -283,7 +297,7 @@ pub async fn process(
     })
 }
 
-pub fn decode_and_decompress(
+pub(crate) fn decode_and_decompress(
     encoded_data: &str,
 ) -> Result<(String, AWSRecordType), Box<dyn std::error::Error>> {
     let decoded_data = crate::common::utils::base64::decode_raw(encoded_data)?;
