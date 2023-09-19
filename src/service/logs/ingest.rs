@@ -178,7 +178,7 @@ pub async fn ingest(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        StreamParams::new(org_id, &stream_name, StreamType::Logs),
+        StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
     )
