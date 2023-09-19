@@ -31,7 +31,7 @@
         <q-btn class="q-ml-md text-bold" outline padding="sm lg" color="red" no-caps :label="t('panel.discard')"
           @click="goBackToDashboardList" />
         <q-btn class="q-ml-md text-bold" outline padding="sm lg"  no-caps
-          :label="t('panel.save')" data-test="dashboard-panel-save" @click="saveVariableApiCall.execute()" :loading="saveVariableApiCall.isLoading.value"  />
+          :label="t('panel.save')" data-test="dashboard-panel-save" @click="savePanelData.execute()" :loading="savePanelData.isLoading.value"  />
         <q-btn class="q-ml-md text-bold no-border" data-test="dashboard-apply" padding="sm lg" color="secondary" no-caps :label="t('panel.apply')"
           @click="runQuery" />
       </div>
@@ -204,20 +204,19 @@ export default defineComponent({
     
     // this is used to activate the watcher only after on mounted
     let isPanelConfigWatcherActivated = false
-    //this is used to know whether panel is saved or not
-    let isPanelSaved = false;
     const isPanelConfigChanged = ref(false);
 
-    const saveVariableApiCall = useLoading(async()=>{
+    const savePanelData = useLoading(async()=>{
       const dashboardId = route.query.dashboard + "";
-      isPanelConfigChanged.value=false;
-      isPanelSaved=true;
       await savePanelChangesToDashboard(dashboardId);
     })
 
     onUnmounted(async () => {
       // clear a few things
       resetDashboardPanelData();
+
+      // remove beforeUnloadHandler event listener
+      window.removeEventListener('beforeunload', beforeUnloadHandler);
     });
 
     onMounted(async () => {
@@ -246,6 +245,9 @@ export default defineComponent({
       // let it call the wathcers and then mark the panel config watcher as activated
       await nextTick()
       isPanelConfigWatcherActivated = true
+
+      //event listener before unload and data is updated
+      window.addEventListener('beforeunload', beforeUnloadHandler);
 
       loadDashboard();
     });
@@ -348,7 +350,7 @@ export default defineComponent({
 
     //watch dashboardpaneldata when changes, isUpdated will be true
     watch(() => dashboardPanelData.data, () => {
-      if(isPanelConfigWatcherActivated&&(!isPanelSaved)) {
+      if(isPanelConfigWatcherActivated) {
         isPanelConfigChanged.value = true;
       }
     },{deep:true})
@@ -363,14 +365,6 @@ export default defineComponent({
       }
       return ;
     };
-
-    //event listener before unload and data is updated
-    window.addEventListener('beforeunload', beforeUnloadHandler);
-    
-    //ondeactivated remove beforeUnloadHandler event listener
-    onUnmounted(() => {
-      window.removeEventListener('beforeunload', beforeUnloadHandler);
-    });
 
   onBeforeRouteLeave((to, from, next) => {
   if (from.path === '/dashboards/add_panel' && isPanelConfigChanged.value) {
@@ -638,6 +632,9 @@ export default defineComponent({
         }
       }
 
+      isPanelConfigWatcherActivated = false
+      isPanelConfigChanged.value = false;
+
       await nextTick();
       return router.push({
         path: "/dashboards/view",
@@ -683,7 +680,7 @@ export default defineComponent({
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
-      saveVariableApiCall,
+      savePanelData,
       resetAggregationFunction,
       isOutDated,
       store
