@@ -30,7 +30,7 @@ use datafusion::{
     error::{DataFusionError, Result},
     execution::{
         context::SessionConfig,
-        memory_pool::{FairSpillPool, GreedyMemoryPool, MemoryPool},
+        memory_pool::{FairSpillPool, GreedyMemoryPool},
         runtime_env::{RuntimeConfig, RuntimeEnv},
     },
     logical_expr::expr::Alias,
@@ -40,7 +40,7 @@ use datafusion::{
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use crate::common::{
     infra::{
@@ -971,21 +971,25 @@ pub fn create_runtime_env() -> Result<RuntimeEnv> {
     let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
     object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
 
-    let mem_pool: Arc<dyn MemoryPool> = if CONFIG
-        .memory_cache
-        .datafusion_memory_pool
-        .to_lowercase()
-        .starts_with("greedy")
-    {
-        Arc::new(GreedyMemoryPool::new(
-            CONFIG.memory_cache.datafusion_max_size,
-        ))
+    let rn_config =
+        RuntimeConfig::new().with_object_store_registry(Arc::new(object_store_registry));
+    let rn_config = if CONFIG.memory_cache.datafusion_max_size > 0 {
+        let mem_pool = super::MemoryPoolType::from_str(&CONFIG.memory_cache.datafusion_memory_pool)
+            .map_err(|e| {
+                DataFusionError::Execution(format!("Invalid datafusion memory pool type: {}", e))
+            })?;
+        match mem_pool {
+            super::MemoryPoolType::Greedy => rn_config.with_memory_pool(Arc::new(
+                GreedyMemoryPool::new(CONFIG.memory_cache.datafusion_max_size),
+            )),
+            super::MemoryPoolType::Fair => rn_config.with_memory_pool(Arc::new(
+                FairSpillPool::new(CONFIG.memory_cache.datafusion_max_size),
+            )),
+            super::MemoryPoolType::None => rn_config,
+        }
     } else {
-        Arc::new(FairSpillPool::new(CONFIG.memory_cache.datafusion_max_size))
+        rn_config
     };
-    let rn_config = RuntimeConfig::new()
-        .with_object_store_registry(Arc::new(object_store_registry))
-        .with_memory_pool(mem_pool);
     RuntimeEnv::new(rn_config)
 }
 

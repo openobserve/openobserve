@@ -238,7 +238,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // leave the cluster
     let _ = cluster::leave().await;
     // flush WAL cache to disk
-    infra::wal::flush_all_to_disk();
+    infra::wal::flush_all_to_disk().await;
     // flush compact offset cache to disk disk
     let _ = db::compact::files::sync_cache_to_db().await;
 

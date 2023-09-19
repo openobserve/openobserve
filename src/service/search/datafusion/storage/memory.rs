@@ -16,7 +16,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
-    path::Path, GetOptions, GetResult, ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
+    path::Path, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, ObjectMeta,
+    ObjectStore, Result,
 };
 use std::ops::Range;
 use tokio::io::AsyncWrite;
@@ -44,7 +45,7 @@ impl FS {
 
     async fn get_cache(&self, location: &Path) -> Option<Bytes> {
         let path = location.to_string();
-        let data = file_data::memory::get(&path);
+        let data = file_data::memory::get(&path).await;
         tokio::task::yield_now().await;
         data
     }
@@ -61,9 +62,25 @@ impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let location = &self.format_location(location);
         match self.get_cache(location).await {
-            Some(data) => Ok(GetResult::Stream(
-                futures::stream::once(async move { Ok(data) }).boxed(),
-            )),
+            Some(data) => {
+                let meta = ObjectMeta {
+                    location: location.clone(),
+                    last_modified: *BASE_TIME,
+                    size: data.len(),
+                    e_tag: None,
+                };
+                let range = Range {
+                    start: 0,
+                    end: data.len(),
+                };
+                Ok(GetResult {
+                    payload: GetResultPayload::Stream(
+                        futures::stream::once(async move { Ok(data) }).boxed(),
+                    ),
+                    meta,
+                    range,
+                })
+            }
             None => match storage::LOCAL_CACHE.get(location).await {
                 Ok(data) => Ok(data),
                 Err(_) => storage::DEFAULT.get(location).await,
@@ -74,9 +91,25 @@ impl ObjectStore for FS {
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         let location = &self.format_location(location);
         match self.get_cache(location).await {
-            Some(data) => Ok(GetResult::Stream(
-                futures::stream::once(async move { Ok(data) }).boxed(),
-            )),
+            Some(data) => {
+                let meta = ObjectMeta {
+                    location: location.clone(),
+                    last_modified: *BASE_TIME,
+                    size: data.len(),
+                    e_tag: None,
+                };
+                let (range, data) = match options.range {
+                    Some(range) => (range.clone(), data.slice(range)),
+                    None => (0..data.len(), data),
+                };
+                Ok(GetResult {
+                    payload: GetResultPayload::Stream(
+                        futures::stream::once(async move { Ok(data) }).boxed(),
+                    ),
+                    meta,
+                    range,
+                })
+            }
             None => match storage::LOCAL_CACHE
                 .get_opts(
                     location,
@@ -90,7 +123,7 @@ impl ObjectStore for FS {
                 )
                 .await
             {
-                Ok(data) => Ok(data),
+                Ok(ret) => Ok(ret),
                 Err(_) => storage::DEFAULT.get_opts(location, options).await,
             },
         }

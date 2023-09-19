@@ -25,7 +25,7 @@ use tokio::sync::mpsc;
 
 use crate::common::infra::{config::CONFIG, errors::*};
 
-pub(crate) static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
+pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
 
 fn connect() -> Pool<Postgres> {
     let db_opts = PgConnectOptions::from_str(&CONFIG.common.meta_postgres_dsn)

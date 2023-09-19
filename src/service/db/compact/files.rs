@@ -109,14 +109,14 @@ mod tests {
     use super::*;
 
     #[actix_web::test]
-    async fn test_files() {
+    async fn test_compact_files() {
         const OFFSET: i64 = 100;
-        set_offset("nexus", "default", "logs".into(), OFFSET)
+        set_offset("default", "compact_file", "logs".into(), OFFSET)
             .await
             .unwrap();
         sync_cache_to_db().await.unwrap();
         assert_eq!(
-            get_offset("nexus", "default", "logs".into()).await,
+            get_offset("default", "compact_file", "logs".into()).await,
             (OFFSET, "".to_string())
         );
         assert!(!list_offset().await.unwrap().is_empty());

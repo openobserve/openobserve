@@ -14,7 +14,7 @@
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{stream::BoxStream, StreamExt};
+use futures::stream::BoxStream;
 use object_store::{
     limit::LimitStore, path::Path, Error, GetOptions, GetResult, ListResult, MultipartId,
     ObjectMeta, ObjectStore, Result,
@@ -95,8 +95,7 @@ impl ObjectStore for Remote {
         let result = self.client.get(&(format_key(&file).into())).await?;
 
         // metrics
-        let data = result.bytes().await?;
-        let data_len = data.len();
+        let data_len = result.meta.size;
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
@@ -109,9 +108,7 @@ impl ObjectStore for Remote {
                 .inc_by(time);
         }
 
-        Ok(GetResult::Stream(
-            futures::stream::once(async move { Ok(data) }).boxed(),
-        ))
+        Ok(result)
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
@@ -123,8 +120,7 @@ impl ObjectStore for Remote {
             .await?;
 
         // metrics
-        let data = result.bytes().await?;
-        let data_len = data.len();
+        let data_len = result.meta.size;
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
@@ -137,9 +133,7 @@ impl ObjectStore for Remote {
                 .inc_by(time);
         }
 
-        Ok(GetResult::Stream(
-            futures::stream::once(async move { Ok(data) }).boxed(),
-        ))
+        Ok(result)
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {

@@ -17,7 +17,7 @@ use parquet::{
     arrow::ArrowWriter, file::properties::WriterProperties, format::SortingColumn,
     schema::types::ColumnPath,
 };
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use crate::common::{
     infra::config::{
@@ -33,8 +33,27 @@ pub mod match_udf;
 pub mod regexp_udf;
 pub mod storage;
 mod time_range_udf;
-
 mod transform_udf;
+
+#[derive(PartialEq, Debug)]
+pub enum MemoryPoolType {
+    Greedy,
+    Fair,
+    None,
+}
+
+impl FromStr for MemoryPoolType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "greedy" => Ok(MemoryPoolType::Greedy),
+            "fair" | "" => Ok(MemoryPoolType::Fair), // default is fair
+            "none" | "off" => Ok(MemoryPoolType::None),
+            _ => Err(format!("Invalid memory pool type '{}'", s)),
+        }
+    }
+}
 
 /// The name of the match UDF given to DataFusion.
 pub const MATCH_UDF_NAME: &str = "str_match";
@@ -83,9 +102,9 @@ pub fn new_parquet_writer<'a>(
         .expect("Not found timestamp field");
     let mut writer_props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
-        .set_write_batch_size(PARQUET_BATCH_SIZE)
-        .set_data_page_size_limit(PARQUET_PAGE_SIZE)
-        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE)
+        .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
+        .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
+        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
         .set_dictionary_enabled(true)
         .set_sorting_columns(Some(
             [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),

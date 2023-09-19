@@ -24,23 +24,23 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use super::StreamMeta;
-use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::stream::StreamParams;
-use crate::common::meta::{
-    ingestion::{IngestionResponse, StreamStatus},
-    StreamType,
-};
-
-use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::ingestion::grpc::get_val;
-use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
-use crate::{
-    common::meta::{
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
         alert::{Alert, Trigger},
         http::HttpResponse as MetaHttpResponse,
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::StreamParams,
         usage::UsageType,
+        StreamType,
     },
-    service::usage::report_request_usage_stats,
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+};
+use crate::service::{
+    db, format_stream_name,
+    ingestion::{grpc::get_val, write_file},
+    schema::stream_schema_exists,
+    usage::report_request_usage_stats,
 };
 
 pub async fn ingest(
@@ -155,14 +155,11 @@ pub async fn ingest(
     let _ = write_file(
         buf,
         thread_id,
-        StreamParams {
-            org_id,
-            stream_name,
-            stream_type: StreamType::Logs,
-        },
+        StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
-    );
+    )
+    .await;
 
     if stream_file_name.is_empty() {
         return Ok(IngestionResponse::new(
@@ -359,14 +356,11 @@ pub async fn handle_grpc_request(
     let mut req_stats = write_file(
         data_buf,
         thread_id,
-        StreamParams {
-            org_id,
-            stream_name,
-            stream_type: StreamType::Logs,
-        },
+        StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
-    );
+    )
+    .await;
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;

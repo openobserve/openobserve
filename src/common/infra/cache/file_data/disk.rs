@@ -15,14 +15,16 @@
 use bytes::Bytes;
 use lru::LruCache;
 use once_cell::sync::Lazy;
-use std::{cmp::max, path::Path, sync::RwLock};
+use std::{cmp::max, path::Path};
+use tokio::{fs, sync::RwLock};
 
 use crate::common::{
     infra::{
         config::{is_local_disk_storage, CONFIG},
         metrics, storage,
     },
-    utils::file::{get_file_meta, put_file_contents, scan_files},
+    utils::asynchronism::file::*,
+    utils::file::scan_files,
 };
 
 static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
@@ -54,7 +56,7 @@ impl FileData {
         }
     }
 
-    pub fn load(&mut self) -> Result<(), anyhow::Error> {
+    pub async fn load(&mut self) -> Result<(), anyhow::Error> {
         let wal_dir = Path::new(&self.root_dir).canonicalize().unwrap();
         let files = scan_files(&self.root_dir);
         for file in files {
@@ -65,7 +67,7 @@ impl FileData {
                 .to_str()
                 .unwrap()
                 .replace('\\', "/");
-            let meta = get_file_meta(&file)?;
+            let meta = get_file_meta(&file).await?;
             let data_size = meta.len() as usize;
             self.cur_size += data_size;
             self.data.put(file_key.clone(), data_size);
@@ -83,11 +85,11 @@ impl FileData {
         Ok(())
     }
 
-    pub fn exist(&mut self, file: &str) -> bool {
+    pub async fn exist(&mut self, file: &str) -> bool {
         self.data.get(file).is_some()
     }
 
-    pub fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+    pub async fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         let data_size = data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
@@ -107,7 +109,7 @@ impl FileData {
                 let (key, data_size) = item.unwrap();
                 // delete file from local disk
                 let file_path = format!("{}{}", self.root_dir, key);
-                std::fs::remove_file(&file_path)?;
+                fs::remove_file(&file_path).await?;
                 // metrics
                 let columns = key.split('/').collect::<Vec<&str>>();
                 if columns[0] == "files" {
@@ -130,8 +132,8 @@ impl FileData {
         self.data.put(file.to_string(), data_size);
         // write file into local disk
         let file_path = format!("{}{}", self.root_dir, file);
-        std::fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
-        put_file_contents(&file_path, &data)?;
+        fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
+        put_file_contents(&file_path, &data).await?;
         // metrics
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
@@ -158,44 +160,47 @@ impl FileData {
     }
 }
 
-pub fn init() -> Result<(), anyhow::Error> {
+pub async fn init() -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&CONFIG.common.data_cache_dir).expect("create cache dir success");
-    let mut files = FILES.write().unwrap();
-    files.load()?;
+    let mut files = FILES.write().await;
+    files.load().await?;
     Ok(())
 }
 
 #[inline]
-pub fn exist(file: &str) -> bool {
-    let mut files = FILES.write().unwrap();
-    files.exist(file)
+pub async fn exist(file: &str) -> bool {
+    if !CONFIG.disk_cache.enabled {
+        return false;
+    }
+    let mut files = FILES.write().await;
+    files.exist(file).await
 }
 
 #[inline]
-pub fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     if !CONFIG.disk_cache.enabled || is_local_disk_storage() {
         return Ok(());
     }
-    let mut files = FILES.write().unwrap();
-    files.set(file, data)
+    let mut files = FILES.write().await;
+    files.set(file, data).await
 }
 
 #[inline]
-pub fn stats() -> (usize, usize) {
-    let files = FILES.read().unwrap();
+pub async fn stats() -> (usize, usize) {
+    let files = FILES.read().await;
     files.size()
 }
 
 #[inline]
-pub fn len() -> usize {
-    let files = FILES.read().unwrap();
+pub async fn len() -> usize {
+    let files = FILES.read().await;
     files.data.len()
 }
 
 #[inline]
 pub async fn download(file: &str) -> Result<Bytes, anyhow::Error> {
     let data = storage::get(file).await?;
-    if let Err(e) = set(file, data.clone()) {
+    if let Err(e) = set(file, data.clone()).await {
         return Err(anyhow::anyhow!(
             "set file {} to disk cache failed: {}",
             file,
@@ -209,46 +214,47 @@ pub async fn download(file: &str) -> Result<Bytes, anyhow::Error> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_set_file_cache() {
+    #[tokio::test]
+    async fn test_cache_set_file() {
         let mut file_data = FileData::with_capacity(1024);
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..100 {
             let file_key = format!(
-                "files/default/logs/olympics/2022/10/03/10/6982652937134804993_{}.parquet",
+                "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
-            let resp = file_data.set(&file_key, content.clone());
+            let resp = file_data.set(&file_key, content.clone()).await;
             assert!(resp.is_ok());
         }
     }
 
-    #[test]
-    fn test_get_file_from_cache() {
+    #[tokio::test]
+    async fn test_cache_get_file() {
         let mut file_data = FileData::default();
-        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
+        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
-        file_data.set(file_key, content.clone()).unwrap();
-        assert!(file_data.exist(file_key));
+        file_data.set(file_key, content.clone()).await.unwrap();
+        assert!(file_data.exist(file_key).await);
 
-        set(file_key, content.clone()).unwrap();
-        assert!(exist(file_key));
+        file_data.set(file_key, content.clone()).await.unwrap();
+        assert!(file_data.exist(file_key).await);
+        assert!(file_data.size().0 > 0);
     }
 
-    #[test]
-    fn test_cache_miss() {
+    #[tokio::test]
+    async fn test_cache_miss() {
         let mut file_data = FileData::with_capacity(10);
-        let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
-        let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2.parquet";
+        let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
+        let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
-        file_data.set(file_key1, content.clone()).unwrap();
-        assert!(file_data.exist(file_key1));
+        file_data.set(file_key1, content.clone()).await.unwrap();
+        assert!(file_data.exist(file_key1).await);
         // set another key, will release first key
-        file_data.set(file_key2, content.clone()).unwrap();
-        assert!(file_data.exist(file_key2));
+        file_data.set(file_key2, content.clone()).await.unwrap();
+        assert!(file_data.exist(file_key2).await);
         // get first key, should get error
-        assert!(!file_data.exist(file_key1));
+        assert!(!file_data.exist(file_key1).await);
     }
 }

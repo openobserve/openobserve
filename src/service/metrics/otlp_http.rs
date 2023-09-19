@@ -12,29 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    common::{
-        infra::{cluster, config::CONFIG, metrics},
-        meta::{
-            self,
-            alert::{Alert, Trigger},
-            http::HttpResponse as MetaHttpResponse,
-            prom::{self, MetricType, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, StreamParams},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json},
-    },
-    handler::http::request::CONTENT_TYPE_JSON,
-    service::{
-        db,
-        ingestion::{chk_schema_by_record, grpc::get_val_for_attr, write_file},
-        schema::{set_schema_metadata, stream_schema_exists},
-        stream::unwrap_partition_time_level,
-        usage::report_request_usage_stats,
-    },
-};
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
@@ -48,6 +25,27 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use super::{get_exclude_labels, otlp_grpc::handle_grpc_request};
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        self,
+        alert::{Alert, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        prom::{self, MetricType, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+        stream::{PartitioningDetails, StreamParams},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json},
+};
+use crate::handler::http::request::CONTENT_TYPE_JSON;
+use crate::service::{
+    db,
+    ingestion::{chk_schema_by_record, grpc::get_val_for_attr, write_file},
+    schema::{set_schema_metadata, stream_schema_exists},
+    stream::unwrap_partition_time_level,
+    usage::report_request_usage_stats,
+};
 
 const SERVICE: &str = "service";
 
@@ -376,14 +374,11 @@ pub async fn metrics_json_handler(
         let mut req_stats = write_file(
             stream_data,
             thread_id,
-            StreamParams {
-                org_id,
-                stream_name: &stream_name,
-                stream_type: StreamType::Metrics,
-            },
+            StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
-        );
+        )
+        .await;
 
         req_stats.response_time += time;
         report_request_usage_stats(
