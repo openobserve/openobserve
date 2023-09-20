@@ -45,7 +45,20 @@ impl TraceService for TraceServer {
             return Err(Status::invalid_argument(msg));
         }
 
-        let resp = handle_trace_request(org_id.unwrap().to_str().unwrap(), 0, in_req, true).await;
+        let stream_name = metadata.get(&CONFIG.grpc.stream_header_key);
+        let mut in_stream_name: Option<&str> = None;
+        if let Some(stream_name) = stream_name {
+            in_stream_name = Some(stream_name.to_str().unwrap());
+        };
+
+        let resp = handle_trace_request(
+            org_id.unwrap().to_str().unwrap(),
+            0,
+            in_req,
+            true,
+            in_stream_name,
+        )
+        .await;
         if resp.is_ok() {
             return Ok(Response::new(ExportTraceServiceResponse {
                 partial_success: None,
