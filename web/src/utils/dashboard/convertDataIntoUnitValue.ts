@@ -33,6 +33,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
       }
       case "seconds": {
         const units = [
+          { unit: "μs", divisor: 0.000001 },
           { unit: "ms", divisor: 0.001 },
           { unit: "s", divisor: 1 },
           { unit: "m", divisor: 60 },
@@ -52,6 +53,56 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
         }
   
         // If the value is too large to fit in any unit, return the original seconds
+        return {
+          value: value,
+          unit: "s",
+        };
+      }
+      case "microseconds": {
+        const units = [
+          { unit: "μs", divisor: 1 },
+          { unit: "ms", divisor: 1000 },
+          { unit: "s", divisor: 1000000 },
+          { unit: "m", divisor: 60000000 },
+          { unit: "h", divisor: 3600000000 },
+          { unit: "D", divisor: 86400000000 },
+          { unit: "M", divisor: 2592000000000 }, // Assuming 30 days in a month
+          { unit: "Y", divisor: 31536000000000 }, // Assuming 365 days in a year
+        ];
+        for (let unitInfo of units) {
+          const unitValue = value ? value / unitInfo.divisor : 0;
+          if (unitValue < 1000) {
+            return {
+              value: unitValue.toFixed(2),
+              unit: unitInfo.unit,
+            };
+          }
+        }
+        return {
+          value: value,
+          unit: "s",
+        };
+      }
+      case "milliseconds": {
+        const units = [
+          { unit: "μs", divisor: 0.001 },
+          { unit: "ms", divisor: 1 },
+          { unit: "s", divisor: 1000 },
+          { unit: "m", divisor: 60000 },
+          { unit: "h", divisor: 3600000 },
+          { unit: "D", divisor: 86400000 },
+          { unit: "M", divisor: 2592000000 }, // Assuming 30 days in a month
+          { unit: "Y", divisor: 31536000000 }, // Assuming 365 days in a year
+        ];
+        for (let unitInfo of units) {
+          const unitValue = value ? value / unitInfo.divisor : 0;
+          if (unitValue < 1000) {
+            return {
+              value: unitValue.toFixed(2),
+              unit: unitInfo.unit,
+            };
+          }
+        }
         return {
           value: value,
           unit: "s",
