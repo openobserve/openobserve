@@ -17,13 +17,15 @@ use actix_web::{http::StatusCode, HttpResponse};
 use std::io;
 
 use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse};
-use crate::service::db::dashboard;
+use crate::service::db::dashboards;
+
+pub mod folders;
 
 #[tracing::instrument(skip(body))]
 pub async fn create_dashboard(org_id: &str, body: web::Bytes) -> Result<HttpResponse, io::Error> {
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
     let dashboard_id = crate::common::infra::ider::generate();
-    match dashboard::put(org_id, &dashboard_id, body).await {
+    match dashboards::put(org_id, &dashboard_id, body).await {
         Ok(dashboard) => {
             tracing::info!(dashboard_id, "Dashboard updated");
             Ok(HttpResponse::Ok().json(dashboard))
@@ -56,7 +58,7 @@ pub async fn update_dashboard(
     } */
 
     // Store new dashboard in the database
-    match dashboard::put(org_id, dashboard_id, body).await {
+    match dashboards::put(org_id, dashboard_id, body).await {
         Ok(dashboard) => {
             tracing::info!(dashboard_id, "Dashboard updated");
             Ok(HttpResponse::Ok().json(dashboard))
@@ -73,13 +75,13 @@ pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
     use meta::dashboards::Dashboards;
 
     Ok(HttpResponse::Ok().json(Dashboards {
-        dashboards: dashboard::list(org_id).await.unwrap(),
+        dashboards: dashboards::list(org_id).await.unwrap(),
     }))
 }
 
 #[tracing::instrument]
 pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
-    let resp = if let Ok(dashboard) = dashboard::get(org_id, dashboard_id).await {
+    let resp = if let Ok(dashboard) = dashboards::get(org_id, dashboard_id).await {
         HttpResponse::Ok().json(dashboard)
     } else {
         Response::NotFound.into()
@@ -89,7 +91,7 @@ pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpRespo
 
 #[tracing::instrument]
 pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
-    let resp = if dashboard::delete(org_id, dashboard_id).await.is_err() {
+    let resp = if dashboards::delete(org_id, dashboard_id).await.is_err() {
         Response::NotFound
     } else {
         Response::OkMessage("Dashboard deleted".to_owned())

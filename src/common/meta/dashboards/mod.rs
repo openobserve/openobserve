@@ -39,3 +39,14 @@ pub struct Dashboards {
 
 pub mod v1;
 pub mod v2;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Folder {
+    #[serde(default)]
+    pub folder_id: String,
+    pub name: String,
+    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dashboards: Option<Vec<String>>,
+}

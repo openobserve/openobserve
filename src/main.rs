@@ -427,7 +427,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                     db::alerts::reset().await?;
                 }
                 "dashboard" => {
-                    db::dashboard::reset().await?;
+                    db::dashboards::reset().await?;
                 }
                 "function" => {
                     db::functions::reset().await?;

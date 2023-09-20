@@ -20,6 +20,8 @@ use crate::common::{
     utils::json,
 };
 
+pub mod folders;
+
 #[tracing::instrument]
 pub(crate) async fn get(org_id: &str, dashboard_id: &str) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{dashboard_id}");
