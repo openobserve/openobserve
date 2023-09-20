@@ -22,6 +22,15 @@ import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick, onActiva
 import * as echarts from "echarts";
 import { useStore } from "vuex";
 
+function autoFontSize(chartRef:any) {
+  // Get the width of the element using getBoundingClientRect()
+  const width = chartRef.value.getBoundingClientRect().width || 400;
+  let newFontSize =Math.min(Math.round(width / 16), 50);
+  console.log(`Current width : ${width}, Updating Fontsize to ${newFontSize}`);
+  return newFontSize;
+};
+
+
 export default defineComponent({
     name: "ChartRenderer",
     emits: ["updated:chart","click","updated:dataZoom"],
@@ -39,6 +48,12 @@ export default defineComponent({
         const windowResizeEventCallback = async () => {
             await nextTick();
             await nextTick();
+
+            //for gauge chart fonsize resize
+            if(props?.data?.options?.series[0]?.type == "gauge"){
+              props.data.options.series[0].detail.fontSize= autoFontSize(chartRef);
+              chart.setOption(props?.data?.options)
+            }
             chart?.resize();
         }
 
@@ -174,6 +189,7 @@ export default defineComponent({
             // while dispatching an event we need to pass a datazoomselectactive as true
             // this action is available in the echarts docs in list of brush actions
             chart?.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
+            windowResizeEventCallback();
         }, { deep: true });
         return { chartRef };
     },
