@@ -211,12 +211,12 @@ const setupSession = async () => {
 
   const playerWidth = playerContainerRef.value?.clientWidth || 0;
   const playerHeight =
-    (session.value[0].data.height / session.value[0].data.width) * playerWidth;
+    (session.value[0].data.height / session.value[0].data.width || 0.56) *
+    playerWidth;
   if (playerRef.value) {
     playerRef.value.style.width = `${playerWidth}px`;
   }
   await nextTick();
-
   if (!playerRef.value) return;
   if (player.value) return;
   player.value = new rrwebPlayer({
