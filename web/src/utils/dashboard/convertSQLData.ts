@@ -362,7 +362,7 @@ export const convertSQLData = (
     },
     toolbox: {
       orient: "vertical",
-      show: !["pie", "donut", "metric"].includes(panelSchema.type),
+      show: !["pie", "donut", "metric","gauge"].includes(panelSchema.type),
       feature: {
         dataZoom: {
           yAxisIndex: "none",
@@ -948,6 +948,46 @@ export const convertSQLData = (
       ];
       break;
     }
+    
+    case "gauge" :{
+      const key1 = yAxisKeys[0];
+      const yAxisValue = getAxisDataFromKey(key1);
+      const unitValue = getUnitValue(
+        yAxisValue.length > 0 ? yAxisValue[0] : 0,
+        panelSchema.config?.unit,
+        panelSchema.config?.unit_custom
+      );
+      options.dataset = { source: [[]] };
+      options.tooltip = {
+        show: false,
+      };
+      options.angleAxis = {
+        show: false,
+      };
+      options.radiusAxis = {
+        show: false,
+      };
+      options.polar = {};
+      options.xAxis = [];
+      options.yAxis = [];
+      options.series=[{
+        ...getPropsByChartTypeForSeries(panelSchema.type),
+        data:[{
+          value:(unitValue.value),
+          detail: {
+            formatter: function (value:any) {
+            return value + unitValue.unit;
+            },
+          }
+        }],
+        detail: {
+          valueAnimation: true,
+          offsetCenter: [0, 0],
+          // fontSize:50
+        },
+      }];
+    }
+
     default: {
       break;
     }
@@ -1360,6 +1400,39 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: {
           focus: "series",
         },
+      };
+    case "gauge":
+      return {
+        type: 'gauge',
+        startAngle: 205,
+        endAngle: -25,
+        min: 0,
+        max: 1,
+        // splitNumber: 12,
+        // itemStyle: {
+          // color: '#FFAB91'
+        // },
+        progress: {
+          show: true,
+          width: 10
+        },
+        pointer: {
+          show: false
+        },
+        axisLine: {
+          lineStyle: {
+            width: 10,
+          }
+        },
+        axisTick: {
+          show:false
+        },
+        splitLine: {
+          show:false
+        },
+        axisLabel: {
+          show:false
+        }
       };
     default:
       return {
