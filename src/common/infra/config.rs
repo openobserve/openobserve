@@ -176,9 +176,9 @@ pub struct Grpc {
     pub port: u16,
     #[env_config(name = "ZO_GRPC_ADDR", default = "")]
     pub addr: String,
-    #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "Organization")]
+    #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "organization")]
     pub org_header_key: String,
-    #[env_config(name = "ZO_GRPC_STREAM_HEADER_KEY", default = "Stream-Name")]
+    #[env_config(name = "ZO_GRPC_STREAM_HEADER_KEY", default = "stream-name")]
     pub stream_header_key: String,
     #[env_config(name = "ZO_INTERNAL_GRPC_TOKEN", default = "")]
     pub internal_grpc_token: String,
