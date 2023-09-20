@@ -137,7 +137,7 @@ const props = defineProps({
   },
 });
 
-const player = ref<rrwebPlayer>();
+const player = ref<rrwebPlayer>(null);
 
 const playerRef = ref<HTMLElement | null>(null);
 
