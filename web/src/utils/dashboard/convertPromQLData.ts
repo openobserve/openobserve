@@ -16,6 +16,15 @@ import moment from "moment";
 import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { utcToZonedTime } from "date-fns-tz";
 
+
+// function autoFontSize() {
+//   let width = document?.getElementById('chart1')?.offsetWidth || 400;
+//   let newFontSize = Math.round(width / 30);
+//   console.log(`Current width : ${width}, Updating Fontsize to ${newFontSize}`);
+//   return newFontSize;
+// };
+
+
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
  *
@@ -278,8 +287,8 @@ export const convertPromQLData = (
               }],
               detail: {
                 valueAnimation: true,
-                offsetCenter: [0, 0],
-                // fontSize:50
+                // offsetCenter: [0, 10],
+                fontSize:30,
               },
             };
           });
@@ -491,12 +500,10 @@ const getPropsByChartTypeForSeries = (type: string) => {
     case "gauge":
       return {
           type: 'gauge',
+          radius:"100%",
+          center:["50%","55%"],
           startAngle: 205,
           endAngle: -25,
-          // splitNumber: 12,
-          // itemStyle: {
-            // color: '#FFAB91'
-          // },
           progress: {
             show: true,
             width: 10

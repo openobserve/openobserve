@@ -149,7 +149,7 @@
     <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
     <div
-      v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+      v-if="dashboardPanelData.data.type == 'geomap' || (promqlMode && dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'gauge')"
       class="q-py-md showLabelOnTop"
     >
       Query
@@ -175,7 +175,7 @@
     <div class="space"></div>
 
     <q-input
-      v-if="promqlMode"
+      v-if="promqlMode && dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'gauge'"
       v-model="
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
