@@ -28,9 +28,8 @@
 
     <div class="space"></div>
 
-    <q-select outlined
-      v-model="dashboardPanelData.data.config.unit" :options="unitOptions" dense
-      label="Unit" class="showLabelOnTop" stack-label emit-value
+    <q-select outlined v-model="dashboardPanelData.data.config.unit" :options="unitOptions" dense label="Unit"
+      class="showLabelOnTop selectedLabel" stack-label emit-value
       :display-value="`${dashboardPanelData.data.config.unit ? unitOptions.find(it => it.value == dashboardPanelData.data.config.unit)?.label : 'Default'}`">
     </q-select>
     <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
@@ -108,7 +107,15 @@ export default defineComponent({
         label: 'Seconds (s)',
         value: 'seconds'
       },
-        {
+      {
+        label: 'Microseconds (μs)',
+        value: 'microseconds'
+      },
+      {
+        label: 'Milliseconds (ms)',
+        value: 'milliseconds'
+      },
+      {
         label: 'Percent (0.0-1.0)',
         value: 'percent-1'
       },
@@ -133,7 +140,11 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+:deep(.selectedLabel span) {
+  text-transform: none !important;
+}
+
 .space {
   margin-top: 10px;
   margin-bottom: 10px;
