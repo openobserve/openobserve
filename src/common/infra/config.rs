@@ -176,8 +176,10 @@ pub struct Grpc {
     pub port: u16,
     #[env_config(name = "ZO_GRPC_ADDR", default = "")]
     pub addr: String,
-    #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "zinc-org-id")]
+    #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "organization")]
     pub org_header_key: String,
+    #[env_config(name = "ZO_GRPC_STREAM_HEADER_KEY", default = "stream-name")]
+    pub stream_header_key: String,
     #[env_config(name = "ZO_INTERNAL_GRPC_TOKEN", default = "")]
     pub internal_grpc_token: String,
 }
@@ -234,7 +236,7 @@ pub struct Common {
     pub parquet_compression: String,
     #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
     pub column_timestamp: String,
-    #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = false)]
+    #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = true)]
     pub widening_schema_evolution: bool,
     #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
     pub skip_schema_validation: bool,
