@@ -266,6 +266,8 @@ export const convertPromQLData = (
             );
             return {
               ...getPropsByChartTypeForSeries(panelSchema.type),
+              min: panelSchema?.config?.gauge_min || 0,
+              max: panelSchema?.config?.gauge_max || 100,
               data:[{
                 value:parseFloat(unitValue.value).toFixed(2),
                 detail: {
@@ -491,8 +493,6 @@ const getPropsByChartTypeForSeries = (type: string) => {
           type: 'gauge',
           startAngle: 205,
           endAngle: -25,
-          min: 0,
-          max: 1,
           // splitNumber: 12,
           // itemStyle: {
             // color: '#FFAB91'

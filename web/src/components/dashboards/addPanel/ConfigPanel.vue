@@ -18,7 +18,7 @@
     <q-toggle
       v-if="
         dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap' && dashboardPanelData.data.type != 'metric'
+        dashboardPanelData.data.type != 'heatmap' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'gauge'
       "
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
@@ -29,7 +29,7 @@
     <q-select
       v-if="
         dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap'
+        dashboardPanelData.data.type != 'heatmap' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'gauge'
       "
       outlined
       v-model="dashboardPanelData.data.config.legends_position"
@@ -254,6 +254,25 @@ name="info" />
       :type="'number'"
     >
     </q-input>
+
+    <q-input v-if="dashboardPanelData.data.type === 'gauge'" v-model="dashboardPanelData.data.config.gauge_min" label="Gauge Min Value" color="input-border"
+      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot placeholder="0">
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">
+          Gauge Min Value
+        </div>
+      </template>
+    </q-input>
+
+    <q-input v-if="dashboardPanelData.data.type === 'gauge'" v-model="dashboardPanelData.data.config.gauge_max" label="Gauge Max Value" color="input-border"
+      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot placeholder="100">
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">
+          Gauge Max Value
+        </div>
+      </template>
+    </q-input>
+
   </div>
 </template>
 

@@ -972,6 +972,8 @@ export const convertSQLData = (
       options.yAxis = [];
       options.series=[{
         ...getPropsByChartTypeForSeries(panelSchema.type),
+        min: panelSchema?.config?.gauge_min || 0,
+        max: panelSchema?.config?.gauge_max || 100,
         data:[{
           value:(unitValue.value),
           detail: {
@@ -1406,8 +1408,6 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: 'gauge',
         startAngle: 205,
         endAngle: -25,
-        min: 0,
-        max: 1,
         // splitNumber: 12,
         // itemStyle: {
           // color: '#FFAB91'
