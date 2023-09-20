@@ -40,10 +40,10 @@ const AssociatedStreamFunction = () =>
 const EnrichmentTableList = () =>
   import("@/components/functions/EnrichmentTableList.vue");
 const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
-const AppSessions = () => import("@/views/RUM/AppSessions.vue");
 const SessionViewer = () => import("@/views/RUM/SessionViewer.vue");
 const ErrorViewer = () => import("@/views/RUM/ErrorViewer.vue");
 const AppErrors = () => import("@/views/RUM/AppErrors.vue");
+const AppSessions = () => import("@/views/RUM/AppSessions.vue");
 
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
@@ -269,11 +269,17 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuardPendingSubscriptions(to, from, next);
       },
+      meta: {
+        keepAlive: true,
+      },
       children: [
         {
           path: "sessions",
           name: "Sessions",
           component: AppSessions,
+          meta: {
+            keepAlive: true,
+          },
         },
         {
           path: "sessions/view/:id",
@@ -286,6 +292,9 @@ const useRoutes = () => {
           name: "ErrorTracking",
           component: AppErrors,
           props: true,
+          meta: {
+            keepAlive: true,
+          },
         },
         {
           path: "errors/view/:id",

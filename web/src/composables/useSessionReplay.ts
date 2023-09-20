@@ -13,13 +13,9 @@
 //  limitations under the License.
 
 import { reactive } from "vue";
-import { useLocalTraceFilterField } from "@/utils/zincutils";
 
 const defaultObject = {
-  organizationIdetifier: "",
-  runQuery: false,
-  loading: false,
-
+  loading: [],
   config: {
     splitterModel: 20,
     lastSplitterPosition: 0,
@@ -47,14 +43,8 @@ const defaultObject = {
     ],
   },
   meta: {
-    refreshInterval: 0,
-    refreshIntervalLabel: "Off",
-    showFields: true,
-    showQuery: true,
-    showHistogram: true,
     resultGrid: {
       wrapCells: false,
-      manualRemoveFields: false,
       rowsPerPage: 150,
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
@@ -62,30 +52,25 @@ const defaultObject = {
         currentRowIndex: 0,
       },
     },
-    scrollInfo: {},
   },
   data: {
-    query: "",
     parsedQuery: {},
     errorMsg: "",
     errorCode: 0,
     additionalErrorMsg: "",
     stream: {
-      streamLists: [],
-      selectedStream: { label: "", value: "" },
+      logStream: "",
+      sessionStream: "",
+      sessionDataStream: "",
       selectedStreamFields: [],
-      selectedFields: <string[]>[],
-      filterField: "",
-      addToFilter: "",
-      functions: [],
     },
     resultGrid: {
       currentDateTime: new Date(),
       currentPage: 0,
       columns: <any>[],
+      size: 10,
     },
-    queryResults: <any>[],
-    sortedQueryResults: <any>[],
+    sessions: <any>{},
     streamResults: <any>[],
     histogram: <any>{},
     editorValue: "",
@@ -95,32 +80,19 @@ const defaultObject = {
       relativeTimePeriod: "15m",
       type: "relative",
     },
-    selectedSession: {
-      sessionId: "",
-    },
+    selectedSession: {},
   },
 };
 
-let searchObj = reactive(Object.assign({}, defaultObject));
+let sessionState = reactive(Object.assign({}, defaultObject));
 
 const useSession = () => {
-  const resetSearchObj = () => {
+  const resetSessionState = () => {
     // delete searchObj.data;
-    searchObj = reactive(Object.assign({}, defaultObject));
-  };
-  const updatedLocalSessionFilterField = (): void => {
-    const identifier: string = searchObj.organizationIdetifier || "default";
-    const selectedFields: any =
-      useLocalTraceFilterField()?.value != null
-        ? useLocalTraceFilterField()?.value
-        : {};
-    selectedFields[
-      `${identifier}_${searchObj.data.stream.selectedStream.value}`
-    ] = searchObj.data.stream.selectedFields;
-    useLocalTraceFilterField(selectedFields);
+    sessionState = reactive(Object.assign({}, defaultObject));
   };
 
-  return { searchObj, resetSearchObj, updatedLocalSessionFilterField };
+  return { sessionState, resetSessionState };
 };
 
 export default useSession;

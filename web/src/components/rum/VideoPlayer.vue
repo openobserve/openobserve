@@ -41,7 +41,7 @@
             height: '15px',
           }"
           title="This is event"
-        ></div>
+        />
       </div>
       <div class="controls flex justify-between items-center">
         <div class="flex items-center">
@@ -103,17 +103,20 @@
 <script setup lang="ts">
 import rrwebPlayer from "rrweb-player";
 import "rrweb-player/dist/style.css";
-import { segments } from "./segments.js";
-import { nextTick, ref, onMounted } from "vue";
+import { nextTick, ref, onMounted, watch } from "vue";
 
-defineProps({
+const props = defineProps({
   events: {
+    type: Array,
+    required: true,
+  },
+  segments: {
     type: Array,
     required: true,
   },
 });
 
-const player = ref<rrwebPlayer>();
+const player = ref<rrwebPlayer>(null);
 
 const playerRef = ref<HTMLElement | null>(null);
 
@@ -170,60 +173,21 @@ const playerState = ref({
   endTime: 0,
   totalTime: 0,
   width: 0,
+  height: 0,
 });
 
-onMounted(async () => {
-  setupSession();
-  const playerWidth = playerContainerRef.value?.clientWidth || 0;
-  console.log(session);
-  const playerHeight =
-    (session.value[0].data.height / session.value[0].data.width) * playerWidth;
-  if (playerRef.value) {
-    playerRef.value.style.width = `${playerWidth}px`;
-  }
-  await nextTick();
-  console.log("playerRef", playerRef.value);
-  if (!playerRef.value) return;
-  player.value = new rrwebPlayer({
-    target: playerRef.value as HTMLElement,
-    props: {
-      events: session.value,
-      autoPlay: false,
-      showController: false,
-      UNSAFE_replayCanvas: true,
-      width: playerWidth,
-      height: playerHeight,
-    },
-  });
+watch(
+  () => props.segments,
+  (value) => {
+    if (value.length) setupSession();
+  },
+  { deep: true, immediate: true }
+);
 
-  player.value.addEventListener("ui-update-current-time", updateProgressBar);
-  player.value.addEventListener("finish", () => {
-    playerState.value.isPlaying = false;
-  });
-  const playerMeta = player.value.getMetaData();
-  playerState.value.startTime = playerMeta.startTime;
-  playerState.value.endTime = playerMeta.endTime;
-  playerState.value.totalTime = playerMeta.totalTime;
-  console.log("playerMeta", playerMeta);
-  playerState.value.duration = formatTimeDifference(
-    playerState.value.totalTime
-  );
+const setupSession = async () => {
+  if (!props.segments.length) return;
 
-  const playbackBarWidth = playbackBarRef.value?.clientWidth || 0;
-  // calculate width of progress bar
-  playerState.value.width = playbackBarWidth;
-
-  // const replayer = new Replayer(session.value, {
-  //   root: document.getElementById("player") as HTMLElement,
-  // });
-
-  // replayer.on("start", (payload) => {
-  //   console.log("ui-update-current-time", payload);
-  // });
-});
-
-const setupSession = () => {
-  segments.forEach((segment: any) => {
+  props.segments.forEach((segment: any) => {
     session.value.push(...segment.records);
     session.value = [
       ...session.value.sort((a: any, b: any) => a.timestamp - b.timestamp),
@@ -244,6 +208,48 @@ const setupSession = () => {
     }
     lastEventTime = currentTime;
   });
+
+  const playerWidth = playerContainerRef.value?.clientWidth || 0;
+  const playerHeight =
+    (session.value[0].data.height / session.value[0].data.width) * playerWidth;
+  if (playerRef.value) {
+    playerRef.value.style.width = `${playerWidth}px`;
+  }
+  await nextTick();
+
+  if (!playerRef.value) return;
+  if (player.value) return;
+  player.value = new rrwebPlayer({
+    target: playerRef.value as HTMLElement,
+    props: {
+      events: session.value,
+      autoPlay: false,
+      showController: false,
+      UNSAFE_replayCanvas: true,
+      width: playerWidth,
+      height: playerHeight,
+    },
+  });
+
+  player.value.addEventListener("ui-update-current-time", updateProgressBar);
+  player.value.addEventListener("finish", () => {
+    playerState.value.isPlaying = false;
+  });
+
+  if (!player.value) return;
+  const playerMeta = player.value?.getMetaData();
+  playerState.value.startTime = playerMeta.startTime;
+  playerState.value.endTime = playerMeta.endTime;
+  playerState.value.totalTime = playerMeta.totalTime;
+  playerState.value.duration = formatTimeDifference(
+    playerState.value.totalTime
+  );
+
+  const playbackBarWidth = playbackBarRef.value?.clientWidth || 0;
+  // calculate width of progress bar
+  playerState.value.width = playbackBarWidth;
+
+  player.value.triggerResize();
 };
 
 function formatTimeDifference(milliSeconds: number) {
@@ -279,7 +285,7 @@ const updateProgressBar = (time: { payload: number }) => {
   playerState.value.time = formatTimeDifference(time.payload);
 };
 
-const handlePlaybackBarClick = (event) => {
+const handlePlaybackBarClick = (event: any) => {
   let time =
     (event.offsetX / playerState.value.width) * playerState.value.totalTime;
   goto(time, false);
@@ -315,6 +321,16 @@ const goto = (timeOffset: number, play: boolean = false) => {
   playerState.value.isPlaying = play;
   player.value?.goto(timeOffset, play);
 };
+
+defineExpose({
+  goto,
+  play,
+  pause,
+  togglePlay,
+  setSpeed,
+  toggleSkipInactive,
+  playerState,
+});
 </script>
 
 <style scoped>

@@ -3,17 +3,14 @@
     <div class="row q-pa-sm event-metadata bg-white">
       <div class="col-12 row">
         <div class="col-12 q-pb-sm text-caption">example@gmail.com</div>
-        <div class="col-6 q-mb-sm text-caption ellipsis q-pr-xs">
-          Today, 4:54 pm
-        </div>
-        <div class="col-6 q-mb-sm q-pl-xs text-caption ellipsis">
-          Chrome, Linux
+        <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
+          {{ sessionDetails.date }}
         </div>
         <div class="col-6 q-mb-sm text-caption ellipsis q-pr-xs">
-          Mumbai, MH, India
+          {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
         <div class="col-6 q-mb-sm q-pl-xs text-caption ellipsis">
-          35.154.126.13
+          {{ sessionDetails.ip }}
         </div>
       </div>
       <div class="flex items-center justify-between col-12 q-pt-sm">
@@ -27,6 +24,7 @@
             clearable
             debounce="1"
             placeholder="Search Event"
+            @update:model-value="searchEvents"
           />
         </div>
         <div class="q-pl-xs event-type-selector" style="width: 40%">
@@ -38,6 +36,7 @@
             filled
             borderless
             dense
+            emit-value
             size="xs"
           />
         </div>
@@ -45,32 +44,57 @@
     </div>
     <q-separator />
     <div class="events-list">
-      <div
-        v-for="event in events"
-        :key="event.id"
-        class="q-mt-xs q-px-sm event-container q-py-sm cursor-pointer rounded-borders"
-      >
-        <div class="ellipsis">
-          <div class="q-mr-md inline">{{ event.displayTime }}</div>
-          <div class="q-mr-md inline event-type">{{ event.type }}</div>
-          <div class="inline" :title="event.name">{{ event.name }}</div>
+      <template v-for="event in filteredEvents" :key="event.id">
+        <div
+          v-if="selectedEventTypes && selectedEventTypes.includes(event.type)"
+          class="q-mt-xs q-px-sm event-container q-py-sm cursor-pointer rounded-borders"
+          @click="handleEventClick(event)"
+        >
+          <div class="ellipsis">
+            <div class="q-mr-md inline">{{ event.displayTime }}</div>
+            <div
+              class="q-mr-md inline event-type q-px-xs"
+              style="border-radius: 4px"
+              :class="event.type === 'error' ? 'bg-red-3' : ''"
+            >
+              {{ event.type }}
+            </div>
+            <div class="inline" :title="event.name">{{ event.name }}</div>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { defineComponent, ref } from "vue";
+import { cloneDeep } from "lodash-es";
+import { ref, watch } from "vue";
 
-defineProps({
+const props = defineProps({
   events: {
     type: Array,
     required: true,
   },
+  sessionDetails: {
+    type: Object,
+    required: true,
+  },
 });
 
-const selectedEventTypes = ref<string[] | null>(null);
+const emit = defineEmits(["event-emitted"]);
+
+const filteredEvents = ref<any[]>([]);
+
+watch(
+  () => props.events,
+  () => {
+    filteredEvents.value = cloneDeep(props.events);
+  },
+  { immediate: true, deep: true }
+);
+
+const selectedEventTypes = ref<string[] | null>(["error", "action", "view"]);
 const searchEvent = ref<string>("");
 
 const eventOptions = [
@@ -78,6 +102,25 @@ const eventOptions = [
   { label: "Action", value: "action" },
   { label: "View", value: "view" },
 ];
+
+const searchEvents = (value: string) => {
+  if (value) {
+    filteredEvents.value = cloneDeep(
+      props.events.filter((event) => {
+        return (
+          event?.name.toLowerCase().includes(value.toLowerCase()) ||
+          event?.type.toLowerCase().includes(value.toLowerCase())
+        );
+      })
+    );
+  } else {
+    filteredEvents.value = cloneDeep(props.events);
+  }
+};
+
+const handleEventClick = (event: any) => {
+emit("event-emitted", "event-click", event);
+};
 </script>
 
 <style scoped lang="scss">

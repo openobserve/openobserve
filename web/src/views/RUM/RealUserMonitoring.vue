@@ -50,6 +50,7 @@ onMounted(() => {
     Dashboard: "dashboard",
     ErrorViewer: "error_tracking",
   };
+  console.log(router.currentRoute.value.name);
   if (routes.includes(router.currentRoute.value.name)) {
     activeTab.value = routeNameMapping[router.currentRoute.value.name];
   } else {

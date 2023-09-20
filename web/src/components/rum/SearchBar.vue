@@ -102,11 +102,23 @@ export default defineComponent({
     QueryEditor,
     SyntaxGuide,
   },
-  emits: ["searchdata"],
+  emits: ["searchdata", "date-change"],
   props: {
     fieldValues: {
       type: Object,
       default: () => {},
+    },
+    sqlMode: {
+      type: Boolean,
+      default: false,
+    },
+    disabled: {
+      type: Boolean,
+      default: false,
+    },
+    showQuery: {
+      type: Boolean,
+      default: true,
     },
   },
   methods: {
@@ -213,6 +225,8 @@ export default defineComponent({
         type: value.relativeTimePeriod ? "relative" : "absolute",
       };
 
+      emit("date-change", searchObj.data.datetime);
+
       if (config.isCloud == "true" && value.userChangedValue) {
         segment.track("Button Click", {
           button: "Date Change",
@@ -285,11 +299,6 @@ export default defineComponent({
       setEditorValue,
       autoCompleteKeywords,
     };
-  },
-  computed: {
-    addSearchTerm() {
-      return this.searchObj.data.stream.addToFilter;
-    },
   },
   watch: {
     addSearchTerm() {

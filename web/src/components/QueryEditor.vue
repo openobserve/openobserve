@@ -18,7 +18,7 @@
     data-test="query-editor"
     class="logs-query-editor"
     ref="editorRef"
-    :id="id"
+    :id="editorId"
   ></div>
 </template>
 
@@ -46,7 +46,7 @@ import useLogs from "@/composables/useLogs";
 
 export default defineComponent({
   props: {
-    id: {
+    editorId: {
       type: String,
       default: "editor",
     },
@@ -137,7 +137,8 @@ export default defineComponent({
 
       registerAutoCompleteProvider();
 
-      const editorElement = document.getElementById(props.id);
+      const editorElement = document.getElementById(props.editorId);
+      if (editorElement?.hasChildNodes()) return;
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query,
         language: "sql",

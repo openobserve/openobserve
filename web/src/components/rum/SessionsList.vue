@@ -8,7 +8,7 @@
       vertical
     >
       <template #before>
-        <IndexList></IndexList>
+        <FieldList></FieldList>
       </template>
       <template #separator>
         <q-avatar
@@ -55,7 +55,7 @@ import { date } from "quasar";
 import AppTable from "./AppTable.vue";
 import { formatDuration } from "@/utils/zincutils";
 import SearchBar from "./SearchBar.vue";
-import IndexList from "@/plugins/traces/IndexList.vue";
+import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useRouter } from "vue-router";
 import userActivityTracking from "./composables/activityTracking";
 
@@ -132,7 +132,6 @@ onMounted(() => {
 });
 
 const handleTableEvents = (event, payload) => {
-  console.log("event", event);
   const eventMapping = {
     "cell-click": handleCellClick,
   };
@@ -141,7 +140,6 @@ const handleTableEvents = (event, payload) => {
 };
 
 const handleCellClick = (payload) => {
-  console.log("cell clicked", payload);
   router.push({
     name: "SessionViewer",
     params: { id: payload.row.id },

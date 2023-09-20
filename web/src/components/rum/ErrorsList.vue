@@ -124,17 +124,9 @@ onMounted(() => {
       id: session.event_id,
     });
   });
-
-  try {
-    console.log("rows -----", rows.value.string.a);
-    console.log("columns -----", columns.value);
-  } catch (err) {
-    console.error("error", err);
-  }
 });
 
 const handleTableEvents = (event, payload) => {
-  console.log("event", event);
   const eventMapping = {
     "cell-click": handleCellClick,
   };
@@ -143,7 +135,6 @@ const handleTableEvents = (event, payload) => {
 };
 
 const handleCellClick = (payload) => {
-  console.log("cell clicked", payload);
   router.push({
     name: "SessionViewer",
     params: { id: payload.row.id },

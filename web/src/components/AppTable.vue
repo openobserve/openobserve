@@ -8,70 +8,74 @@
     5. Component should have highlight property to highlight search text
     6. Rows should have boolean property to expand row. expandable: true
    -->
-  <div>
-    <q-table
-      style="height: calc(100vh - 240px)"
-      flat
-      bordered
-      ref="tableRef"
-      :title="title"
-      :rows="rows"
-      :columns="columns"
-      :table-colspan="9"
-      row-key="index"
-      virtual-scroll
-      :virtual-scroll-item-size="48"
-      :rows-per-page-options="[0]"
-      @virtual-scroll="onScroll"
-      hide-bottom
-    >
-      <template v-slot:header="props">
-        <q-tr :props="props" class="thead-sticky">
-          <q-th
-            v-for="col in props.cols"
-            :key="col.name"
+  <div style="height: calc(100vh - 210px)">
+    <template v-if="!rows.length">
+      <h5 class="q-pt-md text-center">No data found</h5>
+    </template>
+    <template v-else>
+      <q-table
+        flat
+        bordered
+        ref="tableRef"
+        :title="title"
+        :rows="rows"
+        :columns="columns"
+        :table-colspan="9"
+        row-key="index"
+        virtual-scroll
+        :virtual-scroll-item-size="48"
+        :rows-per-page-options="[0]"
+        @virtual-scroll="onScroll"
+        class="full-height"
+        hide-bottom
+      >
+        <template v-slot:header="props">
+          <q-tr :props="props" class="thead-sticky">
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
+          </q-tr>
+        </template>
+        <template v-slot:body="props">
+          <q-tr :props="props" :key="`m_${props.row.index}`">
+            <q-td
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              @click="handleDataClick(col.name, props.row)"
+            >
+              <template v-if="col.slot">
+                <slot :name="col.slotName" :column="props" />
+              </template>
+              <template v-else-if="col.type === 'action'">
+                <q-icon :name="col.icon" size="24px" class="cursor-pointer" />
+              </template>
+              <template v-else>
+                {{ col.value }}
+              </template>
+            </q-td>
+          </q-tr>
+          <q-tr
+            v-show="props.expand"
             :props="props"
-            :style="col.style"
+            :key="`e_${props.row.index}`"
+            class="q-virtual-scroll--with-prev"
           >
-            {{ col.label }}
-          </q-th>
-        </q-tr>
-      </template>
-
-      <template v-slot:body="props">
-        <q-tr :props="props" :key="`m_${props.row.index}`">
-          <q-td
-            v-for="col in props.cols"
-            :key="col.name"
-            :props="props"
-            @click="handleDataClick(col.name, props.row)"
-          >
-            <template v-if="col.slot">
-              <slot :name="col.slotName" />
-            </template>
-            <template v-else-if="col.type === 'action'">
-              <q-icon :name="col.icon" size="24px" class="cursor-pointer" />
-            </template>
-            <template v-else>
-              {{ col.value }}
-            </template>
-          </q-td>
-        </q-tr>
-        <q-tr
-          v-show="props.expand"
-          :props="props"
-          :key="`e_${props.row.index}`"
-          class="q-virtual-scroll--with-prev"
-        >
-          <q-td colspan="100%">
-            <div class="text-left">
-              This is expand slot for row above: {{ props.row.name }} (Index:
-              {{ props.row.index }}).
-            </div>
-          </q-td>
-        </q-tr>
-      </template>
-    </q-table>
+            <q-td colspan="100%">
+              <div class="text-left">
+                This is expand slot for row above: {{ props.row.name }} (Index:
+                {{ props.row.index }}).
+              </div>
+            </q-td>
+          </q-tr>
+        </template>
+      </q-table>
+    </template>
   </div>
 </template>
 
@@ -111,8 +115,8 @@ const handleDataClick = (columnName: string, row: any) => {
   emit("event-emitted", "cell-click", { columnName, row });
 };
 
-const onScroll = () => {
-  console.log("handle table scroll");
+const onScroll = (e) => {
+  emit("event-emitted", "scroll", e);
 };
 </script>
 
