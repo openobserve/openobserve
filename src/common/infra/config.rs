@@ -236,7 +236,7 @@ pub struct Common {
     pub parquet_compression: String,
     #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
     pub column_timestamp: String,
-    #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = false)]
+    #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = true)]
     pub widening_schema_evolution: bool,
     #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
     pub skip_schema_validation: bool,
