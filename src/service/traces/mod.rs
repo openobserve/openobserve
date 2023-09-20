@@ -58,6 +58,7 @@ pub async fn handle_trace_request(
     thread_id: usize,
     request: ExportTraceServiceRequest,
     is_grpc: bool,
+    in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -75,7 +76,14 @@ pub async fn handle_trace_request(
         )));
     }
     let start = std::time::Instant::now();
-    let traces_stream_name = "default";
+
+    let traces_stream_name = match in_stream_name {
+        Some(name) => format_stream_name(name),
+        None => "default".to_owned(),
+    };
+
+    let traces_stream_name = &traces_stream_name;
+
     let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
         AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
