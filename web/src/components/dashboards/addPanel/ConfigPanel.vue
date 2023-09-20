@@ -108,7 +108,15 @@ export default defineComponent({
         label: 'Seconds (s)',
         value: 'seconds'
       },
-        {
+      {
+        label: 'Microseconds(μs)',
+        value: 'microseconds'
+      },
+      {
+        label: 'Milliseconds (ms)',
+        value: 'milliseconds'
+      },
+      {
         label: 'Percent (0.0-1.0)',
         value: 'percent-1'
       },
