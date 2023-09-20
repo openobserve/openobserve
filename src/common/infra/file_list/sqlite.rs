@@ -19,6 +19,7 @@ use sqlx::{QueryBuilder, Row, Sqlite};
 
 use crate::common::{
     infra::{
+        config::CONFIG,
         db::sqlite::CLIENT,
         errors::{Error, Result},
     },
@@ -80,12 +81,20 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     async fn remove(&self, file: &str) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-        sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
-            .bind(stream_key)
-            .bind(date_key)
-            .bind(file_name)
-            .execute(&pool)
-            .await?;
+        let ret =
+            sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
+                .bind(stream_key)
+                .bind(date_key)
+                .bind(file_name)
+                .execute(&pool)
+                .await?;
+        if CONFIG.common.print_key_event {
+            log::info!(
+                "[SQLITE] delete file: {}, affected: {}",
+                file,
+                ret.rows_affected()
+            );
+        }
         Ok(())
     }
 
@@ -134,7 +143,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             let mut tx = pool.begin().await?;
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                sqlx::query(
+                let ret = sqlx::query(
                     r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
                 )
                 .bind(stream_key)
@@ -142,6 +151,13 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
                 .bind(file_name)
                 .execute(&mut *tx)
                 .await?;
+                if CONFIG.common.print_key_event {
+                    log::info!(
+                        "[SQLITE] delete file: {}, affected: {}",
+                        file,
+                        ret.rows_affected()
+                    );
+                }
             }
             if let Err(e) = tx.commit().await {
                 log::error!("[SQLITE] commit file_list delete error: {}", e);
