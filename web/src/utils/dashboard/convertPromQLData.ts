@@ -197,7 +197,7 @@ export const convertPromQLData = (
     },
     toolbox: {
       orient: "vertical",
-      show: !["pie", "donut", "metric"].includes(panelSchema.type),
+      show: !["pie", "donut", "metric", "gauge"].includes(panelSchema.type),
       feature: {
         dataZoom: {
           filterMode: 'none',
@@ -253,10 +253,54 @@ export const convertPromQLData = (
           }
         }
       }
+
+      case "gauge" :{
+          const series = it?.result?.map((metric: any) => {
+            const values = metric.values.sort(
+              (a: any, b: any) => a[0] - b[0]
+            );
+            const unitValue = getUnitValue(
+              values[values.length - 1][1],
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom
+            );
+            return {
+              ...getPropsByChartTypeForSeries(panelSchema.type),
+              data:[{
+                value:parseFloat(unitValue.value).toFixed(2),
+                detail: {
+                  formatter: function (value:any) {
+                    return value + unitValue.unit;
+                  },
+                }
+              }],
+              detail: {
+                valueAnimation: true,
+                offsetCenter: [0, 0],
+                // fontSize:50
+              },
+            };
+          });
+          options.dataset = { source: [[]] };
+          options.tooltip = {
+            show: false,
+          };
+          options.angleAxis = {
+            show: false,
+          };
+          options.radiusAxis = {
+            show: false,
+          };
+          options.polar = {};
+          options.xAxis = [];
+          options.yAxis = [];
+          return series;
+      }
+      
       case "metric": {
         switch (it?.resultType) {
           case "matrix": {
-            const traces = it?.result?.map((metric: any) => {
+            const series = it?.result?.map((metric: any) => {
               const values = metric.values.sort(
                 (a: any, b: any) => a[0] - b[0]
               );
@@ -267,36 +311,22 @@ export const convertPromQLData = (
               );
               return {
                 ...getPropsByChartTypeForSeries(panelSchema.type),
-                data:[{
-                  value:parseFloat(unitValue.value).toFixed(2),
-                  detail: {
-                    formatter: function (value:any) {
-                      return value + unitValue.unit;
+                renderItem: function (params: any) {
+                  return {
+                    type: "text",
+                    style: {
+                      text:
+                        parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
+                      fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
+                      fontWeight: 500,
+                      align: "center",
+                      verticalAlign: "middle",
+                      x: params.coordSys.cx,
+                      y: params.coordSys.cy,
+                      fill: store.state.theme == "dark" ? "#fff" : "#000",
                     },
-                  }
-                }],
-                detail: {
-                  valueAnimation: true,
-                  offsetCenter: [0, 0],
-                  // fontSize:50
+                  };
                 },
-
-                // renderItem: function (params: any) {
-                //   return {
-                //     type: "text",
-                //     style: {
-                //       text:
-                //         parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
-                //       fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
-                //       fontWeight: 500,
-                //       align: "center",
-                //       verticalAlign: "middle",
-                //       x: params.coordSys.cx,
-                //       y: params.coordSys.cy,
-                //       fill: store.state.theme == "dark" ? "#fff" : "#000",
-                //     },
-                //   };
-                // },
               };
             });
             options.dataset = { source: [[]] };
@@ -312,7 +342,7 @@ export const convertPromQLData = (
             options.polar = {};
             options.xAxis = [];
             options.yAxis = [];
-            return traces;
+            return series;
           }
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
@@ -456,10 +486,8 @@ const getPropsByChartTypeForSeries = (type: string) => {
           focus: "series",
         },
       };
-    case "metric":
+    case "gauge":
       return {
-        // type: "custom",
-        // coordinateSystem: "polar",
           type: 'gauge',
           startAngle: 205,
           endAngle: -25,
@@ -490,6 +518,11 @@ const getPropsByChartTypeForSeries = (type: string) => {
           axisLabel: {
             show:false
           }
+      };
+    case "metric":
+      return {
+        type: "custom",
+        coordinateSystem: "polar",
       };
     case "h-stacked":
       return {

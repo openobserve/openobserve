@@ -153,6 +153,11 @@ export default defineComponent({
         title: t('dashboard.metricTextLabel'),
         id: "metric",
       },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
+        title: "Gauge",
+        id: "gauge",
+      },
     ]);
 
     const { promqlMode, dashboardPanelData } = useDashboardPanelData();

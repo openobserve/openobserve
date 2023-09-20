@@ -39,7 +39,9 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
     case "pie":
     case "donut":
     case "scatter":
-    case "metric": {
+    case "metric":
+    case "gauge":
+       {
       if (
         // panelSchema?.fields?.stream_type == "metrics" &&
         // panelSchema?.customQuery &&
