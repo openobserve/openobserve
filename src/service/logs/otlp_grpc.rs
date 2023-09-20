@@ -202,6 +202,7 @@ pub async fn handle_grpc_request(
     thread_id: usize,
     request: ExportLogsServiceRequest,
     is_grpc: bool,
+    in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -219,7 +220,12 @@ pub async fn handle_grpc_request(
         )));
     }
     let start = std::time::Instant::now();
-    let stream_name = "default";
+    let stream_name = match in_stream_name {
+        Some(name) => format_stream_name(name),
+        None => "default".to_owned(),
+    };
+
+    let stream_name = &stream_name;
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -478,7 +484,8 @@ pub mod test {
             resource_logs: vec![res_logs],
         };
 
-        let result = handle_grpc_request(org_id, thread_id, request, true).await;
+        let result =
+            handle_grpc_request(org_id, thread_id, request, true, Some("test_stream")).await;
         assert!(result.is_ok());
     }
 }
