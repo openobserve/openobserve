@@ -34,8 +34,7 @@ pub fn get_file_contents(file: &str) -> Result<Vec<u8>, std::io::Error> {
 #[inline(always)]
 pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Error> {
     let mut file = File::create(file)?;
-    file.write_all(contents)?;
-    Ok(())
+    file.write_all(contents)
 }
 
 #[inline(always)]

@@ -45,16 +45,13 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     write_buf.push(b'\n');
     let file = wal::get_or_create(
         0,
-        StreamParams {
-            org_id: "",
-            stream_name: "",
-            stream_type: StreamType::Filelist,
-        },
+        StreamParams::new("", "", StreamType::Filelist),
         None,
         &date_key,
         false,
-    );
-    file.write(write_buf.as_ref());
+    )
+    .await;
+    file.write(write_buf.as_ref()).await;
 
     // notifiy other nodes
     tokio::task::spawn(async move { super::broadcast::send(&[file_data], None).await });

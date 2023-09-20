@@ -379,14 +379,11 @@ pub async fn traces_json(
     let mut req_stats = write_file(
         data_buf,
         thread_id,
-        StreamParams {
-            org_id,
-            stream_name: traces_stream_name,
-            stream_type: StreamType::Traces,
-        },
+        StreamParams::new(org_id, traces_stream_name, StreamType::Traces),
         &mut traces_file_name,
         None,
-    );
+    )
+    .await;
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
 

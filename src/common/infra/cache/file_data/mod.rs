@@ -22,8 +22,8 @@ pub enum CacheType {
     None,
 }
 
-pub fn init() -> Result<(), anyhow::Error> {
-    disk::init()?;
-    memory::init()?;
+pub async fn init() -> Result<(), anyhow::Error> {
+    disk::init().await?;
+    memory::init().await?;
     Ok(())
 }

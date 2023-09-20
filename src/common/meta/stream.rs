@@ -305,11 +305,22 @@ impl std::fmt::Display for PartitionTimeLevel {
 pub struct ListStream {
     pub list: Vec<Stream>,
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, ToSchema)]
-pub struct StreamParams<'a> {
-    pub org_id: &'a str,
-    pub stream_name: &'a str,
+
+#[derive(Clone, Debug)]
+pub struct StreamParams {
+    pub org_id: faststr::FastStr,
+    pub stream_name: faststr::FastStr,
     pub stream_type: StreamType,
+}
+
+impl StreamParams {
+    pub fn new(org_id: &str, stream_name: &str, stream_type: StreamType) -> Self {
+        Self {
+            org_id: org_id.to_string().into(),
+            stream_name: stream_name.to_string().into(),
+            stream_type,
+        }
+    }
 }
 
 pub struct SchemaEvolution {
@@ -362,5 +373,13 @@ mod test {
         let stats_str: String = stats.try_into().unwrap();
         let stats_frm_str = StreamStats::from(stats_str.as_str());
         assert_eq!(stats, stats_frm_str);
+    }
+
+    #[test]
+    fn test_stream_params() {
+        let params = StreamParams::new("org_id", "stream_name", StreamType::Logs);
+        assert_eq!(params.org_id, "org_id");
+        assert_eq!(params.stream_name, "stream_name");
+        assert_eq!(params.stream_type, StreamType::Logs);
     }
 }

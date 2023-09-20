@@ -247,7 +247,7 @@ mod tests {
         let _ = users::post_user(
             "default",
             UserRequest {
-                email: "user@example.com".to_string(),
+                email: "user1@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Member,
                 first_name: "root".to_owned(),
@@ -266,16 +266,16 @@ mod tests {
             .await
             .unwrap());
         assert!(!validate_credentials("", pwd, "/").await.unwrap());
-        assert!(!validate_credentials("user@example.com", pwd, "/")
+        assert!(!validate_credentials("user1@example.com", pwd, "/")
             .await
             .unwrap());
         assert!(
-            validate_credentials("user@example.com", pwd, "default/user")
+            validate_credentials("user1@example.com", pwd, "default/user")
                 .await
                 .unwrap()
         );
         assert!(
-            !validate_credentials("user@example.com", "x", "default/user")
+            !validate_credentials("user1@example.com", "x", "default/user")
                 .await
                 .unwrap()
         );

@@ -433,7 +433,7 @@ mod tests {
         let _ = post_user(
             "test_org",
             UserRequest {
-                email: "user@example.com".to_string(),
+                email: "user2@example.com".to_string(),
                 password: "pass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
@@ -458,9 +458,9 @@ mod tests {
 
         let resp = update_user(
             "dummy",
-            "user@example.com",
+            "user2@example.com",
             true,
-            "user@example.com",
+            "user2@example.com",
             UpdateUser {
                 token: Some("new_token".to_string()),
                 first_name: Some("first_name".to_string()),
@@ -476,7 +476,7 @@ mod tests {
 
         let resp = update_user(
             "dummy",
-            "user@example.com",
+            "user2@example.com",
             false,
             "admin@zo.dev",
             UpdateUser {
@@ -494,7 +494,7 @@ mod tests {
 
         let resp = add_user_to_org(
             "dummy",
-            "user@example.com",
+            "user2@example.com",
             UserRole::Member,
             "admin@zo.dev",
         )
@@ -502,7 +502,7 @@ mod tests {
 
         assert!(resp.is_ok());
 
-        let resp = remove_user_from_org("dummy", "user@example.com").await;
+        let resp = remove_user_from_org("dummy", "user2@example.com").await;
 
         assert!(resp.is_ok());
     }

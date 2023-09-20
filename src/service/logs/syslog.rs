@@ -20,20 +20,22 @@ use std::net::SocketAddr;
 use syslog_loose::{Message, ProcId, Protocol};
 
 use super::StreamMeta;
-use crate::common::infra::{
-    cluster,
-    config::{CONFIG, SYSLOG_ROUTES},
-    metrics,
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, SYSLOG_ROUTES},
+        metrics,
+    },
+    meta::{
+        alert::{Alert, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        ingestion::{IngestionResponse, StreamSchemaChk, StreamStatus},
+        stream::StreamParams,
+        syslog::SyslogRoute,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
-use crate::common::meta::{
-    alert::{Alert, Trigger},
-    http::HttpResponse as MetaHttpResponse,
-    ingestion::{IngestionResponse, StreamSchemaChk, StreamStatus},
-    stream::StreamParams,
-    syslog::SyslogRoute,
-    StreamType,
-};
-use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::{db, format_stream_name, ingestion::write_file, schema::stream_schema_exists};
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
@@ -180,14 +182,11 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     write_file(
         buf,
         thread_id,
-        StreamParams {
-            org_id,
-            stream_name,
-            stream_type: StreamType::Logs,
-        },
+        StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
-    );
+    )
+    .await;
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
