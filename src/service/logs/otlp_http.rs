@@ -22,7 +22,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
-use crate::{common::{
+use crate::common::{
     infra::{cluster, config::CONFIG, metrics},
     meta::{
         alert::{Alert, Trigger},
@@ -33,10 +33,10 @@ use crate::{common::{
         StreamType,
     },
     utils::{flatten, json},
-}, service::format_stream_name};
+};
 use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
-    db,
+    db, format_stream_name,
     ingestion::{grpc::get_val_for_attr, write_file},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
