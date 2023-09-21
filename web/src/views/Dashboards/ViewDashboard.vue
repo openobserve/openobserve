@@ -41,7 +41,7 @@
       </div>
     </div>
     <q-separator></q-separator>
-    <RenderDashboardCharts :draggable="draggable" :dashboardData="currentDashboardData.data" :currentTimeObj="currentTimeObj" @onDeletePanel="onDeletePanel"/>
+    <RenderDashboardCharts :viewOnly="viewOnly" :dashboardData="currentDashboardData.data" :currentTimeObj="currentTimeObj" @onDeletePanel="onDeletePanel"/>
     <q-dialog
       v-model="showDashboardSettingsDialog"
       position="right"
@@ -102,7 +102,7 @@ export default defineComponent({
       data: {},
     });
     const showDashboardSettingsDialog = ref(false);
-    const draggable = ref(true);
+    const viewOnly = ref(true);
     const eventLog = ref([])
 
     const refDateTime: any = ref(null);
@@ -262,14 +262,6 @@ export default defineComponent({
       })
     })
 
-    const isDraggableClick = (evt, row) => {
-      draggable.value = !draggable.value;
-    }
-
-    const disableDraggable = (evt, row) => {
-      draggable.value = false;
-    }
-
     const onDeletePanel = async(panelId: any) => {      
       await deletePanel(
         store,
@@ -302,10 +294,8 @@ export default defineComponent({
       refreshInterval,
       refreshData,
       selectedDate,
-      isDraggableClick,
-      disableDraggable,
       onDeletePanel,
-      draggable,
+      viewOnly,
       eventLog,
       variablesData,
       variablesDataUpdated,

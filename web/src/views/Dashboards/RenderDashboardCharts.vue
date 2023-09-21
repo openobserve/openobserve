@@ -20,7 +20,7 @@
       @variablesData="variablesDataUpdated"/>
     <div class="displayDiv">
       <grid-layout v-if="dashboardData.panels?.length > 0" :layout.sync="getDashboardLayout(dashboardData)" :col-num="12" :row-height="30"
-        :is-draggable="draggable" :is-resizable="draggable" :vertical-compact="true" :autoSize="true"
+        :is-draggable="!viewOnly" :is-resizable="!viewOnly" :vertical-compact="true" :autoSize="true"
         :restore-on-drag="true" :use-css-transforms="false">
         <grid-item class="plotlyBackground" v-for="item in dashboardData.panels" :key="item.id"
           :x="getPanelLayout(item,'x')" :y="getPanelLayout(item,'y')"
@@ -28,7 +28,7 @@
           :i="getPanelLayout(item,'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent"
           drag-allow-from=".drag-allow">
           <div style="height: 100%;">
-            <PanelContainer @onDeletePanel="OnDeletePanel" :showOption="draggable" :draggable="draggable" :data="item" :dashboardId="dashboardData.id"
+            <PanelContainer @onDeletePanel="OnDeletePanel" :showOption="viewOnly" :data="item" :dashboardId="dashboardData.id"
               :selectedTimeDate="currentTimeObj" :variablesData="variablesData"
               :width="getPanelLayout(item,'w')" :height="getPanelLayout(item,'h')">
             </PanelContainer>
@@ -60,7 +60,7 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 export default defineComponent({
   name: "RenderDashboardCharts",
   emits:["onDeletePanel"],
-  props:["draggable","dashboardData","currentTimeObj"],
+  props:["viewOnly","dashboardData","currentTimeObj"],
   components: {
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,

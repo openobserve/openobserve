@@ -17,7 +17,7 @@
   <div class="plotlycontainer">
     <div class="drag-allow">
       <q-bar :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'" dense class="q-px-xs" style="border-top-left-radius: 3px; border-top-right-radius: 3px;">
-        <q-icon v-if="draggable" name="drag_indicator" />
+        <q-icon v-if="viewOnly" name="drag_indicator" />
         <div :title="props.data.title" class="panelHeader">
           {{ props.data.title }}
         </div>
@@ -64,7 +64,7 @@ import { useQuasar } from "quasar";
 export default defineComponent({
   name: "PanelContainer",
   emits: ["onDeletePanel"],
-  props: ["data", "selectedTimeDate", "draggable","width", "height", "variablesData","showOption","dashboardId"],
+  props: ["data", "selectedTimeDate", "viewOnly","width", "height", "variablesData","showOption","dashboardId"],
   components: {
     PanelSchemaRenderer
 },
