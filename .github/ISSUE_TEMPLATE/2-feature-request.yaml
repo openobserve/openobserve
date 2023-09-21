@@ -1,5 +1,6 @@
 name: 'Feature Request'
 description: Suggest a feature for OpenObserve
+labels: ["✏️ Feature"]
 
 body:
   - type: dropdown
