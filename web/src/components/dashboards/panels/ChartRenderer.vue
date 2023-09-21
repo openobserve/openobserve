@@ -25,8 +25,9 @@ import { useStore } from "vuex";
 function autoFontSize(chartRef:any) {
   // Get the width of the element using getBoundingClientRect()
   const width = chartRef.value.getBoundingClientRect().width || 400;
+
+  // Calculate the new font size using width
   let newFontSize =Math.min(Math.round(width / 16), 50);
-  console.log(`Current width : ${width}, Updating Fontsize to ${newFontSize}`);
   return newFontSize;
 };
 
