@@ -140,12 +140,12 @@ pub fn parse_key(mut key: &str) -> (String, String, String) {
 
 pub fn build_key(module: &str, key1: &str, key2: &str) -> String {
     if key1.is_empty() {
-        return module.to_string();
+        format!("/{module}/")
+    } else if key2.is_empty() {
+        format!("/{module}/{key1}")
+    } else {
+        format!("/{module}/{key1}/{key2}")
     }
-    if key2.is_empty() {
-        return format!("/{}/{}", module, key1);
-    }
-    format!("/{}/{}/{}", module, key1, key2)
 }
 
 #[derive(Debug, Default)]
