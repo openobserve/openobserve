@@ -74,10 +74,7 @@ export const convertSQLData = (
     );
     if (field && field.alias == key) {
       // now we have the format, convert that format
-      result = result.map(
-        (it: any) =>
-          new Date(it).getTime() - new Date("1970-01-01T00:00:00").getTime()
-      );
+      result = result.map((it: any) => new Date(it+ "Z").getTime());
     }
     return result;
   };
@@ -847,8 +844,7 @@ export const convertSQLData = (
     if (isTimeSeries) {
       options.series.map((seriesObj: any) => {
         seriesObj.data = seriesObj.data.map((it: any, index: any) => [
-          new Date(options.xAxis.data[index]).getTime() -
-            new Date("1970-01-01T00:00:00").getTime(),
+          new Date(options.xAxis.data[index]+ "Z").getTime(),
           it,
         ]);
       });
