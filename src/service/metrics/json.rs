@@ -34,6 +34,22 @@ use crate::service::{
     db, ingestion::get_wal_time_key, ingestion::write_file, stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
 };
+use once_cell::sync::Lazy;
+use regex::{self, Regex};
+
+// https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
+static RE_VALID_METRIC_NAME: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^[a-zA-Z_:][a-zA-Z0-9_:]*$").unwrap());
+
+/// Check if the provided metric name is valid or not
+pub fn is_valid_metric_name(metric: &str) -> Result<()> {
+    match RE_VALID_METRIC_NAME.is_match(metric) {
+        true => Ok(()),
+        false => Err(anyhow::anyhow!(
+                "Invalid metric-name, please check https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels"
+            ))
+    }
+}
 
 pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
@@ -64,6 +80,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 return Err(anyhow::anyhow!("invalid __name__, need to be string"));
             }
         };
+
+        is_valid_metric_name(&stream_name)?;
+
         let metrics_type = match record.get(TYPE_LABEL).ok_or(anyhow!("missing __type__"))? {
             json::Value::String(s) => s.clone(),
             _ => {
@@ -314,4 +333,25 @@ fn apply_func(
     )?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_metric_names() {
+        assert!(is_valid_metric_name("valid_metric_name").is_ok());
+        assert!(is_valid_metric_name("valid:metric:name").is_ok());
+        assert!(is_valid_metric_name("_valid_metric_name_").is_ok());
+        assert!(is_valid_metric_name("a1234:5678z").is_ok());
+    }
+
+    #[test]
+    fn test_invalid_metric_names() {
+        assert!(is_valid_metric_name("-invalid-metric-name").is_err());
+        assert!(is_valid_metric_name("invalid metric name").is_err());
+        assert!(is_valid_metric_name("!invalid:metric:name").is_err());
+        assert!(is_valid_metric_name("1234invalid_metric_name").is_err());
+    }
 }
