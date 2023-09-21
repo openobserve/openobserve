@@ -50,3 +50,5 @@ pub struct Folder {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dashboards: Option<Vec<String>>,
 }
+
+pub const DEFAULT_FOLDER: &str = "default";

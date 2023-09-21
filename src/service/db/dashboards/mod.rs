@@ -23,8 +23,12 @@ use crate::common::{
 pub mod folders;
 
 #[tracing::instrument]
-pub(crate) async fn get(org_id: &str, dashboard_id: &str) -> Result<Dashboard, anyhow::Error> {
-    let key = format!("/dashboard/{org_id}/{dashboard_id}");
+pub(crate) async fn get(
+    org_id: &str,
+    dashboard_id: &str,
+    folder: &str,
+) -> Result<Dashboard, anyhow::Error> {
+    let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
     let bytes = infra_db::DEFAULT.get(&key).await?;
     let d_version: DashboardVersion = json::from_slice(&bytes)?;
     if d_version.version == 1 {
@@ -48,9 +52,10 @@ pub(crate) async fn get(org_id: &str, dashboard_id: &str) -> Result<Dashboard, a
 pub(crate) async fn put(
     org_id: &str,
     dashboard_id: &str,
+    folder: &str,
     body: web::Bytes,
 ) -> Result<Dashboard, anyhow::Error> {
-    let key = format!("/dashboard/{org_id}/{}", dashboard_id);
+    let key = format!("/dashboard/{org_id}/{folder}/{}", dashboard_id);
     let d_version: DashboardVersion = json::from_slice(&body)?;
     if d_version.version == 1 {
         let mut dash: v1::Dashboard = json::from_slice(&body)?;
@@ -84,8 +89,8 @@ pub(crate) async fn put(
 }
 
 #[tracing::instrument]
-pub(crate) async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
-    let db_key = format!("/dashboard/{org_id}/");
+pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
+    let db_key = format!("/dashboard/{org_id}/{folder}/");
     infra_db::DEFAULT
         .list(&db_key)
         .await?
