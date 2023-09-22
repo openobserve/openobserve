@@ -17,6 +17,8 @@ use std::{collections::HashMap, io::Error};
 
 use crate::service::dashboards;
 
+pub mod folders;
+
 /** CreateDashboard */
 #[utoipa::path(
     context_path = "/api",
@@ -48,7 +50,7 @@ pub async fn create_dashboard(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let folder = get_folder_name(req);
+    let folder = get_folder(req);
     dashboards::create_dashboard(&org_id, &folder, body).await
 }
 
@@ -81,7 +83,7 @@ async fn update_dashboard(
     req: HttpRequest,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    let folder = get_folder_name(req);
+    let folder = get_folder(req);
     dashboards::update_dashboard(&org_id, &dashboard_id, &folder, body).await
 }
 
@@ -102,7 +104,7 @@ async fn update_dashboard(
 )]
 #[get("/{org_id}/dashboards")]
 async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let folder = get_folder_name(req);
+    let folder = get_folder(req);
     dashboards::list_dashboards(&org_id.into_inner(), &folder).await
 }
 
@@ -126,7 +128,7 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
 #[get("/{org_id}/dashboards/{dashboard_id}")]
 async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    let folder = get_folder_name(req);
+    let folder = get_folder(req);
     dashboards::get_dashboard(&org_id, &dashboard_id, &folder).await
 }
 
@@ -153,7 +155,7 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     dashboards::delete_dashboard(&org_id, &dashboard_id).await
 }
 
-fn get_folder_name(req: HttpRequest) -> String {
+fn get_folder(req: HttpRequest) -> String {
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     match query.get("folder") {
         Some(s) => s.to_string(),

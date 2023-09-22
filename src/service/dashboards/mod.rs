@@ -16,6 +16,7 @@ use actix_web::web;
 use actix_web::{http::StatusCode, HttpResponse};
 use std::io;
 
+use crate::common::meta::dashboards::DEFAULT_FOLDER;
 use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse};
 use crate::service::db::dashboards;
 
@@ -24,19 +25,33 @@ pub mod folders;
 #[tracing::instrument(skip(body))]
 pub async fn create_dashboard(
     org_id: &str,
-    folder: &str,
+    folder_id: &str,
     body: web::Bytes,
 ) -> Result<HttpResponse, io::Error> {
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
-    let dashboard_id = crate::common::infra::ider::generate();
-    match dashboards::put(org_id, &dashboard_id, folder, body).await {
-        Ok(dashboard) => {
-            tracing::info!(dashboard_id, "Dashboard updated");
-            Ok(HttpResponse::Ok().json(dashboard))
+    // If folder is default folder & doesn't exist then create it
+
+    match dashboards::folders::get(org_id, folder_id).await {
+        Ok(_) => {
+            let dashboard_id = crate::common::infra::ider::generate();
+            save_dashboard(org_id, &dashboard_id, folder_id, body).await
         }
-        Err(error) => {
-            tracing::error!(%error, dashboard_id, "Failed to store the dashboard");
-            Ok(Response::InternalServerError(error).into())
+        Err(_) => {
+            if folder_id == DEFAULT_FOLDER {
+                let folder = meta::dashboards::Folder {
+                    folder_id: DEFAULT_FOLDER.to_string(),
+                    name: DEFAULT_FOLDER.to_string(),
+                    description: DEFAULT_FOLDER.to_string(),
+                };
+                folders::save_folder(org_id, folder).await?;
+                let dashboard_id = crate::common::infra::ider::generate();
+                save_dashboard(org_id, &dashboard_id, folder_id, body).await
+            } else {
+                Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                    StatusCode::NOT_FOUND.into(),
+                    "folder not found".to_string(),
+                )))
+            }
         }
     }
 }
@@ -45,42 +60,19 @@ pub async fn create_dashboard(
 pub async fn update_dashboard(
     org_id: &str,
     dashboard_id: &str,
-    folder: &str,
+    folder_id: &str,
     body: web::Bytes,
 ) -> Result<HttpResponse, io::Error> {
-    /*     // Try to find this dashboard in the database
-    let old_dashboard = match dashboard::get(org_id, dashboard_id).await {
-        Ok(dashboard) => dashboard,
-        Err(error) => {
-            tracing::info!(%error, dashboard_id, "Dashboard not found");
-            Ok(Response::NotFound.into());
-        }
-    };
-
-    if dashboard == &old_dashboard {
-        // There is no need to update the database
-        Ok(HttpResponse::Ok().json(dashboard));
-    } */
-
     // Store new dashboard in the database
-    match dashboards::put(org_id, dashboard_id, folder, body).await {
-        Ok(dashboard) => {
-            tracing::info!(dashboard_id, "Dashboard updated");
-            Ok(HttpResponse::Ok().json(dashboard))
-        }
-        Err(error) => {
-            tracing::error!(%error, dashboard_id, "Failed to store the dashboard");
-            Ok(Response::InternalServerError(error).into())
-        }
-    }
+    save_dashboard(org_id, &dashboard_id, folder_id, body).await
 }
 
 #[tracing::instrument]
-pub async fn list_dashboards(org_id: &str, folder: &str) -> Result<HttpResponse, io::Error> {
+pub async fn list_dashboards(org_id: &str, folder_id: &str) -> Result<HttpResponse, io::Error> {
     use meta::dashboards::Dashboards;
 
     Ok(HttpResponse::Ok().json(Dashboards {
-        dashboards: dashboards::list(org_id, folder).await.unwrap(),
+        dashboards: dashboards::list(org_id, folder_id).await.unwrap(),
     }))
 }
 
@@ -88,9 +80,9 @@ pub async fn list_dashboards(org_id: &str, folder: &str) -> Result<HttpResponse,
 pub async fn get_dashboard(
     org_id: &str,
     dashboard_id: &str,
-    folder: &str,
+    folder_id: &str,
 ) -> Result<HttpResponse, io::Error> {
-    let resp = if let Ok(dashboard) = dashboards::get(org_id, dashboard_id, folder).await {
+    let resp = if let Ok(dashboard) = dashboards::get(org_id, dashboard_id, folder_id).await {
         HttpResponse::Ok().json(dashboard)
     } else {
         Response::NotFound.into()
@@ -106,6 +98,24 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpRe
         Response::OkMessage("Dashboard deleted".to_owned())
     };
     Ok(resp.into())
+}
+
+async fn save_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    folder_id: &str,
+    body: web::Bytes,
+) -> Result<HttpResponse, io::Error> {
+    match dashboards::put(org_id, &dashboard_id, folder_id, body).await {
+        Ok(dashboard) => {
+            tracing::info!(dashboard_id, "Dashboard updated");
+            Ok(HttpResponse::Ok().json(dashboard))
+        }
+        Err(error) => {
+            tracing::error!(%error, dashboard_id, "Failed to store the dashboard");
+            Ok(Response::InternalServerError(error).into())
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -47,8 +47,11 @@ pub struct Folder {
     pub folder_id: String,
     pub name: String,
     pub description: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dashboards: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct FolderList {
+    pub list: Vec<Folder>,
 }
 
 pub const DEFAULT_FOLDER: &str = "default";

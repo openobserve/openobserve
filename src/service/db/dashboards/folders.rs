@@ -15,9 +15,9 @@
 use crate::common::{infra::db as infra_db, meta::dashboards::Folder, utils::json};
 
 #[tracing::instrument]
-pub(crate) async fn get(org_id: &str, dashboard_id: &str) -> Result<Folder, anyhow::Error> {
+pub(crate) async fn get(org_id: &str, folder_id: &str) -> Result<Folder, anyhow::Error> {
     let db = &infra_db::DEFAULT;
-    let val = db.get(&format!("/folders/{org_id}/{dashboard_id}")).await?;
+    let val = db.get(&format!("/folders/{org_id}/{folder_id}")).await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
