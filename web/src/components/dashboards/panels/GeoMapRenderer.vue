@@ -23,6 +23,7 @@ import * as echarts from "echarts";
 import { useStore } from "vuex";
 // import * as map from "./../../../locales/languages/map.json"
 import L from 'leaflet';
+import 'echarts-extension-leaflet';
 
 export default defineComponent({
     name: "GeoMapRenderer",
