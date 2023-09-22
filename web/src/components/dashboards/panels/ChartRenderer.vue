@@ -18,7 +18,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
+import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick, onActivated } from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
 
@@ -144,6 +144,12 @@ export default defineComponent({
         onUnmounted(() => {
             window.removeEventListener("resize", windowResizeEventCallback);
         });
+
+        //need to resize chart on activated
+        onActivated(()=>{
+            windowResizeEventCallback();
+        })
+        
         watch(() => props.data.options, async () => {
             await nextTick();
             chart.resize();
