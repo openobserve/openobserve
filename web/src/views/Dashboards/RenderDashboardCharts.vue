@@ -28,7 +28,7 @@
           :i="getPanelLayout(item,'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent"
           drag-allow-from=".drag-allow">
           <div style="height: 100%;">
-            <PanelContainer @onDeletePanel="OnDeletePanel" :showOption="viewOnly" :data="item" :dashboardId="dashboardData.id"
+            <PanelContainer @onDeletePanel="OnDeletePanel" :viewOnly="viewOnly" :data="item" :dashboardId="dashboardData.id"
               :selectedTimeDate="currentTimeObj" :variablesData="variablesData"
               :width="getPanelLayout(item,'w')" :height="getPanelLayout(item,'h')">
             </PanelContainer>
