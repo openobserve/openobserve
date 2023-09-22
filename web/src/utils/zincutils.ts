@@ -366,3 +366,38 @@ export const formatTimeWithSuffix = (us: number) => {
 
   return `${us.toFixed(2)}us`;
 };
+
+export const mergeRoutes: any = (route1: any, route2: any) => {
+  const mergedRoutes = [];
+
+  // Iterate through route1 and add its elements to mergedRoutes
+  for (const r1 of route1) {
+    const matchingRoute = route2.find(
+      (r2) => r2.path === r1.path && r2.name === r1.name
+    );
+
+    if (matchingRoute) {
+      // If a matching route is found in route2, merge the children
+      const mergedChildren = mergeRoutes(
+        r1.children || [],
+        matchingRoute.children || []
+      );
+      mergedRoutes.push({
+        ...r1,
+        children: mergedChildren.length ? mergedChildren : undefined,
+      });
+
+      // Remove the matching route from route2
+      route2 = route2.filter((r2) => r2 !== matchingRoute);
+    } else {
+      // If no matching route is found in route2, add the route from route1 as is
+      mergedRoutes.push({ ...r1 });
+    }
+  }
+
+  // Add any remaining routes from route2 to mergedRoutes
+  mergedRoutes.push(...route2);
+
+  return mergedRoutes;
+};
+

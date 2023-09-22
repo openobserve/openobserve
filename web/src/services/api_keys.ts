@@ -16,13 +16,16 @@ import http from "./http";
 
 const apiKeys = {
   list: () => {
-    return http().get(`/api/api_keys`);
+    return http().get(`/api/usertoken`);
   },
   listRUMTokens: (org_id: string) => {
     return http().get(`/api/${org_id}/organizations/rumtoken`);
   },
   createUserAPIKey: (data: object) => {
-    return http().post(`/api/user_api_key`, data);
+    return http().post(`/api/usertoken`, data);
+  },
+  updateUserAPIKey: (data: object) => {
+    return http().put(`/api/usertoken/${data.id}`, data);
   },
   createRUMToken: (org_id: string) => {
     return http().post(`/api/${org_id}/organizations/rumtoken`);
@@ -31,7 +34,7 @@ const apiKeys = {
     return http().put(`/api/${org_id}/organizations/rumtoken`);
   },
   deleteUserAPIKey: (id: string) => {
-    return http().delete(`/api/api_key/${id}`);
+    return http().delete(`/api/usertoken/${id}`);
   },
 };
 
