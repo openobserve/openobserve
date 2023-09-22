@@ -15,7 +15,9 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
-use sqlx::{QueryBuilder, Row, Sqlite};
+use sqlx::{Pool, QueryBuilder, Row, Sqlite};
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 use crate::common::{
     infra::{
@@ -30,11 +32,37 @@ use crate::common::{
     },
 };
 
-pub struct SqliteFileList {}
+pub struct SqliteFileList {
+    tx: Arc<mpsc::Sender<Event>>,
+}
+
+enum Event {
+    Add(Vec<FileKey>),
+    Remove(Vec<String>),
+}
 
 impl SqliteFileList {
     pub fn new() -> Self {
-        Self {}
+        let (tx, mut rx) = mpsc::channel::<Event>(10000);
+        let client = CLIENT.clone();
+        tokio::task::spawn(async move {
+            while let Some(event) = rx.recv().await {
+                match event {
+                    Event::Add(files) => {
+                        if let Err(e) = batch_add(&client, &files).await {
+                            log::error!("[SQLITE] batch add file list error: {}", e);
+                        }
+                    }
+                    Event::Remove(files) => {
+                        if let Err(e) = batch_remove(&client, &files).await {
+                            log::error!("[SQLITE] batch remove file list error: {}", e);
+                        }
+                    }
+                }
+            }
+            log::info!("[SQLITE] file list event loop exit");
+        });
+        Self { tx: Arc::new(tx) }
     }
 }
 
@@ -47,122 +75,34 @@ impl Default for SqliteFileList {
 #[async_trait]
 impl super::FileList for SqliteFileList {
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
-        let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-        match  sqlx::query(
-            r#"
-INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
-        "#,
-    )
-        .bind(org_id)
-        .bind(stream_key)
-        .bind(date_key)
-        .bind(file_name)
-        .bind(false)
-        .bind(meta.min_ts)
-        .bind(meta.max_ts)
-        .bind(meta.records)
-        .bind(meta.original_size)
-        .bind(meta.compressed_size)
-        .execute(&pool)
-        .await {
-            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
-                  Ok(())
-            } else {
-                  Err(Error::Message(e.to_string()))
-            },
-            Err(e) =>  Err(e.into()),
-            Ok(_) => Ok(()),
-        }
+        let tx = self.tx.clone();
+        tx.send(Event::Add(vec![FileKey::new(file, meta.to_owned(), false)]))
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-        let ret =
-            sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
-                .bind(stream_key)
-                .bind(date_key)
-                .bind(file_name)
-                .execute(&pool)
-                .await?;
-        if CONFIG.common.print_key_event {
-            log::info!(
-                "[SQLITE] delete file: {}, affected: {}",
-                file,
-                ret.rows_affected()
-            );
-        }
+        let tx = self.tx.clone();
+        tx.send(Event::Remove(vec![file.to_string()]))
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
-        let pool = CLIENT.clone();
-        let chunks = files.chunks(100);
-        for files in chunks {
-            let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
-            query_builder.push_values(files, |mut b, item| {
-                let (stream_key, date_key, file_name) =
-                    super::parse_file_key_columns(&item.key).expect("parse file key failed");
-                let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                b.push_bind(org_id)
-                    .push_bind(stream_key)
-                    .push_bind(date_key)
-                    .push_bind(file_name)
-                    .push_bind(false)
-                    .push_bind(item.meta.min_ts)
-                    .push_bind(item.meta.max_ts)
-                    .push_bind(item.meta.records)
-                    .push_bind(item.meta.original_size)
-                    .push_bind(item.meta.compressed_size);
-            });
-            match query_builder.build().execute(&pool).await {
-                Ok(_) => {}
-                Err(sqlx::Error::Database(e)) => {
-                    if e.is_unique_violation() {
-                        // batch insert got unique error, convert to single insert
-                        for file in files {
-                            self.add(&file.key, &file.meta).await?;
-                        }
-                    } else {
-                        return Err(Error::Message(e.to_string()));
-                    }
-                }
-                Err(e) => return Err(e.into()),
-            }
-        }
+        let tx = self.tx.clone();
+        tx.send(Event::Add(files.to_vec()))
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
-        let pool = CLIENT.clone();
-        let chunks = files.chunks(100);
-        for files in chunks {
-            let mut tx = pool.begin().await?;
-            for file in files {
-                let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                let ret = sqlx::query(
-                    r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
-                )
-                .bind(stream_key)
-                .bind(date_key)
-                .bind(file_name)
-                .execute(&mut *tx)
-                .await?;
-                if CONFIG.common.print_key_event {
-                    log::info!(
-                        "[SQLITE] delete file: {}, affected: {}",
-                        file,
-                        ret.rows_affected()
-                    );
-                }
-            }
-            if let Err(e) = tx.commit().await {
-                log::error!("[SQLITE] commit file_list delete error: {}", e);
-            }
-        }
+        let tx = self.tx.clone();
+        tx.send(Event::Remove(files.to_vec()))
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
@@ -462,6 +402,76 @@ UPDATE stream_stats
             .await?;
         Ok(())
     }
+}
+
+async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
+    let chunks = files.chunks(100);
+    for files in chunks {
+        let mut tx = client.begin().await?;
+        let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
+        query_builder.push_values(files, |mut b, item| {
+            let (stream_key, date_key, file_name) =
+                super::parse_file_key_columns(&item.key).expect("parse file key failed");
+            let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+            b.push_bind(org_id)
+                .push_bind(stream_key)
+                .push_bind(date_key)
+                .push_bind(file_name)
+                .push_bind(false)
+                .push_bind(item.meta.min_ts)
+                .push_bind(item.meta.max_ts)
+                .push_bind(item.meta.records)
+                .push_bind(item.meta.original_size)
+                .push_bind(item.meta.compressed_size);
+        });
+        match query_builder.build().execute(&mut *tx).await {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) => {
+                if e.is_unique_violation() {
+                    // batch insert got unique error, convert to single insert
+                    for file in files {
+                        super::add(&file.key, &file.meta).await?;
+                    }
+                } else {
+                    return Err(Error::Message(e.to_string()));
+                }
+            }
+            Err(e) => return Err(e.into()),
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit file_list add error: {}", e);
+        }
+    }
+    Ok(())
+}
+
+async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
+    let chunks = files.chunks(100);
+    for files in chunks {
+        let mut tx = client.begin().await?;
+        for file in files {
+            let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+            let ret = sqlx::query(
+                r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
+            )
+            .bind(stream_key)
+            .bind(date_key)
+            .bind(file_name)
+            .execute(&mut *tx)
+            .await?;
+            if CONFIG.common.print_key_event {
+                log::info!(
+                    "[SQLITE] delete file: {}, affected: {}",
+                    file,
+                    ret.rows_affected()
+                );
+            }
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit file_list delete error: {}", e);
+        }
+    }
+    Ok(())
 }
 
 pub async fn create_table() -> Result<()> {
