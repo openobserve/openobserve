@@ -64,7 +64,7 @@ pub async fn update_dashboard(
     body: web::Bytes,
 ) -> Result<HttpResponse, io::Error> {
     // Store new dashboard in the database
-    save_dashboard(org_id, &dashboard_id, folder_id, body).await
+    save_dashboard(org_id, dashboard_id, folder_id, body).await
 }
 
 #[tracing::instrument]
@@ -106,7 +106,7 @@ async fn save_dashboard(
     folder_id: &str,
     body: web::Bytes,
 ) -> Result<HttpResponse, io::Error> {
-    match dashboards::put(org_id, &dashboard_id, folder_id, body).await {
+    match dashboards::put(org_id, dashboard_id, folder_id, body).await {
         Ok(dashboard) => {
             tracing::info!(dashboard_id, "Dashboard updated");
             Ok(HttpResponse::Ok().json(dashboard))

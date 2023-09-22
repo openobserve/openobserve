@@ -21,7 +21,7 @@ use crate::common::meta::dashboards::Folder;
 /** CreateFolder */
 #[utoipa::path(
     context_path = "/api",
-    tag = "Folders",
+    tag = "Dashboards",
     operation_id = "CreateFolder",
     security(
         ("Authorization" = [])
@@ -33,7 +33,7 @@ use crate::common::meta::dashboards::Folder;
         content = Folder,
         description = "Folder details",
         example = json!({
-            "title": "Network Traffic Overview",
+            "title": "Infrastructure",
             "description": "Traffic patterns and network performance of the infrastructure",
         }),
     ),
@@ -51,6 +51,31 @@ pub async fn create_folder(
     folders::save_folder(&org_id, folder.into_inner()).await
 }
 
+/** UpdateFolder */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "UpdateFolder",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder_id" = String, Path, description = "Folder name"),
+    ),
+    request_body(
+        content = Folder,
+        description = "Folder details",
+        example = json!({
+            "title": "Infra",
+            "description": "Traffic patterns and network performance of the infrastructure",
+        }),
+    ),
+    responses(
+        (status = StatusCode::CREATED, description = "Folder updated", body = Folder),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+    ),
+)]
 #[put("/{org_id}/folders/{folder_id}")]
 pub async fn update_folder(
     path: web::Path<(String, String)>,
@@ -60,18 +85,67 @@ pub async fn update_folder(
     folders::update_folder(&org_id, &folder_id, folder.into_inner()).await
 }
 
+/// ListFolders
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "ListFolders",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = StatusCode::OK, body = FolderList),
+    ),
+)]
 #[get("/{org_id}/folders")]
 pub async fn list_folders(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     folders::list_folders(&org_id).await
 }
 
+/// GetFolder
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "GetFolder",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder_id" = String, Path, description = "Folder ID"),
+    ),
+    responses(
+        (status = StatusCode::OK, body = Folder),
+        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+    ),
+)]
 #[get("/{org_id}/folders/{folder_id}")]
 pub async fn get_folder(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, folder_id) = path.into_inner();
     folders::get_folder(&org_id, &folder_id).await
 }
 
+/// DeleteFolder
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "DeleteFolder",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder_id" = String, Path, description = "Folder ID"),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Folder deleted", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+    ),
+)]
 #[delete("/{org_id}/folders/{folder_id}")]
 async fn delete_folder(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, folder_id) = path.into_inner();
