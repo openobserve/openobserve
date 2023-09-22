@@ -92,8 +92,15 @@ pub async fn get_dashboard(
 }
 
 #[tracing::instrument]
-pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
-    let resp = if dashboards::delete(org_id, dashboard_id).await.is_err() {
+pub async fn delete_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    folder_id: &str,
+) -> Result<HttpResponse, io::Error> {
+    let resp = if dashboards::delete(org_id, dashboard_id, folder_id)
+        .await
+        .is_err()
+    {
         return Ok(Response::NotFound("Dashboard".to_string()).into());
     } else {
         Response::OkMessage("Dashboard deleted".to_owned())
@@ -131,20 +138,19 @@ pub async fn move_dashboard(
         if dashboards::folders::get(org_id, to_folder).await.is_err() {
             return Ok(Response::NotFound("Destination Folder".to_string()).into());
         }
+        let dash = if dashboard.version == 1 {
+            json::to_vec(&dashboard.v1.unwrap()).unwrap()
+        } else {
+            json::to_vec(&dashboard.v2.unwrap()).unwrap()
+        };
+
         // add the dashboard to the destination folder
-        if let Err(error) = dashboards::put(
-            org_id,
-            dashboard_id,
-            to_folder,
-            json::to_vec(&dashboard).unwrap().into(),
-        )
-        .await
-        {
+        if let Err(error) = dashboards::put(org_id, dashboard_id, to_folder, dash.into()).await {
             return Ok(Response::InternalServerError(error).into());
         }
 
         //delete the dashboard from the source folder
-        let _ = dashboards::delete(org_id, dashboard_id).await.is_err();
+        let _ = dashboards::delete(org_id, dashboard_id, from_folder).await;
         Ok(Response::OkMessage("Dashboard moved successfully".to_string()).into())
     } else {
         Ok(Response::NotFound("Dashboard".to_string()).into())

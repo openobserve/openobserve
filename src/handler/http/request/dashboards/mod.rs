@@ -15,6 +15,7 @@
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
 use std::{collections::HashMap, io::Error};
 
+use crate::common::meta::dashboards::MoveDashboard;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::dashboards;
 
@@ -151,28 +152,44 @@ async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> i
     ),
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]
-async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
+async fn delete_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    dashboards::delete_dashboard(&org_id, &dashboard_id).await
+    let folder_id = get_folder(req);
+    dashboards::delete_dashboard(&org_id, &dashboard_id, &folder_id).await
 }
 
+/// MoveDashboard
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "MoveDashboard",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard ID"),
+    ),
+     request_body(
+        content = MoveDashboard,
+        description = "MoveDashboard details",
+        example = json!({
+            "from": "Source folder id",
+            "to": "Destination folder id",
+        }),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Dashboard Moved", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+    ),
+)]
 #[put("/{org_id}/folders/dashboards/{dashboard_id}")]
 async fn move_dashboard(
     path: web::Path<(String, String)>,
-    req: HttpRequest,
+    folder: web::Json<MoveDashboard>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, dashboard_id) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let from = match query.get("from") {
-        Some(s) => s.to_string(),
-        None => "".to_owned(),
-    };
-    let to = match query.get("to") {
-        Some(s) => s.to_string(),
-        None => "".to_owned(),
-    };
-
-    if from.is_empty() || to.is_empty() {
+    if folder.from.is_empty() || folder.to.is_empty() {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::BAD_REQUEST.into(),
@@ -181,7 +198,7 @@ async fn move_dashboard(
         );
     };
 
-    dashboards::move_dashboard(&org_id, &dashboard_id, &from, &to).await
+    dashboards::move_dashboard(&org_id, &dashboard_id, &folder.from, &folder.to).await
 }
 
 fn get_folder(req: HttpRequest) -> String {

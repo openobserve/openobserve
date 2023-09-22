@@ -117,8 +117,12 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
 }
 
 #[tracing::instrument]
-pub(crate) async fn delete(org_id: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
-    let key = format!("/dashboard/{org_id}/{dashboard_id}");
+pub(crate) async fn delete(
+    org_id: &str,
+    dashboard_id: &str,
+    folder: &str,
+) -> Result<(), anyhow::Error> {
+    let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
     Ok(infra_db::DEFAULT
         .delete(&key, false, infra_db::NO_NEED_WATCH)
         .await?)

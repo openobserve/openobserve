@@ -49,6 +49,13 @@ pub struct Folder {
     pub description: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveDashboard {
+    pub from: String,
+    pub to: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct FolderList {
     pub list: Vec<Folder>,
