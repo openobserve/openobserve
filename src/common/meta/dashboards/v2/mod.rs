@@ -141,12 +141,12 @@ pub struct QueryConfig {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Variables {
-    pub list: Vec<List>,
+    pub list: Vec<VariableList>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct List {
+pub struct VariableList {
     #[serde(rename = "type")]
     pub type_field: String,
     pub name: String,
