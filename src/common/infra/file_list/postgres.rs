@@ -437,10 +437,6 @@ UPDATE stream_stats
     }
 
     async fn clear(&self) -> Result<()> {
-        let pool = CLIENT.clone();
-        sqlx::query(r#"DELETE FROM file_list;"#)
-            .execute(&pool)
-            .await?;
         Ok(())
     }
 }

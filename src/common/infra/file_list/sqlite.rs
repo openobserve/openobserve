@@ -37,8 +37,18 @@ pub struct SqliteFileList {
 }
 
 enum Event {
+    FileList(EventFileList),
+    StreamStats(EventStreamStats),
+}
+
+enum EventFileList {
     Add(Vec<FileKey>),
     Remove(Vec<String>),
+}
+
+enum EventStreamStats {
+    Set(String, Vec<(String, StreamStats)>),
+    ResetStreamMinTS(String, i64),
 }
 
 impl SqliteFileList {
@@ -48,14 +58,24 @@ impl SqliteFileList {
         tokio::task::spawn(async move {
             while let Some(event) = rx.recv().await {
                 match event {
-                    Event::Add(files) => {
+                    Event::FileList(EventFileList::Add(files)) => {
                         if let Err(e) = batch_add(&client, &files).await {
                             log::error!("[SQLITE] batch add file list error: {}", e);
                         }
                     }
-                    Event::Remove(files) => {
+                    Event::FileList(EventFileList::Remove(files)) => {
                         if let Err(e) = batch_remove(&client, &files).await {
                             log::error!("[SQLITE] batch remove file list error: {}", e);
+                        }
+                    }
+                    Event::StreamStats(EventStreamStats::Set(org_id, streams)) => {
+                        if let Err(e) = set_stream_stats(&client, &org_id, &streams).await {
+                            log::error!("[SQLITE] set stream stats error: {}", e);
+                        }
+                    }
+                    Event::StreamStats(EventStreamStats::ResetStreamMinTS(stream, min_ts)) => {
+                        if let Err(e) = reset_stream_stats_min_ts(&client, &stream, min_ts).await {
+                            log::error!("[SQLITE] reset stream stats min_ts error: {}", e);
                         }
                     }
                 }
@@ -76,23 +96,29 @@ impl Default for SqliteFileList {
 impl super::FileList for SqliteFileList {
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let tx = self.tx.clone();
-        tx.send(Event::Add(vec![FileKey::new(file, meta.to_owned(), false)]))
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
+        tx.send(Event::FileList(EventFileList::Add(vec![FileKey::new(
+            file,
+            meta.to_owned(),
+            false,
+        )])))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
         let tx = self.tx.clone();
-        tx.send(Event::Remove(vec![file.to_string()]))
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
+        tx.send(Event::FileList(EventFileList::Remove(vec![
+            file.to_string()
+        ])))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
         let tx = self.tx.clone();
-        tx.send(Event::Add(files.to_vec()))
+        tx.send(Event::FileList(EventFileList::Add(files.to_vec())))
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
@@ -100,7 +126,7 @@ impl super::FileList for SqliteFileList {
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
         let tx = self.tx.clone();
-        tx.send(Event::Remove(files.to_vec()))
+        tx.send(Event::FileList(EventFileList::Remove(files.to_vec())))
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
@@ -281,80 +307,13 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         org_id: &str,
         streams: &[(String, StreamStats)],
     ) -> Result<()> {
-        let pool = CLIENT.clone();
-        let old_stats = self.get_stream_stats(org_id, None, None).await?;
-        let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
-        let mut new_streams = Vec::new();
-        let mut update_streams = Vec::with_capacity(streams.len());
-        for (stream_key, item) in streams {
-            let mut stats = match old_stats.get(stream_key) {
-                Some(s) => s.to_owned(),
-                None => {
-                    new_streams.push(stream_key);
-                    StreamStats::default()
-                }
-            };
-            stats.add_stream_stats(item);
-            update_streams.push((stream_key, stats));
-        }
-
-        let mut tx = pool.begin().await?;
-        for stream_key in new_streams {
-            let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-            if let Err(e) = sqlx::query(
-                r#"
-INSERT INTO stream_stats 
-    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
-    VALUES ($1, $2, 0, 0, 0, 0, 0, 0);
-                "#,
-            )
-            .bind(org_id)
-            .bind(stream_key)
-            .execute(&mut *tx)
-            .await
-            {
-                log::error!(
-                    "[SQLITE] insert stream stats error: {}, stream: {}",
-                    e,
-                    stream_key
-                );
-            }
-        }
-        if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit stream stats error: {}", e);
-        }
-
-        let mut tx = pool.begin().await?;
-        for (stream_key, stats) in update_streams {
-            sqlx::query(
-                r#"
-UPDATE stream_stats 
-    SET file_num = $1, min_ts = $2, max_ts = $3, records = $4, original_size = $5, compressed_size = $6
-    WHERE stream = $7;
-                "#,
-            )
-            .bind(stats.file_num)
-            .bind(stats.doc_time_min)
-            .bind(stats.doc_time_max)
-            .bind(stats.doc_num)
-            .bind(stats.storage_size as i64)
-            .bind(stats.compressed_size as i64)
-            .bind(stream_key)
-            .execute(&mut *tx)
-            .await?;
-        }
-        if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit stream stats error: {}", e);
-        }
-
-        Ok(())
-    }
-
-    async fn reset_stream_stats(&self) -> Result<()> {
-        let pool = CLIENT.clone();
-        sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0;"#)
-             .execute(&pool)
-            .await?;
+        let tx = self.tx.clone();
+        tx.send(Event::StreamStats(EventStreamStats::Set(
+            org_id.to_string(),
+            streams.to_vec(),
+        )))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
@@ -364,11 +323,20 @@ UPDATE stream_stats
         stream: &str,
         min_ts: i64,
     ) -> Result<()> {
+        let tx = self.tx.clone();
+        tx.send(Event::StreamStats(EventStreamStats::ResetStreamMinTS(
+            stream.to_string(),
+            min_ts,
+        )))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn reset_stream_stats(&self) -> Result<()> {
         let pool = CLIENT.clone();
-        sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
-            .bind(min_ts)
-            .bind(stream)
-            .execute(&pool)
+        sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0;"#)
+             .execute(&pool)
             .await?;
         Ok(())
     }
@@ -396,10 +364,6 @@ UPDATE stream_stats
     }
 
     async fn clear(&self) -> Result<()> {
-        let pool = CLIENT.clone();
-        sqlx::query(r#"DELETE FROM file_list;"#)
-            .execute(&pool)
-            .await?;
         Ok(())
     }
 }
@@ -471,6 +435,88 @@ async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
             log::error!("[SQLITE] commit file_list delete error: {}", e);
         }
     }
+    Ok(())
+}
+
+async fn set_stream_stats(
+    client: &Pool<Sqlite>,
+    org_id: &str,
+    streams: &[(String, StreamStats)],
+) -> Result<()> {
+    let old_stats = super::get_stream_stats(org_id, None, None).await?;
+    let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
+    let mut new_streams = Vec::new();
+    let mut update_streams = Vec::with_capacity(streams.len());
+    for (stream_key, item) in streams {
+        let mut stats = match old_stats.get(stream_key) {
+            Some(s) => s.to_owned(),
+            None => {
+                new_streams.push(stream_key);
+                StreamStats::default()
+            }
+        };
+        stats.add_stream_stats(item);
+        update_streams.push((stream_key, stats));
+    }
+
+    let mut tx = client.begin().await?;
+    for stream_key in new_streams {
+        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+        if let Err(e) = sqlx::query(
+            r#"
+INSERT INTO stream_stats 
+(org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
+VALUES ($1, $2, 0, 0, 0, 0, 0, 0);
+            "#,
+        )
+        .bind(org_id)
+        .bind(stream_key)
+        .execute(&mut *tx)
+        .await
+        {
+            log::error!(
+                "[SQLITE] insert stream stats error: {}, stream: {}",
+                e,
+                stream_key
+            );
+        }
+    }
+    if let Err(e) = tx.commit().await {
+        log::error!("[SQLITE] commit stream stats error: {}", e);
+    }
+
+    let mut tx = client.begin().await?;
+    for (stream_key, stats) in update_streams {
+        sqlx::query(
+            r#"
+UPDATE stream_stats 
+SET file_num = $1, min_ts = $2, max_ts = $3, records = $4, original_size = $5, compressed_size = $6
+WHERE stream = $7;
+            "#,
+        )
+        .bind(stats.file_num)
+        .bind(stats.doc_time_min)
+        .bind(stats.doc_time_max)
+        .bind(stats.doc_num)
+        .bind(stats.storage_size as i64)
+        .bind(stats.compressed_size as i64)
+        .bind(stream_key)
+        .execute(&mut *tx)
+        .await?;
+    }
+    if let Err(e) = tx.commit().await {
+        log::error!("[SQLITE] commit stream stats error: {}", e);
+    }
+
+    Ok(())
+}
+
+async fn reset_stream_stats_min_ts(client: &Pool<Sqlite>, stream: &str, min_ts: i64) -> Result<()> {
+    sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
+        .bind(min_ts)
+        .bind(stream)
+        .execute(client)
+        .await?;
     Ok(())
 }
 

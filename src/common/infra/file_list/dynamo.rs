@@ -506,7 +506,7 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn clear(&self) -> Result<()> {
-        Ok(()) // TODO
+        Ok(())
     }
 }
 
