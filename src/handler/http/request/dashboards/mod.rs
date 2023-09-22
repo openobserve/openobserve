@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
-use std::io::Error;
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use std::{collections::HashMap, io::Error};
 
+use crate::common::meta::dashboards::MoveDashboard;
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::dashboards;
+
+pub mod folders;
 
 /** CreateDashboard */
 #[utoipa::path(
@@ -45,9 +49,11 @@ use crate::service::dashboards;
 pub async fn create_dashboard(
     path: web::Path<String>,
     body: web::Bytes,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    dashboards::create_dashboard(&org_id, body).await
+    let folder = get_folder(req);
+    dashboards::create_dashboard(&org_id, &folder, body).await
 }
 
 /// UpdateDashboard
@@ -73,9 +79,14 @@ pub async fn create_dashboard(
     ),
 )]
 #[put("/{org_id}/dashboards/{dashboard_id}")]
-async fn update_dashboard(path: web::Path<(String, String)>, body: web::Bytes) -> impl Responder {
+async fn update_dashboard(
+    path: web::Path<(String, String)>,
+    body: web::Bytes,
+    req: HttpRequest,
+) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    dashboards::update_dashboard(&org_id, &dashboard_id, body).await
+    let folder = get_folder(req);
+    dashboards::update_dashboard(&org_id, &dashboard_id, &folder, body).await
 }
 
 /// ListDashboards
@@ -94,8 +105,9 @@ async fn update_dashboard(path: web::Path<(String, String)>, body: web::Bytes) -
     ),
 )]
 #[get("/{org_id}/dashboards")]
-async fn list_dashboards(org_id: web::Path<String>) -> impl Responder {
-    dashboards::list_dashboards(&org_id.into_inner()).await
+async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
+    let folder = get_folder(req);
+    dashboards::list_dashboards(&org_id.into_inner(), &folder).await
 }
 
 /// GetDashboard
@@ -116,9 +128,10 @@ async fn list_dashboards(org_id: web::Path<String>) -> impl Responder {
     ),
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}")]
-async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
+async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    dashboards::get_dashboard(&org_id, &dashboard_id).await
+    let folder = get_folder(req);
+    dashboards::get_dashboard(&org_id, &dashboard_id, &folder).await
 }
 
 /// DeleteDashboard
@@ -139,7 +152,59 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     ),
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]
-async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
+async fn delete_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    dashboards::delete_dashboard(&org_id, &dashboard_id).await
+    let folder_id = get_folder(req);
+    dashboards::delete_dashboard(&org_id, &dashboard_id, &folder_id).await
+}
+
+/// MoveDashboard
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "MoveDashboard",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard ID"),
+    ),
+     request_body(
+        content = MoveDashboard,
+        description = "MoveDashboard details",
+        example = json!({
+            "from": "Source folder id",
+            "to": "Destination folder id",
+        }),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Dashboard Moved", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+    ),
+)]
+#[put("/{org_id}/folders/dashboards/{dashboard_id}")]
+async fn move_dashboard(
+    path: web::Path<(String, String)>,
+    folder: web::Json<MoveDashboard>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, dashboard_id) = path.into_inner();
+    if folder.from.is_empty() || folder.to.is_empty() {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Please specify from & to folder from dashboard movement".to_string(),
+            )),
+        );
+    };
+
+    dashboards::move_dashboard(&org_id, &dashboard_id, &folder.from, &folder.to).await
+}
+
+fn get_folder(req: HttpRequest) -> String {
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    match query.get("folder") {
+        Some(s) => s.to_string(),
+        None => crate::common::meta::dashboards::DEFAULT_FOLDER.to_owned(),
+    }
 }

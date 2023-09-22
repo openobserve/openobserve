@@ -25,6 +25,8 @@ use crate::common::{
     utils::json,
 };
 
+use super::prom::Metadata;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
     pub name: String,
@@ -35,7 +37,7 @@ pub struct Stream {
     pub schema: Vec<StreamProperty>,
     pub settings: StreamSettings,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metrics_meta: Option<super::prom::Metadata>,
+    pub metrics_meta: Option<Metadata>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
