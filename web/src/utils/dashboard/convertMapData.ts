@@ -22,8 +22,8 @@
 export const convertMapData = (mapData: any) => {
     console.log("panelSchema", mapData);
     const mapDataaa = mapData.map((item: any) => ({
-    name: item.x_axis_1,
-    value: item.y_axis_1,
+      name: item.x_axis_1,
+      value: item.y_axis_1,
     }));
     console.log("mapDataaa", mapDataaa);
     
@@ -31,11 +31,20 @@ export const convertMapData = (mapData: any) => {
     const maxValue = Math.max(...mapDataaa.map((item: any) => item.value));
 
     const options: any = {
-        leaflet: {
-          center: [108.39, 39.9],
-          zoom: 4,
-          roam: true,
-        },
+      lmap: {
+        // See https://leafletjs.com/reference.html#map-option for details
+        // NOTE: note that this order is reversed from Leaflet's [lat, lng]!
+        center: [10, 60],     // [lng, lat]
+        zoom: 4,
+        resizeEnable: true,     // automatically handles browser window resize.
+        // whether echarts layer should be rendered when the map is moving. Default is true.
+        // if false, it will only be re-rendered after the map `moveend`.
+        // It's better to set this option to false if data is large.
+        renderOnMoving: true,
+        echartsLayerInteractive: true, // Default: true
+        largeMode: false               // Default: false
+        // Note: Please DO NOT use the initial option `layers` to add Satellite/RoadNet/Other layers now.
+      },
       tooltip: {
         trigger: "item",
         showDelay: 0,
@@ -75,13 +84,18 @@ export const convertMapData = (mapData: any) => {
         {
           name: "USA PopEstimates",
           type: "scatter",
-          coordinateSystem: "leaflet",
+          coordinateSystem: "lmap",
           emphasis: {
             label: {
               show: true,
             },
           },
-          data: mapDataaa,
+          // data: mapDataaa,
+          data: [[120, 30, 8], [120.1, 20, 3]],
+          encode: {
+            // encode the third element of data item as the `value` dimension
+            value: 2
+          }
         },
       ],
     };

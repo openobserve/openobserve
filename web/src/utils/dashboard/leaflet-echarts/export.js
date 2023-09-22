@@ -1,0 +1,1 @@
+export { LeafletComponent } from './lmap'

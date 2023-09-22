@@ -23,7 +23,10 @@ import * as echarts from "echarts";
 import { useStore } from "vuex";
 // import * as map from "./../../../locales/languages/map.json"
 import L from 'leaflet';
-import 'echarts-extension-leaflet';
+import '@/utils/dashboard/leaflet-echarts/index';
+
+// import {tileLayer as LtileLayer } from 'leaflet';
+import "leaflet/dist/leaflet.css";
 
 export default defineComponent({
     name: "GeoMapRenderer",
@@ -66,23 +69,50 @@ export default defineComponent({
             chart = echarts.init(chartRef.value, theme);
             // echarts.registerMap('world', map);
         
-            const map = L.map(chartRef.value, {
-                center: [35, 110],
-                zoom: 4,
-                layers: [
-                    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                        attribution:
-                            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                    }),
-                ],
-            });
+            // const map = L.map(chartRef.value, {
+            //     center: [35, 110],
+            //     zoom: 4,
+            //     layers: [
+            //         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            //             attribution:
+            //                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            //         }),
+            //     ],
+            // });
 
-            // Add other Leaflet elements like markers, controls, etc. as needed
-            L.control.scale().addTo(map);
-            L.marker([35, 110]).addTo(map);
+            // // Add other Leaflet elements like markers, controls, etc. as needed
+            // L.control.scale().addTo(map);
+            // L.marker([35, 110]).addTo(map);
 
             chart.setOption(props?.data?.options || {}, true);
+
             window.addEventListener("resize", windowResizeEventCallback);
+
+            console.log("props.data.options", props?.data?.options);
+            console.log("chart model", chart.getModel());
+
+
+            // Get Leaflet extension component
+            // getModel and getComponent do not seem to be exported in echarts typescript
+            // add the following two comments to circumvent this
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            const lmapComponent = chart.getModel().getComponent('lmap');
+            console.log("lmapComponent ", lmapComponent);
+            
+            // Get the instance of Leaflet
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            const lmap = lmapComponent.getLeaflet();
+
+            L.tileLayer(
+            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            {
+                attribution:
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            }
+            ).addTo(lmap);
+
         });
         onUnmounted(() => {
             window.removeEventListener("resize", windowResizeEventCallback);
