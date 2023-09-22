@@ -27,8 +27,8 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use super::auth::{validator, validator_aws, validator_gcp};
 use super::request::{
-    alerts::*, dashboards::*, enrichment_table, functions, kv, logs, metrics, organization, prom,
-    search, status, stream, syslog, traces, users,
+    alerts::*, dashboards::folders::*, dashboards::*, enrichment_table, functions, kv, logs,
+    metrics, organization, prom, search, status, stream, syslog, traces, users,
 };
 use crate::common::infra::config::CONFIG;
 
@@ -200,7 +200,13 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(enrichment_table::save_enrichment_table)
             .service(metrics::ingest::otlp_metrics_write)
             .service(logs::ingest::otlp_logs_write)
-            .service(traces::otlp_traces_write),
+            .service(traces::otlp_traces_write)
+            .service(create_folder)
+            .service(list_folders)
+            .service(update_folder)
+            .service(get_folder)
+            .service(delete_folder)
+            .service(move_dashboard),
     );
 }
 
