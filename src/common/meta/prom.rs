@@ -15,6 +15,7 @@
 use ahash::HashMap;
 use serde::{Deserialize, Serialize};
 use strum::Display;
+use utoipa::ToSchema;
 
 use crate::common::infra::config::FxIndexMap;
 use crate::service::metrics::prom::prometheus as proto;
@@ -43,7 +44,7 @@ pub struct ClusterLeader {
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/f5fcaa3872ce03808567fabc56afc9cf61c732cb/model/textparse/interface.go#L106-L119
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Display, ToSchema)]
 #[strum(serialize_all = "lowercase")]
 pub enum MetricType {
     Unknown,
@@ -92,7 +93,7 @@ impl From<&str> for MetricType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Metadata {
     pub metric_type: MetricType,
     pub metric_family_name: String,
