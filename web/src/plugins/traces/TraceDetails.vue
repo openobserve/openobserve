@@ -207,7 +207,7 @@ export default defineComponent({
     const activeVisual = ref("timeline");
 
     const traceChart = ref({
-      layout: {},
+      data: [],
     });
 
     const ChartData: any = ref({});
@@ -482,15 +482,13 @@ export default defineComponent({
       });
     };
     const buildTraceChart = () => {
-      const layout: any = {
-        shapes: []
-      };
+      const data :any = [];
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
           spanPositionList.value[i].startTimeMs -
           traceTree.value[0].lowestStartTime;
 
-        layout.shapes.push({
+        data.push({
           x0: absoluteStartTime,
           x1: Number(
             (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(
@@ -500,7 +498,7 @@ export default defineComponent({
           fillcolor: spanPositionList.value[i].style.color,
         });
       }
-      traceChart.value.layout = layout;
+      traceChart.value.data = data;
       ChartData.value = convertTimelineData(traceChart);
     };
     const updateChart = (data:any) => {
