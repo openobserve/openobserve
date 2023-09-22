@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
 use std::{collections::HashMap, io::Error};
 
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::dashboards;
 
 pub mod folders;
@@ -153,6 +154,34 @@ async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> i
 async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     dashboards::delete_dashboard(&org_id, &dashboard_id).await
+}
+
+#[put("/{org_id}/folders/dashboards/{dashboard_id}")]
+async fn move_dashboard(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, dashboard_id) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let from = match query.get("from") {
+        Some(s) => s.to_string(),
+        None => "".to_owned(),
+    };
+    let to = match query.get("to") {
+        Some(s) => s.to_string(),
+        None => "".to_owned(),
+    };
+
+    if from.is_empty() || to.is_empty() {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Please specify from & to folder from dashboard movement".to_string(),
+            )),
+        );
+    };
+
+    dashboards::move_dashboard(&org_id, &dashboard_id, &from, &to).await
 }
 
 fn get_folder(req: HttpRequest) -> String {

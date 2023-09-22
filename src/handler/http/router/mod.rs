@@ -205,7 +205,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(list_folders)
             .service(update_folder)
             .service(get_folder)
-            .service(delete_folder),
+            .service(delete_folder)
+            .service(move_dashboard),
     );
 }
 

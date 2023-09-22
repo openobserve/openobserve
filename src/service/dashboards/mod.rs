@@ -18,6 +18,7 @@ use std::io;
 
 use crate::common::meta::dashboards::DEFAULT_FOLDER;
 use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse};
+use crate::common::utils::json;
 use crate::service::db::dashboards;
 
 pub mod folders;
@@ -85,7 +86,7 @@ pub async fn get_dashboard(
     let resp = if let Ok(dashboard) = dashboards::get(org_id, dashboard_id, folder_id).await {
         HttpResponse::Ok().json(dashboard)
     } else {
-        Response::NotFound.into()
+        return Ok(Response::NotFound("Dashboard".to_string()).into());
     };
     Ok(resp)
 }
@@ -93,7 +94,7 @@ pub async fn get_dashboard(
 #[tracing::instrument]
 pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
     let resp = if dashboards::delete(org_id, dashboard_id).await.is_err() {
-        Response::NotFound
+        return Ok(Response::NotFound("Dashboard".to_string()).into());
     } else {
         Response::OkMessage("Dashboard deleted".to_owned())
     };
@@ -118,10 +119,42 @@ async fn save_dashboard(
     }
 }
 
+#[tracing::instrument]
+pub async fn move_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    from_folder: &str,
+    to_folder: &str,
+) -> Result<HttpResponse, io::Error> {
+    if let Ok(dashboard) = dashboards::get(org_id, dashboard_id, from_folder).await {
+        // make sure the destination folder exists
+        if dashboards::folders::get(org_id, to_folder).await.is_err() {
+            return Ok(Response::NotFound("Destination Folder".to_string()).into());
+        }
+        // add the dashboard to the destination folder
+        if let Err(error) = dashboards::put(
+            org_id,
+            dashboard_id,
+            to_folder,
+            json::to_vec(&dashboard).unwrap().into(),
+        )
+        .await
+        {
+            return Ok(Response::InternalServerError(error).into());
+        }
+
+        //delete the dashboard from the source folder
+        let _ = dashboards::delete(org_id, dashboard_id).await.is_err();
+        Ok(Response::OkMessage("Dashboard moved successfully".to_string()).into())
+    } else {
+        Ok(Response::NotFound("Dashboard".to_string()).into())
+    }
+}
+
 #[derive(Debug)]
 enum Response {
     OkMessage(String),
-    NotFound,
+    NotFound(String),
     InternalServerError(anyhow::Error),
 }
 
@@ -131,9 +164,9 @@ impl From<Response> for HttpResponse {
             Response::OkMessage(message) => {
                 Self::Ok().json(MetaHttpResponse::message(StatusCode::OK.into(), message))
             }
-            Response::NotFound => Self::NotFound().json(MetaHttpResponse::error(
+            Response::NotFound(entity) => Self::NotFound().json(MetaHttpResponse::error(
                 StatusCode::NOT_FOUND.into(),
-                "Dashboard not found".to_owned(),
+                format!("{entity} not found"),
             )),
             Response::InternalServerError(err) => Self::InternalServerError().json(
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.into(), err.to_string()),
