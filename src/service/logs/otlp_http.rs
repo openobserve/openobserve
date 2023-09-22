@@ -36,7 +36,7 @@ use crate::common::{
 };
 use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
-    db,
+    db, format_stream_name,
     ingestion::{grpc::get_val_for_attr, write_file},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
@@ -51,9 +51,12 @@ pub async fn logs_proto_handler(
     org_id: &str,
     thread_id: usize,
     body: web::Bytes,
+    in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = ExportLogsServiceRequest::decode(body).expect("Invalid protobuf");
-    match super::otlp_grpc::handle_grpc_request(org_id, thread_id, request, false).await {
+    match super::otlp_grpc::handle_grpc_request(org_id, thread_id, request, false, in_stream_name)
+        .await
+    {
         Ok(res) => Ok(res),
         Err(e) => {
             log::error!("error while handling request: {}", e);
@@ -72,6 +75,7 @@ pub async fn logs_json_handler(
     org_id: &str,
     thread_id: usize,
     body: web::Bytes,
+    in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, std::io::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -90,7 +94,14 @@ pub async fn logs_json_handler(
     }
 
     let start = std::time::Instant::now();
-    let stream_name = "default";
+
+    let stream_name = match in_stream_name {
+        Some(name) => format_stream_name(name),
+        None => "default".to_owned(),
+    };
+
+    let stream_name = &stream_name;
+
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);

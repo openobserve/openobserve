@@ -15,6 +15,7 @@
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
+use crate::common::infra::config::CONFIG;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
 use crate::service::logs::otlp_http::{logs_json_handler, logs_proto_handler};
@@ -240,12 +241,16 @@ pub async fn otlp_logs_write(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
+    let in_stream_name = req
+        .headers()
+        .get(&CONFIG.grpc.stream_header_key)
+        .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         log::info!("otlp::logs_proto_handler");
-        logs_proto_handler(&org_id, **thread_id, body).await
+        logs_proto_handler(&org_id, **thread_id, body, in_stream_name).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
         log::info!("otlp::logs_json_handler");
-        logs_json_handler(&org_id, **thread_id, body).await
+        logs_json_handler(&org_id, **thread_id, body, in_stream_name).await
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),

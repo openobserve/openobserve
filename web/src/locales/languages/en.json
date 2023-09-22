@@ -309,7 +309,7 @@
     "editPanel": "Edit Panel",
     "addPanel": "Add Panel",
     "firstColumn": "First Column",
-    "zAxis" : "Z-Axis",
+    "zAxis": "Z-Axis",
     "yAxis": "Y-Axis (Columns)",
     "xAxis": "X-Axis (Row)",
     "otherColumn": "Other Columns",
@@ -399,7 +399,7 @@
     "downloadInvoice": "Download Invoice"
   },
   "message": {
-    "ServerInternalError": "Error: Something wrong went. Internal server error.",
+    "ServerInternalError": "Error: Something went wrong. Internal server error.",
     "SearchSQLNotValid": "Error: Not a valid SQL.",
     "SearchStreamNotFound": "Error: Search stream not found.",
     "FullTextSearchFieldNotFound": "Error: Full text search field not found.",

@@ -53,15 +53,17 @@ pub async fn traces_proto(
     org_id: &str,
     thread_id: usize,
     body: web::Bytes,
+    in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     let request = ExportTraceServiceRequest::decode(body).expect("Invalid protobuf");
-    super::handle_trace_request(org_id, thread_id, request, false).await
+    super::handle_trace_request(org_id, thread_id, request, false, in_stream_name).await
 }
 
 pub async fn traces_json(
     org_id: &str,
     thread_id: usize,
     body: web::Bytes,
+    in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -80,7 +82,13 @@ pub async fn traces_json(
     }
 
     let start = std::time::Instant::now();
-    let traces_stream_name = "default";
+    let traces_stream_name = match in_stream_name {
+        Some(name) => format_stream_name(name),
+        None => "default".to_owned(),
+    };
+
+    let traces_stream_name = &traces_stream_name;
+
     let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
         AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();

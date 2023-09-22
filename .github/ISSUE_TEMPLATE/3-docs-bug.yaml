@@ -1,5 +1,6 @@
 name: 'Docs or https://openobserve.ai/docs/ Bug Report'
 description: Report an issue in OpenObserve's documentation
+labels: ["📒 Documentation"]
 
 body:
   - type: textarea
