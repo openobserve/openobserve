@@ -199,9 +199,9 @@ const useRoutes = () => {
       },
       children: [
         {
-          path: "apikeys",
-          name: "apiKeys",
-          component: () => import("@/components/settings/ApiKeys.vue"),
+          path: "general",
+          name: "general",
+          component: () => import("@/components/settings/General.vue"),
         },
       ],
     },

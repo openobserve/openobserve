@@ -468,6 +468,14 @@
     "header": "Settings",
     "userKeyLabel": "User Key",
     "rumKeyLabel": "RUM Key",
-    "newUserKeyBtnLbl": "Generate User Key"
+    "newUserKeyBtnLbl": "Add User Key",
+    "addUserKeyTitle": "Create User Key",
+    "organizationLabel": "Select Organization(s): ",
+    "save": "Save",
+    "cancel": "Cancel",
+    "apiNamePlaceHolder": "Key Name",
+    "updateuserKey": "Update User Key",
+    "id": "Id",
+    "update": "Update"
   }
 }

@@ -150,6 +150,7 @@
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
               <q-item
+                v-if="config.isCloud == 'true'"
                 v-ripple
                 v-close-popup
                 clickable

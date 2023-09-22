@@ -33,6 +33,7 @@
           vertical
         >
           <q-route-tab
+            v-if="config.isCloud == 'true'"
             exact
             default
             name="api_keys"
@@ -58,6 +59,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -79,6 +81,7 @@ export default defineComponent({
       t,
       store,
       router,
+      config,
       settingsTab,
       splitterModel: ref(200),
     };
