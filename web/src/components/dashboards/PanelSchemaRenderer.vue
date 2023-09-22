@@ -25,7 +25,7 @@
     v-else-if="panelSchema.type == 'table'"
     :data="panelData"
     />
-    <GeoMapRenderer v-else :data="panelData" />
+    <GeoMapRenderer v-else-if="panelSchema.type == 'map'" :data="panelData" />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div v-if="errorDetail" class="errorMessage">

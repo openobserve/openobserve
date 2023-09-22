@@ -40,22 +40,15 @@ export default defineComponent({
     setup(props: any) {
         const chartRef: any = ref(null);
         let chart: any;
+
+        const lmapOptions = props.data.options?.lmap || {};
+
         const store = useStore();
         const windowResizeEventCallback = async () => {
             await nextTick();
             await nextTick();
             chart.resize();
-        }
-
-        watch(() => store.state.theme, (newTheme) => {
-            const theme = newTheme === 'dark' ? 'dark' : 'light';
-            chart.dispose();
-            chart = echarts.init(chartRef.value, theme);
-            const options = props.data.options || {}
-            options.animation = false
-            chart.setOption(options, true);
-            chart.setOption({ animation: true });
-        });
+        };
 
         onMounted(async () => {
             await nextTick();
@@ -67,25 +60,16 @@ export default defineComponent({
             await nextTick();
             const theme = store.state.theme === 'dark' ? 'dark' : 'light';
             chart = echarts.init(chartRef.value, theme);
-            // echarts.registerMap('world', map);
-        
-            // const map = L.map(chartRef.value, {
-            //     center: [35, 110],
-            //     zoom: 4,
-            //     layers: [
-            //         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            //             attribution:
-            //                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            //         }),
-            //     ],
-            // });
+            console.log("theme ", theme);
 
-            // // Add other Leaflet elements like markers, controls, etc. as needed
-            // L.control.scale().addTo(map);
-            // L.marker([35, 110]).addTo(map);
+            const options = {
+                ...props.data.options,
+                lmap: lmapOptions,
+            };
 
-            chart.setOption(props?.data?.options || {}, true);
+            console.log("options ", props.data.options);
 
+            chart.setOption(options || {}, true);
             window.addEventListener("resize", windowResizeEventCallback);
 
             console.log("props.data.options", props?.data?.options);
@@ -117,12 +101,50 @@ export default defineComponent({
         onUnmounted(() => {
             window.removeEventListener("resize", windowResizeEventCallback);
         });
-        watch(() => props.data.options, async () => {
+
+        // watch(() => store.state.theme, (newTheme) => {
+        //     console.log("Theme changed to:", newTheme);
+        //     const theme = newTheme === 'dark' ? 'dark' : 'light';
+        //     chart.dispose();
+        //     chart = echarts.init(chartRef.value, theme);
+        //     const options = {
+        //         ...props.data.options,
+        //         lmap: lmapOptions,
+        //     };
+        //     options.animation = false;
+        //     chart.setOption(options, true);
+        //     chart.setOption({ animation: true });
+        // });
+
+        watch(() => props.data.options, async (newOptions) => {
+            console.log("props.data.options changed:", newOptions);
             await nextTick();
             chart.resize();
-            console.log("props.data.options", props.data.options);
-            
-            chart.setOption(props?.data?.options || {}, true);
+            const options = {
+                ...props.data.options,
+                lmap: lmapOptions,
+            };
+            chart.setOption(options || {}, true);
+             // Get Leaflet extension component
+            // getModel and getComponent do not seem to be exported in echarts typescript
+            // add the following two comments to circumvent this
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            const lmapComponent = chart.getModel().getComponent('lmap');
+            console.log("lmapComponent ", lmapComponent);
+
+            // Get the instance of Leaflet
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            const lmap = lmapComponent.getLeaflet();
+
+            L.tileLayer(
+                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+                    attribution:
+                        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                }
+            ).addTo(lmap);
         }, { deep: true });
         return { chartRef };
     },
