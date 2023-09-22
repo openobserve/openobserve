@@ -207,7 +207,6 @@ export default defineComponent({
     const activeVisual = ref("timeline");
 
     const traceChart = ref({
-      data: [{}],
       layout: {},
     });
 
@@ -484,87 +483,23 @@ export default defineComponent({
     };
     const buildTraceChart = () => {
       const layout: any = {
-        autosize: true,
-        scrollZoom: true,
-        paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-        plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-        title: {
-          text: "",
-          font: {
-            size: 12,
-            color: store.state.theme === "dark" ? "#fff" : "#181a1b",
-          },
-        },
-        font: {
-          size: 12,
-          color: store.state.theme === "dark" ? "#fff" : "#181a1b",
-        },
-        height: 200,
-        margin: {
-          l: 16,
-          r: 16,
-          t: 16,
-          b: 16,
-        },
-        xaxis: {
-          ticklen: 5,
-          nticks: 10,
-          tickvals: [],
-          type: "-",
-          ticksuffix: "ms",
-          showgrid: true,
-          zeroline: true,
-          range: [],
-          rangeslider: {
-            visible: true,
-            bgcolor: "#d5d5d5",
-          },
-        },
-        yaxis: {
-          showgrid: false,
-          zeroline: false,
-          autorange: true,
-          showticklabels: false,
-        },
-        shapes: [],
-        hovermode: "closest",
-        showlegend: true,
+        shapes: []
       };
-      const shapes: any = [];
-      let size = 0;
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
           spanPositionList.value[i].startTimeMs -
           traceTree.value[0].lowestStartTime;
 
-        shapes.push({
+        layout.shapes.push({
           x0: absoluteStartTime,
           x1: Number(
             (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(
               2
             )
           ),
-          y0: size,
-          y1: size + 0.5,
-          line: {
-            width: 0,
-          },
-          type: "rect",
-          xref: "x",
-          yref: "y",
-          opacity: 1,
           fillcolor: spanPositionList.value[i].style.color,
         });
-        size += 0.5;
       }
-      baseTracePosition.value.tics.forEach((tic: any) => {
-        layout.xaxis.tickvals.push(tic.value);
-      });
-      layout.shapes = shapes;
-      const endTime = Math.ceil(
-        traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime
-      );
-      layout.xaxis.range = [0, endTime > 0 ? endTime : 1];
       traceChart.value.layout = layout;
       ChartData.value = convertTimelineData(traceChart);
     };

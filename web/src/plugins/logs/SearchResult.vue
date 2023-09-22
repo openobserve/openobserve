@@ -351,6 +351,7 @@ export default defineComponent({
         searchObj.data.histogram.xData.length > 0 
         // && plotChart.value?.reDraw
       ) {
+        //format data in form of echarts options
         plotChart.value = convertLogData(
           searchObj.data.histogram.xData,
           searchObj.data.histogram.yData,
