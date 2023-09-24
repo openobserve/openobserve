@@ -172,8 +172,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
     }
 
     for day in days {
-        let mut t = DateTime::parse_from_str(&format!("{day}T00:00:00Z"), "%Y-%m-%dT%H:%M:%SZ")?
-            .with_timezone(&Utc);
+        let mut t = DateTime::parse_from_rfc3339(&format!("{day}T00:00:00Z"))?.with_timezone(&Utc);
         for _hour in 0..24 {
             let offset = t.timestamp_micros();
             merge_file_list(offset).await?;

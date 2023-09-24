@@ -223,6 +223,10 @@ mod tests {
         let t = parse_str_to_time(s).unwrap();
         assert_eq!(t.timestamp_micros(), 1609459200000000);
 
+        let s = "2021-01-01T23:59:59Z";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609545599000000);
+
         let s = "2021-01-01T00:00:00+08:00";
         let t = parse_str_to_time(s).unwrap();
         assert_eq!(t.timestamp_micros(), 1609430400000000);

@@ -213,10 +213,8 @@ pub async fn cache_time_range(time_min: i64, mut time_max: i64) -> Result<(), an
 
 // cache by day: 2023-01-02
 pub async fn cache_day(day: &str) -> Result<(), anyhow::Error> {
-    let day_start = DateTime::parse_from_str(&format!("{day}T00:00:00Z"), "%Y-%m-%dT%H:%M:%SZ")?
-        .with_timezone(&Utc);
-    let day_end = DateTime::parse_from_str(&format!("{day}T23:59:59Z"), "%Y-%m-%dT%H:%M:%SZ")?
-        .with_timezone(&Utc);
+    let day_start = DateTime::parse_from_rfc3339(&format!("{day}T00:00:00Z"))?.with_timezone(&Utc);
+    let day_end = DateTime::parse_from_rfc3339(&format!("{day}T23:59:59Z"))?.with_timezone(&Utc);
     let time_min = day_start.timestamp_micros();
     let time_max = day_end.timestamp_micros();
     cache_time_range(time_min, time_max).await
