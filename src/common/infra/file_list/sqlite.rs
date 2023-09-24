@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use sqlx::{Pool, QueryBuilder, Row, Sqlite};
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, time};
 
 use crate::common::{
     infra::{
@@ -81,12 +81,34 @@ impl SqliteFileList {
                         }
                     }
                     Event::CreateTable => {
-                        if let Err(e) = create_table_inner(&client).await {
+                        let mut err: Option<String> = None;
+                        for _ in 0..5 {
+                            match create_table_inner(&client).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => err = Some(e.to_string()),
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
                             log::error!("[SQLITE] create table error: {}", e);
                         }
                     }
                     Event::CreateTableIndex => {
-                        if let Err(e) = create_table_index_inner(&client).await {
+                        let mut err: Option<String> = None;
+                        for _ in 0..5 {
+                            match create_table_index_inner(&client).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => err = Some(e.to_string()),
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
                             log::error!("[SQLITE] create table index error: {}", e);
                         }
                     }
