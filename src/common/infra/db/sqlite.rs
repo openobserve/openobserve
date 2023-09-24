@@ -44,9 +44,9 @@ fn connect() -> Pool<Sqlite> {
     let db_opts = SqliteConnectOptions::from_str(&url)
         .expect("sqlite connect options create failed")
         .journal_mode(SqliteJournalMode::Wal)
-        .synchronous(SqliteSynchronous::Off)
-        .disable_statement_logging()
+        .synchronous(SqliteSynchronous::Normal)
         .busy_timeout(Duration::from_secs(10))
+        .disable_statement_logging()
         .create_if_missing(true);
 
     let pool_opts = SqlitePoolOptions::new();
