@@ -190,6 +190,11 @@ pub async fn delete_by_date(
     dist_lock::unlock(&locker).await?;
     drop(locker);
 
+    log::info!(
+        "[COMPACT] deleting stream {org_id}/{stream_type}/{stream_name}/{:?}",
+        date_range
+    );
+
     let mut date_start =
         DateTime::parse_from_str(&format!("{}T00:00:00Z", date_range.0), "%Y-%m-%dT%H:%M:%SZ")?
             .with_timezone(&Utc);

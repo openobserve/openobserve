@@ -20,7 +20,7 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
     ConnectOptions, Pool, Sqlite,
 };
-use std::{str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, RwLock};
 
 use crate::common::infra::{
@@ -46,6 +46,7 @@ fn connect() -> Pool<Sqlite> {
         .journal_mode(SqliteJournalMode::Memory)
         .synchronous(SqliteSynchronous::Off)
         .disable_statement_logging()
+        .busy_timeout(Duration::from_secs(10))
         .create_if_missing(true);
 
     let pool_opts = SqlitePoolOptions::new();

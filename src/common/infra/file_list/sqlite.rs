@@ -48,7 +48,7 @@ enum EventFileList {
 
 enum EventStreamStats {
     Set(String, Vec<(String, StreamStats)>),
-    ResetStreamMinTS(String, i64),
+    ResetMinTS(String, i64),
 }
 
 impl SqliteFileList {
@@ -73,7 +73,7 @@ impl SqliteFileList {
                             log::error!("[SQLITE] set stream stats error: {}", e);
                         }
                     }
-                    Event::StreamStats(EventStreamStats::ResetStreamMinTS(stream, min_ts)) => {
+                    Event::StreamStats(EventStreamStats::ResetMinTS(stream, min_ts)) => {
                         if let Err(e) = reset_stream_stats_min_ts(&client, &stream, min_ts).await {
                             log::error!("[SQLITE] reset stream stats min_ts error: {}", e);
                         }
@@ -324,7 +324,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         min_ts: i64,
     ) -> Result<()> {
         let tx = self.tx.clone();
-        tx.send(Event::StreamStats(EventStreamStats::ResetStreamMinTS(
+        tx.send(Event::StreamStats(EventStreamStats::ResetMinTS(
             stream.to_string(),
             min_ts,
         )))
