@@ -45,6 +45,14 @@ impl Default for PostgresFileList {
 
 #[async_trait]
 impl super::FileList for PostgresFileList {
+    async fn create_table(&self) -> Result<()> {
+        create_table().await
+    }
+
+    async fn create_table_index(&self) -> Result<()> {
+        create_table_index().await
+    }
+
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;

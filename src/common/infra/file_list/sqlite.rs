@@ -39,6 +39,8 @@ pub struct SqliteFileList {
 enum Event {
     FileList(EventFileList),
     StreamStats(EventStreamStats),
+    CreateTable,
+    CreateTableIndex,
 }
 
 enum EventFileList {
@@ -78,6 +80,16 @@ impl SqliteFileList {
                             log::error!("[SQLITE] reset stream stats min_ts error: {}", e);
                         }
                     }
+                    Event::CreateTable => {
+                        if let Err(e) = create_table_inner(&client).await {
+                            log::error!("[SQLITE] create table error: {}", e);
+                        }
+                    }
+                    Event::CreateTableIndex => {
+                        if let Err(e) = create_table_index_inner(&client).await {
+                            log::error!("[SQLITE] create table index error: {}", e);
+                        }
+                    }
                 }
             }
             log::info!("[SQLITE] file list event loop exit");
@@ -94,6 +106,20 @@ impl Default for SqliteFileList {
 
 #[async_trait]
 impl super::FileList for SqliteFileList {
+    async fn create_table(&self) -> Result<()> {
+        let tx = self.tx.clone();
+        tx.send(Event::CreateTable)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
+    }
+    async fn create_table_index(&self) -> Result<()> {
+        let tx = self.tx.clone();
+        tx.send(Event::CreateTableIndex)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
+    }
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let tx = self.tx.clone();
         tx.send(Event::FileList(EventFileList::Add(vec![FileKey::new(
@@ -520,8 +546,7 @@ async fn reset_stream_stats_min_ts(client: &Pool<Sqlite>, stream: &str, min_ts: 
     Ok(())
 }
 
-pub async fn create_table() -> Result<()> {
-    let pool = CLIENT.clone();
+async fn create_table_inner(client: &Pool<Sqlite>) -> Result<()> {
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list
@@ -540,7 +565,7 @@ CREATE TABLE IF NOT EXISTS file_list
 );
         "#,
     )
-    .execute(&pool)
+    .execute(client)
     .await?;
 
     sqlx::query(
@@ -559,14 +584,13 @@ CREATE TABLE IF NOT EXISTS stream_stats
 );
         "#,
     )
-    .execute(&pool)
+    .execute(client)
     .await?;
 
     Ok(())
 }
 
-pub async fn create_table_index() -> Result<()> {
-    let pool = CLIENT.clone();
+async fn create_table_index_inner(client: &Pool<Sqlite>) -> Result<()> {
     // create index for file_list
     sqlx::query(
         r#"
@@ -576,7 +600,7 @@ CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts,
 CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);
         "#,
     )
-    .execute(&pool)
+    .execute(client)
     .await?;
 
     // create index for stream_stats
@@ -586,7 +610,7 @@ CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);
 CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (stream);
         "#,
     )
-    .execute(&pool)
+    .execute(client)
     .await?;
 
     // create trigger
@@ -598,7 +622,7 @@ CREATE TRIGGER IF NOT EXISTS update_stream_stats_delete AFTER DELETE ON file_lis
     END;
         "#,
     )
-    .execute(&pool)
+    .execute(client)
     .await?;
 
     Ok(())
