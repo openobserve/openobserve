@@ -375,6 +375,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
             clap::Command::new("migrate-file-list-from-dynamo")
                 .about("migrate file-list from dynamo to dynamo db"),
             clap::Command::new("migrate-meta").about("migrate meta"),
+            clap::Command::new("migrate-dashboards").about("migrate-dashboards"),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
                 .arg(
@@ -489,6 +490,10 @@ async fn cli() -> Result<bool, anyhow::Error> {
         "migrate-meta" => {
             println!("Running migration");
             migration::meta::run().await?
+        }
+        "migrate-dashboards" => {
+            println!("Running migration dashboard");
+            migration::dashboards::run().await?
         }
         "delete-parquet" => {
             let file = command.get_one::<String>("file").unwrap();

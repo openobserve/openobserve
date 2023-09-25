@@ -22,14 +22,14 @@ pub(crate) async fn get(org_id: &str, folder_id: &str) -> Result<Folder, anyhow:
 }
 
 #[tracing::instrument(skip(folder))]
-pub(crate) async fn put(org_id: &str, folder: Folder) -> Result<(), anyhow::Error> {
+pub(crate) async fn put(org_id: &str, folder: Folder) -> Result<Folder, anyhow::Error> {
     let key = format!("/folders/{org_id}/{}", folder.folder_id);
 
     match infra_db::DEFAULT
         .put(&key, json::to_vec(&folder)?.into(), infra_db::NO_NEED_WATCH)
         .await
     {
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(folder),
         Err(_) => Err(anyhow::anyhow!("Failed to save folder")),
     }
 }

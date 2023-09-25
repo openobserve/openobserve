@@ -14,6 +14,7 @@
 
 use crate::common::infra::config::CONFIG;
 
+pub mod dashboards;
 pub mod file_list;
 pub mod meta;
 
