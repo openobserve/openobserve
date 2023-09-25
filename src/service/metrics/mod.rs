@@ -13,6 +13,8 @@
 // limitations under the License.
 
 use datafusion::arrow::datatypes::Schema;
+use once_cell::sync::Lazy;
+use regex::{self, Regex};
 
 use crate::common;
 use crate::common::infra::config::CONFIG;
@@ -24,6 +26,8 @@ pub mod otlp_http;
 pub mod prom;
 
 const EXCLUDE_LABELS: [&str; 5] = [VALUE_LABEL, "start_time", "is_monotonic", "exemplars", "le"];
+
+static RE_CORRECT_LABEL_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
@@ -65,4 +69,9 @@ fn get_exclude_labels() -> Vec<&'static str> {
     let mut vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
     vec.push(&CONFIG.common.column_timestamp);
     vec
+}
+
+// format stream name
+pub fn format_label_name(label: &str) -> String {
+    RE_CORRECT_LABEL_NAME.replace_all(label, "_").to_string()
 }

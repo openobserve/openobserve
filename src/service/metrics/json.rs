@@ -19,7 +19,7 @@ use datafusion::arrow::{datatypes::Schema, json::reader::infer_json_schema};
 use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
-use crate::common::{
+use crate::{common::{
     infra::{cluster, config::CONFIG, metrics},
     meta::{
         ingestion::{IngestionResponse, StreamStatus},
@@ -29,7 +29,7 @@ use crate::common::{
         StreamType,
     },
     utils::{flatten, json, time},
-};
+}, service::format_stream_name};
 use crate::service::{
     db, ingestion::get_wal_time_key, ingestion::write_file, stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
@@ -59,7 +59,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         // check data type
         let record = record.as_object_mut().unwrap();
         let stream_name = match record.get(NAME_LABEL).ok_or(anyhow!("missing __name__"))? {
-            json::Value::String(s) => s.clone(),
+            json::Value::String(s) => format_stream_name(s),
             _ => {
                 return Err(anyhow::anyhow!("invalid __name__, need to be string"));
             }

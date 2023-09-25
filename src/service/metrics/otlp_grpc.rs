@@ -25,7 +25,7 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
-use super::get_exclude_labels;
+use super::{format_label_name, get_exclude_labels};
 use crate::common::meta::stream::StreamParams;
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics},
@@ -35,6 +35,7 @@ use crate::common::{
     },
     utils::{flatten, json},
 };
+use crate::service::format_stream_name;
 use crate::service::{
     db,
     ingestion::{
@@ -78,7 +79,7 @@ pub async fn handle_grpc_request(
     for resource_metric in &request.resource_metrics {
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
-                let metric_name = &metric.name;
+                let metric_name = &format_stream_name(&metric.name);
                 // check for schema
                 let schema_exists = stream_schema_exists(
                     org_id,
@@ -115,7 +116,7 @@ pub async fn handle_grpc_request(
                 match &resource_metric.resource {
                     Some(res) => {
                         for item in &res.attributes {
-                            rec[item.key.as_str()] = get_val(&item.value);
+                            rec[format_label_name(item.key.as_str())] = get_val(&item.value);
                         }
                     }
                     None => {}
@@ -392,7 +393,7 @@ fn process_sum(
 
     let mut records = vec![];
     process_aggregation_temporality(rec, sum.aggregation_temporality);
-    rec["is_monotonic"] = sum.is_monotonic.into();
+    rec["is_monotonic"] = sum.is_monotonic.to_string().into();
     for data_point in &sum.data_points {
         let mut dp_rec = rec.clone();
         process_data_point(&mut dp_rec, data_point);
@@ -491,11 +492,11 @@ fn process_summary(
 
 fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) {
     for attr in &data_point.attributes {
-        rec[attr.key.as_str()] = get_val(&attr.value);
+        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value);
     }
     rec[VALUE_LABEL] = get_metric_val(&data_point.value);
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
-    rec["start_time"] = data_point.start_time_unix_nano.into();
+    rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::FlagNoRecordedValue.as_str_name()
     } else {
@@ -512,10 +513,10 @@ fn process_hist_data_point(
     let mut bucket_recs = vec![];
 
     for attr in &data_point.attributes {
-        rec[attr.key.as_str()] = get_val(&attr.value);
+        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value);
     }
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
-    rec["start_time"] = data_point.start_time_unix_nano.into();
+    rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::FlagNoRecordedValue.as_str_name()
     } else {
@@ -543,10 +544,10 @@ fn process_hist_data_point(
             bucket_rec[VALUE_LABEL] = (*val).into()
         }
         if let Some(val) = data_point.explicit_bounds.get(i) {
-            bucket_rec["le"] = (*val).into()
+            bucket_rec["le"] = (*val.to_string()).into()
         }
         if i == last_index {
-            bucket_rec["le"] = std::f64::INFINITY.into();
+            bucket_rec["le"] = std::f64::INFINITY.to_string().into();
         }
         bucket_recs.push(bucket_rec);
     }
@@ -560,10 +561,10 @@ fn process_exp_hist_data_point(
     let mut bucket_recs = vec![];
 
     for attr in &data_point.attributes {
-        rec[attr.key.as_str()] = get_val(&attr.value);
+        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value);
     }
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
-    rec["start_time"] = data_point.start_time_unix_nano.into();
+    rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::FlagNoRecordedValue.as_str_name()
     } else {
@@ -591,7 +592,7 @@ fn process_exp_hist_data_point(
             for (i, val) in buckets.bucket_counts.iter().enumerate() {
                 let mut bucket_rec = rec.clone();
                 bucket_rec[VALUE_LABEL] = (*val).into();
-                bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).into();
+                bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
                 bucket_recs.push(bucket_rec);
             }
         }
@@ -604,7 +605,7 @@ fn process_exp_hist_data_point(
             for (i, val) in buckets.bucket_counts.iter().enumerate() {
                 let mut bucket_rec = rec.clone();
                 bucket_rec[VALUE_LABEL] = (*val).into();
-                bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).into();
+                bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
                 bucket_recs.push(bucket_rec);
             }
         }
@@ -621,10 +622,10 @@ fn process_summary_data_point(
     let mut bucket_recs = vec![];
 
     for attr in &data_point.attributes {
-        rec[attr.key.as_str()] = get_val(&attr.value);
+        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value);
     }
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
-    rec["start_time"] = data_point.start_time_unix_nano.into();
+    rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::FlagNoRecordedValue.as_str_name()
     } else {
@@ -647,7 +648,7 @@ fn process_summary_data_point(
     for value in &data_point.quantile_values {
         let mut bucket_rec = rec.clone();
         bucket_rec[VALUE_LABEL] = value.value.into();
-        bucket_rec["quantile"] = value.quantile.into();
+        bucket_rec["quantile"] = value.quantile.to_string().into();
         bucket_recs.push(bucket_rec);
     }
     bucket_recs

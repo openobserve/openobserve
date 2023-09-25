@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use once_cell::sync::Lazy;
+use regex::{self, Regex};
+
 pub mod alert_manager;
 pub mod alerts;
 pub mod compact;
@@ -39,6 +42,8 @@ pub mod users;
 
 const MAX_KEY_LENGTH: usize = 100;
 
+static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_:]+").unwrap());
+
 // format partition key
 pub fn format_partition_key(input: &str) -> String {
     let mut output = String::with_capacity(std::cmp::min(input.len(), MAX_KEY_LENGTH));
@@ -53,7 +58,9 @@ pub fn format_partition_key(input: &str) -> String {
     output
 }
 
-// format straeam name
+// format stream name
 pub fn format_stream_name(stream_name: &str) -> String {
-    stream_name.replace('/', "_").replace('=', "-")
+    RE_CORRECT_STREAM_NAME
+        .replace_all(stream_name, "_")
+        .to_string()
 }
