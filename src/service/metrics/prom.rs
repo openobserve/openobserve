@@ -20,25 +20,6 @@ use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use std::collections::HashMap;
 
-use crate::common::{
-    infra::{
-        cache::stats,
-        cluster::{self, LOCAL_NODE_UUID},
-        config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        errors::{Error, Result},
-        metrics,
-    },
-    meta::{
-        alert,
-        functions::StreamTransform,
-        prom::*,
-        search,
-        stream::{PartitioningDetails, StreamParams},
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{json, time::parse_i64_to_timestamp_micros},
-};
 use crate::service::{
     db,
     ingestion::{chk_schema_by_record, write_file},
@@ -47,6 +28,30 @@ use crate::service::{
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
 };
+use crate::{
+    common::{
+        infra::{
+            cache::stats,
+            cluster::{self, LOCAL_NODE_UUID},
+            config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+            errors::{Error, Result},
+            metrics,
+        },
+        meta::{
+            alert,
+            functions::StreamTransform,
+            prom::*,
+            search,
+            stream::{PartitioningDetails, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{json, time::parse_i64_to_timestamp_micros},
+    },
+    service::format_stream_name,
+};
+
+use super::format_label_name;
 
 pub(crate) mod prometheus {
     include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
@@ -89,7 +94,7 @@ pub async fn remote_write(
 
     // parse metadata
     for item in request.metadata {
-        let metric_name = item.metric_family_name.clone();
+        let metric_name = format_stream_name(&item.metric_family_name.clone());
         let metadata = Metadata {
             metric_family_name: item.metric_family_name.clone(),
             metric_type: item.r#type().into(),
@@ -135,7 +140,7 @@ pub async fn remote_write(
                     true
                 }
             })
-            .map(|label| (label.name, label.value))
+            .map(|label| (format_label_name(&label.name), label.value))
             .collect();
 
         let metric_name = match labels.get(NAME_LABEL) {
