@@ -623,6 +623,7 @@ export default defineComponent({
           "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 
         dashboardPanelData.data.id = panelId;
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         
         const errorMessageOnSave = await addPanel(
           store,
