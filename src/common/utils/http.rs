@@ -52,19 +52,19 @@ mod tests {
         let mut map: HashMap<String, String> = HashMap::default();
         map.insert(key.clone(), key.clone());
 
-        let resp = get_stream_type_from_request(&Query { 0: map.clone() });
+        let resp = get_stream_type_from_request(&Query(map.clone()));
         assert!(resp.is_err());
 
         map.insert(key.clone(), "LOGS".to_string());
-        let resp = get_stream_type_from_request(&Query { 0: map.clone() });
+        let resp = get_stream_type_from_request(&Query(map.clone()));
         assert_eq!(resp.unwrap(), Some(StreamType::Logs));
 
         map.insert(key.clone(), "METRICS".to_string());
-        let resp = get_stream_type_from_request(&Query { 0: map.clone() });
+        let resp = get_stream_type_from_request(&Query(map.clone()));
         assert_eq!(resp.unwrap(), Some(StreamType::Metrics));
 
         map.insert(key.clone(), "TRACES".to_string());
-        let resp = get_stream_type_from_request(&Query { 0: map.clone() });
+        let resp = get_stream_type_from_request(&Query(map.clone()));
         assert_eq!(resp.unwrap(), Some(StreamType::Traces));
     }
 }
