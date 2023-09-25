@@ -91,7 +91,6 @@ pub async fn multi(
             &org_id,
             &stream_name,
             IngestionRequest::Multi(body),
-            //body,
             **thread_id,
         )
         .await
@@ -159,7 +158,6 @@ pub async fn json(
             &org_id,
             &stream_name,
             IngestionRequest::JSON(body),
-            //body,
             **thread_id,
         )
         .await
@@ -184,15 +182,7 @@ pub async fn json_v1(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     Ok(
-        match logs::json::ingest(
-            &org_id,
-            &stream_name,
-            //IngestionRequest::JSON(body),
-            body,
-            **thread_id,
-        )
-        .await
-        {
+        match logs::json::ingest(&org_id, &stream_name, body, **thread_id).await {
             Ok(v) => HttpResponse::Ok().json(v),
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
