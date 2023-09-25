@@ -95,6 +95,7 @@ pub trait Db: Sync + Send + 'static {
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>>;
     async fn count(&self, prefix: &str) -> Result<i64>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
+    async fn close(&self) -> Result<()>;
 }
 
 pub fn parse_key(mut key: &str) -> (String, String, String) {
@@ -175,6 +176,7 @@ pub enum DbEvent {
     CreateTableMeta,
     CreateTableFileList,
     CreateTableFileListIndex,
+    Shutdown,
 }
 
 pub enum DbEventMeta {

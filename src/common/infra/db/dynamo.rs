@@ -428,6 +428,10 @@ impl super::Db for DynamoDb {
     async fn watch(&self, _prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
         Err(Error::NotImplemented)
     }
+
+    async fn close(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 async fn scan_prefix(

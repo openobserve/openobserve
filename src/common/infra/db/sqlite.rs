@@ -20,7 +20,11 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
     ConnectOptions, Pool, Sqlite,
 };
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{
+    str::FromStr,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
+};
 use tokio::{
     sync::{mpsc, RwLock},
     time,
@@ -36,6 +40,9 @@ use crate::common::infra::{
 
 /// Database update retry times
 const DB_RETRY_TIMES: usize = 5;
+
+/// Database shutdown flag
+static DB_SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
 pub static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
 pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
@@ -123,9 +130,6 @@ impl SqliteDbChannel {
         let client = CLIENT.clone();
         tokio::task::spawn(async move {
             loop {
-                if cluster::is_offline() {
-                    break;
-                }
                 let event = match rx.recv().await {
                     Some(v) => v,
                     None => {
@@ -302,6 +306,9 @@ impl SqliteDbChannel {
                             log::error!("[SQLITE] create table file_list index error: {}", e);
                         }
                     }
+                    DbEvent::Shutdown => {
+                        DB_SHUTDOWN.store(true, std::sync::atomic::Ordering::Relaxed);
+                    }
                 }
             }
             log::info!("[SQLITE] db event loop exit");
@@ -477,6 +484,20 @@ impl super::Db for SqliteDb {
             .await
             .insert(prefix.to_string(), Arc::new(tx));
         Ok(Arc::new(rx))
+    }
+
+    async fn close(&self) -> Result<()> {
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::Shutdown)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        loop {
+            if DB_SHUTDOWN.load(std::sync::atomic::Ordering::Relaxed) {
+                break;
+            }
+            time::sleep(time::Duration::from_secs(1)).await;
+        }
+        Ok(())
     }
 }
 

@@ -52,6 +52,21 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
         time::sleep(time::Duration::from_secs(1)).await;
     }
 
+    // waiting for file list remote inited
+    loop {
+        match infra_file_list::inited().await {
+            Ok(ret) => {
+                if ret {
+                    break;
+                }
+            }
+            Err(e) => {
+                log::error!("file list remote inited failed: {}", e);
+            }
+        };
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    }
+
     // update offset
     db::compact::stats::set_offset(latest_pk, Some(&LOCAL_NODE_UUID.clone())).await?;
 

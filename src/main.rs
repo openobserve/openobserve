@@ -240,7 +240,13 @@ async fn main() -> Result<(), anyhow::Error> {
     // flush WAL cache to disk
     infra::wal::flush_all_to_disk().await;
     // flush compact offset cache to disk disk
-    let _ = db::compact::files::sync_cache_to_db().await;
+    if let Err(e) = db::compact::files::sync_cache_to_db().await {
+        log::error!("sync compact offset cache to db failed, error: {}", e);
+    }
+    // flush db
+    if let Err(e) = infra::db::DEFAULT.close().await {
+        log::error!("waiting for db close failed, error: {}", e);
+    }
 
     log::info!("server stopped");
 

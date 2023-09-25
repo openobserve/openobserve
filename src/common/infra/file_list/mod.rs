@@ -50,6 +50,7 @@ pub fn connect() -> Box<dyn FileList> {
 pub trait FileList: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
+    async fn inited(&self) -> Result<bool>;
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()>;
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
@@ -99,6 +100,10 @@ pub async fn create_table() -> Result<()> {
 
 pub async fn create_table_index() -> Result<()> {
     CLIENT.create_table_index().await
+}
+
+pub async fn inited() -> Result<bool> {
+    CLIENT.inited().await
 }
 
 #[inline]

@@ -245,6 +245,10 @@ INSERT INTO meta (module, key1, key2, value)
     async fn watch(&self, _prefix: &str) -> Result<Arc<mpsc::Receiver<super::Event>>> {
         Err(Error::NotImplemented)
     }
+
+    async fn close(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub async fn create_table() -> Result<()> {

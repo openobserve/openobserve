@@ -53,6 +53,10 @@ impl super::FileList for PostgresFileList {
         create_table_index().await
     }
 
+    async fn inited(&self) -> Result<bool> {
+        Ok(true)
+    }
+
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;

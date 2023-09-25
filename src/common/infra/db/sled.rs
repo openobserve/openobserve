@@ -202,6 +202,10 @@ impl super::Db for SledDb {
 
         Ok(Arc::new(rx))
     }
+
+    async fn close(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub fn connect_sled() -> Option<::sled::Db> {

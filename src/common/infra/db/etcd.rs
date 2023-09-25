@@ -296,6 +296,10 @@ impl super::Db for Etcd {
         });
         Ok(Arc::new(rx))
     }
+
+    async fn close(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub async fn create_table() -> Result<()> {

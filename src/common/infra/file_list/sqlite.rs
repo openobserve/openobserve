@@ -16,6 +16,7 @@ use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
 use sqlx::{Pool, QueryBuilder, Row, Sqlite};
+use std::sync::atomic::AtomicBool;
 
 use crate::common::{
     infra::{
@@ -32,6 +33,9 @@ use crate::common::{
         StreamType,
     },
 };
+
+/// Table file_list inited flag
+static FILE_LIST_INITED: AtomicBool = AtomicBool::new(false);
 
 pub struct SqliteFileList {}
 
@@ -56,6 +60,7 @@ impl super::FileList for SqliteFileList {
             .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
+
     async fn create_table_index(&self) -> Result<()> {
         let tx = CHANNEL.db_tx.clone();
         tx.send(DbEvent::CreateTableFileListIndex)
@@ -63,6 +68,11 @@ impl super::FileList for SqliteFileList {
             .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
+
+    async fn inited(&self) -> Result<bool> {
+        Ok(FILE_LIST_INITED.load(std::sync::atomic::Ordering::Relaxed))
+    }
+
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let tx = CHANNEL.db_tx.clone();
         tx.send(DbEvent::FileList(DbEventFileList::Add(vec![FileKey::new(
@@ -476,6 +486,9 @@ WHERE stream = $7;
     if let Err(e) = tx.commit().await {
         log::error!("[SQLITE] commit stream stats error: {}", e);
     }
+
+    // set file list inited flag
+    FILE_LIST_INITED.store(true, std::sync::atomic::Ordering::Relaxed);
 
     Ok(())
 }
