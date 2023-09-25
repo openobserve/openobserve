@@ -264,7 +264,7 @@ export default defineComponent({
     // };
     const loadDashboard = async () => {
 
-      let data = await getDashboard(
+      let data = JSON.parse(JSON.stringify(await getDashboard(
         store,
         route.query.dashboard,
         route.query.folder ?? "default"
