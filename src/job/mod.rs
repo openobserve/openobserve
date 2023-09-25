@@ -142,6 +142,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .expect("file list remote calculate stats failed");
     }
     infra_file_list::create_table_index().await?;
+    infra_file_list::set_inited().await?;
     db::file_list::remote::cache_stats()
         .await
         .expect("Load stream stats failed");
