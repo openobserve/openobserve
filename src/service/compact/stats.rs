@@ -22,6 +22,21 @@ use crate::common::infra::{
 use crate::service::db;
 
 pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
+    // waiting for file list remote inited
+    loop {
+        match infra_file_list::inited().await {
+            Ok(ret) => {
+                if ret {
+                    break;
+                }
+            }
+            Err(e) => {
+                log::error!("file list remote inited failed: {}", e);
+            }
+        };
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    }
+
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
@@ -50,21 +65,6 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
             infra_file_list::set_stream_stats(&org_id, &stream_stats).await?;
         }
         time::sleep(time::Duration::from_secs(1)).await;
-    }
-
-    // waiting for file list remote inited
-    loop {
-        match infra_file_list::inited().await {
-            Ok(ret) => {
-                if ret {
-                    break;
-                }
-            }
-            Err(e) => {
-                log::error!("file list remote inited failed: {}", e);
-            }
-        };
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 
     // update offset
