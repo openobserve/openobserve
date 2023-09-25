@@ -487,9 +487,6 @@ WHERE stream = $7;
         log::error!("[SQLITE] commit stream stats error: {}", e);
     }
 
-    // set file list inited flag
-    FILE_LIST_INITED.store(true, std::sync::atomic::Ordering::Relaxed);
-
     Ok(())
 }
 
@@ -584,6 +581,9 @@ CREATE TRIGGER IF NOT EXISTS update_stream_stats_delete AFTER DELETE ON file_lis
     )
     .execute(client)
     .await?;
+
+    // set file list inited flag
+    FILE_LIST_INITED.store(true, std::sync::atomic::Ordering::Relaxed);
 
     Ok(())
 }
