@@ -31,19 +31,15 @@ pub async fn save_folder(org_id: &str, mut folder: Folder) -> Result<HttpRespons
         folder.folder_id = crate::common::infra::ider::generate();
     }
 
-    if let Err(error) = db::dashboards::folders::put(org_id, folder).await {
-        return Ok(
+    match db::dashboards::folders::put(org_id, folder).await {
+        Ok(folder) => Ok(HttpResponse::Ok().json(folder)),
+        Err(error) => Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 error.to_string(),
             )),
-        );
+        ),
     }
-
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK.into(),
-        "folder created".to_string(),
-    )))
 }
 
 #[tracing::instrument(skip(folder))]
