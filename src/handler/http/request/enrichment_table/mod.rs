@@ -16,6 +16,7 @@ use actix_multipart::Multipart;
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
+use crate::common::infra::config::{CONFIG, SIZE_IN_MB};
 use crate::{common::meta, service::enrichment_table::save_enrichment_data};
 
 /** CreateEnrichmentTable */
@@ -44,6 +45,23 @@ pub async fn save_enrichment_table(
 ) -> Result<HttpResponse, Error> {
     let (org_id, table_name) = path.into_inner();
     let content_type = req.headers().get("content-type");
+    let content_length = match req.headers().get("content-length") {
+        None => 0.0,
+        Some(content_length) => {
+            content_length
+                .to_str()
+                .unwrap_or("0")
+                .parse::<f64>()
+                .unwrap_or(0.0)
+                / SIZE_IN_MB
+        }
+    };
+    if content_length > CONFIG.limit.enrichment_table_limit as f64 {
+        return Ok(bad_request(&format!(
+            "exceeds allowed limit of {} mb",
+            CONFIG.limit.enrichment_table_limit
+        )));
+    }
     match content_type {
         Some(content_type) => {
             if content_type
@@ -53,16 +71,20 @@ pub async fn save_enrichment_table(
             {
                 save_enrichment_data(&org_id, &table_name, payload, **thread_id).await
             } else {
-                Ok(bad_request())
+                Ok(bad_request(
+                    "Bad Request, content-type must be multipart/form-data",
+                ))
             }
         }
-        None => Ok(bad_request()),
+        None => Ok(bad_request(
+            "Bad Request, content-type must be multipart/form-data",
+        )),
     }
 }
 
-fn bad_request() -> HttpResponse {
+fn bad_request(message: &str) -> HttpResponse {
     HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
         http::StatusCode::BAD_REQUEST.into(),
-        "Bad Request".to_string(),
+        message.to_string(),
     ))
 }

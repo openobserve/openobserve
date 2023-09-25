@@ -332,6 +332,8 @@ pub struct Limit {
     pub http_worker_max_blocking: usize,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // in seconds
     pub calculate_stats_interval: u64,
+    #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] //size in mb
+    pub enrichment_table_limit: usize,
 }
 
 #[derive(EnvConfig)]
