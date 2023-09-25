@@ -45,6 +45,10 @@ impl Default for SledDb {
 
 #[async_trait]
 impl super::Db for SledDb {
+    async fn create_table(&self) -> Result<()> {
+        Ok(())
+    }
+
     async fn stats(&self) -> Result<super::Stats> {
         let client = SLED_CLIENT.clone().unwrap();
         let bytes_len = client.size_on_disk()?;

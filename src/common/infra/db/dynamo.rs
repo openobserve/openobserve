@@ -80,6 +80,10 @@ impl DynamoDb {
 
 #[async_trait]
 impl super::Db for DynamoDb {
+    async fn create_table(&self) -> Result<()> {
+        create_table().await
+    }
+
     async fn stats(&self) -> Result<Stats> {
         Ok(Stats::default())
     }

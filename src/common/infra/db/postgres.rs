@@ -54,6 +54,10 @@ impl Default for PostgresDb {
 
 #[async_trait]
 impl super::Db for PostgresDb {
+    async fn create_table(&self) -> Result<()> {
+        create_table().await
+    }
+
     async fn stats(&self) -> Result<super::Stats> {
         let pool = CLIENT.clone();
         let keys_count: i64 = sqlx::query_scalar(r#"SELECT COUNT(*)::BIGINT as num FROM meta;"#)

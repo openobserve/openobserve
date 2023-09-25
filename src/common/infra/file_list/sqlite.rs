@@ -16,13 +16,14 @@ use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
 use sqlx::{Pool, QueryBuilder, Row, Sqlite};
-use std::sync::Arc;
-use tokio::{sync::mpsc, time};
 
 use crate::common::{
     infra::{
         config::CONFIG,
-        db::sqlite::CLIENT,
+        db::{
+            sqlite::{CHANNEL, CLIENT},
+            DbEvent, DbEventFileList, DbEventStreamStats,
+        },
         errors::{Error, Result},
     },
     meta::{
@@ -32,91 +33,11 @@ use crate::common::{
     },
 };
 
-pub struct SqliteFileList {
-    tx: Arc<mpsc::Sender<Event>>,
-}
-
-enum Event {
-    FileList(EventFileList),
-    StreamStats(EventStreamStats),
-    CreateTable,
-    CreateTableIndex,
-}
-
-enum EventFileList {
-    Add(Vec<FileKey>),
-    Remove(Vec<String>),
-}
-
-enum EventStreamStats {
-    Set(String, Vec<(String, StreamStats)>),
-    ResetMinTS(String, i64),
-}
+pub struct SqliteFileList {}
 
 impl SqliteFileList {
     pub fn new() -> Self {
-        let (tx, mut rx) = mpsc::channel::<Event>(10000);
-        let client = CLIENT.clone();
-        tokio::task::spawn(async move {
-            while let Some(event) = rx.recv().await {
-                match event {
-                    Event::FileList(EventFileList::Add(files)) => {
-                        if let Err(e) = batch_add(&client, &files).await {
-                            log::error!("[SQLITE] batch add file list error: {}", e);
-                        }
-                    }
-                    Event::FileList(EventFileList::Remove(files)) => {
-                        if let Err(e) = batch_remove(&client, &files).await {
-                            log::error!("[SQLITE] batch remove file list error: {}", e);
-                        }
-                    }
-                    Event::StreamStats(EventStreamStats::Set(org_id, streams)) => {
-                        if let Err(e) = set_stream_stats(&client, &org_id, &streams).await {
-                            log::error!("[SQLITE] set stream stats error: {}", e);
-                        }
-                    }
-                    Event::StreamStats(EventStreamStats::ResetMinTS(stream, min_ts)) => {
-                        if let Err(e) = reset_stream_stats_min_ts(&client, &stream, min_ts).await {
-                            log::error!("[SQLITE] reset stream stats min_ts error: {}", e);
-                        }
-                    }
-                    Event::CreateTable => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..5 {
-                            match create_table_inner(&client).await {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => err = Some(e.to_string()),
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] create table error: {}", e);
-                        }
-                    }
-                    Event::CreateTableIndex => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..5 {
-                            match create_table_index_inner(&client).await {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => err = Some(e.to_string()),
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] create table index error: {}", e);
-                        }
-                    }
-                }
-            }
-            log::info!("[SQLITE] file list event loop exit");
-        });
-        Self { tx: Arc::new(tx) }
+        Self {}
     }
 }
 
@@ -129,22 +50,22 @@ impl Default for SqliteFileList {
 #[async_trait]
 impl super::FileList for SqliteFileList {
     async fn create_table(&self) -> Result<()> {
-        let tx = self.tx.clone();
-        tx.send(Event::CreateTable)
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::CreateTableFileList)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
     async fn create_table_index(&self) -> Result<()> {
-        let tx = self.tx.clone();
-        tx.send(Event::CreateTableIndex)
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::CreateTableFileListIndex)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
-        let tx = self.tx.clone();
-        tx.send(Event::FileList(EventFileList::Add(vec![FileKey::new(
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileList(DbEventFileList::Add(vec![FileKey::new(
             file,
             meta.to_owned(),
             false,
@@ -155,8 +76,8 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        let tx = self.tx.clone();
-        tx.send(Event::FileList(EventFileList::Remove(vec![
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileList(DbEventFileList::Remove(vec![
             file.to_string()
         ])))
         .await
@@ -165,16 +86,16 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
-        let tx = self.tx.clone();
-        tx.send(Event::FileList(EventFileList::Add(files.to_vec())))
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileList(DbEventFileList::Add(files.to_vec())))
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
-        let tx = self.tx.clone();
-        tx.send(Event::FileList(EventFileList::Remove(files.to_vec())))
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileList(DbEventFileList::Remove(files.to_vec())))
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
@@ -355,8 +276,8 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         org_id: &str,
         streams: &[(String, StreamStats)],
     ) -> Result<()> {
-        let tx = self.tx.clone();
-        tx.send(Event::StreamStats(EventStreamStats::Set(
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::StreamStats(DbEventStreamStats::Set(
             org_id.to_string(),
             streams.to_vec(),
         )))
@@ -371,8 +292,8 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         stream: &str,
         min_ts: i64,
     ) -> Result<()> {
-        let tx = self.tx.clone();
-        tx.send(Event::StreamStats(EventStreamStats::ResetMinTS(
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::StreamStats(DbEventStreamStats::ResetMinTS(
             stream.to_string(),
             min_ts,
         )))
@@ -416,7 +337,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
     }
 }
 
-async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
+pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
     let chunks = files.chunks(100);
     for files in chunks {
         let mut tx = client.begin().await?;
@@ -457,7 +378,7 @@ async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
     Ok(())
 }
 
-async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
+pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
     let chunks = files.chunks(100);
     for files in chunks {
         let mut tx = client.begin().await?;
@@ -486,7 +407,7 @@ async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
     Ok(())
 }
 
-async fn set_stream_stats(
+pub async fn set_stream_stats(
     client: &Pool<Sqlite>,
     org_id: &str,
     streams: &[(String, StreamStats)],
@@ -559,7 +480,11 @@ WHERE stream = $7;
     Ok(())
 }
 
-async fn reset_stream_stats_min_ts(client: &Pool<Sqlite>, stream: &str, min_ts: i64) -> Result<()> {
+pub async fn reset_stream_stats_min_ts(
+    client: &Pool<Sqlite>,
+    stream: &str,
+    min_ts: i64,
+) -> Result<()> {
     sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
         .bind(min_ts)
         .bind(stream)
@@ -568,7 +493,7 @@ async fn reset_stream_stats_min_ts(client: &Pool<Sqlite>, stream: &str, min_ts: 
     Ok(())
 }
 
-async fn create_table_inner(client: &Pool<Sqlite>) -> Result<()> {
+pub async fn create_table(client: &Pool<Sqlite>) -> Result<()> {
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list
@@ -612,7 +537,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     Ok(())
 }
 
-async fn create_table_index_inner(client: &Pool<Sqlite>) -> Result<()> {
+pub async fn create_table_index(client: &Pool<Sqlite>) -> Result<()> {
     // create index for file_list
     sqlx::query(
         r#"
