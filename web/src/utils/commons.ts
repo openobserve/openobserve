@@ -103,7 +103,7 @@ export function getConsumableDateTime(dateObj: any) {
   }
 }
 
-export const getAllDashboards = async (store: any) => {
+export const getAllDashboards = async (store: any, folderId?: any) => {
   // api call
   return await dashboardService
     .list(
@@ -112,7 +112,8 @@ export const getAllDashboards = async (store: any) => {
       "name",
       false,
       "",
-      store.state.selectedOrganization.identifier
+      store.state.selectedOrganization.identifier,
+      folderId ?? "default"
     )
     .then((res) => {
       //dashboard version migration
@@ -398,3 +399,14 @@ export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
 export const getPanelId = () => {
   return "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 };
+
+
+export const getFoldersList = async (store: any) => {
+  let folders = (await dashboardService.list_Folders(store.state.selectedOrganization.identifier)).data.list;
+
+  // get default folder and append it to top
+  const defaultFolder = folders.find((it: any) => it.name == "default");
+  folders = folders.filter((it: any) => it.name != "default");
+  
+  return [defaultFolder, ...folders];
+}

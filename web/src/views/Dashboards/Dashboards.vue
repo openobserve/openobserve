@@ -17,6 +17,64 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" :key="store.state.selectedOrganization.identifier">
+     <!-- searchBar at top -->
+     <div style="display: flex; flex-direction: row; justify-content: space-between; padding: 1%; border-bottom: 2px solid rgb(230, 230, 230);">
+        <div class="q-table__title">{{ t("dashboard.header") }}</div>
+        <q-input
+          v-model="filterQuery"
+          filled
+          dense
+          class="q-ml-auto q-mb-xs"
+          :placeholder="t('dashboard.search')"
+        >
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+        <q-btn
+          class="q-ml-md q-mb-xs text-bold"
+          padding="sm lg"
+          outline
+          no-caps
+          :label="t(`dashboard.import`)"
+          @click="importDashboard"
+        />
+        <!-- add dashboard button -->
+        <q-btn
+          class="q-ml-md q-mb-xs text-bold no-border"
+          padding="sm lg"
+          color="secondary"
+          no-caps
+          data-test="dashboard-add"
+          :label="t(`dashboard.add`)"
+          @click="addDashboard"
+        />
+      </div>
+    <q-splitter
+      v-model="splitterModel"
+      unit="px"
+      style="height: 80vh"
+    >
+      <template v-slot:before>
+        <div class="dashboards-tabs">
+          <q-tabs
+            v-model="activeFolder"
+            @update:model-value="getDashboards"
+            indicator-color="transparent"
+            inline-label
+            vertical
+          >
+            <q-tab
+            v-for="(tab, index) in folders"
+              :key="index"
+              :label="tab.name"
+              :name="index"
+              content-class="tab_content"
+            />
+          </q-tabs>
+        </div>
+      </template>
+    <template v-slot:after>
     <!-- add dashboard table -->
     <q-table
       ref="qTable"
@@ -66,37 +124,6 @@
       </template>
       <!-- searchBar at top -->
       <template #top="scope">
-        <div class="q-table__title">{{ t("dashboard.header") }}</div>
-        <q-input
-          v-model="filterQuery"
-          filled
-          dense
-          class="q-ml-auto q-mb-xs"
-          :placeholder="t('dashboard.search')"
-        >
-          <template #prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
-        <q-btn
-          class="q-ml-md q-mb-xs text-bold"
-          padding="sm lg"
-          outline
-          no-caps
-          :label="t(`dashboard.import`)"
-          @click="importDashboard"
-        />
-        <!-- add dashboard button -->
-        <q-btn
-          class="q-ml-md q-mb-xs text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          data-test="dashboard-add"
-          :label="t(`dashboard.add`)"
-          @click="addDashboard"
-        />
-
         <!-- table pagination -->
         <QTablePagination
           :scope="scope"
@@ -136,6 +163,8 @@
       @update:cancel="confirmDeleteDialog = false"
       v-model="confirmDeleteDialog"
     />
+    </template>
+    </q-splitter>
   </q-page>
 </template>
 
@@ -154,7 +183,7 @@ import { useRouter } from "vue-router";
 import { isProxy, toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
-import { getDashboard } from "../../utils/commons.ts";
+import { getAllDashboards, getDashboard, getFoldersList } from "../../utils/commons.ts";
 import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
@@ -177,6 +206,9 @@ export default defineComponent({
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete = ref(null);
+    const splitterModel = ref(200);
+    const activeFolder = ref(0);
+    const folders = ref([]);
 
     const columns = ref<QTableProps["columns"]>([
       {
@@ -242,7 +274,8 @@ export default defineComponent({
       rowsPerPage: 20,
     });
 
-    onMounted(() => {
+    onMounted(async() => {      
+      folders.value = await getFoldersList(store);
       getDashboards();
     });
 
@@ -318,25 +351,9 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading dashboards...",
       });
-      await dashboardService
-        .list(
-          0,
-          1000,
-          "name",
-          false,
-          "",
-          store.state.selectedOrganization.identifier
-        )
-        .then((res) => {
-          resultTotal.value = res.data.dashboards.length;
-          //dashboard version migration
-          res.data.dashboards = res.data.dashboards.map((dashboard: any) => convertDashboardSchemaVersion(dashboard["v"+dashboard.version]));
-          store.dispatch("setAllDashboardList", res.data.dashboards.sort((a,b) => b.created.localeCompare(a.created)));
-          dismiss();
-        })
-        .catch((error) => {
-          console.error(error);
-        });
+      await getAllDashboards(store,folders.value[activeFolder.value]?.folderId || "default");
+      resultTotal.value = store.state.organizationData.allDashboardList.length;
+      dismiss();
     };
     const dashboards = computed(function () {
       const dashboardList = toRaw(store.state.organizationData.allDashboardList);
@@ -422,6 +439,9 @@ export default defineComponent({
       getDashboards,
       getImageURL,
       verifyOrganizationStatus,
+      splitterModel,
+      folders,
+      activeFolder
     };
   },
   methods: {
@@ -452,6 +472,33 @@ export default defineComponent({
   &__top {
     border-bottom: 1px solid $border-color;
     justify-content: flex-end;
+  }
+}
+
+.dashboards-tabs {
+  .q-tabs {
+    &--vertical {
+      margin: 20px 16px 0 16px;
+      .q-tab {
+        justify-content: flex-start;
+        padding: 0 1rem 0 1.25rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+        text-transform: capitalize;
+        &__content.tab_content {
+          .q-tab {
+            &__icon + &__label {
+              padding-left: 0.875rem;
+              font-weight: 600;
+            }
+          }
+        }
+        &--active {
+          background-color: $accent;
+          color: black;
+        }
+      }
+    }
   }
 }
 </style>

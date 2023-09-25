@@ -21,10 +21,11 @@ const dashboards = {
     sort_by: string,
     desc: boolean,
     name: string,
-    organization: string
+    organization: string,
+    folder: string
   ) => {
     return http().get(
-      `/api/${organization}/dashboards?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+      `/api/${organization}/dashboards?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}&folder=${folder}`
     );
   },
   create: (organization: string, data: any) => {
@@ -38,6 +39,15 @@ const dashboards = {
   },
   save: (organization: string, dashboardID: string, data: any) => {
     return http().put(`/api/${organization}/dashboards/${dashboardID}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+  },
+  list_Folders: (organization: string) => {
+    return http().get(`/api/${organization}/folders`);
+  },
+  new_Folder: (organization: string, data: any) => {
+    return http().post(`/api/${organization}/folders`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+  },
+  move_Dashboard: (organization: string, data: any) => {
+    return http().put(`/api/${organization}/folders/dashboards`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
   }
 
 };
