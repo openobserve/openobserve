@@ -21,7 +21,7 @@
 import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
-// import * as map from "./../../../locales/languages/map.json"
+import * as mapData  from "./../../../locales/languages/map.json"
 import L from 'leaflet';
 import '@/utils/dashboard/leaflet-echarts/index';
 
@@ -41,7 +41,7 @@ export default defineComponent({
         const chartRef: any = ref(null);
         let chart: any;
 
-        const lmapOptions = props.data.options?.lmap || {};
+        const lmapOptions = {...props.data.options?.lmap, map: 'USA'} || {};
 
         const store = useStore();
         const windowResizeEventCallback = async () => {
@@ -69,12 +69,13 @@ export default defineComponent({
 
             console.log("options ", props.data.options);
 
+            echarts.registerMap('USA', mapData);
             chart.setOption(options || {}, true);
             window.addEventListener("resize", windowResizeEventCallback);
 
             console.log("props.data.options", props?.data?.options);
             console.log("chart model", chart.getModel());
-
+            
 
             // Get Leaflet extension component
             // getModel and getComponent do not seem to be exported in echarts typescript
