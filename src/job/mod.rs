@@ -71,6 +71,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::user::watch().await });
     db::user::cache().await.expect("user cache failed");
 
+    db::organization::cache()
+        .await
+        .expect("organization cache sync failed");
+
     //set instance id
     let instance_id = match db::get_instance().await {
         Ok(Some(instance)) => instance,

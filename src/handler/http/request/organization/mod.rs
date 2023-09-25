@@ -27,6 +27,7 @@ use crate::service::organization::{self, update_passcode};
 use crate::service::organization::{get_passcode, get_rum_token, update_rum_token};
 
 pub mod es;
+pub mod settings;
 
 /** GetOrganizations */
 #[utoipa::path(
