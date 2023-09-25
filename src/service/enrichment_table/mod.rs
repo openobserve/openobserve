@@ -18,6 +18,7 @@ use actix_web::{
     HttpResponse,
 };
 use ahash::AHashMap;
+use bytes::Bytes;
 use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
@@ -99,49 +100,52 @@ pub async fn save_enrichment_data(
     while let Ok(Some(mut field)) = payload.try_next().await {
         let content_disposition = field.content_disposition();
         let filename = content_disposition.get_filename();
+        let mut data = bytes::Bytes::new();
 
         if filename.is_some() {
             while let Some(chunk) = field.next().await {
-                let data = chunk.unwrap();
-                let mut rdr = csv::Reader::from_reader(data.as_ref());
-                let headers = rdr.headers()?.clone();
+                let chunked_data = chunk.unwrap();
+                // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
+                data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
+            }
+            let mut rdr = csv::Reader::from_reader(data.as_ref());
+            let headers = rdr.headers()?.clone();
 
-                for result in rdr.records() {
-                    // The iterator yields Result<StringRecord, Error>, so we check the
-                    // error here.
-                    let record = result?;
-                    // Transform the record to a JSON value
-                    let mut json_record = json::Map::new();
+            for result in rdr.records() {
+                // The iterator yields Result<StringRecord, Error>, so we check the
+                // error here.
+                let record = result?;
+                // Transform the record to a JSON value
+                let mut json_record = json::Map::new();
 
-                    for (header, field) in headers.iter().zip(record.iter()) {
-                        json_record.insert(header.into(), json::Value::String(field.into()));
-                    }
-                    json_record.insert(
-                        CONFIG.common.column_timestamp.clone(),
-                        json::Value::Number(timestamp.into()),
-                    );
-                    let value_str = json::to_string(&json_record).unwrap();
-                    chk_schema_by_record(
-                        &mut stream_schema_map,
-                        org_id,
-                        StreamType::EnrichmentTables,
-                        stream_name,
-                        timestamp,
-                        &value_str,
-                    )
-                    .await;
-
-                    if records.is_empty() {
-                        hour_key = super::ingestion::get_wal_time_key(
-                            timestamp,
-                            &vec![],
-                            PartitionTimeLevel::Unset,
-                            &json_record,
-                            None,
-                        );
-                    }
-                    records.push(value_str);
+                for (header, field) in headers.iter().zip(record.iter()) {
+                    json_record.insert(header.into(), json::Value::String(field.into()));
                 }
+                json_record.insert(
+                    CONFIG.common.column_timestamp.clone(),
+                    json::Value::Number(timestamp.into()),
+                );
+                let value_str = json::to_string(&json_record).unwrap();
+                chk_schema_by_record(
+                    &mut stream_schema_map,
+                    org_id,
+                    StreamType::EnrichmentTables,
+                    stream_name,
+                    timestamp,
+                    &value_str,
+                )
+                .await;
+
+                if records.is_empty() {
+                    hour_key = super::ingestion::get_wal_time_key(
+                        timestamp,
+                        &vec![],
+                        PartitionTimeLevel::Unset,
+                        &json_record,
+                        None,
+                    );
+                }
+                records.push(value_str);
             }
         }
     }
