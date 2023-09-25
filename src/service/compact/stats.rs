@@ -24,15 +24,8 @@ use crate::service::db;
 pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     // waiting for file list remote inited
     loop {
-        match infra_file_list::get_inited().await {
-            Ok(ret) => {
-                if ret {
-                    break;
-                }
-            }
-            Err(e) => {
-                log::error!("file list remote inited failed: {}", e);
-            }
+        if infra_file_list::get_inited().await.unwrap_or_default() {
+            break;
         };
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
