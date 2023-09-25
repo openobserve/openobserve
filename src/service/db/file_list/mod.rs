@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use once_cell::sync::Lazy;
 
 use crate::common::infra::{
     cache, cluster,
-    config::{RwHashMap, CONFIG},
+    config::{RwHashMap, RwHashSet, CONFIG},
     file_list,
 };
 use crate::common::meta::common::FileMeta;
@@ -25,6 +25,9 @@ use crate::common::meta::common::FileMeta;
 pub mod broadcast;
 pub mod local;
 pub mod remote;
+
+pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
+    Lazy::new(|| DashSet::with_capacity_and_hasher(1024, Default::default()));
 
 pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
     Lazy::new(|| DashMap::with_capacity_and_hasher(64, Default::default()));

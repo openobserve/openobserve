@@ -128,6 +128,10 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     rw.insert(prefix.clone());
     log::info!("Load file_list [{prefix}] done deleting done");
 
+    // clean depulicate files
+    super::DEPULICATE_FILES.clear();
+    super::DEPULICATE_FILES.shrink_to_fit();
+
     // clean deleted files
     super::DELETED_FILES.clear();
     super::DELETED_FILES.shrink_to_fit();
@@ -187,6 +191,8 @@ async fn process_file(file: &str) -> Result<Vec<FileKey>, anyhow::Error> {
         if item.deleted {
             super::DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;
+        } else {
+            super::DEPULICATE_FILES.insert(item.key.to_string());
         }
         records.push(item);
     }
