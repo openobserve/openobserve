@@ -193,10 +193,10 @@ async fn process_file(file: &str) -> Result<Vec<FileKey>, anyhow::Error> {
             super::DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;
         }
-        if super::DEPULICATE_FILES.contains(&item.key) {
-            continue;
-        }
-        super::DEPULICATE_FILES.insert(item.key.to_string());
+        // if super::DEPULICATE_FILES.contains(&item.key) {
+        //     continue;
+        // }
+        // super::DEPULICATE_FILES.insert(item.key.to_string());
         records.push(item);
     }
 
