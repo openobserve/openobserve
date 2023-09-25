@@ -210,6 +210,9 @@ impl SqliteDbChannel {
                             log::error!("[SQLITE] batch remove file_list error: {}", e);
                         }
                     }
+                    DbEvent::FileList(DbEventFileList::Initialized) => {
+                        sqlite_file_list::set_inited();
+                    }
                     DbEvent::StreamStats(DbEventStreamStats::Set(org_id, streams)) => {
                         let mut err: Option<String> = None;
                         for _ in 0..DB_RETRY_TIMES {

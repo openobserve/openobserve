@@ -187,6 +187,7 @@ pub enum DbEventMeta {
 pub enum DbEventFileList {
     Add(Vec<FileKey>),
     Remove(Vec<String>),
+    Initialized,
 }
 
 pub enum DbEventStreamStats {
