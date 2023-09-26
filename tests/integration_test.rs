@@ -888,20 +888,20 @@ mod tests {
     async fn e2e_post_metrics() {
         let auth = setup();
 
-        let mut loc_lable: Vec<prometheus_prot::Label> = vec![];
-        loc_lable.push(prometheus_prot::Label {
-            name: "__name__".to_string(),
-            value: "grafana_api_dashboard_save_milliseconds_count".to_string(),
-        });
-
-        loc_lable.push(prometheus_prot::Label {
-            name: "cluster".to_string(),
-            value: "prom-k8s".to_string(),
-        });
-        loc_lable.push(prometheus_prot::Label {
-            name: "__replica__".to_string(),
-            value: "prom-k8s-0".to_string(),
-        });
+        let loc_lable: Vec<prometheus_prot::Label> = vec![
+            prometheus_prot::Label {
+                name: "__name__".to_string(),
+                value: "grafana_api_dashboard_save_milliseconds_count".to_string(),
+            },
+            prometheus_prot::Label {
+                name: "cluster".to_string(),
+                value: "prom-k8s".to_string(),
+            },
+            prometheus_prot::Label {
+                name: "__replica__".to_string(),
+                value: "prom-k8s-0".to_string(),
+            },
+        ];
 
         let mut loc_samples: Vec<prometheus_prot::Sample> = vec![];
 
@@ -921,7 +921,7 @@ mod tests {
         });
 
         loc_samples.push(prometheus_prot::Sample {
-            value: 0.0_f64 / 0.0_f64,
+            value: f64::NAN,
             timestamp: Utc::now().timestamp_micros(),
         });
         let loc_exemp: Vec<prometheus_prot::Exemplar> = vec![];

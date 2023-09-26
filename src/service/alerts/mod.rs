@@ -264,7 +264,7 @@ mod test {
             stream: stream.to_string(),
             stream_type: Some(StreamType::Logs),
             query: Some(Query {
-                sql: format!("select count(*) as occurrence from olympics"),
+                sql: ("select count(*) as occurrence from olympics").to_string(),
                 start_time: 0,
                 end_time: 0,
                 sort_by: None,
