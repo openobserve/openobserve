@@ -46,6 +46,12 @@ const dashboards = {
   new_Folder: (organization: string, data: any) => {
     return http().post(`/api/${organization}/folders`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
   },
+  edit_Folder: (organization: string, folderId : any, data: any) => {
+    return http().put(`/api/${organization}/folders/${folderId}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+  },
+  delete_Folder: (organization: string, folderId : any) => {
+    return http().delete(`/api/${organization}/folders/${folderId}`);
+  },
   move_Dashboard: (organization: string, data: any) => {
     return http().put(`/api/${organization}/folders/dashboards`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
   }

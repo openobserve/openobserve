@@ -111,12 +111,12 @@ export default defineComponent({
     },
   },
   emits: ["update:modelValue", "updated", "finish"],
-  setup() {
+  setup(props) {
     const store: any = useStore();
     // const beingUpdated: any = ref(false);
     const addFolderForm: any = ref(null);
     const disableColor: any = ref("");
-    const folderData: any = ref(defaultValue());
+    const folderData: any = ref(props.modelValue);
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
 
@@ -155,31 +155,75 @@ export default defineComponent({
           return false;
         }
 
-        dashboardService.new_Folder(
-          this.store.state.selectedOrganization.identifier,
-          this.folderData
-        )
-          .then((res: { data: any }) => {
-            const data = res.data;
-            this.folderData = {
-              name: "",
-              description: "",
-            };
+        //if edit mode
+        if(this.folderData.folderId) {
+          dashboardService.edit_Folder(
+            this.store.state.selectedOrganization.identifier,
+            this.folderData.id,
+            this.folderData
+          )
+            .then((res: { data: any }) => {
+              this.folderData = {
+                id: "",
+                name: "",
+                description: "",
+              };
 
-            this.$emit("update:modelValue", data);
-            this.$emit("updated", data.folderId);
-            this.addFolderForm.resetValidation();
-            dismiss();
-          })
-          .catch((err: any) => {
-            this.$q.notify({
-              type: "negative",
-              message: JSON.stringify(
-                err.response.data["error"] || "Folder creation failed."
-              ),
+              dismiss();
+              this.$q.notify({
+                type: "positive",
+                message: res.data.message || "Folder updated",
+                timeout: 2000,
+              });
+
+              this.$emit("update:modelValue", this.folderData);
+              
+              this.addFolderForm.resetValidation();
+            })
+            .catch((err: any) => {
+              this.$q.notify({
+                type: "negative",
+                message: JSON.stringify(
+                  err.response.data["error"] || "Folder creation failed."
+                  ),
+              });
+              dismiss();
             });
-            dismiss();
-          });
+          }
+        //else new folder
+        else{
+          dashboardService.new_Folder(
+            this.store.state.selectedOrganization.identifier,
+            this.folderData
+          )
+            .then((res: { data: any }) => {
+              const data = res.data;
+              this.folderData = {
+                id: "",
+                name: "",
+                description: "",
+              };
+  
+              this.$emit("update:modelValue", data);
+              this.$emit("updated", data.folderId);
+              this.addFolderForm.resetValidation();
+              dismiss();
+
+              this.$q.notify({
+                type: "positive",
+                message: `Folder added successfully.`,
+              });
+            })
+            .catch((err: any) => {
+              this.$q.notify({
+                type: "negative",
+                message: JSON.stringify(
+                  err.response.data["error"] || "Folder creation failed."
+                ),
+              });
+              dismiss();
+            });
+        }
       });
     },
   },

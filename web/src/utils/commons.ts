@@ -408,5 +408,9 @@ export const getFoldersList = async (store: any) => {
   const defaultFolder = folders.find((it: any) => it.name == "default");
   folders = folders.filter((it: any) => it.name != "default");
   
-  return [defaultFolder, ...folders];
+  return [defaultFolder, ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name))];
+}
+
+export const deleteFolderById = async (store: any, folderId: any) => {
+  return await dashboardService.delete_Folder(store.state.selectedOrganization.identifier, folderId);
 }

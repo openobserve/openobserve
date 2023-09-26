@@ -59,18 +59,34 @@
         <div class="dashboards-tabs">
           <q-tabs
             v-model="activeFolder"
-            @update:model-value="getDashboards"
             indicator-color="transparent"
             inline-label
             vertical
           >
-            <q-tab
-            v-for="(tab, index) in folders"
+          <q-tab
+          v-for="(tab, index) in folders"
               :key="index"
               :label="tab.name"
               :name="index"
               content-class="tab_content"
-            />
+            >
+              <div>
+                  <q-icon
+                  v-if="index"
+                  name="edit"
+                  class="q-ml-sm"
+                  @click.stop="editFolder(index)"
+                  style="cursor: pointer; justify-self: end;"
+                />
+                <q-icon
+                v-if="index"
+                name="delete"
+                class="q-ml-sm"
+                  @click.stop="deleteFolder(index)"
+                  style="cursor: pointer; justify-self: end;"
+                />
+              </div>
+            </q-tab>
           </q-tabs>
           <q-btn
           class="q-ml-lg text-bold no-border self-center"
@@ -155,6 +171,8 @@
         />
       </template>
     </q-table>
+
+    <!-- add dashboard -->
     <q-dialog
       v-model="showAddDashboardDialog"
       position="right"
@@ -163,6 +181,8 @@
     >
       <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolder="activeFolder" />
     </q-dialog>
+
+    <!-- add folder -->
     <q-dialog
       v-model="showAddFolderDialog"
       position="right"
@@ -170,6 +190,16 @@
       maximized
     >
       <AddFolder @update:modelValue="updateFolderList" />
+    </q-dialog>
+
+     <!-- edit folder -->
+    <q-dialog
+      v-model="showEditFolderDialog"
+      position="right"
+      full-height
+      maximized
+    >
+      <AddFolder @update:modelValue="updateFolderList" :model-value="JSON.parse(JSON.stringify(folders[activeFolder]))"/>
     </q-dialog>
     <ConfirmDialog
       title="Delete dashboard"
@@ -186,7 +216,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onMounted, ref } from "vue";
+import { computed, defineComponent, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -199,7 +229,7 @@ import { useRouter } from "vue-router";
 import { isProxy, toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
-import { getAllDashboards, getDashboard, getFoldersList } from "../../utils/commons.ts";
+import { deleteFolderById, getAllDashboards, getDashboard, getFoldersList } from "../../utils/commons.ts";
 import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
@@ -228,6 +258,7 @@ export default defineComponent({
     const splitterModel = ref(200);
     const activeFolder = ref(0);
     const folders = ref([]);
+    const showEditFolderDialog = ref(false);
 
     const columns = ref<QTableProps["columns"]>([
       {
@@ -295,7 +326,11 @@ export default defineComponent({
 
     onMounted(async() => {      
       folders.value = await getFoldersList(store);
-      getDashboards();
+      await getDashboards();
+    });
+
+    watch(activeFolder, async()=>{
+      await getDashboards();
     });
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -303,9 +338,9 @@ export default defineComponent({
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
-    const changeMaxRecordToReturn = (val: any) => {
+    const changeMaxRecordToReturn = async(val: any) => {
       maxRecordToReturn.value = val;
-      getDashboards();
+      await getDashboards();
     };
     const addDashboard = () => {
       showAddDashboardDialog.value = true;
@@ -425,21 +460,48 @@ export default defineComponent({
     //after adding Folder need to update the Folder list
     const updateFolderList = async (it: any) => {
       showAddFolderDialog.value = false;
+      showEditFolderDialog.value = false;
 
-      //add new folder to folders array
-      folders.value.push(it);
-      activeFolder.value = folders.value.length - 1;
+      folders.value = await getFoldersList(store);
       await getDashboards();
-
-      $q.notify({
-        type: "positive",
-        message: `Folder added successfully.`,
-      });
 
       $router.push({
         path: "/dashboards",
         query: { org_identifier: store.state.selectedOrganization.identifier },
       });
+    }
+
+    const editFolder = (item : any) => {
+      activeFolder.value = item;
+      showEditFolderDialog.value = true;
+    }
+
+    const deleteFolder = async(item : any) => {
+      try {
+        
+        //delete folder
+        await deleteFolderById(store, folders.value[item].folderId);
+        
+        //check activeFolder to be deleted
+        if(activeFolder.value === item) activeFolder.value = 0;
+
+        //remove folder from list
+        folders.value = folders.value.filter((folder,index) => index != item);
+
+        $q.notify({
+          type: "positive",
+          message: `Folder deleted successfully.`,
+          timeout: 2000,
+        });
+
+      } catch (error) {
+        $q.notify({
+          type: "negative",
+          message: "folder contains dashboards, please move/delete dashboards from folder",
+          timeout: 2000,
+        });
+      }
+
     }
 
     return {
@@ -487,7 +549,10 @@ export default defineComponent({
       activeFolder,
       addFolder,
       showAddFolderDialog,
-      updateFolderList
+      showEditFolderDialog,
+      updateFolderList,
+      editFolder,
+      deleteFolder
     };
   },
   methods: {
