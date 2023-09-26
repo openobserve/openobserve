@@ -153,7 +153,10 @@ export default defineComponent({
         glyphMargin: false,
         folding: false,
         scrollBeyondLastColumn: 0,
-        scrollBeyondLastLine: true,
+        scrollBeyondLastLine: false,
+        smoothScrolling: true,
+        mouseWheelScrollSensitivity: 1,
+        fastScrollSensitivity: 1,
         scrollbar: { horizontal: "auto", vertical: "visible" },
         find: {
           addExtraSpaceOnTop: false,
