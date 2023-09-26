@@ -7,7 +7,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let data = infra_db::DEFAULT.list(&db_key).await?;
     for (key, val) in data {
         let key = key.strip_prefix('/').unwrap_or(&key);
-        let len = key.split("/").collect::<Vec<&str>>().len();
+        let len = key.split('/').collect::<Vec<&str>>().len();
         if len > 3 {
             /* println!(
                 "Skip dashboard migration as it is already part of folder: {}",
