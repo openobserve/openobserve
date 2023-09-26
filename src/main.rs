@@ -447,7 +447,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data
                     infra::file_list::reset_stream_stats().await?;
-                    infra::file_list::set_inited().await?;
+                    infra::file_list::set_initialised().await?;
                     // load stream list
                     db::schema::cache().await?;
                     // update stats from file list

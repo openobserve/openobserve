@@ -69,7 +69,7 @@ impl super::FileList for SqliteFileList {
         Ok(())
     }
 
-    async fn set_inited(&self) -> Result<()> {
+    async fn set_initialised(&self) -> Result<()> {
         let tx = CHANNEL.db_tx.clone();
         tx.send(DbEvent::FileList(DbEventFileList::Initialized))
             .await
@@ -77,7 +77,7 @@ impl super::FileList for SqliteFileList {
         Ok(())
     }
 
-    async fn get_inited(&self) -> Result<bool> {
+    async fn get_initialised(&self) -> Result<bool> {
         Ok(FILE_LIST_INITED.load(std::sync::atomic::Ordering::Relaxed))
     }
 
@@ -623,6 +623,6 @@ CREATE TRIGGER IF NOT EXISTS update_stream_stats_delete AFTER DELETE ON file_lis
 }
 
 /// set file list inited flag
-pub fn set_inited() {
+pub fn set_initialised() {
     FILE_LIST_INITED.store(true, std::sync::atomic::Ordering::Relaxed);
 }

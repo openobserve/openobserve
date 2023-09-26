@@ -211,7 +211,7 @@ impl SqliteDbChannel {
                         }
                     }
                     DbEvent::FileList(DbEventFileList::Initialized) => {
-                        sqlite_file_list::set_inited();
+                        sqlite_file_list::set_initialised();
                     }
                     DbEvent::StreamStats(DbEventStreamStats::Set(org_id, streams)) => {
                         let mut err: Option<String> = None;

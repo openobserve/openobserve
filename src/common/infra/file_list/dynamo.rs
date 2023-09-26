@@ -65,11 +65,11 @@ impl super::FileList for DynamoFileList {
         create_table_index().await
     }
 
-    async fn set_inited(&self) -> Result<()> {
+    async fn set_initialised(&self) -> Result<()> {
         Ok(())
     }
 
-    async fn get_inited(&self) -> Result<bool> {
+    async fn get_initialised(&self) -> Result<bool> {
         Ok(true)
     }
 
