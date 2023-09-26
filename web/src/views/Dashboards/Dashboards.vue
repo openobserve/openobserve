@@ -66,25 +66,28 @@
           <q-tab
           v-for="(tab, index) in folders"
               :key="index"
-              :label="tab.name"
               :name="index"
               content-class="tab_content"
-            >
-              <div>
+              >
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="width: 120px">{{tab.name}}</span>
+                <div>
+
                   <q-icon
                   v-if="index"
                   name="edit"
                   class="q-ml-sm"
                   @click.stop="editFolder(index)"
                   style="cursor: pointer; justify-self: end;"
-                />
+                  />
                 <q-icon
                 v-if="index"
                 name="delete"
                 class="q-ml-sm"
-                  @click.stop="deleteFolder(index)"
-                  style="cursor: pointer; justify-self: end;"
+                @click.stop="deleteFolder(index)"
+                style="cursor: pointer; justify-self: end;"
                 />
+              </div>
               </div>
             </q-tab>
           </q-tabs>
