@@ -169,7 +169,7 @@
       full-height
       maximized
     >
-      <AddFolder @updated="updateFolderList" />
+      <AddFolder @update:modelValue="updateFolderList" />
     </q-dialog>
     <ConfirmDialog
       title="Delete dashboard"
@@ -421,6 +421,24 @@ export default defineComponent({
       confirmDeleteDialog.value = true;
     };
 
+    //after adding Folder need to update the Folder list
+    const updateFolderList = async (it: any) => {
+      showAddFolderDialog.value = false;
+
+      //add new folder to folders array
+      folders.value.push(it);
+
+      $q.notify({
+        type: "positive",
+        message: `Folder added successfully.`,
+      });
+
+      $router.push({
+        path: "/dashboards",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    }
+
     return {
       t,
       qTable,
@@ -465,7 +483,8 @@ export default defineComponent({
       folders,
       activeFolder,
       addFolder,
-      showAddFolderDialog
+      showAddFolderDialog,
+      updateFolderList
     };
   },
   methods: {
@@ -482,21 +501,6 @@ export default defineComponent({
       this.$router.push({
         path: "/dashboards/view",
         query: { org_identifier: store.state.selectedOrganization.identifier, dashboard: it },
-      });
-    },
-    //after adding Folder need to update the Folder list
-    async updateFolderList(it: any) {
-      this.showAddFolderDialog = false;
-      this.folders.value = await getFoldersList(store);
-
-      this.$q.notify({
-        type: "positive",
-        message: `Folder added successfully.`,
-      });
-
-      this.$router.push({
-        path: "/dashboards",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
       });
     },
     onRowClick(evt, row) {
