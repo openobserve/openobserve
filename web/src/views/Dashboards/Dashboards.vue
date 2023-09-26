@@ -341,7 +341,8 @@ export default defineComponent({
 
       await dashboardService.create(
         store.state.selectedOrganization.identifier,
-        data
+        data,
+        folders.value[activeFolder?.value]?.folderId || "default"
       );
 
       await getDashboards();
@@ -427,6 +428,8 @@ export default defineComponent({
 
       //add new folder to folders array
       folders.value.push(it);
+      activeFolder.value = folders.value.length - 1;
+      await getDashboards();
 
       $q.notify({
         type: "positive",
