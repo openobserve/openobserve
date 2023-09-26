@@ -171,7 +171,7 @@ mod tests {
         let expected = 3.0;
         match result {
             Some(got) => assert_eq!(got, expected),
-            None => assert!(false),
+            None => panic!(),
         }
     }
 

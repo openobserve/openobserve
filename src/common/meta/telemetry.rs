@@ -267,6 +267,6 @@ mod test_telemetry {
         let tel = Telemetry::new();
         let props = tel.base_info.clone();
         add_zo_info(props).await;
-        assert!(tel.base_info.len() > 0)
+        assert!(!tel.base_info.is_empty())
     }
 }
