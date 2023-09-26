@@ -41,7 +41,7 @@ export default defineComponent({
         const chartRef: any = ref(null);
         let chart: any;
 
-        const lmapOptions = {...props.data.options?.lmap, map: 'USA'} || {};
+        const lmapOptions = {...props.data.options?.lmap} || {};
 
         const store = useStore();
         const windowResizeEventCallback = async () => {
@@ -69,7 +69,7 @@ export default defineComponent({
 
             console.log("options ", props.data.options);
 
-            echarts.registerMap('USA', mapData);
+            // echarts.registerMap('world', mapData);
             chart.setOption(options || {}, true);
             window.addEventListener("resize", windowResizeEventCallback);
 
@@ -97,7 +97,8 @@ export default defineComponent({
                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }
             ).addTo(lmap);
-
+            
+            // L.geoJson(mapData).addTo(lmap);
         });
         onUnmounted(() => {
             window.removeEventListener("resize", windowResizeEventCallback);
