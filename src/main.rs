@@ -223,6 +223,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { zo_logger::send_logs().await });
 
+    // migrate dashboards
+    migration::dashboards::run().await?;
+
     server
         .workers(CONFIG.limit.http_worker_num)
         .worker_max_blocking_threads(
