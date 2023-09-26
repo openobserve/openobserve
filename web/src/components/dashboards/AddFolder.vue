@@ -97,6 +97,7 @@ import { getImageURL } from "../../utils/zincutils";
 
 const defaultValue = () => {
   return {
+    folderId:"default",
     name: "",
     description: "",
   };
@@ -163,12 +164,12 @@ export default defineComponent({
         if(this.$props.editMode) {
           dashboardService.edit_Folder(
             this.store.state.selectedOrganization.identifier,
-            this.folderData.id,
+            this.folderData.folderId,
             this.folderData
           )
             .then((res: { data: any }) => {
               this.folderData = {
-                id: "",
+                folderId: "",
                 name: "",
                 description: "",
               };
@@ -203,7 +204,7 @@ export default defineComponent({
             .then((res: { data: any }) => {
               const data = res.data;
               this.folderData = {
-                id: "",
+                folderId: "",
                 name: "",
                 description: "",
               };
