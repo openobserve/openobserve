@@ -153,7 +153,6 @@
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <b>Query Editor:</b>
             <query-editor
               id="logsQueryEditor"
               ref="queryEditorRef"
@@ -163,12 +162,25 @@
               :suggestions="autoCompleteSuggestions"
               @update:query="updateQueryValue"
               @run-query="handleRunQuery"
+              :class="searchObj.data.editorValue == '' ? 'empty-query' : ''"
             ></query-editor>
           </template>
           <template #after>
-            <div data-test="logs-vrl-function-editor" v-show="searchObj.meta.toggleFunction" style="height: 100%">
-              <b>VRL Function Editor:</b>
-              <div ref="fnEditorRef" id="fnEditor" style="height: 100%"></div>
+            <div
+              data-test="logs-vrl-function-editor"
+              v-show="searchObj.meta.toggleFunction"
+              style="height: 100%"
+            >
+              <div
+                ref="fnEditorRef"
+                id="fnEditor"
+                style="height: 100%"
+                :class="
+                  searchObj.data.tempFunctionContent == ''
+                    ? 'empty-function'
+                    : ''
+                "
+              ></div>
             </div>
           </template>
         </q-splitter>
@@ -793,7 +805,7 @@ export default defineComponent({
 <style lang="scss">
 #logsQueryEditor,
 #fnEditor {
-  height: calc(100% - 20px) !important;
+  height: 100% !important;
 }
 #fnEditor {
   width: 100%;
@@ -811,7 +823,19 @@ export default defineComponent({
 }
 
 .logs-search-bar-component > .row:nth-child(2) {
-  height: calc(100% - 38px); /* or any other height you want to set */
+  height: 100%; /* or any other height you want to set */
+}
+
+.empty-query .monaco-editor-background {
+  background-image: url("../../assets/images/common/query-editor.png");
+  background-repeat: no-repeat;
+  background-size: 170px;
+}
+
+.empty-function .monaco-editor-background {
+  background-image: url("../../assets/images/common/vrl-function.png");
+  background-repeat: no-repeat;
+  background-size: 170px;
 }
 
 .logs-search-bar-component {
@@ -970,7 +994,7 @@ export default defineComponent({
 }
 
 .query-editor-container {
-  height: calc(100% - 40px) !important;
+  height: calc(100% - 37px) !important;
 }
 
 .logs-auto-refresh-interval {
