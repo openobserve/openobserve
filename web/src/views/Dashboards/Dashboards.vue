@@ -72,6 +72,14 @@
               content-class="tab_content"
             />
           </q-tabs>
+          <q-btn
+          class="q-ml-lg text-bold no-border self-center"
+          padding="sm lg"
+          color="secondary"
+          no-caps
+          label="New Folder"
+          @click="addFolder"
+        />
         </div>
       </template>
     <template v-slot:after>
@@ -155,6 +163,14 @@
     >
       <AddDashboard @updated="updateDashboardList" />
     </q-dialog>
+    <q-dialog
+      v-model="showAddFolderDialog"
+      position="right"
+      full-height
+      maximized
+    >
+      <AddFolder @updated="updateFolderList" />
+    </q-dialog>
     <ConfirmDialog
       title="Delete dashboard"
       data-test="dashboard-confirm-dialog"
@@ -186,6 +202,7 @@ import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import { getAllDashboards, getDashboard, getFoldersList } from "../../utils/commons.ts";
 import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import AddFolder from "../../components/dashboards/AddFolder.vue";
 
 export default defineComponent({
   name: "Dashboards",
@@ -194,6 +211,7 @@ export default defineComponent({
     QTablePagination,
     NoData,
     ConfirmDialog,
+    AddFolder
   },
   setup() {
     const store = useStore();
@@ -201,6 +219,7 @@ export default defineComponent({
     const $q = useQuasar();
     const dashboard = ref({});
     const showAddDashboardDialog = ref(false);
+    const showAddFolderDialog = ref(false);
     const qTable: any = ref(null);
     const router = useRouter();
     const orgData: any = ref(store.state.selectedOrganization);
@@ -290,6 +309,9 @@ export default defineComponent({
     };
     const addDashboard = () => {
       showAddDashboardDialog.value = true;
+    };
+    const addFolder = () => {      
+      showAddFolderDialog.value = true;
     };
     const importDashboard = () => {
       router.push({
@@ -441,7 +463,9 @@ export default defineComponent({
       verifyOrganizationStatus,
       splitterModel,
       folders,
-      activeFolder
+      activeFolder,
+      addFolder,
+      showAddFolderDialog
     };
   },
   methods: {
@@ -458,6 +482,21 @@ export default defineComponent({
       this.$router.push({
         path: "/dashboards/view",
         query: { org_identifier: store.state.selectedOrganization.identifier, dashboard: it },
+      });
+    },
+    //after adding Folder need to update the Folder list
+    async updateFolderList(it: any) {
+      this.showAddFolderDialog = false;
+      this.folders.value = await getFoldersList(store);
+
+      this.$q.notify({
+        type: "positive",
+        message: `Folder added successfully.`,
+      });
+
+      this.$router.push({
+        path: "/dashboards",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
       });
     },
     onRowClick(evt, row) {
