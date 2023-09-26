@@ -169,24 +169,24 @@ mod tests {
         let in_arr = vec![int_val.clone()];
         let arr_val = AnyValue {
             value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue {
-                    0: opentelemetry_proto::tonic::common::v1::ArrayValue { values: in_arr },
-                },
+                opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(
+                    opentelemetry_proto::tonic::common::v1::ArrayValue { values: in_arr },
+                ),
             ),
         };
         let resp = get_val(&Some(arr_val));
-        assert!(resp.as_array().unwrap().len() > 0);
+        assert!(!resp.as_array().unwrap().is_empty());
 
         let kv_val = AnyValue {
             value: Some(
-                opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue {
-                    0: opentelemetry_proto::tonic::common::v1::KeyValueList {
+                opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue(
+                    opentelemetry_proto::tonic::common::v1::KeyValueList {
                         values: vec![opentelemetry_proto::tonic::common::v1::KeyValue {
                             key: in_str.clone(),
                             value: Some(int_val.clone()),
                         }],
                     },
-                },
+                ),
             ),
         };
         let resp = get_val(&Some(kv_val));
@@ -199,6 +199,6 @@ mod tests {
             value: Some(in_byte),
         };
         let resp = get_val(&Some(byte_val));
-        assert!(resp.as_array().unwrap().len() > 0);
+        assert!(!resp.as_array().unwrap().is_empty());
     }
 }
