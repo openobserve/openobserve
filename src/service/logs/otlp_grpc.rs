@@ -252,6 +252,8 @@ pub async fn handle_grpc_request(
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
 
+    log::info!("stream schema is empty: {}", stream_schema.has_fields);
+
     let mut trigger: Option<Trigger> = None;
 
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
@@ -333,6 +335,8 @@ pub async fn handle_grpc_request(
 
                 //flattening
                 rec = flatten::flatten(&rec)?;
+
+                log::info!("handle_grpc_request data is flattened");
                 // get json object
                 let local_val = rec.as_object_mut().unwrap();
 
@@ -350,6 +354,7 @@ pub async fn handle_grpc_request(
                 )
                 .await;
 
+                log::info!("add_valid_record passed");
                 if local_trigger.is_some() {
                     trigger = Some(local_trigger.unwrap());
                 }
@@ -367,6 +372,8 @@ pub async fn handle_grpc_request(
         None,
     )
     .await;
+
+    log::info!("write_file passed");
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
@@ -408,6 +415,8 @@ pub async fn handle_grpc_request(
         0,
     )
     .await;
+
+    log::info!("report_request_usage_stats done");
     let res = ExportLogsServiceResponse {
         partial_success: None,
     };

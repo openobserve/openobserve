@@ -399,6 +399,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         };
         STREAM_SCHEMAS.insert(item_key_str.to_string(), json_val);
     }
+    for data in STREAM_SCHEMAS.clone().iter() {
+        println!("key: {}, value: {:?}", data.key(), data.value());
+    }
     log::info!("Stream schemas Cached");
     Ok(())
 }

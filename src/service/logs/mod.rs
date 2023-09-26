@@ -225,6 +225,11 @@ async fn add_valid_record(
     )
     .await;
 
+    log::info!(
+        "check_for_schema done {:?}",
+        stream_schema_map.get(&stream_meta.stream_name)
+    );
+
     // get hour key
     let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
     let hour_key = get_wal_time_key(

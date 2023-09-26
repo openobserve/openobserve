@@ -554,6 +554,9 @@ async fn handle_new_schema(
                     "Acquired lock for stream {} as schema is empty",
                     stream_name
                 );
+                for data in LOCAL_SCHEMA_LOCKER.iter() {
+                    log::info!("key: {:?} value: {:?}", data.key(), data.value());
+                }
                 let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                     .await
                     .unwrap();
