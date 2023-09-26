@@ -18,10 +18,10 @@
     <q-card-section class="q-px-md q-py-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <!-- <div v-if="beingUpdated" class="text-body1 text-bold">
-            update Folder
-          </div> -->
-          <div class="text-body1 text-bold">
+          <div v-if="editMode" class="text-body1 text-bold">
+            Update Folder
+          </div>
+          <div v-else class="text-body1 text-bold">
             New Folder
           </div>
         </div>
@@ -109,6 +109,10 @@ export default defineComponent({
       type: Object,
       default: () => defaultValue(),
     },
+    editMode: {
+      type: Boolean,
+      default: false
+    }
   },
   emits: ["update:modelValue", "updated", "finish"],
   setup(props) {
@@ -116,7 +120,7 @@ export default defineComponent({
     // const beingUpdated: any = ref(false);
     const addFolderForm: any = ref(null);
     const disableColor: any = ref("");
-    const folderData: any = ref(props.modelValue);
+    const folderData: any = ref(props.editMode ? props.modelValue : defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
 
@@ -156,7 +160,7 @@ export default defineComponent({
         }
 
         //if edit mode
-        if(this.folderData.folderId) {
+        if(this.$props.editMode) {
           dashboardService.edit_Folder(
             this.store.state.selectedOrganization.identifier,
             this.folderData.id,

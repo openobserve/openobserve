@@ -185,25 +185,16 @@
       <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolder="activeFolder" />
     </q-dialog>
 
-    <!-- add folder -->
+    <!-- add/edit folder -->
     <q-dialog
       v-model="showAddFolderDialog"
       position="right"
       full-height
       maximized
     >
-      <AddFolder @update:modelValue="updateFolderList" />
+      <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :model-value="JSON.parse(JSON.stringify(folders[activeFolder]))"/>
     </q-dialog>
 
-     <!-- edit folder -->
-    <q-dialog
-      v-model="showEditFolderDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <AddFolder @update:modelValue="updateFolderList" :model-value="JSON.parse(JSON.stringify(folders[activeFolder]))"/>
-    </q-dialog>
     <ConfirmDialog
       title="Delete dashboard"
       data-test="dashboard-confirm-dialog"
@@ -261,7 +252,7 @@ export default defineComponent({
     const splitterModel = ref(200);
     const activeFolder = ref(0);
     const folders = ref([]);
-    const showEditFolderDialog = ref(false);
+    const isFolderEditMode = ref(false);
 
     const columns = ref<QTableProps["columns"]>([
       {
@@ -349,6 +340,7 @@ export default defineComponent({
       showAddDashboardDialog.value = true;
     };
     const addFolder = () => {      
+      isFolderEditMode.value = false;     
       showAddFolderDialog.value = true;
     };
     const importDashboard = () => {
@@ -462,8 +454,8 @@ export default defineComponent({
 
     //after adding Folder need to update the Folder list
     const updateFolderList = async (it: any) => {
+      isFolderEditMode.value = false;
       showAddFolderDialog.value = false;
-      showEditFolderDialog.value = false;
 
       folders.value = await getFoldersList(store);
       await getDashboards();
@@ -476,7 +468,8 @@ export default defineComponent({
 
     const editFolder = (item : any) => {
       activeFolder.value = item;
-      showEditFolderDialog.value = true;
+      isFolderEditMode.value = true;
+      showAddFolderDialog.value = true;
     }
 
     const deleteFolder = async(item : any) => {
@@ -552,7 +545,7 @@ export default defineComponent({
       activeFolder,
       addFolder,
       showAddFolderDialog,
-      showEditFolderDialog,
+      isFolderEditMode,
       updateFolderList,
       editFolder,
       deleteFolder
