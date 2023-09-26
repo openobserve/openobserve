@@ -26,10 +26,10 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
         return Ok(());
     }
     log::info!("Upgrading from {} to {}", old_ver, new_ver);
-    match (old_ver, new_ver) {
-        (_, "v0.6.0") | (_, "v0.6.1") => upgrade_052_053().await,
-        _ => Ok(()),
+    if new_ver.starts_with("v0.6.") {
+        upgrade_052_053().await?;
     }
+    Ok(())
 }
 
 async fn upgrade_052_053() -> Result<(), anyhow::Error> {

@@ -54,6 +54,10 @@ impl Default for Etcd {
 
 #[async_trait]
 impl super::Db for Etcd {
+    async fn create_table(&self) -> Result<()> {
+        Ok(())
+    }
+
     async fn stats(&self) -> Result<super::Stats> {
         let mut client = ETCD_CLIENT.get().await.clone().unwrap();
         let stats = client.status().await?;
@@ -291,6 +295,10 @@ impl super::Db for Etcd {
             Ok(())
         });
         Ok(Arc::new(rx))
+    }
+
+    async fn close(&self) -> Result<()> {
+        Ok(())
     }
 }
 

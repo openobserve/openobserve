@@ -20,21 +20,38 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
     ConnectOptions, Pool, Sqlite,
 };
-use std::{str::FromStr, sync::Arc};
-use tokio::sync::{mpsc, RwLock};
+use std::{
+    str::FromStr,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
+};
+use tokio::{
+    sync::{mpsc, RwLock},
+    time,
+};
 
 use crate::common::infra::{
     cluster,
     config::{FxIndexMap, CONFIG},
+    db::{DbEvent, DbEventFileList, DbEventMeta, DbEventStreamStats, Event, EventData},
     errors::*,
+    file_list::sqlite as sqlite_file_list,
 };
 
+/// Database update retry times
+const DB_RETRY_TIMES: usize = 5;
+
+/// Database shutdown flag
+static DB_SHUTDOWN: AtomicBool = AtomicBool::new(false);
+
 pub static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
+pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
 
 static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
     Lazy::new(|| RwLock::new(Default::default()));
 
-type EventChannel = Arc<mpsc::Sender<super::Event>>;
+type EventChannel = Arc<mpsc::Sender<Event>>;
+type DbChannel = Arc<mpsc::Sender<DbEvent>>;
 
 fn connect() -> Pool<Sqlite> {
     let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
@@ -43,8 +60,9 @@ fn connect() -> Pool<Sqlite> {
     }
     let db_opts = SqliteConnectOptions::from_str(&url)
         .expect("sqlite connect options create failed")
-        .journal_mode(SqliteJournalMode::Memory)
-        .synchronous(SqliteSynchronous::Off)
+        .journal_mode(SqliteJournalMode::Wal)
+        .synchronous(SqliteSynchronous::Normal)
+        .busy_timeout(Duration::from_secs(10))
         .disable_statement_logging()
         .create_if_missing(true);
 
@@ -54,50 +72,265 @@ fn connect() -> Pool<Sqlite> {
     pool_opts.connect_lazy_with(db_opts)
 }
 
-pub struct SqliteDb {
-    event_tx: EventChannel,
+pub struct SqliteDbChannel {
+    pub watch_tx: EventChannel,
+    pub db_tx: DbChannel,
 }
 
-impl SqliteDb {
+impl SqliteDbChannel {
     pub fn new() -> Self {
-        let (tx, mut rx) = mpsc::channel::<super::Event>(1024);
+        Self {
+            watch_tx: SqliteDbChannel::handle_watch_channel(),
+            db_tx: SqliteDbChannel::handle_db_channel(),
+        }
+    }
+
+    fn handle_watch_channel() -> EventChannel {
+        let (tx, mut rx) = mpsc::channel::<Event>(1024);
         tokio::task::spawn(async move {
             loop {
                 if cluster::is_offline() {
                     break;
                 }
-                match rx.recv().await {
-                    Some(v) => {
-                        for (prefix, tx) in WATCHERS.read().await.iter() {
-                            match v.clone() {
-                                super::Event::Put(e) => {
-                                    if e.key.starts_with(prefix) {
-                                        if let Err(e) = tx.send(super::Event::Put(e)).await {
-                                            log::error!("[SQLITE] send event error: {}", e);
-                                        }
-                                    }
-                                }
-                                super::Event::Delete(e) => {
-                                    if e.key.starts_with(prefix) {
-                                        if let Err(e) = tx.send(super::Event::Delete(e)).await {
-                                            log::error!("[SQLITE] send event error: {}", e);
-                                        }
-                                    }
-                                }
-                                super::Event::Empty => {}
-                            }
-                        }
-                    }
+                let event = match rx.recv().await {
+                    Some(v) => v,
                     None => {
-                        log::info!("[SQLITE] watch channel closed");
+                        log::info!("[SQLITE] watch event channel closed");
                         break;
                     }
                 };
+
+                for (prefix, tx) in WATCHERS.read().await.iter() {
+                    match event.clone() {
+                        Event::Put(e) => {
+                            if e.key.starts_with(prefix) {
+                                if let Err(e) = tx.send(Event::Put(e)).await {
+                                    log::error!("[SQLITE] send event error: {}", e);
+                                }
+                            }
+                        }
+                        Event::Delete(e) => {
+                            if e.key.starts_with(prefix) {
+                                if let Err(e) = tx.send(Event::Delete(e)).await {
+                                    log::error!("[SQLITE] send event error: {}", e);
+                                }
+                            }
+                        }
+                        Event::Empty => {}
+                    }
+                }
             }
+            log::info!("[SQLITE] watch event loop exit");
         });
-        Self {
-            event_tx: Arc::new(tx),
-        }
+        Arc::new(tx)
+    }
+
+    fn handle_db_channel() -> DbChannel {
+        let (tx, mut rx) = mpsc::channel::<DbEvent>(10000);
+        let client = CLIENT.clone();
+        tokio::task::spawn(async move {
+            loop {
+                let event = match rx.recv().await {
+                    Some(v) => v,
+                    None => {
+                        log::info!("[SQLITE] db event channel closed");
+                        break;
+                    }
+                };
+                match event {
+                    DbEvent::Meta(DbEventMeta::Put(key, value, need_watch)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match put(&client, &key, value.clone(), need_watch).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] put meta error: {}", e);
+                        }
+                    }
+                    DbEvent::Meta(DbEventMeta::Delete(key, with_prefix, need_watch)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match delete(&client, &key, with_prefix, need_watch).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] delete meta error: {}", e);
+                        }
+                    }
+                    DbEvent::FileList(DbEventFileList::Add(files)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match sqlite_file_list::batch_add(&client, &files).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] batch add file_list error: {}", e);
+                        }
+                    }
+                    DbEvent::FileList(DbEventFileList::Remove(files)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match sqlite_file_list::batch_remove(&client, &files).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] batch remove file_list error: {}", e);
+                        }
+                    }
+                    DbEvent::FileList(DbEventFileList::Initialized) => {
+                        sqlite_file_list::set_initialised();
+                    }
+                    DbEvent::StreamStats(DbEventStreamStats::Set(org_id, streams)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match sqlite_file_list::set_stream_stats(&client, &org_id, &streams)
+                                .await
+                            {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] set stream stats error: {}", e);
+                        }
+                    }
+                    DbEvent::StreamStats(DbEventStreamStats::ResetMinTS(stream, min_ts)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match sqlite_file_list::reset_stream_stats_min_ts(
+                                &client, &stream, min_ts,
+                            )
+                            .await
+                            {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] reset stream stats min_ts error: {}", e);
+                        }
+                    }
+                    DbEvent::CreateTableMeta => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match create_table(&client).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] create table meta error: {}", e);
+                        }
+                    }
+                    DbEvent::CreateTableFileList => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match sqlite_file_list::create_table(&client).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] create table file_list error: {}", e);
+                        }
+                    }
+                    DbEvent::CreateTableFileListIndex => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match sqlite_file_list::create_table_index(&client).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] create table file_list index error: {}", e);
+                        }
+                    }
+                    DbEvent::Shutdown => {
+                        DB_SHUTDOWN.store(true, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+            }
+            log::info!("[SQLITE] db event loop exit");
+        });
+        Arc::new(tx)
+    }
+}
+
+impl Default for SqliteDbChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct SqliteDb {}
+
+impl SqliteDb {
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -109,6 +342,14 @@ impl Default for SqliteDb {
 
 #[async_trait]
 impl super::Db for SqliteDb {
+    async fn create_table(&self) -> Result<()> {
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::CreateTableMeta)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
+    }
+
     async fn stats(&self) -> Result<super::Stats> {
         let pool = CLIENT.clone();
         let keys_count: i64 = sqlx::query_scalar(r#"SELECT COUNT(*) as num FROM meta;"#)
@@ -145,95 +386,26 @@ impl super::Db for SqliteDb {
     }
 
     async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()> {
-        let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
-        let mut tx = pool.begin().await?;
-        sqlx::query(
-            r#"INSERT OR IGNORE INTO meta (module, key1, key2, value) VALUES ($1, $2, $3, '');"#,
-        )
-        .bind(&module)
-        .bind(&key1)
-        .bind(&key2)
-        .execute(&mut *tx)
-        .await?;
-        sqlx::query(r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#)
-            .bind(&module)
-            .bind(&key1)
-            .bind(&key2)
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-            .execute(&mut *tx)
-            .await?;
-        if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit stream stats error: {}", e);
-        }
-
-        // event watch
-        if need_watch {
-            if let Err(e) = self
-                .event_tx
-                .clone()
-                .send(super::Event::Put(super::EventData {
-                    key: key.to_string(),
-                    value: Some(value),
-                }))
-                .await
-            {
-                log::error!("[SQLITE] send event error: {}", e);
-            }
-        }
-
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::Meta(DbEventMeta::Put(
+            key.to_string(),
+            value,
+            need_watch,
+        )))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
     async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
-        // event watch
-        if need_watch {
-            // find all keys then send event
-            let items = if with_prefix {
-                self.list_keys(key).await?
-            } else {
-                vec![key.to_string()]
-            };
-            let tx = self.event_tx.clone();
-            tokio::task::spawn(async move {
-                for key in items {
-                    if let Err(e) = tx
-                        .send(super::Event::Delete(super::EventData {
-                            key: key.to_string(),
-                            value: None,
-                        }))
-                        .await
-                    {
-                        log::error!("[SQLITE] send event error: {}", e);
-                    }
-                }
-            });
-        }
-
-        let (module, key1, key2) = super::parse_key(key);
-        let sql = if with_prefix {
-            if key1.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
-            } else if key2.is_empty() {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}';"#,
-                    module, key1
-                )
-            } else {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%';"#,
-                    module, key1, key2
-                )
-            }
-        } else {
-            format!(
-                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
-                module, key1, key2
-            )
-        };
-        let pool = CLIENT.clone();
-        sqlx::query(&sql).execute(&pool).await?;
-
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::Meta(DbEventMeta::Delete(
+            key.to_string(),
+            with_prefix,
+            need_watch,
+        )))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
@@ -308,7 +480,7 @@ impl super::Db for SqliteDb {
         Ok(count)
     }
 
-    async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<super::Event>>> {
+    async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
         let (tx, rx) = mpsc::channel(1024);
         WATCHERS
             .write()
@@ -316,10 +488,119 @@ impl super::Db for SqliteDb {
             .insert(prefix.to_string(), Arc::new(tx));
         Ok(Arc::new(rx))
     }
+
+    async fn close(&self) -> Result<()> {
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::Shutdown)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        loop {
+            if DB_SHUTDOWN.load(std::sync::atomic::Ordering::Relaxed) {
+                break;
+            }
+            time::sleep(time::Duration::from_secs(1)).await;
+        }
+        Ok(())
+    }
 }
 
-pub async fn create_table() -> Result<()> {
-    let pool = CLIENT.clone();
+async fn put(client: &Pool<Sqlite>, key: &str, value: Bytes, need_watch: bool) -> Result<()> {
+    let (module, key1, key2) = super::parse_key(key);
+    let mut tx = client.begin().await?;
+    sqlx::query(
+        r#"INSERT OR IGNORE INTO meta (module, key1, key2, value) VALUES ($1, $2, $3, '');"#,
+    )
+    .bind(&module)
+    .bind(&key1)
+    .bind(&key2)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#)
+        .bind(&module)
+        .bind(&key1)
+        .bind(&key2)
+        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+        .execute(&mut *tx)
+        .await?;
+    if let Err(e) = tx.commit().await {
+        log::error!("[SQLITE] commit stream stats error: {}", e);
+    }
+
+    // event watch
+    if need_watch {
+        if let Err(e) = CHANNEL
+            .watch_tx
+            .clone()
+            .send(Event::Put(EventData {
+                key: key.to_string(),
+                value: Some(value),
+            }))
+            .await
+        {
+            log::error!("[SQLITE] send event error: {}", e);
+        }
+    }
+
+    Ok(())
+}
+
+async fn delete(
+    client: &Pool<Sqlite>,
+    key: &str,
+    with_prefix: bool,
+    need_watch: bool,
+) -> Result<()> {
+    // event watch
+    if need_watch {
+        // find all keys then send event
+        let items = if with_prefix {
+            super::DEFAULT.list_keys(key).await?
+        } else {
+            vec![key.to_string()]
+        };
+        let tx = CHANNEL.watch_tx.clone();
+        tokio::task::spawn(async move {
+            for key in items {
+                if let Err(e) = tx
+                    .send(Event::Delete(EventData {
+                        key: key.to_string(),
+                        value: None,
+                    }))
+                    .await
+                {
+                    log::error!("[SQLITE] send event error: {}", e);
+                }
+            }
+        });
+    }
+
+    let (module, key1, key2) = super::parse_key(key);
+    let sql = if with_prefix {
+        if key1.is_empty() {
+            format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
+        } else if key2.is_empty() {
+            format!(
+                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}';"#,
+                module, key1
+            )
+        } else {
+            format!(
+                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%';"#,
+                module, key1, key2
+            )
+        }
+    } else {
+        format!(
+            r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
+            module, key1, key2
+        )
+    };
+    sqlx::query(&sql).execute(client).await?;
+
+    Ok(())
+}
+
+async fn create_table(client: &Pool<Sqlite>) -> Result<()> {
     // create table
     sqlx::query(
         r#"
@@ -333,7 +614,7 @@ CREATE TABLE IF NOT EXISTS meta
 );
         "#,
     )
-    .execute(&pool)
+    .execute(client)
     .await?;
     // create table index
     sqlx::query(
@@ -343,7 +624,7 @@ CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);
 CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (module, key1, key2);
         "#,
     )
-    .execute(&pool)
+    .execute(client)
     .await?;
     Ok(())
 }

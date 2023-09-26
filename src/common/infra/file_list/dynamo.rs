@@ -57,6 +57,22 @@ impl Default for DynamoFileList {
 
 #[async_trait]
 impl super::FileList for DynamoFileList {
+    async fn create_table(&self) -> Result<()> {
+        create_table().await
+    }
+
+    async fn create_table_index(&self) -> Result<()> {
+        create_table_index().await
+    }
+
+    async fn set_initialised(&self) -> Result<()> {
+        Ok(())
+    }
+
+    async fn get_initialised(&self) -> Result<bool> {
+        Ok(true)
+    }
+
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
@@ -506,7 +522,7 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn clear(&self) -> Result<()> {
-        Ok(()) // TODO
+        Ok(())
     }
 }
 

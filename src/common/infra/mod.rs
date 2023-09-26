@@ -31,5 +31,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // init db
     db::create_table().await?;
     file_list::create_table().await?;
+    // because of asynchronous, we need to wait for a while
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     Ok(())
 }

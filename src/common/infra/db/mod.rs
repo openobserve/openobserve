@@ -19,10 +19,10 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use crate::common::meta::meta_store::MetaStore;
-
-use super::config::CONFIG;
-use super::errors::Result;
+use crate::common::{
+    infra::{config::CONFIG, errors::Result},
+    meta::{common::FileKey, meta_store::MetaStore, stream::StreamStats},
+};
 
 pub mod dynamo;
 pub mod etcd;
@@ -55,18 +55,10 @@ pub fn default() -> Box<dyn Db> {
 pub async fn create_table() -> Result<()> {
     // check db dir
     std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
-    // create for cluster_coordinator
-    if CONFIG.common.local_mode {
-        sqlite::create_table().await?;
-    }
     // create for meta store
-    match CONFIG.common.meta_store.as_str().into() {
-        MetaStore::Sled => sled::create_table().await,
-        MetaStore::Sqlite => sqlite::create_table().await,
-        MetaStore::Etcd => etcd::create_table().await,
-        MetaStore::DynamoDB => dynamo::create_table().await,
-        MetaStore::PostgreSQL => postgres::create_table().await,
-    }
+    CLUSTER_COORDINATOR.create_table().await?;
+    DEFAULT.create_table().await?;
+    Ok(())
 }
 
 pub fn cluster_coordinator() -> Box<dyn Db> {
@@ -82,6 +74,7 @@ pub fn cluster_coordinator() -> Box<dyn Db> {
 
 #[async_trait]
 pub trait Db: Sync + Send + 'static {
+    async fn create_table(&self) -> Result<()>;
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
     async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()>;
@@ -102,6 +95,7 @@ pub trait Db: Sync + Send + 'static {
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>>;
     async fn count(&self, prefix: &str) -> Result<i64>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
+    async fn close(&self) -> Result<()>;
 }
 
 pub fn parse_key(mut key: &str) -> (String, String, String) {
@@ -173,6 +167,32 @@ pub struct MetaRecord {
     pub key1: String,
     pub key2: String,
     pub value: String,
+}
+
+pub enum DbEvent {
+    Meta(DbEventMeta),
+    FileList(DbEventFileList),
+    StreamStats(DbEventStreamStats),
+    CreateTableMeta,
+    CreateTableFileList,
+    CreateTableFileListIndex,
+    Shutdown,
+}
+
+pub enum DbEventMeta {
+    Put(String, Bytes, bool),
+    Delete(String, bool, bool),
+}
+
+pub enum DbEventFileList {
+    Add(Vec<FileKey>),
+    Remove(Vec<String>),
+    Initialized,
+}
+
+pub enum DbEventStreamStats {
+    Set(String, Vec<(String, StreamStats)>),
+    ResetMinTS(String, i64),
 }
 
 #[cfg(test)]
