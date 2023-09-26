@@ -45,6 +45,22 @@ impl Default for PostgresFileList {
 
 #[async_trait]
 impl super::FileList for PostgresFileList {
+    async fn create_table(&self) -> Result<()> {
+        create_table().await
+    }
+
+    async fn create_table_index(&self) -> Result<()> {
+        create_table_index().await
+    }
+
+    async fn set_initialised(&self) -> Result<()> {
+        Ok(())
+    }
+
+    async fn get_initialised(&self) -> Result<bool> {
+        Ok(true)
+    }
+
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
@@ -437,10 +453,6 @@ UPDATE stream_stats
     }
 
     async fn clear(&self) -> Result<()> {
-        let pool = CLIENT.clone();
-        sqlx::query(r#"DELETE FROM file_list;"#)
-            .execute(&pool)
-            .await?;
         Ok(())
     }
 }

@@ -116,7 +116,7 @@ pub async fn merge_by_stream(
         offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
             - Duration::seconds(1).num_microseconds().unwrap(),
     );
-    let files = match file_list::query(
+    let files = file_list::query(
         org_id,
         stream_name,
         stream_type,
@@ -125,12 +125,7 @@ pub async fn merge_by_stream(
         partition_offset_end,
     )
     .await
-    {
-        Ok(files) => files,
-        Err(err) => {
-            return Err(err);
-        }
-    };
+    .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new offset
