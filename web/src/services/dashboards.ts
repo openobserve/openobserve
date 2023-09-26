@@ -31,8 +31,8 @@ const dashboards = {
   create: (organization: string, data: any, folderId? : string) => {
     return http().post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
   },
-  delete: (organization: string, dashboardID: string) => {
-    return http().delete(`/api/${organization}/dashboards/${dashboardID}`);
+  delete: (organization: string, dashboardID: string, folderId? : string) => {
+    return http().delete(`/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`);
   },
   get_Dashboard: (org_identifier: string) => {
     return http().get(`/api/dashboards/passcode/${org_identifier}`);

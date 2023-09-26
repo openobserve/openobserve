@@ -428,7 +428,7 @@ export default defineComponent({
       if (selectedDelete.value) {
         const dashboardId = selectedDelete.value.id;
         await dashboardService
-          .delete(store.state.selectedOrganization.identifier, dashboardId)
+          .delete(store.state.selectedOrganization.identifier, dashboardId, folders.value[activeFolder.value]?.folderId || "default")
           .then((res) => {
             const dashboards = toRaw(store.state.organizationData.allDashboardList);
             const newDashboards = dashboards.filter(
