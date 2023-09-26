@@ -161,7 +161,7 @@
       full-height
       maximized
     >
-      <AddDashboard @updated="updateDashboardList" />
+      <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolder="activeFolder" />
     </q-dialog>
     <q-dialog
       v-model="showAddFolderDialog"

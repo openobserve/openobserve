@@ -71,6 +71,19 @@
           dense
         />
 
+        <span>&nbsp;</span>
+        <div>
+          <q-btn-dropdown color="primary" :label="folders[activeFolder].name">
+            <q-list>
+              <q-item v-for="(item, index) in folders" :key="index" clickable v-close-popup @click="handleFolderDropDown(index)">
+                <q-item-section>
+                  <q-item-label>{{item.name}}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
+        </div>
+
         <div class="flex justify-center q-mt-lg">
           <q-btn
             v-close-popup
@@ -121,9 +134,20 @@ export default defineComponent({
       type: Object,
       default: () => defaultValue(),
     },
+    folders:{
+      default: [{
+        folderId: "default",
+        name: "default",
+        description: "default"
+      }],
+    },
+    activeFolder:{
+      type: Number,
+      default: 0
+    }
   },
   emits: ["update:modelValue", "updated", "finish"],
-  setup() {
+  setup(props) {
     const store: any = useStore();
     const beingUpdated: any = ref(false);
     const addDashboardForm: any = ref(null);
@@ -131,10 +155,15 @@ export default defineComponent({
     const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
+    const activeFolder = ref(props.activeFolder);
 
     //generate random integer number for dashboard Id
     function getRandInteger() {
       return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
+    }
+
+    const handleFolderDropDown = (folder: any) => {
+      activeFolder.value = folder
     }
 
     return {
@@ -149,6 +178,8 @@ export default defineComponent({
       getRandInteger,
       isValidIdentifier,
       getImageURL,
+      activeFolder,
+      handleFolderDropDown
     };
   },
   created() {
@@ -201,7 +232,8 @@ export default defineComponent({
 
           callDashboard = dashboardService.create(
             this.store.state.selectedOrganization.identifier,
-            baseObj
+            baseObj,
+            this?.folders[this.activeFolder ?? 0 ]?.folderId ?? "default"
           );
         }
         callDashboard

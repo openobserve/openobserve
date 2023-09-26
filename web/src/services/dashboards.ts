@@ -28,8 +28,8 @@ const dashboards = {
       `/api/${organization}/dashboards?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}&folder=${folder}`
     );
   },
-  create: (organization: string, data: any) => {
-    return http().post(`/api/${organization}/dashboards`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+  create: (organization: string, data: any, folderId? : string) => {
+    return http().post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
   },
   delete: (organization: string, dashboardID: string) => {
     return http().delete(`/api/${organization}/dashboards/${dashboardID}`);
