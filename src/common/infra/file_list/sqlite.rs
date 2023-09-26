@@ -556,17 +556,46 @@ CREATE TABLE IF NOT EXISTS stream_stats
 }
 
 pub async fn create_table_index(client: &Pool<Sqlite>) -> Result<()> {
-    // create index for file_list
-    sqlx::query(
-        r#"
+    let index_sql = r#"
 CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);
 CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);
 CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);
 CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);
-        "#,
-    )
-    .execute(client)
-    .await?;
+        "#;
+    // create index for file_list
+    if let Err(e) = sqlx::query(index_sql).execute(client).await {
+        if e.to_string().contains("UNIQUE constraint failed") {
+            // delete duplicate records
+            let ret = sqlx::query(
+                r#"
+                SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;
+                    "#,
+            ).fetch_all(client).await?;
+            for r in ret {
+                let stream = r.get::<String, &str>("stream");
+                let date = r.get::<String, &str>("date");
+                let file = r.get::<String, &str>("file");
+                let id = r.get::<i64, &str>("id");
+                if CONFIG.common.print_key_event {
+                    log::info!(
+                        "[SQLITE] delete duplicate file: {}/{}/{}",
+                        stream,
+                        date,
+                        file
+                    );
+                }
+                sqlx::query(
+                    r#"
+                    DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;
+                        "#,
+                ).bind(id).bind(stream).bind(date).bind(file).execute(client).await?;
+            }
+            // create index again
+            sqlx::query(index_sql).execute(client).await?;
+        } else {
+            return Err(e.into());
+        }
+    }
 
     // create index for stream_stats
     sqlx::query(
