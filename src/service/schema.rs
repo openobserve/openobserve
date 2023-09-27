@@ -251,12 +251,26 @@ pub async fn check_for_schema(
     stream_schema_map: &mut AHashMap<String, Schema>,
     record_ts: i64,
 ) -> SchemaEvolution {
+    log::info!(
+        "check_for_schema: org_id: {}, stream_name: {}, stream_type: {:?}, val_str: {}",
+        org_id,
+        stream_name,
+        stream_type,
+        val_str
+    );
     let mut schema = if stream_schema_map.contains_key(stream_name) {
         stream_schema_map.get(stream_name).unwrap().clone()
     } else {
         let schema = db::schema::get(org_id, stream_name, stream_type)
             .await
             .unwrap();
+        log::info!(
+            "db::schema::get: org_id: {}, stream_name: {}, stream_type: {:?}, val_str: {}",
+            org_id,
+            stream_name,
+            stream_type,
+            val_str
+        );
         stream_schema_map.insert(stream_name.to_string(), schema.clone());
         schema
     };
@@ -282,7 +296,7 @@ pub async fn check_for_schema(
             is_schema_changed: false,
         };
     }
-
+    log::info!("infer_json_schema done");
     if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
         //return (false, None, inferred_schema.fields().to_vec());
         return SchemaEvolution {
@@ -294,6 +308,7 @@ pub async fn check_for_schema(
     }
 
     if schema.fields().is_empty() {
+        log::info!("handling new schema");
         if let Some(value) = handle_new_schema(
             &mut schema,
             &inferred_schema,
@@ -307,12 +322,14 @@ pub async fn check_for_schema(
         {
             return value;
         }
+        log::info!("handling new schema");
     };
 
     let (field_datatype_delta, is_schema_changed, final_fields) =
         get_schema_changes(&schema, &inferred_schema);
 
     if is_schema_changed {
+        log::info!("handling existing schema");
         if let Some(value) = handle_existing_schema(
             stream_name,
             org_id,
@@ -478,6 +495,7 @@ async fn handle_new_schema(
     stream_type: StreamType,
     record_ts: &i64,
 ) -> Option<SchemaEvolution> {
+    log::info!("handling new schema enter");
     if *schema == Schema::empty() {
         let mut metadata = inferred_schema.metadata.clone();
         if !metadata.contains_key("created_at") {

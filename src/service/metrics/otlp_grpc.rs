@@ -167,10 +167,11 @@ pub async fn handle_grpc_request(
                         .await
                         .unwrap();
                 }
-
+                log::info!("start oo processing");
                 for mut rec in records {
                     // flattening
                     rec = flatten::flatten(&rec)?;
+                    log::info!("flatten::flatten done");
                     // get json object
                     let val_map: &mut serde_json::Map<String, serde_json::Value> =
                         rec.as_object_mut().unwrap();
@@ -182,6 +183,7 @@ pub async fn handle_grpc_request(
                         .unwrap_or(Utc::now().timestamp_micros());
 
                     let value_str = json::to_string(&val_map).unwrap();
+                    log::info!("chk_schema_by_record start");
                     chk_schema_by_record(
                         &mut metric_schema_map,
                         org_id,
@@ -191,6 +193,8 @@ pub async fn handle_grpc_request(
                         &value_str,
                     )
                     .await;
+
+                    log::info!("chk_schema_by_record done");
 
                     // get hour key
                     let hour_key = crate::service::ingestion::get_wal_time_key(
@@ -202,6 +206,8 @@ pub async fn handle_grpc_request(
                     );
                     let hour_buf = buf.entry(hour_key).or_default();
                     hour_buf.push(value_str);
+
+                    log::info!("pushed data to hour_buf");
 
                     // real time alert
                     if !stream_alerts_map.is_empty() {
@@ -272,6 +278,8 @@ pub async fn handle_grpc_request(
             Some(CONFIG.limit.metrics_file_retention.as_str().into())
         };
 
+        log::info!("write_file for stream {}", &stream_name);
+
         let mut req_stats = write_file(
             stream_data,
             thread_id,
@@ -280,7 +288,7 @@ pub async fn handle_grpc_request(
             time_level,
         )
         .await;
-
+        log::info!("write_file for stream done");
         req_stats.response_time += time;
         report_request_usage_stats(
             req_stats,
@@ -291,7 +299,7 @@ pub async fn handle_grpc_request(
             0,
         )
         .await;
-
+        log::info!("report_request_usage_stats done");
         let ep = if is_grpc {
             "grpc/export/metrics"
         } else {
