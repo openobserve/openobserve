@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::{
-    trace_service_server::TraceService, ExportTraceServiceResponse,
+    trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
-use tonic::Status;
-use tonic::{codegen::*, Response};
+use tonic::{codegen::*, Response, Status};
 
 use crate::common::infra::config::CONFIG;
 use crate::service::traces::handle_trace_request;

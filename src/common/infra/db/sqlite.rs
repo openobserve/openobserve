@@ -86,7 +86,7 @@ impl SqliteDbChannel {
     }
 
     fn handle_watch_channel() -> EventChannel {
-        let (tx, mut rx) = mpsc::channel::<Event>(1024);
+        let (tx, mut rx) = mpsc::channel::<Event>(10000);
         tokio::task::spawn(async move {
             loop {
                 if cluster::is_offline() {
@@ -99,7 +99,6 @@ impl SqliteDbChannel {
                         break;
                     }
                 };
-
                 for (prefix, tx) in WATCHERS.read().await.iter() {
                     match event.clone() {
                         Event::Put(e) => {
@@ -126,7 +125,7 @@ impl SqliteDbChannel {
     }
 
     fn handle_db_channel() -> DbChannel {
-        let (tx, mut rx) = mpsc::channel::<DbEvent>(10000);
+        let (tx, mut rx) = mpsc::channel::<DbEvent>(100000);
         let client = CLIENT.clone();
         tokio::task::spawn(async move {
             loop {
@@ -311,6 +310,7 @@ impl SqliteDbChannel {
                     }
                     DbEvent::Shutdown => {
                         DB_SHUTDOWN.store(true, std::sync::atomic::Ordering::Relaxed);
+                        break;
                     }
                 }
             }
