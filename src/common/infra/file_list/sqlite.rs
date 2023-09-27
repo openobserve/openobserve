@@ -380,6 +380,8 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
             Err(sqlx::Error::Database(e)) => {
                 if e.is_unique_violation() {
                     // batch insert got unique error, convert to single insert
+                    log::info!(
+                        "[SQLITE] file_list batch insert got unique error, convert to single insert");
                     for file in files {
                         super::add(&file.key, &file.meta).await?;
                     }
