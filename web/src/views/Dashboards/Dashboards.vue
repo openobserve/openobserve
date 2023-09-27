@@ -57,6 +57,9 @@
       style="height: calc(100vh - 132px);"
     >
       <template v-slot:before>
+        <div class="text-bold q-px-md q-pt-sm">
+          Folder List
+        </div>
         <div class="dashboards-tabs">
           <q-tabs
             v-model="activeFolder"
@@ -232,7 +235,7 @@
     <!-- delete folder dialog -->
     <ConfirmDialog
       title="Delete Folder"
-      message="Are you sure you want to delete the Folder?"
+      message="Are you sure you want to delete this Folder?"
       @update:ok="deleteFolder"
       @update:cancel="confirmDeleteFolderDialog = false"
       v-model="confirmDeleteFolderDialog"
@@ -547,10 +550,10 @@ export default defineComponent({
             timeout: 2000,
           });
   
-        } catch (error) {
+        } catch (err) {
           $q.notify({
             type: "negative",
-            message: "folder contains dashboards, please move/delete dashboards from folder",
+            message: err.response.data.message || "Folder deletion failed",
             timeout: 2000,
           });
         } finally {
@@ -654,12 +657,11 @@ export default defineComponent({
 .dashboards-tabs {
   .q-tabs {
     &--vertical {
-      margin: 20px 16px 0 16px;
+      margin: 5px;
       .q-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
         text-transform: capitalize;
         &__content.tab_content {
           .q-tab {
