@@ -35,7 +35,8 @@ export const convertMapData = (mapData: any) => {
         // See https://leafletjs.com/reference.html#map-option for details
         // NOTE: note that this order is reversed from Leaflet's [lat, lng]!
         center: [10, 60], // [lng, lat]
-        zoom: 4,
+        zoom: 14,
+        roam: true,
         resizeEnable: true, // automatically handles browser window resize.
         // whether echarts layer should be rendered when the map is moving. Default is true.
         // if false, it will only be re-rendered after the map `moveend`.
@@ -52,8 +53,8 @@ export const convertMapData = (mapData: any) => {
       },
       visualMap: {
         left: "right",
-        min: 1000,
-        max: 520000,
+        min: 0,
+        max: 50,
         inRange: {
           color: [
             "#313695",
