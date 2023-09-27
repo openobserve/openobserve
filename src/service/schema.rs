@@ -252,11 +252,10 @@ pub async fn check_for_schema(
     record_ts: i64,
 ) -> SchemaEvolution {
     log::info!(
-        "check_for_schema: org_id: {}, stream_name: {}, stream_type: {:?}, val_str: {}",
+        "check_for_schema: org_id: {}, stream_name: {}, stream_type: {:?}",
         org_id,
         stream_name,
         stream_type,
-        val_str
     );
     let mut schema = if stream_schema_map.contains_key(stream_name) {
         stream_schema_map.get(stream_name).unwrap().clone()
@@ -265,11 +264,10 @@ pub async fn check_for_schema(
             .await
             .unwrap();
         log::info!(
-            "db::schema::get: org_id: {}, stream_name: {}, stream_type: {:?}, val_str: {}",
+            "db::schema::get: org_id: {}, stream_name: {}, stream_type: {:?}",
             org_id,
             stream_name,
             stream_type,
-            val_str
         );
         stream_schema_map.insert(stream_name.to_string(), schema.clone());
         schema
@@ -572,9 +570,9 @@ async fn handle_new_schema(
                     "Acquired lock for stream {} as schema is empty",
                     stream_name
                 );
-                for data in LOCAL_SCHEMA_LOCKER.iter() {
+                /* for data in LOCAL_SCHEMA_LOCKER.iter() {
                     log::info!("key: {:?} value: {:?}", data.key(), data.value());
-                }
+                } */
                 let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                     .await
                     .unwrap();
