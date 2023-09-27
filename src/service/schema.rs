@@ -412,7 +412,7 @@ async fn handle_existing_schema(
             "{}/schema/lock/{org_id}/{stream_type}/{stream_name}",
             &CONFIG.sled.prefix
         );
-
+        log::info!("Trying lock for stream {} in local mode", stream_name);
         let value = LOCAL_SCHEMA_LOCKER
             .entry(key.clone())
             .or_insert_with(|| tokio::sync::RwLock::new(false));
@@ -558,6 +558,7 @@ async fn handle_new_schema(
                 "{}/schema/lock/{org_id}/{stream_type}/{stream_name}",
                 &CONFIG.sled.prefix
             );
+            log::info!("Trying lock for stream {} in local mode", stream_name);
 
             let value = LOCAL_SCHEMA_LOCKER
                 .entry(key.clone())
