@@ -158,7 +158,6 @@ export default defineComponent({
             to: this.$props.FolderList[this.selectedFolderIndex].folderId
           }
         ).then((res: any) => {
-
           dismiss();
           this.$q.notify({
             type: "positive",
@@ -170,8 +169,6 @@ export default defineComponent({
           this.moveFolderForm.resetValidation();
           
         }).catch((err) => {
-          console.log(err);
-          
           dismiss();
           this.$q.notify({
             type: "negative",

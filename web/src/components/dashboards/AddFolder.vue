@@ -48,7 +48,8 @@
           outlined
           filled
           dense
-          :rules="[(val) => !!val || t('dashboard.nameRequired')]"
+          :rules="[(val) => !!(val.trim()) || t('dashboard.nameRequired')]"
+          :lazy-rules="true"
         />
         <span>&nbsp;</span>
         <q-input
