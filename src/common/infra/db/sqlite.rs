@@ -56,7 +56,9 @@ type DbChannel = Arc<mpsc::Sender<DbEvent>>;
 fn connect() -> Pool<Sqlite> {
     let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
     if !CONFIG.common.local_mode && std::path::Path::new(&url).exists() {
-        std::fs::remove_file(&url).expect("remove file failed");
+        std::fs::remove_file(&url).expect("remove file sqlite failed");
+        std::fs::remove_file(format!("{url}-shm")).expect("remove file sqlite-shm failed");
+        std::fs::remove_file(format!("{url}-wal")).expect("remove file sqlite-wal failed");
     }
     let db_opts = SqliteConnectOptions::from_str(&url)
         .expect("sqlite connect options create failed")
