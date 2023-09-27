@@ -21,7 +21,11 @@ use tokio::sync::mpsc;
 
 use crate::common::{
     infra::{config::CONFIG, errors::Result},
-    meta::{common::FileKey, meta_store::MetaStore, stream::StreamStats},
+    meta::{
+        common::{FileKey, FileMeta},
+        meta_store::MetaStore,
+        stream::StreamStats,
+    },
 };
 
 pub mod dynamo;
@@ -195,7 +199,8 @@ impl std::fmt::Debug for DbEventMeta {
 }
 
 pub enum DbEventFileList {
-    Add(Vec<FileKey>),
+    Add(String, FileMeta),
+    BatchAdd(Vec<FileKey>),
     Remove(Vec<String>),
     Initialized,
 }
@@ -203,7 +208,8 @@ pub enum DbEventFileList {
 impl std::fmt::Debug for DbEventFileList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DbEventFileList::Add(keys) => write!(f, "Add({})", keys.len()),
+            DbEventFileList::Add(key, _) => write!(f, "Add({})", key),
+            DbEventFileList::BatchAdd(keys) => write!(f, "BatchAdd({})", keys.len()),
             DbEventFileList::Remove(keys) => write!(f, "Remove({})", keys.len()),
             DbEventFileList::Initialized => write!(f, "Initialized"),
         }

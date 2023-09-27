@@ -83,11 +83,10 @@ impl super::FileList for SqliteFileList {
 
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let tx = CHANNEL.db_tx.clone();
-        tx.send(DbEvent::FileList(DbEventFileList::Add(vec![FileKey::new(
-            file,
+        tx.send(DbEvent::FileList(DbEventFileList::Add(
+            file.to_string(),
             meta.to_owned(),
-            false,
-        )])))
+        )))
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
@@ -105,7 +104,7 @@ impl super::FileList for SqliteFileList {
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
         let tx = CHANNEL.db_tx.clone();
-        tx.send(DbEvent::FileList(DbEventFileList::Add(files.to_vec())))
+        tx.send(DbEvent::FileList(DbEventFileList::BatchAdd(files.to_vec())))
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
@@ -355,6 +354,37 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
     }
 }
 
+pub async fn add(client: &Pool<Sqlite>, file: &str, meta: &FileMeta) -> Result<()> {
+    let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+    let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+    match  sqlx::query(
+            r#"
+INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+        "#,
+    )
+        .bind(org_id)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .bind(false)
+        .bind(meta.min_ts)
+        .bind(meta.max_ts)
+        .bind(meta.records)
+        .bind(meta.original_size)
+        .bind(meta.compressed_size)
+        .execute(client)
+        .await {
+            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
+                  Ok(())
+            } else {
+                  Err(Error::Message(e.to_string()))
+            },
+            Err(e) =>  Err(e.into()),
+            Ok(_) => Ok(()),
+        }
+}
+
 pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
     let chunks = files.chunks(100);
     for files in chunks {
@@ -380,10 +410,8 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
             Err(sqlx::Error::Database(e)) => {
                 if e.is_unique_violation() {
                     // batch insert got unique error, convert to single insert
-                    log::info!(
-                        "[SQLITE] file_list batch insert got unique error, convert to single insert");
                     for file in files {
-                        super::add(&file.key, &file.meta).await?;
+                        add(client, &file.key, &file.meta).await?;
                     }
                 } else {
                     return Err(Error::Message(e.to_string()));

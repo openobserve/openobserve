@@ -178,7 +178,25 @@ impl SqliteDbChannel {
                             log::error!("[SQLITE] delete meta error: {}", e);
                         }
                     }
-                    DbEvent::FileList(DbEventFileList::Add(files)) => {
+                    DbEvent::FileList(DbEventFileList::Add(file, meta)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match sqlite_file_list::add(&client, &file, &meta).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] add file_list error: {}", e);
+                        }
+                    }
+                    DbEvent::FileList(DbEventFileList::BatchAdd(files)) => {
                         let mut err: Option<String> = None;
                         for _ in 0..DB_RETRY_TIMES {
                             match sqlite_file_list::batch_add(&client, &files).await {
