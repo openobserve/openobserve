@@ -22,14 +22,14 @@ use crate::common::{
     utils::json,
 };
 
-pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {
+pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(), anyhow::Error> {
     let (_stream_key, date_key, _file_name) = file_list::parse_file_key_columns(key)?;
-    let file_data = FileKey::new(key, meta, deleted);
+    let file_data = FileKey::new(key, meta.clone().unwrap_or_default(), deleted);
 
     // write into file_list storage
     // retry 5 times
     for _ in 0..5 {
-        if let Err(e) = super::progress(key, meta, deleted, true).await {
+        if let Err(e) = super::progress(key, meta.as_ref(), deleted, true).await {
             log::error!("[FILE_LIST] Error saving file to storage, retrying: {}", e);
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
         } else {

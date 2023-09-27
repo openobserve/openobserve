@@ -17,11 +17,10 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::common::{
-    infra::{config::CONFIG, metrics},
-    meta::common::FileMeta,
+    infra::{file_list as infra_file_list, metrics},
+    meta::common::FileKey,
 };
 use crate::handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
-use crate::service::db::file_list;
 
 pub struct Eventer;
 
@@ -38,32 +37,39 @@ impl Event for Eventer {
         tracing::Span::current().set_parent(parent_cx);
 
         let req = req.get_ref();
-        for file in req.items.iter() {
-            if CONFIG.common.print_key_event {
-                log::info!(
-                    "Received event:file {}, deleted: {}",
-                    file.key,
-                    file.deleted
-                );
-            }
-            if let Err(e) = file_list::progress(
-                &file.key,
-                FileMeta::from(file.meta.as_ref().unwrap()),
-                file.deleted,
-                true,
-            )
-            .await
-            {
-                // metrics
-                let time = start.elapsed().as_secs_f64();
-                metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/event/send_file_list", "500", "", "", ""])
-                    .observe(time);
-                metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/event/send_file_list", "500", "", "", ""])
-                    .inc();
-                return Err(Status::internal(e.to_string()));
-            }
+        let put_items = req
+            .items
+            .iter()
+            .filter(|v| !v.deleted)
+            .map(FileKey::from)
+            .collect::<Vec<_>>();
+        let del_items = req
+            .items
+            .iter()
+            .filter(|v| v.deleted)
+            .map(|v| v.key.clone())
+            .collect::<Vec<_>>();
+        if let Err(e) = infra_file_list::batch_add(&put_items).await {
+            // metrics
+            let time = start.elapsed().as_secs_f64();
+            metrics::GRPC_RESPONSE_TIME
+                .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                .observe(time);
+            metrics::GRPC_INCOMING_REQUESTS
+                .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                .inc();
+            return Err(Status::internal(e.to_string()));
+        }
+        if let Err(e) = infra_file_list::batch_remove(&del_items).await {
+            // metrics
+            let time = start.elapsed().as_secs_f64();
+            metrics::GRPC_RESPONSE_TIME
+                .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                .observe(time);
+            metrics::GRPC_INCOMING_REQUESTS
+                .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                .inc();
+            return Err(Status::internal(e.to_string()));
         }
 
         // metrics

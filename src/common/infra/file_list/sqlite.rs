@@ -103,6 +103,9 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
         let tx = CHANNEL.db_tx.clone();
         tx.send(DbEvent::FileList(DbEventFileList::BatchAdd(files.to_vec())))
             .await
@@ -111,6 +114,9 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
         let tx = CHANNEL.db_tx.clone();
         tx.send(DbEvent::FileList(DbEventFileList::Remove(files.to_vec())))
             .await

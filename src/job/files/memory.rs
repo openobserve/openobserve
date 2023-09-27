@@ -98,7 +98,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             }
 
             let (key, meta, _stream_type) = ret.unwrap();
-            let ret = db::file_list::local::set(&key, meta, false).await;
+            let ret = db::file_list::local::set(&key, Some(meta.clone()), false).await;
             if let Err(e) = ret {
                 log::error!(
                     "[JOB] Failed write memory file meta: {}, error: {}",

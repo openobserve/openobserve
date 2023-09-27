@@ -107,6 +107,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
@@ -145,6 +148,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {

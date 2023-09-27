@@ -119,7 +119,7 @@ async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), a
     let deleted = true;
     let file_data = FileKey {
         key: key.to_string(),
-        meta,
+        meta: meta.clone(),
         deleted,
     };
 
@@ -130,7 +130,7 @@ async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), a
     buf.write_all(&write_buf)?;
     let compressed_bytes = buf.finish().unwrap();
     storage::put(&new_file_list_key, compressed_bytes.into()).await?;
-    db::file_list::progress(key, meta, deleted, false).await?;
+    db::file_list::progress(key, Some(&meta), deleted, false).await?;
     db::file_list::broadcast::send(&[file_data], None).await?;
 
     // delete the parquet whaterever the file is exists or not
