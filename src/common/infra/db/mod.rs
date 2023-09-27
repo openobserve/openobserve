@@ -169,6 +169,7 @@ pub struct MetaRecord {
     pub value: String,
 }
 
+#[derive(Debug)]
 pub enum DbEvent {
     Meta(DbEventMeta),
     FileList(DbEventFileList),
@@ -184,15 +185,43 @@ pub enum DbEventMeta {
     Delete(String, bool, bool),
 }
 
+impl std::fmt::Debug for DbEventMeta {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DbEventMeta::Put(key, _, _) => write!(f, "Put({})", key),
+            DbEventMeta::Delete(key, _, _) => write!(f, "Delete({})", key),
+        }
+    }
+}
+
 pub enum DbEventFileList {
     Add(Vec<FileKey>),
     Remove(Vec<String>),
     Initialized,
 }
 
+impl std::fmt::Debug for DbEventFileList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DbEventFileList::Add(keys) => write!(f, "Add({})", keys.len()),
+            DbEventFileList::Remove(keys) => write!(f, "Remove({})", keys.len()),
+            DbEventFileList::Initialized => write!(f, "Initialized"),
+        }
+    }
+}
+
 pub enum DbEventStreamStats {
     Set(String, Vec<(String, StreamStats)>),
     ResetMinTS(String, i64),
+}
+
+impl std::fmt::Debug for DbEventStreamStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DbEventStreamStats::Set(key, _) => write!(f, "Set({})", key),
+            DbEventStreamStats::ResetMinTS(key, _) => write!(f, "ResetMinTS({})", key),
+        }
+    }
 }
 
 #[cfg(test)]

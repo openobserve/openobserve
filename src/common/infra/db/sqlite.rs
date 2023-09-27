@@ -138,6 +138,9 @@ impl SqliteDbChannel {
                         break;
                     }
                 };
+                if CONFIG.common.print_key_event {
+                    log::info!("[SQLITE] db event: {:?}", event);
+                }
                 match event {
                     DbEvent::Meta(DbEventMeta::Put(key, value, need_watch)) => {
                         let mut err: Option<String> = None;
