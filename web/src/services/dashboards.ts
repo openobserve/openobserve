@@ -52,8 +52,8 @@ const dashboards = {
   delete_Folder: (organization: string, folderId : any) => {
     return http().delete(`/api/${organization}/folders/${folderId}`);
   },
-  move_Dashboard: (organization: string, data: any) => {
-    return http().put(`/api/${organization}/folders/dashboards`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+  move_Dashboard: (organization: string, dashboardID: string, data: any) => {
+    return http().put(`/api/${organization}/folders/dashboards/${dashboardID}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
   }
 
 };

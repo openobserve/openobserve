@@ -73,7 +73,7 @@
 
         <span>&nbsp;</span>
         <div>
-          <q-btn-dropdown color="primary" :label="folders[activeFolder].name">
+          <q-btn-dropdown color="primary" :label="folders[activeFolder].name" class="full-width">
             <q-list>
               <q-item v-for="(item, index) in folders" :key="index" clickable v-close-popup @click="handleFolderDropDown(index)">
                 <q-item-section>

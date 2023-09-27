@@ -54,7 +54,7 @@
       v-model="splitterModel"
       unit="px"
       :limits="[200, Infinity]"
-      style="height: calc(100vh - 122px);"
+      style="height: calc(100vh - 132px);"
     >
       <template v-slot:before>
         <div class="dashboards-tabs">
@@ -91,9 +91,9 @@
               </div>
             </q-tab>
           </q-tabs>
-          <div class="row justify-center" style="position: sticky; bottom: 0px;">
+          <div class="row justify-center full-width q-px-xs q-pb-xs" style="position: sticky; bottom: 0px;">
               <q-btn
-              class="text-bold no-border self-center"
+              class="text-bold no-border full-width"
               padding="sm lg"
               color="secondary"
               no-caps
@@ -208,6 +208,16 @@
     >
       <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :model-value="JSON.parse(JSON.stringify(folders[selectedFolderToEdit]))"/>
     </q-dialog>
+    
+    <!-- move dashboard to another folder -->
+    <q-dialog
+      v-model="showMoveDashboardDialog"
+      position="right"
+      full-height
+      maximized
+    >
+      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" :dashobardId="selectedDashboardIdToMove" :-folder-list="folders" :currentFolderIndex="activeFolder"/>
+    </q-dialog>
 
     <!-- delete dashboard dialog -->
     <ConfirmDialog
@@ -236,7 +246,7 @@
 // @ts-nocheck
 import { computed, defineComponent, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useQuasar, date, copyToClipboard } from "quasar";
+import { useQuasar, date } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
@@ -244,13 +254,13 @@ import AddDashboard from "../../components/dashboards/AddDashboard.vue";
 import QTablePagination from "../../components/shared/grid/Pagination.vue";
 import NoData from "../../components/shared/grid/NoData.vue";
 import { useRouter } from "vue-router";
-import { isProxy, toRaw } from "vue";
+import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import { deleteFolderById, getAllDashboards, getDashboard, getFoldersList } from "../../utils/commons.ts";
 import { outlinedDelete, outlinedDriveFileMove, outlinedEdit } from '@quasar/extras/material-icons-outlined'
-import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
+import MoveDashboardToAnotherFolder from "@/components/dashboards/MoveDashboardToAnotherFolder.vue";
 
 export default defineComponent({
   name: "Dashboards",
@@ -259,8 +269,9 @@ export default defineComponent({
     QTablePagination,
     NoData,
     ConfirmDialog,
-    AddFolder
-  },
+    AddFolder,
+    MoveDashboardToAnotherFolder
+},
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -278,8 +289,10 @@ export default defineComponent({
     const folders = ref([]);
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
-    const selectedFolderToEdit = ref(null);
+    const selectedFolderToEdit = ref(0);
     const confirmDeleteFolderDialog = ref<boolean>(false);
+    const selectedDashboardIdToMove = ref(null);
+    const showMoveDashboardDialog = ref(false);
 
     const columns = ref<QTableProps["columns"]>([
       {
@@ -504,10 +517,16 @@ export default defineComponent({
       confirmDeleteFolderDialog.value = true;
     };
 
-    const showMoveDashboardPanel = (index: any) => {
-      console.log("showMoveDashboardPanel called");
-      
+    const showMoveDashboardPanel = (dashboardId: any) => {      
+      selectedDashboardIdToMove.value = dashboardId;
+      showMoveDashboardDialog.value = true;
     };
+
+    const handleDashboardMoved = async(movedFolderIndex: any) => {
+      showMoveDashboardDialog.value = false;
+      activeFolder.value = movedFolderIndex;
+      await getDashboards();
+    }
 
     const deleteFolder = async() => {
       if(selectedFolderDelete.value){
@@ -595,7 +614,10 @@ export default defineComponent({
       showDeleteFolderDialogFn,
       confirmDeleteFolderDialog,
       showMoveDashboardPanel,
-      selectedFolderToEdit
+      selectedFolderToEdit,
+      selectedDashboardIdToMove,
+      showMoveDashboardDialog,
+      handleDashboardMoved
     };
   },
   methods: {
