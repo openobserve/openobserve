@@ -122,6 +122,18 @@
       <!-- add delete icon in actions column -->
       <template #body-cell-actions="props">
         <q-td :props="props">
+          <q-btn
+              v-if="props.row.actions == 'true'"
+              :icon="outlinedDriveFileMove"
+              :title="t('dashboard.move_to_another_folder')"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click.stop=""
+            ></q-btn>
            <q-btn
               v-if="props.row.actions == 'true'"
               icon="content_copy"
@@ -234,7 +246,7 @@ import { isProxy, toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import { deleteFolderById, getAllDashboards, getDashboard, getFoldersList } from "../../utils/commons.ts";
-import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+import { outlinedDelete, outlinedDriveFileMove } from '@quasar/extras/material-icons-outlined'
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 
@@ -542,6 +554,7 @@ export default defineComponent({
       maxRecordToReturn,
       changeMaxRecordToReturn,
       outlinedDelete,
+      outlinedDriveFileMove,
       routeToViewD,
       showDeleteDialogFn,
       confirmDeleteDialog,
