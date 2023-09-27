@@ -530,7 +530,9 @@ async fn handle_new_schema(
                     is_schema_changed: true,
                 });
             } else {
+                stream_schema_map.insert(stream_name.to_string(), chk_schema.clone());
                 *schema = chk_schema;
+
                 lock.unlock().await.map_err(server_internal_error).unwrap();
                 log::info!(
                     "Releasing lock for stream {} after schema is set",
@@ -582,6 +584,7 @@ async fn handle_new_schema(
                     });
                 } else {
                     // No schema change
+                    stream_schema_map.insert(stream_name.to_string(), chk_schema.clone());
                     *lock_acquired = false;
                     drop(lock_acquired); // release lock
                     *schema = chk_schema;
