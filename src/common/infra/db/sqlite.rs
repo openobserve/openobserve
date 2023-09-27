@@ -101,6 +101,9 @@ impl SqliteDbChannel {
                         break;
                     }
                 };
+                if CONFIG.common.print_key_event {
+                    log::info!("[SQLITE] watch event: {:?}", event);
+                }
                 for (prefix, tx) in WATCHERS.read().await.iter() {
                     match event.clone() {
                         Event::Put(e) => {
