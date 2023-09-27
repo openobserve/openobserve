@@ -411,22 +411,30 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
                 .push_bind(item.meta.original_size)
                 .push_bind(item.meta.compressed_size);
         });
-        match query_builder.build().execute(&mut *tx).await {
-            Ok(_) => {}
+        let need_single_insert = match query_builder.build().execute(&mut *tx).await {
+            Ok(_) => false,
             Err(sqlx::Error::Database(e)) => {
                 if e.is_unique_violation() {
-                    // batch insert got unique error, convert to single insert
-                    for file in files {
-                        add(client, &file.key, &file.meta).await?;
-                    }
+                    true
                 } else {
                     return Err(Error::Message(e.to_string()));
                 }
             }
             Err(e) => return Err(e.into()),
-        }
-        if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit file_list add error: {}", e);
+        };
+        if !need_single_insert {
+            if let Err(e) = tx.commit().await {
+                log::error!("[SQLITE] commit file_list add error: {}", e);
+            }
+        } else {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SQLITE] rollback file_list add error: {}", e);
+            }
+            for item in files {
+                if let Err(e) = add(client, &item.key, &item.meta).await {
+                    log::error!("[SQLITE] single insert file_list add error: {}", e);
+                }
+            }
         }
     }
     Ok(())
