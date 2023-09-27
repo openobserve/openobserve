@@ -84,7 +84,7 @@
                 v-if="index"
                 name="delete"
                 class="q-ml-sm"
-                @click.stop="deleteFolder(index)"
+                @click.stop="showDeleteFolderDialogFn(index)"
                 style="cursor: pointer; justify-self: end;"
                 />
               </div>
@@ -195,6 +195,7 @@
       <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :model-value="JSON.parse(JSON.stringify(folders[activeFolder]))"/>
     </q-dialog>
 
+    <!-- delete dashboard dialog -->
     <ConfirmDialog
       title="Delete dashboard"
       data-test="dashboard-confirm-dialog"
@@ -202,6 +203,15 @@
       @update:ok="deleteDashboard"
       @update:cancel="confirmDeleteDialog = false"
       v-model="confirmDeleteDialog"
+    />
+
+    <!-- delete folder dialog -->
+    <ConfirmDialog
+      title="Delete Folder"
+      message="Are you sure you want to delete the Folder?"
+      @update:ok="deleteFolder"
+      @update:cancel="confirmDeleteFolderDialog = false"
+      v-model="confirmDeleteFolderDialog"
     />
     </template>
     </q-splitter>
@@ -253,6 +263,8 @@ export default defineComponent({
     const activeFolder = ref(0);
     const folders = ref([]);
     const isFolderEditMode = ref(false);
+    const selectedFolderDelete = ref(null);
+    const confirmDeleteFolderDialog = ref<boolean>(false);
 
     const columns = ref<QTableProps["columns"]>([
       {
@@ -472,30 +484,39 @@ export default defineComponent({
       showAddFolderDialog.value = true;
     }
 
-    const deleteFolder = async(item : any) => {
-      try {
-        
-        //delete folder
-        await deleteFolderById(store, folders.value[item].folderId);
-        
-        //check activeFolder to be deleted
-        if(activeFolder.value === item) activeFolder.value = 0;
+    const showDeleteFolderDialogFn = (index: any) => {
+      selectedFolderDelete.value = index;
+      confirmDeleteFolderDialog.value = true;
+    };
 
-        //remove folder from list
-        folders.value = folders.value.filter((folder,index) => index != item);
-
-        $q.notify({
-          type: "positive",
-          message: `Folder deleted successfully.`,
-          timeout: 2000,
-        });
-
-      } catch (error) {
-        $q.notify({
-          type: "negative",
-          message: "folder contains dashboards, please move/delete dashboards from folder",
-          timeout: 2000,
-        });
+    const deleteFolder = async() => {
+      if(selectedFolderDelete.value){
+        try {
+          
+          //delete folder
+          await deleteFolderById(store, folders.value[selectedFolderDelete.value].folderId);
+          
+          //check activeFolder to be deleted
+          if(activeFolder.value === selectedFolderDelete.value) activeFolder.value = 0;
+  
+          //remove folder from list
+          folders.value = folders.value.filter((folder,index) => index != selectedFolderDelete.value);
+  
+          $q.notify({
+            type: "positive",
+            message: `Folder deleted successfully.`,
+            timeout: 2000,
+          });
+  
+        } catch (error) {
+          $q.notify({
+            type: "negative",
+            message: "folder contains dashboards, please move/delete dashboards from folder",
+            timeout: 2000,
+          });
+        } finally {
+          confirmDeleteFolderDialog.value = false;
+        }
       }
 
     }
@@ -548,7 +569,9 @@ export default defineComponent({
       isFolderEditMode,
       updateFolderList,
       editFolder,
-      deleteFolder
+      deleteFolder,
+      showDeleteFolderDialogFn,
+      confirmDeleteFolderDialog
     };
   },
   methods: {
