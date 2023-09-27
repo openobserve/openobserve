@@ -97,7 +97,7 @@ import { getImageURL } from "../../utils/zincutils";
 
 const defaultValue = () => {
   return {
-    folderId:"default",
+    folderId:"",
     name: "",
     description: "",
   };

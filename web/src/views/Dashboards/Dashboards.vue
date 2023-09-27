@@ -53,7 +53,8 @@
     <q-splitter
       v-model="splitterModel"
       unit="px"
-      style="height: 80vh"
+      :limits="[200, Infinity]"
+      style="height: calc(100vh - 122px);"
     >
       <template v-slot:before>
         <div class="dashboards-tabs">
@@ -67,38 +68,39 @@
           v-for="(tab, index) in folders"
               :key="index"
               :name="index"
-              content-class="tab_content"
+              content-class="tab_content full-width"
               >
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="width: 120px">{{tab.name}}</span>
+              <div class="full-width row justify-between no-wrap">
+                <span style="white-space: nowrap;  overflow: hidden;  text-overflow: ellipsis;" :title="tab.name">{{ tab.name }}</span>
                 <div>
-
                   <q-icon
-                  v-if="index"
-                  name="edit"
-                  class="q-ml-sm"
-                  @click.stop="editFolder(index)"
-                  style="cursor: pointer; justify-self: end;"
+                    v-if="index"
+                    :name="outlinedEdit"
+                    class="q-ml-sm"
+                    @click.stop="editFolder(index)"
+                    style="cursor: pointer; justify-self: end;"
                   />
-                <q-icon
-                v-if="index"
-                name="delete"
-                class="q-ml-sm"
-                @click.stop="showDeleteFolderDialogFn(index)"
-                style="cursor: pointer; justify-self: end;"
-                />
-              </div>
+                  <q-icon
+                    v-if="index"
+                    :name="outlinedDelete"
+                    class="q-ml-sm"
+                    @click.stop="showDeleteFolderDialogFn(index)"
+                    style="cursor: pointer; justify-self: end;"
+                  />
+                </div>
               </div>
             </q-tab>
           </q-tabs>
-          <q-btn
-          class="q-ml-lg text-bold no-border self-center"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          label="New Folder"
-          @click="addFolder"
-        />
+          <div class="row justify-center" style="position: sticky; bottom: 0px;">
+              <q-btn
+              class="text-bold no-border self-center"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              label="New Folder"
+              @click.stop="addFolder"
+              />
+          </div>
         </div>
       </template>
     <template v-slot:after>
@@ -132,7 +134,7 @@
               size="sm"
               round
               flat
-              @click.stop=""
+              @click.stop="showMoveDashboardPanel(props.row.id)"
             ></q-btn>
            <q-btn
               v-if="props.row.actions == 'true'"
@@ -204,7 +206,7 @@
       full-height
       maximized
     >
-      <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :model-value="JSON.parse(JSON.stringify(folders[activeFolder]))"/>
+      <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :model-value="JSON.parse(JSON.stringify(folders[selectedFolderToEdit]))"/>
     </q-dialog>
 
     <!-- delete dashboard dialog -->
@@ -246,7 +248,7 @@ import { isProxy, toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import { deleteFolderById, getAllDashboards, getDashboard, getFoldersList } from "../../utils/commons.ts";
-import { outlinedDelete, outlinedDriveFileMove } from '@quasar/extras/material-icons-outlined'
+import { outlinedDelete, outlinedDriveFileMove, outlinedEdit } from '@quasar/extras/material-icons-outlined'
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 
@@ -276,6 +278,7 @@ export default defineComponent({
     const folders = ref([]);
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
+    const selectedFolderToEdit = ref(null);
     const confirmDeleteFolderDialog = ref<boolean>(false);
 
     const columns = ref<QTableProps["columns"]>([
@@ -478,8 +481,8 @@ export default defineComponent({
 
     //after adding Folder need to update the Folder list
     const updateFolderList = async (it: any) => {
-      isFolderEditMode.value = false;
       showAddFolderDialog.value = false;
+      isFolderEditMode.value = false;
 
       folders.value = await getFoldersList(store);
       await getDashboards();
@@ -490,8 +493,8 @@ export default defineComponent({
       });
     }
 
-    const editFolder = (item : any) => {
-      activeFolder.value = item;
+    const editFolder = (index : any) => {      
+      selectedFolderToEdit.value = index;      
       isFolderEditMode.value = true;
       showAddFolderDialog.value = true;
     }
@@ -499,6 +502,11 @@ export default defineComponent({
     const showDeleteFolderDialogFn = (index: any) => {
       selectedFolderDelete.value = index;
       confirmDeleteFolderDialog.value = true;
+    };
+
+    const showMoveDashboardPanel = (index: any) => {
+      console.log("showMoveDashboardPanel called");
+      
     };
 
     const deleteFolder = async() => {
@@ -554,6 +562,7 @@ export default defineComponent({
       maxRecordToReturn,
       changeMaxRecordToReturn,
       outlinedDelete,
+      outlinedEdit,
       outlinedDriveFileMove,
       routeToViewD,
       showDeleteDialogFn,
@@ -584,7 +593,9 @@ export default defineComponent({
       editFolder,
       deleteFolder,
       showDeleteFolderDialogFn,
-      confirmDeleteFolderDialog
+      confirmDeleteFolderDialog,
+      showMoveDashboardPanel,
+      selectedFolderToEdit
     };
   },
   methods: {
