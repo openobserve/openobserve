@@ -53,12 +53,12 @@
     <q-splitter
       v-model="splitterModel"
       unit="px"
-      :limits="[200, Infinity]"
+      :limits="[200, 500]"
       style="height: calc(100vh - 132px);"
     >
       <template v-slot:before>
         <div class="text-bold q-px-md q-pt-sm">
-          Folder List
+          Folders
         </div>
         <div class="dashboards-tabs">
           <q-tabs
