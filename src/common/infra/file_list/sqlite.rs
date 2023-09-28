@@ -15,61 +15,24 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
-use once_cell::sync::Lazy;
-use sqlx::{
-    sqlite::{
-        SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode, SqlitePoolOptions,
-        SqliteSynchronous,
-    },
-    ConnectOptions, Pool, QueryBuilder, Row, Sqlite,
-};
-use std::{str::FromStr, sync::atomic::AtomicBool, time::Duration};
+use sqlx::{Pool, QueryBuilder, Row, Sqlite};
+use std::sync::atomic::AtomicBool;
 
 use crate::common::{
-    infra::{config::CONFIG, errors::*},
+    infra::{
+        config::CONFIG,
+        db::{
+            sqlite::{CHANNEL, CLIENT},
+            DbEvent, DbEventFileList, DbEventStreamStats,
+        },
+        errors::{Error, Result},
+    },
     meta::{
         common::{FileKey, FileMeta},
         stream::{PartitionTimeLevel, StreamStats},
         StreamType,
     },
 };
-
-static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
-
-fn connect() -> Pool<Sqlite> {
-    let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
-    if !CONFIG.common.local_mode && std::path::Path::new(&url).exists() {
-        std::fs::remove_file(&url).expect("remove file sqlite failed");
-        std::fs::remove_file(format!("{url}-shm")).expect("remove file sqlite-shm failed");
-        std::fs::remove_file(format!("{url}-wal")).expect("remove file sqlite-wal failed");
-    }
-    let db_opts = SqliteConnectOptions::from_str(&url)
-        .expect("sqlite connect options create failed")
-        .journal_mode(SqliteJournalMode::Wal)
-        .synchronous(SqliteSynchronous::Normal)
-        .locking_mode(SqliteLockingMode::Normal)
-        .busy_timeout(Duration::from_secs(10))
-        .disable_statement_logging()
-        .create_if_missing(true);
-
-    let pool_opts = SqlitePoolOptions::new()
-        .min_connections(10)
-        .max_connections(512)
-        .acquire_timeout(Duration::from_secs(60))
-        .after_connect(|_, _| {
-            Box::pin(async move {
-                log::info!("[SQLITE] file_list db connected");
-                Ok(())
-            })
-        })
-        .after_release(|_, _| {
-            Box::pin(async move {
-                log::info!("[SQLITE] file_list db released");
-                Ok(true)
-            })
-        });
-    pool_opts.connect_lazy_with(db_opts)
-}
 
 /// Table file_list inited flag
 static FILE_LIST_INITED: AtomicBool = AtomicBool::new(false);
@@ -91,35 +54,74 @@ impl Default for SqliteFileList {
 #[async_trait]
 impl super::FileList for SqliteFileList {
     async fn create_table(&self) -> Result<()> {
-        create_table(&CLIENT.clone()).await
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::CreateTableFileList)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        create_table_index(&CLIENT.clone()).await
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::CreateTableFileListIndex)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
     }
 
     async fn set_initialised(&self) -> Result<()> {
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileList(DbEventFileList::Initialized))
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
     async fn get_initialised(&self) -> Result<bool> {
-        Ok(true)
+        Ok(FILE_LIST_INITED.load(std::sync::atomic::Ordering::Relaxed))
     }
 
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
-        add(&CLIENT.clone(), file, meta).await
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileList(DbEventFileList::Add(
+            file.to_string(),
+            meta.to_owned(),
+        )))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        batch_remove(&CLIENT.clone(), &[file.to_string()]).await
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileList(DbEventFileList::Remove(vec![
+            file.to_string()
+        ])))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
-        batch_add(&CLIENT.clone(), files).await
+        if files.is_empty() {
+            return Ok(());
+        }
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileList(DbEventFileList::BatchAdd(files.to_vec())))
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
-        batch_remove(&CLIENT.clone(), files).await
+        if files.is_empty() {
+            return Ok(());
+        }
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileList(DbEventFileList::Remove(files.to_vec())))
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
     }
 
     async fn get(&self, file: &str) -> Result<FileMeta> {
@@ -297,7 +299,14 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         org_id: &str,
         streams: &[(String, StreamStats)],
     ) -> Result<()> {
-        set_stream_stats(&CLIENT.clone(), org_id, streams).await
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::StreamStats(DbEventStreamStats::Set(
+            org_id.to_string(),
+            streams.to_vec(),
+        )))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
     }
 
     async fn reset_stream_stats_min_ts(
@@ -306,7 +315,14 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         stream: &str,
         min_ts: i64,
     ) -> Result<()> {
-        reset_stream_stats_min_ts(&CLIENT.clone(), stream, min_ts).await
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::StreamStats(DbEventStreamStats::ResetMinTS(
+            stream.to_string(),
+            min_ts,
+        )))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
     }
 
     async fn reset_stream_stats(&self) -> Result<()> {
