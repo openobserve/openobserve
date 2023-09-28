@@ -16,7 +16,11 @@ use bytes::Bytes;
 use std::sync::Arc;
 
 use crate::common::{
-    infra::{cluster::LOCAL_NODE_UUID, config::METRIC_CLUSTER_LEADER, db as infra_db},
+    infra::{
+        cluster::LOCAL_NODE_UUID,
+        config::{CONFIG, METRIC_CLUSTER_LEADER},
+        db as infra_db,
+    },
     meta::prom::ClusterLeader,
     utils::json,
 };
@@ -70,6 +74,9 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
                 break;
             }
         };
+        if CONFIG.common.print_key_event {
+            log::info!("watch_prom_cluster_leader: {:?}", ev);
+        }
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();

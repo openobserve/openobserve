@@ -175,12 +175,8 @@ pub async fn remote_write(
             }
 
             if first_line && dedup_enabled {
-                match METRIC_CLUSTER_LEADER
-                    .clone()
-                    .read()
-                    .await
-                    .get(&cluster_name)
-                {
+                let lock = METRIC_CLUSTER_LEADER.read().await;
+                match lock.get(&cluster_name) {
                     Some(leader) => {
                         last_received = leader.last_received;
                         has_entry = true;
@@ -189,6 +185,7 @@ pub async fn remote_write(
                         has_entry = false;
                     }
                 }
+                drop(lock);
                 accept_record = prom_ha_handler(
                     has_entry,
                     &cluster_name,
