@@ -25,6 +25,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
         time::sleep(time::Duration::from_secs(1)).await;
         let files = {
             let mut q = BROADCAST_QUEUE.write().await;
+            if q.is_empty() {
+                continue;
+            }
             q.drain(..).collect::<Vec<_>>()
         };
         if let Err(e) = broadcast::send(&files, None).await {
