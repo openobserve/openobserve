@@ -247,7 +247,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onMounted, ref, watch } from "vue";
+import { computed, defineComponent, onActivated, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -364,10 +364,34 @@ export default defineComponent({
     onMounted(async() => {      
       folders.value = await getFoldersList(store);
       await getDashboards();
+      router.push({
+        path: "/dashboards",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folderId: folders.value[activeFolder.value]?.folderId || "default"
+        },
+      });
+    });
+
+    onActivated(async() => {
+      router.push({
+        path: "/dashboards",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folderId: folders.value[activeFolder.value]?.folderId || "default"
+        },
+      })
     });
 
     watch(activeFolder, async()=>{
       await getDashboards();
+      router.push({
+        path: "/dashboards",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folderId: folders.value[activeFolder.value]?.folderId || "default"
+        },
+      });
     });
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -439,7 +463,11 @@ export default defineComponent({
     const routeToViewD = (row) => {
       return router.push({
         path: "/dashboards/view",
-        query: { org_identifier: store.state.selectedOrganization.identifier, dashboard: row.identifier },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: row.identifier,
+          folderId: folders?.value[activeFolder?.value]?.folderId || "default"
+        },
       });
     };
     const getDashboards = async () => {
