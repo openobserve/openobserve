@@ -20,28 +20,15 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
     ConnectOptions, Pool, Sqlite,
 };
-use std::{
-    str::FromStr,
-    sync::{atomic::AtomicBool, Arc},
-    time::Duration,
-};
-use tokio::{
-    sync::{mpsc, RwLock},
-    time,
-};
+use std::{str::FromStr, sync::Arc, time::Duration};
+use tokio::sync::{mpsc, RwLock};
 
 use crate::common::infra::{
     cluster,
     config::{FxIndexMap, CONFIG},
-    db::{DbEvent, DbEventMeta, Event, EventData},
+    db::{Event, EventData},
     errors::*,
 };
-
-/// Database update retry times
-const DB_RETRY_TIMES: usize = 5;
-
-/// Database shutdown flag
-static DB_SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
 static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
 static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
@@ -50,7 +37,6 @@ static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
     Lazy::new(|| RwLock::new(Default::default()));
 
 type EventChannel = Arc<mpsc::Sender<Event>>;
-type DbChannel = Arc<mpsc::Sender<DbEvent>>;
 
 fn connect() -> Pool<Sqlite> {
     let url = format!("{}{}", CONFIG.common.data_db_dir, "file_list.sqlite");
@@ -68,21 +54,19 @@ fn connect() -> Pool<Sqlite> {
         .create_if_missing(true);
 
     let pool_opts = SqlitePoolOptions::new()
-        .min_connections(CONFIG.limit.cpu_num as u32)
-        .max_connections(1024);
+        .min_connections(1)
+        .max_connections(1);
     pool_opts.connect_lazy_with(db_opts)
 }
 
 struct SqliteDbChannel {
     watch_tx: EventChannel,
-    db_tx: DbChannel,
 }
 
 impl SqliteDbChannel {
     fn new() -> Self {
         Self {
             watch_tx: SqliteDbChannel::handle_watch_channel(),
-            db_tx: SqliteDbChannel::handle_db_channel(),
         }
     }
 
@@ -127,90 +111,6 @@ impl SqliteDbChannel {
         });
         Arc::new(tx)
     }
-
-    fn handle_db_channel() -> DbChannel {
-        let (tx, mut rx) = mpsc::channel::<DbEvent>(10000);
-        let client = CLIENT.clone();
-        tokio::task::spawn(async move {
-            loop {
-                let event = match rx.recv().await {
-                    Some(v) => v,
-                    None => {
-                        log::info!("[SQLITE] db event channel closed");
-                        break;
-                    }
-                };
-                if CONFIG.common.print_key_event {
-                    log::info!("[SQLITE] db event: {:?}", event);
-                }
-                match event {
-                    DbEvent::Meta(DbEventMeta::Put(key, value, need_watch)) => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..DB_RETRY_TIMES {
-                            match put(&client, &key, value.clone(), need_watch).await {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => {
-                                    err = Some(e.to_string());
-                                }
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] put meta error: {}", e);
-                        }
-                    }
-                    DbEvent::Meta(DbEventMeta::Delete(key, with_prefix, need_watch)) => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..DB_RETRY_TIMES {
-                            match delete(&client, &key, with_prefix, need_watch).await {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => {
-                                    err = Some(e.to_string());
-                                }
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] delete meta error: {}", e);
-                        }
-                    }
-                    DbEvent::CreateTableMeta => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..DB_RETRY_TIMES {
-                            match create_table(&client).await {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => {
-                                    err = Some(e.to_string());
-                                }
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] create table meta error: {}", e);
-                        }
-                    }
-                    DbEvent::Shutdown => {
-                        DB_SHUTDOWN.store(true, std::sync::atomic::Ordering::Relaxed);
-                        break;
-                    }
-                    _ => {
-                        log::error!("unknown db event: {:?}", event);
-                    }
-                }
-            }
-            log::info!("[SQLITE] db event loop exit");
-        });
-        Arc::new(tx)
-    }
 }
 
 impl Default for SqliteDbChannel {
@@ -236,11 +136,7 @@ impl Default for SqliteDb {
 #[async_trait]
 impl super::Db for SqliteDb {
     async fn create_table(&self) -> Result<()> {
-        let tx = CHANNEL.db_tx.clone();
-        tx.send(DbEvent::CreateTableMeta)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-        Ok(())
+        create_table(&CLIENT).await
     }
 
     async fn stats(&self) -> Result<super::Stats> {
@@ -279,27 +175,11 @@ impl super::Db for SqliteDb {
     }
 
     async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()> {
-        let tx = CHANNEL.db_tx.clone();
-        tx.send(DbEvent::Meta(DbEventMeta::Put(
-            key.to_string(),
-            value,
-            need_watch,
-        )))
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-        Ok(())
+        put(&CLIENT, key, value, need_watch).await
     }
 
     async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
-        let tx = CHANNEL.db_tx.clone();
-        tx.send(DbEvent::Meta(DbEventMeta::Delete(
-            key.to_string(),
-            with_prefix,
-            need_watch,
-        )))
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-        Ok(())
+        delete(&CLIENT, key, with_prefix, need_watch).await
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
@@ -383,16 +263,6 @@ impl super::Db for SqliteDb {
     }
 
     async fn close(&self) -> Result<()> {
-        let tx = CHANNEL.db_tx.clone();
-        tx.send(DbEvent::Shutdown)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-        loop {
-            if DB_SHUTDOWN.load(std::sync::atomic::Ordering::Relaxed) {
-                break;
-            }
-            time::sleep(time::Duration::from_secs(1)).await;
-        }
         Ok(())
     }
 }
