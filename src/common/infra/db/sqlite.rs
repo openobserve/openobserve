@@ -33,9 +33,8 @@ use tokio::{
 use crate::common::infra::{
     cluster,
     config::{FxIndexMap, CONFIG},
-    db::{DbEvent, DbEventFileList, DbEventMeta, DbEventStreamStats, Event, EventData},
+    db::{DbEvent, DbEventMeta, Event, EventData},
     errors::*,
-    file_list::sqlite as sqlite_file_list,
 };
 
 /// Database update retry times
@@ -44,8 +43,8 @@ const DB_RETRY_TIMES: usize = 5;
 /// Database shutdown flag
 static DB_SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
-pub static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
-pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
+static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
+static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
 
 static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
     Lazy::new(|| RwLock::new(Default::default()));
@@ -54,7 +53,7 @@ type EventChannel = Arc<mpsc::Sender<Event>>;
 type DbChannel = Arc<mpsc::Sender<DbEvent>>;
 
 fn connect() -> Pool<Sqlite> {
-    let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
+    let url = format!("{}{}", CONFIG.common.data_db_dir, "file_list.sqlite");
     if !CONFIG.common.local_mode && std::path::Path::new(&url).exists() {
         std::fs::remove_file(&url).expect("remove file sqlite failed");
         std::fs::remove_file(format!("{url}-shm")).expect("remove file sqlite-shm failed");
@@ -74,13 +73,13 @@ fn connect() -> Pool<Sqlite> {
     pool_opts.connect_lazy_with(db_opts)
 }
 
-pub struct SqliteDbChannel {
-    pub watch_tx: EventChannel,
-    pub db_tx: DbChannel,
+struct SqliteDbChannel {
+    watch_tx: EventChannel,
+    db_tx: DbChannel,
 }
 
 impl SqliteDbChannel {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             watch_tx: SqliteDbChannel::handle_watch_channel(),
             db_tx: SqliteDbChannel::handle_db_channel(),
@@ -130,7 +129,7 @@ impl SqliteDbChannel {
     }
 
     fn handle_db_channel() -> DbChannel {
-        let (tx, mut rx) = mpsc::channel::<DbEvent>(100000);
+        let (tx, mut rx) = mpsc::channel::<DbEvent>(10000);
         let client = CLIENT.clone();
         tokio::task::spawn(async move {
             loop {
@@ -181,105 +180,6 @@ impl SqliteDbChannel {
                             log::error!("[SQLITE] delete meta error: {}", e);
                         }
                     }
-                    DbEvent::FileList(DbEventFileList::Add(file, meta)) => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..DB_RETRY_TIMES {
-                            match sqlite_file_list::add(&client, &file, &meta).await {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => {
-                                    err = Some(e.to_string());
-                                }
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] add file_list error: {}", e);
-                        }
-                    }
-                    DbEvent::FileList(DbEventFileList::BatchAdd(files)) => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..DB_RETRY_TIMES {
-                            match sqlite_file_list::batch_add(&client, &files).await {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => {
-                                    err = Some(e.to_string());
-                                }
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] batch add file_list error: {}", e);
-                        }
-                    }
-                    DbEvent::FileList(DbEventFileList::Remove(files)) => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..DB_RETRY_TIMES {
-                            match sqlite_file_list::batch_remove(&client, &files).await {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => {
-                                    err = Some(e.to_string());
-                                }
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] batch remove file_list error: {}", e);
-                        }
-                    }
-                    DbEvent::FileList(DbEventFileList::Initialized) => {
-                        sqlite_file_list::set_initialised();
-                    }
-                    DbEvent::StreamStats(DbEventStreamStats::Set(org_id, streams)) => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..DB_RETRY_TIMES {
-                            match sqlite_file_list::set_stream_stats(&client, &org_id, &streams)
-                                .await
-                            {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => {
-                                    err = Some(e.to_string());
-                                }
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] set stream stats error: {}", e);
-                        }
-                    }
-                    DbEvent::StreamStats(DbEventStreamStats::ResetMinTS(stream, min_ts)) => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..DB_RETRY_TIMES {
-                            match sqlite_file_list::reset_stream_stats_min_ts(
-                                &client, &stream, min_ts,
-                            )
-                            .await
-                            {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => {
-                                    err = Some(e.to_string());
-                                }
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] reset stream stats min_ts error: {}", e);
-                        }
-                    }
                     DbEvent::CreateTableMeta => {
                         let mut err: Option<String> = None;
                         for _ in 0..DB_RETRY_TIMES {
@@ -298,45 +198,12 @@ impl SqliteDbChannel {
                             log::error!("[SQLITE] create table meta error: {}", e);
                         }
                     }
-                    DbEvent::CreateTableFileList => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..DB_RETRY_TIMES {
-                            match sqlite_file_list::create_table(&client).await {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => {
-                                    err = Some(e.to_string());
-                                }
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] create table file_list error: {}", e);
-                        }
-                    }
-                    DbEvent::CreateTableFileListIndex => {
-                        let mut err: Option<String> = None;
-                        for _ in 0..DB_RETRY_TIMES {
-                            match sqlite_file_list::create_table_index(&client).await {
-                                Ok(_) => {
-                                    err = None;
-                                    break;
-                                }
-                                Err(e) => {
-                                    err = Some(e.to_string());
-                                }
-                            }
-                            time::sleep(time::Duration::from_secs(1)).await;
-                        }
-                        if let Some(e) = err {
-                            log::error!("[SQLITE] create table file_list index error: {}", e);
-                        }
-                    }
                     DbEvent::Shutdown => {
                         DB_SHUTDOWN.store(true, std::sync::atomic::Ordering::Relaxed);
                         break;
+                    }
+                    _ => {
+                        log::error!("unknown db event: {:?}", event);
                     }
                 }
             }

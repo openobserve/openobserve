@@ -15,17 +15,23 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
-use sqlx::{Pool, QueryBuilder, Row, Sqlite};
-use std::sync::atomic::AtomicBool;
+use once_cell::sync::Lazy;
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
+    ConnectOptions, Pool, QueryBuilder, Row, Sqlite,
+};
+use std::{
+    str::FromStr,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
+};
+use tokio::{sync::mpsc, time};
 
 use crate::common::{
     infra::{
         config::CONFIG,
-        db::{
-            sqlite::{CHANNEL, CLIENT},
-            DbEvent, DbEventFileList, DbEventStreamStats,
-        },
-        errors::{Error, Result},
+        db::{DbEvent, DbEventFileList, DbEventStreamStats},
+        errors::*,
     },
     meta::{
         common::{FileKey, FileMeta},
@@ -33,6 +39,218 @@ use crate::common::{
         StreamType,
     },
 };
+
+/// Database update retry times
+const DB_RETRY_TIMES: usize = 5;
+
+/// Database shutdown flag
+static DB_SHUTDOWN: AtomicBool = AtomicBool::new(false);
+
+static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
+static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
+
+type DbChannel = Arc<mpsc::Sender<DbEvent>>;
+
+fn connect() -> Pool<Sqlite> {
+    let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
+    if !CONFIG.common.local_mode && std::path::Path::new(&url).exists() {
+        std::fs::remove_file(&url).expect("remove file sqlite failed");
+        std::fs::remove_file(format!("{url}-shm")).expect("remove file sqlite-shm failed");
+        std::fs::remove_file(format!("{url}-wal")).expect("remove file sqlite-wal failed");
+    }
+    let db_opts = SqliteConnectOptions::from_str(&url)
+        .expect("sqlite connect options create failed")
+        .journal_mode(SqliteJournalMode::Wal)
+        .synchronous(SqliteSynchronous::Normal)
+        .busy_timeout(Duration::from_secs(10))
+        .disable_statement_logging()
+        .create_if_missing(true);
+
+    let pool_opts = SqlitePoolOptions::new()
+        .min_connections(CONFIG.limit.cpu_num as u32)
+        .max_connections(1024);
+    pool_opts.connect_lazy_with(db_opts)
+}
+
+pub struct SqliteDbChannel {
+    pub db_tx: DbChannel,
+}
+
+impl SqliteDbChannel {
+    pub fn new() -> Self {
+        Self {
+            db_tx: SqliteDbChannel::handle_db_channel(),
+        }
+    }
+
+    fn handle_db_channel() -> DbChannel {
+        let (tx, mut rx) = mpsc::channel::<DbEvent>(100000);
+        let client = CLIENT.clone();
+        tokio::task::spawn(async move {
+            loop {
+                let event = match rx.recv().await {
+                    Some(v) => v,
+                    None => {
+                        log::info!("[SQLITE] file_list db event channel closed");
+                        break;
+                    }
+                };
+                if CONFIG.common.print_key_event {
+                    log::info!("[SQLITE] file_list db event: {:?}", event);
+                }
+                match event {
+                    DbEvent::Meta(_) => {
+                        log::error!("[SQLITE] file_list db shouldn't have meta data");
+                    }
+                    DbEvent::FileList(DbEventFileList::Add(file, meta)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match add(&client, &file, &meta).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] add file_list error: {}", e);
+                        }
+                    }
+                    DbEvent::FileList(DbEventFileList::BatchAdd(files)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match batch_add(&client, &files).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] batch add file_list error: {}", e);
+                        }
+                    }
+                    DbEvent::FileList(DbEventFileList::Remove(files)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match batch_remove(&client, &files).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] batch remove file_list error: {}", e);
+                        }
+                    }
+                    DbEvent::FileList(DbEventFileList::Initialized) => {
+                        set_initialised();
+                    }
+                    DbEvent::StreamStats(DbEventStreamStats::Set(org_id, streams)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match set_stream_stats(&client, &org_id, &streams).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] set stream stats error: {}", e);
+                        }
+                    }
+                    DbEvent::StreamStats(DbEventStreamStats::ResetMinTS(stream, min_ts)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match reset_stream_stats_min_ts(&client, &stream, min_ts).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] reset stream stats min_ts error: {}", e);
+                        }
+                    }
+                    DbEvent::CreateTableMeta => {
+                        log::error!("[SQLITE] file_list db shouldn't have meta data");
+                    }
+                    DbEvent::CreateTableFileList => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match create_table(&client).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] create table file_list error: {}", e);
+                        }
+                    }
+                    DbEvent::CreateTableFileListIndex => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match create_table_index(&client).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] create table file_list index error: {}", e);
+                        }
+                    }
+                    DbEvent::Shutdown => {
+                        DB_SHUTDOWN.store(true, std::sync::atomic::Ordering::Relaxed);
+                        break;
+                    }
+                }
+            }
+            log::info!("[SQLITE] file_list db event loop exit");
+        });
+        Arc::new(tx)
+    }
+}
+
+impl Default for SqliteDbChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Table file_list inited flag
 static FILE_LIST_INITED: AtomicBool = AtomicBool::new(false);
