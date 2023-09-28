@@ -157,7 +157,8 @@ export default defineComponent({
       
       let data = JSON.parse(JSON.stringify(await getDashboard(
         store,
-        route.query.dashboard
+        route.query.dashboard,
+        route.query.folder ?? "default"
       )))
       currentDashboardData.data = data;
 
@@ -197,7 +198,7 @@ export default defineComponent({
 
       try {
         // Add the duplicated panel to the dashboard.
-        await addPanel(store, route.query.dashboard, panelData);
+        await addPanel(store, route.query.dashboard, panelData, route.query.folder ?? "default");
 
         // Show a success notification.
         $q.notify({
@@ -304,7 +305,8 @@ export default defineComponent({
       await deletePanel(
         store,
         route.query.dashboard,
-        panelDataElementValue.id
+        panelDataElementValue.id,
+        route.query.folder ?? "default"
       );
       await loadDashboard()
     }

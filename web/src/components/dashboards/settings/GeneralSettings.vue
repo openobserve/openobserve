@@ -28,7 +28,7 @@
             outlined
             filled
             dense
-            :rules="[(val) => !!val || t('dashboard.nameRequired')]"
+            :rules="[(val) => !!(val.trim()) || t('dashboard.nameRequired')]"
           />
           <span>&nbsp;</span>
           <q-input
@@ -53,7 +53,7 @@
               no-caps
             />
             <q-btn
-              :disable="dashboardData.title === ''"
+              :disable="dashboardData.title.trim() === ''"
               :label="t('dashboard.save')"
               class="q-mb-md text-bold no-border q-ml-md"
               color="secondary"
@@ -111,7 +111,7 @@ import { useQuasar } from "quasar";
 
       const saveDashboardApi = useLoading(async () => {
         // get the latest dashboard data and update the title and description
-        const data = JSON.parse(JSON.stringify(await getDashboard(store, route.query.dashboard)));
+        const data = JSON.parse(JSON.stringify(await getDashboard(store, route.query.dashboard, route.query.folder ?? "default")));
 
         // update the values
         data.title = dashboardData.title;
@@ -122,7 +122,8 @@ import { useQuasar } from "quasar";
           store,
           store.state.selectedOrganization.identifier,
           route.query.dashboard,
-          data
+          data,
+          route?.query?.folder ?? "default"
         )
 
         $q.notify({

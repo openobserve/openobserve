@@ -31,7 +31,7 @@
               <div class="textbox col">
                 <q-input v-model="variableData.name" class="showLabelOnTop q-mr-sm"
                   :label="t('dashboard.nameOfVariable') + ' *'" dense filled outlined stack-label
-                  :rules="[(val: any) => !!val || 'Field is required!']"></q-input>
+                  :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"></q-input>
               </div>
               <div class="textbox col">
                 <q-input v-model="variableData.label" class="showLabelOnTop" :label="t('dashboard.labelOfVariable')" dense
@@ -72,7 +72,7 @@
           </div>
           <div class="textbox" v-if="['constant'].includes(variableData.type)">
             <q-input class="showLabelOnTop" v-model="variableData.value" :label="t('dashboard.ValueOfVariable') + ' *'"
-              dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']"></q-input>
+              dense filled outlined stack-label :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"></q-input>
           </div>
           <div class="textbox" v-if="['textbox'].includes(variableData.type)">
             <q-input class="showLabelOnTop" v-model="variableData.value" :label="t('dashboard.DefaultValue')"
@@ -81,10 +81,10 @@
           <!-- show the auto add variables for the custom fields -->
           <div v-if="variableData.type == 'custom'">
             <div v-for="(option, index) in variableData.options" :key="index" class="row">
-              <q-input dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']"
+              <q-input dense filled outlined stack-label :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
                 class="col textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].label"
                 :label="'Label ' + (index + 1) + ' *'" name="label" />
-              <q-input dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']"
+              <q-input dense filled outlined stack-label :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
                 class="col textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].value"
                 :label="'Value ' + (index + 1) + ' *'" name="value" />
               <div>
@@ -217,7 +217,8 @@ export default defineComponent({
            store,
            dashId,
            props.variableName,
-           toRaw(variableData)
+           toRaw(variableData),
+           route.query.folder ?? "default"
          );
          emit('save');
 
@@ -240,7 +241,8 @@ export default defineComponent({
         await addVariable(
         store,
         dashId,
-        variableData
+        variableData,
+        route.query.folder ?? "default"
         );
         emit('save');
       } 

@@ -140,7 +140,8 @@ function findDashboard(dashboardId: string, store: any) {
 export const addPanel = async (
   store: any,
   dashboardId: any,
-  panelData: any
+  panelData: any,
+  folderId?: any
 ) => {
   // get the object of panel data
   // find the dashboard and add the panel data to dashboard object
@@ -197,21 +198,23 @@ export const addPanel = async (
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
-    currentDashboard
+    currentDashboard,
+    folderId ?? "default"
   );
 };
 
 export const addVariable = async (
   store: any,
   dashboardId: any,
-  variableData: any
+  variableData: any,
+  folderId?: any
 ) => {
 
   if (
     !store.state.organizationData.allDashboardList ||
     store.state.organizationData.allDashboardList.length == 0
   ) {
-    await getAllDashboards(store);
+    await getAllDashboards(store,folderId ?? "default");
   }
 
   const currentDashboard = findDashboard(dashboardId, store);
@@ -236,19 +239,25 @@ export const addVariable = async (
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
-    currentDashboard
+    currentDashboard,
+    folderId ?? "default"
   );
 };
 
 export const deleteVariable = async (
   store: any,
   dashboardId: any,
-  variableName: any
+  variableName: any,
+  folderId?: any
 ) => {
   // get the object of panel id
   // find the dashboard and remove the panel data to dashboard object
   // call the update dashboard function
   const currentDashboard = findDashboard(dashboardId, store);
+
+
+  console.log(currentDashboard,"currentDashboard");
+  
 
   //remove panel from current dashboard
   const variableIndex = currentDashboard.variables.list.findIndex(
@@ -257,18 +266,20 @@ export const deleteVariable = async (
   currentDashboard.variables.list.splice(variableIndex, 1);
   currentDashboard.variables.list = currentDashboard.variables.list;
 
-  await updateDashboard(
+  return await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
-    currentDashboard
+    currentDashboard,
+    folderId ?? "default"
   );
 };
 
 export const deletePanel = async (
   store: any,
   dashboardId: any,
-  panelId: any
+  panelId: any,
+  folderId?: any
 ) => {
   // get the object of panel id
   // find the dashboard and remove the panel data to dashboard object
@@ -293,7 +304,8 @@ export const deletePanel = async (
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
-    currentDashboard
+    currentDashboard,
+    folderId ?? "default"
   );
 };
 
@@ -301,7 +313,8 @@ export const updateVariable = async (
   store: any,
   dashboardId: any,
   variableName: any,
-  variableData: any
+  variableData: any,
+  folderId?: any
 ) => {
   // get the object of panel id
   // find the dashboard and remove the panel data to dashboard object
@@ -328,14 +341,16 @@ export const updateVariable = async (
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
-    currentDashboard
+    currentDashboard,
+    folderId ?? "default"
   );
 };
 
 export const updatePanel = async (
   store: any,
   dashboardId: any,
-  panelData: any
+  panelData: any,
+  folderId?: any
 ) => {
   // get the object of panel id
   // find the dashboard and remove the panel data to dashboard object
@@ -352,7 +367,8 @@ export const updatePanel = async (
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
-    currentDashboard
+    currentDashboard,
+    folderId ?? "default"
   );
 };
 
@@ -360,35 +376,36 @@ export const updateDashboard = async (
   store: any,
   org: any,
   dashboardId: any,
-  currentDashboardData: any
+  currentDashboardData: any,
+  folderId?: any
 ) => {
   // make an api call to update the dashboard
   return await dashboardService
-    .save(org, dashboardId, currentDashboardData)
+    .save(org, dashboardId, currentDashboardData, folderId ?? "default")
     .then(async (res) => {
       // update dashboardList
-      await getAllDashboards(store);
+      await getAllDashboards(store, folderId ?? "default");
     }).catch((error) => {
       return error
     });
 };
 
-export const getDashboard = async (store: any, dashboardId: any) => {
+export const getDashboard = async (store: any, dashboardId: any, folderId?: any) => {
   if (
     !store.state.organizationData.allDashboardList ||
     store.state.organizationData.allDashboardList.length == 0
   ) {
-    await getAllDashboards(store);
+    await getAllDashboards(store, folderId ?? "default");
   }
   return findDashboard(dashboardId, store);
 };
 
-export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
+export const getPanel = async (store: any, dashboardId: any, panelId: any, folderId?: any) => {
   if (
     !store.state.organizationData.allDashboardList ||
     store.state.organizationData.allDashboardList.length == 0
   ) {
-    await getAllDashboards(store);
+    await getAllDashboards(store, folderId ?? "default");
   }
   const currentDashboard = findDashboard(dashboardId, store);
   
