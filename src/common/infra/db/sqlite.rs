@@ -60,7 +60,19 @@ fn connect() -> Pool<Sqlite> {
     let pool_opts = SqlitePoolOptions::new()
         .min_connections(1)
         .max_connections(1)
-        .acquire_timeout(Duration::from_secs(60));
+        .acquire_timeout(Duration::from_secs(60))
+        .after_connect(|_, _| {
+            Box::pin(async move {
+                log::info!("[SQLITE] meta db connected");
+                Ok(())
+            })
+        })
+        .after_release(|_, _| {
+            Box::pin(async move {
+                log::info!("[SQLITE] meta db connected");
+                Ok(true)
+            })
+        });
     pool_opts.connect_lazy_with(db_opts)
 }
 
