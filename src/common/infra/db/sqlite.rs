@@ -47,7 +47,8 @@ const DB_RETRY_TIMES: usize = 5;
 /// Database shutdown flag
 static DB_SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
-pub static CLIENT: Lazy<Pool<Sqlite>> = Lazy::new(connect);
+pub static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
+pub static CLIENT_RW: Lazy<Pool<Sqlite>> = Lazy::new(connect_rw);
 pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
 
 static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
@@ -56,7 +57,7 @@ static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
 type EventChannel = Arc<mpsc::Sender<Event>>;
 type DbChannel = Arc<mpsc::Sender<DbEvent>>;
 
-fn connect() -> Pool<Sqlite> {
+fn connect_rw() -> Pool<Sqlite> {
     let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
     if !CONFIG.common.local_mode && std::path::Path::new(&url).exists() {
         std::fs::remove_file(&url).expect("remove file sqlite failed");
@@ -73,18 +74,49 @@ fn connect() -> Pool<Sqlite> {
         .create_if_missing(true);
 
     let pool_opts = SqlitePoolOptions::new()
-        .min_connections(10)
-        .max_connections(1024)
+        .min_connections(1)
+        .max_connections(1)
         .acquire_timeout(Duration::from_secs(30))
         .after_connect(|_, _| {
             Box::pin(async move {
-                log::info!("[SQLITE] db connected");
+                log::info!("[SQLITE] db rw connected");
                 Ok(())
             })
         })
         .after_release(|_, _| {
             Box::pin(async move {
-                log::info!("[SQLITE] db released");
+                log::info!("[SQLITE] db rw released");
+                Ok(true)
+            })
+        });
+    pool_opts.connect_lazy_with(db_opts)
+}
+
+fn connect_ro() -> Pool<Sqlite> {
+    let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
+    let db_opts = SqliteConnectOptions::from_str(&url)
+        .expect("sqlite connect options create failed")
+        .journal_mode(SqliteJournalMode::Wal)
+        .synchronous(SqliteSynchronous::Normal)
+        .locking_mode(SqliteLockingMode::Normal)
+        .busy_timeout(Duration::from_secs(30))
+        .disable_statement_logging()
+        .read_only(true)
+        .create_if_missing(true);
+
+    let pool_opts = SqlitePoolOptions::new()
+        .min_connections(10)
+        .max_connections(1000)
+        .acquire_timeout(Duration::from_secs(30))
+        .after_connect(|_, _| {
+            Box::pin(async move {
+                log::info!("[SQLITE] db ro connected");
+                Ok(())
+            })
+        })
+        .after_release(|_, _| {
+            Box::pin(async move {
+                log::info!("[SQLITE] db ro released");
                 Ok(true)
             })
         });
@@ -154,7 +186,7 @@ impl SqliteDbChannel {
 
     fn handle_db_channel() -> DbChannel {
         let (tx, mut rx) = mpsc::channel::<DbEvent>(100000);
-        let client = CLIENT.clone();
+        let client = CLIENT_RW.clone();
         tokio::task::spawn(async move {
             loop {
                 let event = match rx.recv().await {
@@ -400,7 +432,7 @@ impl super::Db for SqliteDb {
     }
 
     async fn stats(&self) -> Result<super::Stats> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let keys_count: i64 = sqlx::query_scalar(r#"SELECT COUNT(*) as num FROM meta;"#)
             .fetch_one(&pool)
             .await
@@ -416,7 +448,7 @@ impl super::Db for SqliteDb {
 
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let value: String = match sqlx::query_scalar(
             r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
         )
@@ -470,7 +502,7 @@ impl super::Db for SqliteDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
             .await?;
@@ -497,7 +529,7 @@ impl super::Db for SqliteDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
             .await?;
@@ -524,7 +556,7 @@ impl super::Db for SqliteDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RO.clone();
         let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
         Ok(count)
     }

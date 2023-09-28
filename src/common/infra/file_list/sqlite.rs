@@ -22,7 +22,7 @@ use crate::common::{
     infra::{
         config::CONFIG,
         db::{
-            sqlite::{CHANNEL, CLIENT},
+            sqlite::{CHANNEL, CLIENT_RO as CLIENT},
             DbEvent, DbEventFileList, DbEventStreamStats,
         },
         errors::{Error, Result},
