@@ -375,6 +375,10 @@ const useLogs = () => {
         timestamps.startTime != "Invalid Date" &&
         timestamps.endTime != "Invalid Date"
       ) {
+        if (timestamps.startTime > timestamps.endTime) {
+          showErrorNotification("Start time cannot be greater than end time");
+          return false;
+        }
         searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
 
         req.query.start_time = timestamps.startTime;
