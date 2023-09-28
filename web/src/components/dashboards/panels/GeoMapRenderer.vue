@@ -21,7 +21,6 @@
 import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
-import * as mapData  from "./../../../locales/languages/map.json"
 import L from 'leaflet';
 import '@/utils/dashboard/leaflet-echarts/index';
 
@@ -58,9 +57,9 @@ export default defineComponent({
             await nextTick();
             await nextTick();
             await nextTick();
-            const theme = store.state.theme === 'dark' ? 'dark' : 'light';
-            chart = echarts.init(chartRef.value, theme);
-            console.log("theme ", theme);
+            // const theme = store.state.theme === 'dark' ? 'dark' : 'light';
+            chart = echarts.init(chartRef.value);
+            // console.log("theme ", theme);
 
             const options = {
                 ...props.data.options,

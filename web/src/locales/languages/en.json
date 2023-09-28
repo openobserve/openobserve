@@ -326,7 +326,10 @@
     "sql": "Query",
     "back": "<< Back",
     "auto": "Auto",
-    "promQL": "PromQL"
+    "promQL": "PromQL",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "weight": "Weight"
   },
   "alerts": {
     "header": "Alerts",

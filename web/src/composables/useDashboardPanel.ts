@@ -32,67 +32,74 @@ const colors = [
   '#c4ccd3'
 ]
 
-const getDefaultDashboardPanelData :any = () => ({
-    data: {
-      version: 2,
-      id: "",
-      type: "bar",
-      title: "",
-      description: "",
-      config: {
-        show_legends: true,
-        legends_position: null,
-        unit: null,
-        unit_custom: null,
+const getDefaultDashboardPanelData: any = () => ({
+  data: {
+    version: 2,
+    id: "",
+    type: "bar",
+    title: "",
+    description: "",
+    config: {
+      show_legends: true,
+      legends_position: null,
+      unit: null,
+      unit_custom: null,
+      basemap: {
+        type: "osm",
       },
-      queryType: "sql",
-      queries: [
-        {
-          query: "",
-          customQuery: false,
-          fields: {
-            stream: "",
-            stream_type: "logs",
-            x: [],
-            y: [],
-            z: [],
-            filter: [],
-          },
-          config: {
-            promql_legend: "",
-          },
+    },
+    queryType: "sql",
+    queries: [
+      {
+        query: "",
+        customQuery: false,
+        fields: {
+          stream: "",
+          stream_type: "logs",
+          x: [],
+          y: [],
+          z: [],
+          filter: [],
+          latitude: null,
+          longitude: null,
+          weight: null,
         },
-      ],
+        config: {
+          promql_legend: "",
+          layer_type: "scatter",
+          weight_fixed: 1,
+        },
+      },
+    ],
+  },
+  layout: {
+    splitter: 20,
+    querySplitter: 20,
+    showQueryBar: false,
+    isConfigPanelOpen: false,
+    currentQueryIndex: 0,
+  },
+  meta: {
+    parsedQuery: "",
+    dragAndDrop: {
+      dragging: false,
+      dragElement: null,
     },
-    layout: {
-      splitter: 20,
-      querySplitter: 20,
-      showQueryBar: false,
-      isConfigPanelOpen: false,
-      currentQueryIndex: 0
+    errors: {
+      queryErrors: [],
     },
-    meta: {
-      parsedQuery: "",
-      dragAndDrop: {
-        dragging: false,
-        dragElement: null
-      },
-      errors: {
-        queryErrors: []
-      },
-      editorValue: "",
-      dateTime: {start_time: "", end_time: ""},
-      filterValue: <any>[],
-      stream: {
-        selectedStreamFields: [],
-        customQueryFields: [],
-        functions: [],
-        streamResults: <any>[],
-        filterField: "",
-      },
-    }
-  }
-)
+    editorValue: "",
+    dateTime: { start_time: "", end_time: "" },
+    filterValue: <any>[],
+    stream: {
+      selectedStreamFields: [],
+      customQueryFields: [],
+      functions: [],
+      streamResults: <any>[],
+      filterField: "",
+    },
+  },
+});
 
 let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData()});
 
@@ -279,6 +286,26 @@ const removeQuery = (index: number) => {
     updateArrayAlias();
   };
 
+  const addLatitude = (value: any) => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.latitude = value.name;
+    console.log("latitude", value.name);
+    
+  };
+
+  const addLongitude = (value: any) => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.longitude = value.name;
+  };
+
+  const addWeight = (value: any) => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.weight = value.name;
+  };
+
   // get new color value based on existing color from the chart
   const getNewColorValue = () => {
    const YAxisColor = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.map((it: any)=> it.color)
@@ -377,6 +404,24 @@ const removeQuery = (index: number) => {
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.splice(index, 1)
     }
   }
+
+  const removeLatitude = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.latitude = null;
+  };
+
+  const removeLongitude = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.longitude = null;
+  };
+
+  const removeWeight = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.weight = null;
+  };
 
   const addFilteredItem = (name: string) => {
     if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter) {
@@ -608,10 +653,16 @@ const loadFilterItem = (name:any)=>{
     addXAxisItem,
     addYAxisItem,
     addZAxisItem,
+    addLatitude,
+    addLongitude,
+    addWeight,
     removeXAxisItem,
     removeYAxisItem,
     removeZAxisItem,
     removeFilterItem,
+    removeLatitude,
+    removeLongitude,
+    removeWeight,
     addFilteredItem,
     loadFilterItem,
     removeXYFilters,

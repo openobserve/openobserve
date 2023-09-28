@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div v-if="!promqlMode">
+  <div v-if="!promqlMode && dashboardPanelData.data.type != 'map'">
     <div style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis') }}
       <q-icon name="info_outline" class="q-ml-xs" >
@@ -436,6 +436,7 @@
 
     </div>
   </div>
+  <DashboardMapQueryBuilder/>
 </template>
 
 <script lang="ts">
@@ -443,10 +444,11 @@ import { defineComponent, ref, reactive, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
+import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
-  components: {},
+  components: { DashboardMapQueryBuilder },
   setup() {
     const showXAxis = ref(true);
     const panelName = ref("");

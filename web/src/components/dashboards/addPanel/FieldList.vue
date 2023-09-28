@@ -70,7 +70,7 @@
                   {{ props.row.name }}
                 </div>
                 <div class="field_icons"
-                  v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))">
+                  v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length) || dashboardPanelData.data.type == 'map')">
                   <q-btn padding="sm" :disabled="isAddXAxisNotAllowed" @click="addXAxisItem(props.row)"  data-test="dashboard-add-x-data">
                     <div>
                       {{
@@ -92,6 +92,22 @@
                     <div>+F</div>
                   </q-btn>
                 </div>
+                <div class="field_icons"
+                    v-if="dashboardPanelData.data.type == 'map'">
+                    <q-btn padding="sm" @click="addLatitude(props.row)"  data-test="dashboard-add-x-data">
+                      <div>
+                        +lat
+                      </div>
+                    </q-btn>
+                    <q-btn padding="sm" @click="addLongitude(props.row)" data-test="dashboard-add-y-data">
+                      <div>
+                        +lng
+                      </div>
+                    </q-btn>
+                    <q-btn  padding="sm" @click="addWeight(props.row)">
+                       <div>+W</div>
+                      </q-btn>
+                  </div>
               </div>
             </q-td>
           </q-tr>
@@ -135,7 +151,7 @@ export default defineComponent({
     });
     const filteredStreams = ref([]);
     const $q = useQuasar();
-    const { dashboardPanelData, addXAxisItem, addYAxisItem, addZAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, isAddZAxisNotAllowed, promqlMode } =
+    const { dashboardPanelData, addXAxisItem, addYAxisItem, addZAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, isAddZAxisNotAllowed, promqlMode, addLatitude, addLongitude, addWeight } =
       useDashboardPanelData();
       
     const streamDataLoading = useLoading(async ()=>{
@@ -269,6 +285,9 @@ export default defineComponent({
       addXAxisItem,
       addYAxisItem,
       addZAxisItem,
+      addLatitude,
+      addLongitude,
+      addWeight,
       addFilteredItem,
       data,
       getStreamList,
