@@ -47,14 +47,14 @@ fn connect() -> Pool<Sqlite> {
         .expect("sqlite connect options create failed")
         .journal_mode(SqliteJournalMode::Wal)
         .synchronous(SqliteSynchronous::Normal)
-        .locking_mode(SqliteLockingMode::Exclusive)
+        .locking_mode(SqliteLockingMode::Normal)
         .busy_timeout(Duration::from_secs(10))
         .disable_statement_logging()
         .create_if_missing(true);
 
     let pool_opts = SqlitePoolOptions::new()
-        .min_connections(1)
-        .max_connections(1)
+        .min_connections(10)
+        .max_connections(512)
         .acquire_timeout(Duration::from_secs(60))
         .after_connect(|_, _| {
             Box::pin(async move {
