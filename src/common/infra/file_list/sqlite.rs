@@ -54,7 +54,8 @@ fn connect() -> Pool<Sqlite> {
 
     let pool_opts = SqlitePoolOptions::new()
         .min_connections(1)
-        .max_connections(1);
+        .max_connections(1)
+        .acquire_timeout(Duration::from_secs(60));
     pool_opts.connect_lazy_with(db_opts)
 }
 
@@ -78,11 +79,11 @@ impl Default for SqliteFileList {
 #[async_trait]
 impl super::FileList for SqliteFileList {
     async fn create_table(&self) -> Result<()> {
-        create_table(&CLIENT).await
+        create_table(&CLIENT.clone()).await
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        create_table_index(&CLIENT).await
+        create_table_index(&CLIENT.clone()).await
     }
 
     async fn set_initialised(&self) -> Result<()> {
@@ -94,19 +95,19 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
-        add(&CLIENT, file, meta).await
+        add(&CLIENT.clone(), file, meta).await
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        batch_remove(&CLIENT, &[file.to_string()]).await
+        batch_remove(&CLIENT.clone(), &[file.to_string()]).await
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
-        batch_add(&CLIENT, files).await
+        batch_add(&CLIENT.clone(), files).await
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
-        batch_remove(&CLIENT, files).await
+        batch_remove(&CLIENT.clone(), files).await
     }
 
     async fn get(&self, file: &str) -> Result<FileMeta> {
@@ -284,7 +285,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         org_id: &str,
         streams: &[(String, StreamStats)],
     ) -> Result<()> {
-        set_stream_stats(&CLIENT, org_id, streams).await
+        set_stream_stats(&CLIENT.clone(), org_id, streams).await
     }
 
     async fn reset_stream_stats_min_ts(
@@ -293,7 +294,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         stream: &str,
         min_ts: i64,
     ) -> Result<()> {
-        reset_stream_stats_min_ts(&CLIENT, stream, min_ts).await
+        reset_stream_stats_min_ts(&CLIENT.clone(), stream, min_ts).await
     }
 
     async fn reset_stream_stats(&self) -> Result<()> {

@@ -59,7 +59,8 @@ fn connect() -> Pool<Sqlite> {
 
     let pool_opts = SqlitePoolOptions::new()
         .min_connections(1)
-        .max_connections(1);
+        .max_connections(1)
+        .acquire_timeout(Duration::from_secs(60));
     pool_opts.connect_lazy_with(db_opts)
 }
 
@@ -140,7 +141,7 @@ impl Default for SqliteDb {
 #[async_trait]
 impl super::Db for SqliteDb {
     async fn create_table(&self) -> Result<()> {
-        create_table(&CLIENT).await
+        create_table(&CLIENT.clone()).await
     }
 
     async fn stats(&self) -> Result<super::Stats> {
@@ -179,11 +180,11 @@ impl super::Db for SqliteDb {
     }
 
     async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()> {
-        put(&CLIENT, key, value, need_watch).await
+        put(&CLIENT.clone(), key, value, need_watch).await
     }
 
     async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
-        delete(&CLIENT, key, with_prefix, need_watch).await
+        delete(&CLIENT.clone(), key, with_prefix, need_watch).await
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
