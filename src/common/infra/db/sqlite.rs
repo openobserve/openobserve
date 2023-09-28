@@ -69,7 +69,7 @@ fn connect() -> Pool<Sqlite> {
         })
         .after_release(|_, _| {
             Box::pin(async move {
-                log::info!("[SQLITE] meta db connected");
+                log::info!("[SQLITE] meta db released");
                 Ok(true)
             })
         });

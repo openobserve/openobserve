@@ -64,7 +64,7 @@ fn connect() -> Pool<Sqlite> {
         })
         .after_release(|_, _| {
             Box::pin(async move {
-                log::info!("[SQLITE] file_list db connected");
+                log::info!("[SQLITE] file_list db released");
                 Ok(true)
             })
         });
