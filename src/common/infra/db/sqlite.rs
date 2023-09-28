@@ -17,7 +17,10 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use once_cell::sync::Lazy;
 use sqlx::{
-    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
+    sqlite::{
+        SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode, SqlitePoolOptions,
+        SqliteSynchronous,
+    },
     ConnectOptions, Pool, Sqlite,
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
@@ -49,6 +52,7 @@ fn connect() -> Pool<Sqlite> {
         .expect("sqlite connect options create failed")
         .journal_mode(SqliteJournalMode::Wal)
         .synchronous(SqliteSynchronous::Normal)
+        .locking_mode(SqliteLockingMode::Exclusive)
         .busy_timeout(Duration::from_secs(10))
         .disable_statement_logging()
         .create_if_missing(true);
