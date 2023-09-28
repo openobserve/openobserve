@@ -369,7 +369,10 @@ async fn handle_existing_schema(
         metadata.extend(inferred_schema.metadata().to_owned());
         let final_schema = Schema::new(final_fields.clone()).with_metadata(metadata);
         if is_schema_changed {
-            log::info!("Acquired lock for stream {} to update schema", stream_name);
+            log::info!(
+                "Acquired lock for cluster stream {} to update schema",
+                stream_name
+            );
             db::schema::set(
                 org_id,
                 stream_name,
@@ -423,7 +426,10 @@ async fn handle_existing_schema(
             metadata.extend(inferred_schema.metadata().to_owned());
             let final_schema = Schema::new(final_fields.clone()).with_metadata(metadata);
             if is_schema_changed {
-                log::info!("Acquired lock for stream {} to update schema", stream_name);
+                log::info!(
+                    "Acquired lock for local stream {} to update schema",
+                    stream_name
+                );
                 db::schema::set(
                     org_id,
                     stream_name,

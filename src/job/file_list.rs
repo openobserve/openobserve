@@ -20,6 +20,7 @@ use crate::common::{
     meta::{stream::StreamParams, StreamType},
     utils::file::scan_files,
 };
+use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if CONFIG.common.local_mode || CONFIG.common.meta_store_external {
@@ -27,7 +28,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(async move { run_move_file_to_s3().await });
-    tokio::task::spawn(async move { run_sync_s3_to_cache().await });
+    // tokio::task::spawn(async move { run_sync_s3_to_cache().await });
 
     Ok(())
 }
@@ -136,20 +137,19 @@ async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error
     }
 }
 
-async fn run_sync_s3_to_cache() -> Result<(), anyhow::Error> {
-    // if !cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
-    //     && !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
-    // {
-    //     return Ok(()); // only querier or compactor need to sync
-    // }
+async fn _run_sync_s3_to_cache() -> Result<(), anyhow::Error> {
+    if !cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
+        && !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
+    {
+        return Ok(()); // only querier or compactor need to sync
+    }
 
-    // let mut interval = time::interval(time::Duration::from_secs(CONFIG.s3.sync_to_cache_interval));
-    // interval.tick().await; // trigger the first run
-    // loop {
-    //     interval.tick().await;
-    //     if let Err(e) = db::file_list::remote::cache_latest_hour().await {
-    //         log::error!("[JOB] File_list sync s3 to cache error: {}", e);
-    //     }
-    // }
-    Ok(())
+    let mut interval = time::interval(time::Duration::from_secs(CONFIG.s3.sync_to_cache_interval));
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        if let Err(e) = db::file_list::remote::cache_latest_hour().await {
+            log::error!("[JOB] File_list sync s3 to cache error: {}", e);
+        }
+    }
 }
