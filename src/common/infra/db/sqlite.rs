@@ -68,9 +68,9 @@ fn connect() -> Pool<Sqlite> {
         .disable_statement_logging()
         .create_if_missing(true);
 
-    let pool_opts = SqlitePoolOptions::new();
-    let pool_opts = pool_opts.min_connections(CONFIG.limit.cpu_num as u32);
-    let pool_opts = pool_opts.max_connections(CONFIG.limit.query_thread_num as u32);
+    let pool_opts = SqlitePoolOptions::new()
+        .min_connections(CONFIG.limit.cpu_num as u32)
+        .max_connections(1024);
     pool_opts.connect_lazy_with(db_opts)
 }
 
@@ -533,23 +533,37 @@ impl super::Db for SqliteDb {
 async fn put(client: &Pool<Sqlite>, key: &str, value: Bytes, need_watch: bool) -> Result<()> {
     let (module, key1, key2) = super::parse_key(key);
     let mut tx = client.begin().await?;
-    sqlx::query(
+    if let Err(e) = sqlx::query(
         r#"INSERT OR IGNORE INTO meta (module, key1, key2, value) VALUES ($1, $2, $3, '');"#,
     )
     .bind(&module)
     .bind(&key1)
     .bind(&key2)
     .execute(&mut *tx)
-    .await?;
-    sqlx::query(r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#)
-        .bind(&module)
-        .bind(&key1)
-        .bind(&key2)
-        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-        .execute(&mut *tx)
-        .await?;
+    .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!("[SQLITE] rollback put meta error: {}", e);
+        }
+        return Err(e.into());
+    }
+    if let Err(e) =
+        sqlx::query(r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#)
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!("[SQLITE] rollback put meta error: {}", e);
+        }
+        return Err(e.into());
+    }
     if let Err(e) = tx.commit().await {
-        log::error!("[SQLITE] commit stream stats error: {}", e);
+        log::error!("[SQLITE] commit put meta error: {}", e);
+        return Err(e.into());
     }
 
     // event watch

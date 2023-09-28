@@ -417,18 +417,26 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
                 if e.is_unique_violation() {
                     true
                 } else {
+                    if let Err(e) = tx.rollback().await {
+                        log::error!("[SQLITE] rollback file_list batch add error: {}", e);
+                    }
                     return Err(Error::Message(e.to_string()));
                 }
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback file_list batch add error: {}", e);
+                }
+                return Err(e.into());
+            }
         };
         if !need_single_insert {
             if let Err(e) = tx.commit().await {
-                log::error!("[SQLITE] commit file_list add error: {}", e);
+                log::error!("[SQLITE] commit file_list batch add error: {}", e);
             }
         } else {
             if let Err(e) = tx.rollback().await {
-                log::error!("[SQLITE] rollback file_list add error: {}", e);
+                log::error!("[SQLITE] rollback file_list batch add error: {}", e);
             }
             for item in files {
                 if let Err(e) = add(client, &item.key, &item.meta).await {
@@ -446,24 +454,34 @@ pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()>
         let mut tx = client.begin().await?;
         for file in files {
             let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-            let ret = sqlx::query(
+            let rows_affected = match sqlx::query(
                 r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
             )
             .bind(stream_key)
             .bind(date_key)
             .bind(file_name)
             .execute(&mut *tx)
-            .await?;
+            .await
+            {
+                Ok(ret) => ret.rows_affected(),
+                Err(e) => {
+                    if let Err(e) = tx.rollback().await {
+                        log::error!("[SQLITE] rollback file_list batch remove error: {}", e);
+                    }
+                    return Err(e.into());
+                }
+            };
             if CONFIG.common.print_key_event {
                 log::info!(
                     "[SQLITE] delete file: {}, affected: {}",
                     file,
-                    ret.rows_affected()
+                    rows_affected
                 );
             }
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit file_list delete error: {}", e);
+            log::error!("[SQLITE] commit file_list batch remove error: {}", e);
+            return Err(e.into());
         }
     }
     Ok(())
@@ -505,20 +523,20 @@ VALUES ($1, $2, 0, 0, 0, 0, 0, 0);
         .execute(&mut *tx)
         .await
         {
-            log::error!(
-                "[SQLITE] insert stream stats error: {}, stream: {}",
-                e,
-                stream_key
-            );
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SQLITE] rollback insert stream stats error: {}", e);
+            }
+            return Err(e.into());
         }
     }
     if let Err(e) = tx.commit().await {
-        log::error!("[SQLITE] commit stream stats error: {}", e);
+        log::error!("[SQLITE] commit set stream stats error: {}", e);
+        return Err(e.into());
     }
 
     let mut tx = client.begin().await?;
     for (stream_key, stats) in update_streams {
-        sqlx::query(
+        if let Err(e) = sqlx::query(
             r#"
 UPDATE stream_stats 
 SET file_num = $1, min_ts = $2, max_ts = $3, records = $4, original_size = $5, compressed_size = $6
@@ -533,10 +551,17 @@ WHERE stream = $7;
         .bind(stats.compressed_size as i64)
         .bind(stream_key)
         .execute(&mut *tx)
-        .await?;
+        .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SQLITE] rollback set stream stats error: {}", e);
+            }
+            return Err(e.into());
+        }
     }
     if let Err(e) = tx.commit().await {
-        log::error!("[SQLITE] commit stream stats error: {}", e);
+        log::error!("[SQLITE] commit set stream stats error: {}", e);
+        return Err(e.into());
     }
 
     Ok(())
