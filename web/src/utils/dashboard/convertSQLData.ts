@@ -800,7 +800,6 @@ export const convertSQLData = (
       });
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
-      // options.xAxis = options.xAxis.slice(field,1);
       options.tooltip.formatter = function (name: any) {
         if (name.length == 0) return "";
   
@@ -854,13 +853,8 @@ export const convertSQLData = (
           it,
         ]);
       });
-      // options.xAxis = options.xAxis.slice(0,1);
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
-      // options.xAxis[0].axisLabel= {
-      //   show:true
-      // };
-      // options.xAxis[0].axisTick= null;
       options.tooltip.formatter = null;
       options.tooltip.axisPointer = {
         type: "cross",
