@@ -368,7 +368,7 @@ export default defineComponent({
         path: "/dashboards",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folderId: folders.value[activeFolder.value]?.folderId || "default"
+          folder: folders.value[activeFolder.value]?.folderId || "default"
         },
       });
     });
@@ -378,7 +378,7 @@ export default defineComponent({
         path: "/dashboards",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folderId: folders.value[activeFolder.value]?.folderId || "default"
+          folder: folders.value[activeFolder.value]?.folderId || "default"
         },
       })
     });
@@ -389,7 +389,7 @@ export default defineComponent({
         path: "/dashboards",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folderId: folders.value[activeFolder.value]?.folderId || "default"
+          folder: folders.value[activeFolder.value]?.folderId || "default"
         },
       });
     });
@@ -466,7 +466,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.identifier,
-          folderId: folders?.value[activeFolder?.value]?.folderId || "default"
+          folder: folders?.value[activeFolder?.value]?.folderId || "default"
         },
       });
     };
@@ -530,11 +530,6 @@ export default defineComponent({
 
       folders.value = await getFoldersList(store);
       await getDashboards();
-
-      $router.push({
-        path: "/dashboards",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
-      });
     }
 
     const editFolder = (index : any) => {      
