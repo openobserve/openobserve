@@ -202,6 +202,8 @@ pub async fn remote_write(
                 return Ok(());
             }
 
+            log::info!("prom: after prom_ha_handler: stream {:?}", &metric_name);
+
             // check for schema
             let _schema_exists = stream_schema_exists(
                 org_id,
@@ -210,6 +212,8 @@ pub async fn remote_write(
                 &mut metric_schema_map,
             )
             .await;
+
+            log::info!("prom: stream_schema_exists: stream {:?}", &metric_name);
 
             // get partition keys
             if !stream_partitioning_map.contains_key(&metric_name) {
