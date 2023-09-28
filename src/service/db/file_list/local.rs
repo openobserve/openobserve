@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use once_cell::sync::Lazy;
+use tokio::sync::RwLock;
+
 use crate::common::{
     infra::{config::CONFIG, file_list, wal},
     meta::{
@@ -21,6 +24,10 @@ use crate::common::{
     },
     utils::json,
 };
+
+/// use queue to batch send broadcast to other nodes
+pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
+    Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
 
 pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(), anyhow::Error> {
     let (_stream_key, date_key, _file_name) = file_list::parse_file_key_columns(key)?;
@@ -54,8 +61,10 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
     file.write(write_buf.as_ref()).await;
 
     // notifiy other nodes
-    tokio::task::spawn(async move { super::broadcast::send(&[file_data], None).await });
-    tokio::task::yield_now().await;
+    if !CONFIG.common.local_mode {
+        let mut q = BROADCAST_QUEUE.write().await;
+        q.push(file_data);
+    }
 
     Ok(())
 }
