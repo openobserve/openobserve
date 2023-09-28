@@ -278,6 +278,8 @@ pub async fn remote_write(
             )
             .await;
 
+            log::info!("prom: chk_schema_by_record: stream {:?}", &metric_name);
+
             // get hour key
             let hour_key = crate::service::ingestion::get_wal_time_key(
                 timestamp,
@@ -288,6 +290,8 @@ pub async fn remote_write(
             );
             let hour_buf = buf.entry(hour_key).or_default();
             hour_buf.push(value_str);
+
+            log::info!("prom: get_wal_time_key: stream {:?}", &metric_name);
 
             // real time alert
             if !stream_alerts_map.is_empty() {
@@ -356,6 +360,8 @@ pub async fn remote_write(
             Some(CONFIG.limit.metrics_file_retention.as_str().into())
         };
 
+        log::info!("prom: starting write file: stream");
+
         let mut req_stats = write_file(
             stream_data,
             thread_id,
@@ -377,6 +383,8 @@ pub async fn remote_write(
         )
         .await;
     }
+
+    log::info!("prom: handle stream alerts");
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in &stream_trigger_map {
