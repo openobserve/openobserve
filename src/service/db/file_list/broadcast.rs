@@ -30,7 +30,7 @@ type EventChannel = Arc<mpsc::UnboundedSender<Vec<FileKey>>>;
 
 /// send an event to broadcast, will create a new channel for each nodes
 pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), anyhow::Error> {
-    if CONFIG.common.local_mode {
+    if CONFIG.common.local_mode || items.is_empty() {
         return Ok(());
     }
     let nodes = if node_uuid.is_none() {

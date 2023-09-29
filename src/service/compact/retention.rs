@@ -407,7 +407,8 @@ async fn write_file_list_s3(
             let mut cache_success = true;
             for event in &events {
                 if let Err(e) =
-                    db::file_list::progress(&event.key, event.meta, event.deleted, false).await
+                    db::file_list::progress(&event.key, Some(&event.meta), event.deleted, false)
+                        .await
                 {
                     cache_success = false;
                     log::error!(

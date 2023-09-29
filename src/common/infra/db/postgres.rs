@@ -105,15 +105,24 @@ INSERT INTO meta (module, key1, key2, value)
         .bind(&key2)
         .execute(&mut *tx)
         .await?;
-        sqlx::query(r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#)
-            .bind(&module)
-            .bind(&key1)
-            .bind(&key2)
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-            .execute(&mut *tx)
-            .await?;
+        if let Err(e) = sqlx::query(
+            r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
+        )
+        .bind(&module)
+        .bind(&key1)
+        .bind(&key2)
+        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+        .execute(&mut *tx)
+        .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback put meta error: {}", e);
+            }
+            return Err(e.into());
+        }
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit stream stats error: {}", e);
+            log::error!("[POSTGRES] commit put meta error: {}", e);
+            return Err(e.into());
         }
 
         // event watch
@@ -255,7 +264,7 @@ pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
     // create table
-    sqlx::query(
+    if let Err(e) = sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS meta
 (
@@ -268,20 +277,49 @@ CREATE TABLE IF NOT EXISTS meta
         "#,
     )
     .execute(&mut *tx)
-    .await?;
+    .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] rollback create table meta error: {}", e);
+        }
+        return Err(e.into());
+    }
+
     // create table index
-    sqlx::query("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);")
+    if let Err(e) = sqlx::query("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);")
         .execute(&mut *tx)
-        .await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);")
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query(
+        .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] rollback create table meta index error: {}", e);
+        }
+        return Err(e.into());
+    }
+    if let Err(e) =
+        sqlx::query("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);")
+            .execute(&mut *tx)
+            .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] rollback create table meta index error: {}", e);
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = sqlx::query(
         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (module, key1, key2);",
     )
     .execute(&mut *tx)
-    .await?;
-    tx.commit().await?;
+    .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] rollback create table meta index error: {}", e);
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = tx.commit().await {
+        log::error!("[POSTGRES] commit create table meta error: {}", e);
+        return Err(e.into());
+    }
 
     Ok(())
 }

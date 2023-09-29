@@ -53,11 +53,13 @@ use openobserve::{
         grpc::{
             auth::check_auth,
             cluster_rpc::{
-                event_server::EventServer, metrics_server::MetricsServer,
-                search_server::SearchServer, usage_server::UsageServer,
+                event_server::EventServer, filelist_server::FilelistServer,
+                metrics_server::MetricsServer, search_server::SearchServer,
+                usage_server::UsageServer,
             },
             request::{
                 event::Eventer,
+                filelist::Filelister,
                 logs::LogsServer,
                 metrics::{ingester::Ingester, querier::Querier},
                 search::Searcher,
@@ -269,6 +271,9 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
     let search_svc = SearchServer::new(Searcher)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
+    let filelist_svc = FilelistServer::new(Filelister)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
     let metrics_svc = MetricsServer::new(Querier)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
@@ -292,6 +297,7 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
             .layer(tonic::service::interceptor(check_auth))
             .add_service(event_svc)
             .add_service(search_svc)
+            .add_service(filelist_svc)
             .add_service(metrics_svc)
             .add_service(metrics_ingest_svc)
             .add_service(trace_svc)

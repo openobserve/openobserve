@@ -117,7 +117,7 @@ pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLoc
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
-pub static LOCAL_SCHEMA_LOCKER: Lazy<RwHashMap<String, tokio::sync::RwLock<bool>>> =
+pub static LOCAL_SCHEMA_LOCKER: Lazy<RwAHashMap<String, tokio::sync::RwLock<bool>>> =
     Lazy::new(|| Arc::new(Default::default)());
 
 #[derive(EnvConfig)]

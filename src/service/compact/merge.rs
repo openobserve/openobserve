@@ -179,7 +179,7 @@ pub async fn merge_by_stream(
                 deleted: false,
             });
             for file in new_file_list.iter() {
-                stream_stats = stream_stats - file.meta;
+                stream_stats = stream_stats - file.meta.clone();
                 events.push(FileKey {
                     key: file.key.clone(),
                     meta: FileMeta::default(),
@@ -489,7 +489,7 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
         let mut cache_success = true;
         for event in events.iter() {
             if let Err(e) =
-                db::file_list::progress(&event.key, event.meta, event.deleted, false).await
+                db::file_list::progress(&event.key, Some(&event.meta), event.deleted, false).await
             {
                 cache_success = false;
                 log::error!("[COMPACT] set local cache failed, retrying: {}", e);

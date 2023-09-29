@@ -21,7 +21,11 @@ use tokio::sync::mpsc;
 
 use crate::common::{
     infra::{config::CONFIG, errors::Result},
-    meta::{common::FileKey, meta_store::MetaStore, stream::StreamStats},
+    meta::{
+        common::{FileKey, FileMeta},
+        meta_store::MetaStore,
+        stream::StreamStats,
+    },
 };
 
 pub mod dynamo;
@@ -169,6 +173,7 @@ pub struct MetaRecord {
     pub value: String,
 }
 
+#[derive(Debug)]
 pub enum DbEvent {
     Meta(DbEventMeta),
     FileList(DbEventFileList),
@@ -184,15 +189,45 @@ pub enum DbEventMeta {
     Delete(String, bool, bool),
 }
 
+impl std::fmt::Debug for DbEventMeta {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DbEventMeta::Put(key, _, _) => write!(f, "Put({})", key),
+            DbEventMeta::Delete(key, _, _) => write!(f, "Delete({})", key),
+        }
+    }
+}
+
 pub enum DbEventFileList {
-    Add(Vec<FileKey>),
+    Add(String, FileMeta),
+    BatchAdd(Vec<FileKey>),
     Remove(Vec<String>),
     Initialized,
+}
+
+impl std::fmt::Debug for DbEventFileList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DbEventFileList::Add(key, _) => write!(f, "Add({})", key),
+            DbEventFileList::BatchAdd(keys) => write!(f, "BatchAdd({})", keys.len()),
+            DbEventFileList::Remove(keys) => write!(f, "Remove({})", keys.len()),
+            DbEventFileList::Initialized => write!(f, "Initialized"),
+        }
+    }
 }
 
 pub enum DbEventStreamStats {
     Set(String, Vec<(String, StreamStats)>),
     ResetMinTS(String, i64),
+}
+
+impl std::fmt::Debug for DbEventStreamStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DbEventStreamStats::Set(key, _) => write!(f, "Set({})", key),
+            DbEventStreamStats::ResetMinTS(key, _) => write!(f, "ResetMinTS({})", key),
+        }
+    }
 }
 
 #[cfg(test)]

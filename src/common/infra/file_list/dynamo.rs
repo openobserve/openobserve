@@ -124,6 +124,9 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
         for batch in files.chunks(25) {
             let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
             for file in batch {
@@ -142,6 +145,9 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
         for batch in files.chunks(25) {
             let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
             for file in batch {
