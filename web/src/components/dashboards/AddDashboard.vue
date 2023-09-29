@@ -135,13 +135,9 @@ export default defineComponent({
         description: "default"
       }],
     },
-    activeFolder:{
-      type: Object,
-      default: () => ({
-        folderId: "default",
-        name: "default",
-        description: "default"
-      })
+    activeFolderId:{
+      type: String,
+      default: "default",
     }
   },
   emits: ["update:modelValue", "updated", "finish"],
@@ -153,7 +149,8 @@ export default defineComponent({
     const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
-    const selectedFolder = ref({label: props.activeFolder.name, value: props.activeFolder.folderId});
+    const activeFolder: any = props.folders.find((item) => item.folderId === props.activeFolderId);
+    const selectedFolder = ref({label: activeFolder.name, value: activeFolder.folderId});
 
     //generate random integer number for dashboard Id
     function getRandInteger() {

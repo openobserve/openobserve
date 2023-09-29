@@ -65,6 +65,7 @@
             indicator-color="transparent"
             inline-label
             vertical
+            v-model="activeFolderId"
             @update:model-value="updateActiveFolder"
           >
           <q-tab
@@ -199,7 +200,7 @@
       full-height
       maximized
     >
-      <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolder="activeFolder" />
+      <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolderId="activeFolderId" />
     </q-dialog>
 
     <!-- add/edit folder -->
@@ -209,7 +210,7 @@
       full-height
       maximized
     >
-      <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :model-value="JSON.parse(JSON.stringify(folders.find((folder) => folder.folderId === (selectedFolderToEdit ?? 'default'))))"/>
+      <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :model-value="JSON.parse(JSON.stringify(isFolderEditMode ?  folders.find((folder) => folder.folderId === (selectedFolderToEdit ?? 'default')) : {}))"/>
     </q-dialog>
     
     <!-- move dashboard to another folder -->
@@ -219,7 +220,7 @@
       full-height
       maximized
     >
-      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" @folder-updated="updateFolderList" :dashobardId="selectedDashboardIdToMove" :folderList="folders" :activeFolderId="activeFolder.folderId"/>
+      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" @folder-updated="updateFolderList" :dashobardId="selectedDashboardIdToMove" :folderList="folders" :activeFolderId="activeFolderId"/>
     </q-dialog>
 
     <!-- delete dashboard dialog -->
@@ -289,7 +290,7 @@ export default defineComponent({
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete = ref(null);
     const splitterModel = ref(200);
-    const activeFolder = ref(null);
+    const activeFolderId = ref(null);
     const folders = ref([]);
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
@@ -364,16 +365,16 @@ export default defineComponent({
 
     onMounted(async() => {      
       folders.value = await getFoldersList(store);
-      activeFolder.value = folders.value.find((it:any) => it.folderId === (route.query.folder ?? "default"));      
+      activeFolderId.value = route.query.folder ?? "default";      
     });
 
-    watch(activeFolder, async()=>{
+    watch(activeFolderId, async()=>{
       await getDashboards();
       router.push({
         path: "/dashboards",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: activeFolder.value.folderId || "default"
+          folder: activeFolderId.value || "default"
         },
       });
     },{deep: true});
@@ -423,7 +424,7 @@ export default defineComponent({
       await dashboardService.create(
         store.state.selectedOrganization.identifier,
         data,
-        activeFolder.value.folderId || "default"
+        activeFolderId.value || "default"
       );
 
       await getDashboards();
@@ -450,7 +451,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.identifier,
-          folder: activeFolder.value.folderId || "default"
+          folder: activeFolderId.value || "default"
         },
       });
     };
@@ -459,7 +460,7 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading dashboards...",
       });
-      await getAllDashboards(store,activeFolder.value.folderId || "default");
+      await getAllDashboards(store,activeFolderId.value || "default");
       resultTotal.value = store.state.organizationData.allDashboardList.length;
       dismiss();
     };
@@ -483,7 +484,7 @@ export default defineComponent({
       if (selectedDelete.value) {
         const dashboardId = selectedDelete.value.id;
         await dashboardService
-          .delete(store.state.selectedOrganization.identifier, dashboardId, activeFolder.value.folderId || "default")
+          .delete(store.state.selectedOrganization.identifier, dashboardId, activeFolderId.value || "default")
           .then((res) => {
             const dashboards = toRaw(store.state.organizationData.allDashboardList);
             const newDashboards = dashboards.filter(
@@ -538,7 +539,7 @@ export default defineComponent({
     }
 
     const updateActiveFolder = (it: any) => {
-      activeFolder.value = folders.value.find((folder) => folder.folderId == it);      
+      activeFolderId.value = it;    
     }
 
     const deleteFolder = async() => {
@@ -548,8 +549,8 @@ export default defineComponent({
           //delete folder
           await deleteFolderById(store, selectedFolderDelete.value);
           
-          //check activeFolder to be deleted
-          if(activeFolder.value.folderId === selectedFolderDelete.value) activeFolder.value = { folderId: "default", name: "default", description:"default" };
+          //check activeFolderId to be deleted
+          if(activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
   
           //remove folder from list
           folders.value = folders.value.filter((folder,index) => folder.folderId != selectedFolderDelete.value);
@@ -617,7 +618,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       splitterModel,
       folders,
-      activeFolder,
+      activeFolderId,
       addFolder,
       showAddFolderDialog,
       isFolderEditMode,
@@ -638,7 +639,7 @@ export default defineComponent({
     //after adding dashboard need to update the dashboard list
     async updateDashboardList(dashboardId: any, folderId: any) {
       this.showAddDashboardDialog = false;
-      this.activeFolder = this.folders.find((folder) => folder.folderId == folderId);
+      this.activeFolderId = folderId
       await this.getDashboards();
 
       this.$q.notify({
