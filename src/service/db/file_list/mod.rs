@@ -39,7 +39,7 @@ pub static BLOCKED_ORGS: Lazy<Vec<&str>> =
 
 pub async fn progress(
     key: &str,
-    data: FileMeta,
+    data: Option<&FileMeta>,
     delete: bool,
     download: bool,
 ) -> Result<(), anyhow::Error> {
@@ -52,7 +52,7 @@ pub async fn progress(
             );
         }
     } else {
-        if let Err(e) = file_list::add(key, &data).await {
+        if let Err(e) = file_list::add(key, data.unwrap()).await {
             log::error!(
                 "service:db:file_list: add {}, set_file_to_cache error: {}",
                 key,

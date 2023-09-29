@@ -234,7 +234,7 @@ pub async fn handle_grpc_request(
     let stream_schema = stream_schema_exists(
         org_id,
         stream_name,
-        StreamType::Traces,
+        StreamType::Logs,
         &mut stream_schema_map,
     )
     .await;
@@ -248,7 +248,7 @@ pub async fn handle_grpc_request(
     }
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Traces, stream_name);
+    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, stream_name);
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
 

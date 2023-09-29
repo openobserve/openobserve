@@ -28,7 +28,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(async move { run_move_file_to_s3().await });
-    tokio::task::spawn(async move { run_sync_s3_to_cache().await });
+    // tokio::task::spawn(async move { run_sync_s3_to_cache().await });
 
     Ok(())
 }
@@ -137,7 +137,7 @@ async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error
     }
 }
 
-async fn run_sync_s3_to_cache() -> Result<(), anyhow::Error> {
+async fn _run_sync_s3_to_cache() -> Result<(), anyhow::Error> {
     if !cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
         && !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
     {

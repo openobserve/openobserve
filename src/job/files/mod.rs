@@ -17,6 +17,7 @@ use crate::common::{
     meta::StreamType,
 };
 
+pub mod broadcast;
 pub mod disk;
 pub mod memory;
 
@@ -27,6 +28,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { disk::run().await });
     tokio::task::spawn(async move { memory::run().await });
+    tokio::task::spawn(async move { broadcast::run().await });
 
     Ok(())
 }

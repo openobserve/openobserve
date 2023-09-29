@@ -122,7 +122,7 @@ impl From<&HashMap<String, AttributeValue>> for FileKey {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileMeta {
     pub min_ts: i64, // microseconds
     pub max_ts: i64, // microseconds

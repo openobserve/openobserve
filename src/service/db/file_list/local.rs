@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use once_cell::sync::Lazy;
+use tokio::sync::RwLock;
+
 use crate::common::{
     infra::{config::CONFIG, file_list, wal},
     meta::{
@@ -22,14 +25,18 @@ use crate::common::{
     utils::json,
 };
 
-pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {
+/// use queue to batch send broadcast to other nodes
+pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
+    Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
+
+pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(), anyhow::Error> {
     let (_stream_key, date_key, _file_name) = file_list::parse_file_key_columns(key)?;
-    let file_data = FileKey::new(key, meta, deleted);
+    let file_data = FileKey::new(key, meta.clone().unwrap_or_default(), deleted);
 
     // write into file_list storage
     // retry 5 times
     for _ in 0..5 {
-        if let Err(e) = super::progress(key, meta, deleted, true).await {
+        if let Err(e) = super::progress(key, meta.as_ref(), deleted, true).await {
             log::error!("[FILE_LIST] Error saving file to storage, retrying: {}", e);
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
         } else {
@@ -54,8 +61,8 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     file.write(write_buf.as_ref()).await;
 
     // notifiy other nodes
-    tokio::task::spawn(async move { super::broadcast::send(&[file_data], None).await });
-    tokio::task::yield_now().await;
+    let mut q = BROADCAST_QUEUE.write().await;
+    q.push(file_data);
 
     Ok(())
 }
