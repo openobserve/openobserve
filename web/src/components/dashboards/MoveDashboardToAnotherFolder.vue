@@ -34,9 +34,9 @@
     </q-card-section>
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="moveFolderForm" @submit="onSubmit">
+      <q-form ref="moveFolderForm" @submit.stop="onSubmit">
         <q-input
-          v-model="folders[currentFolderIndex].name"
+          v-model="folders.find((item: any) => item.folderId === activeFolderId).name"
           label="Current Folder"
           color="input-border"
           bg-color="input-bg"
@@ -50,8 +50,8 @@
         <span>&nbsp;</span>
         <div class="flex justify-center q-mt-lg">
           <!-- select new folder -->
-          <q-select v-model="selectedFolderIndex" label="Select Another Folder"
-            :options="folders.map((item: any,index: any)=> {return {label: item.name, value: index}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
+          <q-select v-model="selectedFolder" label="Select Another Folder"
+            :options="folders.map((item: any)=> {return {label: item.name, value: item.folderId}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
             class="q-mb-xs" style="width: 88%">
           </q-select>
 
@@ -77,7 +77,7 @@
           />
           <q-btn
             data-test="dashboard-add-submit"
-            :disable="currentFolderIndex === selectedFolderIndex.value"
+            :disable="activeFolderId === selectedFolder.value"
             label="Move"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
@@ -115,9 +115,9 @@ export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
   components:{AddFolder},
   props: {
-    currentFolderIndex: {
-      type: Number,
-      default: 0,
+    activeFolderId: {
+      type: String,
+      default: "default",
     },
     folderList: {
       default: [
@@ -140,7 +140,10 @@ export default defineComponent({
     const showAddFolderDialog: any = ref(false);
     const folders:any = ref(props.folderList);
     //dropdown selected folder index
-    const selectedFolderIndex = ref({label: folders.value[props.currentFolderIndex].name, value: props.currentFolderIndex});
+    const selectedFolder = ref({
+      label: folders.value.find((item: any) => item.folderId === props.activeFolderId).name,
+      value: props.activeFolderId
+    });
     const { t } = useI18n();    
 
     const updateFolderList = async () => {
@@ -156,7 +159,7 @@ export default defineComponent({
       moveFolderForm,
       store,
       getImageURL,
-      selectedFolderIndex,
+      selectedFolder,
       updateFolderList,
       showAddFolderDialog,
       folders
@@ -178,8 +181,8 @@ export default defineComponent({
           this.store.state.selectedOrganization.identifier,
           this.$props.dashobardId,
           {
-            from: this.folders[this.currentFolderIndex].folderId,
-            to: this.folders[this.selectedFolderIndex.value].folderId
+            from: this.activeFolderId,
+            to: this.selectedFolder.value
           }
         ).then((res: any) => {
           dismiss();
