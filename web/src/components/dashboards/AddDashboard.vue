@@ -72,8 +72,8 @@
         />
 
         <span>&nbsp;</span>
-        <q-select v-model="selectedFolderIndex" label="Select Another Folder"
-          :options="folders.map((item,index)=> {return {label: item.name, value: index}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
+        <q-select v-model="selectedFolder" label="Select Another Folder"
+          :options="folders.map((item)=> {return {label: item.name, value: item.folderId}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
           class="q-mb-xs">
         </q-select>
 
@@ -129,15 +129,19 @@ export default defineComponent({
       default: () => defaultValue(),
     },
     folders:{
-      default: [{
+      default: ()=>[{
         folderId: "default",
         name: "default",
         description: "default"
       }],
     },
-    activeFolderIndex:{
-      type: Number,
-      default: 0
+    activeFolder:{
+      type: Object,
+      default: () => ({
+        folderId: "default",
+        name: "default",
+        description: "default"
+      })
     }
   },
   emits: ["update:modelValue", "updated", "finish"],
@@ -149,7 +153,7 @@ export default defineComponent({
     const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
-    const selectedFolderIndex = ref({label: props.folders[props.activeFolderIndex].name, value: props.activeFolderIndex});
+    const selectedFolder = ref({label: props.activeFolder.name, value: props.activeFolder.folderId});
 
     //generate random integer number for dashboard Id
     function getRandInteger() {
@@ -168,7 +172,7 @@ export default defineComponent({
       getRandInteger,
       isValidIdentifier,
       getImageURL,
-      selectedFolderIndex
+      selectedFolder
     };
   },
   created() {
@@ -223,7 +227,7 @@ export default defineComponent({
           callDashboard = dashboardService.create(
             this.store.state.selectedOrganization.identifier,
             baseObj,
-            this?.folders[this.selectedFolderIndex.value ?? 0 ]?.folderId ?? "default"
+            this.selectedFolder.value ?? "default"
           );
         }
         callDashboard
@@ -236,7 +240,7 @@ export default defineComponent({
             };
 
             this.$emit("update:modelValue", data);
-            this.$emit("updated", data.dashboardId, this?.folders[this.selectedFolderIndex.value ?? 0 ]?.folderId ?? "default");
+            this.$emit("updated", data.dashboardId, this.selectedFolder.value);
             this.addDashboardForm.resetValidation();
             dismiss();
           })
