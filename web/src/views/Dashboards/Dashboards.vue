@@ -62,15 +62,15 @@
         </div>
         <div class="dashboards-tabs">
           <q-tabs
-            v-model="activeFolder"
             indicator-color="transparent"
             inline-label
             vertical
+            @update:model-value="updateActiveFolder"
           >
           <q-tab
           v-for="(tab, index) in folders"
-              :key="index"
-              :name="index"
+              :key="tab.folderId"
+              :name="tab.folderId"
               content-class="tab_content full-width"
               >
               <div class="full-width row justify-between no-wrap">
@@ -80,14 +80,14 @@
                     v-if="index"
                     :name="outlinedEdit"
                     class="q-ml-sm"
-                    @click.stop="editFolder(index)"
+                    @click.stop="editFolder(tab.folderId)"
                     style="cursor: pointer; justify-self: end;"
                   />
                   <q-icon
                     v-if="index"
                     :name="outlinedDelete"
                     class="q-ml-sm"
-                    @click.stop="showDeleteFolderDialogFn(index)"
+                    @click.stop="showDeleteFolderDialogFn(tab.folderId)"
                     style="cursor: pointer; justify-self: end;"
                   />
                 </div>
@@ -199,7 +199,7 @@
       full-height
       maximized
     >
-      <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolderIndex="activeFolder" />
+      <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolder="activeFolder" />
     </q-dialog>
 
     <!-- add/edit folder -->
@@ -209,7 +209,7 @@
       full-height
       maximized
     >
-      <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :model-value="JSON.parse(JSON.stringify(folders[selectedFolderToEdit]))"/>
+      <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :model-value="JSON.parse(JSON.stringify(folders.find((folder) => folder.folderId === (selectedFolderToEdit ?? 'default'))))"/>
     </q-dialog>
     
     <!-- move dashboard to another folder -->
@@ -219,7 +219,7 @@
       full-height
       maximized
     >
-      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" @folder-updated="updateFolderList" :dashobardId="selectedDashboardIdToMove" :folderList="folders" :currentFolderIndex="activeFolder"/>
+      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" @folder-updated="updateFolderList" :dashobardId="selectedDashboardIdToMove" :folderList="folders" :activeFolderId="activeFolder.folderId"/>
     </q-dialog>
 
     <!-- delete dashboard dialog -->
@@ -293,7 +293,7 @@ export default defineComponent({
     const folders = ref([]);
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
-    const selectedFolderToEdit = ref(0);
+    const selectedFolderToEdit = ref(null);
     const confirmDeleteFolderDialog = ref<boolean>(false);
     const selectedDashboardIdToMove = ref(null);
     const showMoveDashboardDialog = ref(false);
@@ -364,7 +364,7 @@ export default defineComponent({
 
     onMounted(async() => {      
       folders.value = await getFoldersList(store);
-      activeFolder.value = folders.value.findIndex((it:any) => it.folderId === (route.query.folder ?? "default"));      
+      activeFolder.value = folders.value.find((it:any) => it.folderId === (route.query.folder ?? "default"));      
     });
 
     watch(activeFolder, async()=>{
@@ -373,10 +373,10 @@ export default defineComponent({
         path: "/dashboards",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: folders.value[activeFolder.value]?.folderId || "default"
+          folder: activeFolder.value.folderId || "default"
         },
       });
-    });
+    },{deep: true});
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -423,7 +423,7 @@ export default defineComponent({
       await dashboardService.create(
         store.state.selectedOrganization.identifier,
         data,
-        folders.value[activeFolder?.value]?.folderId || "default"
+        activeFolder.value.folderId || "default"
       );
 
       await getDashboards();
@@ -450,7 +450,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.identifier,
-          folder: folders?.value[activeFolder?.value]?.folderId || "default"
+          folder: activeFolder.value.folderId || "default"
         },
       });
     };
@@ -459,7 +459,7 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading dashboards...",
       });
-      await getAllDashboards(store,folders.value[activeFolder.value]?.folderId || "default");
+      await getAllDashboards(store,activeFolder.value.folderId || "default");
       resultTotal.value = store.state.organizationData.allDashboardList.length;
       dismiss();
     };
@@ -483,7 +483,7 @@ export default defineComponent({
       if (selectedDelete.value) {
         const dashboardId = selectedDelete.value.id;
         await dashboardService
-          .delete(store.state.selectedOrganization.identifier, dashboardId, folders.value[activeFolder.value]?.folderId || "default")
+          .delete(store.state.selectedOrganization.identifier, dashboardId, activeFolder.value.folderId || "default")
           .then((res) => {
             const dashboards = toRaw(store.state.organizationData.allDashboardList);
             const newDashboards = dashboards.filter(
@@ -516,14 +516,14 @@ export default defineComponent({
       await getDashboards();
     }
 
-    const editFolder = (index : any) => {      
-      selectedFolderToEdit.value = index;      
+    const editFolder = (folderId : any) => {      
+      selectedFolderToEdit.value = folderId;      
       isFolderEditMode.value = true;
       showAddFolderDialog.value = true;
     }
 
-    const showDeleteFolderDialogFn = (index: any) => {
-      selectedFolderDelete.value = index;
+    const showDeleteFolderDialogFn = (folderId: any) => {
+      selectedFolderDelete.value = folderId;
       confirmDeleteFolderDialog.value = true;
     };
 
@@ -537,18 +537,22 @@ export default defineComponent({
       await getDashboards();
     }
 
+    const updateActiveFolder = (it: any) => {
+      activeFolder.value = folders.value.find((folder) => folder.folderId == it);      
+    }
+
     const deleteFolder = async() => {
       if(selectedFolderDelete.value){
         try {
           
           //delete folder
-          await deleteFolderById(store, folders.value[selectedFolderDelete.value].folderId);
+          await deleteFolderById(store, selectedFolderDelete.value);
           
           //check activeFolder to be deleted
-          if(activeFolder.value === selectedFolderDelete.value) activeFolder.value = 0;
+          if(activeFolder.value.folderId === selectedFolderDelete.value) activeFolder.value = { folderId: "default", name: "default", description:"default" };
   
           //remove folder from list
-          folders.value = folders.value.filter((folder,index) => index != selectedFolderDelete.value);
+          folders.value = folders.value.filter((folder,index) => folder.folderId != selectedFolderDelete.value);
   
           $q.notify({
             type: "positive",
@@ -626,14 +630,15 @@ export default defineComponent({
       selectedFolderToEdit,
       selectedDashboardIdToMove,
       showMoveDashboardDialog,
-      handleDashboardMoved
+      handleDashboardMoved,
+      updateActiveFolder
     };
   },
   methods: {
     //after adding dashboard need to update the dashboard list
     async updateDashboardList(dashboardId: any, folderId: any) {
       this.showAddDashboardDialog = false;
-      this.activeFolder = this.folders.findIndex((folder) => folder.folderId == folderId);
+      this.activeFolder = this.folders.find((folder) => folder.folderId == folderId);
       await this.getDashboards();
 
       this.$q.notify({
