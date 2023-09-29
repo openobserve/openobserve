@@ -44,7 +44,7 @@ pub async fn create_dashboard(
                     name: DEFAULT_FOLDER.to_string(),
                     description: DEFAULT_FOLDER.to_string(),
                 };
-                folders::save_folder(org_id, folder).await?;
+                folders::save_folder(org_id, folder, true).await?;
                 let dashboard_id = crate::common::infra::ider::generate();
                 save_dashboard(org_id, &dashboard_id, folder_id, body).await
             } else {

@@ -48,7 +48,7 @@ pub async fn create_folder(
     folder: web::Json<Folder>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    folders::save_folder(&org_id, folder.into_inner()).await
+    folders::save_folder(&org_id, folder.into_inner(), false).await
 }
 
 /** UpdateFolder */

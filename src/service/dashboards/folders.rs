@@ -26,7 +26,19 @@ use crate::common::meta::{
 use crate::service::db;
 
 #[tracing::instrument(skip(folder))]
-pub async fn save_folder(org_id: &str, mut folder: Folder) -> Result<HttpResponse, Error> {
+pub async fn save_folder(
+    org_id: &str,
+    mut folder: Folder,
+    is_internal: bool,
+) -> Result<HttpResponse, Error> {
+    if !is_internal && folder.folder_id == DEFAULT_FOLDER {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                http::StatusCode::BAD_REQUEST.into(),
+                "can't update default folder".to_string(),
+            )),
+        );
+    }
     if folder.folder_id != DEFAULT_FOLDER {
         folder.folder_id = crate::common::infra::ider::generate();
     }

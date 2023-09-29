@@ -782,12 +782,15 @@ export const convertSQLData = (
   }
 
   // auto SQL: if x axis has time series
-  if(panelSchema.type != "h-bar"&& panelSchema.type != "h-stacked"){ 
+  if(panelSchema.type != "h-bar"&& panelSchema.type != "h-stacked"&& panelSchema?.queries[0]?.customQuery == false){
+    // auto SQL: if x axis has time series(aggregation function is histogram)
     const field = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
         it.aggregationFunction == "histogram" &&
         it.column == store.state.zoConfig.timestamp_column
     );
+
+    //if x axis has time series
     if (field) {
       options.series.map((seriesObj: any) => {
         seriesObj.data = seriesObj.data.map((it: any, index: any) => [
@@ -828,7 +831,9 @@ export const convertSQLData = (
 
   //custom SQL: check if it is timeseries or not
   if (
-    (panelSchema.type != "h-bar"&&panelSchema.type != "h-stacked") &&
+    panelSchema.type != "h-bar" &&
+    panelSchema.type != "h-stacked" &&
+    panelSchema?.queries[0]?.customQuery == true &&
     options.xAxis.length > 0 &&
     options.xAxis[0].data.length > 0
   ) {
@@ -843,13 +848,14 @@ export const convertSQLData = (
     });
     if (isTimeSeries) {
       options.series.map((seriesObj: any) => {
-        seriesObj.data = seriesObj.data.map((it: any, index: any) => [
-          new Date(options.xAxis.data[index]+ "Z").getTime(),
+        seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+          new Date(options.xAxis[0].data[index] + "Z").getTime(),
           it,
         ]);
       });
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
+      options.tooltip.formatter = null;
       options.tooltip.axisPointer = {
         type: "cross",
         label: {
