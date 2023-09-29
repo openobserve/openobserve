@@ -219,7 +219,7 @@
       full-height
       maximized
     >
-      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" :dashobardId="selectedDashboardIdToMove" :folderList="folders" :currentFolderIndex="activeFolder"/>
+      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" @folder-updated="updateFolderList" :dashobardId="selectedDashboardIdToMove" :folderList="folders" :currentFolderIndex="activeFolder"/>
     </q-dialog>
 
     <!-- delete dashboard dialog -->
@@ -289,7 +289,7 @@ export default defineComponent({
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete = ref(null);
     const splitterModel = ref(200);
-    const activeFolder = ref(0);
+    const activeFolder = ref(null);
     const folders = ref([]);
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
