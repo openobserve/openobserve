@@ -406,11 +406,9 @@ async fn handle_existing_schema(
             .entry(key.clone())
             .or_insert_with(|| tokio::sync::RwLock::new(false));
 
-        let mut lock_acquired = value.write().await; // lock acquired
+        let lock_acquired = value.write().await; // lock acquired
 
         if !*lock_acquired {
-            *lock_acquired = true; // We've acquired the lock.
-
             let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
@@ -446,7 +444,6 @@ async fn handle_existing_schema(
                 //No Change in schema.
                 stream_schema_map.insert(stream_name.to_string(), schema.clone());
             }
-            *lock_acquired = false;
             drop(lock_acquired); // release lock
 
             Some(SchemaEvolution {
@@ -464,7 +461,6 @@ async fn handle_existing_schema(
                 get_schema_changes(&schema, &inferred_schema);
             stream_schema_map.insert(stream_name.to_string(), schema);
             log::info!("Schema exists for stream {} ", stream_name);
-            *lock_acquired = false;
             drop(lock_acquired); // release lock
             Some(SchemaEvolution {
                 schema_compatible: true,
@@ -559,7 +555,6 @@ async fn handle_new_schema(
 
             let lock_acquired = value.write().await; // lock acquired
             if !*lock_acquired {
-                //*lock_acquired = true; // We've acquired the lock.
                 log::info!(
                     "Acquired lock for stream {} as schema is empty",
                     stream_name
@@ -567,7 +562,6 @@ async fn handle_new_schema(
                 let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                     .await
                     .unwrap();
-                log::info!("got schema from from_db schema for stream {}", stream_name);
                 if chk_schema.fields().is_empty() {
                     log::info!(
                         "Setting schema for stream {} as schema is empty",
@@ -583,7 +577,6 @@ async fn handle_new_schema(
                     )
                     .await
                     .unwrap();
-                    //*lock_acquired = false;
                     drop(lock_acquired); // release lock
                     return Some(SchemaEvolution {
                         schema_compatible: true,
@@ -594,7 +587,6 @@ async fn handle_new_schema(
                 } else {
                     // No schema change
                     stream_schema_map.insert(stream_name.to_string(), chk_schema.clone());
-                    //*lock_acquired = false;
                     drop(lock_acquired); // release lock
                     *schema = chk_schema;
                     log::info!(
