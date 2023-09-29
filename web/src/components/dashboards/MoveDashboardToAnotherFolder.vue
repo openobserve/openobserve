@@ -146,9 +146,10 @@ export default defineComponent({
     });
     const { t } = useI18n();    
 
-    const updateFolderList = async () => {
+    const updateFolderList = async (data: any) => {
       showAddFolderDialog.value = false;
       folders.value = await getFoldersList(store);
+      selectedFolder.value = {label: data.name, value: data.folderId};
       emit("folderUpdated", folders);
     }
 
