@@ -401,7 +401,8 @@ async fn handle_existing_schema(
             &CONFIG.sled.prefix
         );
 
-        let value = LOCAL_SCHEMA_LOCKER
+        let mut schema_locker = LOCAL_SCHEMA_LOCKER.write().await;
+        let value = schema_locker
             .entry(key.clone())
             .or_insert_with(|| tokio::sync::RwLock::new(false));
 
@@ -551,7 +552,8 @@ async fn handle_new_schema(
                 &CONFIG.sled.prefix
             );
 
-            let value = LOCAL_SCHEMA_LOCKER
+            let mut schema_locker = LOCAL_SCHEMA_LOCKER.write().await;
+            let value = schema_locker
                 .entry(key.clone())
                 .or_insert_with(|| tokio::sync::RwLock::new(false));
 

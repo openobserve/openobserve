@@ -21,7 +21,7 @@ use sqlx::{
         SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode, SqlitePoolOptions,
         SqliteSynchronous,
     },
-    ConnectOptions, Pool, Sqlite,
+    Pool, Sqlite,
 };
 use std::{
     str::FromStr,
@@ -70,7 +70,7 @@ fn connect_rw() -> Pool<Sqlite> {
         .synchronous(SqliteSynchronous::Normal)
         .locking_mode(SqliteLockingMode::Normal)
         .busy_timeout(Duration::from_secs(30))
-        .disable_statement_logging()
+        // .disable_statement_logging()
         .create_if_missing(true);
 
     let pool_opts = SqlitePoolOptions::new()
@@ -100,13 +100,11 @@ fn connect_ro() -> Pool<Sqlite> {
         .synchronous(SqliteSynchronous::Normal)
         .locking_mode(SqliteLockingMode::Normal)
         .busy_timeout(Duration::from_secs(30))
-        .disable_statement_logging()
-        .read_only(true)
-        .create_if_missing(true);
-
+        // .disable_statement_logging()
+        .read_only(true);
     let pool_opts = SqlitePoolOptions::new()
         .min_connections(10)
-        .max_connections(1000)
+        .max_connections(128)
         .acquire_timeout(Duration::from_secs(30))
         .after_connect(|_, _| {
             Box::pin(async move {
@@ -186,7 +184,6 @@ impl SqliteDbChannel {
 
     fn handle_db_channel() -> DbChannel {
         let (tx, mut rx) = mpsc::channel::<DbEvent>(100000);
-        let client = CLIENT_RW.clone();
         tokio::task::spawn(async move {
             loop {
                 let event = match rx.recv().await {
@@ -199,6 +196,7 @@ impl SqliteDbChannel {
                 if CONFIG.common.print_key_event {
                     log::info!("[SQLITE] db event: {:?}", event);
                 }
+                let client = CLIENT_RW.clone();
                 match event {
                     DbEvent::Meta(DbEventMeta::Put(key, value, need_watch)) => {
                         let mut err: Option<String> = None;
@@ -437,7 +435,7 @@ impl super::Db for SqliteDb {
             .fetch_one(&pool)
             .await
             .unwrap_or_default();
-        let bytes_len: i64 =   sqlx::query_scalar(r#"SELECT (page_count * page_size) as size FROM pragma_page_count(), pragma_page_size();"#)
+        let bytes_len: i64 = sqlx::query_scalar(r#"SELECT (page_count * page_size) as size FROM pragma_page_count(), pragma_page_size();"#)
         .fetch_one(&pool)
         .await.unwrap_or_default();
         Ok(super::Stats {
