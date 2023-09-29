@@ -42,6 +42,9 @@ pub async fn run(prefix: &str) -> Result<(), anyhow::Error> {
     db::file_list::remote::cache(prefix, false)
         .await
         .expect("file list migration failed");
+    infra_file_list::set_initialised()
+        .await
+        .expect("file list migration set initialised failed");
     // update stream stats
     update_stats_from_file_list()
         .await

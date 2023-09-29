@@ -121,20 +121,20 @@ mod tests {
 
     #[test]
     fn test_increment_stream_file_num_v1() {
-        let suffix_nums = vec![1, 9, 11, 78, 100, 234, 546];
+        let suffix_nums = [1, 9, 11, 78, 100, 234, 546];
 
-        for i in 0..suffix_nums.len() {
-            let suffix = increment_stream_file_num_v1(&format!(
+        for &suffix in &suffix_nums {
+            let new_suffix = increment_stream_file_num_v1(&format!(
                 "./data/openobserve/WAL/nexus/logs/olympics/1663064862606912_{}.json",
-                suffix_nums[i]
+                suffix
             ));
-            assert_eq!(suffix, suffix_nums[i] + 1);
+            assert_eq!(new_suffix as usize, suffix + 1);
         }
     }
 
     #[test]
     fn test_get_file_name_v1() {
-        let file_key = get_file_name_v1(&"nexus".to_owned(), &"Olympics".to_owned(), 2);
+        let file_key = get_file_name_v1("nexus", "Olympics", 2);
         assert!(file_key
             .as_str()
             .ends_with("/wal/nexus/logs/Olympics/Olympics_2.json"));

@@ -570,23 +570,24 @@ mod tests {
     use float_cmp::approx_eq;
 
     fn generate_test_labels() -> Labels {
-        let mut labels: Labels = Default::default();
-        labels.push(Arc::new(Label {
-            name: "a".to_owned(),
-            value: "1".to_owned(),
-        }));
-        labels.push(Arc::new(Label {
-            name: "b".to_owned(),
-            value: "2".to_owned(),
-        }));
-        labels.push(Arc::new(Label {
-            name: "c".to_owned(),
-            value: "3".to_owned(),
-        }));
-        labels.push(Arc::new(Label {
-            name: "d".to_owned(),
-            value: "4".to_owned(),
-        }));
+        let labels: Labels = vec![
+            Arc::new(Label {
+                name: "a".to_owned(),
+                value: "1".to_owned(),
+            }),
+            Arc::new(Label {
+                name: "b".to_owned(),
+                value: "2".to_owned(),
+            }),
+            Arc::new(Label {
+                name: "c".to_owned(),
+                value: "3".to_owned(),
+            }),
+            Arc::new(Label {
+                name: "d".to_owned(),
+                value: "4".to_owned(),
+            }),
+        ];
         labels
     }
     #[test]
@@ -688,7 +689,7 @@ mod tests {
         assert!(value == "1");
 
         let value = labels.get_value("non-existant-label");
-        assert!(value == "");
+        assert!(value.is_empty());
     }
 
     #[test]

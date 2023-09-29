@@ -45,6 +45,22 @@ impl Default for PostgresFileList {
 
 #[async_trait]
 impl super::FileList for PostgresFileList {
+    async fn create_table(&self) -> Result<()> {
+        create_table().await
+    }
+
+    async fn create_table_index(&self) -> Result<()> {
+        create_table_index().await
+    }
+
+    async fn set_initialised(&self) -> Result<()> {
+        Ok(())
+    }
+
+    async fn get_initialised(&self) -> Result<bool> {
+        Ok(true)
+    }
+
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
@@ -91,6 +107,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
@@ -129,6 +148,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
@@ -138,7 +160,12 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
                 let sql = format!("DELETE FROM file_list WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
                 match sqlx::query(&sql).execute(&mut *tx).await {
                     Ok(_) => {}
-                    Err(e) => return Err(e.into()),
+                    Err(e) => {
+                        if let Err(e) = tx.rollback().await {
+                            log::error!("[POSTGRES] rollback batch remove error: {}", e);
+                        }
+                        return Err(e.into());
+                    }
                 }
             }
             tx.commit().await?;
@@ -354,20 +381,20 @@ INSERT INTO stream_stats
             .execute(&mut *tx)
             .await
             {
-                log::error!(
-                    "[POSTGRES] insert stream stats error: {}, stream: {}",
-                    e,
-                    stream_key
-                );
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback insert stream stats error: {}", e);
+                }
+                return Err(e.into());
             }
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit stream stats error: {}", e);
+            log::error!("[POSTGRES] commit set stream stats error: {}", e);
+            return Err(e.into());
         }
 
         let mut tx = pool.begin().await?;
         for (stream_key, stats) in update_streams {
-            sqlx::query(
+            if let Err(e) = sqlx::query(
                 r#"
 UPDATE stream_stats 
     SET file_num = $1, min_ts = $2, max_ts = $3, records = $4, original_size = $5, compressed_size = $6
@@ -382,10 +409,16 @@ UPDATE stream_stats
             .bind(stats.compressed_size as i64)
             .bind(stream_key)
             .execute(&mut *tx)
-            .await?;
+            .await{
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback set stream stats error: {}", e);
+                }
+                return Err(e.into());
+            }
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit stream stats error: {}", e);
+            log::error!("[POSTGRES] commit set stream stats error: {}", e);
+            return Err(e.into());
         }
 
         Ok(())
@@ -437,10 +470,6 @@ UPDATE stream_stats
     }
 
     async fn clear(&self) -> Result<()> {
-        let pool = CLIENT.clone();
-        sqlx::query(r#"DELETE FROM file_list;"#)
-            .execute(&pool)
-            .await?;
         Ok(())
     }
 }
@@ -494,33 +523,94 @@ pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
     // create index for file_list
-    sqlx::query("CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);")
+    if let Err(e) = sqlx::query("CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);")
         .execute(&mut *tx)
-        .await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);")
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query(
+        .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!(
+                "[POSTGRES] rollback create table file_list index error: {}",
+                e
+            );
+        }
+        return Err(e.into());
+    }
+    if let Err(e) =
+        sqlx::query("CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);")
+            .execute(&mut *tx)
+            .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!(
+                "[POSTGRES] rollback create table file_list index error: {}",
+                e
+            );
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = sqlx::query(
         "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
     )
     .execute(&mut *tx)
-    .await?;
-    sqlx::query(
+    .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!(
+                "[POSTGRES] rollback create table file_list index error: {}",
+                e
+            );
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = sqlx::query(
         "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);",
     )
     .execute(&mut *tx)
-    .await?;
+    .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!(
+                "[POSTGRES] rollback create table file_list index error: {}",
+                e
+            );
+        }
+        return Err(e.into());
+    }
 
     // create index for stream_stats
-    sqlx::query("CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);")
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query(
+    if let Err(e) =
+        sqlx::query("CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);")
+            .execute(&mut *tx)
+            .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!(
+                "[POSTGRES] rollback create table stream_stats index error: {}",
+                e
+            );
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = sqlx::query(
         "CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (stream);",
     )
     .execute(&mut *tx)
-    .await?;
-    tx.commit().await?;
-
+    .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!(
+                "[POSTGRES] rollback create table stream_stats index error: {}",
+                e
+            );
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = tx.commit().await {
+        log::error!(
+            "[POSTGRES] commit create table file_list index error: {}",
+            e
+        );
+        return Err(e.into());
+    }
     Ok(())
 }

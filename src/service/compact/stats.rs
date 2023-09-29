@@ -22,6 +22,14 @@ use crate::common::infra::{
 use crate::service::db;
 
 pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
+    // waiting for file list remote inited
+    loop {
+        if infra_file_list::get_initialised().await.unwrap_or_default() {
+            break;
+        };
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    }
+
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {

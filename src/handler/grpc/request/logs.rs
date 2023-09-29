@@ -16,8 +16,7 @@ use async_trait::async_trait;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
-use tonic::Response;
-use tonic::Status;
+use tonic::{Response, Status};
 
 use crate::common::infra::config::CONFIG;
 

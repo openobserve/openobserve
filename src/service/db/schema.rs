@@ -69,7 +69,6 @@ pub async fn get_from_db(
     stream_type: StreamType,
 ) -> Result<Schema, anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
-
     let db = &infra_db::DEFAULT;
     Ok(match db.get(&key).await {
         Err(_) => {

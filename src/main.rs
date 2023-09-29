@@ -53,11 +53,13 @@ use openobserve::{
         grpc::{
             auth::check_auth,
             cluster_rpc::{
-                event_server::EventServer, metrics_server::MetricsServer,
-                search_server::SearchServer, usage_server::UsageServer,
+                event_server::EventServer, filelist_server::FilelistServer,
+                metrics_server::MetricsServer, search_server::SearchServer,
+                usage_server::UsageServer,
             },
             request::{
                 event::Eventer,
+                filelist::Filelister,
                 logs::LogsServer,
                 metrics::{ingester::Ingester, querier::Querier},
                 search::Searcher,
@@ -223,6 +225,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { zo_logger::send_logs().await });
 
+    // migrate dashboards
+    migration::dashboards::run().await?;
+
     server
         .workers(CONFIG.limit.http_worker_num)
         .worker_max_blocking_threads(
@@ -240,7 +245,13 @@ async fn main() -> Result<(), anyhow::Error> {
     // flush WAL cache to disk
     infra::wal::flush_all_to_disk().await;
     // flush compact offset cache to disk disk
-    let _ = db::compact::files::sync_cache_to_db().await;
+    if let Err(e) = db::compact::files::sync_cache_to_db().await {
+        log::error!("sync compact offset cache to db failed, error: {}", e);
+    }
+    // flush db
+    if let Err(e) = infra::db::DEFAULT.close().await {
+        log::error!("waiting for db close failed, error: {}", e);
+    }
 
     log::info!("server stopped");
 
@@ -258,6 +269,9 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
     let search_svc = SearchServer::new(Searcher)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let filelist_svc = FilelistServer::new(Filelister)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
     let metrics_svc = MetricsServer::new(Querier)
@@ -283,6 +297,7 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
             .layer(tonic::service::interceptor(check_auth))
             .add_service(event_svc)
             .add_service(search_svc)
+            .add_service(filelist_svc)
             .add_service(metrics_svc)
             .add_service(metrics_ingest_svc)
             .add_service(trace_svc)
@@ -369,6 +384,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
             clap::Command::new("migrate-file-list-from-dynamo")
                 .about("migrate file-list from dynamo to dynamo db"),
             clap::Command::new("migrate-meta").about("migrate meta"),
+            clap::Command::new("migrate-dashboards").about("migrate-dashboards"),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
                 .arg(
@@ -437,6 +453,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data
                     infra::file_list::reset_stream_stats().await?;
+                    infra::file_list::set_initialised().await?;
                     // load stream list
                     db::schema::cache().await?;
                     // update stats from file list
@@ -483,6 +500,10 @@ async fn cli() -> Result<bool, anyhow::Error> {
         "migrate-meta" => {
             println!("Running migration");
             migration::meta::run().await?
+        }
+        "migrate-dashboards" => {
+            println!("Running migration dashboard");
+            migration::dashboards::run().await?
         }
         "delete-parquet" => {
             let file = command.get_one::<String>("file").unwrap();

@@ -21,10 +21,7 @@ use std::{
     io::{BufRead, BufReader},
     sync::atomic,
 };
-use tokio::{
-    sync::{mpsc, RwLock},
-    time,
-};
+use tokio::{sync::RwLock, time};
 
 use crate::common::{
     infra::{cache::stats, config::CONFIG, file_list as infra_file_list, storage},
@@ -44,6 +41,9 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    let start = std::time::Instant::now();
+    let mut stats = ProcessStats::default();
+
     let files = storage::list(&prefix).await?;
     let files_num = files.len();
     log::info!("Load file_list [{prefix}] gets {} files", files_num);
@@ -54,27 +54,28 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     }
 
     let mut tasks = Vec::with_capacity(CONFIG.limit.query_thread_num + 1);
-    let (tx, mut rx) = mpsc::channel::<Vec<FileKey>>(files_num);
     let chunk_size = std::cmp::max(1, files_num / CONFIG.limit.query_thread_num);
     for chunk in files.chunks(chunk_size) {
         let chunk = chunk.to_vec();
-        let tx = tx.clone();
         let task: tokio::task::JoinHandle<Result<ProcessStats, anyhow::Error>> =
             tokio::task::spawn(async move {
                 let start = std::time::Instant::now();
                 let mut stats = ProcessStats::default();
                 for file in chunk {
                     match process_file(&file).await {
-                        Ok(ret) => {
-                            stats.file_count += ret.len();
-                            if let Err(e) = tx.send(ret).await {
-                                log::error!("Error sending file: {:?} {:?}", file, e);
-                                continue;
-                            }
-                        }
                         Err(err) => {
                             log::error!("Error processing file: {:?} {:?}", file, err);
                             continue;
+                        }
+                        Ok(files) => {
+                            if files.is_empty() {
+                                continue;
+                            }
+                            stats.file_count += files.len();
+                            if let Err(e) = infra_file_list::batch_add(&files).await {
+                                log::error!("Error sending file: {:?} {:?}", file, e);
+                                continue;
+                            }
                         }
                     }
                     tokio::task::yield_now().await;
@@ -85,25 +86,11 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
         tasks.push(task);
     }
 
-    let start = std::time::Instant::now();
-    let mut stats = ProcessStats::default();
-    let mut message_num = 0;
-    while let Some(files) = rx.recv().await {
-        if !files.is_empty() {
-            infra_file_list::batch_add(&files).await?;
-            tokio::task::yield_now().await;
-        }
-        message_num += 1;
-        if message_num == files_num {
-            break;
-        }
-    }
-    stats.caching_time = start.elapsed().as_millis() as usize;
-
     let task_results = try_join_all(tasks).await?;
     for task_result in task_results {
         stats = stats + task_result?;
     }
+    stats.caching_time = start.elapsed().as_millis() as usize;
 
     log::info!(
         "Load file_list [{prefix}] load {}:{} done, download: {}ms, caching: {}ms",
@@ -123,10 +110,15 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
         .map(|v| v.key().to_string())
         .collect::<Vec<String>>();
     infra_file_list::batch_remove(&deleted_files).await?;
+    infra_file_list::set_initialised().await?;
 
     // cache result
     rw.insert(prefix.clone());
     log::info!("Load file_list [{prefix}] done deleting done");
+
+    // clean depulicate files
+    super::DEPULICATE_FILES.clear();
+    super::DEPULICATE_FILES.shrink_to_fit();
 
     // clean deleted files
     super::DELETED_FILES.clear();
@@ -188,6 +180,13 @@ async fn process_file(file: &str) -> Result<Vec<FileKey>, anyhow::Error> {
             super::DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;
         }
+        // check duplicate files
+        if CONFIG.common.feature_filelist_dedup_enabled {
+            if super::DEPULICATE_FILES.contains(&item.key) {
+                continue;
+            }
+            super::DEPULICATE_FILES.insert(item.key.to_string());
+        }
         records.push(item);
     }
 
@@ -213,10 +212,8 @@ pub async fn cache_time_range(time_min: i64, mut time_max: i64) -> Result<(), an
 
 // cache by day: 2023-01-02
 pub async fn cache_day(day: &str) -> Result<(), anyhow::Error> {
-    let day_start = DateTime::parse_from_str(&format!("{day}T00:00:00Z"), "%Y-%m-%dT%H:%M:%SZ")?
-        .with_timezone(&Utc);
-    let day_end = DateTime::parse_from_str(&format!("{day}T23:59:59Z"), "%Y-%m-%dT%H:%M:%SZ")?
-        .with_timezone(&Utc);
+    let day_start = DateTime::parse_from_rfc3339(&format!("{day}T00:00:00Z"))?.with_timezone(&Utc);
+    let day_end = DateTime::parse_from_rfc3339(&format!("{day}T23:59:59Z"))?.with_timezone(&Utc);
     let time_min = day_start.timestamp_micros();
     let time_max = day_end.timestamp_micros();
     cache_time_range(time_min, time_max).await

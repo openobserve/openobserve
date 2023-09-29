@@ -13,10 +13,11 @@
 // limitations under the License.
 
 use crate::common::{
-    infra::{cluster, config::FILE_EXT_PARQUET},
+    infra::{cluster, config::FILE_EXT_PARQUET, ider},
     meta::StreamType,
 };
 
+pub mod broadcast;
 pub mod disk;
 pub mod memory;
 
@@ -27,6 +28,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { disk::run().await });
     tokio::task::spawn(async move { memory::run().await });
+    tokio::task::spawn(async move { broadcast::run().await });
 
     Ok(())
 }
@@ -46,10 +48,12 @@ pub fn generate_storage_file_name(
     );
     // let hash_id = file_columns[5].to_string();
     let file_name = file_columns.last().unwrap().to_string();
-    let file_ext_pos = file_name.rfind('.').unwrap();
-    let file_name = file_name[..file_ext_pos].to_string();
-    format!(
-        "files/{stream_key}/{file_date}/{file_name}{}",
-        FILE_EXT_PARQUET
-    )
+    let file_name_pos = file_name.rfind('/').unwrap_or_default();
+    let id = ider::generate();
+    let file_name = if file_name_pos == 0 {
+        id
+    } else {
+        format!("{}/{}", &file_name[..file_name_pos], id)
+    };
+    format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
 }
