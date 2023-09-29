@@ -76,19 +76,7 @@ fn connect_rw() -> Pool<Sqlite> {
     let pool_opts = SqlitePoolOptions::new()
         .min_connections(1)
         .max_connections(1)
-        .acquire_timeout(Duration::from_secs(30))
-        .after_connect(|_, _| {
-            Box::pin(async move {
-                log::info!("[SQLITE] db rw connected");
-                Ok(())
-            })
-        })
-        .after_release(|_, _| {
-            Box::pin(async move {
-                log::info!("[SQLITE] db rw released");
-                Ok(true)
-            })
-        });
+        .acquire_timeout(Duration::from_secs(30));
     pool_opts.connect_lazy_with(db_opts)
 }
 
@@ -104,20 +92,8 @@ fn connect_ro() -> Pool<Sqlite> {
         .read_only(true);
     let pool_opts = SqlitePoolOptions::new()
         .min_connections(10)
-        .max_connections(128)
-        .acquire_timeout(Duration::from_secs(30))
-        .after_connect(|_, _| {
-            Box::pin(async move {
-                log::info!("[SQLITE] db ro connected");
-                Ok(())
-            })
-        })
-        .after_release(|_, _| {
-            Box::pin(async move {
-                log::info!("[SQLITE] db ro released");
-                Ok(true)
-            })
-        });
+        .max_connections(512)
+        .acquire_timeout(Duration::from_secs(30));
     pool_opts.connect_lazy_with(db_opts)
 }
 

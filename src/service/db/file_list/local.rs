@@ -61,10 +61,8 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
     file.write(write_buf.as_ref()).await;
 
     // notifiy other nodes
-    if !CONFIG.common.local_mode {
-        let mut q = BROADCAST_QUEUE.write().await;
-        q.push(file_data);
-    }
+    let mut q = BROADCAST_QUEUE.write().await;
+    q.push(file_data);
 
     Ok(())
 }
