@@ -37,7 +37,7 @@
     </q-card-section>
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="addDashboardForm" @submit="onSubmit">
+      <q-form ref="addDashboardForm" @submit.stop="onSubmit">
         <q-input
           v-if="beingUpdated"
           v-model="dashboardData.id"

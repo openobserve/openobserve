@@ -37,7 +37,7 @@
     </q-card-section>
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="addFolderForm" @submit="onSubmit">
+      <q-form ref="addFolderForm" @submit.stop="onSubmit">
         <q-input
           v-model="folderData.name"
           label="Name *"
