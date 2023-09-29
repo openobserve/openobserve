@@ -346,7 +346,7 @@ export default defineComponent({
     const goBack = () => {
       return router.push({
         path: "/dashboards/view",
-        query: {org_identifier: store.state.selectedOrganization.identifier, dashboard: route.query.dashboard },
+        query: {org_identifier: store.state.selectedOrganization.identifier, dashboard: route.query.dashboard, folder: route.query.folder},
       });
     };
 
@@ -642,7 +642,7 @@ export default defineComponent({
       await nextTick();
       return router.push({
         path: "/dashboards/view",
-        query: {org_identifier: store.state.selectedOrganization.identifier, dashboard: dashId },
+        query: {org_identifier: store.state.selectedOrganization.identifier, dashboard: dashId, folder: route.query.folder ?? "default"},
       });
     };
 

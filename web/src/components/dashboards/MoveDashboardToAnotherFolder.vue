@@ -36,7 +36,7 @@
     <q-card-section class="q-w-md q-mx-lg">
       <q-form ref="moveFolderForm" @submit="onSubmit">
         <q-input
-          v-model="FolderList[currentFolderIndex].name"
+          v-model="folderList[currentFolderIndex].name"
           label="Current Folder"
           color="input-border"
           bg-color="input-bg"
@@ -48,20 +48,11 @@
           :disable="true"
         />
         <span>&nbsp;</span>
-
-        <div>
-          <span class="q-my-lg">Select New Folder</span>
-          <q-btn-dropdown color="primary" :label="FolderList[selectedFolderIndex].name" class="full-width">
-            <q-list>
-              <q-item v-for="(item, index) in FolderList" :key="index" clickable v-close-popup @click="handleFolderDropDown(index)">
-                <q-item-section>
-                  <q-item-label>{{item.name}}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-        </div>
-
+        <!-- select new folder -->
+        <q-select v-model="selectedFolderIndex" label="Select Another Folder"
+          :options="folderList.map((item,index)=> {return {label: item.name, value: index}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
+          class="q-mb-xs">
+        </q-select>
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
@@ -74,7 +65,7 @@
           />
           <q-btn
             data-test="dashboard-add-submit"
-            :disable="currentFolderIndex === selectedFolderIndex"
+            :disable="currentFolderIndex === selectedFolderIndex.value"
             label="Move"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
@@ -102,7 +93,7 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
-    FolderList: {
+    folderList: {
       default: [
       {
         name: "default",
@@ -120,12 +111,9 @@ export default defineComponent({
   setup(props) {
     const store: any = useStore();
     const moveFolderForm: any = ref(null);
-    const selectedFolderIndex = ref(props.currentFolderIndex);
+    //dropdown selected folder index
+    const selectedFolderIndex = ref({label: props.folderList[props.currentFolderIndex].name, value: props.currentFolderIndex});
     const { t } = useI18n();
-
-    const handleFolderDropDown = (index: any) => {
-      selectedFolderIndex.value = index
-    }
 
     return {
       t,
@@ -135,7 +123,6 @@ export default defineComponent({
       store,
       getImageURL,
       selectedFolderIndex,
-      handleFolderDropDown
     };
   },
   methods: {
@@ -154,8 +141,8 @@ export default defineComponent({
           this.store.state.selectedOrganization.identifier,
           this.$props.dashobardId,
           {
-            from: this.$props.FolderList[this.currentFolderIndex].folderId,
-            to: this.$props.FolderList[this.selectedFolderIndex].folderId
+            from: this.$props.folderList[this.currentFolderIndex].folderId,
+            to: this.$props.folderList[this.selectedFolderIndex.value].folderId
           }
         ).then((res: any) => {
           dismiss();
@@ -165,7 +152,7 @@ export default defineComponent({
             timeout: 2000,
           });
 
-          this.$emit("updated",this.selectedFolderIndex);
+          this.$emit("updated");
           this.moveFolderForm.resetValidation();
           
         }).catch((err) => {

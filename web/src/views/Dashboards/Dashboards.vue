@@ -199,7 +199,7 @@
       full-height
       maximized
     >
-      <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolder="activeFolder" />
+      <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolderIndex="activeFolder" />
     </q-dialog>
 
     <!-- add/edit folder -->
@@ -219,7 +219,7 @@
       full-height
       maximized
     >
-      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" :dashobardId="selectedDashboardIdToMove" :-folder-list="folders" :currentFolderIndex="activeFolder"/>
+      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" :dashobardId="selectedDashboardIdToMove" :folderList="folders" :currentFolderIndex="activeFolder"/>
     </q-dialog>
 
     <!-- delete dashboard dialog -->
@@ -256,7 +256,7 @@ import dashboardService from "../../services/dashboards";
 import AddDashboard from "../../components/dashboards/AddDashboard.vue";
 import QTablePagination from "../../components/shared/grid/Pagination.vue";
 import NoData from "../../components/shared/grid/NoData.vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
@@ -284,6 +284,7 @@ export default defineComponent({
     const showAddFolderDialog = ref(false);
     const qTable: any = ref(null);
     const router = useRouter();
+    const route = useRoute();
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete = ref(null);
@@ -363,24 +364,7 @@ export default defineComponent({
 
     onMounted(async() => {      
       folders.value = await getFoldersList(store);
-      await getDashboards();
-      router.push({
-        path: "/dashboards",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          folder: folders.value[activeFolder.value]?.folderId || "default"
-        },
-      });
-    });
-
-    onActivated(async() => {
-      router.push({
-        path: "/dashboards",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          folder: folders.value[activeFolder.value]?.folderId || "default"
-        },
-      })
+      activeFolder.value = folders.value.findIndex((it:any) => it.folderId === (route.query.folder ?? "default"));      
     });
 
     watch(activeFolder, async()=>{
@@ -548,9 +532,8 @@ export default defineComponent({
       showMoveDashboardDialog.value = true;
     };
 
-    const handleDashboardMoved = async(movedFolderIndex: any) => {
+    const handleDashboardMoved = async() => {
       showMoveDashboardDialog.value = false;
-      activeFolder.value = movedFolderIndex;
       await getDashboards();
     }
 
@@ -648,8 +631,9 @@ export default defineComponent({
   },
   methods: {
     //after adding dashboard need to update the dashboard list
-    async updateDashboardList(it: any) {
+    async updateDashboardList(dashboardId: any, folderId: any) {
       this.showAddDashboardDialog = false;
+      this.activeFolder = this.folders.findIndex((folder) => folder.folderId == folderId);
       await this.getDashboards();
 
       this.$q.notify({
@@ -659,7 +643,7 @@ export default defineComponent({
 
       this.$router.push({
         path: "/dashboards/view",
-        query: { org_identifier: store.state.selectedOrganization.identifier, dashboard: it },
+        query: { org_identifier: store.state.selectedOrganization.identifier, dashboard: dashboardId, folder: folderId },
       });
     },
     onRowClick(evt, row) {

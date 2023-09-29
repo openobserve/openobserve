@@ -176,7 +176,10 @@ export default defineComponent({
 
     // back button to render dashboard List page
     const goBackToDashboardList = () => {
-      return router.push("/dashboards");
+      return router.push({
+        path:"/dashboards",
+        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
+      });
     };
 
     //create a duplicate panel
@@ -209,7 +212,7 @@ export default defineComponent({
         // Navigate to the new panel.
         return router.push({
           path: "/dashboards/add_panel",
-          query: { dashboard: String(route.query.dashboard), panelId: panelId }
+          query: { dashboard: String(route.query.dashboard), panelId: panelId, folder: route.query.folder ?? "default" },
         });
       } catch (err) {
         // Show an error notification.
@@ -248,7 +251,7 @@ export default defineComponent({
     const addPanelData = () => {
       return router.push({
         path: "/dashboards/add_panel",
-        query: { dashboard: route.query.dashboard },
+        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
       });
     };
     

@@ -72,17 +72,10 @@
         />
 
         <span>&nbsp;</span>
-        <div>
-          <q-btn-dropdown color="primary" :label="folders[activeFolder].name" class="full-width">
-            <q-list>
-              <q-item v-for="(item, index) in folders" :key="index" clickable v-close-popup @click="handleFolderDropDown(index)">
-                <q-item-section>
-                  <q-item-label>{{item.name}}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-        </div>
+        <q-select v-model="selectedFolderIndex" label="Select Another Folder"
+          :options="folders.map((item,index)=> {return {label: item.name, value: index}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
+          class="q-mb-xs">
+        </q-select>
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
@@ -116,6 +109,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { isProxy, toRaw } from "vue";
 import { getImageURL } from "../../utils/zincutils";
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 const defaultValue = () => {
   return {
@@ -141,7 +135,7 @@ export default defineComponent({
         description: "default"
       }],
     },
-    activeFolder:{
+    activeFolderIndex:{
       type: Number,
       default: 0
     }
@@ -155,15 +149,11 @@ export default defineComponent({
     const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
-    const activeFolder = ref(props.activeFolder);
+    const selectedFolderIndex = ref({label: props.folders[props.activeFolderIndex].name, value: props.activeFolderIndex});
 
     //generate random integer number for dashboard Id
     function getRandInteger() {
       return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
-    }
-
-    const handleFolderDropDown = (folder: any) => {
-      activeFolder.value = folder
     }
 
     return {
@@ -178,8 +168,7 @@ export default defineComponent({
       getRandInteger,
       isValidIdentifier,
       getImageURL,
-      activeFolder,
-      handleFolderDropDown
+      selectedFolderIndex
     };
   },
   created() {
@@ -228,17 +217,18 @@ export default defineComponent({
             owner: this.store.state.userInfo.name,
             created: new Date().toISOString(),
             panels: [],
+            version:2
           };
 
           callDashboard = dashboardService.create(
             this.store.state.selectedOrganization.identifier,
             baseObj,
-            this?.folders[this.activeFolder ?? 0 ]?.folderId ?? "default"
+            this?.folders[this.selectedFolderIndex.value ?? 0 ]?.folderId ?? "default"
           );
         }
         callDashboard
           .then((res: { data: any }) => {
-            const data = res.data;
+            const data = convertDashboardSchemaVersion(res.data["v" + res.data.version]);
             this.dashboardData = {
               id: "",
               name: "",
@@ -246,7 +236,7 @@ export default defineComponent({
             };
 
             this.$emit("update:modelValue", data);
-            this.$emit("updated", data.dashboardId);
+            this.$emit("updated", data.dashboardId, this?.folders[this.selectedFolderIndex.value ?? 0 ]?.folderId ?? "default");
             this.addDashboardForm.resetValidation();
             dismiss();
           })
