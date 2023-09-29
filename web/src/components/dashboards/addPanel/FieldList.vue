@@ -94,17 +94,17 @@
                 </div>
                 <div class="field_icons"
                     v-if="dashboardPanelData.data.type == 'map'">
-                    <q-btn padding="sm" @click="addLatitude(props.row)"  data-test="dashboard-add-x-data">
+                    <q-btn no-caps padding="sm" @click="addLatitude(props.row)"  data-test="dashboard-add-x-data">
                       <div>
-                        +lat
+                        +Lat
                       </div>
                     </q-btn>
-                    <q-btn padding="sm" @click="addLongitude(props.row)" data-test="dashboard-add-y-data">
+                    <q-btn no-caps padding="sm" @click="addLongitude(props.row)" data-test="dashboard-add-y-data">
                       <div>
-                        +lng
+                        +Lng
                       </div>
                     </q-btn>
-                    <q-btn  padding="sm" @click="addWeight(props.row)">
+                    <q-btn padding="sm" @click="addWeight(props.row)">
                        <div>+W</div>
                       </q-btn>
                   </div>

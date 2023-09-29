@@ -30,10 +30,10 @@
       }" @dragenter="onDragEnter($event, 'latitude')" @dragleave="onDragLeave($event, 'latitude')"
         @dragover="onDragOver($event, 'latitude')" @drop="onDrop($event, 'latitude')" v-mutation="handler2"
         data-test="dashboard-x-layout">
-        <q-btn-group class="q-mr-sm">
-          <q-btn icon-right="arrow_drop_down" no-caps color="primary" dense rounded size="sm" :label="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude"
-            class="q-pl-sm" :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.column}`">
-            <q-menu class="q-pa-md" :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.column}-menu`">
+        <q-btn-group class="q-mr-sm" v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude">
+          <q-btn icon-right="arrow_drop_down" no-caps color="primary" dense rounded size="sm" :label="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column"
+            class="q-pl-sm" :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column}`">
+            <q-menu class="q-pa-md" :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column}-menu`">
               <div>
                 <!-- <div class="">
                   <div v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"
@@ -50,13 +50,12 @@
                     </q-select>
                   </div>
                 </div> -->
-                <q-input dense filled data-test="dashboard-x-item-input" label="Label" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude
-                  .label
-                  " :rules="[val => val > 0 || 'Required']" />
+                <q-input dense filled data-test="dashboard-x-item-input" label="Label" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.label"
+                   :rules="[val => val > 0 || 'Required']" />
               </div>
             </q-menu>
           </q-btn>
-          <q-btn size="xs" round flat dense :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.column}-remove`"
+          <q-btn size="xs" round flat dense :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column}-remove`"
             @click="removeLatitude()" icon="close" />
         </q-btn-group>
         <div class="text-caption text-weight-bold text-center q-mt-xs"
@@ -82,10 +81,10 @@
       }" @dragenter="onDragEnter($event, 'longitude')" @dragleave="onDragLeave($event, 'longitude')"
         @dragover="onDragOver($event, 'longitude')" @drop="onDrop($event, 'longitude')" v-mutation="handler2"
         data-test="dashboard-y-layout">
-        <q-btn-group class="q-mr-sm">
-          <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude"
-            :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.column}`" class="q-pl-sm">
-            <q-menu class="q-pa-md" :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.column}-menu`">
+        <q-btn-group class="q-mr-sm" v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude">
+          <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude?.column"
+            :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude?.column}`" class="q-pl-sm">
+            <q-menu class="q-pa-md" :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude?.column}-menu`">
               <div>
                 <!-- <div class="row q-mb-sm" style="align-items: center;">
                   <div v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"
@@ -110,13 +109,12 @@
                       " />
                   </div>
                 </div> -->
-                <q-input dense filled label="Label" data-test="dashboard-y-item-input" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude
-                  .label
-                  " :rules="[val => val > 0 || 'Required']" />
+                <q-input dense filled label="Label" data-test="dashboard-y-item-input" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.label"
+                   :rules="[val => val > 0 || 'Required']" />
               </div>
             </q-menu>
           </q-btn>
-          <q-btn size="xs" round flat dense :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.column}-remove`"
+          <q-btn size="xs" round flat dense :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude?.column}-remove`"
             @click="removeLongitude()" icon="close" />
         </q-btn-group>
         <div class="text-caption text-weight-bold text-center q-mt-xs"
@@ -141,10 +139,10 @@
         }" @dragenter="onDragEnter($event, 'weight')" @dragleave="onDragLeave($event, 'weight')"
           @dragover="onDragOver($event, 'weight')" @drop="onDrop($event, 'weight')" v-mutation="handler2"
           data-test="dashboard-y-layout">
-          <q-btn-group class="q-mr-sm">
-            <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight"
-              :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.column}`" class="q-pl-sm">
-              <q-menu class="q-pa-md" :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.column}-menu`">
+          <q-btn-group class="q-mr-sm" v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight">
+            <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight?.column"
+              :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight?.column}`" class="q-pl-sm">
+              <q-menu class="q-pa-md" :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight?.column}-menu`">
                 <div>
                   <!-- <div class="row q-mb-sm" style="align-items: center;">
                     <div v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"
@@ -169,13 +167,12 @@
                         " />
                     </div>
                   </div> -->
-                  <q-input dense filled label="Label" data-test="dashboard-y-item-input" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight
-                    .label
-                    " :rules="[val => val > 0 || 'Required']" />
+                  <q-input dense filled label="Label" data-test="dashboard-y-item-input" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.label" 
+                      :rules="[val => val > 0 || 'Required']" />
                 </div>
               </q-menu>
             </q-btn>
-            <q-btn size="xs" round flat dense :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.column}-remove`"
+            <q-btn size="xs" round flat dense :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight?.column}-remove`"
               @click="removeWeight()" icon="close" />
           </q-btn-group>
           <div class="text-caption text-weight-bold text-center q-mt-xs"

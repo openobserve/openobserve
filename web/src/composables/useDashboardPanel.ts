@@ -66,7 +66,7 @@ const getDefaultDashboardPanelData: any = () => ({
         },
         config: {
           promql_legend: "",
-          layer_type: "scatter",
+          layer_type: "scatter/heatmap",
           weight_fixed: 1,
         },
       },
@@ -286,25 +286,63 @@ const removeQuery = (index: number) => {
     updateArrayAlias();
   };
 
-  const addLatitude = (value: any) => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.latitude = value.name;
-    console.log("latitude", value.name);
-    
+  const addLatitude = (row: any) => {
+    if (
+      
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.latitude
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.latitude = {
+        label: generateLabelFromName(row.name),
+        alias: "latitude",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: null, // You can set the appropriate aggregation function here
+      };
+    }
   };
 
-  const addLongitude = (value: any) => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.longitude = value.name;
+  const addLongitude = (row: any) => {
+    if (
+      
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.longitude
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.longitude = {
+        label: generateLabelFromName(row.name),
+        alias: "longitude",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: null, // You can set the appropriate aggregation function here
+      };
+    }
   };
 
-  const addWeight = (value: any) => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.weight = value.name;
+  const addWeight = (row: any) => {
+    if (
+      
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.weight
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.weight = {
+        label: generateLabelFromName(row.name),
+        alias: "weight",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: null, // You can set the appropriate aggregation function here
+      };
+    }
   };
+
 
   // get new color value based on existing color from the chart
   const getNewColorValue = () => {
