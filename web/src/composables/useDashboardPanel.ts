@@ -66,7 +66,7 @@ const getDefaultDashboardPanelData: any = () => ({
         },
         config: {
           promql_legend: "",
-          layer_type: "scatter/heatmap",
+          layer_type: "scatter",
           weight_fixed: 1,
         },
       },

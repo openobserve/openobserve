@@ -94,17 +94,17 @@
                 </div>
                 <div class="field_icons"
                     v-if="dashboardPanelData.data.type == 'geomap'">
-                    <q-btn no-caps padding="sm" @click="addLatitude(props.row)"  data-test="dashboard-add-x-data">
+                    <q-btn :disabled="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude != null"  no-caps padding="sm" @click="addLatitude(props.row)"  data-test="dashboard-add-x-data">
                       <div>
                         +Lat
                       </div>
                     </q-btn>
-                    <q-btn no-caps padding="sm" @click="addLongitude(props.row)" data-test="dashboard-add-y-data">
+                    <q-btn :disabled="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude != null" no-caps padding="sm" @click="addLongitude(props.row)" data-test="dashboard-add-y-data">
                       <div>
                         +Lng
                       </div>
                     </q-btn>
-                    <q-btn padding="sm" @click="addWeight(props.row)">
+                    <q-btn :disabled="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight != null" padding="sm" @click="addWeight(props.row)">
                        <div>+W</div>
                       </q-btn>
                   </div>

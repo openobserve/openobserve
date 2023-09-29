@@ -23,7 +23,7 @@
                 </div>
                 <q-space />
                 <div style="max-width: 600px">
-                <q-tabs v-if="promqlMode" v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows mobile-arrows>
+                <q-tabs v-if="promqlMode || dashboardPanelData.data.type == 'geomap'" v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows mobile-arrows>
                     <q-tab no-caps :ripple="false" v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
                         :label="'Query ' + (index + 1)" @click.stop>
                         <q-icon
@@ -45,8 +45,8 @@
                     </div>
                 </div> -->
                 </div>
-                <span v-if="!promqlMode" class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
-                <q-btn v-if="promqlMode" round flat @click.stop="addTab" icon="add" style="margin-right: 10px;"></q-btn>
+                <span v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')" class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
+                <q-btn v-if="promqlMode || dashboardPanelData.data.type == 'geomap'" round flat @click.stop="addTab" icon="add" style="margin-right: 10px;"></q-btn>
             </div>
             <div>
                 <QueryTypeSelector></QueryTypeSelector>

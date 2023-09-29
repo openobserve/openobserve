@@ -38,9 +38,17 @@
 
     <div class="space"></div>
 
+    <q-select v-if="dashboardPanelData.data.type == 'geomap'" outlined
+        v-model="dashboardPanelData.data.config.basemap.type" :options="basemapTypeOptions" dense
+        label="Base Map" class="showLabelOnTop" stack-label emit-value
+        :display-value="'OpenStreetMap'">
+      </q-select>
+
+    <div class="space"></div>
+
     <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
-      <div v-if="promqlMode"  class="q-py-md showLabelOnTop">Query
+      <div v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"  class="q-py-md showLabelOnTop">Query
     <q-tabs v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows mobile-arrows>
       <q-tab no-caps v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
         :label="'Query ' + (index + 1)">
@@ -64,6 +72,20 @@
         </div>
       </template>
     </q-input>
+
+    <div class="space"></div>
+
+    <q-select v-if="dashboardPanelData.data.type == 'geomap'" outlined
+      v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.layer_type" :options="layerTypeOptions" dense
+      label="Layer Type" class="showLabelOnTop" stack-label emit-value
+      :display-value="`${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.layer_type}`">
+    </q-select>
+
+    <div class="space"></div>
+
+   <q-input v-if="dashboardPanelData.data.type == 'geomap'" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.weight_fixed" label="Weight" color="input-border"
+      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot readonly>
+    </q-input>
   </div>
 </template>
 
@@ -75,6 +97,23 @@ export default defineComponent({
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData()
 
+    const basemapTypeOptions = [
+      {
+        label: 'OpenStreetMap',
+        value: 'osm'
+      }
+    ]
+
+    const layerTypeOptions = [
+      {
+        label: 'Scatter',
+        value: 'scatter'
+      },
+      {
+        label: 'Heatmap',
+        value: 'heatmap'
+      }
+    ]
     // options for legends position
     const legendsPositionOptions = [
       {
@@ -131,7 +170,8 @@ export default defineComponent({
     return {
       dashboardPanelData,
       promqlMode,
-
+      basemapTypeOptions,
+      layerTypeOptions,
       // legends position options
       legendsPositionOptions,
       unitOptions
