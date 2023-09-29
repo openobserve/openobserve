@@ -70,7 +70,7 @@
                   {{ props.row.name }}
                 </div>
                 <div class="field_icons"
-                  v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length) || dashboardPanelData.data.type == 'map')">
+                  v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length) || dashboardPanelData.data.type == 'geomap')">
                   <q-btn padding="sm" :disabled="isAddXAxisNotAllowed" @click="addXAxisItem(props.row)"  data-test="dashboard-add-x-data">
                     <div>
                       {{
@@ -93,7 +93,7 @@
                   </q-btn>
                 </div>
                 <div class="field_icons"
-                    v-if="dashboardPanelData.data.type == 'map'">
+                    v-if="dashboardPanelData.data.type == 'geomap'">
                     <q-btn no-caps padding="sm" @click="addLatitude(props.row)"  data-test="dashboard-add-x-data">
                       <div>
                         +Lat

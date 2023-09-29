@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div v-if="!promqlMode && dashboardPanelData.data.type == 'map'">
+  <div v-if="!promqlMode && dashboardPanelData.data.type == 'geomap'">
     <div style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name">{{ t('panel.latitude') }}
         <q-icon name="info_outline" class="q-ml-xs">
@@ -283,7 +283,7 @@ export default defineComponent({
 
     const Hint = computed((e: any) => {
       switch (dashboardPanelData.data.type) {
-        case 'map':
+        case 'geomap':
           return "Add 1 field here"
         default:
           return "Add maximum 2 fields here";

@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div v-if="!promqlMode && dashboardPanelData.data.type != 'map'">
+  <div v-if="!promqlMode && dashboardPanelData.data.type != 'geomap'">
     <div style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis') }}
       <q-icon name="info_outline" class="q-ml-xs" >

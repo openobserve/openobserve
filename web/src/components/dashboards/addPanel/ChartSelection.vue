@@ -94,8 +94,8 @@ export default defineComponent({
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
-        title: "Map",
-        id: "map",
+        title: "GeoMap",
+        id: "geomap",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),

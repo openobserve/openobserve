@@ -32,7 +32,6 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
     case "h-bar":
     case "stacked":
     case "heatmap":
-    // case "map":
     case "h-stacked":
     case "line":
     case "pie":
@@ -52,9 +51,7 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
     case "table": {
       return convertTableData(panelSchema, data);
     }
-    case "map": {
-      console.log("map");
-      
+    case "geomap": {
       return convertMapData(data);
     }
     default: {

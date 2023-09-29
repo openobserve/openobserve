@@ -20,12 +20,12 @@
       class="plotlycontainer"
       style="height: 100%; width: 100%"
     >
-    <ChartRenderer v-if="panelSchema.type != 'table'&& panelSchema.type != 'map'" :data="panelData" />
+    <ChartRenderer v-if="panelSchema.type != 'table'&& panelSchema.type != 'geomap'" :data="panelData" />
     <TableRenderer
     v-else-if="panelSchema.type == 'table'"
     :data="panelData"
     />
-    <GeoMapRenderer v-else-if="panelSchema.type == 'map'" :data="panelData" />
+    <GeoMapRenderer v-else-if="panelSchema.type == 'geomap'" :data="panelData" />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div v-if="errorDetail" class="errorMessage">
