@@ -338,7 +338,7 @@ const removeQuery = (index: number) => {
         alias: "weight",
         column: row.name,
         color: getNewColorValue(),
-        aggregationFunction: null, // You can set the appropriate aggregation function here
+        aggregationFunction: "count", // You can set the appropriate aggregation function here
       };
     }
   };
