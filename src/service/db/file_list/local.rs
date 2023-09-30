@@ -13,16 +13,17 @@
 // limitations under the License.
 
 use once_cell::sync::Lazy;
+use std::io::{BufRead, BufReader};
 use tokio::sync::RwLock;
 
 use crate::common::{
-    infra::{config::CONFIG, file_list, wal},
+    infra::{config::CONFIG, file_list as infra_file_list, wal},
     meta::{
         common::{FileKey, FileMeta},
         stream::StreamParams,
         StreamType,
     },
-    utils::json,
+    utils::{asynchronism::file::get_file_contents, file::scan_files, json},
 };
 
 /// use queue to batch send broadcast to other nodes
@@ -30,7 +31,7 @@ pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
     Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
 
 pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(), anyhow::Error> {
-    let (_stream_key, date_key, _file_name) = file_list::parse_file_key_columns(key)?;
+    let (_stream_key, date_key, _file_name) = infra_file_list::parse_file_key_columns(key)?;
     let file_data = FileKey::new(key, meta.clone().unwrap_or_default(), deleted);
 
     // write into file_list storage
@@ -67,17 +68,56 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
     Ok(())
 }
 
+/// need to load wal file_list when the ingester
+async fn get_in_wal() -> Result<Vec<FileKey>, anyhow::Error> {
+    let mut result = Vec::with_capacity(1024);
+    let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
+    let files = scan_files(&pattern);
+    let mut line_num = 0;
+    for file in files {
+        line_num += 1;
+        let data = get_file_contents(&file)
+            .await
+            .expect("open wal file list failed");
+        let reader = BufReader::new(data.as_slice());
+        // parse file list
+        for line in reader.lines() {
+            let line = line?;
+            if line.is_empty() {
+                continue;
+            }
+            let item: FileKey = match json::from_slice(line.as_bytes()) {
+                Ok(item) => item,
+                Err(err) => {
+                    panic!(
+                        "parse wal file list failed:\nfile: {}\nline_no: {}\nline: {}\nerr: {}",
+                        file, line_num, line, err
+                    );
+                }
+            };
+            result.push(item);
+        }
+    }
+    Ok(result)
+}
+
+pub async fn load_wal_in_cache() -> Result<(), anyhow::Error> {
+    let files = get_in_wal().await?;
+    infra_file_list::batch_add(&files).await?;
+    Ok(())
+}
+
 pub async fn broadcast_cache(node_uuid: Option<String>) -> Result<(), anyhow::Error> {
-    let files = file_list::list().await?;
+    let files = infra_file_list::list()
+        .await?
+        .into_iter()
+        .map(|(k, v)| FileKey::new(&k, v, false))
+        .collect::<Vec<_>>();
     if files.is_empty() {
         return Ok(());
     }
     for chunk in files.chunks(100) {
-        let chunk = chunk
-            .iter()
-            .map(|(k, v)| FileKey::new(k, v.to_owned(), false))
-            .collect::<Vec<_>>();
-        if let Err(e) = super::broadcast::send(&chunk, node_uuid.clone()).await {
+        if let Err(e) = super::broadcast::send(chunk, node_uuid.clone()).await {
             log::error!("[FILE_LIST] broadcast cached file list failed: {}", e);
         }
     }
