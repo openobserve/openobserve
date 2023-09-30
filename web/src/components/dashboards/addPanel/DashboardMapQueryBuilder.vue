@@ -140,7 +140,7 @@
           @dragover="onDragOver($event, 'weight')" @drop="onDrop($event, 'weight')" v-mutation="handler2"
           data-test="dashboard-y-layout">
           <q-btn-group class="q-mr-sm" v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight">
-            <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight?.column"
+            <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="weightLabel"
               :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight?.column}`" class="q-pl-sm">
               <q-menu class="q-pa-md" :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight?.column}-menu`">
                 <div>
@@ -283,32 +283,22 @@ export default defineComponent({
       }
     })
 
-    // const commonBtnLabel = (field: any) => {
-    //   if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
-    //     return field.column
-    //   }
-    //   if (field.aggregationFunction) {
-    //     const aggregation = field.aggregationFunction.toUpperCase();
-    //     return `${aggregation}(${field.column})`;
-    //   } else {
-    //     return field.column;
-    //   }
-    // };
+    const commonBtnLabel = (field: any) => {
+      if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
+        return field.column
+      }
+      if (field.aggregationFunction) {
+        const aggregation = field.aggregationFunction.toUpperCase();
+        return `${aggregation}(${field.column})`;
+      } else {
+        return field.column;
+      }
+    };
 
-    // const xLabel = computed(() => {
-    //   const xFields = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x;
-    //   return xFields.map(commonBtnLabel);
-    // });
-
-    // const yLabel = computed(() => {
-    //   const yFields = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y;
-    //   return yFields.map(commonBtnLabel);
-    // });
-
-    // const zLabel = computed(() => {
-    //   const zFields = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z;
-    //   return zFields.map(commonBtnLabel);
-    // });
+    const weightLabel = computed(() => {
+      const weightField = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight;
+      return commonBtnLabel(weightField);
+    });
 
     return {
       // showXAxis,
@@ -341,7 +331,7 @@ export default defineComponent({
       promqlMode,
       // xLabel,
       // yLabel,
-      // zLabel,
+      weightLabel,
     };
   },
 });
