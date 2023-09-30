@@ -648,8 +648,6 @@ export default defineComponent({
     //after adding dashboard need to update the dashboard list
     async updateDashboardList(dashboardId: any, folderId: any) {
       this.showAddDashboardDialog = false;
-      this.activeFolderId = folderId
-      await this.getDashboards();
 
       this.$q.notify({
         type: "positive",
@@ -657,8 +655,8 @@ export default defineComponent({
       });
 
       this.$router.push({
-        path: "/dashboards/view",
-        query: { org_identifier: store.state.selectedOrganization.identifier, dashboard: dashboardId, folder: folderId },
+        path: "/dashboards/view/",
+        query: { org_identifier: this.store.state.selectedOrganization.identifier, dashboard: dashboardId, folder: folderId },
       });
     },
     onRowClick(evt, row) {
