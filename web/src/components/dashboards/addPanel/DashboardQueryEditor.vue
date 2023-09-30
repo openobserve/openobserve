@@ -184,6 +184,10 @@ export default defineComponent({
                     query += `, ${weightField} as ${weight.alias}`;
                 } 
                 query += ` FROM "${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream}" `;
+                if (weight && weight.aggregationFunction) {
+                    query += `GROUP BY ${latitude.alias}, ${longitude.alias}`; 
+                }
+
             }
             return query; 
         }
