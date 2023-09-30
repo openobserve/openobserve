@@ -129,15 +129,15 @@ pub struct PanelConfig {
     unit_custom: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Variables {
-    pub list: Vec<List>,
+    pub list: Vec<VariableList>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct List {
+pub struct VariableList {
     #[serde(rename = "type")]
     pub type_field: String,
     pub name: String,
@@ -148,7 +148,7 @@ pub struct List {
     pub options: Option<Vec<CustomFieldsOption>>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct QueryData {
     pub stream_type: StreamType,
     pub stream: String,
@@ -156,7 +156,7 @@ pub struct QueryData {
     pub max_record_size: Option<i64>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomFieldsOption {
     pub label: String,

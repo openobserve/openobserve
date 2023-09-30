@@ -112,7 +112,7 @@ mod tests {
             body: "Test Body".into(),
             is_default: Some(false),
         };
-        let _ = db::alerts::templates::set("default", "testTemplate", template);
+        let _ = db::alerts::templates::set("default", "testTemplate", template).await;
 
         let destination = AlertDestination {
             url: "http://dummy/alert".to_string(),
@@ -122,7 +122,7 @@ mod tests {
             template: "testTemplate".to_string(),
             name: Some("test".to_string()),
         };
-        let _ = db::alerts::destinations::set("default", "testDest", destination);
+        let _ = db::alerts::destinations::set("default", "testDest", destination).await;
 
         let obj: Trigger = Trigger {
             timestamp: chrono::Utc::now().timestamp_micros(),

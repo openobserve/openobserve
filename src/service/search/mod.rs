@@ -552,58 +552,58 @@ mod tests {
         assert!(filter_source_by_partition_key(path, &[]));
         assert!(!filter_source_by_partition_key(
             path,
-            &vec![("kuberneteshost", "")]
+            &[("kuberneteshost", "")]
         ));
         assert!(filter_source_by_partition_key(
             path,
-            &vec![("kuberneteshost", "gke-dev1")]
+            &[("kuberneteshost", "gke-dev1")]
         ));
         assert!(!filter_source_by_partition_key(
-            &path,
-            &vec![("kuberneteshost", "gke-dev2")]
+            path,
+            &[("kuberneteshost", "gke-dev2")]
         ));
         assert!(
-            filter_source_by_partition_key(path, &vec![("some_other_key", "no-matter")]),
+            filter_source_by_partition_key(path, &[("some_other_key", "no-matter")]),
             "Partition key was not found ==> the Parquet file has to be searched"
         );
         assert!(filter_source_by_partition_key(
             path,
-            &vec![
+            &[
                 ("kuberneteshost", "gke-dev1"),
                 ("kubernetesnamespacename", "ziox-qqx")
             ],
         ));
         assert!(!filter_source_by_partition_key(
             path,
-            &vec![
+            &[
                 ("kuberneteshost", "gke-dev1"),
                 ("kubernetesnamespacename", "abcdefg")
             ],
         ));
         assert!(!filter_source_by_partition_key(
             path,
-            &vec![
+            &[
                 ("kuberneteshost", "gke-dev2"),
                 ("kubernetesnamespacename", "ziox-qqx")
             ],
         ));
         assert!(!filter_source_by_partition_key(
             path,
-            &vec![
+            &[
                 ("kuberneteshost", "gke-dev2"),
                 ("kubernetesnamespacename", "abcdefg")
             ],
         ));
         assert!(filter_source_by_partition_key(
             path,
-            &vec![
+            &[
                 ("kuberneteshost", "gke-dev1"),
                 ("some_other_key", "no-matter")
             ],
         ));
         assert!(!filter_source_by_partition_key(
             path,
-            &vec![
+            &[
                 ("kuberneteshost", "gke-dev2"),
                 ("some_other_key", "no-matter")
             ],

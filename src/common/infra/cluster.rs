@@ -100,7 +100,7 @@ pub async fn register_and_keepalive() -> Result<()> {
     if CONFIG.common.local_mode {
         let roles = load_local_node_role();
         if !is_single_node(&roles) {
-            panic!("For local mode only single node deployment is allowed!");
+            panic!("Local mode only support NODE_ROLE=all");
         }
         // cache local node
         NODES.insert(LOCAL_NODE_UUID.clone(), load_local_mode_node());

@@ -117,7 +117,7 @@ pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLoc
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
-pub static LOCAL_SCHEMA_LOCKER: Lazy<RwHashMap<String, tokio::sync::RwLock<bool>>> =
+pub static LOCAL_SCHEMA_LOCKER: Lazy<RwAHashMap<String, tokio::sync::RwLock<bool>>> =
     Lazy::new(|| Arc::new(Default::default)());
 
 #[derive(EnvConfig)]
@@ -176,7 +176,7 @@ pub struct Grpc {
     pub port: u16,
     #[env_config(name = "ZO_GRPC_ADDR", default = "")]
     pub addr: String,
-    #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "organization")]
+    #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "zinc-org-id")]
     pub org_header_key: String,
     #[env_config(name = "ZO_GRPC_STREAM_HEADER_KEY", default = "stream-name")]
     pub stream_header_key: String,
@@ -246,6 +246,8 @@ pub struct Common {
     pub feature_fulltext_on_all_fields: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
+    #[env_config(name = "ZO_FEATURE_FILELIST_DEDUP_ENABLED", default = false)]
+    pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -332,6 +334,8 @@ pub struct Limit {
     pub http_worker_max_blocking: usize,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // in seconds
     pub calculate_stats_interval: u64,
+    #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] //size in mb
+    pub enrichment_table_limit: usize,
 }
 
 #[derive(EnvConfig)]

@@ -24,20 +24,7 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
-use super::{get_exclude_labels, otlp_grpc::handle_grpc_request};
-use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
-    meta::{
-        self,
-        alert::{Alert, Trigger},
-        http::HttpResponse as MetaHttpResponse,
-        prom::{self, MetricType, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
-        stream::{PartitioningDetails, StreamParams},
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{flatten, json},
-};
+use super::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request};
 use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
     db,
@@ -45,6 +32,22 @@ use crate::service::{
     schema::{set_schema_metadata, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
+};
+use crate::{
+    common::{
+        infra::{cluster, config::CONFIG, metrics},
+        meta::{
+            self,
+            alert::{Alert, Trigger},
+            http::HttpResponse as MetaHttpResponse,
+            prom::{self, MetricType, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+            stream::{PartitioningDetails, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json},
+    },
+    service::format_stream_name,
 };
 
 const SERVICE: &str = "service";
@@ -138,7 +141,7 @@ pub async fn metrics_json_handler(
                         format!(
                             "{}_{}",
                             SERVICE,
-                            local_attr.get("key").unwrap().as_str().unwrap()
+                            format_label_name(local_attr.get("key").unwrap().as_str().unwrap())
                         ),
                         get_val_for_attr(local_attr.get("value").unwrap().clone()),
                     );
@@ -156,7 +159,9 @@ pub async fn metrics_json_handler(
                 let metrics = inst_metrics.get("metrics").unwrap().as_array().unwrap();
                 for metric in metrics {
                     // parse metadata
-                    let metric_name = metric.get("name").unwrap().as_str().unwrap();
+                    let metric_name =
+                        &format_stream_name(metric.get("name").unwrap().as_str().unwrap());
+
                     // check for schema
                     let schema_exists = stream_schema_exists(
                         org_id,
@@ -632,7 +637,8 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
     {
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
-            rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v)
+            rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
+                get_attribute_value(v)
         }
     }
     let ts = data_point
@@ -642,7 +648,12 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
         .unwrap()
         .parse::<u64>()
         .unwrap();
-    rec["start_time"] = data_point.get("startTimeUnixNano").unwrap().clone();
+    rec["start_time"] = data_point
+        .get("startTimeUnixNano")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
 
     set_data_point_value(rec, data_point);
@@ -673,7 +684,8 @@ fn process_hist_data_point(
     {
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
-            rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v);
+            rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
+                get_attribute_value(v);
         }
     }
     let ts = data_point
@@ -683,7 +695,12 @@ fn process_hist_data_point(
         .unwrap()
         .parse::<u64>()
         .unwrap();
-    rec["start_time"] = data_point.get("startTimeUnixNano").unwrap().clone();
+    rec["start_time"] = data_point
+        .get("startTimeUnixNano")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -745,7 +762,8 @@ fn process_exp_hist_data_point(
     {
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
-            rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v);
+            rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
+                get_attribute_value(v);
         }
     }
     let ts = data_point
@@ -755,7 +773,12 @@ fn process_exp_hist_data_point(
         .unwrap()
         .parse::<u64>()
         .unwrap();
-    rec["start_time"] = data_point.get("startTimeUnixNano").unwrap().clone();
+    rec["start_time"] = data_point
+        .get("startTimeUnixNano")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -834,7 +857,8 @@ fn process_summary_data_point(
     {
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
-            rec[attr.get("key").unwrap().as_str().unwrap()] = get_attribute_value(v)
+            rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
+                get_attribute_value(v)
         }
     }
     let ts = data_point
@@ -844,7 +868,12 @@ fn process_summary_data_point(
         .unwrap()
         .parse::<u64>()
         .unwrap();
-    rec["start_time"] = data_point.get("startTimeUnixNano").unwrap().clone();
+    rec["start_time"] = data_point
+        .get("startTimeUnixNano")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {

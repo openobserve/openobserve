@@ -369,7 +369,10 @@ async fn handle_existing_schema(
         metadata.extend(inferred_schema.metadata().to_owned());
         let final_schema = Schema::new(final_fields.clone()).with_metadata(metadata);
         if is_schema_changed {
-            log::info!("Acquired lock for stream {} to update schema", stream_name);
+            log::info!(
+                "Acquired lock for cluster stream {} to update schema",
+                stream_name
+            );
             db::schema::set(
                 org_id,
                 stream_name,
@@ -398,15 +401,14 @@ async fn handle_existing_schema(
             &CONFIG.sled.prefix
         );
 
-        let value = LOCAL_SCHEMA_LOCKER
+        let mut schema_locker = LOCAL_SCHEMA_LOCKER.write().await;
+        let value = schema_locker
             .entry(key.clone())
             .or_insert_with(|| tokio::sync::RwLock::new(false));
 
-        let mut lock_acquired = value.write().await; // lock acquired
+        let lock_acquired = value.write().await; // lock acquired
 
         if !*lock_acquired {
-            *lock_acquired = true; // We've acquired the lock.
-
             let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
@@ -423,7 +425,10 @@ async fn handle_existing_schema(
             metadata.extend(inferred_schema.metadata().to_owned());
             let final_schema = Schema::new(final_fields.clone()).with_metadata(metadata);
             if is_schema_changed {
-                log::info!("Acquired lock for stream {} to update schema", stream_name);
+                log::info!(
+                    "Acquired lock for local stream {} to update schema",
+                    stream_name
+                );
                 db::schema::set(
                     org_id,
                     stream_name,
@@ -439,7 +444,6 @@ async fn handle_existing_schema(
                 //No Change in schema.
                 stream_schema_map.insert(stream_name.to_string(), schema.clone());
             }
-            *lock_acquired = false;
             drop(lock_acquired); // release lock
 
             Some(SchemaEvolution {
@@ -457,7 +461,6 @@ async fn handle_existing_schema(
                 get_schema_changes(&schema, &inferred_schema);
             stream_schema_map.insert(stream_name.to_string(), schema);
             log::info!("Schema exists for stream {} ", stream_name);
-            *lock_acquired = false;
             drop(lock_acquired); // release lock
             Some(SchemaEvolution {
                 schema_compatible: true,
@@ -530,7 +533,9 @@ async fn handle_new_schema(
                     is_schema_changed: true,
                 });
             } else {
+                stream_schema_map.insert(stream_name.to_string(), chk_schema.clone());
                 *schema = chk_schema;
+
                 lock.unlock().await.map_err(server_internal_error).unwrap();
                 log::info!(
                     "Releasing lock for stream {} after schema is set",
@@ -543,13 +548,13 @@ async fn handle_new_schema(
                 &CONFIG.sled.prefix
             );
 
-            let value = LOCAL_SCHEMA_LOCKER
+            let mut schema_locker = LOCAL_SCHEMA_LOCKER.write().await;
+            let value = schema_locker
                 .entry(key.clone())
                 .or_insert_with(|| tokio::sync::RwLock::new(false));
 
-            let mut lock_acquired = value.write().await; // lock acquired
+            let lock_acquired = value.write().await; // lock acquired
             if !*lock_acquired {
-                *lock_acquired = true; // We've acquired the lock.
                 log::info!(
                     "Acquired lock for stream {} as schema is empty",
                     stream_name
@@ -572,7 +577,6 @@ async fn handle_new_schema(
                     )
                     .await
                     .unwrap();
-                    *lock_acquired = false;
                     drop(lock_acquired); // release lock
                     return Some(SchemaEvolution {
                         schema_compatible: true,
@@ -582,7 +586,7 @@ async fn handle_new_schema(
                     });
                 } else {
                     // No schema change
-                    *lock_acquired = false;
+                    stream_schema_map.insert(stream_name.to_string(), chk_schema.clone());
                     drop(lock_acquired); // release lock
                     *schema = chk_schema;
                     log::info!(
@@ -592,7 +596,7 @@ async fn handle_new_schema(
                 }
             } else {
                 // Some other request has already acquired the lock.
-                *lock_acquired = false;
+                //*lock_acquired = false;
                 drop(lock_acquired); // release lock
                 let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                     .await

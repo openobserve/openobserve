@@ -57,6 +57,22 @@ impl Default for DynamoFileList {
 
 #[async_trait]
 impl super::FileList for DynamoFileList {
+    async fn create_table(&self) -> Result<()> {
+        create_table().await
+    }
+
+    async fn create_table_index(&self) -> Result<()> {
+        create_table_index().await
+    }
+
+    async fn set_initialised(&self) -> Result<()> {
+        Ok(())
+    }
+
+    async fn get_initialised(&self) -> Result<bool> {
+        Ok(true)
+    }
+
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
@@ -108,6 +124,9 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
         for batch in files.chunks(25) {
             let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
             for file in batch {
@@ -126,6 +145,9 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
         for batch in files.chunks(25) {
             let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
             for file in batch {
@@ -506,7 +528,7 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn clear(&self) -> Result<()> {
-        Ok(()) // TODO
+        Ok(())
     }
 }
 

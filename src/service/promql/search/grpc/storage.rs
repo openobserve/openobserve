@@ -110,14 +110,15 @@ pub(crate) async fn create_context(
     );
 
     // load files to local cache
-    let deleted_files = cache_parquet_files(&files, &scan_stats).await?;
+    let (cache_type, deleted_files) = cache_parquet_files(&files, &scan_stats).await?;
     if !deleted_files.is_empty() {
         // remove deleted files
         files.retain(|f| !deleted_files.contains(&f.key));
     }
     log::info!(
-        "promql->search->storage: load files {}, into memory cache done",
-        scan_stats.files
+        "promql->search->storage: load files {}, into {:?} cache done",
+        scan_stats.files,
+        cache_type
     );
 
     let schema = Arc::new(
@@ -189,7 +190,10 @@ async fn get_file_list(
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:cache_parquet_files", skip_all)]
-async fn cache_parquet_files(files: &[FileKey], scan_stats: &ScanStats) -> Result<Vec<String>> {
+async fn cache_parquet_files(
+    files: &[FileKey],
+    scan_stats: &ScanStats,
+) -> Result<(file_data::CacheType, Vec<String>)> {
     let cache_type = if CONFIG.memory_cache.enabled
         && scan_stats.compressed_size < CONFIG.memory_cache.skip_size as i64
     {
@@ -203,7 +207,7 @@ async fn cache_parquet_files(files: &[FileKey], scan_stats: &ScanStats) -> Resul
         file_data::CacheType::Disk
     } else {
         // no cache
-        return Ok(vec![]);
+        return Ok((file_data::CacheType::None, vec![]));
     };
 
     let mut tasks = Vec::new();
@@ -230,7 +234,6 @@ async fn cache_parquet_files(files: &[FileKey], scan_stats: &ScanStats) -> Resul
                 _ => None,
             };
             let ret = if let Some(e) = ret {
-                log::info!("promql->search->storage: download file to cache err: {}", e);
                 if e.to_string().to_lowercase().contains("not found") {
                     // delete file from file list
                     if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
@@ -238,6 +241,7 @@ async fn cache_parquet_files(files: &[FileKey], scan_stats: &ScanStats) -> Resul
                     }
                     Some(file_name)
                 } else {
+                    log::error!("promql->search->storage: download file to cache err: {}", e);
                     None
                 }
             } else {
@@ -263,5 +267,5 @@ async fn cache_parquet_files(files: &[FileKey], scan_stats: &ScanStats) -> Resul
         }
     }
 
-    Ok(delete_files)
+    Ok((cache_type, delete_files))
 }

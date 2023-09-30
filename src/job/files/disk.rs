@@ -23,6 +23,7 @@ use tokio::{sync::Semaphore, task, time};
 
 use crate::common::{
     infra::{
+        cluster,
         config::{COLUMN_TRACE_ID, CONFIG},
         metrics, storage, wal,
     },
@@ -38,11 +39,16 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
     interval.tick().await; // trigger the first run
     loop {
+        if cluster::is_offline() {
+            break;
+        }
         interval.tick().await;
         if let Err(e) = move_files_to_storage().await {
             log::error!("Error moving disk files to remote: {}", e);
         }
     }
+    log::info!("job::files::disk is stopped");
+    Ok(())
 }
 
 /*
@@ -125,7 +131,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             }
 
             let (key, meta, _stream_type) = ret.unwrap();
-            let ret = db::file_list::local::set(&key, meta, false).await;
+            let ret = db::file_list::local::set(&key, Some(meta.clone()), false).await;
             if let Err(e) = ret {
                 log::error!(
                     "[JOB] Failed write disk file meta: {}, error: {}",
