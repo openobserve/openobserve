@@ -72,10 +72,9 @@
         />
 
         <span>&nbsp;</span>
-        <q-select v-model="selectedFolder" label="Select Another Folder"
-          :options="folders.map((item)=> {return {label: item.name, value: item.folderId}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
-          class="q-mb-xs">
-        </q-select>
+        <!-- select folder or create new folder and select -->
+        <select-folder-dropdown :folderList="folders" :activeFolderId="activeFolderId" @folder-created="updateFolderList" @folder-selected="selectedFolder = $event"/>
+
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
@@ -110,6 +109,8 @@ import { useStore } from "vuex";
 import { isProxy, toRaw } from "vue";
 import { getImageURL } from "../../utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import SelectFolderDropdown from "./SelectFolderDropdown.vue";
+import { getFoldersList } from "@/utils/commons";
 
 const defaultValue = () => {
   return {
@@ -128,20 +129,20 @@ export default defineComponent({
       type: Object,
       default: () => defaultValue(),
     },
-    folders:{
-      default: ()=>[{
-        folderId: "default",
-        name: "default",
-        description: "default"
-      }],
+    folders: {
+      default: () => [{
+              folderId: "default",
+              name: "default",
+              description: "default"
+          }],
     },
-    activeFolderId:{
+    activeFolderId: {
       type: String,
       default: "default",
     }
   },
-  emits: ["update:modelValue", "updated", "finish"],
-  setup(props) {
+  emits: ["update:modelValue", "updated", "finish", "folderUpdated"],
+  setup(props, { emit }) {
     const store: any = useStore();
     const beingUpdated: any = ref(false);
     const addDashboardForm: any = ref(null);
@@ -150,11 +151,20 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const activeFolder: any = props.folders.find((item) => item.folderId === props.activeFolderId);
+    const showAddFolderDialog: any = ref(false);
+    const folders = ref(props.folders);
     const selectedFolder = ref({label: activeFolder.name, value: activeFolder.folderId});
 
     //generate random integer number for dashboard Id
     function getRandInteger() {
       return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
+    }
+
+      const updateFolderList = async (data: any) => {
+      showAddFolderDialog.value = false;
+      folders.value = await getFoldersList(store);
+      selectedFolder.value = {label: data.name, value: data.folderId};
+      emit("folderUpdated", folders);
     }
 
     return {
@@ -169,7 +179,8 @@ export default defineComponent({
       getRandInteger,
       isValidIdentifier,
       getImageURL,
-      selectedFolder
+      selectedFolder,
+      updateFolderList
     };
   },
   created() {
@@ -253,5 +264,6 @@ export default defineComponent({
       });
     },
   },
+  components: { SelectFolderDropdown }
 });
 </script>

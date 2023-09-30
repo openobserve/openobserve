@@ -48,23 +48,9 @@
           :disable="true"
         />
         <span>&nbsp;</span>
-        <div class="flex justify-center q-mt-lg">
-          <!-- select new folder -->
-          <q-select v-model="selectedFolder" label="Select Another Folder"
-            :options="folders.map((item: any)=> {return {label: item.name, value: item.folderId}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
-            class="q-mb-xs" style="width: 88%">
-          </q-select>
 
-          <q-btn
-            class="q-mb-md text-bold"
-            label="+"
-            text-color="light-text"
-            padding="sm md"
-            no-caps
-            @click="()=>{showAddFolderDialog = true}"
-          />
-        </div>
-        
+        <!-- select folder or create new folder and select -->
+        <SelectFolderDropdown :folderList="folders" :activeFolderId="activeFolderId" @folder-created="updateFolderList" @folder-selected="selectedFolder = $event"/>
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
@@ -89,16 +75,6 @@
       </q-form>
     </q-card-section>
   </q-card>
-
-  <!-- add/edit folder -->
-  <q-dialog
-      v-model="showAddFolderDialog"
-      position="right"
-      full-height
-      maximized
-    >
-    <AddFolder @update:modelValue="updateFolderList" :edit-mode="false"/>
-  </q-dialog>
 </template>
 
 <script lang="ts">
@@ -108,12 +84,11 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import { getFoldersList } from "../../utils/commons";
-import AddFolder from "../../components/dashboards/AddFolder.vue";
-
+import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
-  components:{AddFolder},
+  components:{ SelectFolderDropdown },
   props: {
     activeFolderId: {
       type: String,

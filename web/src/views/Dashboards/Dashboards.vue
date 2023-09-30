@@ -200,7 +200,7 @@
       full-height
       maximized
     >
-      <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolderId="activeFolderId" />
+      <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolderId="activeFolderId" @folder-updated="updateFolderList" />
     </q-dialog>
 
     <!-- add/edit folder -->
@@ -368,6 +368,11 @@ export default defineComponent({
       activeFolderId.value = route.query.folder ?? "default";      
     });
 
+    onActivated(async() => {
+      folders.value = await getFoldersList(store);
+      activeFolderId.value = route.query.folder ?? "default";
+    });
+
     watch(activeFolderId, async()=>{
       await getDashboards();
       router.push({
@@ -398,6 +403,10 @@ export default defineComponent({
     const importDashboard = () => {
       router.push({
         path: "/dashboards/import",
+        query:{
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value || "default",
+        }
       });
     };
 

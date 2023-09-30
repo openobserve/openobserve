@@ -40,6 +40,10 @@
               .json files only
             </template>
           </q-file>
+
+        <!-- select folder or create new folder and select -->
+        <select-folder-dropdown v-if="folders.length" :folderList="folders" :activeFolderId="route.query.folder ?? 'default'" @folder-created="updateFolderList" @folder-selected="selectedFolder = $event"/>
+
           <div>
             <div v-if="filesImportResults.length" class="q-py-sm">
               <div v-for="importResult in filesImportResults">
@@ -60,11 +64,15 @@
         <div class="q-my-md">
           Import Dashboard from URL
         </div>
-        <div class="flex" style="width: 400px;">
-          <q-input v-model="url" style="width:275px;" label="Add your url" color="input-border" bg-color="input-bg"
+        <div style="width: 400px;">
+          <q-input v-model="url" label="Add your url" color="input-border" bg-color="input-bg"
             stack-label filled dense label-slot :disable="!!isLoading" />
-          <div>
-            <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.URL" class="text-bold no-border q-ml-md"
+
+        <!-- select folder or create new folder and select -->
+        <select-folder-dropdown v-if="folders.length" :folderList="folders" :activeFolderId="route.query.folder ?? 'default'" @folder-created="updateFolderList" @folder-selected="selectedFolder = $event"/>
+          
+          <div class="q-my-md">
+            <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.URL" class="text-bold no-border"
               :label="t('dashboard.import')" color="secondary" type="submit" no-caps @click="importFromUrl()"
               padding="sm xl" />
           </div>
@@ -79,6 +87,10 @@
           <q-input :disable="!!isLoading" v-model="jsonStr" style="width: 400px;" label="JSON Object" color="input-border"
             dense filled type="textarea" />
         </div>
+        
+        <!-- select folder or create new folder and select -->
+        <select-folder-dropdown v-if="folders.length" :folderList="folders" :activeFolderId="route.query.folder ?? 'default'" @folder-created="updateFolderList" @folder-selected="selectedFolder = $event"/>
+
         <div class="q-my-md">
           <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.JSON_STRING" class="text-bold no-border q-mr-md"
             :label="t('dashboard.import')" color="secondary" type="submit" padding="sm xl" no-caps
@@ -97,22 +109,30 @@
 // @ts-nocheck
 import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { getAllDashboards } from "../../utils/commons.ts";
+import { getAllDashboards, getFoldersList } from "../../utils/commons.ts";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import dashboardService from "../../services/dashboards";
 import axios from 'axios';
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 
 export default defineComponent({
   name: "Import Dashboard",
   props: ["dashboardId"],
-  setup(props, { emit }) {
+  setup() {
     const { t } = useI18n();
     const store = useStore()
     const router = useRouter()
+    const route = useRoute();
     const $q = useQuasar();
+
+    const folders = ref([]);
+    const selectedFolder = ref({
+      label: folders.value.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
+      value: route.query.folder
+    });
 
     // hold the values of 3 supported import types
     const jsonFiles = ref<any>()
@@ -132,8 +152,13 @@ export default defineComponent({
     // store the results of the import (for files)
     const filesImportResults = ref([])
 
-    onMounted(() => {
-      filesImportResults.value = []
+    onMounted(async() => {
+      filesImportResults.value = [];   
+      folders.value = await getFoldersList(store);
+      selectedFolder.value = {
+        label: folders.value.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name,
+        value: route.query.folder
+      }         
     });
 
     //import dashboard from the json
@@ -313,14 +338,24 @@ export default defineComponent({
       url.value = ''
       jsonStr.value = ''
       filesImportResults.value = []
-      return router.push("/dashboards");
-    };
-
+      return router.push({
+          path: "/dashboards",
+          query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: route?.query?.folder || "default",
+          }
+      });
+  };
     const onSubmit = () => {
       // do nothing here
-    }
+    };
 
-    return {
+  const updateFolderList = async (data: any) => {
+    showAddFolderDialog.value = false;
+    folders.value = await getFoldersList(store);
+    selectedFolder.value = {label: data.name, value: data.folderId};
+  };
+  return {
       t,
       goBack,
       onSubmit,
@@ -332,8 +367,13 @@ export default defineComponent({
       importFromJsonStr,
       isLoading,
       ImportType,
-      filesImportResults
-    }
-  }
+      filesImportResults,
+      route,
+      folders,
+      updateFolderList,
+      selectedFolder
+  };
+  },
+components: { SelectFolderDropdown }
 })
 </script>
