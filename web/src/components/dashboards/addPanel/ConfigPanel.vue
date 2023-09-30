@@ -83,7 +83,7 @@
 
     <div class="space"></div>
 
-   <q-input v-if="dashboardPanelData.data.type == 'geomap'" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.weight_fixed" label="Weight" color="input-border"
+   <q-input v-if="dashboardPanelData.data.type == 'geomap' && !isWeightFieldPresent" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.weight_fixed" label="Weight" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot readonly>
     </q-input>
   </div>
@@ -91,7 +91,7 @@
 
 <script lang="ts">
 import useDashboardPanelData from '@/composables/useDashboardPanel';
-import { defineComponent, watch } from 'vue';
+import { computed, defineComponent, watch } from 'vue';
 
 export default defineComponent({
   setup() {
@@ -167,6 +167,10 @@ export default defineComponent({
         value: 'custom'
       },
     ]
+    const isWeightFieldPresent = computed(() => {
+      const layoutFields = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields; 
+      return !!layoutFields?.weight;
+    });
     return {
       dashboardPanelData,
       promqlMode,
@@ -174,7 +178,8 @@ export default defineComponent({
       layerTypeOptions,
       // legends position options
       legendsPositionOptions,
-      unitOptions
+      unitOptions,
+      isWeightFieldPresent
     };
   }
 });
