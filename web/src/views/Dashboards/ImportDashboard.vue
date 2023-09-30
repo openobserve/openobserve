@@ -171,7 +171,8 @@ export default defineComponent({
 
       return dashboardService.create(
         store.state.selectedOrganization.identifier,
-        data
+        data,
+        selectedFolder.value.value
       )
     }
 
@@ -267,7 +268,13 @@ export default defineComponent({
       return getAllDashboards(store).then(() => {
         return getAllDashboards(store)
       }).then(() => {
-        router.push('/dashboards')
+        router.push({
+          path: '/dashboards',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            folder: selectedFolder.value.value,
+          }
+        })
       })
     }
 
