@@ -21,14 +21,15 @@
  */
 export const convertMapData = (mapData: any) => {
     console.log("panelSchema", mapData);
-    const mapDataaa = mapData.map((item: any) => ({
-      name: item.x_axis_1,
-      value: item.y_axis_1,
-    }));
+    const mapDataaa = mapData.map((item: any) => ([
+      item.longitude,
+      item.latitude,
+      item.weight
+    ]));
     console.log("mapDataaa", mapDataaa);
     
-    const minValue = Math.min(...mapDataaa.map((item: any) => item.value));
-    const maxValue = Math.max(...mapDataaa.map((item: any) => item.value));
+    const minValue = Math.min(...mapDataaa.map((item: any) => item[2]));
+    const maxValue = Math.max(...mapDataaa.map((item: any) => item[2]));
 
     const options: any = {
       lmap: {
@@ -53,8 +54,8 @@ export const convertMapData = (mapData: any) => {
       },
       visualMap: {
         left: "right",
-        min: 0,
-        max: 50,
+        min: minValue,
+        max: maxValue,
         inRange: {
           color: [
             "#313695",
@@ -90,29 +91,7 @@ export const convertMapData = (mapData: any) => {
               show: true,
             },
           },
-          // data: mapDataaa,
-          data: [
-            [120, 30, 28],
-            [120.1, 20, 3],
-            [115.5, 28, 7],
-            [121, 32, 6],
-            [119.7, 25, 4],
-            [118.8, 22, 25],
-            [119.3, 27, 9],
-            [120.5, 31, 2],
-            [121.2, 33, 7],
-            [119.9, 29, 6],
-            [120.7, 26, 23],
-            [118.3, 24, 8],
-            [121.5, 30, 5],
-            [119.6, 21, 4],
-            [119.8, 23, 9],
-            [120.3, 28, 2],
-            [120.9, 27, 21],
-            [118.7, 22, 27],
-            [121.3, 31, 35],
-            [119.4, 25, 6],
-          ],
+          data: mapDataaa,
           symbolSize: function (val: any) {
             return val[2];
           },
@@ -124,52 +103,52 @@ export const convertMapData = (mapData: any) => {
             value: 2,
           },
         },
-        {
-          name: "USA PopEstimates",
-          type: "heatmap",
-          // map: "world",
-          coordinateSystem: "lmap",
-          emphasis: {
-            label: {
-              show: true,
-            },
-          },
+        // {
+        //   name: "USA PopEstimates",
+        //   type: "heatmap",
+        //   // map: "world",
+        //   coordinateSystem: "lmap",
+        //   emphasis: {
+        //     label: {
+        //       show: true,
+        //     },
+        //   },
 
-          // data: mapDataaa,
-          data: [
-            [120, 30, 28],
-            [120.1, 20, 3],
-            [115.5, 28, 7],
-            [121, 32, 6],
-            [119.7, 25, 4],
-            [118.8, 22, 25],
-            [119.3, 27, 9],
-            [120.5, 31, 2],
-            [121.2, 33, 7],
-            [119.9, 29, 6],
-            [120.7, 26, 23],
-            [118.3, 24, 8],
-            [121.5, 30, 5],
-            [119.6, 21, 4],
-            [119.8, 23, 9],
-            [120.3, 28, 2],
-            [120.9, 27, 21],
-            [118.7, 22, 27],
-            [121.3, 31, 35],
-            [119.4, 25, 6],
-          ],
+        //   data: mapDataaa,
+        //   // data: [
+        //   //   [120, 30, 28],
+        //   //   [120.1, 20, 3],
+        //   //   [115.5, 28, 7],
+        //   //   [121, 32, 6],
+        //   //   [119.7, 25, 4],
+        //   //   [118.8, 22, 25],
+        //   //   [119.3, 27, 9],
+        //   //   [120.5, 31, 2],
+        //   //   [121.2, 33, 7],
+        //   //   [119.9, 29, 6],
+        //   //   [120.7, 26, 23],
+        //   //   [118.3, 24, 8],
+        //   //   [121.5, 30, 5],
+        //   //   [119.6, 21, 4],
+        //   //   [119.8, 23, 9],
+        //   //   [120.3, 28, 2],
+        //   //   [120.9, 27, 21],
+        //   //   [118.7, 22, 27],
+        //   //   [121.3, 31, 35],
+        //   //   [119.4, 25, 6],
+        //   // ],
 
-          // symbolSize: function (val: any) {
-          //   return val[2];
-          // },
-          // itemStyle: {
-          //   color: "#b02a02",
-          // },
-          encode: {
-            // encode the third element of data item as the `value` dimension
-            value: 2,
-          },
-        },
+        //   // symbolSize: function (val: any) {
+        //   //   return val[2];
+        //   // },
+        //   // itemStyle: {
+        //   //   color: "#b02a02",
+        //   // },
+        //   encode: {
+        //     // encode the third element of data item as the `value` dimension
+        //     value: 2,
+        //   },
+        // },
       ],
     };
     console.log(
