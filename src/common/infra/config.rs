@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use dashmap::{DashMap, DashSet};
 use datafusion::arrow::datatypes::Schema;
 use dotenv_config::EnvConfig;
@@ -42,6 +42,7 @@ pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
 pub type RwHashMap<K, V> = DashMap<K, V, ahash::RandomState>;
 pub type RwHashSet<K> = DashSet<K, ahash::RandomState>;
 pub type RwAHashMap<K, V> = tokio::sync::RwLock<AHashMap<K, V>>;
+pub type RwAHashSet<K> = tokio::sync::RwLock<AHashSet<K>>;
 
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
