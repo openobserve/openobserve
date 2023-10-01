@@ -169,11 +169,18 @@ export default defineComponent({
       data.owner = store.state.userInfo.name
       data.created = new Date().toISOString()
 
-      return dashboardService.create(
+      //create new dashboard
+      const newDashboard = await dashboardService.create(
         store.state.selectedOrganization.identifier,
         data,
         selectedFolder.value.value
       )
+
+      //update store
+      await getAllDashboards(store, selectedFolder.value.value);
+
+      //return new dashboard
+      return newDashboard;
     }
 
     // import multiple files

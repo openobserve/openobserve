@@ -110,7 +110,7 @@ import { isProxy, toRaw } from "vue";
 import { getImageURL } from "../../utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
-import { getFoldersList } from "@/utils/commons";
+import { getAllDashboards, getFoldersList } from "@/utils/commons";
 
 const defaultValue = () => {
   return {
@@ -239,7 +239,7 @@ export default defineComponent({
           );
         }
         callDashboard
-          .then((res: { data: any }) => {
+          .then(async (res: { data: any }) => {
             const data = convertDashboardSchemaVersion(res.data["v" + res.data.version]);
             this.dashboardData = {
               id: "",
@@ -247,6 +247,8 @@ export default defineComponent({
               description: "",
             };
 
+            //update store
+            await getAllDashboards(this.store, this.selectedFolder.value);
             this.$emit("update:modelValue", data);
             this.$emit("updated", data.dashboardId, this.selectedFolder.value);
             this.addDashboardForm.resetValidation();
