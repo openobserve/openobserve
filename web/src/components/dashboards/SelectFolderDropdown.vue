@@ -17,7 +17,7 @@
   <div class="flex justify-center q-mt-lg">
     <!-- select new folder -->
     <q-select v-model="selectedFolder" label="Select Folder"
-      :options="folders.map((item: any)=> {return {label: item.name, value: item.folderId}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
+      :options="store.state.organizationData.folders.map((item: any)=> {return {label: item.name, value: item.folderId}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
       class="q-mb-xs" style="width: 88%">
     </q-select>
 
@@ -46,7 +46,6 @@
 import { defineComponent, onActivated, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { getFoldersList } from "../../utils/commons";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import { useRoute } from "vue-router";
 
@@ -58,39 +57,27 @@ export default defineComponent({
       type: String,
       default: "default",
     },
-    folderList: {
-      default: [
-      {
-        name: "default",
-        folderId: "default",
-        description: "default",
-      }
-      ]
-    },
   },
-  emits: ["folder-created", "folder-selected"],
+  emits: ["folder-selected"],
   setup(props, { emit }) {
 
     const store: any = useStore();
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
-    const folders:any = ref(props.folderList);
     //dropdown selected folder index
     const selectedFolder = ref({
-      label: folders.value.find((item: any) => item.folderId === route.query.folder ?? "default")?.name ?? "default",
+      label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? "default")?.name ?? "default",
       value: route.query.folder ?? "default",
     });
     const { t } = useI18n();    
 
     const updateFolderList = async (data: any) => {
       showAddFolderDialog.value = false;
-      folders.value = await getFoldersList(store);
       selectedFolder.value = {label: data.name, value: data.folderId};
-      emit("folder-created", data);
     }
     
     onActivated(() => {
-      selectedFolder.value = {label: folders.value.find((item: any) => item.folderId === route.query.folder ?? "default")?.name, value: route.query.folder ?? "default"};
+      selectedFolder.value = {label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? "default")?.name, value: route.query.folder ?? "default"};
     })
     
 
@@ -103,8 +90,7 @@ export default defineComponent({
       store,
       selectedFolder,
       updateFolderList,
-      showAddFolderDialog,
-      folders
+      showAddFolderDialog
     };
   },
 });
