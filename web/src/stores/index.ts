@@ -33,6 +33,7 @@ const organizationObj = {
   quotaThresholdMsg: "",
   functions: [],
   streams: {},
+  folders: [],
 };
 
 export default createStore({
@@ -118,6 +119,9 @@ export default createStore({
     setConfig(state, payload) {
       state.zoConfig = payload;
     },
+    setFolders(state, payload) {
+      state.organizationData.folders = payload;
+    },
     appTheme(state, payload) {
       state.theme = payload;
     },
@@ -158,6 +162,9 @@ export default createStore({
     // },
     setAllDashboardList(context, payload) {
       context.commit("setAllDashboardList", payload);
+    },
+    setFolders(context, payload) {
+      context.commit("setFolders", payload);
     },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);
