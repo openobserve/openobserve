@@ -6,8 +6,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let db_key = format!("/dashboard/");
     let data = infra_db::DEFAULT.list(&db_key).await?;
     for (key, val) in data {
-        let key = key.strip_prefix('/').unwrap_or(&key);
-        let len = key.split('/').collect::<Vec<&str>>().len();
+        let local_key = key.strip_prefix('/').unwrap_or(&key);
+        let len = local_key.split('/').collect::<Vec<&str>>().len();
         if len > 3 {
             /* println!(
                 "Skip dashboard migration as it is already part of folder: {}",
@@ -22,7 +22,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         {
             Ok(_) => {
                 let _ = infra_db::DEFAULT
-                    .delete(key, false, infra_db::NO_NEED_WATCH)
+                    .delete(&key, false, infra_db::NO_NEED_WATCH)
                     .await;
                 println!("Migrated dashboard: {} successfully", key);
             }
