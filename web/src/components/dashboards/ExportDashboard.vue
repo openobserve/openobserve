@@ -19,6 +19,7 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getDashboard } from "../../utils/commons.ts";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "ExportDashboard",
@@ -26,9 +27,10 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore()
+    const route = useRoute();
     const downloadDashboard = async () => {
       // get the dashboard
-      const dashboard = await getDashboard(store, props.dashboardId)
+      const dashboard = await getDashboard(store, props.dashboardId, route.query.folder)
       dashboard.owner = ''
 
       // prepare json and download via a click
