@@ -432,10 +432,26 @@ export const getFoldersList = async (store: any) => {
   // get default folder and append it to top
   const defaultFolder = folders.find((it: any) => it.name == "default");
   folders = folders.filter((it: any) => it.name != "default");
-  
-  return [defaultFolder, ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name))];
+  store.dispatch(
+    "setFolders",
+    [defaultFolder, ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name))]
+  );
+
+  return store.state.organizationData.folders;
 }
 
 export const deleteFolderById = async (store: any, folderId: any) => {
-  return await dashboardService.delete_Folder(store.state.selectedOrganization.identifier, folderId);
+  await dashboardService.delete_Folder(store.state.selectedOrganization.identifier, folderId);
+  await getFoldersList(store);
+}
+
+export const createFolder = async (store: any, data: any) => {
+  const newFolder = await dashboardService.new_Folder(store.state.selectedOrganization.identifier, data);
+  await getFoldersList(store);
+  return newFolder;
+}
+
+export const updateFolder = async (store: any, folderId: any, data: any) => {
+  await dashboardService.edit_Folder(store.state.selectedOrganization.identifier, folderId, data);
+  await getFoldersList(store);
 }
