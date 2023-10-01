@@ -120,7 +120,11 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
 
     let file_list_num = file_list::len().await;
-    stats.insert("FILE_LIST", json::json!({"num":file_list_num}));
+    let file_list_max_id = file_list::get_max_pk_value().await.unwrap_or_default();
+    stats.insert(
+        "FILE_LIST",
+        json::json!({"num":file_list_num,"max_id": file_list_max_id}),
+    );
 
     let tmpfs_mem_size = cache::tmpfs::stats().unwrap();
     stats.insert("TMPFS", json::json!({ "mem_size": tmpfs_mem_size }));
