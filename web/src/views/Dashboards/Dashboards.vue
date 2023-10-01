@@ -261,7 +261,7 @@ import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
-import { deleteFolderById, getAllDashboards, getDashboard, getFoldersList } from "../../utils/commons.ts";
+import { deleteFolderById, getAllDashboards, getAllDashboardsByFolderId, getDashboard, getFoldersList } from "../../utils/commons.ts";
 import { outlinedDelete, outlinedDriveFileMove, outlinedEdit } from '@quasar/extras/material-icons-outlined'
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import MoveDashboardToAnotherFolder from "@/components/dashboards/MoveDashboardToAnotherFolder.vue";
@@ -365,7 +365,7 @@ export default defineComponent({
 
     onMounted(async() => {      
       folders.value = await getFoldersList(store);
-      activeFolderId.value = route.query.folder ?? "default";      
+      activeFolderId.value = route.query.folder ?? "default";
     });
 
     onActivated(async() => {
@@ -374,7 +374,7 @@ export default defineComponent({
     });
 
     watch(activeFolderId, async()=>{
-      await getDashboards();
+      await getAllDashboardsByFolderId(store, activeFolderId.value);
       router.push({
         path: "/dashboards",
         query: {
@@ -420,7 +420,7 @@ export default defineComponent({
 
     try {
       // Get the dashboard
-      const dashboard = await getDashboard(store, dashboardId);
+      const dashboard = await getDashboard(store, dashboardId, activeFolderId.value ?? "default");
 
       // Duplicate the dashboard
       const data = JSON.parse(JSON.stringify(dashboard));
@@ -469,12 +469,12 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading dashboards...",
       });
-      await getAllDashboards(store,activeFolderId.value || "default");
-      resultTotal.value = store.state.organizationData.allDashboardList.length;
+      await getAllDashboards(store, activeFolderId.value ?? "default");
+      resultTotal.value = store.state.organizationData.allDashboardList[activeFolderId.value].length;
       dismiss();
     };
     const dashboards = computed(function () {
-      const dashboardList = toRaw(store.state.organizationData.allDashboardList);
+      const dashboardList = toRaw(store.state.organizationData.allDashboardList[activeFolderId.value] ?? []);
       return dashboardList.map((board: any, index) => {
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
@@ -493,13 +493,13 @@ export default defineComponent({
       if (selectedDelete.value) {
         const dashboardId = selectedDelete.value.id;
         await dashboardService
-          .delete(store.state.selectedOrganization.identifier, dashboardId, activeFolderId.value || "default")
+          .delete(store.state.selectedOrganization.identifier, dashboardId, activeFolderId.value ?? "default")
           .then((res) => {
-            const dashboards = toRaw(store.state.organizationData.allDashboardList);
-            const newDashboards = dashboards.filter(
+            const allDashboardList = toRaw(store.state.organizationData.allDashboardList);
+            const newDashboards = allDashboardList[activeFolderId.value].filter(
               (dashboard) => dashboard.dashboardId != dashboardId
             );
-            store.dispatch("setAllDashboardList", newDashboards);
+            store.dispatch("setAllDashboardList", {...allDashboardList, [activeFolderId.value]: newDashboards});
             $q.notify({
               type: "positive",
               message: "Dashboard deleted successfully.",
@@ -523,7 +523,6 @@ export default defineComponent({
       isFolderEditMode.value = false;
 
       folders.value = await getFoldersList(store);
-      await getDashboards();
     }
 
     const editFolder = (folderId : any) => {      
