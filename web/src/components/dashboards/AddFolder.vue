@@ -107,9 +107,9 @@ const defaultValue = () => {
 export default defineComponent({
   name: "AddFolder",
   props: {
-    modelValue: {
-      type: Object,
-      default: () => defaultValue(),
+    folderId: {
+      type: String,
+      default: "default",
     },
     editMode: {
       type: Boolean,
@@ -122,7 +122,7 @@ export default defineComponent({
     // const beingUpdated: any = ref(false);
     const addFolderForm: any = ref(null);
     const disableColor: any = ref("");
-    const folderData: any = ref(props.editMode ? props.modelValue : defaultValue());
+    const folderData: any = ref(props.editMode ? JSON.parse(JSON.stringify(store.state.organizationData.folders.find((item: any) => item.folderId === props.folderId))) : defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
 
@@ -139,16 +139,16 @@ export default defineComponent({
       getImageURL,
     };
   },
-  created() {
-    if (this.modelValue && this.modelValue.id) {
-      // this.beingUpdated = true;
-      this.disableColor = "grey-5";
-      this.folderData = {
-        name: this.modelValue.name,
-        description: this.modelValue.description,
-      };
-    }
-  },
+  // created() {
+  //   if (this.modelValue && this.modelValue.id) {
+  //     // this.beingUpdated = true;
+  //     this.disableColor = "grey-5";
+  //     this.folderData = {
+  //       name: this.modelValue.name,
+  //       description: this.modelValue.description,
+  //     };
+  //   }
+  // },
   methods: {
     onSubmit() {
       const dismiss = this.$q.notify({
