@@ -108,16 +108,18 @@ import dashboardService from "@/services/dashboards";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
-import { getAllDashboards } from "@/utils/commons";
+import { getAllDashboards, getAllDashboardsByFolderId } from "@/utils/commons";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import type store from "@/test/unit/helpers/store";
+import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "AddToDashboard",
   emits: ["save"],
   setup(props, { emit }) {
     const store = useStore();
+    const route = useRoute();
     const q = useQuasar();
     const dashboardList: Ref<any[]> = ref([]);
     const filteredDashboards: Ref<any[]> = ref([]);
@@ -130,19 +132,23 @@ export default defineComponent({
     const { t } = useI18n();
 
     onBeforeMount(() => {
-      if (!store.state.organizationData.allDashboardList?.length) {
-        getAllDashboards(store).then(() => {
+      // if (!store.state.organizationData.allDashboardList[route.query.folder ?? "default"] ||
+      //     store.state.organizationData.allDashboardList[route.query.folder ?? "default"].length == 0) {
+            // getAllDashboards(store, route.query.folder).then(() => {
+      //       updateDashboardOptions();
+      //   });
+      // } else {
+      //   updateDashboardOptions();
+      // }
+        getAllDashboardsByFolderId(store, route.query.folder ?? "default").then(() => {
           updateDashboardOptions();
-        });
-      } else {
-        updateDashboardOptions();
-      }
+        })
     });
 
     const updateDashboardOptions = () => {
       dashboardList.value = [];
       filteredDashboards.value = [];
-      store.state.organizationData.allDashboardList.forEach((dashboard: any) => {
+      store.state.organizationData.allDashboardList[route?.query?.folder ?? "default"].forEach((dashboard: any) => {
         dashboardList.value.push({
           id: dashboard.dashboardId,
           label: dashboard.title,
@@ -187,7 +193,7 @@ export default defineComponent({
         dashboardService
           .create(store.state.selectedOrganization.identifier, baseObj)
           .then((newDashboard) => {
-            getAllDashboards(store).then(() => {
+            getAllDashboards(store, route.query.folder).then(() => {
               emit("save", newDashboard.data.dashboardId);
             });
           })
