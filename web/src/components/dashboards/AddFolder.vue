@@ -91,7 +91,7 @@
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import dashboardService from "../../services/dashboards";
+import { createFolder, updateFolder } from "@/utils/commons";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
@@ -156,79 +156,50 @@ export default defineComponent({
         message: "Please wait...",
         timeout: 2000,
       });
-      this.addFolderForm.validate().then((valid: any) => {
+      this.addFolderForm.validate().then(async (valid: any) => {
         if (!valid) {
           return false;
         }
 
-        //if edit mode
-        if(this.$props.editMode) {
-          dashboardService.edit_Folder(
-            this.store.state.selectedOrganization.identifier,
-            this.folderData.folderId,
-            this.folderData
-          )
-            .then((res: { data: any }) => {
-              this.folderData = {
-                folderId: "",
-                name: "",
-                description: "",
-              };
-
-              dismiss();
-              this.$q.notify({
-                type: "positive",
-                message: res.data.message || "Folder updated",
-                timeout: 2000,
-              });
-
-              this.$emit("update:modelValue", this.folderData);
-              
-              this.addFolderForm.resetValidation();
-            })
-            .catch((err: any) => {
-              this.$q.notify({
-                type: "negative",
-                message: JSON.stringify(
-                  err.response.data["error"] || "Folder creation failed."
-                  ),
-              });
-              dismiss();
+        try {
+          //if edit mode
+          if(this.$props.editMode) {            
+            await updateFolder(this.store, this.folderData.folderId, this.folderData);            
+            this.$q.notify({
+              type: "positive",
+              message: "Folder updated",
+              timeout: 2000,
+            });
+            this.$emit("update:modelValue", this.folderData);
+          }
+          //else new folder
+          else{
+            const newFolder: any = await createFolder(this.store, this.folderData);
+            this.$emit("update:modelValue", newFolder);
+            this.$emit("updated", newFolder.folderId);
+            this.$q.notify({
+              type: "positive",
+              message: `Folder added successfully.`,
+              timeout: 2000,
             });
           }
-        //else new folder
-        else{
-          dashboardService.new_Folder(
-            this.store.state.selectedOrganization.identifier,
-            this.folderData
-          )
-            .then((res: { data: any }) => {
-              const data = res.data;
-              this.folderData = {
-                folderId: "",
-                name: "",
-                description: "",
-              };
-  
-              this.$emit("update:modelValue", data);
-              this.$emit("updated", data.folderId);
-              this.addFolderForm.resetValidation();
-              dismiss();
-
-              this.$q.notify({
-                type: "positive",
-                message: `Folder added successfully.`,
-              });
-            })
-            .catch((err: any) => {
-              this.$q.notify({
-                type: "negative",
-                message: JSON.stringify(
-                  err.response.data["error"] || "Folder creation failed."
-                ),
-              });
-              dismiss();
-            });
+          
+        } catch (err: any) {
+          this.$q.notify({
+            type: "negative",
+            message: JSON.stringify(
+              err?.response?.data["error"] || "Folder creation failed."
+            ),
+            timeout: 2000,
+          });
+          dismiss();
+        } finally {
+          this.folderData = {
+            folderId: "",
+            name: "",
+            description: "",
+          };
+          this.addFolderForm.resetValidation();
         }
       });
     },
