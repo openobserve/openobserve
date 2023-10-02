@@ -136,7 +136,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             db::file_list::local::load_wal_in_cache()
                 .await
                 .expect("load wal file list failed");
-        } else if cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
+        }
+        if cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
             || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
         {
             db::file_list::remote::cache("", false)

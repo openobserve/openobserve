@@ -59,7 +59,7 @@ use openobserve::{
             },
             request::{
                 event::Eventer,
-                filelist::Filelister,
+                file_list::Filelister,
                 logs::LogsServer,
                 metrics::{ingester::Ingester, querier::Querier},
                 search::Searcher,

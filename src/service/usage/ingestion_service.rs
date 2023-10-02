@@ -50,7 +50,11 @@ pub async fn ingest(
         .connect()
         .await
         .map_err(|err| {
-            log::error!("ingest->grpc: node: {}, connect err: {:?}", node.id, err);
+            log::error!(
+                "ingest->grpc: node: {}, connect err: {:?}",
+                &node.grpc_addr,
+                err
+            );
             Error::msg("connect ingest node error")
         })?;
     let mut client = cluster_rpc::usage_client::UsageClient::with_interceptor(
@@ -70,7 +74,11 @@ pub async fn ingest(
     let res: cluster_rpc::UsageResponse = match client.report_usage(req).await {
         Ok(res) => res.into_inner(),
         Err(err) => {
-            log::error!("ingest->grpc: node: {}, ingest err: {:?}", node.id, err);
+            log::error!(
+                "ingest->grpc: node: {}, ingest err: {:?}",
+                &node.grpc_addr,
+                err
+            );
             if err.code() == tonic::Code::Internal {
                 return Err(err.into());
             }

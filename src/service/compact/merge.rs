@@ -123,6 +123,7 @@ pub async fn merge_by_stream(
         partition_time_level,
         partition_offset_start,
         partition_offset_end,
+        true,
     )
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
