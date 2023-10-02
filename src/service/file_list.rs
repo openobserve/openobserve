@@ -97,7 +97,7 @@ pub async fn query(
                 .map_err(|err| {
                     log::error!(
                         "file_list->grpc: node: {}, connect err: {:?}",
-                        node.grpc_addr.clone(),
+                        &node.grpc_addr,
                         err
                     );
                     Error::ErrorCode(ErrorCodes::ServerInternalError(
@@ -121,7 +121,7 @@ pub async fn query(
                 Err(err) => {
                     log::error!(
                         "file_list->grpc: node: {}, query max_id err: {:?}",
-                        node.grpc_addr.clone(),
+                        &node.grpc_addr,
                         err
                     );
                     if err.code() == tonic::Code::Internal {
