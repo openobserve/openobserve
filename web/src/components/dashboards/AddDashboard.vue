@@ -37,7 +37,7 @@
     </q-card-section>
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="addDashboardForm" @submit="onSubmit">
+      <q-form ref="addDashboardForm" @submit.stop="onSubmit.execute">
         <q-input
           v-if="beingUpdated"
           v-model="dashboardData.id"
@@ -56,7 +56,7 @@
           outlined
           filled
           dense
-          :rules="[(val) => !!val || t('dashboard.nameRequired')]"
+          :rules="[(val) => !!(val.trim()) || t('dashboard.nameRequired')]"
         />
         <span>&nbsp;</span>
         <q-input
@@ -71,6 +71,10 @@
           dense
         />
 
+        <span>&nbsp;</span>
+        <!-- select folder or create new folder and select -->
+        <select-folder-dropdown @folder-selected="selectedFolder = $event"/>
+
         <div class="flex justify-center q-mt-lg">
           <q-btn
             v-close-popup
@@ -83,6 +87,7 @@
           <q-btn
             data-test="dashboard-add-submit"
             :disable="dashboardData.name === ''"
+            :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
@@ -103,6 +108,11 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { isProxy, toRaw } from "vue";
 import { getImageURL } from "../../utils/zincutils";
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import SelectFolderDropdown from "./SelectFolderDropdown.vue";
+import { getAllDashboards } from "@/utils/commons";
+import { useQuasar } from "quasar";
+import { useLoading } from "@/composables/useLoading";
 
 const defaultValue = () => {
   return {
@@ -117,13 +127,13 @@ let callDashboard: Promise<{ data: any }>;
 export default defineComponent({
   name: "ComponentAddDashboard",
   props: {
-    modelValue: {
-      type: Object,
-      default: () => defaultValue(),
-    },
+    activeFolderId: {
+      type: String,
+      default: "default",
+    }
   },
-  emits: ["update:modelValue", "updated", "finish"],
-  setup() {
+  emits: ["updated"],
+  setup(props, { emit }) {
     const store: any = useStore();
     const beingUpdated: any = ref(false);
     const addDashboardForm: any = ref(null);
@@ -131,11 +141,71 @@ export default defineComponent({
     const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
+    const $q = useQuasar();
+    const activeFolder: any = store.state.organizationData.folders.find((item: any) => item.folderId === props.activeFolderId);
+    const selectedFolder = ref({label: activeFolder.name, value: activeFolder.folderId});
 
     //generate random integer number for dashboard Id
     function getRandInteger() {
       return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
     }
+
+    const onSubmit = useLoading(async () => {
+      await addDashboardForm.value.validate().then(async (valid: any) => {
+        if (!valid) {
+          return false;
+        }
+
+        const dashboardId = dashboardData.value.id;
+        delete dashboardData.value.id;
+
+        if (dashboardId == "") {
+          const obj = toRaw(dashboardData.value);
+          const baseObj = {
+            title: obj.name,
+            // NOTE: the dashboard ID is generated at the server side,
+            // in "Create a dashboard" request handler. The server
+            // doesn't care what value we put here as long as it's
+            // a string.
+            dashboardId: "",
+            description: obj.description,
+            role: "",
+            owner: store.state.userInfo.name,
+            created: new Date().toISOString(),
+            panels: [],
+            version:2
+          };
+
+          callDashboard = dashboardService.create(
+            store.state.selectedOrganization.identifier,
+            baseObj,
+            selectedFolder.value.value ?? "default"
+          );
+        }
+        await callDashboard
+          .then(async (res: { data: any }) => {
+            const data = convertDashboardSchemaVersion(res.data["v" + res.data.version]);
+            
+            //update store
+            await getAllDashboards(store, selectedFolder.value.value);
+            emit("updated", data.dashboardId, selectedFolder.value.value);
+            dashboardData.value = {
+              id: "",
+              name: "",
+              description: "",
+            };
+            await addDashboardForm.value.resetValidation();
+          })
+          .catch((err: any) => {
+            $q.notify({
+              type: "negative",
+              message: JSON.stringify(
+                err.response.data["error"] || "Dashboard creation failed."
+              ),
+            });
+          });
+      });
+    })
 
     return {
       t,
@@ -149,18 +219,9 @@ export default defineComponent({
       getRandInteger,
       isValidIdentifier,
       getImageURL,
+      selectedFolder,
+      onSubmit
     };
-  },
-  created() {
-    if (this.modelValue && this.modelValue.id) {
-      this.beingUpdated = true;
-      this.disableColor = "grey-5";
-      this.dashboardData = {
-        id: this.modelValue.id,
-        name: this.modelValue.name,
-        description: this.modelValue.description,
-      };
-    }
   },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
@@ -169,66 +230,7 @@ export default defineComponent({
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
       });
     },
-    onSubmit() {
-      const dismiss = this.$q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
-      this.addDashboardForm.validate().then((valid: any) => {
-        if (!valid) {
-          return false;
-        }
-
-        const dashboardId = this.dashboardData.id;
-        delete this.dashboardData.id;
-
-        if (dashboardId == "") {
-          const obj = toRaw(this.dashboardData);
-          const baseObj = {
-            title: obj.name,
-            // NOTE: the dashboard ID is generated at the server side,
-            // in "Create a dashboard" request handler. The server
-            // doesn't care what value we put here as long as it's
-            // a string.
-            dashboardId: "",
-            description: obj.description,
-            role: "",
-            owner: this.store.state.userInfo.name,
-            created: new Date().toISOString(),
-            panels: [],
-          };
-
-          callDashboard = dashboardService.create(
-            this.store.state.selectedOrganization.identifier,
-            baseObj
-          );
-        }
-        callDashboard
-          .then((res: { data: any }) => {
-            const data = res.data;
-            this.dashboardData = {
-              id: "",
-              name: "",
-              description: "",
-            };
-
-            this.$emit("update:modelValue", data);
-            this.$emit("updated", data.dashboardId);
-            this.addDashboardForm.resetValidation();
-            dismiss();
-          })
-          .catch((err: any) => {
-            this.$q.notify({
-              type: "negative",
-              message: JSON.stringify(
-                err.response.data["error"] || "Dashboard creation failed."
-              ),
-            });
-            dismiss();
-          });
-      });
-    },
   },
+  components: { SelectFolderDropdown }
 });
 </script>
