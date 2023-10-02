@@ -151,6 +151,8 @@ async fn main() -> Result<(), anyhow::Error> {
     // check version upgrade
     let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
     migration::check_upgrade(&old_version, VERSION).await?;
+    // migrate dashboards
+    migration::dashboards::run().await?;
 
     // init job
     job::init().await.expect("job init failed");
@@ -224,9 +226,6 @@ async fn main() -> Result<(), anyhow::Error> {
     .bind(haddr)?;
 
     tokio::task::spawn(async move { zo_logger::send_logs().await });
-
-    // migrate dashboards
-    migration::dashboards::run().await?;
 
     server
         .workers(CONFIG.limit.http_worker_num)
