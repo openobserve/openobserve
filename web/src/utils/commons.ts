@@ -107,6 +107,8 @@ export function getConsumableDateTime(dateObj: any) {
 //api call
 //save to store
 export const getAllDashboards = async (store: any, folderId: any) => {
+  //call only if we have folderId
+  if(!folderId)return;
   // api call
   return await dashboardService
     .list(
@@ -430,8 +432,17 @@ export const getFoldersList = async (store: any) => {
   let folders = (await dashboardService.list_Folders(store.state.selectedOrganization.identifier)).data.list;
 
   // get default folder and append it to top
-  const defaultFolder = folders.find((it: any) => it.name == "default");
+  let defaultFolder = folders.find((it: any) => it.name == "default");
   folders = folders.filter((it: any) => it.name != "default");
+
+  if(!defaultFolder){
+    defaultFolder = {
+      name: "default",
+      folderId: "default",
+      decription: "default"
+    }
+  }
+  
   store.dispatch(
     "setFolders",
     [defaultFolder, ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name))]

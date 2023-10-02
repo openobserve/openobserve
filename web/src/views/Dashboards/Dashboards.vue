@@ -256,7 +256,7 @@ import dashboardService from "../../services/dashboards";
 import AddDashboard from "../../components/dashboards/AddDashboard.vue";
 import QTablePagination from "../../components/shared/grid/Pagination.vue";
 import NoData from "../../components/shared/grid/NoData.vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
@@ -283,7 +283,6 @@ export default defineComponent({
     const showAddDashboardDialog = ref(false);
     const showAddFolderDialog = ref(false);
     const qTable: any = ref(null);
-    const router = useRouter();
     const route = useRoute();
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
@@ -376,15 +375,15 @@ export default defineComponent({
         message: "Please wait while loading dashboards...",
       });
       await getAllDashboardsByFolderId(store, activeFolderId.value);
+      dismiss();
       resultTotal.value = store.state.organizationData.allDashboardList[activeFolderId.value].length;
-      router.push({
+      route.push({
         path: "/dashboards",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value || "default"
         },
       });
-      dismiss();
     },{deep: true});
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -404,7 +403,7 @@ export default defineComponent({
       showAddFolderDialog.value = true;
     };
     const importDashboard = () => {
-      router.push({
+      route.push({
         path: "/dashboards/import",
         query:{
           org_identifier: store.state.selectedOrganization.identifier,
@@ -458,7 +457,7 @@ export default defineComponent({
     };
 
     const routeToViewD = (row) => {
-      return router.push({
+      return route.push({
         path: "/dashboards/view",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -584,7 +583,6 @@ export default defineComponent({
       qTable,
       store,
       orgData,
-      router,
       loading: ref(false),
       dashboards,
       dashboard,
@@ -649,7 +647,7 @@ export default defineComponent({
         message: `Dashboard added successfully.`,
       });
 
-      this.$router.push({
+      this.$route.push({
         path: "/dashboards/view/",
         query: { org_identifier: this.store.state.selectedOrganization.identifier, dashboard: dashboardId, folder: folderId },
       });
