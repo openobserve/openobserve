@@ -34,7 +34,7 @@
     </q-card-section>
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="moveFolderForm" @submit.stop="onSubmit">
+      <q-form ref="moveFolderForm" @submit.stop="onSubmit.execute()">
         <q-input
           v-model="store.state.organizationData.folders.find((item: any) => item.folderId === activeFolderId).name"
           label="Current Folder"
@@ -64,6 +64,7 @@
           <q-btn
             data-test="dashboard-add-submit"
             :disable="activeFolderId === selectedFolder.value"
+            :loading="onSubmit.isLoading.value"
             label="Move"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
@@ -84,6 +85,8 @@ import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import { moveDashboardToAnotherFolder } from "../../utils/commons";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
+import { useLoading } from "@/composables/useLoading";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
@@ -102,48 +105,34 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const moveFolderForm: any = ref(null);
-    const showAddFolderDialog: any = ref(false);
     //dropdown selected folder
     const selectedFolder = ref({
       label: store.state.organizationData.folders.find((item: any) => item.folderId === props.activeFolderId).name,
       value: props.activeFolderId
     });
-    const { t } = useI18n();    
+    const { t } = useI18n(); 
+    const $q = useQuasar();
 
-    return {
-      t,
-      moveFolderForm,
-      store,
-      getImageURL,
-      selectedFolder,
-      showAddFolderDialog
-    };
-  },
-  methods: {
-    onSubmit() {
-      const dismiss = this.$q.notify({
-        spinner: true,
-        message: "Please wait..."
-      });
-      this.moveFolderForm.validate().then(async (valid: any) => {
+    const onSubmit = useLoading(async () => {   
+
+      await moveFolderForm.value.validate().then(async (valid: any) => {
         if (!valid) {
           return false;
         }
 
         try {
-          await moveDashboardToAnotherFolder(this.store, this.$props.dashboardId, this.activeFolderId, this.selectedFolder.value);
-          dismiss();
-          this.$q.notify({
+          await moveDashboardToAnotherFolder(store, props.dashboardId, props.activeFolderId, selectedFolder.value.value);
+          $q.notify({
             type: "positive",
             message: "Dashboard Moved successfully",
             timeout: 2000,
           });
 
-          this.$emit("updated");
-          this.moveFolderForm.resetValidation();
+          emit("updated");
+          moveFolderForm.value.resetValidation();
+
         } catch (err: any) {
-          dismiss();
-          this.$q.notify({
+          $q.notify({
             type: "negative",
             message: JSON.stringify(
               err.response.data.message || "Dashboard move failed."
@@ -152,7 +141,16 @@ export default defineComponent({
           });
         };
       });
-    },
-  },
+    })
+
+    return {
+      t,
+      moveFolderForm,
+      store,
+      getImageURL,
+      selectedFolder,
+      onSubmit
+    };
+  }
 });
 </script>
