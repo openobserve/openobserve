@@ -43,7 +43,7 @@ use crate::service::{
     usage::report_request_usage_stats,
 };
 
-pub async fn ingest(
+pub async fn usage_ingest(
     org_id: &str,
     in_stream_name: &str,
     body: web::Bytes,

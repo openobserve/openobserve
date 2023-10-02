@@ -26,6 +26,7 @@ use vrl::{
 
 use crate::common::{
     infra::{
+        cluster,
         config::{CONFIG, SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS},
         wal::get_or_create,
     },
@@ -345,6 +346,24 @@ pub fn get_value(value: &Value) -> String {
     } else {
         "".to_string()
     }
+}
+
+pub fn is_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Option<anyhow::Error> {
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        return Some(anyhow::anyhow!("not an ingester"));
+    }
+    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+        return Some(anyhow::anyhow!("Quota exceeded for this organization"));
+    }
+
+    // check if we are allowed to ingest
+    if let Some(stream_name) = stream_name {
+        if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
+            return Some(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
+        }
+    };
+
+    None
 }
 
 #[cfg(test)]
