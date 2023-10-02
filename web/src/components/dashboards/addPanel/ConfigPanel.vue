@@ -84,7 +84,7 @@
     <div class="space"></div>
 
    <q-input v-if="dashboardPanelData.data.type == 'geomap' && !isWeightFieldPresent" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.weight_fixed" label="Weight" color="input-border"
-      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot readonly>
+      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
     </q-input>
   </div>
 </template>

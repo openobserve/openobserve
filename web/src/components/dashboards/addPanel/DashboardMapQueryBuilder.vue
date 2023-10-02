@@ -90,7 +90,7 @@
         <div class="layout-name">{{ t('panel.weight') }}
           <q-icon name="info_outline" class="q-ml-xs">
             <q-tooltip>
-              {{ Hint }}
+              {{ WeightHint }}
             </q-tooltip>
           </q-icon>
         </div>
@@ -132,7 +132,7 @@
           </q-btn-group>
           <div class="text-caption text-weight-bold text-center q-mt-xs"
             v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight == null">
-            {{ Hint }}
+            {{ WeightHint }}
           </div>
         </div>
       </div>
@@ -245,6 +245,15 @@ export default defineComponent({
       }
     })
 
+    const WeightHint = computed((e: any) => {
+      switch (dashboardPanelData.data.type) {
+        case 'geomap':
+          return "Add 1 field or Configure it from the Config"
+        default:
+          return "Add maximum 2 fields here";
+      }
+    })
+
     const commonBtnLabel = (field: any) => {
       if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
         return field.column
@@ -290,6 +299,7 @@ export default defineComponent({
       expansionItems,
       // triggerOperatorsWithHistogram,
       Hint,
+      WeightHint,
       promqlMode,
       // xLabel,
       // yLabel,
