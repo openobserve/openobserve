@@ -14,21 +14,24 @@
 -->
 
 <template>
-  <div class="flex justify-center q-mt-lg">
-    <!-- select new folder -->
-    <q-select v-model="selectedFolder" label="Select Folder"
-      :options="store.state.organizationData.folders.map((item: any)=> {return {label: item.name, value: item.folderId}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
-      class="q-mb-xs" style="width: 88%">
-    </q-select>
+  <div class="q-mt-lg">
+    <span>Select Folder</span>
+    <div class="flex justify-center">
+      <!-- select new folder -->
+      <q-select v-model="selectedFolder"
+        :options="store.state.organizationData.folders.map((item: any)=> {return {label: item.name, value: item.folderId}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
+        class="q-mb-xs" style="width: 88%">
+      </q-select>
 
-    <q-btn
-      class="q-mb-md text-bold"
-      label="+"
-      text-color="light-text"
-      padding="sm md"
-      no-caps
-      @click="()=>{showAddFolderDialog = true}"
-    />
+      <q-btn
+        class="q-mb-md text-bold"
+        label="+"
+        text-color="light-text"
+        padding="sm md"
+        no-caps
+        @click="()=>{showAddFolderDialog = true}"
+      />
+    </div>
   </div>
 
   <!-- add/edit folder -->
