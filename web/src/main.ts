@@ -29,6 +29,7 @@ import "./styles/quasar-overrides.scss";
 import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
+import userActivityTracking from "./composables/activityTracking";
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -72,5 +73,8 @@ const getConfig = async () => {
 };
 
 getConfig();
+// const tracking = userActivityTracking();
+// tracking.initializeTracking();
+// store.dispatch("setTracing", tracking);
 
 app.mount("#app");

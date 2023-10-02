@@ -50,6 +50,7 @@ export default createStore({
     theme: "",
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: {},
+    tracing: null,
   },
   mutations: {
     login(state, payload) {
@@ -128,6 +129,9 @@ export default createStore({
     appTheme(state, payload) {
       state.theme = payload;
     },
+    setTracing(state, payload) {
+      state.tracing = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -198,6 +202,9 @@ export default createStore({
     },
     appTheme(context, payload) {
       context.commit("appTheme", payload);
+    },
+    setTracing(context, payload) {
+      context.commit("setTracing", payload);
     },
   },
   modules: {},

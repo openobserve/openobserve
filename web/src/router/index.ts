@@ -20,6 +20,7 @@ import config from "@/aws-exports";
 import userCloudRoutes from "@/enterprise/composables/router";
 import userRoutes from "@/composables/shared/router";
 import useOSRoutes from "@/composables/router";
+import { nextTick } from "vue";
 
 export default function (store: any) {
   let { parentRoutes, homeChildRoutes } = userRoutes();
@@ -76,6 +77,10 @@ export default function (store: any) {
           store.dispatch("login", {
             loginState: true,
             userInfo: userInfo,
+          });
+
+          nextTick(() => {
+            store.state.tracing?.setUser(userInfo);
           });
         }
         next();
