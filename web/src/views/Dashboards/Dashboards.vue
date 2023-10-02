@@ -256,7 +256,7 @@ import dashboardService from "../../services/dashboards";
 import AddDashboard from "../../components/dashboards/AddDashboard.vue";
 import QTablePagination from "../../components/shared/grid/Pagination.vue";
 import NoData from "../../components/shared/grid/NoData.vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
@@ -283,6 +283,7 @@ export default defineComponent({
     const showAddDashboardDialog = ref(false);
     const showAddFolderDialog = ref(false);
     const qTable: any = ref(null);
+    const router = useRouter();
     const route = useRoute();
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
@@ -361,12 +362,23 @@ export default defineComponent({
     });
 
     onMounted(async() => {      
-      await getFoldersList(store);
-      activeFolderId.value = route.query.folder ?? "default";
-    });
+      //clear all dashboards store
+      await store.dispatch("setAllDashboardList", {});
 
-    onActivated(async() => {
-      activeFolderId.value = route.query.folder ?? "default";
+      //get folders list
+      await getFoldersList(store);
+
+      //initial activeFolderId will be null
+      //if route has query and we have a folder in folder list then set activeFolderId to that folder
+      // else default as a folder
+
+      activeFolderId.value = null;
+      if((route.query.folder && store.state.organizationData.folders.find((it:any) => it.folderId === route.query.folder))){
+        activeFolderId.value = route.query.folder;
+      }else{
+        activeFolderId.value = "default";
+      }
+      
     });
 
     watch(activeFolderId, async()=>{
@@ -376,12 +388,12 @@ export default defineComponent({
       });
       await getAllDashboardsByFolderId(store, activeFolderId.value);
       dismiss();
-      resultTotal.value = store.state.organizationData.allDashboardList[activeFolderId.value].length;
-      route.push({
+      resultTotal.value = store.state.organizationData.allDashboardList[activeFolderId.value].length;      
+      router.push({
         path: "/dashboards",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: activeFolderId.value || "default"
+          folder: activeFolderId.value
         },
       });
     },{deep: true});
@@ -403,7 +415,7 @@ export default defineComponent({
       showAddFolderDialog.value = true;
     };
     const importDashboard = () => {
-      route.push({
+      router.push({
         path: "/dashboards/import",
         query:{
           org_identifier: store.state.selectedOrganization.identifier,
@@ -457,7 +469,7 @@ export default defineComponent({
     };
 
     const routeToViewD = (row) => {
-      return route.push({
+      return router.push({
         path: "/dashboards/view",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -472,8 +484,8 @@ export default defineComponent({
         message: "Please wait while loading dashboards...",
       });
       await getAllDashboards(store, activeFolderId.value ?? "default");
-      resultTotal.value = store.state.organizationData.allDashboardList[activeFolderId.value].length;
       dismiss();
+      resultTotal.value = store.state.organizationData.allDashboardList[activeFolderId.value].length;
     };
     const dashboards = computed(function () {
       const dashboardList = toRaw(store.state.organizationData.allDashboardList[activeFolderId.value] ?? []);
@@ -583,6 +595,7 @@ export default defineComponent({
       qTable,
       store,
       orgData,
+      router,
       loading: ref(false),
       dashboards,
       dashboard,
@@ -647,7 +660,7 @@ export default defineComponent({
         message: `Dashboard added successfully.`,
       });
 
-      this.$route.push({
+      this.$router.push({
         path: "/dashboards/view/",
         query: { org_identifier: this.store.state.selectedOrganization.identifier, dashboard: dashboardId, folder: folderId },
       });
