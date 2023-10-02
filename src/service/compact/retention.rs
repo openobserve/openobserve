@@ -110,6 +110,7 @@ pub async fn delete_all(
             PartitionTimeLevel::Unset,
             0,
             0,
+            true,
         )
         .await?;
         match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
@@ -219,6 +220,7 @@ pub async fn delete_by_date(
             PartitionTimeLevel::Unset,
             time_range.0,
             time_range.1,
+            true,
         )
         .await?;
         match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
@@ -280,6 +282,7 @@ async fn delete_from_file_list(
         PartitionTimeLevel::Unset,
         time_range.0,
         time_range.1,
+        true,
     )
     .await?;
     if files.is_empty() {

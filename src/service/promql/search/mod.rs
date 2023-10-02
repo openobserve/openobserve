@@ -131,7 +131,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
 
         log::info!(
             "promql->search->partition: node: {}, need_wal: {}, start: {}, end: {}",
-            node.id,
+            &node.grpc_addr,
             req_need_wal,
             req_query.start,
             req_query.end,
@@ -165,7 +165,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                     .map_err(|err| {
                         log::error!(
                             "promql->search->grpc: node: {}, connect err: {:?}",
-                            node.id,
+                            &node.grpc_addr,
                             err
                         );
                         server_internal_error("connect search node error")
@@ -188,7 +188,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                     Err(err) => {
                         log::error!(
                             "promql->search->grpc: node: {}, search err: {:?}",
-                            node.id,
+                            &node.grpc_addr,
                             err
                         );
                         if err.code() == tonic::Code::Internal {
@@ -202,7 +202,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
 
                 log::info!(
                     "promql->search->grpc: result node: {}, need_wal: {}, took: {}, files: {}, scan_size: {}",
-                    node.id,
+                    &node.grpc_addr,
                     req_need_wal,
                     response.took,
                     scan_stats.files,
