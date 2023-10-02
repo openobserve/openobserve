@@ -37,7 +37,7 @@
     </q-card-section>
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="addDashboardForm" @submit.stop="onSubmit">
+      <q-form ref="addDashboardForm" @submit.stop="onSubmit.execute">
         <q-input
           v-if="beingUpdated"
           v-model="dashboardData.id"
@@ -87,6 +87,7 @@
           <q-btn
             data-test="dashboard-add-submit"
             :disable="dashboardData.name === ''"
+            :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
@@ -110,6 +111,8 @@ import { getImageURL } from "../../utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { getAllDashboards } from "@/utils/commons";
+import { useQuasar } from "quasar";
+import { useLoading } from "@/composables/useLoading";
 
 const defaultValue = () => {
   return {
@@ -138,6 +141,7 @@ export default defineComponent({
     const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
+    const $q = useQuasar();
     const activeFolder: any = store.state.organizationData.folders.find((item: any) => item.folderId === props.activeFolderId);
     const selectedFolder = ref({label: activeFolder.name, value: activeFolder.folderId});
 
@@ -145,6 +149,63 @@ export default defineComponent({
     function getRandInteger() {
       return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
     }
+
+    const onSubmit = useLoading(async () => {
+      await addDashboardForm.value.validate().then(async (valid: any) => {
+        if (!valid) {
+          return false;
+        }
+
+        const dashboardId = dashboardData.value.id;
+        delete dashboardData.value.id;
+
+        if (dashboardId == "") {
+          const obj = toRaw(dashboardData.value);
+          const baseObj = {
+            title: obj.name,
+            // NOTE: the dashboard ID is generated at the server side,
+            // in "Create a dashboard" request handler. The server
+            // doesn't care what value we put here as long as it's
+            // a string.
+            dashboardId: "",
+            description: obj.description,
+            role: "",
+            owner: store.state.userInfo.name,
+            created: new Date().toISOString(),
+            panels: [],
+            version:2
+          };
+
+          callDashboard = dashboardService.create(
+            store.state.selectedOrganization.identifier,
+            baseObj,
+            selectedFolder.value.value ?? "default"
+          );
+        }
+        await callDashboard
+          .then(async (res: { data: any }) => {
+            const data = convertDashboardSchemaVersion(res.data["v" + res.data.version]);
+            
+            //update store
+            await getAllDashboards(store, selectedFolder.value.value);
+            emit("updated", data.dashboardId, selectedFolder.value.value);
+            dashboardData.value = {
+              id: "",
+              name: "",
+              description: "",
+            };
+            await addDashboardForm.value.resetValidation();
+          })
+          .catch((err: any) => {
+            $q.notify({
+              type: "negative",
+              message: JSON.stringify(
+                err.response.data["error"] || "Dashboard creation failed."
+              ),
+            });
+          });
+      });
+    })
 
     return {
       t,
@@ -159,6 +220,7 @@ export default defineComponent({
       isValidIdentifier,
       getImageURL,
       selectedFolder,
+      onSubmit
     };
   },
   methods: {
@@ -166,69 +228,6 @@ export default defineComponent({
       this.$q.notify({
         type: "negative",
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
-      });
-    },
-    onSubmit() {
-      const dismiss = this.$q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
-      this.addDashboardForm.validate().then((valid: any) => {
-        if (!valid) {
-          return false;
-        }
-
-        const dashboardId = this.dashboardData.id;
-        delete this.dashboardData.id;
-
-        if (dashboardId == "") {
-          const obj = toRaw(this.dashboardData);
-          const baseObj = {
-            title: obj.name,
-            // NOTE: the dashboard ID is generated at the server side,
-            // in "Create a dashboard" request handler. The server
-            // doesn't care what value we put here as long as it's
-            // a string.
-            dashboardId: "",
-            description: obj.description,
-            role: "",
-            owner: this.store.state.userInfo.name,
-            created: new Date().toISOString(),
-            panels: [],
-            version:2
-          };
-
-          callDashboard = dashboardService.create(
-            this.store.state.selectedOrganization.identifier,
-            baseObj,
-            this.selectedFolder.value ?? "default"
-          );
-        }
-        callDashboard
-          .then(async (res: { data: any }) => {
-            const data = convertDashboardSchemaVersion(res.data["v" + res.data.version]);
-            
-            //update store
-            await getAllDashboards(this.store, this.selectedFolder.value);
-            this.$emit("updated", data.dashboardId, this.selectedFolder.value);
-            this.dashboardData = {
-              id: "",
-              name: "",
-              description: "",
-            };
-            this.addDashboardForm.resetValidation();
-            dismiss();
-          })
-          .catch((err: any) => {
-            this.$q.notify({
-              type: "negative",
-              message: JSON.stringify(
-                err.response.data["error"] || "Dashboard creation failed."
-              ),
-            });
-            dismiss();
-          });
       });
     },
   },
