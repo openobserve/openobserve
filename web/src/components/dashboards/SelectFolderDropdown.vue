@@ -74,6 +74,9 @@ export default defineComponent({
       selectedFolder.value = {label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? "default")?.name ?? "default", value: route.query.folder ?? "default"};
     })
     
+    watch(()=>store.state.organizationData.folders,()=>{
+      selectedFolder.value = {label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? "default")?.name ?? "default", value: route.query.folder ?? "default"};
+    })
 
     watch(()=>selectedFolder.value,()=>{
       emit("folder-selected", selectedFolder.value);

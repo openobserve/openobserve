@@ -42,7 +42,7 @@
           </q-file>
 
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown @folder-selected="selectedFolder = $event"/>
+        <select-folder-dropdown @folder-selected="selectedFolderAtJson = $event"/>
 
           <div>
             <div v-if="filesImportResults.length" class="q-py-sm">
@@ -69,7 +69,7 @@
             stack-label filled dense label-slot :disable="!!isLoading" />
 
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown @folder-selected="selectedFolder = $event"/>
+        <select-folder-dropdown @folder-selected="selectedFolderAtUrl = $event"/>
           
           <div class="q-my-md">
             <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.URL" class="text-bold no-border"
@@ -89,7 +89,7 @@
         </div>
         
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown @folder-selected="selectedFolder = $event"/>
+        <select-folder-dropdown @folder-selected="selectedFolderAtJsonObj = $event"/>
 
         <div class="q-my-md">
           <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.JSON_STRING" class="text-bold no-border q-mr-md"
@@ -128,7 +128,15 @@ export default defineComponent({
     const route = useRoute();
     const $q = useQuasar();
 
-    const selectedFolder = ref({
+    const selectedFolderAtJson = ref({
+      label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
+      value: route.query.folder
+    });
+    const selectedFolderAtUrl = ref({
+      label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
+      value: route.query.folder
+    });
+    const selectedFolderAtJsonObj = ref({
       label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
       value: route.query.folder
     });
@@ -154,14 +162,22 @@ export default defineComponent({
     onMounted(async() => {
       filesImportResults.value = [];   
       await getFoldersList(store);
-      selectedFolder.value = {
-        label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name,
+      selectedFolderAtJson.value = {
+        label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
         value: route.query.folder
-      }         
+      };
+      selectedFolderAtUrl.value = {
+        label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
+        value: route.query.folder
+      };
+      selectedFolderAtJsonObj.value = {
+        label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
+        value: route.query.folder
+      };       
     });
 
     //import dashboard from the json
-    const importDashboardFromJSON = async (jsonObj: any) => {
+    const importDashboardFromJSON = async (jsonObj: any, selectedFolder: any) => {
       const data = typeof jsonObj == 'string' ? JSON.parse(jsonObj) : typeof jsonObj == 'object' ? jsonObj : jsonObj
 
       //set owner name and creator name to import dashboard
@@ -172,11 +188,11 @@ export default defineComponent({
       const newDashboard = await dashboardService.create(
         store.state.selectedOrganization.identifier,
         data,
-        selectedFolder.value.value
+        selectedFolder.value
       )
 
       //update store
-      await getAllDashboards(store, selectedFolder.value.value);
+      await getAllDashboards(store, selectedFolder.value);
 
       //return new dashboard
       return newDashboard;
@@ -203,7 +219,7 @@ export default defineComponent({
               const oldImportedSchema = JSON.parse(readerResult.target.result);
               const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
 
-              importDashboardFromJSON(convertedSchema)
+              importDashboardFromJSON(convertedSchema, selectedFolderAtJson.value)
                 .then((res) => {
                   jsonFiles.value = null
                   resolve({ file: it.name, result: res })
@@ -227,7 +243,7 @@ export default defineComponent({
             .filter(r => r.status === 'fulfilled')?.length
 
           if (results.length == allFulfilledValues) {
-            await resetAndRefresh(ImportType.FILES);
+            await resetAndRefresh(ImportType.FILES, selectedFolderAtJson.value);
           }
 
           if(allFulfilledValues){
@@ -253,7 +269,7 @@ export default defineComponent({
     }
 
     // reset and refresh the value based on selected type 
-    const resetAndRefresh = async (type) => {
+    const resetAndRefresh = async (type, selectedFolder) => {
       switch (type) {
         case ImportType.FILES:
           jsonFiles.value = null
@@ -271,16 +287,12 @@ export default defineComponent({
           break
       }
 
-      return getAllDashboards(store).then(() => {
-        return getAllDashboards(store)
-      }).then(() => {
-        router.push({
-          path: '/dashboards',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            folder: selectedFolder.value.value,
-          }
-        })
+      return router.push({
+        path: '/dashboards',
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: selectedFolder.value,
+        }
       })
     }
 
@@ -296,9 +308,9 @@ export default defineComponent({
         const oldImportedSchema = (res.data);
         const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
 
-        await importDashboardFromJSON(convertedSchema)
+        await importDashboardFromJSON(convertedSchema, selectedFolderAtUrl.value)
           .then((res) => {
-            resetAndRefresh(ImportType.URL);
+            resetAndRefresh(ImportType.URL, selectedFolderAtUrl.value);
             filesImportResults.value = []
             $q.notify({
               type: "positive",
@@ -325,9 +337,9 @@ export default defineComponent({
         const oldImportedSchema = JSON.parse(jsonStr.value);
         const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
 
-        await importDashboardFromJSON(convertedSchema)
+        await importDashboardFromJSON(convertedSchema, selectedFolderAtJsonObj.value)
           .then((res) => {
-            resetAndRefresh(ImportType.JSON_STRING);
+            resetAndRefresh(ImportType.JSON_STRING, selectedFolderAtJsonObj.value);
             filesImportResults.value = []
             $q.notify({
                 type: "positive",
@@ -377,7 +389,9 @@ export default defineComponent({
       ImportType,
       filesImportResults,
       route,
-      selectedFolder
+      selectedFolderAtJson,
+      selectedFolderAtUrl,
+      selectedFolderAtJsonObj
   };
   },
 components: { SelectFolderDropdown }

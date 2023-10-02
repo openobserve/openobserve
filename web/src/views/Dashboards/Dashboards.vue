@@ -371,6 +371,10 @@ export default defineComponent({
     });
 
     watch(activeFolderId, async()=>{
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading dashboards...",
+      });
       await getAllDashboardsByFolderId(store, activeFolderId.value);
       resultTotal.value = store.state.organizationData.allDashboardList[activeFolderId.value].length;
       router.push({
@@ -380,6 +384,7 @@ export default defineComponent({
           folder: activeFolderId.value || "default"
         },
       });
+      dismiss();
     },{deep: true});
 
     const changePagination = (val: { label: string; value: any }) => {
