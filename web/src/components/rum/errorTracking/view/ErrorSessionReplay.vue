@@ -3,10 +3,52 @@
     <div class="tags-title text-grey-8 text-bold q-mb-sm q-ml-xs">
       Session Replay
     </div>
+    <div class="row">
+      <template v-for="(value, tag) in getSessionTags" :key="tag.tag">
+        <ErrorTag :tag="{ key: tag, value }" />
+      </template>
+    </div>
+    <div
+      class="play-button bg-primary cursor-pointer q-mt-md text-white row items-center"
+      style="width: fit-content; border-radius: 3px; padding: 6px 8px"
+      @click="playSessionReplay"
+    >
+      <q-icon name="play_circle" size="18px" class="q-mr-xs" /> Play Session
+      Replay
+    </div>
   </div>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { computed } from "vue";
+import ErrorTag from "./ErrorTag.vue";
+import { useRouter } from "vue-router";
+
+const props = defineProps({
+  error: {
+    type: Object,
+    required: true,
+  },
+});
+
+const router = useRouter();
+
+const getSessionTags = computed(() => {
+  return {
+    session_id: props.error.session_id,
+    view_id: props.error.view_id,
+  };
+});
+
+const playSessionReplay = () => {
+  router.push({
+    name: "SessionViewer",
+    params: {
+      session_id: props.error.session_id,
+    },
+  });
+};
+</script>
 
 <style scoped>
 .tags-title {

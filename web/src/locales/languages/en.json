@@ -46,7 +46,7 @@
     "openapi": "OpenAPI",
     "docs": "Docs",
     "billings": "Billing",
-    "rum": "User Monitoring",
+    "rum": "Real User Monitoring",
     "settings": "Settings"
   },
   "about": {

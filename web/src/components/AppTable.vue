@@ -8,7 +8,7 @@
     5. Component should have highlight property to highlight search text
     6. Rows should have boolean property to expand row. expandable: true
    -->
-  <div style="height: calc(100vh - 210px)">
+  <div :style="{ height: height }" class="app-table-container">
     <template v-if="!rows.length">
       <h5 class="q-pt-md text-center">No data found</h5>
     </template>
@@ -22,7 +22,7 @@
         :columns="columns"
         :table-colspan="9"
         row-key="index"
-        virtual-scroll
+        :virtual-scroll="virtualScroll"
         :virtual-scroll-item-size="48"
         :rows-per-page-options="[0]"
         @virtual-scroll="onScroll"
@@ -106,6 +106,14 @@ defineProps({
   title: {
     type: String,
     default: "",
+  },
+  virtualScroll: {
+    type: Boolean,
+    default: true,
+  },
+  height: {
+    type: String,
+    default: "100%",
   },
 });
 
