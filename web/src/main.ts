@@ -30,6 +30,7 @@ import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
 import userActivityTracking from "./composables/activityTracking";
+import userActivityTrackingOO from "./composables/activityTracking2";
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -80,8 +81,10 @@ const getConfig = async () => {
 };
 
 getConfig();
-// const tracking = userActivityTracking();
-// tracking.initializeTracking();
-// store.dispatch("setTracing", tracking);
+const tracking = userActivityTracking();
+tracking.initializeTracking();
+
+const trackingOO = userActivityTrackingOO();
+trackingOO.initializeTracking();
 
 app.mount("#app");

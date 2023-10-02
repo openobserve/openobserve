@@ -13,18 +13,18 @@
 //  limitations under the License.
 
 import { useStore } from "vuex";
-import { datadogRum as openobserveRum } from "@datadog/browser-rum";
-import "@datadog/browser-rum/bundle/datadog-rum";
+import { openobserveRum } from "@openobserve/browser-rum";
+import "@openobserve/browser-rum/bundle/openobserve-rum";
 import config from "@/aws-exports";
 
 const userActivityTracking = () => {
   const store = useStore();
   const initializeTracking = () => {
     openobserveRum.init({
-      applicationId: config.ddApplicationID,
-      clientToken: config.ddClientToken,
-      site: config.ddSite,
-      service: config.ddService,
+      applicationId: config.ooApplicationID,
+      clientToken: config.ooClientToken,
+      site: config.ooSite,
+      service: config.ooService,
       env: config.environment,
       // Specify a version number to identify the deployed version of your application in Datadog
       // version: '1.0.0',
