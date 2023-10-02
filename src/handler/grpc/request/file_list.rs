@@ -42,10 +42,10 @@ impl Filelist for Filelister {
         // metrics
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/filelist/max_id", "200", "", "", ""])
+            .with_label_values(&["/file_list/max_id", "200", "", "", ""])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/filelist/max_id", "200", "", "", ""])
+            .with_label_values(&["/file_list/max_id", "200", "", "", ""])
             .inc();
 
         Ok(Response::new(MaxIdResponse { max_id }))
@@ -83,10 +83,10 @@ impl Filelist for Filelister {
         // metrics
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/filelist/query", "200", "", "", ""])
+            .with_label_values(&["/file_list/query", "200", "", "", ""])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/filelist/query", "200", "", "", ""])
+            .with_label_values(&["/file_list/query", "200", "", "", ""])
             .inc();
 
         Ok(Response::new(FileList { items }))
