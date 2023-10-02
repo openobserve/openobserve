@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use async_recursion::async_recursion;
 use futures::future::try_join_all;
 use std::io::Write;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -34,7 +33,6 @@ use crate::common::{
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, search::MetadataMap};
 
-#[async_recursion]
 pub async fn query(
     org_id: &str,
     stream_name: &str,
@@ -45,23 +43,15 @@ pub async fn query(
     is_local: bool,
 ) -> Result<Vec<FileKey>, anyhow::Error> {
     if is_local || CONFIG.common.local_mode {
-        let files = file_list::query(
+        return query_inner(
             org_id,
-            stream_type,
             stream_name,
+            stream_type,
             time_level,
-            (time_min, time_max),
+            time_min,
+            time_max,
         )
-        .await?;
-        let mut file_keys = Vec::with_capacity(files.len());
-        for file in files {
-            file_keys.push(FileKey {
-                key: file.0,
-                meta: file.1,
-                deleted: false,
-            });
-        }
-        return Ok(file_keys);
+        .await;
     }
 
     // cluster mode
@@ -154,16 +144,21 @@ pub async fn query(
     let node = max_id_node.unwrap();
     if node.uuid.eq(cluster::LOCAL_NODE_UUID.as_str()) {
         // local node, no need grpc call
-        return query(
+        let files = query_inner(
             org_id,
             stream_name,
             stream_type,
             time_level,
             time_min,
             time_max,
-            true,
         )
-        .await;
+        .await?;
+        log::info!(
+            "file_list->local: query list: {}, time: {}ms",
+            files.len(),
+            start.elapsed().as_millis()
+        );
+        return Ok(files);
     }
     // use the max_id node to query file_list
     let req = cluster_rpc::FileListQueryRequest {
@@ -238,6 +233,34 @@ pub async fn query(
         start.elapsed().as_millis()
     );
     Ok(files)
+}
+
+#[inline]
+async fn query_inner(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    time_level: PartitionTimeLevel,
+    time_min: i64,
+    time_max: i64,
+) -> Result<Vec<FileKey>, anyhow::Error> {
+    let files = file_list::query(
+        org_id,
+        stream_type,
+        stream_name,
+        time_level,
+        (time_min, time_max),
+    )
+    .await?;
+    let mut file_keys = Vec::with_capacity(files.len());
+    for file in files {
+        file_keys.push(FileKey {
+            key: file.0,
+            meta: file.1,
+            deleted: false,
+        });
+    }
+    Ok(file_keys)
 }
 
 #[inline]
