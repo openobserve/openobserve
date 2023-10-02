@@ -71,9 +71,9 @@ export default defineComponent({
     });
     const { t } = useI18n();    
 
-    const updateFolderList = async (data: any) => {
+    const updateFolderList = async (newFolder: any) => {
       showAddFolderDialog.value = false;
-      selectedFolder.value = {label: data.name, value: data.folderId};
+      selectedFolder.value = {label: newFolder.data.name, value: newFolder.data.folderId};
     }
     
     onActivated(() => {
