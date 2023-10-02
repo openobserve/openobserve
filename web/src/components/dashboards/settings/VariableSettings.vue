@@ -148,7 +148,7 @@ export default defineComponent({
 
    
     const getDashboardData = async () => {
-      const data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard)))?.variables?.list
+      const data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard, route.query.folder ?? "default")))?.variables?.list
       dashboardVariableData.data = data.map((it:any, index:number) => {
         
         return {
@@ -176,16 +176,17 @@ export default defineComponent({
         await deleteVariable(
           store,
           route.query.dashboard,
-          variableName
+          variableName,
+          route.query.folder ?? "default"
         );
 
         await getDashboardData()
         emit("save")
       }
     }
-    const handleSaveVariable = () => {
+    const handleSaveVariable = async () => {
       isAddVariable.value = false;
-      getDashboardData()
+      await getDashboardData()
       emit("save")
     };
     const goBackToDashboardList = () => {

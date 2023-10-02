@@ -21,23 +21,39 @@ const dashboards = {
     sort_by: string,
     desc: boolean,
     name: string,
-    organization: string
+    organization: string,
+    folderId: string
   ) => {
     return http().get(
-      `/api/${organization}/dashboards?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+      `/api/${organization}/dashboards?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}&folder=${folderId}`
     );
   },
-  create: (organization: string, data: any) => {
-    return http().post(`/api/${organization}/dashboards`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+  create: (organization: string, data: any, folderId? : string) => {
+    return http().post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
   },
-  delete: (organization: string, dashboardID: string) => {
-    return http().delete(`/api/${organization}/dashboards/${dashboardID}`);
+  delete: (organization: string, dashboardID: string, folderId? : string) => {
+    return http().delete(`/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`);
   },
   get_Dashboard: (org_identifier: string) => {
     return http().get(`/api/dashboards/passcode/${org_identifier}`);
   },
-  save: (organization: string, dashboardID: string, data: any) => {
-    return http().put(`/api/${organization}/dashboards/${dashboardID}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+  save: (organization: string, dashboardID: string, data: any, folderId? : string) => {
+    return http().put(`/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+  },
+  list_Folders: (organization: string) => {
+    return http().get(`/api/${organization}/folders`);
+  },
+  new_Folder: (organization: string, data: any) => {
+    return http().post(`/api/${organization}/folders`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+  },
+  edit_Folder: (organization: string, folderId : any, data: any) => {
+    return http().put(`/api/${organization}/folders/${folderId}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+  },
+  delete_Folder: (organization: string, folderId : any) => {
+    return http().delete(`/api/${organization}/folders/${folderId}`);
+  },
+  move_Dashboard: (organization: string, dashboardId: string, data: any) => {
+    return http().put(`/api/${organization}/folders/dashboards/${dashboardId}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
   }
 
 };

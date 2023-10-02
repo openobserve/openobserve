@@ -29,10 +29,11 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
 
 const organizationObj = {
   organizationPasscode: "",
-  allDashboardList: [],
+  allDashboardList: {},
   quotaThresholdMsg: "",
   functions: [],
   streams: {},
+  folders: [],
 };
 
 export default createStore({
@@ -85,6 +86,9 @@ export default createStore({
     setOrganizationPasscode(state, payload) {
       state.organizationData.organizationPasscode = payload;
     },
+    resetOrganizationData(state, payload) {
+      state.organizationData = JSON.parse(JSON.stringify(organizationObj));
+    },
     // setAllCurrentDashboards(state, payload) {
     //   state.allCurrentDashboards = payload;
     // },
@@ -118,6 +122,9 @@ export default createStore({
     setConfig(state, payload) {
       state.zoConfig = payload;
     },
+    setFolders(state, payload) {
+      state.organizationData.folders = payload;
+    },
     appTheme(state, payload) {
       state.theme = payload;
     },
@@ -150,6 +157,9 @@ export default createStore({
     setOrganizationPasscode(context, payload) {
       context.commit("setOrganizationPasscode", payload);
     },
+    resetOrganizationData(context, payload) {
+      context.commit("resetOrganizationData", payload);
+    },
     // setAllCurrentDashboards(context, payload) {
     //   context.commit('setAllCurrentDashboards', payload);
     // },
@@ -158,6 +168,9 @@ export default createStore({
     // },
     setAllDashboardList(context, payload) {
       context.commit("setAllDashboardList", payload);
+    },
+    setFolders(context, payload) {
+      context.commit("setFolders", payload);
     },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);

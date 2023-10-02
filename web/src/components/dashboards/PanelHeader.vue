@@ -71,7 +71,7 @@ export default defineComponent({
     const addNewPanel = () => {
       return router.push({
         path: "/dashboards/add_panel",
-        query: { dashboard: String(route.query.dashboard), panelId:panelDataElementObject.id },
+        query: { dashboard: String(route.query.dashboard), panelId:panelDataElementObject.id, folder: route.query.folder ?? "default" },
       });
     }
 
