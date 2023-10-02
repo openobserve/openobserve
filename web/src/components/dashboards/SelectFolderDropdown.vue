@@ -14,13 +14,12 @@
 -->
 
 <template>
-  <div class="q-mt-lg">
-    <span>Select Folder</span>
-    <div class="flex justify-center">
+    <div class="flex justify-center items-baseline">
       <!-- select new folder -->
       <q-select v-model="selectedFolder"
+        label="Select Folder"
         :options="store.state.organizationData.folders.map((item: any)=> {return {label: item.name, value: item.folderId}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
-        class="q-mb-xs" style="width: 88%">
+        class="q-mb-xs showLabelOnTop" style="width: 88%">
       </q-select>
 
       <q-btn
@@ -32,8 +31,6 @@
         @click="()=>{showAddFolderDialog = true}"
       />
     </div>
-  </div>
-
   <!-- add/edit folder -->
   <q-dialog
       v-model="showAddFolderDialog"
