@@ -119,7 +119,7 @@ export default defineComponent({
   emits: ["save"],
   setup(props, { emit }) {
     const store = useStore();
-    const route = useRoute();
+    const route:any = useRoute();
     const q = useQuasar();
     const dashboardList: Ref<any[]> = ref([]);
     const filteredDashboards: Ref<any[]> = ref([]);
