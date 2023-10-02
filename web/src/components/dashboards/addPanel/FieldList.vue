@@ -93,7 +93,7 @@
                   </q-btn>
                 </div>
                 <div class="field_icons"
-                    v-if="dashboardPanelData.data.type == 'geomap'">
+                    v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length)) && dashboardPanelData.data.type == 'geomap'">
                     <q-btn :disabled="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude != null"  no-caps padding="sm" @click="addLatitude(props.row)"  data-test="dashboard-add-x-data">
                       <div>
                         +Lat
