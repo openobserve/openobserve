@@ -86,6 +86,9 @@ export default createStore({
     setOrganizationPasscode(state, payload) {
       state.organizationData.organizationPasscode = payload;
     },
+    resetOrganizationData(state, payload) {
+      state.organizationData = JSON.parse(JSON.stringify(organizationObj));
+    },
     // setAllCurrentDashboards(state, payload) {
     //   state.allCurrentDashboards = payload;
     // },
@@ -153,6 +156,9 @@ export default createStore({
     },
     setOrganizationPasscode(context, payload) {
       context.commit("setOrganizationPasscode", payload);
+    },
+    resetOrganizationData(context, payload) {
+      context.commit("resetOrganizationData", payload);
     },
     // setAllCurrentDashboards(context, payload) {
     //   context.commit('setAllCurrentDashboards', payload);

@@ -354,7 +354,6 @@ export default defineComponent({
       { label: "100", value: 100 },
       { label: "All", value: 0 },
     ];
-    const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
     const pagination: any = ref({
@@ -362,9 +361,6 @@ export default defineComponent({
     });
 
     onMounted(async() => {      
-      //clear all dashboards store
-      await store.dispatch("setAllDashboardList", {});
-
       //get folders list
       await getFoldersList(store);
 
@@ -375,10 +371,9 @@ export default defineComponent({
       activeFolderId.value = null;
       if((route.query.folder && store.state.organizationData.folders.find((it:any) => it.folderId === route.query.folder))){
         activeFolderId.value = route.query.folder;
-      }else{
+      } else {
         activeFolderId.value = "default";
       }
-      
     });
 
     watch(activeFolderId, async()=>{
@@ -388,7 +383,6 @@ export default defineComponent({
       });
       await getAllDashboardsByFolderId(store, activeFolderId.value);
       dismiss();
-      resultTotal.value = store.state.organizationData.allDashboardList[activeFolderId.value].length;      
       router.push({
         path: "/dashboards",
         query: {
@@ -485,10 +479,9 @@ export default defineComponent({
       });
       await getAllDashboards(store, activeFolderId.value ?? "default");
       dismiss();
-      resultTotal.value = store.state.organizationData.allDashboardList[activeFolderId.value].length;
     };
     const dashboards = computed(function () {
-      const dashboardList = toRaw(store.state.organizationData.allDashboardList[activeFolderId.value] ?? []);
+      const dashboardList = toRaw(store.state.organizationData?.allDashboardList[activeFolderId.value] ?? []);
       return dashboardList.map((board: any, index) => {
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
@@ -502,6 +495,10 @@ export default defineComponent({
         };
       });
     });
+
+    const resultTotal = computed(function () {
+      return store.state.organizationData?.allDashboardList[activeFolderId.value]?.length || 0;
+    })
 
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
@@ -555,10 +552,6 @@ export default defineComponent({
 
     const handleDashboardMoved = async() => {
       showMoveDashboardDialog.value = false;
-    }
-
-    const updateActiveFolder = (it: any) => {
-      activeFolderId.value = it;    
     }
 
     const deleteFolder = async() => {
@@ -647,7 +640,6 @@ export default defineComponent({
       selectedDashboardIdToMove,
       showMoveDashboardDialog,
       handleDashboardMoved,
-      updateActiveFolder
     };
   },
   methods: {
