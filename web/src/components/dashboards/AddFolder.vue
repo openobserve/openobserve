@@ -141,8 +141,7 @@ export default defineComponent({
     onSubmit() {
       const dismiss = this.$q.notify({
         spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
+        message: "Please wait..."
       });
       this.addFolderForm.validate().then(async (valid: any) => {
         if (!valid) {
@@ -150,6 +149,7 @@ export default defineComponent({
         }
 
         try {
+          dismiss();
           //if edit mode
           if(this.$props.editMode) {            
             await updateFolder(this.store, this.folderData.folderId, this.folderData);            
@@ -179,7 +179,6 @@ export default defineComponent({
             ),
             timeout: 2000,
           });
-          dismiss();
         } finally {
           this.folderData = {
             folderId: "",

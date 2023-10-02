@@ -123,8 +123,7 @@ export default defineComponent({
     onSubmit() {
       const dismiss = this.$q.notify({
         spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
+        message: "Please wait..."
       });
       this.moveFolderForm.validate().then(async (valid: any) => {
         if (!valid) {

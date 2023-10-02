@@ -70,10 +70,9 @@
   
 <script lang="ts">
 import { defineComponent, onMounted, ref, type Ref } from "vue";
-import dashboardService from "../../../services/dashboards";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { isProxy, toRaw, reactive } from "vue";
+import { reactive } from "vue";
 import { getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import DashboardHeader from "./common/DashboardHeader.vue";
@@ -101,7 +100,7 @@ import { useQuasar } from "quasar";
       });
       
       const getDashboardData = async () => {
-        const data = await getDashboard(store, route.query.dashboard);
+        const data = await getDashboard(store, route.query.dashboard, route.query.folder ?? "default");
         dashboardData.title = data.title;
         dashboardData.description = data.description;
       };

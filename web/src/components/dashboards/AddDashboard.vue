@@ -56,7 +56,7 @@
           outlined
           filled
           dense
-          :rules="[(val) => !!val || t('dashboard.nameRequired')]"
+          :rules="[(val) => !!(val.trim()) || t('dashboard.nameRequired')]"
         />
         <span>&nbsp;</span>
         <q-input
@@ -208,15 +208,15 @@ export default defineComponent({
         callDashboard
           .then(async (res: { data: any }) => {
             const data = convertDashboardSchemaVersion(res.data["v" + res.data.version]);
+            
+            //update store
+            await getAllDashboards(this.store, this.selectedFolder.value);
+            this.$emit("updated", data.dashboardId, this.selectedFolder.value);
             this.dashboardData = {
               id: "",
               name: "",
               description: "",
             };
-
-            //update store
-            await getAllDashboards(this.store, this.selectedFolder.value);
-            this.$emit("updated", data.dashboardId, this.selectedFolder.value);
             this.addDashboardForm.resetValidation();
             dismiss();
           })
