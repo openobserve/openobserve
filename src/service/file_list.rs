@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use async_recursion::async_recursion;
 use futures::future::try_join_all;
 use std::io::Write;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -33,6 +34,7 @@ use crate::common::{
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, search::MetadataMap};
 
+#[async_recursion]
 pub async fn query(
     org_id: &str,
     stream_name: &str,
@@ -78,7 +80,6 @@ pub async fn query(
                 .parse()
                 .map_err(|_| Error::Message("invalid org_id".to_string()))?;
             let mut request = tonic::Request::new(req);
-            // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
             opentelemetry::global::get_text_map_propagator(|propagator| {
                 propagator.inject_context(
@@ -151,6 +152,19 @@ pub async fn query(
         return Ok(Vec::new());
     }
     let node = max_id_node.unwrap();
+    if node.uuid.eq(cluster::LOCAL_NODE_UUID.as_str()) {
+        // local node, no need grpc call
+        return query(
+            org_id,
+            stream_name,
+            stream_type,
+            time_level,
+            time_min,
+            time_max,
+            true,
+        )
+        .await;
+    }
     // use the max_id node to query file_list
     let req = cluster_rpc::FileListQueryRequest {
         org_id: org_id.to_string(),
@@ -164,7 +178,6 @@ pub async fn query(
         .parse()
         .map_err(|_| Error::Message("invalid org_id".to_string()))?;
     let mut request = tonic::Request::new(req);
-    // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
     opentelemetry::global::get_text_map_propagator(|propagator| {
         propagator.inject_context(
