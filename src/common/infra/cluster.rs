@@ -377,10 +377,14 @@ async fn watch_node_list() -> Result<()> {
                         && (item_value.status.eq(&NodeStatus::Prepare)
                             || item_value.status.eq(&NodeStatus::Online))
                     {
-                        log::info!("[CLUSTER] broadcast file_list to new node: {}", item_key);
                         let notice_uuid = if item_key.eq(LOCAL_NODE_UUID.as_str()) {
+                            log::info!("[CLUSTER] broadcast file_list to other nodes");
                             None
                         } else {
+                            log::info!(
+                                "[CLUSTER] broadcast file_list to new node: {}",
+                                &item_value.grpc_addr
+                            );
                             Some(item_key.to_string())
                         };
                         tokio::task::spawn(async move {

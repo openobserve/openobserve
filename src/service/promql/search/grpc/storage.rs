@@ -159,6 +159,7 @@ async fn get_file_list(
         time_level,
         time_min,
         time_max,
+        true,
     )
     .await
     {
