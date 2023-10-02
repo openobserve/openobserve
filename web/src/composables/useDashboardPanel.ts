@@ -721,7 +721,18 @@ const loadFilterItem = (name:any)=>{
             // Update the field alias and column to the new name
             field.alias = newName;
             field.column = newName;
-          }
+          } else {
+            // Check if the field is in the z fields array
+            fieldIndex = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.findIndex((it: any) => it.alias == oldName);
+            if (fieldIndex >= 0) {
+              const newName = newArray[changedIndex[0]]?.name;
+              const field =dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[fieldIndex];
+
+              // Update the field alias and column to the new name
+              field.alias = newName;
+              field.column = newName;
+            }
+          }  
         }
       }
     }
