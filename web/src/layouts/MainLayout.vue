@@ -664,6 +664,7 @@ export default defineComponent({
     }
 
     const redirectToParentRoute = (machedRoutes: any) => {
+      store.dispatch("resetOrganizationData", {});
       if (router.currentRoute.value.path.indexOf("/dashboards/") > -1) {
         router.push({
           name: "dashboards",

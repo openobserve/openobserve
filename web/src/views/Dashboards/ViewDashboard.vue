@@ -157,7 +157,8 @@ export default defineComponent({
       
       let data = JSON.parse(JSON.stringify(await getDashboard(
         store,
-        route.query.dashboard
+        route.query.dashboard,
+        route.query.folder ?? "default"
       )))
       currentDashboardData.data = data;
 
@@ -175,7 +176,10 @@ export default defineComponent({
 
     // back button to render dashboard List page
     const goBackToDashboardList = () => {
-      return router.push("/dashboards");
+      return router.push({
+        path:"/dashboards",
+        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
+      });
     };
 
     //create a duplicate panel
@@ -197,7 +201,7 @@ export default defineComponent({
 
       try {
         // Add the duplicated panel to the dashboard.
-        await addPanel(store, route.query.dashboard, panelData);
+        await addPanel(store, route.query.dashboard, panelData, route.query.folder ?? "default");
 
         // Show a success notification.
         $q.notify({
@@ -208,7 +212,7 @@ export default defineComponent({
         // Navigate to the new panel.
         return router.push({
           path: "/dashboards/add_panel",
-          query: { dashboard: String(route.query.dashboard), panelId: panelId }
+          query: { dashboard: String(route.query.dashboard), panelId: panelId, folder: route.query.folder ?? "default" },
         });
       } catch (err) {
         // Show an error notification.
@@ -247,7 +251,7 @@ export default defineComponent({
     const addPanelData = () => {
       return router.push({
         path: "/dashboards/add_panel",
-        query: { dashboard: route.query.dashboard },
+        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
       });
     };
     
@@ -284,6 +288,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
+          folder: route.query.folder,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value)
         }
@@ -303,7 +308,8 @@ export default defineComponent({
       await deletePanel(
         store,
         route.query.dashboard,
-        panelDataElementValue.id
+        panelDataElementValue.id,
+        route.query.folder ?? "default"
       );
       await loadDashboard()
     }

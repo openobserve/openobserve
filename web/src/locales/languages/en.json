@@ -261,6 +261,7 @@
     "delete": "Delete Dashboard",
     "edit": "Edit Dashboard",
     "duplicate": "Duplicate Dashboard",
+    "move_to_another_folder": "Move to another Folder",
     "search": "Search Dashboard",
     "name": "Name",
     "typeDesc": "Description",

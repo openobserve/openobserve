@@ -228,7 +228,8 @@ export default defineComponent({
         const panelData = await getPanel(
           store,
           route.query.dashboard,
-          route.query.panelId
+          route.query.panelId,
+          route.query.folder
         );
         Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData)));
         await nextTick();
@@ -265,7 +266,8 @@ export default defineComponent({
 
       let data = JSON.parse(JSON.stringify(await getDashboard(
         store,
-        route.query.dashboard
+        route.query.dashboard,
+        route.query.folder ?? "default"
       )))
       currentDashboardData.data = data
 
@@ -344,7 +346,7 @@ export default defineComponent({
     const goBack = () => {
       return router.push({
         path: "/dashboards/view",
-        query: {org_identifier: store.state.selectedOrganization.identifier, dashboard: route.query.dashboard },
+        query: {org_identifier: store.state.selectedOrganization.identifier, dashboard: route.query.dashboard, folder: route.query.folder},
       });
     };
 
@@ -609,7 +611,8 @@ export default defineComponent({
         const errorMessageOnSave = await updatePanel(
           store,
           dashId,
-          dashboardPanelData.data
+          dashboardPanelData.data,
+          route.query.folder ?? "default"
         );
         if (errorMessageOnSave instanceof Error) { 
           errorData.errors.push("Error saving panel configuration : " + errorMessageOnSave.message); 
@@ -624,7 +627,8 @@ export default defineComponent({
         const errorMessageOnSave = await addPanel(
           store,
           dashId,
-          dashboardPanelData.data
+          dashboardPanelData.data,
+          route.query.folder ?? "default"
         );
         if (errorMessageOnSave instanceof Error) {
           errorData.errors.push("Error saving panel configuration  : " + errorMessageOnSave.message);
@@ -638,7 +642,7 @@ export default defineComponent({
       await nextTick();
       return router.push({
         path: "/dashboards/view",
-        query: {org_identifier: store.state.selectedOrganization.identifier, dashboard: dashId },
+        query: {org_identifier: store.state.selectedOrganization.identifier, dashboard: dashId, folder: route.query.folder ?? "default"},
       });
     };
 
