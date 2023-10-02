@@ -17,6 +17,7 @@ use std::io::Error;
 
 use crate::common::infra::config::CONFIG;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::meta::ingestion::IngestionRequest;
 use crate::handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
 use crate::service::logs::otlp_http::{logs_json_handler, logs_proto_handler};
 use crate::{
@@ -86,6 +87,34 @@ pub async fn multi(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     Ok(
+        match logs::ingest::ingest(
+            &org_id,
+            &stream_name,
+            IngestionRequest::Multi(body),
+            **thread_id,
+        )
+        .await
+        {
+            Ok(v) => HttpResponse::Ok().json(v),
+            Err(e) => {
+                log::error!("Error processing request: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
+}
+
+#[post("/{org_id}/{stream_name}/v1/_multi")]
+pub async fn multi_v1(
+    path: web::Path<(String, String)>,
+    body: web::Bytes,
+    thread_id: web::Data<usize>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    Ok(
         match logs::multi::ingest(&org_id, &stream_name, body, **thread_id).await {
             Ok(v) => HttpResponse::Ok().json(v),
             Err(e) => {
@@ -119,6 +148,34 @@ pub async fn multi(
 )]
 #[post("/{org_id}/{stream_name}/_json")]
 pub async fn json(
+    path: web::Path<(String, String)>,
+    body: web::Bytes,
+    thread_id: web::Data<usize>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    Ok(
+        match logs::ingest::ingest(
+            &org_id,
+            &stream_name,
+            IngestionRequest::JSON(body),
+            **thread_id,
+        )
+        .await
+        {
+            Ok(v) => HttpResponse::Ok().json(v),
+            Err(e) => {
+                log::error!("Error processing request: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
+}
+
+#[post("/{org_id}/{stream_name}/v1/_json")]
+pub async fn json_v1(
     path: web::Path<(String, String)>,
     body: web::Bytes,
     thread_id: web::Data<usize>,
@@ -164,6 +221,41 @@ pub async fn handle_kinesis_request(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     Ok(
+        match logs::ingest::ingest(
+            &org_id,
+            &stream_name,
+            IngestionRequest::KinesisFH(post_data.into_inner()),
+            **thread_id,
+        )
+        .await
+        {
+            Ok(v) => {
+                /* if v.error_message.is_some() {
+                    log::error!("Error processing request: {:?}", v);
+                    HttpResponse::BadRequest().json(v)
+                } else { */
+                HttpResponse::Ok().json(v)
+                //}
+            }
+            Err(e) => {
+                log::error!("Error processing request: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
+}
+
+#[post("/{org_id}/{stream_name}/v1/_kinesis_firehose")]
+pub async fn handle_kinesis_request_v1(
+    path: web::Path<(String, String)>,
+    thread_id: web::Data<usize>,
+    post_data: web::Json<KinesisFHRequest>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    Ok(
         match logs::kinesis_firehose::process(
             &org_id,
             &stream_name,
@@ -171,6 +263,36 @@ pub async fn handle_kinesis_request(
             **thread_id,
         )
         .await
+        {
+            Ok(v) => {
+                if v.error_message.is_some() {
+                    log::error!("Error processing request: {:?}", v);
+                    HttpResponse::BadRequest().json(v)
+                } else {
+                    HttpResponse::Ok().json(v)
+                }
+            }
+            Err(e) => {
+                log::error!("Error processing request: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
+}
+
+#[post("/{org_id}/{stream_name}/v1/_sub")]
+pub async fn handle_gcp_request_v1(
+    path: web::Path<(String, String)>,
+    thread_id: web::Data<usize>,
+    post_data: web::Json<GCPIngestionRequest>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    Ok(
+        match logs::gcs_pub_sub::process(&org_id, &stream_name, post_data.into_inner(), **thread_id)
+            .await
         {
             Ok(v) => {
                 if v.error_message.is_some() {
@@ -199,17 +321,15 @@ pub async fn handle_gcp_request(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     Ok(
-        match logs::gcs_pub_sub::process(&org_id, &stream_name, post_data.into_inner(), **thread_id)
-            .await
+        match logs::ingest::ingest(
+            &org_id,
+            &stream_name,
+            IngestionRequest::GCP(post_data.into_inner()),
+            **thread_id,
+        )
+        .await
         {
-            Ok(v) => {
-                if v.error_message.is_some() {
-                    log::error!("Error processing request: {:?}", v);
-                    HttpResponse::BadRequest().json(v)
-                } else {
-                    HttpResponse::Ok().json(v)
-                }
-            }
+            Ok(v) => HttpResponse::Ok().json(v),
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(

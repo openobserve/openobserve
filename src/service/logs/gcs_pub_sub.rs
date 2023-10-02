@@ -1,17 +1,13 @@
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use flate2::read::GzDecoder;
-use std::io::Read;
 
-use super::StreamMeta;
+use super::{ingest::decode_and_decompress, StreamMeta};
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics},
     meta::{
         alert::{Alert, Trigger},
-        ingestion::{
-            AWSRecordType, GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus,
-        },
+        ingestion::{GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus},
         stream::StreamParams,
         usage::UsageType,
         StreamType,
@@ -219,41 +215,4 @@ pub async fn process(
         timestamp: request.message.publish_time,
         error_message: None,
     })
-}
-
-fn decode_and_decompress(
-    encoded_data: &str,
-) -> Result<(String, AWSRecordType), Box<dyn std::error::Error>> {
-    let decoded_data = crate::common::utils::base64::decode_raw(encoded_data)?;
-    let mut gz = GzDecoder::new(&decoded_data[..]);
-    let mut decompressed_data = String::new();
-    match gz.read_to_string(&mut decompressed_data) {
-        Ok(_) => Ok((decompressed_data, AWSRecordType::Cloudwatch)),
-        Err(_) => Ok((String::from_utf8(decoded_data)?, AWSRecordType::JSON)),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::decode_and_decompress;
-
-    #[test]
-    fn test_decode_and_decompress_success() {
-        let encoded_data = "eyJpbnNlcnRJZCI6Im8zM203czJ2ZjdvaGtqZHUiLCJsYWJlbHMiOnsiY29tcHV0ZS5nb29nbGVhcGlzLmNvbS9yZXNvdXJjZV9uYW1lIjoiZ2tlLWRldjEtYzNjcHUtcG9vbC1mYTM1YmE5My0yeGg3IiwiazhzLXBvZC9hcHBfa3ViZXJuZXRlc19pby9pbnN0YW5jZSI6InpvMSIsIms4cy1wb2QvYXBwX2t1YmVybmV0ZXNfaW8vbmFtZSI6Im9wZW5vYnNlcnZlIiwiazhzLXBvZC9wb2QtdGVtcGxhdGUtaGFzaCI6Ijc3ZmI0NzY3N2QiLCJrOHMtcG9kL3JvbGUiOiJjb21wYWN0b3IifSwibG9nTmFtZSI6InByb2plY3RzL3ppbmMxLTM0MjAxNi9sb2dzL3N0ZGVyciIsInJlY2VpdmVUaW1lc3RhbXAiOiIyMDIzLTA2LTE2VDE0OjU4OjA4LjQ2Nzc2NTk3M1oiLCJyZXNvdXJjZSI6eyJsYWJlbHMiOnsiY2x1c3Rlcl9uYW1lIjoiZGV2MSIsImNvbnRhaW5lcl9uYW1lIjoib3Blbm9ic2VydmUiLCJsb2NhdGlvbiI6InVzLWNlbnRyYWwxIiwibmFtZXNwYWNlX25hbWUiOiJ6aW94LWFscGhhMSIsInBvZF9uYW1lIjoiem8xLW9wZW5vYnNlcnZlLWNvbXBhY3Rvci03N2ZiNDc2NzdkLWs3cHZrIiwicHJvamVjdF9pZCI6InppbmMxLTM0MjAxNiJ9LCJ0eXBlIjoiazhzX2NvbnRhaW5lciJ9LCJzZXZlcml0eSI6IkVSUk9SIiwidGV4dFBheWxvYWQiOiJbMjAyMy0wNi0xNlQxNDo1ODowNVogSU5GTyAgb3Blbm9ic2VydmU6OnNlcnZpY2U6OmNvbXBhY3Q6Om1lcmdlXSBbQ09NUEFDVF0gbWVyZ2Ugc21hbGwgZmlsZTogZmlsZXMvcHJvZHVjdGlvbl9uMjMwazE5QVVOVDU2bTAvbWV0cmljcy9wcm9tZXRoZXVzX2h0dHBfcmVzcG9uc2Vfc2l6ZV9ieXRlc19zdW0vMjAyMy8wNi8xNS8yMy83MDc1MjQ4MzU1MDE3ODk1OTM2LnBhcnF1ZXQiLCJ0aW1lc3RhbXAiOiIyMDIzLTA2LTE2VDE0OjU4OjA1LjMyMzUwMjA0N1oifQ==";
-        let expected = "{\"insertId\":\"o33m7s2vf7ohkjdu\",\"labels\":{\"compute.googleapis.com/resource_name\":\"gke-dev1-c3cpu-pool-fa35ba93-2xh7\",\"k8s-pod/app_kubernetes_io/instance\":\"zo1\",\"k8s-pod/app_kubernetes_io/name\":\"openobserve\",\"k8s-pod/pod-template-hash\":\"77fb47677d\",\"k8s-pod/role\":\"compactor\"},\"logName\":\"projects/zinc1-342016/logs/stderr\",\"receiveTimestamp\":\"2023-06-16T14:58:08.467765973Z\",\"resource\":{\"labels\":{\"cluster_name\":\"dev1\",\"container_name\":\"openobserve\",\"location\":\"us-central1\",\"namespace_name\":\"ziox-alpha1\",\"pod_name\":\"zo1-openobserve-compactor-77fb47677d-k7pvk\",\"project_id\":\"zinc1-342016\"},\"type\":\"k8s_container\"},\"severity\":\"ERROR\",\"textPayload\":\"[2023-06-16T14:58:05Z INFO  openobserve::service::compact::merge] [COMPACT] merge small file: files/production_n230k19AUNT56m0/metrics/prometheus_http_response_size_bytes_sum/2023/06/15/23/7075248355017895936.parquet\",\"timestamp\":\"2023-06-16T14:58:05.323502047Z\"}";
-        let result =
-            decode_and_decompress(encoded_data).expect("Failed to decode and decompress data");
-        println!("{:?}", result.0);
-        assert_eq!(result.0, expected);
-    }
-
-    #[test]
-    fn test_decode_and_decompress_invalid_base64() {
-        let encoded_data = "H4sIAAAAAAAC/ytJLS4BAAxGw7gNAAA&"; // Invalid base64 string
-        let result = decode_and_decompress(encoded_data);
-        assert!(
-            result.is_err(),
-            "Expected an error due to invalid base64 input"
-        );
-    }
 }
