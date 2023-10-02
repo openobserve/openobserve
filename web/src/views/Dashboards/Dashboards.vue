@@ -372,6 +372,7 @@ export default defineComponent({
 
     watch(activeFolderId, async()=>{
       await getAllDashboardsByFolderId(store, activeFolderId.value);
+      resultTotal.value = store.state.organizationData.allDashboardList[activeFolderId.value].length;
       router.push({
         path: "/dashboards",
         query: {

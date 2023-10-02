@@ -52,12 +52,6 @@ import { useRoute } from "vue-router";
 export default defineComponent({
   name: "SelectedFolderDropdown",
   components:{AddFolder},
-  props: {
-    activeFolderId: {
-      type: String,
-      default: "default",
-    },
-  },
   emits: ["folder-selected"],
   setup(props, { emit }) {
 
@@ -77,7 +71,7 @@ export default defineComponent({
     }
     
     onActivated(() => {
-      selectedFolder.value = {label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? "default")?.name, value: route.query.folder ?? "default"};
+      selectedFolder.value = {label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? "default")?.name ?? "default", value: route.query.folder ?? "default"};
     })
     
 

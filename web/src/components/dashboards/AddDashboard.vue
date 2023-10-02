@@ -73,7 +73,7 @@
 
         <span>&nbsp;</span>
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown :activeFolderId="activeFolderId" @folder-selected="selectedFolder = $event"/>
+        <select-folder-dropdown @folder-selected="selectedFolder = $event"/>
 
         <div class="flex justify-center q-mt-lg">
           <q-btn

@@ -42,7 +42,7 @@
           </q-file>
 
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown v-if="folders.length" :folderList="folders" :activeFolderId="route.query.folder ?? 'default'" @folder-created="updateFolderList" @folder-selected="selectedFolder = $event"/>
+        <select-folder-dropdown @folder-selected="selectedFolder = $event"/>
 
           <div>
             <div v-if="filesImportResults.length" class="q-py-sm">
@@ -69,7 +69,7 @@
             stack-label filled dense label-slot :disable="!!isLoading" />
 
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown v-if="folders.length" :folderList="folders" :activeFolderId="route.query.folder ?? 'default'" @folder-created="updateFolderList" @folder-selected="selectedFolder = $event"/>
+        <select-folder-dropdown @folder-selected="selectedFolder = $event"/>
           
           <div class="q-my-md">
             <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.URL" class="text-bold no-border"
@@ -89,7 +89,7 @@
         </div>
         
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown v-if="folders.length" :folderList="folders" :activeFolderId="route.query.folder ?? 'default'" @folder-created="updateFolderList" @folder-selected="selectedFolder = $event"/>
+        <select-folder-dropdown @folder-selected="selectedFolder = $event"/>
 
         <div class="q-my-md">
           <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.JSON_STRING" class="text-bold no-border q-mr-md"
@@ -128,9 +128,8 @@ export default defineComponent({
     const route = useRoute();
     const $q = useQuasar();
 
-    const folders = ref([]);
     const selectedFolder = ref({
-      label: folders.value.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
+      label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
       value: route.query.folder
     });
 
@@ -154,9 +153,9 @@ export default defineComponent({
 
     onMounted(async() => {
       filesImportResults.value = [];   
-      folders.value = await getFoldersList(store);
+      await getFoldersList(store);
       selectedFolder.value = {
-        label: folders.value.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name,
+        label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name,
         value: route.query.folder
       }         
     });
@@ -364,11 +363,6 @@ export default defineComponent({
       // do nothing here
     };
 
-  const updateFolderList = async (data: any) => {
-    showAddFolderDialog.value = false;
-    folders.value = await getFoldersList(store);
-    selectedFolder.value = {label: data.name, value: data.folderId};
-  };
   return {
       t,
       goBack,
@@ -383,8 +377,6 @@ export default defineComponent({
       ImportType,
       filesImportResults,
       route,
-      folders,
-      updateFolderList,
       selectedFolder
   };
   },
