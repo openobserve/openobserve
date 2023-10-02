@@ -79,11 +79,10 @@
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import dashboardService from "../../services/dashboards";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
-import { getFoldersList } from "../../utils/commons";
+import { moveDashboardToAnotherFolder } from "../../utils/commons";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 
 export default defineComponent({
@@ -94,7 +93,7 @@ export default defineComponent({
       type: String,
       default: "default",
     },
-    dashobardId:{
+    dashboardId:{
       type: String,
       default: ""
     },
@@ -127,30 +126,23 @@ export default defineComponent({
         message: "Please wait...",
         timeout: 2000,
       });
-      this.moveFolderForm.validate().then((valid: any) => {
+      this.moveFolderForm.validate().then(async (valid: any) => {
         if (!valid) {
           return false;
         }
 
-        dashboardService.move_Dashboard(
-          this.store.state.selectedOrganization.identifier,
-          this.$props.dashobardId,
-          {
-            from: this.activeFolderId,
-            to: this.selectedFolder.value
-          }
-        ).then((res: any) => {
+        try {
+          await moveDashboardToAnotherFolder(this.store, this.$props.dashboardId, this.activeFolderId, this.selectedFolder.value);
           dismiss();
           this.$q.notify({
             type: "positive",
-            message: res.message || "Dashboard Moved successfully",
+            message: "Dashboard Moved successfully",
             timeout: 2000,
           });
 
           this.$emit("updated");
           this.moveFolderForm.resetValidation();
-          
-        }).catch((err) => {
+        } catch (err: any) {
           dismiss();
           this.$q.notify({
             type: "negative",
@@ -159,9 +151,8 @@ export default defineComponent({
               ),
             timeout: 2000,
           });
-        });
-      }
-      );
+        };
+      });
     },
   },
 });

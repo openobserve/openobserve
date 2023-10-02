@@ -455,3 +455,19 @@ export const updateFolder = async (store: any, folderId: any, data: any) => {
   await dashboardService.edit_Folder(store.state.selectedOrganization.identifier, folderId, data);
   await getFoldersList(store);
 }
+
+
+export const moveDashboardToAnotherFolder = async (store: any, dashboardId: any, from: any, to:any) => {
+  //move dashboard
+  await dashboardService.move_Dashboard(
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    {
+      from: from,
+      to: to
+    });
+
+  //update both folders dashboard
+  await getAllDashboards(store, to);
+  await getAllDashboards(store, from);
+}

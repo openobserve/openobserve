@@ -219,7 +219,7 @@
       full-height
       maximized
     >
-      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" :dashobardId="selectedDashboardIdToMove" :activeFolderId="activeFolderId"/>
+      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" :dashboard-id="selectedDashboardIdToMove" :activeFolderId="activeFolderId"/>
     </q-dialog>
 
     <!-- delete dashboard dialog -->
@@ -538,7 +538,6 @@ export default defineComponent({
 
     const handleDashboardMoved = async() => {
       showMoveDashboardDialog.value = false;
-      await getDashboards();
     }
 
     const updateActiveFolder = (it: any) => {
