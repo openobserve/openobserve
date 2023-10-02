@@ -410,6 +410,19 @@ export const getDashboard = async (store: any, dashboardId: any, folderId: any) 
   return findDashboard(dashboardId, store, folderId);
 };
 
+export const deleteDashboardById = async (store: any, dashboardId: any, folderId: any) => {
+// Delete the dashboard using the dashboardService
+await dashboardService.delete(store.state.selectedOrganization.identifier, dashboardId, folderId)
+
+// Get list of all dashboard of all folders
+const allDashboardList = store.state.organizationData.allDashboardList;
+
+// Filter out the deleted dashboard from the list
+const newDashboards = allDashboardList[folderId].filter((dashboard: any) => dashboard.dashboardId != dashboardId);
+
+// Update the allDashboardList in the store with the new list
+store.dispatch("setAllDashboardList", {...allDashboardList, [folderId]: newDashboards});}
+
 export const getPanel = async (store: any, dashboardId: any, panelId: any, folderId: any) => {
   if (
     !store.state.organizationData.allDashboardList[folderId] ||

@@ -260,7 +260,7 @@ import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
-import { deleteFolderById, getAllDashboards, getAllDashboardsByFolderId, getDashboard, getFoldersList } from "../../utils/commons.ts";
+import { deleteDashboardById, deleteFolderById, getAllDashboards, getAllDashboardsByFolderId, getDashboard, getFoldersList } from "../../utils/commons.ts";
 import { outlinedDelete, outlinedDriveFileMove, outlinedEdit } from '@quasar/extras/material-icons-outlined'
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import MoveDashboardToAnotherFolder from "@/components/dashboards/MoveDashboardToAnotherFolder.vue";
@@ -502,24 +502,21 @@ export default defineComponent({
 
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
-        const dashboardId = selectedDelete.value.id;
-        await dashboardService
-          .delete(store.state.selectedOrganization.identifier, dashboardId, activeFolderId.value ?? "default")
-          .then((res) => {
-            const allDashboardList = toRaw(store.state.organizationData.allDashboardList);
-            const newDashboards = allDashboardList[activeFolderId.value].filter(
-              (dashboard) => dashboard.dashboardId != dashboardId
-            );
-            store.dispatch("setAllDashboardList", {...allDashboardList, [activeFolderId.value]: newDashboards});
-            $q.notify({
-              type: "positive",
-              message: "Dashboard deleted successfully.",
-              timeout: 5000,
-            });
-          })
-          .catch((error) => {
-            // console.log(error);
+        try {
+          //delete dashboard by id and folder id
+          await deleteDashboardById(store, selectedDelete.value.id, activeFolderId.value ?? "default")
+          $q.notify({
+            type: "positive",
+            message: "Dashboard deleted successfully.",
+            timeout: 5000,
           });
+        } catch (err) {
+          $q.notify({
+            type: "negative",
+            message: "Dashboard deletion failed",
+            timeout: 2000,
+          });
+        }
       }
     };
 
