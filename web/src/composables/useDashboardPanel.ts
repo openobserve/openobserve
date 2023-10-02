@@ -591,50 +591,92 @@ const loadFilterItem = (name:any)=>{
     if (!promqlMode.value &&dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery == true) {
       // Loop through each custom query field in the dashboard panel data's stream meta
       dashboardPanelData.meta.stream.customQueryFields.forEach((it: any, index: number) => {
-        // Determine if the current field is an x or y field
-        let currentFieldType;
-        if (
-          index <
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.x.length
-        ) {
-          currentFieldType = "x";
-        } else if (
-          index <
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.x.length +
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.y.length
-        ) {
-          currentFieldType = "y";
-        } else {
-          currentFieldType = "z";
-        }
-        // Get the current field based on its index and whether it's an x or y field
-        let field;
-        if (currentFieldType === "x") {
-          field = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index];
-        } else if (currentFieldType === "y") {
-          field = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index - dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length];
-        } else {
-          field = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[index - dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length - dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length];
-        }
         // Get the name of the current custom query field
         const { name } = it;
 
-          // Update the properties of the current field
-          field.alias = name; // Set the alias to the name of the custom query field
-          field.column = name; // Set the column to the name of the custom query field
-          field.color = null; // Reset the color to null
-          // If the current field is a y field, set the aggregation function to "count"
+        // Determine the current field type based on the name
+        let field;
+        if (name === "latitude") {
+          field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.latitude;
+        } else if (name === "longitude") {
+          field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.longitude;
+        } else if (name === "weight") {
+          field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.weight;
+        } else {
+          // For other field types (x, y, z), determine the type and index as before
+          let currentFieldType;
+
+          if (
+            index <
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.x.length
+          ) {
+            currentFieldType = "x";
+          } else if (
+            index <
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.x.length +
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.y.length
+          ) {
+            currentFieldType = "y";
+          } else {
+            currentFieldType = "z";
+          }
+
+          if (currentFieldType === "x") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.x[index];
+          } else if (currentFieldType === "y") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.y[
+                index -
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields.x.length
+              ];
+          } else {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.z[
+                index -
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields.x.length -
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields.y.length
+              ];
+          }
+
+          // If the current field is a y or z field, set the aggregation function to "count"
           if (currentFieldType === "y" || currentFieldType === "z") {
             field.aggregationFunction = "count";
           }
         }
-      );
+
+        // Update the properties of the current field
+        field.alias = name; // Set the alias to the name of the custom query field
+        field.column = name; // Set the column to the name of the custom query field
+        field.color = null; // Reset the color to null
+      });
     }
   };
 
