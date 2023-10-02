@@ -116,10 +116,9 @@ export default defineComponent({
       default: false
     }
   },
-  emits: ["update:modelValue", "updated", "finish"],
+  emits: ["update:modelValue"],
   setup(props) {
     const store: any = useStore();
-    // const beingUpdated: any = ref(false);
     const addFolderForm: any = ref(null);
     const disableColor: any = ref("");
     const folderData: any = ref(props.editMode ? JSON.parse(JSON.stringify(store.state.organizationData.folders.find((item: any) => item.folderId === props.folderId))) : defaultValue());
@@ -130,7 +129,6 @@ export default defineComponent({
       t,
       disableColor,
       isPwd: ref(true),
-      // beingUpdated,
       status,
       folderData,
       addFolderForm,
@@ -139,16 +137,6 @@ export default defineComponent({
       getImageURL,
     };
   },
-  // created() {
-  //   if (this.modelValue && this.modelValue.id) {
-  //     // this.beingUpdated = true;
-  //     this.disableColor = "grey-5";
-  //     this.folderData = {
-  //       name: this.modelValue.name,
-  //       description: this.modelValue.description,
-  //     };
-  //   }
-  // },
   methods: {
     onSubmit() {
       const dismiss = this.$q.notify({
@@ -176,7 +164,6 @@ export default defineComponent({
           else{
             const newFolder: any = await createFolder(this.store, this.folderData);
             this.$emit("update:modelValue", newFolder);
-            this.$emit("updated", newFolder.folderId);
             this.$q.notify({
               type: "positive",
               message: `Folder added successfully.`,

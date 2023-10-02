@@ -66,10 +66,9 @@
             inline-label
             vertical
             v-model="activeFolderId"
-            @update:model-value="updateActiveFolder"
           >
           <q-tab
-          v-for="(tab, index) in folders"
+          v-for="(tab, index) in store.state.organizationData.folders"
               :key="tab.folderId"
               :name="tab.folderId"
               content-class="tab_content full-width"
@@ -200,7 +199,7 @@
       full-height
       maximized
     >
-      <AddDashboard @updated="updateDashboardList" :folders="folders" :activeFolderId="activeFolderId" @folder-updated="updateFolderList" />
+      <AddDashboard @updated="updateDashboardList" :activeFolderId="activeFolderId"/>
     </q-dialog>
 
     <!-- add/edit folder -->
@@ -210,7 +209,7 @@
       full-height
       maximized
     >
-      <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :model-value="JSON.parse(JSON.stringify(isFolderEditMode ?  folders.find((folder) => folder.folderId === (selectedFolderToEdit ?? 'default')) : {}))"/>
+      <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :folder-id="selectedFolderToEdit ?? 'default'"/>
     </q-dialog>
     
     <!-- move dashboard to another folder -->
@@ -220,7 +219,7 @@
       full-height
       maximized
     >
-      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" @folder-updated="updateFolderList" :dashobardId="selectedDashboardIdToMove" :folderList="folders" :activeFolderId="activeFolderId"/>
+      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" :dashobardId="selectedDashboardIdToMove" :activeFolderId="activeFolderId"/>
     </q-dialog>
 
     <!-- delete dashboard dialog -->
@@ -291,7 +290,6 @@ export default defineComponent({
     const selectedDelete = ref(null);
     const splitterModel = ref(200);
     const activeFolderId = ref(null);
-    const folders = ref([]);
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
     const selectedFolderToEdit = ref(null);
@@ -364,12 +362,11 @@ export default defineComponent({
     });
 
     onMounted(async() => {      
-      folders.value = await getFoldersList(store);
+      await getFoldersList(store);
       activeFolderId.value = route.query.folder ?? "default";
     });
 
     onActivated(async() => {
-      folders.value = await getFoldersList(store);
       activeFolderId.value = route.query.folder ?? "default";
     });
 
@@ -521,8 +518,6 @@ export default defineComponent({
     const updateFolderList = async (it: any) => {
       showAddFolderDialog.value = false;
       isFolderEditMode.value = false;
-
-      folders.value = await getFoldersList(store);
     }
 
     const editFolder = (folderId : any) => {      
@@ -559,10 +554,7 @@ export default defineComponent({
           
           //check activeFolderId to be deleted
           if(activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
-  
-          //remove folder from list
-          folders.value = folders.value.filter((folder,index) => folder.folderId != selectedFolderDelete.value);
-  
+    
           $q.notify({
             type: "positive",
             message: `Folder deleted successfully.`,
@@ -625,7 +617,6 @@ export default defineComponent({
       getImageURL,
       verifyOrganizationStatus,
       splitterModel,
-      folders,
       activeFolderId,
       addFolder,
       showAddFolderDialog,

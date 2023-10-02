@@ -36,7 +36,7 @@
     <q-card-section class="q-w-md q-mx-lg">
       <q-form ref="moveFolderForm" @submit.stop="onSubmit">
         <q-input
-          v-model="folders.find((item: any) => item.folderId === activeFolderId).name"
+          v-model="store.state.organizationData.folders.find((item: any) => item.folderId === activeFolderId).name"
           label="Current Folder"
           color="input-border"
           bg-color="input-bg"
@@ -50,7 +50,7 @@
         <span>&nbsp;</span>
 
         <!-- select folder or create new folder and select -->
-        <SelectFolderDropdown :folderList="folders" :activeFolderId="activeFolderId" @folder-created="updateFolderList" @folder-selected="selectedFolder = $event"/>
+        <SelectFolderDropdown :activeFolderId="activeFolderId" @folder-selected="selectedFolder = $event"/>
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
@@ -94,51 +94,30 @@ export default defineComponent({
       type: String,
       default: "default",
     },
-    folderList: {
-      default: [
-      {
-        name: "default",
-        folderId: "default",
-        description: "default",
-      }
-      ]
-    },
     dashobardId:{
       type: String,
       default: ""
     },
   },
-  emits: ["updated", "folderUpdated"],
+  emits: ["updated"],
   setup(props, { emit }) {
     const store: any = useStore();
     const moveFolderForm: any = ref(null);
     const showAddFolderDialog: any = ref(false);
-    const folders:any = ref(props.folderList);
-    //dropdown selected folder index
+    //dropdown selected folder
     const selectedFolder = ref({
-      label: folders.value.find((item: any) => item.folderId === props.activeFolderId).name,
+      label: store.state.organizationData.folders.find((item: any) => item.folderId === props.activeFolderId).name,
       value: props.activeFolderId
     });
     const { t } = useI18n();    
 
-    const updateFolderList = async (data: any) => {
-      showAddFolderDialog.value = false;
-      folders.value = await getFoldersList(store);
-      selectedFolder.value = {label: data.name, value: data.folderId};
-      emit("folderUpdated", folders);
-    }
-
     return {
       t,
-      isPwd: ref(true),
-      status,
       moveFolderForm,
       store,
       getImageURL,
       selectedFolder,
-      updateFolderList,
-      showAddFolderDialog,
-      folders
+      showAddFolderDialog
     };
   },
   methods: {
