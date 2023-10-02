@@ -37,7 +37,7 @@
     </q-card-section>
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="addFolderForm" @submit.stop="onSubmit">
+      <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
         <q-input
           v-model="folderData.name"
           label="Name *"
@@ -76,6 +76,7 @@
           <q-btn
             data-test="dashboard-add-submit"
             :disable="folderData.name.trim() === ''"
+            :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
@@ -95,6 +96,8 @@ import { createFolder, updateFolder } from "@/utils/commons";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
+import { useQuasar } from "quasar";
+import { useLoading } from "@/composables/useLoading";
 
 const defaultValue = () => {
   return {
@@ -117,13 +120,61 @@ export default defineComponent({
     }
   },
   emits: ["update:modelValue"],
-  setup(props) {
+  setup(props, {emit}) {
     const store: any = useStore();
     const addFolderForm: any = ref(null);
     const disableColor: any = ref("");
     const folderData: any = ref(props.editMode ? JSON.parse(JSON.stringify(store.state.organizationData.folders.find((item: any) => item.folderId === props.folderId))) : defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
+    const $q = useQuasar();
+
+    const onSubmit = useLoading(async () => {
+      await addFolderForm.value.validate().then(async (valid: any) => {
+        if (!valid) {
+          return false;
+        }
+
+        try {
+          //if edit mode
+          if(props.editMode) {            
+            await updateFolder(store, folderData.value.folderId, folderData.value);            
+            $q.notify({
+              type: "positive",
+              message: "Folder updated",
+              timeout: 2000,
+            });
+            emit("update:modelValue", folderData.value);
+          }
+          //else new folder
+          else{
+            const newFolder: any = await createFolder(store, folderData.value);
+            emit("update:modelValue", newFolder);
+            $q.notify({
+              type: "positive",
+              message: `Folder added successfully.`,
+              timeout: 2000,
+            });
+          }
+          
+        } catch (err: any) {
+          $q.notify({
+            type: "negative",
+            message: JSON.stringify(
+              err?.response?.data["error"] || "Folder creation failed."
+            ),
+            timeout: 2000,
+          });
+        } finally {
+          folderData.value = {
+            folderId: "",
+            name: "",
+            description: "",
+          };
+          await addFolderForm.value.resetValidation();
+        }
+      });
+    });
 
     return {
       t,
@@ -135,60 +186,8 @@ export default defineComponent({
       store,
       isValidIdentifier,
       getImageURL,
+      onSubmit
     };
-  },
-  methods: {
-    onSubmit() {
-      const dismiss = this.$q.notify({
-        spinner: true,
-        message: "Please wait..."
-      });
-      this.addFolderForm.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
-        }
-
-        try {
-          dismiss();
-          //if edit mode
-          if(this.$props.editMode) {            
-            await updateFolder(this.store, this.folderData.folderId, this.folderData);            
-            this.$q.notify({
-              type: "positive",
-              message: "Folder updated",
-              timeout: 2000,
-            });
-            this.$emit("update:modelValue", this.folderData);
-          }
-          //else new folder
-          else{
-            const newFolder: any = await createFolder(this.store, this.folderData);
-            this.$emit("update:modelValue", newFolder);
-            this.$q.notify({
-              type: "positive",
-              message: `Folder added successfully.`,
-              timeout: 2000,
-            });
-          }
-          
-        } catch (err: any) {
-          this.$q.notify({
-            type: "negative",
-            message: JSON.stringify(
-              err?.response?.data["error"] || "Folder creation failed."
-            ),
-            timeout: 2000,
-          });
-        } finally {
-          this.folderData = {
-            folderId: "",
-            name: "",
-            description: "",
-          };
-          this.addFolderForm.resetValidation();
-        }
-      });
-    },
-  },
+  }
 });
 </script>
