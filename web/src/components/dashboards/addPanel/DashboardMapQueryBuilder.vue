@@ -35,21 +35,6 @@
             class="q-pl-sm" :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column}`">
             <q-menu class="q-pa-md" :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column}-menu`">
               <div>
-                <!-- <div class="">
-                  <div v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"
-                    class="q-mr-xs q-mb-sm">
-                    <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index]
-                      .aggregationFunction
-                      " :options="triggerOperatorsWithHistogram" dense filled emit-value
-                      map-options label="Aggregation" data-test="dashboard-x-item-dropdown">
-                      <template v-slot:append>
-                        <q-icon name="close" size="small"
-                          @click.stop.prevent="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index].aggregationFunction = null"
-                          class="cursor-pointer" />
-                      </template>
-                    </q-select>
-                  </div>
-                </div> -->
                 <q-input dense filled data-test="dashboard-x-item-input" label="Label" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.label"
                    :rules="[val => val > 0 || 'Required']" />
               </div>
@@ -86,29 +71,6 @@
             :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude?.column}`" class="q-pl-sm">
             <q-menu class="q-pa-md" :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude?.column}-menu`">
               <div>
-                <!-- <div class="row q-mb-sm" style="align-items: center;">
-                  <div v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"
-                    class="q-mr-xs" style="width: 160px">
-                    <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index]
-                      .aggregationFunction
-                      "
-                      :options="dashboardPanelData.data.type == 'heatmap' ? triggerOperatorsWithHistogram : triggerOperators"
-                      dense filled emit-value map-options label="Aggregation" data-test="dashboard-y-item-dropdown">
-                      <template v-slot:append>
-                        <div v-if="dashboardPanelData.data.type == 'heatmap'">
-                          <q-icon name="close" size="small"
-                            @click.stop.prevent="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index].aggregationFunction = null"
-                            class="cursor-pointer" />
-                        </div>
-                      </template>
-                    </q-select>
-                  </div>
-                  <div class="color-input-wrapper" v-if="!['table', 'pie'].includes(dashboardPanelData.data.type)">
-                    <input type="color" data-test="dashboard-y-item-color" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index]
-                      .color
-                      " />
-                  </div>
-                </div> -->
                 <q-input dense filled label="Label" data-test="dashboard-y-item-input" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.label"
                    :rules="[val => val > 0 || 'Required']" />
               </div>

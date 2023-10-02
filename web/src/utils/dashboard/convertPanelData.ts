@@ -52,7 +52,7 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
       return convertTableData(panelSchema, data);
     }
     case "geomap": {
-      return convertMapData(data);
+      return convertMapData(panelSchema, data);
     }
     default: {
       console.log("No Chart Type found, skipping");
