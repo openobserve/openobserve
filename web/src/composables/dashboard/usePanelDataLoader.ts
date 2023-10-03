@@ -122,24 +122,37 @@ export const usePanelDataLoader = (
       // Get the page type from the first query in the panel schema
       const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 
-      await queryService
-        .search({
-          org_identifier: store.state.selectedOrganization.identifier,
-          query: query,
-          page_type: pageType,
-        })
-        .then((res) => {
-          // Set searchQueryData.data to the API response hits
-          state.data = res.data.hits;
-          state.errorDetail = "";
-        })
-        .catch((error) => {
-          // Process API error for "sql"
-          processApiError(error, "sql");
-        })
-        .finally(() => {
-          state.loading = false;
-        });
+      const sqlqueryPromise = panelSchema.value.queries?.map(
+        async (it: any) => {
+          await queryService
+            .search({
+              org_identifier: store.state.selectedOrganization.identifier,
+              query: {
+                query: {
+                  sql: replaceQueryValue(it.query),
+                  sql_mode: "full",
+                  start_time: startISOTimestamp,
+                  end_time: endISOTimestamp,
+                  size: 0,
+                },
+              },
+              page_type: pageType,
+            })
+            .then((res) => {
+              // Set searchQueryData.data to the API response hits
+              state.data = res.data.hits;
+              state.errorDetail = "";
+            })
+            .catch((error) => {
+              // Process API error for "sql"
+              processApiError(error, "sql");
+            });
+        }
+      );
+      // Wait for all query promises to resolve
+      const sqlqueryResults = await Promise.all(sqlqueryPromise);
+      state.loading = false;
+      state.data = sqlqueryResults;
     }
   };
 
