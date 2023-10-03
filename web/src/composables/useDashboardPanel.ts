@@ -108,21 +108,32 @@ const useDashboardPanelData = () => {
   const $q = useQuasar();
 
 const addQuery = () => {
-  const newQuery:any = {
+  const newQuery: any = {
     query: "",
     customQuery: true,
     fields: {
-      stream: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
-      stream_type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type,
+      stream:
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+      stream_type:
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type,
       x: [],
       y: [],
-      z:[],
+      z: [],
       filter: [],
+      latitude: null,
+      longitude: null,
+      weight: null,
     },
     config: {
       promql_legend: "",
+      layer_type: "scatter",
+      weight_fixed: 1,
     },
-  }
+  };
   dashboardPanelData.data.queries.push(newQuery);
 };
 
