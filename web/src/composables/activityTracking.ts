@@ -13,8 +13,8 @@
 //  limitations under the License.
 
 import { useStore } from "vuex";
-import { datadogRum as openobserveRum } from "@datadog/browser-rum";
-import "@datadog/browser-rum/bundle/datadog-rum";
+import { openobserveRum } from "@openobserve/browser-rum";
+import "@openobserve/browser-rum/bundle/openobserve-rum";
 import config from "@/aws-exports";
 
 const userActivityTracking = () => {
@@ -32,8 +32,8 @@ const userActivityTracking = () => {
       premiumSampleRate: 100,
       trackUserInteractions: true,
       defaultPrivacyLevel: "mask-user-input",
-      // forwardErrorsToLogs: true,
-      // forwardConsoleLogs: "all",
+      forwardErrorsToLogs: true,
+      forwardConsoleLogs: "all",
       organizationIdentifier: "myorg",
       insecureHTTP: true,
       apiVersion: "v1",

@@ -13,18 +13,18 @@
 //  limitations under the License.
 
 import { useStore } from "vuex";
-import { openobserveRum } from "@openobserve/browser-rum";
-import "@openobserve/browser-rum/bundle/openobserve-rum";
+import { datadogRum as openobserveRum } from "@datadog/browser-rum";
+import "@datadog/browser-rum/bundle/datadog-rum";
 import config from "@/aws-exports";
 
 const userActivityTracking = () => {
   const store = useStore();
   const initializeTracking = () => {
     openobserveRum.init({
-      applicationId: config.ooApplicationID,
-      clientToken: config.ooClientToken,
-      site: config.ooSite,
-      service: config.ooService,
+      applicationId: "d2017c95-c1dd-4ad0-851b-db25947f406e",
+      clientToken: "pube705971a05eed4d79c5f2e2362837397",
+      site: "us5.datadoghq.com",
+      service: "openobserve",
       env: config.environment,
       // Specify a version number to identify the deployed version of your application in Datadog
       // version: '1.0.0',
@@ -32,11 +32,6 @@ const userActivityTracking = () => {
       premiumSampleRate: 100,
       trackUserInteractions: true,
       defaultPrivacyLevel: "mask-user-input",
-      forwardErrorsToLogs: true,
-      forwardConsoleLogs: "all",
-      organizationIdentifier: "myorg",
-      insecureHTTP: true,
-      apiVersion: "v1",
     });
 
     openobserveRum.startSessionReplayRecording();
