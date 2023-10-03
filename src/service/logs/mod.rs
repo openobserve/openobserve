@@ -32,7 +32,10 @@ use crate::common::{
 };
 use crate::service::schema::check_for_schema;
 
-use super::ingestion::{get_value, get_wal_time_key};
+use super::{
+    ingestion::{get_value, get_wal_time_key},
+    stream::unwrap_partition_time_level,
+};
 
 pub mod bulk;
 pub mod gcs_pub_sub;
@@ -231,7 +234,7 @@ async fn add_valid_record(
     let hour_key = get_wal_time_key(
         timestamp,
         &stream_meta.partition_keys,
-        PartitionTimeLevel::Hourly,
+        unwrap_partition_time_level(stream_meta.partition_time_level, StreamType::Logs),
         local_val,
         Some(&schema_key),
     );
@@ -344,6 +347,7 @@ struct StreamMeta {
     org_id: String,
     stream_name: String,
     partition_keys: Vec<String>,
+    partition_time_level: Option<PartitionTimeLevel>,
     stream_alerts_map: AHashMap<String, Vec<Alert>>,
 }
 

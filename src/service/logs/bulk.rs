@@ -28,7 +28,7 @@ use crate::common::{
             BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
             StreamSchemaChk,
         },
-        stream::StreamParams,
+        stream::{PartitioningDetails, StreamParams},
         usage::UsageType,
         StreamType,
     },
@@ -73,7 +73,7 @@ pub async fn ingest(
     let mut stream_data_map = AHashMap::new();
 
     let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
-    let mut stream_partition_keys_map: AHashMap<String, (StreamSchemaChk, Vec<String>)> =
+    let mut stream_partition_keys_map: AHashMap<String, (StreamSchemaChk, PartitioningDetails)> =
         AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
 
@@ -126,17 +126,13 @@ pub async fn ingest(
                     &mut stream_schema_map,
                 )
                 .await;
-                let mut partition_keys: Vec<String> = vec![];
-                if stream_schema.has_partition_keys {
-                    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                        &stream_name,
-                        &stream_schema_map,
-                    )
-                    .await;
-                    partition_keys = partition_det.partition_keys;
-                }
+                let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                    &stream_name,
+                    &stream_schema_map,
+                )
+                .await;
                 stream_partition_keys_map
-                    .insert(stream_name.clone(), (stream_schema, partition_keys.clone()));
+                    .insert(stream_name.clone(), (stream_schema, partition_det));
             }
 
             stream_data_map
@@ -235,10 +231,14 @@ pub async fn ingest(
                 CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
-            let partition_keys: Vec<String> = match stream_partition_keys_map.get(&stream_name) {
-                Some((_, partition_keys)) => partition_keys.to_vec(),
-                None => vec![],
-            };
+            let (partition_keys, partition_time_level) =
+                match stream_partition_keys_map.get(&stream_name) {
+                    Some((_, partition_det)) => (
+                        partition_det.partition_keys.clone(),
+                        partition_det.partition_time_level,
+                    ),
+                    None => (vec![], None),
+                };
 
             // only for bulk insert
             let mut status = RecordStatus::default();
@@ -247,6 +247,7 @@ pub async fn ingest(
                     org_id: org_id.to_string(),
                     stream_name: stream_name.clone(),
                     partition_keys,
+                    partition_time_level,
                     stream_alerts_map: stream_alerts_map.clone(),
                 },
                 &mut stream_schema_map,
