@@ -19,23 +19,16 @@
  * @param {any} mapData - the map data
  * @return {Object} - the option object for rendering the map chart
  */
-export const convertMapData = (layertype: any, mapData: any) => {
+export const convertMapData = (panelSchema: any, mapData: any) => {
   console.log(
     "layer_type",
-    layertype.queries[0].config
-      .layer_type
+    panelSchema
   );
 
   console.log("panelSchema", mapData);
-  const mapDataaa = mapData.map((item: any) => [
-    item.longitude,
-    item.latitude,
-    item.weight || layertype.queries[0].config.weight_fixed,
-  ]);
-  console.log("mapDataaa", mapDataaa);
 
-  const minValue = Math.min(...mapDataaa.map((item: any) => item[2]));
-  const maxValue = Math.max(...mapDataaa.map((item: any) => item[2]));
+  // const minValue = Math.min(...mapData.map((item: any) => item[2]));
+  // const maxValue = Math.max(...mapData.map((item: any) => item[2]));
 
   const options: any = {
     lmap: {
@@ -60,8 +53,8 @@ export const convertMapData = (layertype: any, mapData: any) => {
     },
     visualMap: {
       left: "right",
-      min: minValue,
-      max: maxValue,
+      min: 0,
+      max: 0,
       inRange: {
         color: [
           "#313695",
@@ -87,31 +80,51 @@ export const convertMapData = (layertype: any, mapData: any) => {
     },
     //   xAxis: [],
     //   yAxis: [],
-    series: [
-      {
-        name: "USA PopEstimates",
-        type: layertype.queries[0].config.layer_type,
-        coordinateSystem: "lmap",
-        emphasis: {
-          label: {
-            show: true,
-          },
-        },
-        data: mapDataaa,
-        symbolSize: function (val: any) {
-          return val[2];
-        },
-        itemStyle: {
-          color: "#b02a02",
-        },
-        encode: {
-          // encode the third element of data item as the `value` dimension
-          value: 2,
+    series: [],
+  };
+
+  console.log("Number of queries in panelSchema:", panelSchema.queries.length);
+  panelSchema.queries.forEach((query: any, index: any) => {
+    console.log("query", query);
+    console.log("mapData[index]", mapData[index]);
+
+    const seriesConfig: any = {
+      name: `Query ${index + 1}`,
+      type: query.config.layer_type,
+      coordinateSystem: "lmap",
+      emphasis: {
+        label: {
+          show: true,
         },
       },
-    ],
-  };
-  console.log("options", options.series);
+      data: mapData.map((item: any) => [
+        item.longitude,
+        item.latitude,
+        item.weight !== null ? item.weight : query.config.weight_fixed,
+      ]),
+      symbolSize: function (val: any) {
+        return val[2];
+      },
+      itemStyle: {
+        color: "#b02a02",
+      },
+      encode: {
+        value: 2,
+      },
+    };
+
+    options.series.push(seriesConfig);
+  });
+
+  const seriesData = options.series.flatMap((series: any) => series.data);
+  const minValue = Math.min(...seriesData.map((item: any) => item[2]));
+  const maxValue = Math.max(...seriesData.map((item: any) => item[2]));
+
+  options.visualMap.min = minValue;
+  options.visualMap.max = maxValue;
+
+  console.log("options", options);
+
   return { options };
 };
 
