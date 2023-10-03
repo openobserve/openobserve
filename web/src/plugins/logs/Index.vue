@@ -509,6 +509,9 @@ export default defineComponent({
     fullSQLMode() {
       return this.searchObj.meta.sqlMode;
     },
+    refreshHistogram() {
+      return this.searchObj.meta.histogramDirtyFlag;
+    },
   },
   watch: {
     showFields() {
@@ -580,6 +583,10 @@ export default defineComponent({
     },
     fullSQLMode(newVal) {
       this.setQuery(newVal);
+    },
+    refreshHistogram() {
+      this.searchObj.meta.histogramDirtyFlag = false;
+      this.refreshHistogramChart();
     },
   },
 });
