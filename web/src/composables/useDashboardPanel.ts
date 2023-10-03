@@ -683,7 +683,7 @@ const loadFilterItem = (name:any)=>{
     }
   };
 
-
+  // this updates the fields when you switch from the auto to custom
   const updateXYFieldsOnCustomQueryChange = (oldCustomQueryFields: any) => {
     // Create a copy of the old custom query fields array
     const oldArray = oldCustomQueryFields;
@@ -705,37 +705,95 @@ const loadFilterItem = (name:any)=>{
       // Check if there is only one changed field
       if (changedIndex.length == 1) {
         const oldName = oldArray[changedIndex[0]]?.name;
-        let fieldIndex = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.findIndex((it: any) => it.alias == oldName);
+
+        let fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x.findIndex((it: any) => it.alias == oldName);
         // Check if the field is in the x fields array
         if (fieldIndex >= 0) {
           const newName = newArray[changedIndex[0]]?.name;
-          const field =dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[fieldIndex];
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.x[fieldIndex];
 
           // Update the field alias and column to the new name
           field.alias = newName;
           field.column = newName;
-        } else {
-          // Check if the field is in the y fields array
-          fieldIndex = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.findIndex((it: any) => it.alias == oldName);
-          if (fieldIndex >= 0) {
-            const newName = newArray[changedIndex[0]]?.name;
-            const field =dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[fieldIndex];
+        }
+        // Check if the field is in the y fields array
+        fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.findIndex((it: any) => it.alias == oldName);
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.y[fieldIndex];
 
-            // Update the field alias and column to the new name
-            field.alias = newName;
-            field.column = newName;
-          } else {
-            // Check if the field is in the z fields array
-            fieldIndex = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.findIndex((it: any) => it.alias == oldName);
-            if (fieldIndex >= 0) {
-              const newName = newArray[changedIndex[0]]?.name;
-              const field =dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[fieldIndex];
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+        // Check if the field is in the z fields array
+        fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z.findIndex((it: any) => it.alias == oldName);
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.z[fieldIndex];
 
-              // Update the field alias and column to the new name
-              field.alias = newName;
-              field.column = newName;
-            }
-          }  
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the latitude fields 
+        let field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.latitude;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the longitude fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.longitude;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+          console.log("newName", newName);
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the weight fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.weight;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+          console.log("newName", newName);
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
         }
       }
     }
