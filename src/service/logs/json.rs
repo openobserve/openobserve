@@ -29,8 +29,7 @@ use crate::common::meta::{
 use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::ingestion::is_ingestion_allowed;
 use crate::service::{
-    format_stream_name, ingestion::write_file, schema::stream_schema_exists,
-    usage::report_request_usage_stats,
+    format_stream_name, ingestion::write_file, usage::report_request_usage_stats,
 };
 
 pub async fn ingest(
@@ -64,21 +63,10 @@ pub async fn ingest(
     );
     // End Register Transforms for stream
 
-    let stream_schema = stream_schema_exists(
-        org_id,
-        stream_name,
-        StreamType::Logs,
-        &mut stream_schema_map,
-    )
-    .await;
-
-    let mut partition_keys: Vec<String> = vec![];
-    if stream_schema.has_partition_keys {
-        let partition_det =
-            crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map)
-                .await;
-        partition_keys = partition_det.partition_keys;
-    }
+    let partition_det =
+        crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
+    let partition_keys = partition_det.partition_keys;
+    let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
@@ -142,6 +130,7 @@ pub async fn ingest(
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
                 partition_keys: partition_keys.clone(),
+                partition_time_level,
                 stream_alerts_map: stream_alerts_map.clone(),
             },
             &mut stream_schema_map,

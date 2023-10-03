@@ -63,21 +63,11 @@ pub async fn process(
     );
     // End Register Transforms for stream
 
-    let stream_schema = crate::service::schema::stream_schema_exists(
-        org_id,
-        stream_name,
-        StreamType::Logs,
-        &mut stream_schema_map,
-    )
-    .await;
+    let partition_det =
+        crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
+    let partition_keys = partition_det.partition_keys;
+    let partition_time_level = partition_det.partition_time_level;
 
-    let mut partition_keys: Vec<String> = vec![];
-    if stream_schema.has_partition_keys {
-        let partition_det =
-            crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map)
-                .await;
-        partition_keys = partition_det.partition_keys;
-    }
     // Start get stream alerts
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
@@ -136,6 +126,7 @@ pub async fn process(
                     org_id: org_id.to_string(),
                     stream_name: stream_name.to_string(),
                     partition_keys: partition_keys.clone(),
+                    partition_time_level,
                     stream_alerts_map: stream_alerts_map.clone(),
                 },
                 &mut stream_schema_map,
