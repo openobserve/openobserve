@@ -22,9 +22,8 @@ const config = {
   aws_mobile_analytics_app_region: "us-west-2",
   oauth: {
     domain: import.meta.env.VITE_OAUTH_DOMAIN,
-    scope: `openid%20email%20profile%20offline_access%20urn%3Azitadel%3Aiam%3Aorg%3Aproject%3Aid%3Azitadel%3Aaud%20urn%3Azitadel%3Aiam%3Auser%3Ametadata%20urn%3Azitadel%3Aiam%3Aorg%3Aid%3A${
-      import.meta.env.VITE_ZITADEL_ORG_ID
-    }&prompt=login&code_challenge=9az09PjcfuENS7oDK7jUd2xAWRb-B3N7Sr3kDoWECOY&code_challenge_method=S256`,
+    scope: `openid%20email%20profile%20offline_access%20urn%3Azitadel%3Aiam%3Aorg%3Aproject%3Aid%3Azitadel%3Aaud%20urn%3Azitadel%3Aiam%3Auser%3Ametadata%20urn%3Azitadel%3Aiam%3Aorg%3Aid%3A${import.meta.env.VITE_ZITADEL_ORG_ID
+      }&prompt=login&code_challenge=9az09PjcfuENS7oDK7jUd2xAWRb-B3N7Sr3kDoWECOY&code_challenge_method=S256`,
     redirectSignIn: import.meta.env.VITE_REDIRECT_SIGNIN,
     redirectSignOut: import.meta.env.VITE_REDIRECT_SIGNOUT,
     responseType: "code",
@@ -41,10 +40,10 @@ const config = {
     : "false",
   freePlan: "Free-Plan-USD-Monthly",
   paidPlan: "professional-USD-Monthly",
-  ddApplicationID: import.meta.env.VITE_DD_APP_ID,
-  ddClientToken: import.meta.env.VITE_DD_CLIENT_TOKEN,
-  ddSite: import.meta.env.VITE_DD_SITE,
-  ddService: import.meta.env.VITE_DD_SERVICE,
+  ooApplicationID: import.meta.env.VITE_OO_APP_ID,
+  ooClientToken: import.meta.env.VITE_OO_CLIENT_TOKEN,
+  ooSite: import.meta.env.VITE_OO_SITE,
+  ooService: import.meta.env.VITE_OO_SERVICE,
   environment: import.meta.env.VITE_ENVIRONMENT,
 };
 
