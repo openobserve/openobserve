@@ -48,21 +48,8 @@ pub async fn get_stream(
         .await
         .unwrap();
 
-    let mut stats = if !CONFIG.common.usage_enabled {
-        stats::get_stream_stats(org_id, stream_name, stream_type)
-    } else {
-        let in_stats = get_stream_stats(org_id, Some(stream_type), Some(stream_name.to_string()))
-            .await
-            .unwrap_or_default();
-        match in_stats.is_empty() {
-            true => StreamStats::default(),
-            false => *in_stats
-                .get(format!("{}/{}", stream_name, stream_type).as_str())
-                .unwrap(),
-        }
-    };
-
-    stats = transform_stats(&mut stats);
+    let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
+    transform_stats(&mut stats);
     if schema != Schema::empty() {
         let stream = stream_res(stream_name, stream_type, schema, Some(stats));
         Ok(HttpResponse::Ok().json(stream))
@@ -81,30 +68,14 @@ pub async fn get_streams(
 ) -> Vec<Stream> {
     let indices = db::schema::list(org_id, stream_type, fetch_schema)
         .await
-        .unwrap();
+        .unwrap_or_default();
     let mut indices_res = Vec::with_capacity(indices.len());
-
-    // get all steam stats
-    let all_stats = if !CONFIG.common.usage_enabled {
-        HashMap::new()
-    } else {
-        get_stream_stats(org_id, stream_type, None)
-            .await
-            .unwrap_or_default()
-    };
-
     for stream_loc in indices {
-        let mut stats = if !CONFIG.common.usage_enabled {
-            stats::get_stream_stats(
-                org_id,
-                stream_loc.stream_name.as_str(),
-                stream_loc.stream_type,
-            )
-        } else {
-            *all_stats
-                .get(format!("{}/{}", stream_loc.stream_name, stream_loc.stream_type).as_str())
-                .unwrap_or(&StreamStats::default())
-        };
+        let mut stats = stats::get_stream_stats(
+            org_id,
+            stream_loc.stream_name.as_str(),
+            stream_loc.stream_type,
+        );
         if stats.eq(&StreamStats::default()) {
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
@@ -113,7 +84,7 @@ pub async fn get_streams(
                 None,
             ));
         } else {
-            stats = transform_stats(&mut stats);
+            transform_stats(&mut stats);
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
@@ -305,14 +276,11 @@ pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, any
     }
 }
 
-fn transform_stats(stats: &mut StreamStats) -> StreamStats {
-    if !CONFIG.common.usage_enabled {
-        stats.storage_size /= SIZE_IN_MB;
-        stats.compressed_size /= SIZE_IN_MB;
-    }
+fn transform_stats(stats: &mut StreamStats) {
+    stats.storage_size /= SIZE_IN_MB;
+    stats.compressed_size /= SIZE_IN_MB;
     stats.storage_size = (stats.storage_size * 100.0).round() / 100.0;
     stats.compressed_size = (stats.compressed_size * 100.0).round() / 100.0;
-    *stats
 }
 
 pub fn stream_created(schema: &Schema) -> Option<i64> {
@@ -353,7 +321,8 @@ pub fn unwrap_partition_time_level(
     }
 }
 
-async fn get_stream_stats(
+/// get stream stats from usage report
+async fn _get_stream_stats(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<String>,
@@ -411,13 +380,6 @@ async fn get_stream_stats(
 mod test {
     use super::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
-
-    #[test]
-    fn test_transform_stats() {
-        let mut stats = StreamStats::default();
-        let res = transform_stats(&mut stats);
-        assert_eq!(stats, res);
-    }
 
     #[test]
     fn test_stream_res() {
