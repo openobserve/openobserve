@@ -582,6 +582,9 @@ const loadFilterItem = (name:any)=>{
         ].fields.z.length
       );
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.splice(0,dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.length);
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude = null;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude = null;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight = null;
     }
   }
 
