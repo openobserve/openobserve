@@ -102,7 +102,8 @@ pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
     Lazy::new(DashMap::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
 pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
-pub static USERS_RUM_TOKEN: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
+pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
+    Lazy::new(|| Arc::new(DashMap::default()));
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
@@ -298,6 +299,18 @@ pub struct Common {
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION", default = "86400")] // Everyday to test
     pub mmdb_update_duration: u64,
+
+    #[env_config(
+        name = "ZO_MMDB_GEOLITE_CITYDB_URL",
+        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.mmdb"
+    )]
+    pub mmdb_geolite_citydb_url: String,
+
+    #[env_config(
+        name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
+        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.sha256"
+    )]
+    pub mmdb_geolite_citydb_sha256_url: String,
 }
 
 #[derive(EnvConfig)]

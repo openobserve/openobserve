@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use tokio::time;
-
 use crate::common::infra::cluster::is_ingester;
 use crate::common::infra::config::{CONFIG, MAXMIND_DB_CLIENT};
 use crate::common::meta::maxmind::MaxmindClient;
@@ -24,9 +22,7 @@ use std::cmp::min;
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-
-const DOWNLOAD_URL: &str = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.mmdb";
-const SHA256SUM_URL: &str = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.sha256";
+use tokio::time;
 
 pub async fn is_digest_different(
     local_file_path: &str,
@@ -85,7 +81,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let client = reqwest::ClientBuilder::default().build().unwrap();
         let fname = format!("{}/GeoLite2-City.mmdb", &CONFIG.common.mmdb_data_dir);
 
-        let download_files = match is_digest_different(&fname, SHA256SUM_URL).await {
+        let download_files = match is_digest_different(
+            &fname,
+            &CONFIG.common.mmdb_geolite_citydb_sha256_url,
+        )
+        .await
+        {
             Ok(is_different) => is_different,
             Err(e) => {
                 log::error!("Well something broke. {e}");
@@ -94,7 +95,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         };
 
         if download_files {
-            match download_file(&client, DOWNLOAD_URL, &fname).await {
+            match download_file(&client, &CONFIG.common.mmdb_geolite_citydb_url, &fname).await {
                 Ok(()) => {
                     let maxminddb_client = MaxmindClient::new_with_path(fname);
                     let mut client = MAXMIND_DB_CLIENT.write().await;

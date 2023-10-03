@@ -149,7 +149,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
-    operation_id = "Rum",
+    operation_id = "GetOrganizationUserIngestToken",
     security(
         ("Authorization"= [])
     ),

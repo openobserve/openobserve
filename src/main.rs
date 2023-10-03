@@ -106,12 +106,6 @@ async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
     let agent_running = agent.start().expect("Failed to start pyroscope agent");
 
-    let ua_parser = web::Data::new(
-        UserAgentParser::builder()
-            .build_from_bytes(USER_AGENT_REGEX_FILE)
-            .expect("User Agent Parser creation failed"),
-    );
-
     if cli().await? {
         return Ok(());
     }
@@ -196,6 +190,11 @@ async fn main() -> Result<(), anyhow::Error> {
         .event("OpenObserve - Starting server", None, false)
         .await;
 
+    let ua_parser = web::Data::new(
+        UserAgentParser::builder()
+            .build_from_bytes(USER_AGENT_REGEX_FILE)
+            .expect("User Agent Parser creation failed"),
+    );
     let server = HttpServer::new(move || {
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
         if CONFIG.common.feature_per_thread_lock {

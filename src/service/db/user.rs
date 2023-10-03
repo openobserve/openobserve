@@ -101,13 +101,6 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
     )
     .await?;
 
-    db.put(
-        &key,
-        json::to_vec(&user).unwrap().into(),
-        infra_db::NEED_WATCH,
-    )
-    .await?;
-
     // cache user
     for org in user.organizations {
         let user = User {
@@ -126,11 +119,11 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
             user.clone(),
         );
 
-        // unwrap because this is where it would be set anyway.
-        USERS_RUM_TOKEN.insert(
-            format!("{}/{}", org.name.clone(), org.rum_token.unwrap()),
-            user,
-        );
+        if let Some(rum_token) = org.rum_token {
+            USERS_RUM_TOKEN
+                .clone()
+                .insert(format!("{}/{}", org.name.clone(), rum_token), user);
+        }
     }
     Ok(())
 }
@@ -203,7 +196,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             }
             USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
             if let Some(rum_token) = &user.rum_token {
-                USERS_RUM_TOKEN.insert(format!("{}/{}", user.org, rum_token), user);
+                USERS_RUM_TOKEN
+                    .clone()
+                    .insert(format!("{}/{}", user.org, rum_token), user);
             }
         }
     }

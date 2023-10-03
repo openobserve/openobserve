@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use actix_web::{http, web};
-use ahash::{AHashMap, HashMap};
+use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
@@ -46,7 +46,7 @@ pub async fn ingest_with_keys(
     org_id: &str,
     in_stream_name: &str,
     body: web::Bytes,
-    extend_json: &HashMap<String, serde_json::Value>,
+    extend_json: &AHashMap<String, serde_json::Value>,
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     ingest_inner(org_id, in_stream_name, body, extend_json, thread_id).await
@@ -66,14 +66,21 @@ pub async fn ingest(
     body: web::Bytes,
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
-    ingest_inner(org_id, in_stream_name, body, &HashMap::default(), thread_id).await
+    ingest_inner(
+        org_id,
+        in_stream_name,
+        body,
+        &AHashMap::default(),
+        thread_id,
+    )
+    .await
 }
 
 async fn ingest_inner(
     org_id: &str,
     in_stream_name: &str,
     body: web::Bytes,
-    extend_json: &HashMap<String, serde_json::Value>,
+    extend_json: &AHashMap<String, serde_json::Value>,
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();

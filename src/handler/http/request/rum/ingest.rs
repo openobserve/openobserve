@@ -17,7 +17,7 @@ use crate::common::{meta::http::HttpResponse as MetaHttpResponse, utils::json};
 use crate::service::logs;
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
 use actix_web::{http, post, web, HttpResponse};
-use ahash::HashMap;
+use ahash::AHashMap;
 
 use std::io::Error;
 
@@ -197,7 +197,7 @@ async fn ingest_multi_json(
     org_id: &str,
     stream_name: &str,
     body: web::Bytes,
-    extend_json: &HashMap<String, serde_json::Value>,
+    extend_json: &AHashMap<String, serde_json::Value>,
     thread_id: usize,
 ) -> Result<HttpResponse, Error> {
     Ok(

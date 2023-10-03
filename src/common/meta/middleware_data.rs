@@ -1,12 +1,25 @@
+// Copyright 2023 Zinc Labs Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use crate::common::infra::config::MAXMIND_DB_CLIENT;
-use actix_web::Error as ActixErr;
 use actix_web::{
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
-    web, FromRequest, HttpMessage,
+    web, Error as ActixErr, FromRequest, HttpMessage,
 };
 use actix_web_lab::middleware::Next;
-use ahash::HashMap;
+use ahash::AHashMap;
 use maxminddb::geoip2::city::Location;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
@@ -24,7 +37,7 @@ pub struct GeoInfoData<'a> {
 /// NOTE: the only condition is that the prefix of such params is `oo`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RumExtraData {
-    pub data: HashMap<String, serde_json::Value>,
+    pub data: AHashMap<String, serde_json::Value>,
 }
 
 impl RumExtraData {
@@ -34,13 +47,13 @@ impl RumExtraData {
     ) -> Result<ServiceResponse<impl MessageBody>, ActixErr> {
         let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
         let mut data =
-            web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+            web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
         data.retain(|k, _| {
             (k.starts_with("oo") || k.starts_with("batch_time")) && !k.eq("oo-api-key")
         });
 
         // These are the tags which come in `ootags`
-        let tags: HashMap<String, serde_json::Value> = match data.get("ootags") {
+        let tags: AHashMap<String, serde_json::Value> = match data.get("ootags") {
             Some(tags) => tags
                 .split(',')
                 .map(|tag| {
@@ -49,10 +62,10 @@ impl RumExtraData {
                 })
                 .collect(),
 
-            None => HashMap::default(),
+            None => AHashMap::default(),
         };
 
-        let mut user_agent_hashmap: HashMap<String, serde_json::Value> = data
+        let mut user_agent_hashmap: AHashMap<String, serde_json::Value> = data
             .into_inner()
             .into_iter()
             .map(|(key, val)| (key, val.into()))
