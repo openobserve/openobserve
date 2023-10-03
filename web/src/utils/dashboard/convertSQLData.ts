@@ -335,7 +335,10 @@ export const convertSQLData = (
         options.xAxis[0].axisLabel = {};
         options.xAxis[0].axisTick = {};
         options.xAxis[0].nameGap = 20;
-        options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
+
+        // get the unique value of the first xAxis's key
+        options.xAxis[0].data = Array.from(new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]])));
+        // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
         
         // stacked with xAxis's second value
         // allow 2 xAxis and 1 yAxis value for stack chart
@@ -794,7 +797,7 @@ export const convertSQLData = (
     if (field) {
       options.series.map((seriesObj: any) => {
         seriesObj.data = seriesObj.data.map((it: any, index: any) => [
-          options.xAxis[0].data[index],
+          Number.isInteger(options.xAxis[0].data[index]) ? options.xAxis[0].data[index] : new Date(options.xAxis[0].data[index]+ "Z").getTime(),
           it,
         ]);
       });
@@ -820,6 +823,17 @@ export const convertSQLData = (
         type: "cross",
         label: {
           fontsize: 12,
+          formatter: function (params: any) {
+            if (params.axisDimension == "y")
+              return formatUnitValue(
+                getUnitValue(
+                  params.value,
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom
+                )
+              );
+            return formatDate(new Date(params.seriesData[0].data[0])).toString();
+          },
         },
         formatter: function (params: any) {
           const date = new Date(params[0].value[0]);
@@ -860,6 +874,17 @@ export const convertSQLData = (
         type: "cross",
         label: {
           fontsize: 12,
+          formatter: function (params: any) {
+            if (params.axisDimension == "y")
+              return formatUnitValue(
+                getUnitValue(
+                  params.value,
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom
+                )
+              );
+            return formatDate(new Date(params?.seriesData[0]?.data[0])).toString();
+          },
         },
         formatter: function (params: any) {
           const date = new Date(params[0].value[0]);
@@ -950,6 +975,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "line",
         emphasis: { focus: "series" },
         smooth: true,
+        showSymbol: false,
         areaStyle: null,
       };
     case "scatter":
@@ -1008,6 +1034,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         smooth: true,
         emphasis: { focus: "series" },
         areaStyle: {},
+        showSymbol: false,
       };
     case "stacked":
       return {
@@ -1039,6 +1066,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: {
           focus: "series",
         },
+        showSymbol: false,
       };
     case "metric":
       return {
