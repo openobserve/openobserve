@@ -93,7 +93,7 @@ export default defineComponent({
         id: "heatmap",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/geomap.png"),
         title: "GeoMap",
         id: "geomap",
       },
