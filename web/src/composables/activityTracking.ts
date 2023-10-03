@@ -33,7 +33,7 @@ const userActivityTracking = () => {
       trackUserInteractions: true,
       defaultPrivacyLevel: "mask-user-input",
       // forwardErrorsToLogs: true,
-      forwardConsoleLogs: "all",
+      // forwardConsoleLogs: "all",
       organizationIdentifier: "myorg",
       insecureHTTP: true,
       apiVersion: "v1",
