@@ -1,5 +1,21 @@
 <template>
   <div class="row qp-2 full-height">
+    <div
+      class="q-pb-lg flex items-center justify-center text-center full-width"
+      style="height: calc(100vh - 200px)"
+    >
+      <div>
+        <q-spinner-hourglass
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; display: block"
+        />
+        <div class="text-center full-width">
+          Hold on tight, we're fetching session.
+        </div>
+      </div>
+    </div>
+
     <div class="col-12 q-px-sm q-pt-md row items-end bg-grey-2">
       <div class="col-9 row">
         <div
