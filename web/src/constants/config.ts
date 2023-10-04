@@ -18,6 +18,10 @@ export const config = {
   oAuthDomain: import.meta.env.VITE_OAUTH_DOMAIN,
   redirectSignIn: import.meta.env.VITE_REDIRECT_SIGNIN,
   redirectSignOut: import.meta.env.VITE_REDIRECT_SIGNOUT,
+  ooApplicationID: import.meta.env.VITE_OO_APP_ID,
+  ooClientToken: import.meta.env.VITE_OO_CLIENT_TOKEN,
+  ooSite: import.meta.env.VITE_OO_SITE,
+  ooService: import.meta.env.VITE_OO_SERVICE,
   responseType: "CODE",
   scope: "",
 };
