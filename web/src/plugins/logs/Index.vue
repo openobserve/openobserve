@@ -454,7 +454,7 @@ export default defineComponent({
       parser,
       searchObj,
       searchBarRef,
-      splitterModel: ref(17),
+      splitterModel: ref(14),
       // loadPageData,
       getQueryData,
       searchResultRef,
