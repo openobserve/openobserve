@@ -375,6 +375,10 @@ const useLogs = () => {
         timestamps.startTime != "Invalid Date" &&
         timestamps.endTime != "Invalid Date"
       ) {
+        if (timestamps.startTime > timestamps.endTime) {
+          showErrorNotification("Start time cannot be greater than end time");
+          return false;
+        }
         searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
 
         req.query.start_time = timestamps.startTime;
@@ -554,6 +558,13 @@ const useLogs = () => {
 
         if (queryReq != null) {
           if (
+            searchObj.meta.refreshInterval > 0 &&
+            router.currentRoute.value.name == "logs"
+          ) {
+            queryReq.query.from = 0;
+          }
+
+          if (
             searchObj.data.tempFunctionContent != "" &&
             searchObj.meta.toggleFunction
           ) {
@@ -566,10 +577,16 @@ const useLogs = () => {
 
           if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
           else {
-            queryReq.query.start_time =
-              initialQueryPayload.value?.query?.start_time;
-            queryReq.query.end_time =
-              initialQueryPayload.value?.query?.end_time;
+            if (
+              searchObj.meta.refreshInterval == 0 &&
+              router.currentRoute.value.name == "logs" &&
+              searchObj.data.queryResults.hasOwnProperty("hits")
+            ) {
+              queryReq.query.start_time =
+                initialQueryPayload.value?.query?.start_time;
+              queryReq.query.end_time =
+                initialQueryPayload.value?.query?.end_time;
+            }
           }
 
           searchObj.data.errorCode = 0;
@@ -588,7 +605,35 @@ const useLogs = () => {
                 searchObj.data.queryResults.hits.push(...res.data.hits);
               } else {
                 resetFieldValues();
-                searchObj.data.queryResults = res.data;
+                if (
+                  searchObj.meta.refreshInterval > 0 &&
+                  router.currentRoute.value.name == "logs" &&
+                  searchObj.data.queryResults.hasOwnProperty("hits")
+                ) {
+                  searchObj.data.queryResults.from = res.data.from;
+                  searchObj.data.queryResults.scan_size = res.data.scan_size;
+                  searchObj.data.queryResults.took = res.data.took;
+                  searchObj.data.queryResults.aggs = res.data.aggs;
+                  const lastRecordTimeStamp = parseInt(
+                    searchObj.data.queryResults.hits[0]._timestamp
+                  );
+                  // searchObj.data.queryResults.hits = res.data.hits;
+                  for (let i = 0; i < res.data.hits.length; i++) {
+                    if (
+                      lastRecordTimeStamp <
+                      parseInt(res.data.hits[i]._timestamp)
+                    ) {
+                      searchObj.data.queryResults.hits.unshift(
+                        res.data.hits[i]
+                      );
+                    }
+                  }
+
+                  searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.splice(0, 150);
+
+                } else {
+                  searchObj.data.queryResults = res.data;
+                }
               }
 
               updateFieldValues();
@@ -962,8 +1007,11 @@ const useLogs = () => {
     ) {
       clearInterval(refreshIntervalID);
       refreshIntervalID = setInterval(async () => {
-        searchObj.loading = true;
-        await getQueryData();
+        // searchObj.loading = true;
+        await getQueryData(true);
+        generateHistogramData();
+        updateGridColumns();
+        searchObj.meta.histogramDirtyFlag = true;
       }, searchObj.meta.refreshInterval * 1000);
       $q.notify({
         message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
