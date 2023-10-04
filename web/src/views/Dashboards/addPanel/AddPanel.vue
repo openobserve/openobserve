@@ -506,6 +506,14 @@ export default defineComponent({
 
             break;
           }
+          case 'geomap':{
+            if(dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.latitude == null){
+              errors.push("Add one field for the latitude")
+            }
+            if(dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.longitude == null){
+              errors.push("Add one field for the longitude")
+            }
+          }
           default:
             break;
         }
