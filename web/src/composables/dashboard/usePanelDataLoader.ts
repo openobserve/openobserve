@@ -124,7 +124,7 @@ export const usePanelDataLoader = (
 
       const sqlqueryPromise = panelSchema.value.queries?.map(
         async (it: any) => {
-          await queryService
+          return await queryService
             .search({
               org_identifier: store.state.selectedOrganization.identifier,
               query: {
@@ -140,8 +140,9 @@ export const usePanelDataLoader = (
             })
             .then((res) => {
               // Set searchQueryData.data to the API response hits
-              state.data = res.data.hits;
+              // state.data = res.data.hits;
               state.errorDetail = "";
+              return res.data.hits;
             })
             .catch((error) => {
               // Process API error for "sql"
@@ -151,6 +152,7 @@ export const usePanelDataLoader = (
       );
       // Wait for all query promises to resolve
       const sqlqueryResults = await Promise.all(sqlqueryPromise);
+      console.log("sqlqueryResults", sqlqueryResults);
       state.loading = false;
       state.data = sqlqueryResults;
     }
