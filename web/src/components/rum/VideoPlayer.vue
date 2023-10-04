@@ -179,6 +179,7 @@ const playerState = ref({
 watch(
   () => props.segments,
   (value) => {
+    console.log("segments changed", value.length);
     if (value.length) setupSession();
   },
   { deep: true, immediate: true }

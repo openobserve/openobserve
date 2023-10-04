@@ -6,7 +6,7 @@
         <div class="col-12 row">
           <div class="col-12 q-pb-sm text-caption">
             <q-icon name="mail" size="16px" class="q-pr-xs" />
-            {{ sessionDetails.user_email || "example@gmail.com" }}
+            {{ sessionDetails.user_email || "Unknown User" }}
           </div>
           <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
             <q-icon name="schedule" size="16px" class="q-pr-xs" />

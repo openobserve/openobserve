@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 import AppTabs from "@/components/common/AppTabs.vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeMount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
@@ -37,6 +37,10 @@ const tabs = [
   },
 ];
 
+onBeforeMount(() => {
+  console.log("Rum on before mount");
+});
+
 onMounted(() => {
   const routes = ["SessionViewer", "ErrorTracking", "Dashboard", "ErrorViewer"];
   const routeNameMapping = {
@@ -45,7 +49,7 @@ onMounted(() => {
     Dashboard: "dashboard",
     ErrorViewer: "error_tracking",
   };
-  console.log(router.currentRoute.value.name);
+
   if (routes.includes(router.currentRoute.value.name)) {
     activeTab.value = routeNameMapping[router.currentRoute.value.name];
   } else {
@@ -56,6 +60,7 @@ onMounted(() => {
 });
 
 const changeTab = (tab: string) => {
+  console.log("change tab");
   router.push({
     name: tab === "sessions" ? "Sessions" : "ErrorTracking",
   });

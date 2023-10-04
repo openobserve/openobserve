@@ -114,7 +114,7 @@ interface Session {
   initial_view_name: string;
   id: string;
 }
-import { h, onBeforeMount, onMounted, ref } from "vue";
+import { h, onActivated, onBeforeMount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { date } from "quasar";
 import AppTable from "@/components/AppTable.vue";
@@ -176,7 +176,8 @@ const columns = ref([
 const rows = ref<Session[]>([]);
 const router = useRouter();
 
-onBeforeMount(async () => {
+onActivated(async () => {
+  console.log("app errors before mount");
   await getStreamFields();
 });
 
@@ -265,6 +266,7 @@ const getErrorLogs = () => {
 
 const updateDateChange = (date) => {
   dateTime.value = date;
+  console.log("updated date", date);
   errorTrackingState.data.datetime = date;
   if (!isLoading.value.length) getErrorLogs();
 };
