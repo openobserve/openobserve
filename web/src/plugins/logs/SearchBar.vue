@@ -767,9 +767,20 @@ export default defineComponent({
           this.searchObj.data.query = currentQuery.join("| ");
         } else {
           if (currentQuery != "") {
-            currentQuery += " and " + filter;
+            if (
+              this.searchObj.meta.sqlMode == true &&
+              currentQuery.toString().toLowerCase().indexOf("where") == -1
+            ) {
+              currentQuery += " where " + filter;
+            } else {
+              currentQuery += " and " + filter;
+            }
           } else {
-            currentQuery = filter;
+            if (this.searchObj.meta.sqlMode == true) {
+              currentQuery = "where " + filter;
+            } else {
+              currentQuery = filter;
+            }
           }
           this.searchObj.data.query = currentQuery;
         }
