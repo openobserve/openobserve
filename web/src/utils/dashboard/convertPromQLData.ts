@@ -356,6 +356,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: { focus: "series" },
         smooth: true,
         areaStyle: {},
+        symbolSize:1,
         // showSymbol: false,
       };
     case "stacked":
@@ -370,6 +371,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         stack: "Total",
         areaStyle: {},
         // showSymbol: false,
+        symbolSize:1,
         emphasis: {
           focus: "series",
         },
