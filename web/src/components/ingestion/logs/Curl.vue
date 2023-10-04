@@ -24,15 +24,18 @@
           round
           size="0.5rem"
           padding="0.6rem"
-          :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
+          color="grey"
+          icon="content_copy"
           @click="$emit('copy-to-clipboard-fn', content)"
         />
       </div>
     </div>
     <pre ref="content" data-test="curl-content-text">
-curl -u {{ currUserEmail }}:{{ store.state.organizationData.organizationPasscode }} -k {{
-        endpoint.url
-      }}/api/{{ currOrgIdentifier }}/default/_json -d '[{"level":"info","job":"test","log":"test message for openobserve"}]'
+curl -u {{ currUserEmail }}:{{
+        store.state.organizationData.organizationPasscode
+      }} -k {{ endpoint.url }}/api/{{
+        currOrgIdentifier
+      }}/default/_json -d '[{"level":"info","job":"test","log":"test message for openobserve"}]'
     </pre>
   </div>
 </template>
@@ -88,8 +91,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .tabContent {
-    background-color: rgba(136, 136, 136, 0.103);
-// tab content bg color
+  background-color: rgba(136, 136, 136, 0.103);
+  // tab content bg color
   padding: 1rem 1.25rem 0.5rem;
   border-radius: 0.5rem;
   &__head {

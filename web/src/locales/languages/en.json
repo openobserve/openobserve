@@ -45,7 +45,8 @@
     "alerts": "Alerts",
     "openapi": "OpenAPI",
     "docs": "Docs",
-    "billings": "Billing"
+    "billings": "Billing",
+    "settings": "Settings"
   },
   "about": {
     "name": "OpenObserve",
@@ -235,7 +236,12 @@
   },
   "ingestion": {
     "header": "Ingestion",
-    "passwordLabel": "Reset Token"
+    "passwordLabel": "Reset Token",
+    "resetTokenBtnLabel": "Reset Token",
+    "resetRUMTokenLabel": "Reset RUM Token",
+    "generateRUMTokenLabel": "Generate RUM Token",
+    "generateRUMTokenMessage": "Generate RUM Token to enable RUM for your organization.",
+    "npmStepTitle": "NPM Installation Method"
   },
   "syslog": {
     "stream": "Stream",
@@ -457,5 +463,19 @@
     "searchLabel": "Search metric label",
     "add": "Add",
     "cancel": "Cancel"
+  },
+  "settings": {
+    "header": "Settings",
+    "userKeyLabel": "User Key",
+    "rumKeyLabel": "RUM Key",
+    "newUserKeyBtnLbl": "Add User Key",
+    "addUserKeyTitle": "Create User Key",
+    "organizationLabel": "Select Organization(s): ",
+    "save": "Save",
+    "cancel": "Cancel",
+    "apiNamePlaceHolder": "Key Name",
+    "updateuserKey": "Update User Key",
+    "id": "Id",
+    "update": "Update"
   }
 }
