@@ -18,13 +18,13 @@
 <template>
   <q-page class="q-pa-none" :key="store.state.selectedOrganization.identifier">
      <!-- searchBar at top -->
-     <div style="display: flex; flex-direction: row; justify-content: space-between; padding: 1%; border-bottom: 2px solid rgb(230, 230, 230);">
+     <div class="q-table__top" style="display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
         <div class="q-table__title">{{ t("dashboard.header") }}</div>
         <q-input
           v-model="filterQuery"
           filled
           dense
-          class="q-ml-auto q-mb-xs"
+          class="q-ml-auto"
           :placeholder="t('dashboard.search')"
         >
           <template #prepend>
@@ -32,7 +32,7 @@
           </template>
         </q-input>
         <q-btn
-          class="q-ml-md q-mb-xs text-bold"
+          class="q-ml-md text-bold"
           padding="sm lg"
           outline
           no-caps
@@ -41,7 +41,7 @@
         />
         <!-- add dashboard button -->
         <q-btn
-          class="q-ml-md q-mb-xs text-bold no-border"
+          class="q-ml-md text-bold no-border"
           padding="sm lg"
           color="secondary"
           no-caps
@@ -54,7 +54,7 @@
       v-model="splitterModel"
       unit="px"
       :limits="[200, 500]"
-      style="height: calc(100vh - 132px);"
+      style="height: calc(100vh - 122px);"
     >
       <template v-slot:before>
         <div class="text-bold q-px-md q-pt-sm">
