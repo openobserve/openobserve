@@ -50,7 +50,7 @@ export const convertSQLData = (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    const data = searchQueryData.filter((item: any) => {
+    const data = searchQueryData[0].filter((item: any) => {
       return (
         xAxisKeys.every((key: any) => item[key] != null) &&
         yAxisKeys.every((key: any) => item[key] != null)
@@ -390,7 +390,7 @@ export const convertSQLData = (
         const key1 = xAxisKeys[1];
         // get the unique value of the second xAxis's key
         const stackedXAxisUniqueValue = [
-          ...new Set(searchQueryData.map((obj: any) => obj[key1])),
+          ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
         ].filter((it) => it);
   
         // create a trace based on second xAxis's unique values
@@ -405,10 +405,10 @@ export const convertSQLData = (
               name: yAxisKeys.length == 1 ? key : key + " (" + yAxisName +")",
               ...getPropsByChartTypeForSeries(panelSchema.type),
               data: Array.from(
-                  new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
+                  new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
                 ).map(
                   (it: any) =>
-                    searchQueryData.find(
+                    searchQueryData[0].find(
                       (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
                     )?.[yAxis] || 0
                 ),
@@ -645,7 +645,7 @@ export const convertSQLData = (
       const key1 = xAxisKeys[1];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData.map((obj: any) => obj[key1])),
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
@@ -653,10 +653,10 @@ export const convertSQLData = (
           name: key,
           ...getPropsByChartTypeForSeries(panelSchema.type),
           data: Array.from(
-            new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
+            new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
           ).map(
             (it: any) =>
-              searchQueryData.find(
+              searchQueryData[0].find(
                 (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
               )?.[yAxisKeys[0]] || 0
           ),
@@ -670,21 +670,21 @@ export const convertSQLData = (
       const key0 = xAxisKeys[0];
       // get the unique value of the first xAxis's key
       const xAxisZerothPositionUniqueValue = [
-        ...new Set(searchQueryData.map((obj: any) => obj[key0])),
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key0])),
       ].filter((it) => it);
 
       // get second x axis key
       const key1 = yAxisKeys[0];
       // get the unique value of the second xAxis's key
       const xAxisFirstPositionUniqueValue = [
-        ...new Set(searchQueryData.map((obj: any) => obj[key1])),
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       const yAxisKey0 = zAxisKeys[0];
       const Zvalues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
         return xAxisZerothPositionUniqueValue.map((zero: any) => {
           return (
-            searchQueryData.find(
+            searchQueryData[0].find(
               (it: any) => it[key0] == zero && it[key1] == first
             )?.[yAxisKey0] || "-"
           );
@@ -774,7 +774,7 @@ export const convertSQLData = (
       const key1 = xAxisKeys[1];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData.map((obj: any) => obj[key1])),
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
@@ -782,10 +782,10 @@ export const convertSQLData = (
           name: key,
           ...getPropsByChartTypeForSeries(panelSchema.type),
           data: Array.from(
-            new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
+            new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
           ).map(
             (it: any) =>
-              searchQueryData.find(
+              searchQueryData[0].find(
                 (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
               )?.[yAxisKeys[0]] || 0
           ),
