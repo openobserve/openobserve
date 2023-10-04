@@ -24,8 +24,22 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
 
   console.log("mapData", mapData);
 
-  // const minValue = Math.min(...mapData.map((item: any) => item[2]));
-  // const maxValue = Math.max(...mapData.map((item: any) => item[2]));
+  // validate if response is not at number
+  const nonNumericValues = panelSchema.queries.every((query: any, index: any) => {
+    const queryResult = mapData[index]
+    const queryField = queryResult.every((item: any) => {
+      return (
+        !isNaN(item[query.fields.longitude.alias]) &&
+        !isNaN(item[query.fields.latitude.alias]) &&
+        (query.fields.weight ? !isNaN(item[query.fields.weight.alias]) : true)
+      );
+    })
+    
+    console.log("queryField", queryField);
+    return queryField
+  })
+  
+  console.log(nonNumericValues, "nonNumericValues");
 
   const options: any = {
     lmap: {
@@ -114,7 +128,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       },
       data: mapData[index]?.map((item: any) => {
         if (query.customQuery) {
-          // For custom queries, use alias names
+          // For custom queries
           return [
             item[query.fields.longitude.alias],
             item[query.fields.latitude.alias],
@@ -123,7 +137,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
               : item[query.fields.weight.alias],
           ];
         } else {
-          // For auto-generated queries, use actual field names
+          // For auto queries
           return [
             item.longitude,
             item.latitude,
