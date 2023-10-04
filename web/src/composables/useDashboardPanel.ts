@@ -47,6 +47,11 @@ const getDefaultDashboardPanelData: any = () => ({
       basemap: {
         type: "osm",
       },
+      mapview: {
+        zoom: 1,
+        lat: 0,
+        lon: 0,
+      }
     },
     queryType: "sql",
     queries: [

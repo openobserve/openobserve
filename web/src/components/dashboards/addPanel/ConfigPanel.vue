@@ -44,6 +44,24 @@
         :display-value="'OpenStreetMap'">
       </q-select>
 
+      <div class="space"></div>
+
+        <q-input v-if="dashboardPanelData.data.type == 'geomap'" v-model="dashboardPanelData.data.config.mapview.lat" label="Latitude" color="input-border"
+          bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
+        </q-input>
+
+      <div class="space"></div>
+
+        <q-input v-if="dashboardPanelData.data.type == 'geomap'" v-model="dashboardPanelData.data.config.mapview.lon" label="Longitude" color="input-border"
+          bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
+        </q-input>
+
+     <div class="space"></div>
+
+         <q-input v-if="dashboardPanelData.data.type == 'geomap'" v-model="dashboardPanelData.data.config.zoom" label="Zoom" color="input-border"
+            bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
+          </q-input>
+          
     <div class="space"></div>
 
     <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"

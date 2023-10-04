@@ -31,8 +31,8 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     lmap: {
       // See https://leafletjs.com/reference.html#map-option for details
       // NOTE: note that this order is reversed from Leaflet's [lat, lng]!
-      center: [10, 60], // [lng, lat]
-      zoom: 14,
+      center: [panelSchema.config.mapview.lon, panelSchema.config.mapview.lat], // [lng, lat]
+      zoom: panelSchema.config.mapview.zoom,
       roam: true,
       resizeEnable: true, // automatically handles browser window resize.
       // whether echarts layer should be rendered when the map is moving. Default is true.
