@@ -1,18 +1,33 @@
 <template>
   <div class="events-container relative-position">
-    <div class="row q-pa-sm event-metadata bg-white">
-      <div class="col-12 row">
-        <div class="col-12 q-pb-sm text-caption">example@gmail.com</div>
-        <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-          {{ sessionDetails.date }}
-        </div>
-        <div class="col-6 q-mb-sm text-caption ellipsis q-pr-xs">
-          {{ sessionDetails.browser }}, {{ sessionDetails.os }}
-        </div>
-        <div class="col-6 q-mb-sm q-pl-xs text-caption ellipsis">
-          {{ sessionDetails.ip }}
+    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" />
+    <template v-if="activeTab === 'tags'">
+      <div class="row q-pa-sm event-metadata bg-white">
+        <div class="col-12 row">
+          <div class="col-12 q-pb-sm text-caption">
+            <q-icon name="mail" size="16px" class="q-pr-xs" />
+            {{ sessionDetails.user_email || "example@gmail.com" }}
+          </div>
+          <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
+            <q-icon name="schedule" size="16px" class="q-pr-xs" />
+            {{ sessionDetails.date }}
+          </div>
+          <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
+            <q-icon name="settings" size="16px" class="q-pr-xs" />
+            {{ sessionDetails.browser }}, {{ sessionDetails.os }}
+          </div>
+          <div class="col-12 q-mb-sm text-caption ellipsis">
+            <q-icon name="language" size="16px" class="q-pr-xs" />
+            {{ sessionDetails.ip }}
+          </div>
+          <div class="col-12 q-mb-sm text-caption ellipsis">
+            <q-icon name="location_on" size="16px" class="q-pr-xs" />
+            {{ sessionDetails.city }}, {{ sessionDetails.country }}
+          </div>
         </div>
       </div>
+    </template>
+    <template v-else>
       <div class="flex items-center justify-between col-12 q-pt-sm">
         <div class="q-pr-xs" style="width: 60%">
           <q-input
@@ -41,35 +56,36 @@
           />
         </div>
       </div>
-    </div>
-    <q-separator />
-    <div class="events-list">
-      <template v-for="event in filteredEvents" :key="event.id">
-        <div
-          v-if="selectedEventTypes && selectedEventTypes.includes(event.type)"
-          class="q-mt-xs q-px-sm event-container q-py-sm cursor-pointer rounded-borders"
-          @click="handleEventClick(event)"
-        >
-          <div class="ellipsis">
-            <div class="q-mr-md inline">{{ event.displayTime }}</div>
-            <div
-              class="q-mr-md inline event-type q-px-xs"
-              style="border-radius: 4px"
-              :class="event.type === 'error' ? 'bg-red-3' : ''"
-            >
-              {{ event.type }}
+      <q-separator class="q-mt-sm" />
+      <div class="events-list">
+        <template v-for="event in filteredEvents" :key="event.id">
+          <div
+            v-if="selectedEventTypes && selectedEventTypes.includes(event.type)"
+            class="q-mt-xs q-px-sm event-container q-py-sm cursor-pointer rounded-borders"
+            @click="handleEventClick(event)"
+          >
+            <div class="ellipsis">
+              <div class="q-mr-md inline">{{ event.displayTime }}</div>
+              <div
+                class="q-mr-md inline event-type q-px-xs"
+                style="border-radius: 4px"
+                :class="event.type === 'error' ? 'bg-red-3' : ''"
+              >
+                {{ event.type }}
+              </div>
+              <div class="inline" :title="event.name">{{ event.name }}</div>
             </div>
-            <div class="inline" :title="event.name">{{ event.name }}</div>
           </div>
-        </div>
-      </template>
-    </div>
+        </template>
+      </div>
+    </template>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { cloneDeep } from "lodash-es";
 import { ref, watch } from "vue";
+import AppTabs from "../common/AppTabs.vue";
 
 const props = defineProps({
   events: {
@@ -81,6 +97,20 @@ const props = defineProps({
     required: true,
   },
 });
+
+const activeTab = ref<string>("breadcrumbs");
+const tabs = [
+  {
+    label: "Breadcrumbs",
+    value: "breadcrumbs",
+    style: { width: "fit-content", padding: "8px 10px", "margin-right": "4px" },
+  },
+  {
+    label: "Tags",
+    value: "tags",
+    style: { width: "fit-content", padding: "8px 10px" },
+  },
+];
 
 const emit = defineEmits(["event-emitted"]);
 
@@ -119,7 +149,7 @@ const searchEvents = (value: string) => {
 };
 
 const handleEventClick = (event: any) => {
-emit("event-emitted", "event-click", event);
+  emit("event-emitted", "event-click", event);
 };
 </script>
 
@@ -129,6 +159,7 @@ emit("event-emitted", "event-click", event);
 }
 
 .events-container {
+  width: calc(100% - 1px);
   height: calc(100vh - 57px);
   overflow: hidden;
   padding-right: 8px;

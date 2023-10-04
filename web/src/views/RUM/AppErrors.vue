@@ -238,7 +238,7 @@ const getErrorLogs = () => {
 
   req.query.sql = `select min(${
     store.state.zoConfig.timestamp_column
-  }) as zo_sql_timestamp, error_type, error_message, service, MIN(
+  }) as zo_sql_timestamp, type, error_message, service, MIN(
         CASE
             WHEN error_stack IS NOT NULL THEN error_stack
             ELSE error_handling_stack
@@ -247,7 +247,7 @@ const getErrorLogs = () => {
       errorTrackingState.data.editorValue.length
         ? " where type='error' and " + errorTrackingState.data.editorValue
         : " where type='error' "
-    } group by error_type, error_message, service, error_stack, error_handling order by zo_sql_timestamp DESC`;
+    } group by type, error_message, service, error_stack, error_handling order by zo_sql_timestamp DESC`;
   req.query.sql_mode = "full";
   delete req.aggs;
   isLoading.value.push(true);

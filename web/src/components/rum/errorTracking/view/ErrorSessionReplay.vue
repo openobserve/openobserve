@@ -44,7 +44,11 @@ const playSessionReplay = () => {
   router.push({
     name: "SessionViewer",
     params: {
-      session_id: props.error.session_id,
+      id: props.error.session_id,
+    },
+    query: {
+      start_time: props.error._timestamp,
+      end_time: props.error._timestamp,
     },
   });
 };

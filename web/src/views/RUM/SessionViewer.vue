@@ -1,5 +1,21 @@
 <template>
   <div class="row qp-2 full-height">
+    <div class="col-12 q-px-sm q-pt-md row items-end bg-grey-2">
+      <div class="col-9 row">
+        <div
+          class="text-caption ellipsis row items-center q-mr-md"
+          style="font-size: 20px"
+        >
+          <q-icon name="language" size="20px" class="q-pr-xs" />
+          {{ getSessionDetails.ip }}
+        </div>
+        <div class="text-caption ellipsis q-pr-xs row items-center q-mr-md">
+          <q-icon name="calendar_month" size="16px" class="q-pr-xs" />
+          {{ getSessionDetails.date }}
+        </div>
+      </div>
+      <q-separator class="full-width q-mt-sm" />
+    </div>
     <div class="col-9">
       <VideoPlayer
         ref="videoPlayerRef"
@@ -7,7 +23,8 @@
         :segments="segments"
       />
     </div>
-    <div class="col-3">
+    <div class="col-3 row">
+      <q-separator vertical class="full-height" />
       <PlayerEventsSidebar
         :events="segmentEvents"
         :sessionDetails="getSessionDetails"
@@ -46,17 +63,21 @@ const sessionId = ref("1");
 const router = useRouter();
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
-const { buildQueryPayload } = useQuery();
+const { buildQueryPayload, getTimeInterval, parseQuery } = useQuery();
 const segments = ref<any[]>([]);
 const segmentEvents = ref<any[]>([]);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
+const errorCount = ref(10);
 
 const session_start_time = 1692884313968;
 const session_end_time = 1692884769270;
 
-onBeforeMount(() => {
+const getSessionId = computed(() => router.currentRoute.value.params.id);
+
+onBeforeMount(async () => {
   sessionId.value = router.currentRoute.value.params.id as string;
+  await getSession();
   getSessionSegments();
   getSessionEvents();
 });
@@ -67,18 +88,67 @@ const getSessionDetails = computed(() => {
     browser: sessionState.data.selectedSession?.browser,
     os: sessionState.data.selectedSession?.os,
     ip: sessionState.data.selectedSession?.ip,
+    user_email: sessionState.data.selectedSession?.user_email,
+    city: sessionState.data.selectedSession?.city,
+    country: sessionState.data.selectedSession?.country,
   };
 });
 
+const getSession = () => {
+  console.log(router.currentRoute.value.query.start_time);
+  return new Promise((resolve) => {
+    const req = {
+      query: {
+        sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, min(geo_info_city) as city, min(geo_info_country) as country, min(session_id) as session_id from "_sessionreplay" where session_id='${getSessionId.value}' order by zo_sql_timestamp`,
+        start_time:
+          Number(router.currentRoute.value.query.start_time) - 900000000,
+        end_time: Number(router.currentRoute.value.query.end_time) + 900000000,
+        from: 0,
+        size: 10,
+        sql_mode: "full",
+      },
+    };
+
+    console.log(req.query.start_time, req.query.end_time);
+
+    isLoading.value.push(true);
+    searchService
+      .search({
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: req,
+        page_type: "logs",
+      })
+      .then((res) => {
+        if (res.data.hits.length === 0) {
+          console.log("No session found");
+          return;
+        }
+        sessionState.data.selectedSession = {
+          ...res.data.hits[0],
+          type: res.data.hits[0].source,
+          time_spent: res.data.hits[0].end_time - res.data.hits[0].start_time,
+          timestamp: res.data.hits[0].zo_sql_timestamp,
+        };
+      })
+      .finally(() => {
+        isLoading.value.pop();
+        resolve(true);
+      });
+  });
+};
+
 const getSessionSegments = () => {
+  if (!sessionState.data.selectedSession) return;
+
   const queryPayload = {
     from: 0,
     size: 150,
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
       startTime:
-        Number(router.currentRoute.value.query.start_time) * 1000 - 300000,
-      endTime: Number(router.currentRoute.value.query.end_time) * 1000 + 300000,
+        Number(sessionState.data.selectedSession?.start_time) * 1000 - 300000,
+      endTime:
+        Number(sessionState.data.selectedSession?.end_time) * 1000 + 300000,
     },
     sqlMode: false,
     currentPage: 0,
@@ -110,8 +180,9 @@ const getSessionEvents = () => {
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
       startTime:
-        Number(router.currentRoute.value.query.start_time) * 1000 - 300000,
-      endTime: Number(router.currentRoute.value.query.end_time) * 1000 + 300000,
+        Number(sessionState.data.selectedSession?.start_time) * 1000 - 300000,
+      endTime:
+        Number(sessionState.data.selectedSession?.start_time) * 1000 + 300000,
     },
     sqlMode: false,
     currentPage: 0,

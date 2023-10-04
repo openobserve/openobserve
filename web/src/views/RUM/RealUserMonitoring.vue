@@ -1,22 +1,17 @@
 <template>
   <div :style="{ height: 'calc(100vh - 57px)', overflow: 'hidden' }">
-    <div v-if="showTabs" class="flex items-center rum-tabs">
-      <div v-for="tab in tabs" :key="tab.value" class="cursor-pointer">
-        <div
-          class="q-px-lg q-py-sm rum-tab text-center"
-          :class="activeTab === tab.value ? 'active' : ''"
-          @click="changeTab(tab.value)"
-        >
-          {{ tab.label }}
-        </div>
-      </div>
-      <q-separator class="full-width" />
-    </div>
+    <AppTabs
+      :show="showTabs"
+      :tabs="tabs"
+      v-model:active-tab="activeTab"
+      @update:active-tab="changeTab"
+    />
     <RouterView />
   </div>
 </template>
 
 <script setup lang="ts">
+import AppTabs from "@/components/common/AppTabs.vue";
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
@@ -61,7 +56,6 @@ onMounted(() => {
 });
 
 const changeTab = (tab: string) => {
-  activeTab.value = tab;
   router.push({
     name: tab === "sessions" ? "Sessions" : "ErrorTracking",
   });

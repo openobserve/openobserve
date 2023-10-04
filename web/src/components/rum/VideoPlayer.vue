@@ -335,20 +335,20 @@ defineExpose({
 
 <style scoped>
 .player {
-  height: calc(100% - 100px);
+  height: calc(100% - 153px);
 }
-.player-container {
+/* .player-container {
   background: rgb(198, 198, 198);
-}
+} */
 
-.controls-container {
+/* .controls-container {
   background: rgb(169, 168, 168);
-}
+} */
 
 .playback_bar {
   width: 100%;
   height: 5px;
-  background-color: #fff;
+  background-color: #ebebeb;
 }
 </style>
 
