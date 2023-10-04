@@ -34,44 +34,46 @@
       </div>
     </div>
 
-    <div v-for="key in userAPIKey" :key="key.id" v-if="userAPIKey.length > 0">
-      <div class="tabContent q-mb-md q-pa-sm">
-        <label class="text-bold">{{ key.api_name }}</label>
-        <pre data-test="curl-content-text">
+    <div v-if="userAPIKey.length > 0">
+      <div v-for="key in userAPIKey" :key="key?.id">
+        <div class="tabContent q-mb-md q-pa-sm">
+          <label class="text-bold">{{ key.api_name }}</label>
+          <pre data-test="curl-content-text">
           {{ key.api_key }}<br />
           Allowed Organization: {{ key.org_identifier }}
         </pre>
 
-        <q-btn
-          data-test="user-api-key-edit-btn"
-          flat
-          round
-          size="sm"
-          class="float-right btn-edit"
-          icon="edit"
-          @click="editUserKey(key)"
-        />
+          <q-btn
+            data-test="user-api-key-edit-btn"
+            flat
+            round
+            size="sm"
+            class="float-right btn-edit"
+            icon="edit"
+            @click="editUserKey(key)"
+          />
 
-        <q-btn
-          data-test="user-api-key-del-btn"
-          flat
-          round
-          size="sm"
-          class="float-right btn-delete"
-          :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
-          @click="handleDeleteAction(key.id)"
-        />
+          <q-btn
+            data-test="user-api-key-del-btn"
+            flat
+            round
+            size="sm"
+            class="float-right btn-delete"
+            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+            @click="handleDeleteAction(key.id)"
+          />
 
-        <q-btn
-          data-test="user-api-key-copy-btn"
-          flat
-          round
-          size="sm"
-          class="float-right btn-copy"
-          color="grey"
-          icon="content_copy"
-          @click="copyToClipboardFn(key.api_key)"
-        />
+          <q-btn
+            data-test="user-api-key-copy-btn"
+            flat
+            round
+            size="sm"
+            class="float-right btn-copy"
+            color="grey"
+            icon="content_copy"
+            @click="copyToClipboardFn(key.api_key)"
+          />
+        </div>
       </div>
     </div>
     <div v-else>
@@ -167,12 +169,12 @@ export default defineComponent({
     const q = useQuasar();
     const store = useStore();
     const router: any = useRouter();
-    const userAPIKey = ref([]);
-    const rumAPIKey = ref([]);
-    const toggleCreateUserKeyDialog = ref(false);
-    const toggleDeleteUserKeyDialog = ref(false);
-    const editRecordSet = ref();
-    const deleteID = ref("");
+    const userAPIKey: any = ref([]);
+    const rumAPIKey: any = ref([]);
+    const toggleCreateUserKeyDialog: any = ref(false);
+    const toggleDeleteUserKeyDialog: any = ref(false);
+    const editRecordSet: any = ref();
+    const deleteID: any = ref("");
 
     const listAPIKeys = () => {
       apiKeysService

@@ -121,27 +121,27 @@ openobserveRum.startSessionReplayRecording();`;
     const replaceStaticValues = () => {
       rumToken.value = store.state.organizationData.rumToken.rum_token;
       let configData = defaultConfig;
-      configData = configData.replaceAll(
-        "<OPENOBSERVE_CLIENT_TOKEN>",
+      configData = configData.replace(
+        /<OPENOBSERVE_CLIENT_TOKEN>/g,
         rumToken.value
       );
 
-      configData = configData.replaceAll(
-        "<OPENOBSERVE_SITE>",
+      configData = configData.replace(
+        /<OPENOBSERVE_SITE>/g,
         store.state.API_ENDPOINT.replace("https://", "")
           .replace("http://", "")
           .replace(/\/$/, "")
       );
 
-      configData = configData.replaceAll(
-        "<OPENOBSERVE_ORGANIZATION_IDENTIFIER>",
+      configData = configData.replace(
+        /<OPENOBSERVE_ORGANIZATION_IDENTIFIER>/g,
         store.state.selectedOrganization.identifier
       );
 
       if (store.state.API_ENDPOINT.indexOf("https://") > -1) {
-        configData = configData.replaceAll("<INSECUREHTTP>", "false");
+        configData = configData.replace(/<INSECUREHTTP>/g, "false");
       } else {
-        configData = configData.replaceAll("<INSECUREHTTP>", "true");
+        configData = configData.replace(/<INSECUREHTTP>/g, "true");
       }
 
       initConfiguration.value = configData;
