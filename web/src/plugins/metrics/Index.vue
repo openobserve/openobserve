@@ -879,7 +879,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .query-editor-container {
   .monaco-editor {
     height: 80px !important;
