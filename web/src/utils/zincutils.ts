@@ -373,7 +373,7 @@ export const mergeRoutes: any = (route1: any, route2: any) => {
   // Iterate through route1 and add its elements to mergedRoutes
   for (const r1 of route1) {
     const matchingRoute = route2.find(
-      (r2) => r2.path === r1.path && r2.name === r1.name
+      (r2: any) => r2.path === r1.path && r2.name === r1.name
     );
 
     if (matchingRoute) {
@@ -388,7 +388,7 @@ export const mergeRoutes: any = (route1: any, route2: any) => {
       });
 
       // Remove the matching route from route2
-      route2 = route2.filter((r2) => r2 !== matchingRoute);
+      route2 = route2.filter((r2: any) => r2 !== matchingRoute);
     } else {
       // If no matching route is found in route2, add the route from route1 as is
       mergedRoutes.push({ ...r1 });
@@ -400,4 +400,3 @@ export const mergeRoutes: any = (route1: any, route2: any) => {
 
   return mergedRoutes;
 };
-

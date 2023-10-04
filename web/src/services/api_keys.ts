@@ -24,7 +24,7 @@ const apiKeys = {
   createUserAPIKey: (data: object) => {
     return http().post(`/api/usertoken`, data);
   },
-  updateUserAPIKey: (data: object) => {
+  updateUserAPIKey: (data: any) => {
     return http().put(`/api/usertoken/${data.id}`, data);
   },
   createRUMToken: (org_id: string) => {
