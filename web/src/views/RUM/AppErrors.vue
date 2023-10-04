@@ -246,6 +246,7 @@ const getErrorLogs = () => {
 
 const updateDateChange = (date: any) => {
   dateTime.value = date;
+  console.log("updated date", date);
   errorTrackingState.data.datetime = date;
   if (!isLoading.value.length) runQuery();
 };
