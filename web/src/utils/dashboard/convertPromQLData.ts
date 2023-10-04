@@ -325,8 +325,8 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "line",
         emphasis: { focus: "series" },
         smooth: true,
-        // showSymbol: false,
-        symbolSize:1
+        showSymbol: false,
+        // symbolSize:1
       };
     case "scatter":
       return {
@@ -356,8 +356,8 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: { focus: "series" },
         smooth: true,
         areaStyle: {},
-        symbolSize:1,
-        // showSymbol: false,
+        // symbolSize:1,
+        showSymbol: false,
       };
     case "stacked":
       return {
@@ -370,8 +370,8 @@ const getPropsByChartTypeForSeries = (type: string) => {
         smooth: true,
         stack: "Total",
         areaStyle: {},
-        // showSymbol: false,
-        symbolSize:1,
+        showSymbol: false,
+        // symbolSize:1,
         emphasis: {
           focus: "series",
         },
