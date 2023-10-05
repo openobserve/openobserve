@@ -86,7 +86,13 @@ export default defineComponent({
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(data, async () => {
-      panelData.value = convertPanelData(panelSchema.value, data.value, store);
+      // panelData.value = convertPanelData(panelSchema.value, data.value, store);
+      try {
+        panelData.value = convertPanelData(panelSchema.value, data.value, store);
+        errorDetail.value = "";
+      } catch (error: any) {
+        errorDetail.value = error.message;
+      }
     });
 
     // Compute the value of the 'noData' variable

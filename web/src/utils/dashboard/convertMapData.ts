@@ -25,20 +25,26 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
   console.log("mapData", mapData);
 
   // validate if response is not at number
-  const nonNumericValues = panelSchema.queries.every((query: any, index: any) => {
-    const queryResult = mapData[index]
-    const queryField = queryResult.every((item: any) => {
-      return (
-        !isNaN(item[query.fields.longitude.alias]) &&
-        !isNaN(item[query.fields.latitude.alias]) &&
-        (query.fields.weight ? !isNaN(item[query.fields.weight.alias]) : true)
-      );
-    })
-    
-    console.log("queryField", queryField);
-    return queryField
-  })
-  
+  const nonNumericValues = panelSchema.queries.map(
+    (query: any, index: any) => {
+      const queryResult = mapData[index];
+
+      const queryField = queryResult.forEach((item: any) => {
+        if (isNaN(item[query.fields.latitude.alias])) {
+          throw new Error("All latitude values should be numeric value.");
+        }
+        if (isNaN(item[query.fields.longitude.alias])) {
+          throw new Error("All longitude values should be numeric value.");
+        }
+        if (query.fields.weight && isNaN(item[query.fields.weight.alias])) {
+          throw new Error("All weight values should be numeric value.");
+        }
+      });
+      console.log("queryField", queryField);
+      return queryField;
+    }
+  );
+
   console.log(nonNumericValues, "nonNumericValues");
 
   const options: any = {
