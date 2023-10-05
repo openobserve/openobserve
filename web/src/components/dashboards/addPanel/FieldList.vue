@@ -174,6 +174,12 @@ export default defineComponent({
           fields?.schema || [];
       }
     );
+    const selectedStreamForQueries: any = ref({});
+
+    // Watch for changes in the current query selected stream
+    watch(() => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream, (newStream) => {
+      selectedStreamForQueries.value[dashboardPanelData.layout.currentQueryIndex] = newStream;
+    });
 
     watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type, dashboardPanelData.meta.stream.streamResults], () => {
 
@@ -192,7 +198,12 @@ export default defineComponent({
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream &&
         data.indexOptions.length > 0
       ) {
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream = data.indexOptions[0];
+        const currentIndex = dashboardPanelData.layout.currentQueryIndex;
+        if (selectedStreamForQueries.value[currentIndex]) {
+          dashboardPanelData.data.queries[currentIndex].fields.stream = selectedStreamForQueries.value[currentIndex];
+        } else {
+          dashboardPanelData.data.queries[currentIndex].fields.stream = data.indexOptions[0];
+        }
       }
     })
 
