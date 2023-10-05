@@ -25,7 +25,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
   console.log("mapData", mapData);
 
   // validate if response is not at number
-  const nonNumericValues = panelSchema.queries.map(
+  const nonNumericValues = panelSchema.queries.forEach(
     (query: any, index: any) => {
       const queryResult = mapData[index];
 
@@ -70,8 +70,6 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     },
     visualMap: {
       left: "right",
-      min: 0,
-      max: 0,
       inRange: {
         color: [
           "#313695",
@@ -164,12 +162,16 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
   });
 
   const seriesData = options.series.flatMap((series: any) => series.data);
-  const minValue = Math.min(...seriesData.map((item: any) => item[2]));
-  const maxValue = Math.max(...seriesData.map((item: any) => item[2]));
+   if (seriesData.length > 0) {
+     const minValue = Math.min(...seriesData.map((item: any) => item[2]));
+     const maxValue = Math.max(...seriesData.map((item: any) => item[2]));
 
-  options.visualMap.min = minValue;
-  options.visualMap.max = maxValue;
-
+     options.visualMap.min = minValue;
+     options.visualMap.max = maxValue;
+   } else {
+     options.visualMap = [];
+     options.series = [];
+   }
   console.log("options convertMapData", options);
 
   return { options };
