@@ -113,9 +113,13 @@ const useDashboardPanelData = () => {
   const $q = useQuasar();
 
 const addQuery = () => {
+  const queryType =
+    dashboardPanelData.data.queryType === "sql"
+      ? "sql"
+      : "promql";
   const newQuery: any = {
     query: "",
-    customQuery: true,
+    customQuery: queryType === "promql",
     fields: {
       stream:
         dashboardPanelData.data.queries[
