@@ -406,15 +406,18 @@ const removeQuery = (index: number) => {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.z = [];
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.latitude = null;
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.longitude = null;
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.weight = null;
+          // we have multiple queries for geomap, so if we are moving away, we need to reset
+          // the values of lat, lng and weight in all the queries
+          dashboardPanelData.data.queries?.forEach((query: any) => {
+            query.fields.latitude = null;
+            query.fields.longitude = null;
+            query.fields.weight = null;
+          })
+          if (dashboardPanelData.data.queryType === "sql") {
+            dashboardPanelData.layout.currentQueryIndex = 0;
+            dashboardPanelData.data.queries =
+              dashboardPanelData.data.queries.slice(0, 1);
+          }
       break;
        case "geomap":
         dashboardPanelData.data.queries[
