@@ -91,8 +91,6 @@ export default defineComponent({
         panelData.value = convertPanelData(panelSchema.value, data.value, store);
         errorDetail.value = "";
       } catch (error: any) {
-        console.log("error", error);
-        
         errorDetail.value = error.message;
       }
     });

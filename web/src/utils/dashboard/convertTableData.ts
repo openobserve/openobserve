@@ -32,7 +32,7 @@ export const convertTableData = (
     obj["name"] = it.label;
     obj["field"] = it.alias;
     obj["label"] = it.label;
-    obj["align"] = !isSampleValuesNumbers(searchQueryData, it.alias, 20)
+    obj["align"] = !isSampleValuesNumbers(searchQueryData[0], it.alias, 20)
       ? "left"
       : "right";
     obj["sortable"] = true;
@@ -40,7 +40,7 @@ export const convertTableData = (
   });
 
   return {
-    rows: searchQueryData,
+    rows: searchQueryData[0],
     columns,
   };
 };
