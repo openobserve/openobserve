@@ -411,10 +411,10 @@ const removeQuery = (index: number) => {
           ].fields.latitude = null;
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.latitude = null;
+          ].fields.longitude = null;
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.latitude = null;
+          ].fields.weight = null;
       break;
        case "geomap":
         dashboardPanelData.data.queries[
