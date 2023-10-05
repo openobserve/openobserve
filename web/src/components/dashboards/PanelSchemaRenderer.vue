@@ -91,6 +91,8 @@ export default defineComponent({
         panelData.value = convertPanelData(panelSchema.value, data.value, store);
         errorDetail.value = "";
       } catch (error: any) {
+        console.log("error", error);
+        
         errorDetail.value = error.message;
       }
     });
@@ -106,7 +108,7 @@ export default defineComponent({
           : "No Data"; // Return "No Data" if there is no data
       } else {
         // The queryType is not 'promql'
-        return !data.value.length ? "No Data" : ""; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
+        return !data.value.length[0] ? "No Data" : ""; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
       }
     });
 
