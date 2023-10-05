@@ -20,7 +20,7 @@
       class="plotlycontainer"
       style="height: 100%; width: 100%"
     >
-    <ChartRenderer v-if="panelSchema.type != 'table'&& panelSchema.type != 'geomap'" :data="panelData" />
+    <ChartRenderer v-if="panelSchema.type != 'table'&& panelSchema.type != 'geomap'" :data="data.length && data[0].length ? panelData : {}" />
     <TableRenderer
     v-else-if="panelSchema.type == 'table'"
     :data="panelData"

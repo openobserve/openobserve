@@ -261,7 +261,6 @@ export const convertSQLData = (
 
         return {
           type: "category",
-          show: data.length,
           position: panelSchema.type == "h-bar" ? "left" : "bottom",
           name:
             index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
@@ -577,10 +576,6 @@ export const convertSQLData = (
         return seriesObj;
       });
       
-      //filter series object based on data
-      options.series = options.series.filter((it: any) => {
-        return it.data && it.data.length > 0;
-      });
       options.xAxis = [];
       options.yAxis = [];
       break;
@@ -617,10 +612,7 @@ export const convertSQLData = (
         };
         return seriesObj;
       });
-      //filter series object based on data
-      options.series = options.series.filter((it: any) => {
-        return it.data && it.data.length > 0;
-      });
+
       options.xAxis = [];
       options.yAxis = [];
       break;
