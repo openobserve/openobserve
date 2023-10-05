@@ -107,8 +107,8 @@ export default defineComponent({
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
       } else {
-        // The queryType is not 'promql'
-        return !data.value.length[0] ? "No Data" : ""; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
+        // The queryType is not 'promql'        
+        return data.value.length && data.value[0]?.length ? "" : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
       }
     });
 
