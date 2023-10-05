@@ -77,5 +77,3 @@ const userActivityTracking = () => {
     catchError,
   };
 };
-
-export default userActivityTracking;
