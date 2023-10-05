@@ -179,7 +179,9 @@ export default defineComponent({
             if (query) {
                 if (weight) {
                     const weightField = weight.aggregationFunction
-                        ? `${weight.aggregationFunction}(${weight.column})`
+                        ? (weight.aggregationFunction == 'count-distinct') 
+                            ? `count(distinct(${weight.column}))` 
+                            : `${weight.aggregationFunction}(${weight.column})`
                         : `${weight.column}`;
                     query += `, ${weightField} as ${weight.alias}`;
                 } 
