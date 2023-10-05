@@ -115,8 +115,8 @@ const useSqlSuggestions = () => {
       cursorIndex: 0,
     },
     popup: {
-      open: (val: string) => {},
-      close: (val: string) => {},
+      open: (val: string) => { },
+      close: (val: string) => { },
     },
   });
   const autoCompleteSuggestions: any = ref([]);
@@ -168,7 +168,7 @@ const useSqlSuggestions = () => {
     ) {
       const values = Array.from(
         autoCompleteData.value.fieldValues[sqlWhereClause.meta.label] ||
-          new Set()
+        new Set()
       ).map((item) => {
         return {
           label: item,
@@ -200,7 +200,7 @@ const useSqlSuggestions = () => {
       }
       const itemObj = {
         label: field.name,
-        kind: "Text",
+        kind: "Field",
         insertText: field.name,
         insertTextRules: "InsertAsSnippet",
       };
@@ -213,7 +213,7 @@ const useSqlSuggestions = () => {
     functions.forEach((field: any) => {
       const itemObj = {
         label: field.name,
-        kind: "Text",
+        kind: "Function",
         insertText: field.name + field.args,
         insertTextRules: "InsertAsSnippet",
       };
