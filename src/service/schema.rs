@@ -400,8 +400,8 @@ async fn handle_existing_schema(
             "{}/schema/lock/{org_id}/{stream_type}/{stream_name}",
             &CONFIG.sled.prefix
         );
-
-        let mut schema_locker = LOCAL_SCHEMA_LOCKER.write().await;
+        let local_map = LOCAL_SCHEMA_LOCKER.clone();
+        let mut schema_locker = local_map.write().await;
         let value = schema_locker
             .entry(key.clone())
             .or_insert_with(|| tokio::sync::RwLock::new(false));
@@ -548,12 +548,14 @@ async fn handle_new_schema(
                 &CONFIG.sled.prefix
             );
 
-            let mut schema_locker = LOCAL_SCHEMA_LOCKER.write().await;
+            let map = LOCAL_SCHEMA_LOCKER.clone(); // get a copy to read the value
+
+            let mut schema_locker = map.write().await; // lock it for writing a key for stream
             let value = schema_locker
                 .entry(key.clone())
-                .or_insert_with(|| tokio::sync::RwLock::new(false));
+                .or_insert_with(|| tokio::sync::RwLock::new(false)); // if stream schema doesn't exist, create a new key set value as false or for existing key get the value
 
-            let lock_acquired = value.write().await; // lock acquired
+            let lock_acquired = value.write().await; //  acquire lock for writing
             if !*lock_acquired {
                 log::info!(
                     "Acquired lock for stream {} as schema is empty",
