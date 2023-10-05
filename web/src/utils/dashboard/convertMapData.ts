@@ -29,7 +29,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     (query: any, index: any) => {
       const queryResult = mapData[index];
 
-      const queryField = queryResult.forEach((item: any) => {
+      const queryField = queryResult?.forEach((item: any) => {
         if (isNaN(item[query.fields.latitude.alias])) {
           throw new Error("All latitude values should be numeric value.");
         }
