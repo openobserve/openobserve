@@ -23,8 +23,8 @@
     </div>
   </div>
     <q-separator />
-    <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
+    <div class="q-w-md q-mx-lg">
+      <q-form @submit.stop="onSubmit.execute">
         <q-input
           v-model="scrapeIntereval"
           label="Scrape Interval *"
@@ -35,7 +35,7 @@
           outlined
           filled
           dense
-          :rules="[(val) => !!(val.trim()) || 'Scrape Interval is required']"
+          :rules="[(val) => !!val || 'Scrape Interval is required']"
           :lazy-rules="true"
         />
         <span>&nbsp;</span>
@@ -43,7 +43,6 @@
         <div class="flex justify-center q-mt-lg">
           <q-btn
             data-test="dashboard-add-submit"
-            :disable="scrapeIntereval.trim() === ''"
             :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
             class="q-mb-md text-bold no-border q-ml-md"
@@ -54,13 +53,13 @@
           />
         </div>
       </q-form>
-    </q-card-section>
-  </q-card>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onBeforeMount, ref } from "vue";
+import { defineComponent, onActivated, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -74,13 +73,14 @@ export default defineComponent({
     const q = useQuasar();
     const store = useStore();
     const router: any = useRouter();
-    const scrapeIntereval = ref(store.state.organizationData.scrapeInterval);
-
+    const scrapeIntereval = ref(JSON.parse(JSON.stringify(store.state.organizationData.organizationSettings.scrapeInterval)));
+    
+    onActivated(() => {
+      scrapeIntereval.value = JSON.parse(JSON.stringify(store.state.organizationData.organizationSettings.scrapeInterval));
+    });
+    
     const onSubmit = useLoading(async () => {
-      await store.dispatch("updateOrganization", {
-        ...store.state.organizationData,
-        scrapeInterval: scrapeIntereval.value,
-      });
+      await store.dispatch("setScrapeInterval", scrapeIntereval.value);
     });
 
     return {

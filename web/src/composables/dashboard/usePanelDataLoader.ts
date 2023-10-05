@@ -88,8 +88,39 @@ export const usePanelDataLoader = (
     // Check if the query type is "promql"
     if (panelSchema.value.queryType == "promql") {
 
+      //fixed variables value calculations
+      //scrape interval by default 15 seconds
+      const scrapeInterval = store.state.organizationData.organizationSettings.scrapeInterval ?? 15;
+
+      // timestamp in seconds / chart panel width
+      const __interval = Math.floor((endISOTimestamp - startISOTimestamp)/(1000000*(chartPanelRef.value?.offsetWidth ?? 1000)));
+
+      //max(interval + scrapeInterval, 4 * scrapeInterval)
+      const __rate_interval = Math.max( __interval + scrapeInterval , 4 * scrapeInterval);      
+
+      const fixedVariables = [
+        {
+          name: "__interval",
+          value: `${__interval}s`
+        },
+        {
+          name: "__rate_interval",
+          value: `${__rate_interval <= 0 ? 1 : __rate_interval}s`
+        }
+      ]
+
       // Iterate through each query in the panel schema
       const queryPromises = panelSchema.value.queries?.map(async (it: any) => {
+        
+        // replace fixed variables with its values
+        fixedVariables?.forEach((variable: any) => {
+          const variableName = `$${variable.name}`;
+          const variableValue = variable.value;
+          it.query = it.query.replaceAll(variableName, variableValue);
+        });      
+
+        console.log(chartPanelRef.value?.offsetWidth,it.query , "query");
+        
 
         // Call the metrics_query_range API
         return queryService

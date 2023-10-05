@@ -37,6 +37,9 @@ const organizationObj = {
   functions: [],
   streams: {},
   folders: [],
+  organizationSettings: {
+    scrapeInterval: 15
+  }
 };
 
 export default createStore({
@@ -104,6 +107,9 @@ export default createStore({
     // },
     setAllDashboardList(state, payload) {
       state.organizationData.allDashboardList = payload;
+    },
+    setOrganizationSettings(state, payload) {
+      state.organizationData.organizationSettings = payload;
     },
     setFunctions(state, payload) {
       state.organizationData.functions = payload;
@@ -181,6 +187,9 @@ export default createStore({
     // },
     setAllDashboardList(context, payload) {
       context.commit("setAllDashboardList", payload);
+    },
+    setOrganizationSettings(context, payload) {
+      context.commit("setOrganizationSettings", payload);
     },
     setFolders(context, payload) {
       context.commit("setFolders", payload);

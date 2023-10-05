@@ -296,6 +296,7 @@ import {
   outlinedFormatListBulleted,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
+import organizations from "@/services/organizations";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -763,9 +764,19 @@ export default defineComponent({
         this.setSelectedOrganization();
       }, 500);
     },
-    changeOrganizationIdentifier() {
+    async changeOrganizationIdentifier() {
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
+      
+      //get organizations settings
+      const orgSettings: any = await organizations.get_organization_settings(
+        this.store.state?.selectedOrganization?.identifier
+      );
+
+      //set settings in store
+      this.store.dispatch("setOrganizationSettings",({
+        scrapeInterval: orgSettings?.data?.scrape_interval ?? 15,
+      }));
       setTimeout(() => {
         this.redirectToParentRoute(this.$route.matched);
         // this.setSelectedOrganization();
