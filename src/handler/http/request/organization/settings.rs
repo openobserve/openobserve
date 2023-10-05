@@ -26,7 +26,7 @@ use std::io::Error;
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
-    operation_id = "OrganizationSetting",
+    operation_id = "OrganizationSettingCreate",
     security(
         ("Authorization"= [])
     ),
@@ -44,11 +44,11 @@ async fn create(
     path: web::Path<String>,
     settings: web::Json<OrganizationSetting>,
 ) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
     if settings.scrape_interval == 0 {
         return bad_request("scrape_interval should be a positive value");
     }
 
+    let org_id = path.into_inner();
     match set_org_setting(&org_id, &settings).await {
         Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
         Err(e) => bad_request(e.to_string().as_str()),
@@ -59,7 +59,7 @@ async fn create(
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
-    operation_id = "OrganizationSetting",
+    operation_id = "OrganizationSettingGet",
     security(
         ("Authorization"= [])
     ),
@@ -74,8 +74,8 @@ async fn create(
 #[get("/{org_id}/settings")]
 async fn get(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let settings = match get_org_setting(&org_id).await {
-        Ok(settings) => settings,
+    let org_settings = match get_org_setting(&org_id).await {
+        Ok(s) => s,
         Err(e) => {
             let err = e.to_string();
             let expected_err = format!("DbError# key /organization/{org_id} does not exist");
@@ -90,7 +90,7 @@ async fn get(path: web::Path<String>) -> Result<HttpResponse, Error> {
             return bad_request(&err);
         }
     };
-    let data: OrganizationSetting = json::from_slice(&settings).unwrap();
+    let data: OrganizationSetting = json::from_slice(&org_settings).unwrap();
     Ok(HttpResponse::Ok().json(OrganizationSettingResponse { data }))
 }
 

@@ -668,6 +668,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    // If the default scrape interval is less than 5s, raise an error
+    if cfg.common.default_scrape_interval < 5 {
+        return Err(anyhow::anyhow!(
+            "Default scrape interval can not be set to lesser than 5s ."
+        ));
+    }
     Ok(())
 }
 
