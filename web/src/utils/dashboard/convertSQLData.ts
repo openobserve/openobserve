@@ -261,6 +261,7 @@ export const convertSQLData = (
 
         return {
           type: "category",
+          show: data.length,
           position: panelSchema.type == "h-bar" ? "left" : "bottom",
           name:
             index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
@@ -384,7 +385,7 @@ export const convertSQLData = (
         options.xAxis[0].nameGap = 20;
 
         // get the unique value of the first xAxis's key
-        options.xAxis[0].data = Array.from(new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]])));
+        options.xAxis[0].data = Array.from(new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]])));
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
         
         // stacked with xAxis's second value
@@ -575,6 +576,11 @@ export const convertSQLData = (
         };
         return seriesObj;
       });
+      
+      //filter series object based on data
+      options.series = options.series.filter((it: any) => {
+        return it.data && it.data.length > 0;
+      });
       options.xAxis = [];
       options.yAxis = [];
       break;
@@ -610,6 +616,10 @@ export const convertSQLData = (
           },
         };
         return seriesObj;
+      });
+      //filter series object based on data
+      options.series = options.series.filter((it: any) => {
+        return it.data && it.data.length > 0;
       });
       options.xAxis = [];
       options.yAxis = [];
@@ -648,7 +658,7 @@ export const convertSQLData = (
       const key1 = xAxisKeys[1];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key1]))
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
@@ -1029,6 +1039,15 @@ export const convertSQLData = (
     }
   }
 
+  //check if is there any data else filter out axis or series data
+  options.series = options.series.filter((it: any) => it.data.length);
+  if(panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"){
+    options.xAxis = options.series.length ? options.xAxis : {};
+  }else{
+    options.yAxis = options.series.length ? options.yAxis : {};
+  }
+  
+  
   // extras will be used to return other data to chart renderer
   // e.g. setCurrentSeriesIndex to set the current series index which is hovered
   return {
