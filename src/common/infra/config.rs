@@ -118,7 +118,7 @@ pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLoc
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
-pub static LOCAL_SCHEMA_LOCKER: Lazy<RwAHashMap<String, tokio::sync::RwLock<bool>>> =
+pub static LOCAL_SCHEMA_LOCKER: Lazy<Arc<RwAHashMap<String, tokio::sync::RwLock<bool>>>> =
     Lazy::new(|| Arc::new(Default::default)());
 
 #[derive(EnvConfig)]
@@ -303,9 +303,9 @@ pub struct Limit {
     pub req_payload_limit: usize,
     #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 32)] // MB
     pub max_file_size_on_disk: u64,
-    #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
+    #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 6000)] // seconds
     pub max_file_retention_time: u64,
-    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 60)] // seconds
+    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 6000)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
