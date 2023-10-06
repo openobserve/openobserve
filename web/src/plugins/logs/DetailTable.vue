@@ -14,7 +14,10 @@
 -->
 
 <template>
-  <q-card class="column full-height no-wrap searchdetaildialog" data-test="dialog-box">
+  <q-card
+    class="column full-height no-wrap searchdetaildialog"
+    data-test="dialog-box"
+  >
     <q-card-section class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap">
         <div class="col">
@@ -23,7 +26,13 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup round flat icon="cancel" data-test="close-dialog"/>
+          <q-btn
+            v-close-popup
+            round
+            flat
+            icon="cancel"
+            data-test="close-dialog"
+          />
         </div>
       </div>
     </q-card-section>
@@ -219,7 +228,6 @@
               class="text-bold"
               text-color="light-text"
               no-caps
-              :disabled="currentIndex >= totalLength - 1"
               outline
               label="Search Around"
               @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
