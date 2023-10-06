@@ -282,7 +282,13 @@ async fn upload_file(
         if CONFIG.common.traces_bloom_filter_enabled && stream_type == StreamType::Traces {
             Some(vec![COLUMN_TRACE_ID])
         } else {
-            None
+            Some(
+                CONFIG
+                    .common
+                    .bloom_filter_default_columns
+                    .split(',')
+                    .collect::<Vec<&str>>(),
+            )
         };
     let mut writer = new_parquet_writer(
         &mut buf_parquet,

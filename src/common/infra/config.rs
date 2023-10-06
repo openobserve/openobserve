@@ -257,6 +257,8 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_TRACES_BLOOM_FILTER_ENABLED", default = false)]
     pub traces_bloom_filter_enabled: bool,
+    #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_COLUMNS", default = "")]
+    pub bloom_filter_default_columns: String,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
@@ -425,7 +427,7 @@ pub struct Etcd {
     pub prefix: String,
     #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
-    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 10)]
+    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 5)]
     pub command_timeout: u64,
     #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
