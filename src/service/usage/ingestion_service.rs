@@ -13,6 +13,9 @@
 // limitations under the License.
 
 use anyhow::Error;
+use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
+use rand::SeedableRng;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
 use crate::common::infra::cluster;
@@ -25,12 +28,15 @@ pub async fn ingest(
 ) -> Result<UsageResponse, Error> {
     let mut nodes = cluster::get_cached_online_ingester_nodes().unwrap();
     nodes.sort_by_key(|x| x.id);
-    let nodes = nodes;
 
     if nodes.is_empty() {
         log::error!("no online ingester node found");
         return Err(Error::msg("no online ingester node found"));
     }
+
+    // random nodes
+    let mut rng = StdRng::from_entropy();
+    nodes.shuffle(&mut rng);
 
     let node = nodes.first();
 
@@ -86,4 +92,26 @@ pub async fn ingest(
         }
     };
     Ok(res)
+}
+
+#[cfg(test)]
+mod test {
+    use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
+
+    #[test]
+    fn test_ingest() {
+        let mut nodes = vec![1, 2];
+        let mut count_1 = 0;
+        let mut count_2 = 0;
+        for _ in 0..10 {
+            let mut rng = StdRng::from_entropy();
+            nodes.shuffle(&mut rng);
+            match nodes.first() {
+                Some(1) => count_1 += 1,
+                Some(2) => count_2 += 1,
+                _ => {}
+            }
+        }
+        println!("{:?} => {:?} ", count_1, count_2)
+    }
 }
