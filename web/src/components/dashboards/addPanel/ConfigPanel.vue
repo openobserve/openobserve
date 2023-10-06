@@ -39,7 +39,7 @@
     <div class="space"></div>
 
     <q-select v-if="dashboardPanelData.data.type == 'geomap'" outlined
-        v-model="dashboardPanelData.data.config.basemap.type" :options="basemapTypeOptions" dense
+        v-model="dashboardPanelData.data.config.base_map.type" :options="basemapTypeOptions" dense
         label="Base Map" class="showLabelOnTop" stack-label emit-value
         :display-value="'OpenStreetMap'">
       </q-select>
@@ -48,10 +48,10 @@
       <div v-if="dashboardPanelData.data.type == 'geomap'">
         <span>Initial View:</span>
         <div class="row">
-          <q-input  v-model.number="dashboardPanelData.data.config.mapview.lat" label="Latitude" color="input-border"
+          <q-input  v-model.number="dashboardPanelData.data.config.map_view.lat" label="Latitude" color="input-border"
             bg-color="input-bg" class="col-6 q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
           </q-input>
-          <q-input v-model.number="dashboardPanelData.data.config.mapview.lon" label="Longitude" color="input-border"
+          <q-input v-model.number="dashboardPanelData.data.config.map_view.lng" label="Longitude" color="input-border"
             bg-color="input-bg" class="col-6 q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
           </q-input>
         </div>

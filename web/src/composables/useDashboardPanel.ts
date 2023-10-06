@@ -44,13 +44,13 @@ const getDefaultDashboardPanelData: any = () => ({
       legends_position: null,
       unit: null,
       unit_custom: null,
-      basemap: {
+      base_map: {
         type: "osm",
       },
-      mapview: {
+      map_view: {
         zoom: 1,
         lat: 0,
-        lon: 0,
+        lng: 0,
       }
     },
     queryType: "sql",
