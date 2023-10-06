@@ -20,7 +20,6 @@ use object_store::{
     ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
 };
 use std::ops::Range;
-use futures::{StreamExt, TryStreamExt};
 use tokio::io::AsyncWrite;
 
 use super::{format_key, CONCURRENT_REQUESTS};
