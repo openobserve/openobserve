@@ -28,8 +28,14 @@ export const convertPromQLData = (
   searchQueryData: any,
   store: any
 ) => {
+  
   // if no data than return it
-  if(!searchQueryData) {
+  if (
+    !Array.isArray(searchQueryData) ||
+    searchQueryData.length === 0 ||
+    !searchQueryData[0] ||
+    !panelSchema
+  ) {
     return { options: null };
   }
 

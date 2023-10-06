@@ -87,13 +87,16 @@ export default defineComponent({
     // when we get the new data from the apis, convert the data to render the panel
     watch(data, async () => {
       // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-      try {
-        panelData.value = convertPanelData(panelSchema.value, data.value, store);
-        errorDetail.value = "";
-      } catch (error: any) {
-        console.log("error", error);
-        
-        errorDetail.value = error.message;
+      if (!errorDetail.value) {
+
+        try {
+          panelData.value = convertPanelData(panelSchema.value, data.value, store);
+          errorDetail.value = "";
+        } catch (error: any) {
+          console.log("error", error);
+
+          errorDetail.value = error.message;
+        }
       }
     });
 
@@ -115,7 +118,7 @@ export default defineComponent({
     // when the error changes, emit the error
     watch(errorDetail, () => {
       //check if there is an error message or not
-      if(!errorDetail.value)return;
+      if (!errorDetail.value) return;
       emit("error", errorDetail);
     });
 
