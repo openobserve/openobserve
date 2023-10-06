@@ -36,13 +36,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(60));
     interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
         if let Err(e) = update_metadata_metrics().await {
             log::error!("Error update metadata metrics: {}", e);
         }
         if let Err(e) = update_storage_metrics().await {
             log::error!("Error update storage metrics: {}", e);
         }
+        interval.tick().await;
     }
 }
 
