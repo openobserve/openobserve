@@ -135,12 +135,20 @@ const getTimeInSecondsBasedOnUnit = (seconds: any, unit: any) => {
 }
 
 const formateRateInterval = (interval: any) => {
+  let formattedStr = ""
   const days = Math.floor(interval / (3600 * 24));
-  const hours = Math.floor((interval % (3600 * 24)) / 3600);
-  const minutes = Math.floor((interval % 3600) / 60);
-  const remainingSeconds = interval % 60;
+  if( days > 0 ) formattedStr += days.toString() + "d";
 
-  return `${days.toString()}d${hours.toString()}h${minutes.toString()}m${remainingSeconds.toString()}s`;
+  const hours = Math.floor((interval % (3600 * 24)) / 3600);
+  if( hours > 0 ) formattedStr += hours.toString() + "h";
+
+  const minutes = Math.floor((interval % 3600) / 60);
+  if( minutes > 0 ) formattedStr += minutes.toString() + "m";
+
+  const remainingSeconds = interval % 60;
+  if( remainingSeconds > 0 ) formattedStr += remainingSeconds.toString() + "s";
+
+  return formattedStr;
 }
 
 export const usePanelDataLoader = (
@@ -363,7 +371,7 @@ export const usePanelDataLoader = (
     let __interval = ((endISOTimestamp - startISOTimestamp)/(chartPanelRef.value?.offsetWidth ?? 1000))/1000;
 
     // if less than 1, set it to 1
-    // minimum will be 1 millisecond
+    // minimum will be 15000 millisecond
     __interval = Math.max(15000, __interval);
     
     // round interval
