@@ -21,6 +21,8 @@ RUN rustc --version && sccache --version
 
 WORKDIR /app
 COPY . /app
+COPY ../arrow-rs /arrow-rs
+COPY ../arrow-datafusion /arrow-datafusion
 COPY --from=webBuilder /web/dist web/dist
 RUN mkdir -p /app/target/release/
 
