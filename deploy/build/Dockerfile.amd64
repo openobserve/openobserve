@@ -23,6 +23,7 @@ WORKDIR /app
 COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 RUN mkdir -p /app/target/release/
+RUN pwd
 RUN ls -la /
 RUN ls -la /arrow-rs/
 
