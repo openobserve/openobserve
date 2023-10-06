@@ -77,25 +77,19 @@ export const convertPromQLData = (
     },
     tooltip: {
       show: true,
-      trigger: "axis",
+      trigger: "item",
       textStyle: {
         fontSize: 12,
       },
       formatter: function (name: any) {
-        if (name.length == 0) return "";
-
-        const date = new Date(name[0].data[0]);
-
-        let hoverText = name.map((it: any) => {
-          return `${it.marker} ${it.seriesName} : ${formatUnitValue(
-            getUnitValue(
-              it.data[1],
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom
-            )
-          )}`;
-        });
-        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+        const date = new Date(name.value[0]);
+        return `${formatDate(date)} <br/> ${name?.marker} ${name?.seriesName} : ${formatUnitValue(
+              getUnitValue(
+                name?.value[1],
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom
+              )
+            )}`;
       },
       axisPointer: {
         show: true,
@@ -331,7 +325,8 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "line",
         emphasis: { focus: "series" },
         smooth: true,
-        showSymbol: false,
+        // showSymbol: false,
+        symbolSize:1
       };
     case "scatter":
       return {
@@ -361,7 +356,8 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: { focus: "series" },
         smooth: true,
         areaStyle: {},
-        showSymbol: false,
+        symbolSize:1,
+        // showSymbol: false,
       };
     case "stacked":
       return {
@@ -374,7 +370,8 @@ const getPropsByChartTypeForSeries = (type: string) => {
         smooth: true,
         stack: "Total",
         areaStyle: {},
-        showSymbol: false,
+        // showSymbol: false,
+        symbolSize:1,
         emphasis: {
           focus: "series",
         },

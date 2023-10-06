@@ -333,6 +333,30 @@ pub static STORAGE_RECORDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static STORAGE_WRITE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "storage_write_requests",
+            "Storage write requests. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream", "stream_type"],
+    )
+    .expect("Metric created")
+});
+pub static STORAGE_READ_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "storage_read_requests",
+            "Storage read requests. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream", "stream_type"],
+    )
+    .expect("Metric created")
+});
 pub static STORAGE_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -558,7 +582,12 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(STORAGE_TIME.clone()))
         .expect("Metric registered");
-
+    registry
+        .register(Box::new(STORAGE_READ_REQUESTS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(STORAGE_WRITE_REQUESTS.clone()))
+        .expect("Metric registered");
     // metadata stats
     registry
         .register(Box::new(META_STORAGE_BYTES.clone()))

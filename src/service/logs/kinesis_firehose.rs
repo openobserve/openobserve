@@ -35,7 +35,7 @@ use crate::common::{
     },
 };
 use crate::service::{
-    db, format_stream_name, ingestion::write_file, usage::report_request_usage_stats,
+    db, get_formatted_stream_name, ingestion::write_file, usage::report_request_usage_stats,
 };
 
 pub async fn process(
@@ -45,7 +45,12 @@ pub async fn process(
     thread_id: usize,
 ) -> Result<KinesisFHIngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
-    let stream_name = &format_stream_name(in_stream_name);
+    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let stream_name = &get_formatted_stream_name(
+        StreamParams::new(org_id, in_stream_name, StreamType::Logs),
+        &mut stream_schema_map,
+    )
+    .await;
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
@@ -61,7 +66,6 @@ pub async fn process(
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<Trigger> = None;

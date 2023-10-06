@@ -48,6 +48,8 @@ pub struct Node {
     pub cpu_num: u64,
     pub status: NodeStatus,
     #[serde(default)]
+    pub scheduled: bool,
+    #[serde(default)]
     pub broadcasted: bool,
 }
 
@@ -200,6 +202,7 @@ pub async fn register() -> Result<()> {
         role: LOCAL_NODE_ROLE.clone(),
         cpu_num: CONFIG.limit.cpu_num as u64,
         status: NodeStatus::Prepare,
+        scheduled: true,
         broadcasted: false,
     };
     // cache local node
@@ -248,6 +251,7 @@ pub async fn set_online() -> Result<()> {
             role: LOCAL_NODE_ROLE.clone(),
             cpu_num: CONFIG.limit.cpu_num as u64,
             status: NodeStatus::Online,
+            scheduled: true,
             broadcasted: false,
         },
     };
@@ -300,23 +304,29 @@ pub fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
 
 #[inline(always)]
 pub fn get_cached_online_nodes() -> Option<Vec<Node>> {
-    get_cached_nodes(|node| node.status == NodeStatus::Online)
+    get_cached_nodes(|node| node.status == NodeStatus::Online && node.scheduled)
 }
 
 #[inline]
 pub fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
-    get_cached_nodes(|node| node.status == NodeStatus::Online && is_ingester(&node.role))
+    get_cached_nodes(|node| {
+        node.status == NodeStatus::Online && node.scheduled && is_ingester(&node.role)
+    })
 }
 
 #[inline]
 pub fn get_cached_online_querier_nodes() -> Option<Vec<Node>> {
-    get_cached_nodes(|node| node.status == NodeStatus::Online && is_querier(&node.role))
+    get_cached_nodes(|node| {
+        node.status == NodeStatus::Online && node.scheduled && is_querier(&node.role)
+    })
 }
 
 #[inline(always)]
 pub fn get_cached_online_query_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| {
-        node.status == NodeStatus::Online && (is_querier(&node.role) || is_ingester(&node.role))
+        node.status == NodeStatus::Online
+            && node.scheduled
+            && (is_querier(&node.role) || is_ingester(&node.role))
     })
 }
 
@@ -422,6 +432,7 @@ pub fn load_local_mode_node() -> Node {
         role: [Role::All].to_vec(),
         cpu_num: CONFIG.limit.cpu_num as u64,
         status: NodeStatus::Online,
+        scheduled: true,
         broadcasted: false,
     }
 }

@@ -146,7 +146,8 @@ import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
-import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import useLogs from "@/composables/useLogs";
 
 export default defineComponent({
   name: "functionList",
@@ -168,6 +169,7 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const { searchObj } = useLogs();
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -232,6 +234,8 @@ export default defineComponent({
               actions: "",
             };
           });
+
+          searchObj.data.transforms = jsTransforms.value;
 
           dismiss();
         })

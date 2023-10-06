@@ -35,8 +35,9 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
     }
     let nodes = if node_uuid.is_none() {
         cluster::get_cached_nodes(|node| {
-            (node.status == cluster::NodeStatus::Prepare
-                || node.status == cluster::NodeStatus::Online)
+            node.scheduled
+                && (node.status == cluster::NodeStatus::Prepare
+                    || node.status == cluster::NodeStatus::Online)
                 && (cluster::is_querier(&node.role) || cluster::is_compactor(&node.role))
         })
         .unwrap()
