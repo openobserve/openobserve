@@ -20,6 +20,8 @@ phases:
       # download dependencies
       - git clone https://github.com/openobserve/arrow-rs.git
       - git clone https://github.com/openobserve/arrow-datafusion.git
+      - cd arrow-rs && git checkout 47-read-bloomfilter && cd ..
+      - cd arrow-datafusion && git checkout 47-read-bloomfilter && cd ..
 
   build:
     commands:
