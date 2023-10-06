@@ -181,10 +181,8 @@ pub struct BaseMap {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct MapView {
-    #[serde(rename = "type")]
     pub zoom: f64,
     pub lat: f64,
-    pub long: f64,
+    pub lng: f64,
 }
