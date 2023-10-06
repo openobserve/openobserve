@@ -664,7 +664,6 @@ export default defineComponent({
     }
 
     const redirectToParentRoute = (machedRoutes: any) => {
-      store.dispatch("resetOrganizationData", {});
       if (router.currentRoute.value.path.indexOf("/dashboards/") > -1) {
         router.push({
           name: "dashboards",
@@ -737,6 +736,7 @@ export default defineComponent({
     },
     changeOrganizationIdentifier() {
       this.store.dispatch("setOrganizationPasscode", "");
+      this.store.dispatch("resetOrganizationData", {});
       setTimeout(() => {
         this.redirectToParentRoute(this.$route.matched);
         // this.setSelectedOrganization();

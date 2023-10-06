@@ -152,6 +152,9 @@
                       filled
                       mask="time"
                       :rules="['time']"
+                      @blur="
+                        resetTime(selectedTime.startTime, selectedTime.endTime)
+                      "
                     >
                       <template #append>
                         <q-icon name="access_time" class="cursor-pointer">
@@ -181,6 +184,9 @@
                       filled
                       mask="time"
                       :rules="['time']"
+                      @blur="
+                        resetTime(selectedTime.startTime, selectedTime.endTime)
+                      "
                     >
                       <template #append>
                         <q-icon name="access_time" class="cursor-pointer">
@@ -302,6 +308,7 @@ export default defineComponent({
     onMounted(() => {
       // updateDisplayValue();
       try {
+        resetTime("", "");
         selectedType.value = props.defaultType;
         setAbsoluteTime(
           props.defaultAbsoluteTime?.startTime,
@@ -383,13 +390,24 @@ export default defineComponent({
       }
     };
 
+    const resetTime = (startTime, endTime) => {
+      if (!startTime || !endTime) {
+        var dateString = new Date().toLocaleDateString("en-ZA");
+        selectedDate.value.from = dateString;
+        selectedDate.value.to = dateString;
+        if (!startTime) selectedTime.value.startTime = "00:00";
+
+        if (!endTime) selectedTime.value.endTime = "23:59";
+        return;
+      }
+      return;
+    };
+
     const setAbsoluteTime = (startTime, endTime) => {
       if (!startTime || !endTime) {
         var dateString = new Date().toLocaleDateString("en-ZA");
         selectedDate.value.from = dateString;
         selectedDate.value.to = dateString;
-        selectedTime.value.startTime = "00:00";
-        selectedTime.value.endTime = "23:59";
         return;
       }
 
@@ -544,6 +562,7 @@ export default defineComponent({
       displayValue,
       refresh,
       dateLocale,
+      resetTime,
     };
   },
 });

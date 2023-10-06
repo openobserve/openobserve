@@ -36,7 +36,7 @@ use crate::common::{
 };
 use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
-    db, format_stream_name,
+    db, get_formatted_stream_name,
     ingestion::{grpc::get_val_for_attr, write_file},
     usage::report_request_usage_stats,
 };
@@ -93,15 +93,20 @@ pub async fn logs_json_handler(
     }
 
     let start = std::time::Instant::now();
-
+    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let stream_name = match in_stream_name {
-        Some(name) => format_stream_name(name),
+        Some(name) => {
+            get_formatted_stream_name(
+                StreamParams::new(org_id, name, StreamType::Logs),
+                &mut stream_schema_map,
+            )
+            .await
+        }
         None => "default".to_owned(),
     };
 
     let stream_name = &stream_name;
 
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<Trigger> = None;
