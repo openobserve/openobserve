@@ -48,14 +48,7 @@ pub async fn list(prefix: &str) -> Result<Vec<String>, anyhow::Error> {
     let files = DEFAULT
         .list(Some(&prefix.into()))
         .await?
-        .map_ok(|meta| {
-            let file = meta.location.to_string();
-            let columns = file.split('/').collect::<Vec<&str>>();
-            metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[3], columns[2]])
-                .inc();
-            file
-        })
+        .map_ok(|meta| meta.location.to_string())
         .try_collect::<Vec<String>>()
         .await
         .expect("Error listing files");

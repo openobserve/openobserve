@@ -341,11 +341,7 @@ pub static STORAGE_WRITE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[
-            "organization",
-            "stream",
-            "stream_type",
-        ],
+        &["organization", "stream", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -355,15 +351,11 @@ pub static STORAGE_READ_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
             "storage_read_requests",
             "Storage read requests. ".to_owned() + HELP_SUFFIX,
         )
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
-        &[
-            "organization",
-            "stream",
-            "stream_type",
-        ],
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream", "stream_type"],
     )
-        .expect("Metric created")
+    .expect("Metric created")
 });
 pub static STORAGE_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -371,11 +363,11 @@ pub static STORAGE_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
             "storage_write_bytes",
             "Storage write bytes. ".to_owned() + HELP_SUFFIX,
         )
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
     )
-        .expect("Metric created")
+    .expect("Metric created")
 });
 pub static STORAGE_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
