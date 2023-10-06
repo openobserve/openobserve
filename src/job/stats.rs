@@ -21,13 +21,13 @@ use crate::common::infra::{
 use crate::service::{compact::stats::update_stats_from_file_list, db, usage};
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    tokio::task::spawn(async move { usage_report_stats().await });
+    //tokio::task::spawn(async move { usage_report_stats().await });
     tokio::task::spawn(async move { file_list_update_stats().await });
     tokio::task::spawn(async move { cache_stream_stats().await });
     Ok(())
 }
 
-async fn usage_report_stats() -> Result<(), anyhow::Error> {
+async fn _usage_report_stats() -> Result<(), anyhow::Error> {
     if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) || !CONFIG.common.usage_enabled {
         return Ok(());
     }
