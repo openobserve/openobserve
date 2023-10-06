@@ -454,7 +454,7 @@ export default defineComponent({
       parser,
       searchObj,
       searchBarRef,
-      splitterModel: ref(17),
+      splitterModel: ref(14),
       // loadPageData,
       getQueryData,
       searchResultRef,
@@ -508,6 +508,9 @@ export default defineComponent({
     },
     fullSQLMode() {
       return this.searchObj.meta.sqlMode;
+    },
+    refreshHistogram() {
+      return this.searchObj.meta.histogramDirtyFlag;
     },
   },
   watch: {
@@ -580,6 +583,10 @@ export default defineComponent({
     },
     fullSQLMode(newVal) {
       this.setQuery(newVal);
+    },
+    refreshHistogram() {
+      this.searchObj.meta.histogramDirtyFlag = false;
+      this.refreshHistogramChart();
     },
   },
 });

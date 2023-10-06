@@ -231,7 +231,11 @@ impl Manager {
 
     pub async fn check_in_use(&self, stream: StreamParams, file_name: &str) -> bool {
         let columns = file_name.split('/').collect::<Vec<&str>>();
-        let thread_id: usize = columns.first().unwrap().parse().unwrap();
+        let thread_id: usize = columns
+            .first()
+            .unwrap()
+            .parse()
+            .expect(format!("need a thread id, but the file is: {file_name}").as_str());
         let key = columns[1..columns.len() - 1].join("/");
         if let Some(file) = self.get(thread_id, stream, &key).await {
             if file.name() == file_name {

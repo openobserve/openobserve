@@ -72,7 +72,7 @@
     "@vue/test-utils": "^2.0.2",
     "@vue/tsconfig": "^0.1.3",
     "c8": "^7.11.3",
-    "cypress": "^10.3.0",
+    "cypress": "^13.3.0",
     "cypress-localstorage-commands": "^2.2.1",
     "dotenv": "^16.0.3",
     "eslint": "^8.5.0",

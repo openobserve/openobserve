@@ -36,7 +36,7 @@ use crate::common::{
     },
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
-use crate::service::{db, format_stream_name, ingestion::write_file};
+use crate::service::{db, get_formatted_stream_name, ingestion::write_file};
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     let start = std::time::Instant::now();
@@ -59,7 +59,12 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
 
-    let stream_name = &format_stream_name(in_stream_name);
+    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let stream_name = &get_formatted_stream_name(
+        StreamParams::new(org_id, in_stream_name, StreamType::Logs),
+        &mut stream_schema_map,
+    )
+    .await;
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -79,7 +84,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
         );
     }
 
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
 
