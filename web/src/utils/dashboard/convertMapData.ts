@@ -24,6 +24,14 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
 
   console.log("mapData", mapData);
 
+  //if no latitude and longitude than return it 
+  if (
+    !panelSchema.queries[0]?.fields?.latitude?.alias ||
+    !panelSchema.queries[0]?.fields?.longitude?.alias
+  ) {
+    return { options: null };
+  }
+
   // validate if response is not at number
   const nonNumericValues = panelSchema.queries.forEach(
     (query: any, index: any) => {
@@ -67,6 +75,11 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       trigger: "item",
       showDelay: 0,
       transitionDuration: 0.2,
+      textStyle: {
+        fontSize: 10,
+      },
+      padding: 6,
+      backgroundColor: "rgba(255,255,255,0.8)",
     },
     visualMap: {
       left: "right",
