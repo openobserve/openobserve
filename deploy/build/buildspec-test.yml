@@ -17,6 +17,10 @@ phases:
       - export RUSTFLAGS='-C target-cpu=native'
       - rm -rf ~/.cargo/registry
 
+      # download dependencies
+      - git clone https://github.com/openobserve/arrow-rs.git
+      - git clone https://github.com/openobserve/arrow-datafusion.git
+
   build:
     commands:
       # Increase swap file size

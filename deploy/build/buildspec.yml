@@ -25,6 +25,10 @@ phases:
       - mv buildx-v0.10.4.linux-amd64 ~/.docker/cli-plugins/docker-buildx
       - docker buildx install
 
+      # download dependencies
+      - git clone https://github.com/openobserve/arrow-rs.git
+      - git clone https://github.com/openobserve/arrow-datafusion.git
+
       # build for sccache image
       # - docker build -t public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64 -f deploy/build/Dockerfile.sccache.amd64 .
       # - docker push public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64
