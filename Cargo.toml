@@ -79,7 +79,7 @@ datafusion = { path="../arrow-datafusion/datafusion/core", version = "31", featu
 arrow = { path="../arrow-rs/arrow", version = "47", features = ["simd", "ipc_compression"] }
 arrow-schema = { path="../arrow-rs/arrow-schema", version = "47", features = ["serde"] }
 parquet = { path="../arrow-rs/parquet", version = "47", features = ["arrow", "async"] }
-object_store = { path="../arrow-rs/object_store", version = "0.7", features = ["aws", "azure", "gcp"] }
+object_store = { version = "0.7", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"

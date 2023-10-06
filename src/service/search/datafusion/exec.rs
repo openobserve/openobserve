@@ -876,7 +876,7 @@ pub async fn merge_parquet_files(
     // query data
     let runtime_env = create_runtime_env()?;
     let session_config = create_session_config();
-    let ctx = SessionContext::with_config_rt(session_config, Arc::new(runtime_env));
+    let ctx = SessionContext::new_with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -996,7 +996,7 @@ pub fn create_runtime_env() -> Result<RuntimeEnv> {
 pub fn prepare_datafusion_context() -> Result<SessionContext, DataFusionError> {
     let runtime_env = create_runtime_env()?;
     let session_config = create_session_config();
-    Ok(SessionContext::with_config_rt(
+    Ok(SessionContext::new_with_config_rt(
         session_config,
         Arc::new(runtime_env),
     ))
