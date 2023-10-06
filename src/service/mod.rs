@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap;
+use arrow_schema::Schema;
 use once_cell::sync::Lazy;
 use regex::{self, Regex};
+
+use crate::common::meta::stream::StreamParams;
 
 pub mod alert_manager;
 pub mod alerts;
@@ -56,6 +60,32 @@ pub fn format_partition_key(input: &str) -> String {
         }
     }
     output
+}
+
+// format stream name
+pub async fn get_formatted_stream_name(
+    params: StreamParams,
+    schema_map: &mut AHashMap<String, Schema>,
+) -> String {
+    let mut stream_name = params.stream_name.to_string();
+
+    let schema = db::schema::get(&params.org_id, &stream_name, params.stream_type)
+        .await
+        .unwrap();
+
+    if schema.fields().is_empty() {
+        stream_name = RE_CORRECT_STREAM_NAME
+            .replace_all(&stream_name, "_")
+            .to_string();
+        let corrected_schema = db::schema::get(&params.org_id, &stream_name, params.stream_type)
+            .await
+            .unwrap();
+        schema_map.insert(stream_name.to_owned(), corrected_schema);
+    } else {
+        schema_map.insert(stream_name.to_owned(), schema);
+    }
+
+    stream_name
 }
 
 // format stream name

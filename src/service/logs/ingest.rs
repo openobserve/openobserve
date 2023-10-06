@@ -39,7 +39,7 @@ use crate::common::meta::{
 use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::ingestion::is_ingestion_allowed;
 use crate::service::{
-    format_stream_name, ingestion::write_file, usage::report_request_usage_stats,
+    get_formatted_stream_name, ingestion::write_file, usage::report_request_usage_stats,
 };
 
 pub async fn ingest(
@@ -49,7 +49,13 @@ pub async fn ingest(
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
-    let stream_name = &format_stream_name(in_stream_name);
+
+    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let stream_name = &get_formatted_stream_name(
+        StreamParams::new(org_id, in_stream_name, StreamType::Logs),
+        &mut stream_schema_map,
+    )
+    .await;
 
     if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
         return Err(value);
@@ -60,7 +66,6 @@ pub async fn ingest(
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<Trigger> = None;
@@ -89,7 +94,10 @@ pub async fn ingest(
 
     let data = match in_req {
         IngestionRequest::JSON(req) => {
-            let reader: Vec<json::Value> = json::from_slice(&req)?;
+            let reader: Vec<json::Value> = json::from_slice(&req).unwrap_or({
+                let val: json::Value = json::from_slice(&req)?;
+                vec![val]
+            });
             ep = "/api/org/ingest/logs/_json";
             IngestionData::JSON(reader)
         }
