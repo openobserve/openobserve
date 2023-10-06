@@ -382,6 +382,16 @@ const removeQuery = (index: number) => {
         ].fields.y.forEach((itemY: any) => {
           itemY.aggregationFunction = null;
         })
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+        });
+        if (dashboardPanelData.data.queryType === "sql") {
+          dashboardPanelData.layout.currentQueryIndex = 0;
+          dashboardPanelData.data.queries =
+            dashboardPanelData.data.queries.slice(0, 1);
+        }
         break;
 
         case "area":

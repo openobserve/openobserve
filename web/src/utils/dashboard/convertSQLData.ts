@@ -25,9 +25,9 @@ export const convertSQLData = (
   searchQueryData: any,
   store: any
 ) => {
-  
+
   // if no data than return it
-  if (!Array.isArray(searchQueryData) || searchQueryData.length === 0 || !searchQueryData[0] || !panelSchema) {
+  if (!Array.isArray(searchQueryData) || searchQueryData.length === 0 || !searchQueryData[0] || !panelSchema.queries[0].fields.x || !panelSchema.queries[0].fields.y) {
     return { options: null };
   }
 
