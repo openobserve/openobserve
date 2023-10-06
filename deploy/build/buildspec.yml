@@ -26,10 +26,10 @@ phases:
       - docker buildx install
 
       # download dependencies
-      - git clone https://github.com/openobserve/arrow-rs.git ../arrow-rs
-      - git clone https://github.com/openobserve/arrow-datafusion.git ../arrow-datafusion
-      - cd ../arrow-rs && git checkout 47-read-bloomfilter && cd ../openobserve
-      - cd ../arrow-datafusion && git checkout 47-read-bloomfilter && cd ../openobserve
+      - git clone https://github.com/openobserve/arrow-rs.git
+      - git clone https://github.com/openobserve/arrow-datafusion.git
+      - cd ./arrow-rs && git checkout 47-read-bloomfilter && cd ..
+      - cd ./arrow-datafusion && git checkout 47-read-bloomfilter && cd ..
 
       # build for sccache image
       # - docker build -t public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64 -f deploy/build/Dockerfile.sccache.amd64 .
