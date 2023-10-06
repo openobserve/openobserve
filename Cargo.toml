@@ -75,10 +75,10 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { path="/arrow-datafusion/datafusion/core", version = "31", features = ["simd"] }
-arrow = { path="/arrow-rs/arrow", version = "47", features = ["simd", "ipc_compression"] }
-arrow-schema = { path="/arrow-rs/arrow-schema", version = "47", features = ["serde"] }
-parquet = { path="/arrow-rs/parquet", version = "47", features = ["arrow", "async"] }
+datafusion = { path="../arrow-datafusion/datafusion/core", version = "31", features = ["simd"] }
+arrow = { path="../arrow-rs/arrow", version = "47", features = ["simd", "ipc_compression"] }
+arrow-schema = { path="../arrow-rs/arrow-schema", version = "47", features = ["serde"] }
+parquet = { path="../arrow-rs/parquet", version = "47", features = ["arrow", "async"] }
 object_store = { version = "0.7", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
@@ -170,7 +170,7 @@ prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
-datafusion-expr = { path="/arrow-datafusion/datafusion/expr", version = "31" }
+datafusion-expr = { path="../arrow-datafusion/datafusion/expr", version = "31" }
 
 expect-test = "1.4"
 float-cmp = "0.9"
