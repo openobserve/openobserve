@@ -381,7 +381,14 @@ export const usePanelDataLoader = (
     // we need formatted interval value in seconds
     let __rate_interval: any = Math.max( getTimeInSecondsBasedOnUnit(formattedInterval.value, formattedInterval.unit) + scrapeInterval , 4 * scrapeInterval);
 
+    //get interval in ms
+    const __interval_ms = getTimeInSecondsBasedOnUnit(formattedInterval.value, formattedInterval.unit) * 1000;    
+
     const fixedVariables = [
+      {
+        name: "__interval_ms",
+        value: `${__interval_ms}ms`
+      },
       {
         name: "__interval",
         value: `${formattedInterval.value}${formattedInterval.unit}`
