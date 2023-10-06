@@ -26,8 +26,9 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
 
   //if no latitude and longitude than return it 
   if (
-    !panelSchema.queries[0]?.fields?.latitude?.alias ||
-    !panelSchema.queries[0]?.fields?.longitude?.alias
+    !panelSchema.queries[0]?.fields?.latitude ||
+    !panelSchema.queries[0]?.fields?.longitude ||
+    !mapData
   ) {
     return { options: null };
   }
@@ -145,6 +146,9 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       },
       data: mapData[index]?.map((item: any) => {
         if (query.customQuery) {
+          console.log("item[query.fields.longitude.alias]", item[query.fields.longitude]);
+          console.log("item[query.fields.latitude.alias]", item[query.fields.latitude]);
+          
           // For custom queries
           return [
             item[query.fields.longitude.alias],
@@ -173,6 +177,9 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       },
     };
   });
+  console.log("panelSchema.queries.fields.latitude.alias", panelSchema.queries[0]?.fields?.latitude?.alias);
+  console.log("panelSchema.queries.fields.longitude.alias", panelSchema.queries[0]?.fields?.longitude?.alias);
+
 
   const seriesData = options.series.flatMap((series: any) => series.data);
    if (seriesData.length > 0) {

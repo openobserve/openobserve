@@ -1,7 +1,4 @@
 // Copyright 2023 Zinc Labs Inc.
-
-import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
-
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
 //  You may obtain a copy of the License at
@@ -16,17 +13,23 @@ import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnit
 
 /**
  * Converts SQL data into a format suitable for rendering a chart.
- *
- * @param {any} panelSchema - the panel schema object
- * @param {any} searchQueryData - the search query data
- * @param {any} store - the store object
- * @return {Object} - the options object for rendering the chart
- */
+*
+* @param {any} panelSchema - the panel schema object
+* @param {any} searchQueryData - the search query data
+* @param {any} store - the store object
+* @return {Object} - the options object for rendering the chart
+*/
+import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 export const convertSQLData = (
   panelSchema: any,
   searchQueryData: any,
   store: any
 ) => {
+  // if no data than return it
+  if (!searchQueryData[0]) {
+    return { options: null };
+  }
+
   // get the x axis key
   const getXAxisKeys = () => {
     return panelSchema?.queries[0]?.fields?.x?.length

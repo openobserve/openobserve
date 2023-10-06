@@ -28,6 +28,10 @@ export const convertPromQLData = (
   searchQueryData: any,
   store: any
 ) => {
+  // if no data than return it
+  if(!searchQueryData) {
+    return { options: null };
+  }
 
   // It is used to keep track of the current series name in tooltip to bold the series name
   let currentSeriesName = "";

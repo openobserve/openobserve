@@ -20,7 +20,7 @@
       class="plotlycontainer"
       style="height: 100%; width: 100%"
     >
-    <ChartRenderer v-if="panelSchema.type != 'table'&& panelSchema.type != 'geomap'" :data="panelSchema.queryType === 'promql' || (data.length && data[0].length) ? panelData : {}" />
+    <ChartRenderer v-if="panelSchema.type != 'table'&& panelSchema.type != 'geomap'" :data="panelSchema.queryType === 'promql' || (data.length && data[0].length) ? panelData : []" />
     <TableRenderer
     v-else-if="panelSchema.type == 'table'"
     :data="panelData"
@@ -91,6 +91,8 @@ export default defineComponent({
         panelData.value = convertPanelData(panelSchema.value, data.value, store);
         errorDetail.value = "";
       } catch (error: any) {
+        console.log("error", error);
+        
         errorDetail.value = error.message;
       }
     });

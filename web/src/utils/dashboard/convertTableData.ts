@@ -23,6 +23,10 @@ export const convertTableData = (
   panelSchema: any,
   searchQueryData: any
 ) => {
+  // if no data than return it
+  if (!searchQueryData) {
+    return { rows: [], columns: [] };
+  }
   const x = panelSchema?.queries[0].fields?.x || [];
   const y = panelSchema?.queries[0].fields?.y || [];
   const columnData = [...x, ...y];
