@@ -850,7 +850,7 @@ pub async fn convert_parquet_file(
     let schema: Schema = df.schema().into();
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
-    let mut writer = super::new_parquet_writer(buf, &schema, 0, None);
+    let mut writer = super::new_parquet_writer(buf, &schema, 0);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -922,20 +922,7 @@ pub async fn merge_parquet_files(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
 
-    let bf_fields = if CONFIG.common.bloom_filter_enabled
-        && !CONFIG.common.bloom_filter_default_columns.is_empty()
-    {
-        Some(
-            CONFIG
-                .common
-                .bloom_filter_default_columns
-                .split(',')
-                .collect::<Vec<&str>>(),
-        )
-    } else {
-        None
-    };
-    let mut writer = super::new_parquet_writer(buf, &schema, file_meta.records as u64, bf_fields);
+    let mut writer = super::new_parquet_writer(buf, &schema, file_meta.records as u64);
     for batch in batches {
         writer.write(&batch)?;
     }

@@ -274,25 +274,7 @@ async fn upload_file(
 
     // write parquet file
     let mut buf_parquet = Vec::new();
-    let bf_fields = if CONFIG.common.bloom_filter_enabled
-        && !CONFIG.common.bloom_filter_default_columns.is_empty()
-    {
-        Some(
-            CONFIG
-                .common
-                .bloom_filter_default_columns
-                .split(',')
-                .collect::<Vec<&str>>(),
-        )
-    } else {
-        None
-    };
-    let mut writer = new_parquet_writer(
-        &mut buf_parquet,
-        &arrow_schema,
-        file_meta.records as u64,
-        bf_fields,
-    );
+    let mut writer = new_parquet_writer(&mut buf_parquet, &arrow_schema, file_meta.records as u64);
     for batch in batches {
         writer.write(&batch)?;
     }

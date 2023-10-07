@@ -92,6 +92,29 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     )
 });
 
+pub static BLOOM_FILTER_DEFAULT_COLUMNS: Lazy<Option<Vec<String>>> = Lazy::new(|| {
+    if !CONFIG.common.bloom_filter_enabled || CONFIG.common.bloom_filter_default_columns.is_empty()
+    {
+        None
+    } else {
+        Some(
+            CONFIG
+                .common
+                .bloom_filter_default_columns
+                .split(',')
+                .filter_map(|s| {
+                    let s = s.trim();
+                    if s.is_empty() {
+                        None
+                    } else {
+                        Some(s.to_string())
+                    }
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
+});
+
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
 pub static STREAM_SCHEMAS: Lazy<RwHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);

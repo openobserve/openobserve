@@ -21,8 +21,8 @@ use std::{str::FromStr, sync::Arc};
 
 use crate::common::{
     infra::config::{
-        get_parquet_compression, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
-        PARQUET_PAGE_SIZE, SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA,
+        get_parquet_compression, BLOOM_FILTER_DEFAULT_COLUMNS, CONFIG, PARQUET_BATCH_SIZE,
+        PARQUET_MAX_ROW_GROUP_SIZE, PARQUET_PAGE_SIZE, SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA,
     },
     meta::functions::ZoFunction,
 };
@@ -95,7 +95,6 @@ pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
     num_rows: u64,
-    bf_fields: Option<Vec<&str>>,
 ) -> ArrowWriter<&'a mut Vec<u8>> {
     let sort_column_id = schema
         .index_of(&CONFIG.common.column_timestamp)
@@ -113,7 +112,7 @@ pub fn new_parquet_writer<'a>(
         writer_props = writer_props
             .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
     }
-    if let Some(fields) = bf_fields {
+    if let Some(fields) = BLOOM_FILTER_DEFAULT_COLUMNS.as_ref() {
         for field in fields {
             writer_props = writer_props
                 .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
