@@ -56,7 +56,6 @@ pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
 pub const HAS_FUNCTIONS: bool = true;
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
-pub const COLUMN_TRACE_ID: &str = "trace_id";
 
 const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "events", "json"];
@@ -255,8 +254,8 @@ pub struct Common {
     pub ui_sql_base64_enabled: bool,
     #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
     pub metrics_dedup_enabled: bool,
-    #[env_config(name = "ZO_TRACES_BLOOM_FILTER_ENABLED", default = false)]
-    pub traces_bloom_filter_enabled: bool,
+    #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = false)]
+    pub bloom_filter_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_COLUMNS", default = "")]
     pub bloom_filter_default_columns: String,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]

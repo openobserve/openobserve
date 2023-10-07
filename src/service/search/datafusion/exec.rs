@@ -45,12 +45,12 @@ use std::{str::FromStr, sync::Arc};
 use crate::common::{
     infra::{
         cache::tmpfs,
-        config::{COLUMN_TRACE_ID, CONFIG, PARQUET_BATCH_SIZE},
+        config::{CONFIG, PARQUET_BATCH_SIZE},
     },
     meta::{
         common::{FileKey, FileMeta},
         search::Session as SearchSession,
-        sql, StreamType,
+        sql,
     },
     utils::{flatten, json},
 };
@@ -870,7 +870,6 @@ pub async fn merge_parquet_files(
     session_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
-    stream_type: StreamType,
 ) -> Result<FileMeta> {
     let start = std::time::Instant::now();
     // query data
@@ -923,12 +922,19 @@ pub async fn merge_parquet_files(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
 
-    let bf_fields =
-        if CONFIG.common.traces_bloom_filter_enabled && stream_type == StreamType::Traces {
-            Some(vec![COLUMN_TRACE_ID])
-        } else {
-            None
-        };
+    let bf_fields = if CONFIG.common.bloom_filter_enabled
+        && !CONFIG.common.bloom_filter_default_columns.is_empty()
+    {
+        Some(
+            CONFIG
+                .common
+                .bloom_filter_default_columns
+                .split(',')
+                .collect::<Vec<&str>>(),
+        )
+    } else {
+        None
+    };
     let mut writer = super::new_parquet_writer(buf, &schema, file_meta.records as u64, bf_fields);
     for batch in batches {
         writer.write(&batch)?;
@@ -951,7 +957,7 @@ pub fn create_session_config() -> SessionConfig {
     options.execution.parquet.pushdown_filters = true;
     options.execution.parquet.reorder_filters = true;
     options.optimizer.repartition_sorts = true;
-    if CONFIG.common.traces_bloom_filter_enabled {
+    if CONFIG.common.bloom_filter_enabled {
         options.execution.parquet.bloom_filter_enabled = true;
     }
 

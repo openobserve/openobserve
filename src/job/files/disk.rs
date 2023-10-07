@@ -22,11 +22,7 @@ use std::{
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::{
-    infra::{
-        cluster,
-        config::{COLUMN_TRACE_ID, CONFIG},
-        metrics, storage, wal,
-    },
+    infra::{cluster, config::CONFIG, metrics, storage, wal},
     meta::{common::FileMeta, stream::StreamParams, StreamType},
     utils::{file::scan_files, json, stream::populate_file_meta},
 };
@@ -278,18 +274,19 @@ async fn upload_file(
 
     // write parquet file
     let mut buf_parquet = Vec::new();
-    let bf_fields =
-        if CONFIG.common.traces_bloom_filter_enabled && stream_type == StreamType::Traces {
-            Some(vec![COLUMN_TRACE_ID])
-        } else {
-            Some(
-                CONFIG
-                    .common
-                    .bloom_filter_default_columns
-                    .split(',')
-                    .collect::<Vec<&str>>(),
-            )
-        };
+    let bf_fields = if CONFIG.common.bloom_filter_enabled
+        && !CONFIG.common.bloom_filter_default_columns.is_empty()
+    {
+        Some(
+            CONFIG
+                .common
+                .bloom_filter_default_columns
+                .split(',')
+                .collect::<Vec<&str>>(),
+        )
+    } else {
+        None
+    };
     let mut writer = new_parquet_writer(
         &mut buf_parquet,
         &arrow_schema,
