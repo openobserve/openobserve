@@ -15,6 +15,12 @@
 import moment from "moment";
 import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
+let currentSeriesIndex = 0;
+
+export const setCurrentSeriesIndex = (newValue: any) => {
+  currentSeriesIndex = newValue;
+};
+
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
  *
@@ -77,19 +83,45 @@ export const convertPromQLData = (
     },
     tooltip: {
       show: true,
-      trigger: "item",
+      trigger: "axis",
       textStyle: {
         fontSize: 12,
       },
+      enterable: true,
+      extraCssText: "max-height: 200px; overflow: auto;",
       formatter: function (name: any) {
-        const date = new Date(name.value[0]);
-        return `${formatDate(date)} <br/> ${name?.marker} ${name?.seriesName} : ${formatUnitValue(
+        // const date = new Date(name.value[0]);
+        // return `${formatDate(date)} <br/> ${name?.marker} ${name?.seriesName} : ${formatUnitValue(
+        //       getUnitValue(
+        //         name?.value[1],
+        //         panelSchema.config?.unit,
+        //         panelSchema.config?.unit_custom
+        //       )
+        //     )}`;
+
+        if (name.length == 0) return "";
+
+        const date = new Date(name[0].data[0]);
+
+        let hoverText = name.map((it: any) => {          
+          if(it.seriesIndex == currentSeriesIndex)
+            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
-                name?.value[1],
+                it.data[1],
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom
+              )
+            )} </strong>`;
+            else
+            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+              getUnitValue(
+                it.data[1],
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom
               )
             )}`;
+        });
+        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       },
       axisPointer: {
         show: true,
@@ -164,6 +196,7 @@ export const convertPromQLData = (
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
+                triggerLineEvent: true,
                 data: values.map((value: any) => [value[0] * 1000, value[1]]),
                 ...getPropsByChartTypeForSeries(panelSchema.type),
               };
@@ -333,6 +366,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "scatter",
         emphasis: { focus: "series" },
         symbolSize: 5,
+        // showSymbol: false,
       };
     case "pie":
       return {
