@@ -17,7 +17,7 @@ use crate::common::infra::{config::CONFIG, db::etcd, errors::Result};
 /// lock key in etcd, wait_ttl is 0 means wait forever
 #[inline(always)]
 pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<etcd::Locker>> {
-    if CONFIG.common.local_mode {
+    if CONFIG.common.local_mode || !CONFIG.common.feature_query_queue {
         return Ok(None);
     }
     let mut lock = etcd::Locker::new(key);
