@@ -21,7 +21,6 @@
 import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
-import { setCurrentSeriesIndex } from "@/utils/dashboard/convertPromQLData";
 
 export default defineComponent({
     name: "ChartRenderer",
@@ -51,7 +50,7 @@ export default defineComponent({
           chart.setOption(options, true);
           chart.setOption({animation: true});
           chart.on('mouseover', function(params : any) {
-            setCurrentSeriesIndex(params.seriesIndex);
+            props.data?.extras?.setCurrentSeriesIndex(params.seriesIndex);
           })
         });
 
@@ -67,7 +66,7 @@ export default defineComponent({
             chart = echarts.init(chartRef.value, theme);
             chart.setOption(props?.data?.options || {}, true);
             chart.on('mouseover', function(params : any) {
-              setCurrentSeriesIndex(params.seriesIndex);
+              props.data?.extras?.setCurrentSeriesIndex(params.seriesIndex);
             })
             window.addEventListener("resize", windowResizeEventCallback);
         });
