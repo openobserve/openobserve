@@ -15,12 +15,6 @@
 import moment from "moment";
 import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
-let currentSeriesIndex = 0;
-
-export const setCurrentSeriesIndex = (newValue: any) => {
-  currentSeriesIndex = newValue;
-};
-
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
  *
@@ -68,6 +62,14 @@ export const convertPromQLData = (
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
 
+  // It is used to keep track of the current series index in tooltip to bold the series name
+  let currentSeriesIndex = 0;
+
+  // set the current series index (will be set at chartrenderer on mouseover)
+  const setCurrentSeriesIndex = (newValue: any) => {
+    currentSeriesIndex = newValue;
+  };
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -103,7 +105,10 @@ export const convertPromQLData = (
 
         const date = new Date(name[0].data[0]);
 
-        let hoverText = name.map((it: any) => {          
+        let hoverText = name.map((it: any) => { 
+          
+          // check if the series is the current series being hovered
+          // if have than bold it
           if(it.seriesIndex == currentSeriesIndex)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
@@ -112,14 +117,15 @@ export const convertPromQLData = (
                 panelSchema.config?.unit_custom
               )
             )} </strong>`;
+            // else normal text
             else
-            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
-              getUnitValue(
-                it.data[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
-              )
-            )}`;
+              return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                getUnitValue(
+                  it.data[1],
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom
+                )
+              )}`;
         });
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       },
@@ -288,7 +294,9 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  return { options };
+  // extras will be used to return other data to chart renderer
+  // e.g. setCurrentSeriesIndex to set the current series index which is hovered
+  return { options, extras: { setCurrentSeriesIndex }};
 };
 
 /**
