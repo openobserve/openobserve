@@ -120,6 +120,14 @@ export const convertSQLData = (
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
 
+    // It is used to keep track of the current series index in tooltip to bold the series name
+    let currentSeriesIndex = 0;
+
+    // set the current series index (will be set at chartrenderer on mouseover)
+    const setCurrentSeriesIndex = (newValue: any) => {
+      currentSeriesIndex = newValue;
+    };
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -134,7 +142,7 @@ export const convertSQLData = (
       bottom: "40",
     },
     tooltip: {
-      trigger: "item",
+      trigger: "axis",
       textStyle: {
         fontSize: 12,
       },
@@ -188,13 +196,31 @@ export const convertSQLData = (
         },
       },
       formatter: function (name: any) {
-        return `${name.name} <br/> ${name.marker} ${name.seriesName} : ${formatUnitValue(
+        if (name.length == 0) return "";
+
+        let hoverText = name.map((it: any) => {
+          
+          // check if the series is the current series being hovered
+          // if have than bold it
+          if(it.seriesIndex == currentSeriesIndex)
+            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
-                name.value,
+                it.value,
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom
               )
-        )}`;
+            )} </strong>`;
+            // else normal text
+            else
+            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+              getUnitValue(
+                it.value,
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom
+              )
+            )}`;
+        });
+        return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
     xAxis: xAxisKeys
@@ -387,16 +413,32 @@ export const convertSQLData = (
       }
       else{
         options.tooltip.formatter = function (name: any) {
-          return `${name.name} <br/> ${name.marker} ${
-                name.seriesName
-              } : ${formatUnitValue(
+          if (name.length == 0) return "";
+
+            let hoverText = name.map((it: any) => { 
+              
+            // check if the series is the current series being hovered
+            // if have than bold it
+            if(it.seriesIndex == currentSeriesIndex)
+              return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                 getUnitValue(
-                  name.value[1],
+                  it.data[1],
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom
                 )
-          )}`;
-        };
+              )} </strong>`;
+            // else normal text
+            else
+              return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                getUnitValue(
+                  it.data[1],
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom
+                )
+              )}`;
+            });
+            return `${name[0].data[0]} <br/> ${hoverText.join("<br/>")}`;
+          };
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
             name: panelSchema?.queries[0]?.fields?.y.find(
@@ -786,8 +828,6 @@ export const convertSQLData = (
     //if x axis has time series
     if (field) {
       options.series.map((seriesObj: any) => {
-        seriesObj.showSymbol= true;
-        seriesObj.symbolSize = 1;
         seriesObj.data = seriesObj.data.map((it: any, index: any) => [
           Number.isInteger(options.xAxis[0].data[index]) ? options.xAxis[0].data[index] : new Date(options.xAxis[0].data[index]+ "Z").getTime(),
           it,
@@ -796,14 +836,33 @@ export const convertSQLData = (
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
-        const date = new Date(name.value[0]);
-        return `${formatDate(date)} <br/> ${name.marker} ${name.seriesName} : ${formatUnitValue(
+        if (name.length == 0) return "";
+  
+        const date = new Date(name[0].data[0]);
+  
+        let hoverText = name.map((it: any) => {
+          
+          // check if the series is the current series being hovered
+          // if have than bold it
+          if(it.seriesIndex == currentSeriesIndex)
+            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
-                name.value[1],
+                it.data[1],
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom
               )
-        )}`;
+            )} </strong>`;
+            // else normal text
+            else
+            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+              getUnitValue(
+                it.data[1],
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom
+              )
+            )}`;
+        });
+        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
       options.tooltip.axisPointer = {
         type: "cross",
@@ -848,8 +907,6 @@ export const convertSQLData = (
     });
     if (isTimeSeries) {
       options.series.map((seriesObj: any) => {
-        seriesObj.showSymbol= true;
-        seriesObj.symbolSize = 1;
         seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
           new Date(options.xAxis[0].data[index] + "Z").getTime(),
           it,
@@ -857,15 +914,53 @@ export const convertSQLData = (
       });
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
-      options.tooltip.formatter = function (name: any) {  
-        const date = new Date(name.value[0]);
-        return `${formatDate(date)} <br/> ${name.marker} ${name.seriesName} : ${formatUnitValue(
+      // options.tooltip.formatter = function (name: any) {  
+      //   const date = new Date(name.value[0]);
+      //   return `${formatDate(date)} <br/> ${name.marker} ${name.seriesName} : ${formatUnitValue(
+      //         getUnitValue(
+      //           name.value[1],
+      //           panelSchema.config?.unit,
+      //           panelSchema.config?.unit_custom
+      //         )
+      //   )}`;
+      // };
+      options.tooltip.formatter = function (name: any) {
+        // const date = new Date(name.value[0]);
+        // return `${formatDate(date)} <br/> ${name.marker} ${name.seriesName} : ${formatUnitValue(
+        //       getUnitValue(
+        //         name.value[1],
+        //         panelSchema.config?.unit,
+        //         panelSchema.config?.unit_custom
+        //       )
+        // )}`;
+
+        if (name.length == 0) return "";
+  
+        const date = new Date(name[0].data[0]);
+  
+        let hoverText = name.map((it: any) => {
+          
+          // check if the series is the current series being hovered
+          // if have than bold it
+          if(it.seriesIndex == currentSeriesIndex)
+            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
-                name.value[1],
+                it.data[1],
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom
               )
-        )}`;
+            )} </strong>`;
+            // else normal text
+            else
+            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+              getUnitValue(
+                it.data[1],
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom
+              )
+            )}`;
+        });
+        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
       options.tooltip.axisPointer = {
         type: "cross",
@@ -891,8 +986,13 @@ export const convertSQLData = (
     }
   }
 
+  // extras will be used to return other data to chart renderer
+  // e.g. setCurrentSeriesIndex to set the current series index which is hovered
   return {
     options,
+    extras: {
+      setCurrentSeriesIndex
+    }
   };
 };
 
