@@ -509,7 +509,19 @@ export default defineComponent({
       },
     ];
 
-    onMounted(() => (miniMode.value = true));
+    onMounted(async () => {
+      miniMode.value = true
+
+      //get organizations settings
+      const orgSettings: any = await organizations.get_organization_settings(
+        store.state?.selectedOrganization?.identifier
+      );
+
+      //set settings in store
+      store.dispatch("setOrganizationSettings",({
+        scrapeInterval: orgSettings?.data?.scrape_interval ?? 15,
+      }));
+    });
 
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
