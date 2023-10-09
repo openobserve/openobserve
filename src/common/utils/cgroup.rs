@@ -28,9 +28,18 @@ pub fn get_cpu_limit() -> usize {
         } else {
             0
         }
+    } else if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") {
+        let columns = val.split(' ').collect::<Vec<&str>>();
+        let val = columns[0].parse::<usize>().unwrap_or_default();
+        if val < 100000 {
+            1 // maybe the limit less than 1 core
+        } else {
+            val / 100000
+        }
     } else {
         0
     };
+
     if cpu_num > 0 {
         cpu_num
     } else {
@@ -48,6 +57,8 @@ pub fn get_memory_limit() -> usize {
         } else {
             0
         }
+    } else if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory/memory.limit_in_bytes") {
+        val.trim_end().parse::<usize>().unwrap_or_default() / 1048576
     } else {
         0
     };
