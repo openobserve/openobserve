@@ -487,8 +487,12 @@ pub struct S3 {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_S3_REQUEST_TIMEOUT", default = 3600)] // seconds
     pub request_timeout: u64,
+    // Deprecated, use ZO_S3_FEATURE_FORCE_HOSTED_STYLE instead
+    // #[deprecated(since = "0.6.5", note = "use `ZO_S3_FEATURE_FORCE_HOSTED_STYLE` instead")]
     #[env_config(name = "ZO_S3_FEATURE_FORCE_PATH_STYLE", default = false)]
     pub feature_force_path_style: bool,
+    #[env_config(name = "ZO_S3_FEATURE_FORCE_HOSTED_STYLE", default = false)]
+    pub feature_force_hosted_style: bool,
     #[env_config(name = "ZO_S3_FEATURE_HTTP1_ONLY", default = false)]
     pub feature_http1_only: bool,
     #[env_config(name = "ZO_S3_FEATURE_HTTP2_ONLY", default = false)]

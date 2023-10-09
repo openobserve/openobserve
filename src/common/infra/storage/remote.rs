@@ -224,10 +224,12 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
     if CONFIG.s3.feature_http2_only {
         opts = opts.with_http2_only();
     }
+    let force_hosted_style =
+        CONFIG.s3.feature_force_hosted_style || CONFIG.s3.feature_force_path_style;
     let mut builder = object_store::aws::AmazonS3Builder::from_env()
         .with_client_options(opts)
         .with_bucket_name(&CONFIG.s3.bucket_name)
-        .with_virtual_hosted_style_request(CONFIG.s3.feature_force_path_style);
+        .with_virtual_hosted_style_request(force_hosted_style);
     if !CONFIG.s3.server_url.is_empty() {
         builder = builder.with_endpoint(&CONFIG.s3.server_url);
     }
