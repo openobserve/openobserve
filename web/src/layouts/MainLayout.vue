@@ -519,7 +519,7 @@ export default defineComponent({
 
       //set settings in store
       store.dispatch("setOrganizationSettings",({
-        scrapeInterval: orgSettings?.data?.scrape_interval ?? 15,
+        scrapeInterval: orgSettings?.data?.data?.scrape_interval ?? 15,
       }));
     });
 
@@ -787,7 +787,7 @@ export default defineComponent({
 
       //set settings in store
       this.store.dispatch("setOrganizationSettings",({
-        scrapeInterval: orgSettings?.data?.scrape_interval ?? 15,
+        scrapeInterval: orgSettings?.data?.data?.scrape_interval ?? 15,
       }));
       setTimeout(() => {
         this.redirectToParentRoute(this.$route.matched);
