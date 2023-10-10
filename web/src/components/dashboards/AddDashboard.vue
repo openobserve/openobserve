@@ -57,6 +57,7 @@
           filled
           dense
           :rules="[(val) => !!(val.trim()) || t('dashboard.nameRequired')]"
+          :lazy-rules="true"
         />
         <span>&nbsp;</span>
         <q-input
@@ -86,7 +87,7 @@
           />
           <q-btn
             data-test="dashboard-add-submit"
-            :disable="dashboardData.name === ''"
+            :disable="dashboardData.name.trim() === ''"
             :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
             class="q-mb-md text-bold no-border q-ml-md"
