@@ -51,6 +51,14 @@ export default defineComponent({
           chart.setOption({animation: true});
           chart.on('mouseover', function(params : any) {
             props.data?.extras?.setCurrentSeriesIndex(params.seriesIndex);
+
+            // scroll legend upto current series index
+            const legendOption = chart.getOption().legend[0];
+            
+            if (legendOption) {
+                legendOption.scrollDataIndex = params.seriesIndex;
+                chart.setOption({ legend: [legendOption] });
+            }
           })
         });
 
@@ -66,8 +74,16 @@ export default defineComponent({
             chart = echarts.init(chartRef.value, theme);
             chart.setOption(props?.data?.options || {}, true);
             chart.on('mouseover', function(params : any) {
-              props.data?.extras?.setCurrentSeriesIndex(params.seriesIndex);
-            })
+                props.data?.extras?.setCurrentSeriesIndex(params.seriesIndex);
+
+                // scroll legend upto current series index
+                const legendOption = chart.getOption().legend[0];
+
+                if (legendOption) {
+                    legendOption.scrollDataIndex = params.seriesIndex;
+                    chart.setOption({ legend: [legendOption] });
+                } 
+           })
             window.addEventListener("resize", windowResizeEventCallback);
         });
         onUnmounted(() => {

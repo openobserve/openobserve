@@ -220,6 +220,12 @@ export const convertSQLData = (
               )
             )}`;
         });
+
+        // swap current hovered series index to top in tooltip
+        const temp = hoverText[0];
+        hoverText[0] = hoverText[currentSeriesIndex];
+        hoverText[currentSeriesIndex] = temp;
+
         return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
@@ -437,6 +443,12 @@ export const convertSQLData = (
                 )
               )}`;
             });
+
+            // swap current hovered series index to top in tooltip
+            const temp = hoverText[0];
+            hoverText[0] = hoverText[currentSeriesIndex];
+            hoverText[currentSeriesIndex] = temp;
+
             return `${name[0].data[0]} <br/> ${hoverText.join("<br/>")}`;
           };
         options.series = yAxisKeys?.map((key: any) => {
@@ -862,6 +874,12 @@ export const convertSQLData = (
               )
             )}`;
         });
+
+        // swap current hovered series index to top in tooltip
+        const temp = hoverText[0];
+        hoverText[0] = hoverText[currentSeriesIndex];
+        hoverText[currentSeriesIndex] = temp;
+
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
       options.tooltip.axisPointer = {
@@ -960,6 +978,12 @@ export const convertSQLData = (
               )
             )}`;
         });
+
+        // swap current hovered series index to top in tooltip
+        const temp = hoverText[0];
+        hoverText[0] = hoverText[currentSeriesIndex];
+        hoverText[currentSeriesIndex] = temp;
+
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
       options.tooltip.axisPointer = {
