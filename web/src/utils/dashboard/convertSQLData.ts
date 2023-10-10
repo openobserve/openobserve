@@ -107,7 +107,18 @@ export const convertSQLData = (
     textStyle: {
       width: 100,
       overflow: "truncate",
+      rich: {
+        a: {
+            fontWeight: 'bold'
+        },
+        b: {
+            fontStyle: 'normal'
+        }
+      }
     },
+    formatter: (name: any) => {
+      return name == currentSeriesName ? '{a|' + name + '}': '{b|' + name + '}'
+    }
   };
 
   // Additional logic to adjust the legend position
@@ -120,13 +131,13 @@ export const convertSQLData = (
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
 
-    // It is used to keep track of the current series index in tooltip to bold the series name
-    let currentSeriesIndex = 0;
+  // It is used to keep track of the current series name in tooltip to bold the series name
+  let currentSeriesName = "";
 
-    // set the current series index (will be set at chartrenderer on mouseover)
-    const setCurrentSeriesIndex = (newValue: any) => {
-      currentSeriesIndex = newValue;
-    };
+  // set the current series name (will be set at chartrenderer on mouseover)
+  const setCurrentSeriesValue = (newValue: any) => {
+    currentSeriesName = newValue;
+  };
 
   const options: any = {
     backgroundColor: "transparent",
@@ -198,11 +209,22 @@ export const convertSQLData = (
       formatter: function (name: any) {
         if (name.length == 0) return "";
 
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) => it.seriesName == currentSeriesName
+        )
+        
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
+
         let hoverText = name.map((it: any) => {
           
           // check if the series is the current series being hovered
           // if have than bold it
-          if(it.seriesIndex == currentSeriesIndex)
+          if(it?.seriesName == currentSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.value,
@@ -220,11 +242,6 @@ export const convertSQLData = (
               )
             )}`;
         });
-
-        // swap current hovered series index to top in tooltip
-        const temp = hoverText[0];
-        hoverText[0] = hoverText[currentSeriesIndex];
-        hoverText[currentSeriesIndex] = temp;
 
         return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
@@ -421,11 +438,21 @@ export const convertSQLData = (
         options.tooltip.formatter = function (name: any) {
           if (name.length == 0) return "";
 
+          // get the current series index from name
+          const currentSeriesIndex = name.findIndex(
+            (it: any) => it.seriesName == currentSeriesName
+          )
+          
+          // swap current hovered series index to top in tooltip
+          const temp = name[0];
+          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
             let hoverText = name.map((it: any) => { 
               
             // check if the series is the current series being hovered
             // if have than bold it
-            if(it.seriesIndex == currentSeriesIndex)
+            if(it?.seriesName == currentSeriesName)
               return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                 getUnitValue(
                   it.data[1],
@@ -443,11 +470,6 @@ export const convertSQLData = (
                 )
               )}`;
             });
-
-            // swap current hovered series index to top in tooltip
-            const temp = hoverText[0];
-            hoverText[0] = hoverText[currentSeriesIndex];
-            hoverText[currentSeriesIndex] = temp;
 
             return `${name[0].data[0]} <br/> ${hoverText.join("<br/>")}`;
           };
@@ -851,12 +873,23 @@ export const convertSQLData = (
         if (name.length == 0) return "";
   
         const date = new Date(name[0].data[0]);
+
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) => it.seriesName == currentSeriesName
+        )
+        
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
   
         let hoverText = name.map((it: any) => {
           
           // check if the series is the current series being hovered
           // if have than bold it
-          if(it.seriesIndex == currentSeriesIndex)
+          if(it?.seriesName == currentSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -874,11 +907,6 @@ export const convertSQLData = (
               )
             )}`;
         });
-
-        // swap current hovered series index to top in tooltip
-        const temp = hoverText[0];
-        hoverText[0] = hoverText[currentSeriesIndex];
-        hoverText[currentSeriesIndex] = temp;
 
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
@@ -955,12 +983,23 @@ export const convertSQLData = (
         if (name.length == 0) return "";
   
         const date = new Date(name[0].data[0]);
+
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) => it.seriesName == currentSeriesName
+        )
+        
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
   
         let hoverText = name.map((it: any) => {
           
           // check if the series is the current series being hovered
           // if have than bold it
-          if(it.seriesIndex == currentSeriesIndex)
+          if(it?.seriesName == currentSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -978,11 +1017,6 @@ export const convertSQLData = (
               )
             )}`;
         });
-
-        // swap current hovered series index to top in tooltip
-        const temp = hoverText[0];
-        hoverText[0] = hoverText[currentSeriesIndex];
-        hoverText[currentSeriesIndex] = temp;
 
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
@@ -1015,7 +1049,7 @@ export const convertSQLData = (
   return {
     options,
     extras: {
-      setCurrentSeriesIndex
+      setCurrentSeriesValue
     }
   };
 };

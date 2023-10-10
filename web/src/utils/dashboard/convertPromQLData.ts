@@ -29,6 +29,14 @@ export const convertPromQLData = (
   store: any
 ) => {
 
+  // It is used to keep track of the current series name in tooltip to bold the series name
+  let currentSeriesName = "";
+
+  // set the current series name (will be set at chartrenderer on mouseover)
+  const setCurrentSeriesValue = (newValue: any) => {
+    currentSeriesName = newValue;
+  };
+
   const legendPosition = getLegendPosition(
     panelSchema?.config?.legends_position
   );
@@ -49,7 +57,18 @@ export const convertPromQLData = (
     textStyle: {
       width: 150,
       overflow: "truncate",
+      rich: {
+        a: {
+            fontWeight: 'bold'
+        },
+        b: {
+            fontStyle: 'normal'
+        }
+      }
     },
+    formatter: (name: any) => {
+      return name == currentSeriesName ? '{a|' + name + '}': '{b|' + name + '}'
+    }
   };
 
   // Additional logic to adjust the legend position
@@ -61,14 +80,6 @@ export const convertPromQLData = (
     legendConfig.left = "0"; // Apply left positioning
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
-
-  // It is used to keep track of the current series index in tooltip to bold the series name
-  let currentSeriesIndex = 0;
-
-  // set the current series index (will be set at chartrenderer on mouseover)
-  const setCurrentSeriesIndex = (newValue: any) => {
-    currentSeriesIndex = newValue;
-  };
 
   const options: any = {
     backgroundColor: "transparent",
@@ -105,11 +116,21 @@ export const convertPromQLData = (
 
         const date = new Date(name[0].data[0]);
 
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) => it.seriesName == currentSeriesName
+        )
+        
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
         let hoverText = name.map((it: any) => { 
           
           // check if the series is the current series being hovered
           // if have than bold it
-          if(it.seriesIndex == currentSeriesIndex)
+          if(it?.seriesName == currentSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -127,11 +148,6 @@ export const convertPromQLData = (
                 )
               )}`;
         });
-
-        // swap current hovered series index to top in tooltip
-        const temp = hoverText[0];
-        hoverText[0] = hoverText[currentSeriesIndex];
-        hoverText[currentSeriesIndex] = temp;
 
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       },
@@ -301,8 +317,8 @@ export const convertPromQLData = (
   options.series = options.series.flat();
 
   // extras will be used to return other data to chart renderer
-  // e.g. setCurrentSeriesIndex to set the current series index which is hovered
-  return { options, extras: { setCurrentSeriesIndex }};
+  // e.g. setCurrentSeriesValue to set the current series index which is hovered
+  return { options, extras: { setCurrentSeriesValue }};
 };
 
 /**

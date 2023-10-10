@@ -41,6 +41,18 @@ export default defineComponent({
             chart.resize();
         }
 
+        const mouseHoverEffectFn = (params: any) => {
+          props.data?.extras?.setCurrentSeriesValue(params.seriesName);
+
+          // scroll legend upto current series index
+          const legendOption = chart.getOption().legend[0];
+
+          if (legendOption) {
+            legendOption.scrollDataIndex = params.seriesIndex;
+            chart.setOption({ legend: [legendOption] });
+          } 
+        }
+
         watch(() => store.state.theme, (newTheme) => {
           const theme = newTheme === 'dark' ? 'dark' : 'light';
           chart.dispose();  
@@ -49,17 +61,7 @@ export default defineComponent({
           options.animation = false
           chart.setOption(options, true);
           chart.setOption({animation: true});
-          chart.on('mouseover', function(params : any) {
-            props.data?.extras?.setCurrentSeriesIndex(params.seriesIndex);
-
-            // scroll legend upto current series index
-            const legendOption = chart.getOption().legend[0];
-            
-            if (legendOption) {
-                legendOption.scrollDataIndex = params.seriesIndex;
-                chart.setOption({ legend: [legendOption] });
-            }
-          })
+          chart.on('mouseover', mouseHoverEffectFn)
         });
 
         onMounted(async () => {
@@ -73,17 +75,7 @@ export default defineComponent({
             const theme = store.state.theme === 'dark' ? 'dark' : 'light';
             chart = echarts.init(chartRef.value, theme);
             chart.setOption(props?.data?.options || {}, true);
-            chart.on('mouseover', function(params : any) {
-                props.data?.extras?.setCurrentSeriesIndex(params.seriesIndex);
-
-                // scroll legend upto current series index
-                const legendOption = chart.getOption().legend[0];
-
-                if (legendOption) {
-                    legendOption.scrollDataIndex = params.seriesIndex;
-                    chart.setOption({ legend: [legendOption] });
-                } 
-           })
+            chart.on('mouseover', mouseHoverEffectFn)
             window.addEventListener("resize", windowResizeEventCallback);
         });
         onUnmounted(() => {
