@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::path::Path;
+
 use sysinfo::SystemExt;
 
 /// Get cpu limit by cgroup or return the node cpu cores
@@ -20,7 +22,7 @@ pub fn get_cpu_limit() -> usize {
         if !val.is_empty() && !val.to_lowercase().starts_with("max") {
             let columns = val.split(' ').collect::<Vec<&str>>();
             let val = columns[0].parse::<usize>().unwrap_or_default();
-            log::info!("cpu.max: {}", val);
+            println!("cpu.max: {}", val);
             if val > 0 {
                 if val < 100000 {
                     1 // maybe the limit less than 1 core
@@ -50,7 +52,7 @@ pub fn get_cpu_limit() -> usize {
 pub fn get_memory_limit() -> usize {
     let mem_size = if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory.max") {
         if !val.is_empty() && !val.to_lowercase().starts_with("max") {
-            log::info!("memory.max: {}", val);
+            println!("memory.max: {}", val);
             val.trim_end().parse::<usize>().unwrap_or_default()
         } else {
             read_memory_cgroup_v1()
@@ -69,10 +71,23 @@ pub fn get_memory_limit() -> usize {
 }
 
 fn read_cpu_cgroup_v1() -> usize {
+    if Path::new("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").is_file() {
+        println!("/sys/fs/cgroup/cpu/cpu.cfs_quota_us is a file!");
+    } else {
+        println!("/sys/fs/cgroup/cpu/cpu.cfs_quota_us is not a file or doesn't exist");
+    }
+
+    if Path::new("/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_quota_us").is_file() {
+        println!("/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_quota_us is a file!");
+    } else {
+        println!("/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_quota_us is not a file or doesn't exist");
+    }
+
     if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") {
+        println!("cpu.cfs_quota_us read: {}", val);
         let columns = val.split(' ').collect::<Vec<&str>>();
         let val = columns[0].parse::<usize>().unwrap_or_default();
-        log::info!("cpu.cfs_quota_us: {}", val);
+        println!("cpu.cfs_quota_us: {}", val);
         if val > 0 && val < 100000 {
             1 // maybe the limit less than 1 core
         } else {
@@ -85,7 +100,7 @@ fn read_cpu_cgroup_v1() -> usize {
 
 fn read_memory_cgroup_v1() -> usize {
     if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory/memory.limit_in_bytes") {
-        log::info!("memory.limit_in_bytes: {}", val);
+        println!("memory.limit_in_bytes: {}", val);
         val.trim_end().parse::<usize>().unwrap_or_default()
     } else {
         0
