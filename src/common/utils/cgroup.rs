@@ -69,7 +69,7 @@ pub fn get_memory_limit() -> usize {
 }
 
 fn read_cpu_cgroup_v1() -> usize {
-    if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_quota_us") {
+    if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") {
         let columns = val.split(' ').collect::<Vec<&str>>();
         let val = columns[0].parse::<usize>().unwrap_or_default();
         log::info!("cpu.cfs_quota_us: {}", val);
