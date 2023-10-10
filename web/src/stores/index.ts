@@ -38,7 +38,7 @@ const organizationObj = {
   streams: {},
   folders: [],
   organizationSettings: {
-    scrapeInterval: 15
+    scrape_interval: 15
   }
 };
 

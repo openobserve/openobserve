@@ -26,8 +26,10 @@
     <div class="q-w-md q-mx-lg">
       <q-form @submit.stop="onSubmit.execute">
         <q-input
-          v-model="scrapeIntereval"
-          label="Scrape Interval *"
+          v-model.number="scrapeIntereval"
+          type="number"
+          min="0"
+          label="Scrape Interval (In Seconds) *"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -35,7 +37,7 @@
           outlined
           filled
           dense
-          :rules="[(val) => !!val || 'Scrape Interval is required']"
+          :rules="[(val) => !!val || 'Scrape interval is required']"
           :lazy-rules="true"
         />
         <span>&nbsp;</span>
@@ -65,6 +67,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
+import organizations from "@/services/organizations";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -73,14 +76,31 @@ export default defineComponent({
     const q = useQuasar();
     const store = useStore();
     const router: any = useRouter();
-    const scrapeIntereval = ref(JSON.parse(JSON.stringify(store.state.organizationData.organizationSettings.scrapeInterval)));
+    const scrapeIntereval = ref(store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15);
     
     onActivated(() => {
-      scrapeIntereval.value = JSON.parse(JSON.stringify(store.state.organizationData.organizationSettings.scrapeInterval));
+      scrapeIntereval.value = store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15
     });
     
     const onSubmit = useLoading(async () => {
-      await store.dispatch("setScrapeInterval", scrapeIntereval.value);
+      //set organizations settings in store
+      //scrape interval will be in number
+      store.dispatch("setOrganizationSettings", {
+        ...store.state?.organizationData?.organizationSettings,
+        scrape_interval: scrapeIntereval.value
+      });
+
+      //update settings in backend
+      await organizations.post_organization_settings(
+        store.state?.selectedOrganization?.identifier,
+        store.state?.organizationData?.organizationSettings
+      );
+
+      q.notify({
+        type: "positive",
+        message: "Organization settings updated",
+        timeout: 2000,
+      })
     });
 
     return {
