@@ -266,7 +266,7 @@ export default defineComponent({
       await deletePanel(
         store,
         route.query.dashboard,
-        panelDataElementValue.id,
+        panelId,
         route.query.folder ?? "default"
       );
       await loadDashboard()
