@@ -127,6 +127,12 @@ export const convertPromQLData = (
                 )
               )}`;
         });
+
+        // swap current hovered series index to top in tooltip
+        const temp = hoverText[0];
+        hoverText[0] = hoverText[currentSeriesIndex];
+        hoverText[currentSeriesIndex] = temp;
+
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       },
       axisPointer: {
