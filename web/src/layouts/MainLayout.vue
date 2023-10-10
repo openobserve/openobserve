@@ -511,17 +511,6 @@ export default defineComponent({
 
     onMounted(async () => {
       miniMode.value = true
-
-      //get organizations settings
-      const orgSettings: any = await organizations.get_organization_settings(
-        store.state?.selectedOrganization?.identifier
-      );
-
-      //set settings in store
-      //scrape interval will be in number
-      store.dispatch("setOrganizationSettings",({
-        scrape_interval: orgSettings?.data?.data?.scrape_interval ?? 15,
-      }));
     });
 
     const selectedLanguage: any =
@@ -576,7 +565,7 @@ export default defineComponent({
       store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
     };
 
-    const setSelectedOrganization = () => {
+    const setSelectedOrganization = async () => {
       customOrganization = router.currentRoute.value.query.hasOwnProperty(
         "org_identifier"
       )
@@ -672,8 +661,26 @@ export default defineComponent({
         mainLayoutMixin.setup().getOrganizationThreshold(store);
       }
 
+      await getOrganizationSettings();
       isLoading.value = true;
     };
+
+    // get organizations settings on first load and identifier change
+    const getOrganizationSettings = async () => {
+      try {
+        //get organizations settings
+        const orgSettings: any = await organizations.get_organization_settings(
+            store.state?.selectedOrganization?.identifier
+          );
+  
+          //set settings in store
+          //scrape interval will be in number
+          store.dispatch("setOrganizationSettings",({
+            scrape_interval: orgSettings?.data?.data?.scrape_interval ?? 15,
+          }));
+      } catch (error) {}
+      return ;
+    }
 
     /**
      * Get configuration from the backend.
@@ -755,6 +762,7 @@ export default defineComponent({
       updateOrganization,
       setSelectedOrganization,
       redirectToParentRoute,
+      getOrganizationSettings
     };
   },
   computed: {
@@ -778,19 +786,13 @@ export default defineComponent({
       }, 500);
     },
     async changeOrganizationIdentifier() {
+      this.isLoading = false
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
       
-      //get organizations settings
-      const orgSettings: any = await organizations.get_organization_settings(
-        this.store.state?.selectedOrganization?.identifier
-      );
+      await this.getOrganizationSettings()
 
-      //set settings in store
-      //scrape interval will be in number
-      this.store.dispatch("setOrganizationSettings",({
-        scrape_interval: orgSettings?.data?.data?.scrape_interval ?? 15,
-      }));
+      this.isLoading = true
       setTimeout(() => {
         this.redirectToParentRoute(this.$route.matched);
         // this.setSelectedOrganization();
