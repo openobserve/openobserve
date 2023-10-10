@@ -20,7 +20,6 @@ pub fn get_cpu_limit() -> usize {
         if !val.is_empty() && !val.to_lowercase().starts_with("max") {
             let columns = val.split(' ').collect::<Vec<&str>>();
             let val = columns[0].parse::<usize>().unwrap_or_default();
-            println!("cpu.max: {}", val);
             if val > 0 {
                 if val < 100000 {
                     1 // maybe the limit less than 1 core
@@ -50,7 +49,6 @@ pub fn get_cpu_limit() -> usize {
 pub fn get_memory_limit() -> usize {
     let mem_size = if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory.max") {
         if !val.is_empty() && !val.to_lowercase().starts_with("max") {
-            println!("memory.max: {}", val);
             val.trim_end().parse::<usize>().unwrap_or_default()
         } else {
             read_memory_cgroup_v1()
@@ -71,7 +69,6 @@ pub fn get_memory_limit() -> usize {
 fn read_cpu_cgroup_v1() -> usize {
     if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") {
         let ret_val = val.trim().to_string().parse::<usize>().unwrap_or_default();
-        println!("cpu.cfs_quota_us: {}", ret_val);
         if ret_val > 0 && ret_val < 100000 {
             1 // maybe the limit less than 1 core
         } else {
@@ -84,7 +81,6 @@ fn read_cpu_cgroup_v1() -> usize {
 
 fn read_memory_cgroup_v1() -> usize {
     if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory/memory.limit_in_bytes") {
-        println!("memory.limit_in_bytes: {}", val);
         val.trim_end().parse::<usize>().unwrap_or_default()
     } else {
         0
