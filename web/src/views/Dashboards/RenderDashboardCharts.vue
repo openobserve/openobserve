@@ -102,7 +102,7 @@ export default defineComponent({
     const addPanelData = () => {
       return router.push({
         path: "/dashboards/add_panel",
-        query: { dashboard: route.query.dashboard },
+        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
       });
     };
 

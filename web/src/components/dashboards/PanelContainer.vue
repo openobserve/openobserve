@@ -77,7 +77,7 @@ export default defineComponent({
     const onEditPanel = (data:any) => {
       return router.push({
         path: "/dashboards/add_panel",
-        query: { dashboard: String(route.query.dashboard), panelId:data.id },
+        query: { dashboard: String(route.query.dashboard), panelId: data.id, folder: route.query.folder ?? "default" },
       });
     }
     //create a duplicate panel
@@ -99,7 +99,7 @@ export default defineComponent({
   
       try {
         // Add the duplicated panel to the dashboard.
-        await addPanel(store, route.query.dashboard, panelData);
+        await addPanel(store, route.query.dashboard, panelData, route.query.folder ?? "default");
   
         // Show a success notification.
         $q.notify({
@@ -110,7 +110,7 @@ export default defineComponent({
         // Navigate to the new panel.
         router.push({
           path: "/dashboards/add_panel",
-          query: { dashboard: String(route.query.dashboard), panelId: panelId }
+          query: { dashboard: String(route.query.dashboard), panelId: panelId, folder: route.query.folder ?? "default" },
         });
         return;
       } catch (err:any) {
