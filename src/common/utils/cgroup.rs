@@ -70,12 +70,12 @@ pub fn get_memory_limit() -> usize {
 
 fn read_cpu_cgroup_v1() -> usize {
     if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") {
-        let val = val.parse::<usize>().unwrap_or_default();
-        println!("cpu.cfs_quota_us: {}", val);
-        if val > 0 && val < 100000 {
+        let ret_val = val.trim().to_string().parse::<usize>().unwrap_or_default();
+        println!("cpu.cfs_quota_us: {}", ret_val);
+        if ret_val > 0 && ret_val < 100000 {
             1 // maybe the limit less than 1 core
         } else {
-            val / 100000
+            ret_val / 100000
         }
     } else {
         0
