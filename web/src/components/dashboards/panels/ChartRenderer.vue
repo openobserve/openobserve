@@ -62,6 +62,9 @@ export default defineComponent({
           chart.setOption(options, true);
           chart.setOption({animation: true});
           chart.on('mouseover', mouseHoverEffectFn)
+          chart.on('globalout', () => {
+              props.data?.extras?.setCurrentSeriesValue("");
+          })
         });
 
         onMounted(async () => {
@@ -76,6 +79,9 @@ export default defineComponent({
             chart = echarts.init(chartRef.value, theme);
             chart.setOption(props?.data?.options || {}, true);
             chart.on('mouseover', mouseHoverEffectFn)
+            chart.on('globalout', () => {
+              props.data?.extras?.setCurrentSeriesValue("");
+            })
             window.addEventListener("resize", windowResizeEventCallback);
         });
         onUnmounted(() => {
