@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::path::Path;
-
 use sysinfo::SystemExt;
 
 /// Get cpu limit by cgroup or return the node cpu cores
@@ -71,22 +69,8 @@ pub fn get_memory_limit() -> usize {
 }
 
 fn read_cpu_cgroup_v1() -> usize {
-    if Path::new("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").is_file() {
-        println!("/sys/fs/cgroup/cpu/cpu.cfs_quota_us is a file!");
-    } else {
-        println!("/sys/fs/cgroup/cpu/cpu.cfs_quota_us is not a file or doesn't exist");
-    }
-
-    if Path::new("/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_quota_us").is_file() {
-        println!("/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_quota_us is a file!");
-    } else {
-        println!("/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_quota_us is not a file or doesn't exist");
-    }
-
     if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") {
-        println!("cpu.cfs_quota_us read: {}", val);
-        let columns = val.split(' ').collect::<Vec<&str>>();
-        let val = columns[0].parse::<usize>().unwrap_or_default();
+        let val = val.parse::<usize>().unwrap_or_default();
         println!("cpu.cfs_quota_us: {}", val);
         if val > 0 && val < 100000 {
             1 // maybe the limit less than 1 core
