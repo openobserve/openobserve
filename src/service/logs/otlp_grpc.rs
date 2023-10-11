@@ -51,7 +51,7 @@ pub async fn usage_ingest(
     let start = std::time::Instant::now();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let stream_name = &get_formatted_stream_name(
-        StreamParams::new(org_id, in_stream_name, StreamType::Logs),
+        &StreamParams::new(org_id, in_stream_name, StreamType::Logs),
         &mut stream_schema_map,
     )
     .await;
@@ -123,7 +123,7 @@ pub async fn usage_ingest(
         );
 
         let local_trigger = super::add_valid_record(
-            StreamMeta {
+            &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
                 partition_keys: partition_keys.clone(),
@@ -147,7 +147,7 @@ pub async fn usage_ingest(
     let _ = write_file(
         &buf,
         thread_id,
-        StreamParams::new(org_id, stream_name, StreamType::Logs),
+        &StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
     )
@@ -216,7 +216,7 @@ pub async fn handle_grpc_request(
     let stream_name = match in_stream_name {
         Some(name) => {
             get_formatted_stream_name(
-                StreamParams::new(org_id, name, StreamType::Logs),
+                &StreamParams::new(org_id, name, StreamType::Logs),
                 &mut stream_schema_map,
             )
             .await
@@ -343,7 +343,7 @@ pub async fn handle_grpc_request(
                 let local_val = rec.as_object_mut().unwrap();
 
                 let local_trigger = super::add_valid_record(
-                    StreamMeta {
+                    &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
                         partition_keys: partition_keys.clone(),
@@ -369,7 +369,7 @@ pub async fn handle_grpc_request(
     let mut req_stats = write_file(
         &data_buf,
         thread_id,
-        StreamParams::new(org_id, stream_name, StreamType::Logs),
+        &StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
     )

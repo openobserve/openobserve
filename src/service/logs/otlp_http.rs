@@ -97,7 +97,7 @@ pub async fn logs_json_handler(
     let stream_name = match in_stream_name {
         Some(name) => {
             get_formatted_stream_name(
-                StreamParams::new(org_id, name, StreamType::Logs),
+                &StreamParams::new(org_id, name, StreamType::Logs),
                 &mut stream_schema_map,
             )
             .await
@@ -286,7 +286,7 @@ pub async fn logs_json_handler(
                     local_val = value.as_object_mut().unwrap();
 
                     let local_trigger = super::add_valid_record(
-                        StreamMeta {
+                        &StreamMeta {
                             org_id: org_id.to_string(),
                             stream_name: stream_name.to_string(),
                             partition_keys: partition_keys.clone(),
@@ -313,7 +313,7 @@ pub async fn logs_json_handler(
     let mut req_stats = write_file(
         &buf,
         thread_id,
-        StreamParams::new(org_id, stream_name, StreamType::Logs),
+        &StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
     )

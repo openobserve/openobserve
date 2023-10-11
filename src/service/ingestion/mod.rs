@@ -305,7 +305,7 @@ pub fn init_functions_runtime() -> Runtime {
 pub async fn write_file(
     buf: &AHashMap<String, Vec<String>>,
     thread_id: usize,
-    stream: StreamParams,
+    stream: &StreamParams,
     stream_file_name: &mut String,
     partition_time_level: Option<PartitionTimeLevel>,
 ) -> RequestStats {
@@ -324,7 +324,7 @@ pub async fn write_file(
             thread_id,
             stream.clone(),
             partition_time_level,
-            &key,
+            key,
             CONFIG.common.wal_memory_mode_enabled,
         )
         .await;

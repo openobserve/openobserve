@@ -243,7 +243,7 @@ pub async fn ingest(
             // only for bulk insert
             let mut status = RecordStatus::default();
             let local_trigger = super::add_valid_record(
-                StreamMeta {
+                &StreamMeta {
                     org_id: org_id.to_string(),
                     stream_name: stream_name.clone(),
                     partition_keys,
@@ -298,7 +298,7 @@ pub async fn ingest(
         let mut req_stats = write_file(
             &stream_data.data,
             thread_id,
-            StreamParams::new(org_id, &stream_name, StreamType::Logs),
+            &StreamParams::new(org_id, &stream_name, StreamType::Logs),
             &mut stream_file_name,
             None,
         )

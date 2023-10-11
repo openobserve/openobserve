@@ -401,7 +401,7 @@ pub async fn metrics_json_handler(
         let mut req_stats = write_file(
             &stream_data,
             thread_id,
-            StreamParams::new(org_id, &stream_name, StreamType::Metrics),
+            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
         )
