@@ -229,15 +229,6 @@ pub async fn process(
     let mut stream_file_name = "".to_string();
     let mut req_stats =
         write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
-
-    if stream_file_name.is_empty() {
-        return Ok(KinesisFHIngestionResponse {
-            request_id: request.request_id,
-            error_message: Some(
-                json::to_string(&stream_status).unwrap_or("error processing request".to_string()),
-            ),
-            timestamp: request.timestamp.unwrap_or(Utc::now().timestamp_micros()),
-        });
     }
 
     // only one trigger per request, as it updates etcd
