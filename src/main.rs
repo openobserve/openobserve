@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{middleware, web, App, HttpServer};
+use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
 use log::LevelFilter;
 use opentelemetry::{
@@ -246,6 +246,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .worker_max_blocking_threads(
             CONFIG.limit.http_worker_num * CONFIG.limit.http_worker_max_blocking,
         )
+        .keep_alive(KeepAlive::Timeout(std::time::Duration::from_secs(10)))
         .run()
         .await?;
 

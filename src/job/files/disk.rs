@@ -110,7 +110,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 &stream_name,
                 file
             );
-            if let Err(e) = fs::remove_file(&local_file) {
+            if let Err(e) = tokio::fs::remove_file(&local_file).await {
                 log::error!(
                     "[JOB] Failed to remove disk file from disk: {}, {}",
                     local_file,
@@ -142,7 +142,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 return Ok(());
             }
 
-            let ret = fs::remove_file(&local_file);
+            let ret = tokio::fs::remove_file(&local_file).await;
             if let Err(e) = ret {
                 log::error!(
                     "[JOB] Failed to remove disk file from disk: {}, {}",
@@ -188,7 +188,7 @@ async fn upload_file(
     let file_size = file_meta.len();
     log::info!("[JOB] File upload begin: disk: {}", path_str);
     if file_size == 0 {
-        if let Err(e) = fs::remove_file(path_str) {
+        if let Err(e) = tokio::fs::remove_file(path_str).await {
             log::error!(
                 "[JOB] Failed to remove disk file from disk: {}, {}",
                 path_str,
@@ -307,11 +307,22 @@ async fn upload_file(
 
     let new_file_name =
         super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
-    match storage::put(&new_file_name, bytes::Bytes::from(buf_parquet)).await {
-        Ok(_output) => {
-            log::info!("[JOB] disk file upload succeeded: {}", new_file_name);
-            Ok((new_file_name, file_meta, stream_type))
-        }
+    let file = new_file_name.to_owned();
+    match task::spawn_blocking(move || async move {
+        storage::put(&new_file_name, bytes::Bytes::from(buf_parquet)).await
+    })
+    .await
+    {
+        Ok(output) => match output.await {
+            Ok(_) => {
+                log::info!("[JOB] disk file upload succeeded: {}", file);
+                Ok((file, file_meta, stream_type))
+            }
+            Err(err) => {
+                log::error!("[JOB] disk file upload error: {:?}", err);
+                return Err(anyhow::anyhow!(err));
+            }
+        },
         Err(err) => {
             log::error!("[JOB] disk file upload error: {:?}", err);
             Err(anyhow::anyhow!(err))
