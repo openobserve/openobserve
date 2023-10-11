@@ -42,6 +42,14 @@ export default defineComponent({
         }
 
         const mouseHoverEffectFn = (params: any) => {
+
+          // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
+          // seriesName and seriesIndex will used in the same function
+          if(params.componentSubType === "pie"){
+            params.seriesName = params.data?.name;
+            params.seriesIndex = params.dataIndex;
+          }
+          
           props.data?.extras?.setCurrentSeriesValue(params.seriesName);
 
           // scroll legend upto current series index
