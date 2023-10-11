@@ -509,9 +509,7 @@ export default defineComponent({
       },
     ];
 
-    onMounted(async () => {
-      miniMode.value = true
-    });
+    onMounted(() => (miniMode.value = true));
 
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
