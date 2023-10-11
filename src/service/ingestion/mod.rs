@@ -303,7 +303,7 @@ pub fn init_functions_runtime() -> Runtime {
 }
 
 pub async fn write_file(
-    buf: AHashMap<String, Vec<String>>,
+    buf: &AHashMap<String, Vec<String>>,
     thread_id: usize,
     stream: StreamParams,
     stream_file_name: &mut String,
@@ -316,7 +316,7 @@ pub async fn write_file(
             continue;
         }
         write_buf.clear();
-        for row in &entry {
+        for row in entry {
             write_buf.put(row.as_bytes());
             write_buf.put("\n".as_bytes());
         }
