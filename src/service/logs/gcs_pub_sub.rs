@@ -126,9 +126,9 @@ pub async fn process(
                 &StreamMeta {
                     org_id: org_id.to_string(),
                     stream_name: stream_name.to_string(),
-                    partition_keys: partition_keys.clone(),
+                    partition_keys: &partition_keys,
                     partition_time_level,
-                    stream_alerts_map: stream_alerts_map.clone(),
+                    stream_alerts_map: &stream_alerts_map,
                 },
                 &mut stream_schema_map,
                 &mut stream_status.status,
@@ -163,7 +163,7 @@ pub async fn process(
         write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, stream_alerts_map).await;
+    super::evaluate_trigger(trigger, &stream_alerts_map).await;
 
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[

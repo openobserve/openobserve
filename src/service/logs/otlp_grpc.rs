@@ -126,9 +126,9 @@ pub async fn usage_ingest(
             &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
-                partition_keys: partition_keys.clone(),
+                partition_keys: &partition_keys,
                 partition_time_level,
-                stream_alerts_map: stream_alerts_map.clone(),
+                stream_alerts_map: &stream_alerts_map,
             },
             &mut stream_schema_map,
             &mut stream_status.status,
@@ -161,7 +161,7 @@ pub async fn usage_ingest(
     }
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, stream_alerts_map).await;
+    super::evaluate_trigger(trigger, &stream_alerts_map).await;
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -346,9 +346,9 @@ pub async fn handle_grpc_request(
                     &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
-                        partition_keys: partition_keys.clone(),
+                        partition_keys: &partition_keys,
                         partition_time_level,
-                        stream_alerts_map: stream_alerts_map.clone(),
+                        stream_alerts_map: &stream_alerts_map,
                     },
                     &mut stream_schema_map,
                     &mut stream_status.status,
@@ -376,7 +376,7 @@ pub async fn handle_grpc_request(
     .await;
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, stream_alerts_map).await;
+    super::evaluate_trigger(trigger, &stream_alerts_map).await;
 
     let ep = if is_grpc {
         "grpc/export/logs"

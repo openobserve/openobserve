@@ -90,7 +90,7 @@ pub async fn multi(
         match logs::ingest::ingest(
             &org_id,
             &stream_name,
-            IngestionRequest::Multi(body),
+            IngestionRequest::Multi(&body),
             **thread_id,
         )
         .await
@@ -157,7 +157,7 @@ pub async fn json(
         match logs::ingest::ingest(
             &org_id,
             &stream_name,
-            IngestionRequest::JSON(body),
+            IngestionRequest::JSON(&body),
             **thread_id,
         )
         .await
@@ -224,7 +224,7 @@ pub async fn handle_kinesis_request(
         match logs::ingest::ingest(
             &org_id,
             &stream_name,
-            IngestionRequest::KinesisFH(post_data.into_inner()),
+            IngestionRequest::KinesisFH(&post_data.into_inner()),
             **thread_id,
         )
         .await
@@ -324,7 +324,7 @@ pub async fn handle_gcp_request(
         match logs::ingest::ingest(
             &org_id,
             &stream_name,
-            IngestionRequest::GCP(post_data.into_inner()),
+            IngestionRequest::GCP(&post_data.into_inner()),
             **thread_id,
         )
         .await

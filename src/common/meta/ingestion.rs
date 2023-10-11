@@ -282,18 +282,18 @@ pub struct GCPIngestionResponse {
     pub timestamp: String,
 }
 
-pub enum IngestionRequest {
-    JSON(web::Bytes),
-    Multi(web::Bytes),
-    KinesisFH(KinesisFHRequest),
-    GCP(GCPIngestionRequest),
+pub enum IngestionRequest<'a> {
+    JSON(&'a web::Bytes),
+    Multi(&'a web::Bytes),
+    KinesisFH(&'a KinesisFHRequest),
+    GCP(&'a GCPIngestionRequest),
 }
 
 pub enum IngestionData<'a> {
-    JSON(Vec<json::Value>),
+    JSON(&'a Vec<json::Value>),
     Multi(&'a [u8]),
-    GCP(GCPIngestionRequest),
-    KinesisFH(KinesisFHRequest),
+    GCP(&'a GCPIngestionRequest),
+    KinesisFH(&'a KinesisFHRequest),
 }
 
 #[derive(Debug)]
