@@ -213,6 +213,10 @@ pub async fn ingest(
         local_trans.len() as u16,
     )
     .await;
+    drop(runtime);
+    drop(stream_schema_map);
+    drop(buf);
+    drop(stream_vrl_map);
 
     drop(runtime);
     drop(stream_schema_map);
