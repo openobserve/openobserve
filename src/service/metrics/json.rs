@@ -247,7 +247,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
 
         let mut stream_file_name = "".to_string();
         let mut req_stats = write_file(
-            stream_data,
+            &stream_data,
             thread_id,
             StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             &mut stream_file_name,

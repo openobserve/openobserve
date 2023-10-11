@@ -171,7 +171,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
     }
     let mut stream_file_name = "".to_string();
     write_file(
-        buf,
+        &buf,
         thread_id,
         StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,

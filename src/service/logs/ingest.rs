@@ -173,7 +173,7 @@ pub async fn ingest(
     // write to file
     let mut stream_file_name = "".to_string();
     let mut req_stats = write_file(
-        buf,
+        &buf,
         thread_id,
         StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
@@ -221,6 +221,10 @@ pub async fn ingest(
         local_trans.len() as u16,
     )
     .await;
+    drop(runtime);
+    drop(stream_schema_map);
+    drop(buf);
+    drop(stream_vrl_map);
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
