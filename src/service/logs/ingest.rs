@@ -219,6 +219,7 @@ pub async fn ingest(
     drop(buf);
     drop(stream_vrl_map);
     drop(stream_params);
+    drop(stream_alerts_map);
 
     drop(runtime);
     drop(stream_schema_map);
