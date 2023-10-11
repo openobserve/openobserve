@@ -164,7 +164,7 @@ pub async fn save_enrichment_data(
     let mut req_stats = write_file(
         &buf,
         thread_id,
-        StreamParams::new(org_id, stream_name, StreamType::EnrichmentTables),
+        &StreamParams::new(org_id, stream_name, StreamType::EnrichmentTables),
         &mut stream_file_name,
         None,
     )

@@ -378,7 +378,7 @@ pub async fn traces_json(
     let mut req_stats = write_file(
         &data_buf,
         thread_id,
-        StreamParams::new(org_id, traces_stream_name, StreamType::Traces),
+        &StreamParams::new(org_id, traces_stream_name, StreamType::Traces),
         &mut traces_file_name,
         None,
     )

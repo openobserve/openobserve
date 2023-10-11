@@ -204,7 +204,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Opt
 }
 
 async fn add_valid_record(
-    stream_meta: StreamMeta,
+    stream_meta: &StreamMeta,
     stream_schema_map: &mut AHashMap<String, Schema>,
     status: &mut RecordStatus,
     buf: &mut AHashMap<String, Vec<String>>,

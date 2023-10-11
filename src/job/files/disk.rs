@@ -307,7 +307,8 @@ async fn upload_file(
 
     let new_file_name =
         super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
-    let file = new_file_name.to_owned();
+    drop(file);
+    let file_name = new_file_name.to_owned();
     match task::spawn_blocking(move || async move {
         storage::put(&new_file_name, bytes::Bytes::from(buf_parquet)).await
     })
@@ -315,12 +316,12 @@ async fn upload_file(
     {
         Ok(output) => match output.await {
             Ok(_) => {
-                log::info!("[JOB] disk file upload succeeded: {}", file);
-                Ok((file, file_meta, stream_type))
+                log::info!("[JOB] disk file upload succeeded: {}", file_name);
+                Ok((file_name, file_meta, stream_type))
             }
             Err(err) => {
                 log::error!("[JOB] disk file upload error: {:?}", err);
-                return Err(anyhow::anyhow!(err));
+                Err(anyhow::anyhow!(err))
             }
         },
         Err(err) => {

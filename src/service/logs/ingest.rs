@@ -51,11 +51,8 @@ pub async fn ingest(
     let start = std::time::Instant::now();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let stream_name = &get_formatted_stream_name(
-        StreamParams::new(org_id, in_stream_name, StreamType::Logs),
-        &mut stream_schema_map,
-    )
-    .await;
+    let stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
+    let stream_name = &get_formatted_stream_name(&stream_params, &mut stream_schema_map).await;
 
     if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
         return Err(value);
@@ -138,7 +135,7 @@ pub async fn ingest(
                             }
                         }
                         let local_trigger = super::add_valid_record(
-                            StreamMeta {
+                            &StreamMeta {
                                 org_id: org_id.to_string(),
                                 stream_name: stream_name.to_string(),
                                 partition_keys: partition_keys.clone(),
@@ -172,14 +169,8 @@ pub async fn ingest(
 
     // write to file
     let mut stream_file_name = "".to_string();
-    let mut req_stats = write_file(
-        &buf,
-        thread_id,
-        StreamParams::new(org_id, stream_name, StreamType::Logs),
-        &mut stream_file_name,
-        None,
-    )
-    .await;
+    let mut req_stats =
+        write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     if stream_file_name.is_empty() {
         return Ok(IngestionResponse::new(
@@ -221,10 +212,12 @@ pub async fn ingest(
         local_trans.len() as u16,
     )
     .await;
+
     drop(runtime);
     drop(stream_schema_map);
     drop(buf);
     drop(stream_vrl_map);
+    drop(stream_params);
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
