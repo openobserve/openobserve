@@ -215,7 +215,6 @@ export const convertPromQLData = (
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
-                triggerLineEvent: true,
                 data: values.map((value: any) => [value[0] * 1000, value[1]]),
                 ...getPropsByChartTypeForSeries(panelSchema.type),
               };
@@ -380,14 +379,12 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: { focus: "series" },
         smooth: true,
         showSymbol: false,
-        // symbolSize:1
       };
     case "scatter":
       return {
         type: "scatter",
         emphasis: { focus: "series" },
         symbolSize: 5,
-        // showSymbol: false,
       };
     case "pie":
       return {
@@ -411,7 +408,6 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: { focus: "series" },
         smooth: true,
         areaStyle: {},
-        // symbolSize:1,
         showSymbol: false,
       };
     case "stacked":
@@ -426,7 +422,6 @@ const getPropsByChartTypeForSeries = (type: string) => {
         stack: "Total",
         areaStyle: {},
         showSymbol: false,
-        // symbolSize:1,
         emphasis: {
           focus: "series",
         },

@@ -1119,7 +1119,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "scatter",
         emphasis: { focus: "series" },
-        symbolSize: 10,
+        symbolSize: 5,
       };
     case "pie":
       return {
