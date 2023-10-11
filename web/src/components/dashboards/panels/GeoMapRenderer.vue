@@ -133,7 +133,6 @@ export default defineComponent({
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             const lmapComponent = chart.getModel().getComponent('lmap');
-            console.log("lmapComponent ", lmapComponent);
 
             // Get the instance of Leaflet
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
