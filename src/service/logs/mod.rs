@@ -234,7 +234,7 @@ async fn add_valid_record(
     let hour_key = get_wal_time_key(
         timestamp,
         &stream_meta.partition_keys,
-        unwrap_partition_time_level(stream_meta.partition_time_level, StreamType::Logs),
+        unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
         local_val,
         Some(&schema_key),
     );
@@ -347,7 +347,7 @@ struct StreamMeta<'a> {
     org_id: String,
     stream_name: String,
     partition_keys: &'a Vec<String>,
-    partition_time_level: Option<PartitionTimeLevel>,
+    partition_time_level: &'a Option<PartitionTimeLevel>,
     stream_alerts_map: &'a AHashMap<String, Vec<Alert>>,
 }
 

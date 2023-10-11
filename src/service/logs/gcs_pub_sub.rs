@@ -127,7 +127,7 @@ pub async fn process(
                     org_id: org_id.to_string(),
                     stream_name: stream_name.to_string(),
                     partition_keys: &partition_keys,
-                    partition_time_level,
+                    partition_time_level: &partition_time_level,
                     stream_alerts_map: &stream_alerts_map,
                 },
                 &mut stream_schema_map,
