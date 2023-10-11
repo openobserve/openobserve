@@ -45,7 +45,7 @@ use crate::service::{
 pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
-    in_req: IngestionRequest,
+    in_req: IngestionRequest<'_>,
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
@@ -66,7 +66,8 @@ pub async fn ingest(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<Trigger> = None;
-    let multi_req: Bytes;
+    let multi_req: &Bytes;
+    let reader: Vec<json::Value>;
 
     // Start Register Transforms for stream
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
@@ -91,12 +92,12 @@ pub async fn ingest(
 
     let data = match in_req {
         IngestionRequest::JSON(req) => {
-            let reader: Vec<json::Value> = json::from_slice(&req).unwrap_or({
-                let val: json::Value = json::from_slice(&req)?;
+            reader = json::from_slice(req).unwrap_or({
+                let val: json::Value = json::from_slice(req)?;
                 vec![val]
             });
             ep = "/api/org/ingest/logs/_json";
-            IngestionData::JSON(reader)
+            IngestionData::JSON(&reader)
         }
         IngestionRequest::GCP(req) => {
             ep = "/api/org/ingest/logs/_gcs";
@@ -105,7 +106,7 @@ pub async fn ingest(
         IngestionRequest::Multi(req) => {
             multi_req = req;
             ep = "/api/org/ingest/logs/_multi";
-            IngestionData::Multi(&multi_req)
+            IngestionData::Multi(multi_req)
         }
         IngestionRequest::KinesisFH(req) => {
             ep = "/api/org/ingest/logs/_kinesis";
@@ -138,9 +139,9 @@ pub async fn ingest(
                             &StreamMeta {
                                 org_id: org_id.to_string(),
                                 stream_name: stream_name.to_string(),
-                                partition_keys: partition_keys.clone(),
+                                partition_keys: &partition_keys,
                                 partition_time_level,
-                                stream_alerts_map: stream_alerts_map.clone(),
+                                stream_alerts_map: &stream_alerts_map,
                             },
                             &mut stream_schema_map,
                             &mut stream_status.status,
@@ -161,7 +162,7 @@ pub async fn ingest(
                 };
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                log::error!("Error: {:?}", e);
                 return Err(anyhow::Error::msg("Failed processing"));
             }
         }
@@ -179,7 +180,7 @@ pub async fn ingest(
         ));
     }
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, stream_alerts_map).await;
+    super::evaluate_trigger(trigger, &stream_alerts_map).await;
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -218,6 +219,7 @@ pub async fn ingest(
     drop(buf);
     drop(stream_vrl_map);
     drop(stream_params);
+    drop(stream_alerts_map);
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),

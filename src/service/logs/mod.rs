@@ -204,7 +204,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Opt
 }
 
 async fn add_valid_record(
-    stream_meta: &StreamMeta,
+    stream_meta: &StreamMeta<'_>,
     stream_schema_map: &mut AHashMap<String, Schema>,
     status: &mut RecordStatus,
     buf: &mut AHashMap<String, Vec<String>>,
@@ -323,7 +323,7 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
 
 async fn evaluate_trigger(
     trigger: Option<Trigger>,
-    stream_alerts_map: AHashMap<String, Vec<Alert>>,
+    stream_alerts_map: &AHashMap<String, Vec<Alert>>,
 ) {
     if trigger.is_some() {
         let val = trigger.unwrap();
@@ -343,12 +343,12 @@ async fn evaluate_trigger(
     }
 }
 
-struct StreamMeta {
+struct StreamMeta<'a> {
     org_id: String,
     stream_name: String,
-    partition_keys: Vec<String>,
+    partition_keys: &'a Vec<String>,
     partition_time_level: Option<PartitionTimeLevel>,
-    stream_alerts_map: AHashMap<String, Vec<Alert>>,
+    stream_alerts_map: &'a AHashMap<String, Vec<Alert>>,
 }
 
 #[cfg(test)]
