@@ -268,7 +268,7 @@ export default defineComponent({
         store,
         route.query.dashboard,
         route.query.folder ?? "default"
-      )))
+      )));
       currentDashboardData.data = data
 
       // if variables data is null, set it to empty list
