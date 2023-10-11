@@ -221,7 +221,6 @@ export default defineComponent({
 
               importDashboardFromJSON(convertedSchema, selectedFolderAtJson.value)
                 .then((res) => {
-                  jsonFiles.value = null
                   resolve({ file: it.name, result: res })
                 }).catch((e) => {
                   reject({ file: it.name, error: e })
@@ -235,7 +234,7 @@ export default defineComponent({
         })
       })
 
-      Promise.allSettled(data)
+      Promise.allSettled(data ?? [])
         .then(async (results) => {
           filesImportResults.value = results
 
@@ -301,7 +300,15 @@ export default defineComponent({
       isLoading.value = ImportType.URL
       try {
         // get the dashboard
-        const urlData = url.value ? url.value : ''
+        const urlData = url.value.trim() ? url.value.trim() : ''
+
+        if(!urlData){
+          $q.notify({
+              type: "negative",
+              message: `Please Enter a URL for import`,
+            });
+            return ;
+        }
 
         const res = await axios.get(urlData);
 
