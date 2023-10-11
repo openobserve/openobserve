@@ -85,6 +85,12 @@ pub struct PanelFields {
     pub y: Vec<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub z: Option<Vec<AxisItem>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latitude: Option<AxisItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub longitude: Option<AxisItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weight: Option<AxisItem>,
     pub filter: Vec<PanelFilter>,
 }
 
@@ -136,6 +142,10 @@ pub struct PanelConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct QueryConfig {
     promql_legend: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    layer_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    weight_fixed: Option<f64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
