@@ -251,7 +251,6 @@ async fn main() -> Result<(), anyhow::Error> {
         .worker_max_blocking_threads(
             CONFIG.limit.http_worker_num * CONFIG.limit.http_worker_max_blocking,
         )
-        .keep_alive(KeepAlive::Timeout(std::time::Duration::from_secs(10)))
         .run()
         .await?;
 
