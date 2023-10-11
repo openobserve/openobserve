@@ -445,8 +445,8 @@ export const getFoldersList = async (store: any) => {
   let folders = (await dashboardService.list_Folders(store.state.selectedOrganization.identifier)).data.list;
 
   // get default folder and append it to top
-  let defaultFolder = folders.find((it: any) => it.name == "default");
-  folders = folders.filter((it: any) => it.name != "default");
+  let defaultFolder = folders.find((it: any) => it.folderId == "default");
+  folders = folders.filter((it: any) => it.folderId != "default");  
 
   if(!defaultFolder){
     defaultFolder = {

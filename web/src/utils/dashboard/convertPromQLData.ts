@@ -29,6 +29,14 @@ export const convertPromQLData = (
   store: any
 ) => {
 
+  // It is used to keep track of the current series name in tooltip to bold the series name
+  let currentSeriesName = "";
+
+  // set the current series name (will be set at chartrenderer on mouseover)
+  const setCurrentSeriesValue = (newValue: any) => {
+    currentSeriesName = newValue ?? "";
+  };
+
   const legendPosition = getLegendPosition(
     panelSchema?.config?.legends_position
   );
@@ -49,7 +57,18 @@ export const convertPromQLData = (
     textStyle: {
       width: 150,
       overflow: "truncate",
+      rich: {
+        a: {
+            fontWeight: 'bold'
+        },
+        b: {
+            fontStyle: 'normal'
+        }
+      }
     },
+    formatter: (name: any) => {
+      return name == currentSeriesName ? '{a|' + name + '}': '{b|' + name + '}'
+    }
   };
 
   // Additional logic to adjust the legend position
@@ -77,19 +96,51 @@ export const convertPromQLData = (
     },
     tooltip: {
       show: true,
-      trigger: "item",
+      trigger: "axis",
       textStyle: {
         fontSize: 12,
       },
+      enterable: true,
+      extraCssText: "max-height: 200px; overflow: auto;",
       formatter: function (name: any) {
-        const date = new Date(name.value[0]);
-        return `${formatDate(date)} <br/> ${name?.marker} ${name?.seriesName} : ${formatUnitValue(
+        if (name.length == 0) return "";
+
+        const date = new Date(name[0].data[0]);
+
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) => it.seriesName == currentSeriesName
+        )
+        
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
+        let hoverText = name.map((it: any) => { 
+          
+          // check if the series is the current series being hovered
+          // if have than bold it
+          if(it?.seriesName == currentSeriesName)
+            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
-                name?.value[1],
+                it.data[1],
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom
               )
-            )}`;
+            )} </strong>`;
+            // else normal text
+            else
+              return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                getUnitValue(
+                  it.data[1],
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom
+                )
+              )}`;
+        });
+
+        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       },
       axisPointer: {
         show: true,
@@ -255,7 +306,9 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  return { options };
+  // extras will be used to return other data to chart renderer
+  // e.g. setCurrentSeriesValue to set the current series index which is hovered
+  return { options, extras: { setCurrentSeriesValue }};
 };
 
 /**
@@ -325,8 +378,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "line",
         emphasis: { focus: "series" },
         smooth: true,
-        // showSymbol: false,
-        symbolSize:1
+        showSymbol: false,
       };
     case "scatter":
       return {
@@ -356,8 +408,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: { focus: "series" },
         smooth: true,
         areaStyle: {},
-        symbolSize:1,
-        // showSymbol: false,
+        showSymbol: false,
       };
     case "stacked":
       return {
@@ -370,8 +421,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         smooth: true,
         stack: "Total",
         areaStyle: {},
-        // showSymbol: false,
-        symbolSize:1,
+        showSymbol: false,
         emphasis: {
           focus: "series",
         },

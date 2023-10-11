@@ -87,7 +87,8 @@ export default defineComponent({
         store,
         store.state.selectedOrganization.identifier,
         props.dashboardData.dashboardId,
-        props.dashboardData
+        props.dashboardData,
+        route.query.folder ?? "default"
       );
 
       $q.notify({

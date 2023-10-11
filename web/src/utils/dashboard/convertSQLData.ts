@@ -107,7 +107,18 @@ export const convertSQLData = (
     textStyle: {
       width: 100,
       overflow: "truncate",
+      rich: {
+        a: {
+            fontWeight: 'bold'
+        },
+        b: {
+            fontStyle: 'normal'
+        }
+      }
     },
+    formatter: (name: any) => {
+      return name == currentSeriesName ? '{a|' + name + '}': '{b|' + name + '}'
+    }
   };
 
   // Additional logic to adjust the legend position
@@ -119,6 +130,14 @@ export const convertSQLData = (
     legendConfig.left = "0"; // Apply left positioning
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
+
+  // It is used to keep track of the current series name in tooltip to bold the series name
+  let currentSeriesName = "";
+
+  // set the current series name (will be set at chartrenderer on mouseover)
+  const setCurrentSeriesValue = (newValue: any) => {
+    currentSeriesName = newValue ?? "";
+  };
 
   const options: any = {
     backgroundColor: "transparent",
@@ -134,7 +153,7 @@ export const convertSQLData = (
       bottom: "40",
     },
     tooltip: {
-      trigger: "item",
+      trigger: "axis",
       textStyle: {
         fontSize: 12,
       },
@@ -188,13 +207,43 @@ export const convertSQLData = (
         },
       },
       formatter: function (name: any) {
-        return `${name.name} <br/> ${name.marker} ${name.seriesName} : ${formatUnitValue(
+        if (name.length == 0) return "";
+
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) => it.seriesName == currentSeriesName
+        )
+        
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
+
+        let hoverText = name.map((it: any) => {
+          
+          // check if the series is the current series being hovered
+          // if have than bold it
+          if(it?.seriesName == currentSeriesName)
+            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
-                name.value,
+                it.value,
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom
               )
-        )}`;
+            )} </strong>`;
+            // else normal text
+            else
+            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+              getUnitValue(
+                it.value,
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom
+              )
+            )}`;
+        });
+
+        return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
     xAxis: xAxisKeys
@@ -387,16 +436,43 @@ export const convertSQLData = (
       }
       else{
         options.tooltip.formatter = function (name: any) {
-          return `${name.name} <br/> ${name.marker} ${
-                name.seriesName
-              } : ${formatUnitValue(
+          if (name.length == 0) return "";
+
+          // get the current series index from name
+          const currentSeriesIndex = name.findIndex(
+            (it: any) => it.seriesName == currentSeriesName
+          )
+          
+          // swap current hovered series index to top in tooltip
+          const temp = name[0];
+          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
+            let hoverText = name.map((it: any) => { 
+              
+            // check if the series is the current series being hovered
+            // if have than bold it
+            if(it?.seriesName == currentSeriesName)
+              return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                 getUnitValue(
-                  name.value[1],
+                  it.data[1],
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom
                 )
-          )}`;
-        };
+              )} </strong>`;
+            // else normal text
+            else
+              return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                getUnitValue(
+                  it.data[1],
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom
+                )
+              )}`;
+            });
+
+            return `${name[0].data[0]} <br/> ${hoverText.join("<br/>")}`;
+          };
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
             name: panelSchema?.queries[0]?.fields?.y.find(
@@ -786,8 +862,6 @@ export const convertSQLData = (
     //if x axis has time series
     if (field) {
       options.series.map((seriesObj: any) => {
-        seriesObj.showSymbol= true;
-        seriesObj.symbolSize = 1;
         seriesObj.data = seriesObj.data.map((it: any, index: any) => [
           Number.isInteger(options.xAxis[0].data[index]) ? options.xAxis[0].data[index] : new Date(options.xAxis[0].data[index]+ "Z").getTime(),
           it,
@@ -796,14 +870,45 @@ export const convertSQLData = (
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
-        const date = new Date(name.value[0]);
-        return `${formatDate(date)} <br/> ${name.marker} ${name.seriesName} : ${formatUnitValue(
+        if (name.length == 0) return "";
+  
+        const date = new Date(name[0].data[0]);
+
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) => it.seriesName == currentSeriesName
+        )
+        
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
+  
+        let hoverText = name.map((it: any) => {
+          
+          // check if the series is the current series being hovered
+          // if have than bold it
+          if(it?.seriesName == currentSeriesName)
+            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
-                name.value[1],
+                it.data[1],
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom
               )
-        )}`;
+            )} </strong>`;
+            // else normal text
+            else
+            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+              getUnitValue(
+                it.data[1],
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom
+              )
+            )}`;
+        });
+
+        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
       options.tooltip.axisPointer = {
         type: "cross",
@@ -848,8 +953,6 @@ export const convertSQLData = (
     });
     if (isTimeSeries) {
       options.series.map((seriesObj: any) => {
-        seriesObj.showSymbol= true;
-        seriesObj.symbolSize = 1;
         seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
           new Date(options.xAxis[0].data[index] + "Z").getTime(),
           it,
@@ -857,15 +960,47 @@ export const convertSQLData = (
       });
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
-      options.tooltip.formatter = function (name: any) {  
-        const date = new Date(name.value[0]);
-        return `${formatDate(date)} <br/> ${name.marker} ${name.seriesName} : ${formatUnitValue(
+      options.tooltip.formatter = function (name: any) {
+
+        if (name.length == 0) return "";
+  
+        const date = new Date(name[0].data[0]);
+
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) => it.seriesName == currentSeriesName
+        )
+        
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
+  
+        let hoverText = name.map((it: any) => {
+          
+          // check if the series is the current series being hovered
+          // if have than bold it
+          if(it?.seriesName == currentSeriesName)
+            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
-                name.value[1],
+                it.data[1],
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom
               )
-        )}`;
+            )} </strong>`;
+            // else normal text
+            else
+            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+              getUnitValue(
+                it.data[1],
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom
+              )
+            )}`;
+        });
+
+        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
       options.tooltip.axisPointer = {
         type: "cross",
@@ -891,8 +1026,13 @@ export const convertSQLData = (
     }
   }
 
+  // extras will be used to return other data to chart renderer
+  // e.g. setCurrentSeriesIndex to set the current series index which is hovered
   return {
     options,
+    extras: {
+      setCurrentSeriesValue
+    }
   };
 };
 
@@ -979,7 +1119,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "scatter",
         emphasis: { focus: "series" },
-        symbolSize: 10,
+        symbolSize: 5,
       };
     case "pie":
       return {
