@@ -246,7 +246,7 @@ export const usePanelDataLoader = (
       }
       case "sql": {
         const errorDetailValue =
-          error.response?.data.error_detail ?? error.message;
+          error.response?.data.error_detail || error.response?.data.message || error.message;
         const trimmedErrorMessage =
           errorDetailValue.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."

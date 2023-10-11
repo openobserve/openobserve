@@ -428,9 +428,17 @@ const removeQuery = (index: number) => {
 
       })
       .catch((error: any) => {
+        const errorDetailValue =
+          error.response?.data.error_detail ||
+          error.response?.data.message ||
+          "Something went wrong!";
+        const trimmedErrorMessage =
+          errorDetailValue.length > 300
+            ? errorDetailValue.slice(0, 300) + " ..."
+            : errorDetailValue;
         $q.notify({
           type: "negative",
-          message: "Something went wrong!",
+          message: trimmedErrorMessage,
           timeout: 5000,
         });
       });
@@ -457,14 +465,22 @@ const loadFilterItem = (name:any)=>{
           column: name,
           value: res?.data?.hits?.[0]?.values
             .map((it: any) => it.zo_sql_key)
-            .filter((it: any) => it),
+            .filter((it: any) => it).map((it: any) => String(it)),
         });
 
       })
       .catch((error: any) => {
+        const errorDetailValue =
+          error.response?.data.error_detail ||
+          error.response?.data.message ||
+          "Something went wrong!";
+        const trimmedErrorMessage =
+          errorDetailValue.length > 300
+            ? errorDetailValue.slice(0, 300) + " ..."
+            : errorDetailValue;
         $q.notify({
           type: "negative",
-          message: "Something went wrong!",
+          message: trimmedErrorMessage,
           timeout: 5000,
         });
       });
