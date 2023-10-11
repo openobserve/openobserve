@@ -233,7 +233,7 @@ async fn add_valid_record(
     let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
     let hour_key = get_wal_time_key(
         timestamp,
-        &stream_meta.partition_keys,
+        stream_meta.partition_keys,
         unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
         local_val,
         Some(&schema_key),
