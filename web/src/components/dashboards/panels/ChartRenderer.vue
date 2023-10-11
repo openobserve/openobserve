@@ -53,6 +53,35 @@ export default defineComponent({
           } 
         }
 
+        const legendSelectChangedFn =  (params: any) => {
+          // check if all series are selected (all will be false)
+          if(Object.values(params.selected).every((value: any) => value === false)){
+
+            // set all series to true
+            Object.keys(params.selected).forEach((name: any) => {
+              params.selected[ name ] = true;
+            });
+
+          // select only selected series
+          }else {
+
+            // set all false except selected series
+            Object.keys(params.selected).forEach((name: any) => {
+              params.selected[ name ] = params.name === name ? true : false;
+            });
+
+          }              
+
+          // get legend
+          const legendOption = chart.getOption().legend[0];
+
+          // set options with selected object
+          if (legendOption) {
+            legendOption.selected = params.selected;
+            chart.setOption({ legend: [legendOption] });
+          }
+        }
+
         watch(() => store.state.theme, (newTheme) => {
           const theme = newTheme === 'dark' ? 'dark' : 'light';
           chart.dispose();  
@@ -61,10 +90,9 @@ export default defineComponent({
           options.animation = false
           chart.setOption(options, true);
           chart.setOption({animation: true});
-          chart.on('mouseover', mouseHoverEffectFn)
-          chart.on('globalout', () => {
-              props.data?.extras?.setCurrentSeriesValue("");
-          })
+          chart.on("mouseover", mouseHoverEffectFn);
+          chart.on("globalout", () => {mouseHoverEffectFn({})});
+          chart.on("legendselectchanged",legendSelectChangedFn);
         });
 
         onMounted(async () => {
@@ -78,10 +106,9 @@ export default defineComponent({
             const theme = store.state.theme === 'dark' ? 'dark' : 'light';
             chart = echarts.init(chartRef.value, theme);
             chart.setOption(props?.data?.options || {}, true);
-            chart.on('mouseover', mouseHoverEffectFn)
-            chart.on('globalout', () => {
-              props.data?.extras?.setCurrentSeriesValue("");
-            })
+            chart.on("mouseover", mouseHoverEffectFn);
+            chart.on("globalout", () => {mouseHoverEffectFn({})});
+            chart.on("legendselectchanged",legendSelectChangedFn);
             window.addEventListener("resize", windowResizeEventCallback);
         });
         onUnmounted(() => {

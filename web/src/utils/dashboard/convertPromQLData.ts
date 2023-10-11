@@ -34,7 +34,7 @@ export const convertPromQLData = (
 
   // set the current series name (will be set at chartrenderer on mouseover)
   const setCurrentSeriesValue = (newValue: any) => {
-    currentSeriesName = newValue;
+    currentSeriesName = newValue ?? "";
   };
 
   const legendPosition = getLegendPosition(
@@ -103,15 +103,6 @@ export const convertPromQLData = (
       enterable: true,
       extraCssText: "max-height: 200px; overflow: auto;",
       formatter: function (name: any) {
-        // const date = new Date(name.value[0]);
-        // return `${formatDate(date)} <br/> ${name?.marker} ${name?.seriesName} : ${formatUnitValue(
-        //       getUnitValue(
-        //         name?.value[1],
-        //         panelSchema.config?.unit,
-        //         panelSchema.config?.unit_custom
-        //       )
-        //     )}`;
-
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
