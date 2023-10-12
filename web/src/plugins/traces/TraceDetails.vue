@@ -142,7 +142,6 @@ import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceHeader from "./TraceHeader.vue";
-import TraceChart from "./TraceChart.vue";
 import { useStore } from "vuex";
 import { duration } from "moment";
 import D3Chart from "@/components/D3Chart.vue";
@@ -165,7 +164,6 @@ export default defineComponent({
     TraceDetailsSidebar,
     TraceTree,
     TraceHeader,
-    TraceChart,
     D3Chart,
     TraceTimelineIcon,
     ServiceMapIcon,
