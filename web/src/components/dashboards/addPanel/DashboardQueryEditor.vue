@@ -91,9 +91,7 @@ export default defineComponent({
     emits: ["searchdata"],
     methods: {
         searchData() {
-            if (this.searchdashboardPanelData.loading == false) {
-                this.$emit("searchdata");
-            }
+            this.$emit("searchdata");
         },
     },
     setup() {

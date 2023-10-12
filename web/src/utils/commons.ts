@@ -148,7 +148,7 @@ function findDashboard(dashboardId: string, store: any, folderId: any) {
   const dashboards = store.state.organizationData.allDashboardList[folderId];
   const dashboard = dashboards.find((it: any) => it.dashboardId === dashboardId);
   // return the deep cody of the dashboard object to prevent it from being modified
-  return typeof dashboard === 'object' ? JSON.parse(JSON.stringify(dashboard)) : dashboard;
+  return  dashboard && typeof dashboard === 'object' ? JSON.parse(JSON.stringify(dashboard)) : {};
 }
 
 export const addPanel = async (
@@ -445,8 +445,8 @@ export const getFoldersList = async (store: any) => {
   let folders = (await dashboardService.list_Folders(store.state.selectedOrganization.identifier)).data.list;
 
   // get default folder and append it to top
-  let defaultFolder = folders.find((it: any) => it.name == "default");
-  folders = folders.filter((it: any) => it.name != "default");
+  let defaultFolder = folders.find((it: any) => it.folderId == "default");
+  folders = folders.filter((it: any) => it.folderId != "default");  
 
   if(!defaultFolder){
     defaultFolder = {

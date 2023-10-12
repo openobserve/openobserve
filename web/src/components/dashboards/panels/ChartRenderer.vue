@@ -28,7 +28,7 @@ export default defineComponent({
         data: {
             required: true,
             type: Object,
-            default: () => ({ options: {} })
+            default: () => ({ options: {}, extras: {} })
         },
     },
     setup(props: any) {
@@ -41,6 +41,55 @@ export default defineComponent({
             chart.resize();
         }
 
+        const mouseHoverEffectFn = (params: any) => {
+
+          // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
+          // seriesName and seriesIndex will used in the same function
+          if(params.componentSubType === "pie"){
+            params.seriesName = params.data?.name;
+            params.seriesIndex = params.dataIndex;
+          }
+          
+          props.data?.extras?.setCurrentSeriesValue(params.seriesName);
+
+          // scroll legend upto current series index
+          const legendOption = chart.getOption().legend[0];
+
+          if (legendOption) {
+            legendOption.scrollDataIndex = params.seriesIndex;
+            chart.setOption({ legend: [legendOption] });
+          } 
+        }
+
+        const legendSelectChangedFn =  (params: any) => {
+          // check if all series are selected (all will be false)
+          if(Object.values(params.selected).every((value: any) => value === false)){
+
+            // set all series to true
+            Object.keys(params.selected).forEach((name: any) => {
+              params.selected[ name ] = true;
+            });
+
+          // select only selected series
+          }else {
+
+            // set all false except selected series
+            Object.keys(params.selected).forEach((name: any) => {
+              params.selected[ name ] = params.name === name ? true : false;
+            });
+
+          }              
+
+          // get legend
+          const legendOption = chart.getOption().legend[0];
+
+          // set options with selected object
+          if (legendOption) {
+            legendOption.selected = params.selected;
+            chart.setOption({ legend: [legendOption] });
+          }
+        }
+
         watch(() => store.state.theme, (newTheme) => {
           const theme = newTheme === 'dark' ? 'dark' : 'light';
           chart.dispose();  
@@ -49,6 +98,9 @@ export default defineComponent({
           options.animation = false
           chart.setOption(options, true);
           chart.setOption({animation: true});
+          chart.on("mouseover", mouseHoverEffectFn);
+          chart.on("globalout", () => {mouseHoverEffectFn({})});
+          chart.on("legendselectchanged",legendSelectChangedFn);
         });
 
         onMounted(async () => {
@@ -62,6 +114,9 @@ export default defineComponent({
             const theme = store.state.theme === 'dark' ? 'dark' : 'light';
             chart = echarts.init(chartRef.value, theme);
             chart.setOption(props?.data?.options || {}, true);
+            chart.on("mouseover", mouseHoverEffectFn);
+            chart.on("globalout", () => {mouseHoverEffectFn({})});
+            chart.on("legendselectchanged",legendSelectChangedFn);
             window.addEventListener("resize", windowResizeEventCallback);
         });
         onUnmounted(() => {
