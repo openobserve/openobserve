@@ -12,7 +12,7 @@
  See the License for the specific language governing permissions and
  limitations under the License. 
 -->
-
+<!-- 
 <template>
   <div ref="plotref" id="plotly_chart" class="logs-timeline-chart" />
 </template>
@@ -214,3 +214,4 @@ export default defineComponent({
   }
 }
 </style>
+-->

@@ -12,7 +12,7 @@
  See the License for the specific language governing permissions and
  limitations under the License. 
 -->
-
+<!-- 
 <template>
   <div ref="plotref" :id="id" style="width: 100%" />
 </template>
@@ -239,4 +239,4 @@ export default defineComponent({
     };
   },
 });
-</script>
+</script> -->

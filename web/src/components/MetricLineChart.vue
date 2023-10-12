@@ -12,7 +12,7 @@
  See the License for the specific language governing permissions and
  limitations under the License. 
 -->
-
+<!-- 
 <template>
   <div ref="plotref" id="metrics_plotly_chart" />
 </template>
@@ -231,4 +231,4 @@ export default defineComponent({
     };
   },
 });
-</script>
+</script> -->
