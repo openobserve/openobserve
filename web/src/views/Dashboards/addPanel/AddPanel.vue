@@ -93,7 +93,7 @@
                     </div>
 
                     <div style="flex:1;">
-                      <PanelSchemaRenderer :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
+                      <PanelSchemaRenderer :key="dashboardPanelData.data.type" :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                     </div>
                     <DashboardErrorsComponent :errors="errorData" />
                     </div>
@@ -306,7 +306,8 @@ export default defineComponent({
       return dashboardPanelData.data.type == 'table' ? 'Other Columns' : dashboardPanelData.data.type == 'h-bar' ? 'X-Axis' : 'Y-Axis'
     })
 
-    watch(() => dashboardPanelData.data.type, () => {
+    watch(() => dashboardPanelData.data.type, async() => {
+      await nextTick();
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
     })
 

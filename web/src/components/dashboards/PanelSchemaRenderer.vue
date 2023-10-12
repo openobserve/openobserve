@@ -17,15 +17,14 @@
   <div ref="chartPanelRef" style="height: 100%; position: relative">
     <div
       v-show="!errorDetail"
-      class="plotlycontainer"
       style="height: 100%; width: 100%"
     >
-    <ChartRenderer v-if="panelSchema.type != 'table'&& panelSchema.type != 'geomap'" :data="panelSchema.queryType === 'promql' || (data.length && data[0].length) ? panelData : []" />
+    <GeoMapRenderer v-if="panelSchema.type == 'geomap'" :data="panelData.chartType == 'geomap'? panelData: {options: {}}" />
     <TableRenderer
     v-else-if="panelSchema.type == 'table'"
-    :data="panelData"
+    :data="panelData.chartType == 'table'? panelData: {options: {}}"
     />
-    <GeoMapRenderer v-else-if="panelSchema.type == 'geomap'" :data="panelData" />
+    <ChartRenderer v-else :data="panelSchema.queryType === 'promql' || (data.length && data[0].length  && panelData.chartType != 'geomap' && panelData.chartType != 'table') ? panelData : {options:{}}" />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div v-if="errorDetail" class="errorMessage">

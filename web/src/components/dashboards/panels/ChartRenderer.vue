@@ -28,7 +28,7 @@ export default defineComponent({
         data: {
             required: true,
             type: Object,
-            default: () => ({ options: {}, extras: {} })
+            default: () => ({ options: {} })
         },
     },
     setup(props: any) {
@@ -53,11 +53,11 @@ export default defineComponent({
           props.data?.extras?.setCurrentSeriesValue(params.seriesName);
 
           // scroll legend upto current series index
-          const legendOption = chart.getOption().legend[0];
+          const legendOption = chart.getOption()?.legend[0];
 
-          if (legendOption) {
-            legendOption.scrollDataIndex = params.seriesIndex;
-            chart.setOption({ legend: [legendOption] });
+          if (legendOption && params?.seriesIndex) {
+                legendOption.scrollDataIndex = params?.seriesIndex;
+            chart?.setOption({ legend: [legendOption] });
           } 
         }
 
@@ -84,7 +84,7 @@ export default defineComponent({
           const legendOption = chart.getOption().legend[0];
 
           // set options with selected object
-          if (legendOption) {
+          if (legendOption && params?.selected) {
             legendOption.selected = params.selected;
             chart.setOption({ legend: [legendOption] });
           }

@@ -274,6 +274,9 @@ export const usePanelDataLoader = (
     }
   };
 
+  const hasAtLeastOneQuery = () =>
+    panelSchema.value.queries?.some((q: any) => q?.query);
+
   watch(
     () => isVisible.value,
     async () => {
@@ -281,7 +284,8 @@ export const usePanelDataLoader = (
       if (
         isVisible.value &&
         isDirty.value &&
-        panelSchema.value.queries?.length
+        panelSchema.value.queries?.length &&
+        hasAtLeastOneQuery()
       ) {
         loadData();
       }

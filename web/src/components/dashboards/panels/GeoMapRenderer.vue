@@ -14,7 +14,7 @@
 -->
 
 <template>
-    <div ref="chartRef" id="chart1" style="height: 100%; width: 100%;"></div>
+    <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%;"></div>
 </template>
 
 <script lang="ts">
@@ -39,7 +39,8 @@ export default defineComponent({
     setup(props: any) {
         const chartRef: any = ref(null);
         let chart: any;
-
+        let lmap: any;
+        let lmapComponent: any;
         const lmapOptions = {...props.data.options?.lmap} || {};
 
         const store = useStore();
@@ -81,13 +82,13 @@ export default defineComponent({
             // add the following two comments to circumvent this
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            const lmapComponent = chart.getModel().getComponent('lmap');
+            lmapComponent = chart.getModel().getComponent('lmap');
             console.log("lmapComponent ", lmapComponent);
             
             // Get the instance of Leaflet
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            const lmap = lmapComponent.getLeaflet();
+            lmap = lmapComponent.getLeaflet();
 
             L.tileLayer(
             "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -102,6 +103,13 @@ export default defineComponent({
         });
         onUnmounted(() => {
             window.removeEventListener("resize", windowResizeEventCallback);
+            if (lmap) {
+                lmap.off();
+                lmap.remove();
+            }
+            if (chart) {
+                chart.dispose();
+            }
         });
 
         // watch(() => store.state.theme, (newTheme) => {
@@ -132,12 +140,12 @@ export default defineComponent({
             // add the following two comments to circumvent this
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            const lmapComponent = chart.getModel().getComponent('lmap');
+            lmapComponent = chart.getModel().getComponent('lmap');
 
             // Get the instance of Leaflet
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            const lmap = lmapComponent.getLeaflet();
+            lmap = lmapComponent.getLeaflet();
 
             L.tileLayer(
                 "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
