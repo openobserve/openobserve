@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.1.1",
+    "@joakimono/echarts-extension-leaflet": "^1.0.1",
     "@openreplay/tracker": "^4.1.5",
     "@quasar/extras": "^1.14.3",
     "@segment/analytics-next": "^1.45.0",
@@ -35,6 +36,7 @@
     "jest-canvas-mock": "^2.5.0",
     "js-cookie": "^3.0.1",
     "jwt-decode": "^3.1.2",
+    "leaflet": "^1.9.4",
     "lodash-es": "^4.17.21",
     "moment": "^2.15.2",
     "node-polyfill-webpack-plugin": "^2.0.1",
@@ -61,6 +63,7 @@
     "@types/d3-selection": "^3.0.5",
     "@types/js-cookie": "^3.0.2",
     "@types/jsdom": "^16.2.14",
+    "@types/leaflet": "^1.9.4",
     "@types/lodash-es": "^4.17.6",
     "@types/node": "^16.11.45",
     "@types/plotly.js-dist-min": "^2.3.1",
