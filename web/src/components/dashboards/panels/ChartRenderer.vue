@@ -51,10 +51,10 @@ export default defineComponent({
             await nextTick();
 
             //for gauge chart fonsize resize
-            if(props?.data?.options?.series[0]?.type == "gauge"){
-              props.data.options.series[0].detail.fontSize= autoFontSize(chartRef);
-              chart.setOption(props?.data?.options)
-            }
+            // if(props?.data?.options?.series[0]?.type == "gauge"){
+            //   props.data.options.series[0].detail.fontSize= autoFontSize(chartRef);
+            //   chart.setOption(props?.data?.options)
+            // }
             chart?.resize();
         }
 
