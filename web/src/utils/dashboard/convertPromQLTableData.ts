@@ -24,9 +24,10 @@ export const convertPromQLTableData = (
   searchQueryData: any
 ) => {
   
+  // for each columns/querys values, we will find average
   const data = searchQueryData.map((it: any) => {
     return it?.result?.map((res:any)=>{
-      res.values = (res?.values?.reduce((acc: any, cur: any) => acc + (+cur[1]||0),0)/(res?.values?.length||1)).toFixed(2);
+      res.values = ((res?.values?.reduce((acc: any, cur: any) => acc + (+cur[1]||0),0) || 1)/(res?.values?.length||1))?.toFixed(2);
       return JSON.parse(JSON.stringify(res));
     })
   })
