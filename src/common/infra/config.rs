@@ -331,7 +331,7 @@ pub struct Limit {
     pub max_file_size_on_disk: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
-    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 60)] // seconds
+    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
