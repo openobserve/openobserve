@@ -103,7 +103,7 @@ export const convertPromQLData = (
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
-    grid: {
+    grid: [{
       containLabel: true,
       left: "30",
       right:
@@ -112,7 +112,7 @@ export const convertPromQLData = (
           : "40",
       top: "15",
       bottom: "30",
-    },
+    }],
     tooltip: {
       show: true,
       trigger: "axis",
@@ -217,6 +217,16 @@ export const convertPromQLData = (
     series: [],
   };
 
+  // To pass grid index in gauge chart
+  let gaugeIndex = 1;
+
+  let totalLength = 0;
+  
+  searchQueryData.forEach((metric: any) => {
+    if (metric.result && Array.isArray(metric.result)) {
+      totalLength += metric.result.length;
+    }
+  });  
 
   options.series = searchQueryData.map((it: any, index: number) => {
 
@@ -264,7 +274,21 @@ export const convertPromQLData = (
       }
 
       case "gauge" :{
-          const series = it?.result?.map((metric: any) => {
+        const numGaugesPerRow = 5;
+        const numRows = Math.ceil(totalLength / numGaugesPerRow); // Calculate the number of rows
+        const numGaugesInRow = Math.min(numGaugesPerRow, (totalLength - gaugeIndex + 1) * numGaugesPerRow);
+        const cellWidth = 100 / numGaugesInRow; // Calculate the width of each cell in percentage
+        const cellHeight = 100 / numRows; // Calculate the height of each cell in percentage
+
+
+        console.log(cellWidth, cellHeight);
+        
+
+        const series = it?.result?.map((metric: any, seriesIndex: any) => {          
+            options.grid.push({
+              left: `${((seriesIndex) * cellWidth)%100}%`,
+              top: `${Number.parseInt(((gaugeIndex - 1) / 5).toString()) * cellHeight}%`,
+            })
             const values = metric.values.sort(
               (a: any, b: any) => a[0] - b[0]
             );
@@ -273,11 +297,19 @@ export const convertPromQLData = (
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom
             );
+            gaugeIndex++;           
             return {
               ...getPropsByChartTypeForSeries(panelSchema.type),
               min: panelSchema?.config?.gauge_min || 0,
               max: panelSchema?.config?.gauge_max || 100,
+              gridIndex: gaugeIndex,
+              radius:`${cellHeight}%`,
+              title:{
+                fontSize: 10,
+              },
+              center:[`${(seriesIndex * cellWidth)%100 + 10}%`,`${Number.parseInt(((gaugeIndex - 2) / 5).toString()) * cellHeight + 10}%`],
               data:[{
+                // name: JSON.stringify(metric.metric),
                 value:parseFloat(unitValue.value).toFixed(2),
                 detail: {
                   formatter: function (value:any) {
@@ -287,8 +319,8 @@ export const convertPromQLData = (
               }],
               detail: {
                 valueAnimation: true,
-                // offsetCenter: [0, 10],
-                fontSize:30,
+                offsetCenter: [0, 20],
+                fontSize:15,
               },
             };
           });
@@ -376,6 +408,9 @@ export const convertPromQLData = (
 });
 
   options.series = options.series.flat();
+
+  console.log(JSON.parse(JSON.stringify(options)));
+  
 
   // extras will be used to return other data to chart renderer
   // e.g. setCurrentSeriesValue to set the current series index which is hovered
@@ -500,8 +535,6 @@ const getPropsByChartTypeForSeries = (type: string) => {
     case "gauge":
       return {
           type: 'gauge',
-          radius:"100%",
-          center:["50%","55%"],
           startAngle: 205,
           endAngle: -25,
           progress: {
