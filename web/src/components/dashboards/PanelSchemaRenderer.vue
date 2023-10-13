@@ -17,14 +17,14 @@
   <div ref="chartPanelRef" style="height: 100%; position: relative">
     <div
       v-show="!errorDetail"
-      class="plotlycontainer"
       style="height: 100%; width: 100%"
     >
-      <ChartRenderer v-if="panelSchema.type != 'table'" :data="panelData" />
-      <TableRenderer
-        v-else-if="panelSchema.type == 'table'"
-        :data="panelData"
-      />
+    <GeoMapRenderer v-if="panelSchema.type == 'geomap'" :data="panelData.chartType == 'geomap'? panelData: {options: {}}" />
+    <TableRenderer
+    v-else-if="panelSchema.type == 'table'"
+    :data="panelData.chartType == 'table'? panelData: {options: {}}"
+    />
+    <ChartRenderer v-else :data="panelSchema.queryType === 'promql' || (data.length && data[0].length  && panelData.chartType != 'geomap' && panelData.chartType != 'table') ? panelData : {options:{}}" />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div v-if="errorDetail" class="errorMessage">
@@ -48,9 +48,10 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
+import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
 export default defineComponent({
   name: "PanelSchemaRenderer",
-  components: { ChartRenderer, TableRenderer },
+  components: { ChartRenderer, TableRenderer, GeoMapRenderer },
   props: {
     selectedTimeObj: {
       required: true,
@@ -84,7 +85,16 @@ export default defineComponent({
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(data, async () => {
-      panelData.value = convertPanelData(panelSchema.value, data.value, store);
+      // panelData.value = convertPanelData(panelSchema.value, data.value, store);
+      if (!errorDetail.value) {
+
+        try {
+          panelData.value = convertPanelData(panelSchema.value, data.value, store);
+          errorDetail.value = "";
+        } catch (error: any) {
+          errorDetail.value = error.message;
+        }
+      }
     });
 
     // Compute the value of the 'noData' variable
@@ -97,15 +107,15 @@ export default defineComponent({
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
       } else {
-        // The queryType is not 'promql'
-        return !data.value.length ? "No Data" : ""; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
+        // The queryType is not 'promql'        
+        return data.value.length && data.value[0]?.length ? "" : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
       }
     });
 
     // when the error changes, emit the error
     watch(errorDetail, () => {
       //check if there is an error message or not
-      if(!errorDetail.value)return;
+      if (!errorDetail.value) return;
       emit("error", errorDetail);
     });
 

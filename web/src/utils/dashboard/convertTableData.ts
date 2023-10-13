@@ -23,6 +23,16 @@ export const convertTableData = (
   panelSchema: any,
   searchQueryData: any
 ) => {
+  
+  // if no data than return it
+  if (
+    !Array.isArray(searchQueryData) ||
+    searchQueryData.length === 0 ||
+    !searchQueryData[0] ||
+    !panelSchema
+  ) {
+    return { rows: [], columns: [] };
+  }
   const x = panelSchema?.queries[0].fields?.x || [];
   const y = panelSchema?.queries[0].fields?.y || [];
   const columnData = [...x, ...y];
@@ -32,7 +42,7 @@ export const convertTableData = (
     obj["name"] = it.label;
     obj["field"] = it.alias;
     obj["label"] = it.label;
-    obj["align"] = !isSampleValuesNumbers(searchQueryData, it.alias, 20)
+    obj["align"] = !isSampleValuesNumbers(searchQueryData[0], it.alias, 20)
       ? "left"
       : "right";
     obj["sortable"] = true;
@@ -40,7 +50,7 @@ export const convertTableData = (
   });
 
   return {
-    rows: searchQueryData,
+    rows: searchQueryData[0],
     columns,
   };
 };

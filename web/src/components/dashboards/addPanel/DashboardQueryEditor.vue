@@ -23,7 +23,7 @@
                 </div>
                 <q-space />
                 <div style="max-width: 600px">
-                <q-tabs v-if="promqlMode" v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows mobile-arrows>
+                <q-tabs v-if="promqlMode || dashboardPanelData.data.type == 'geomap'" v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows mobile-arrows>
                     <q-tab no-caps :ripple="false" v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
                         :label="'Query ' + (index + 1)" @click.stop>
                         <q-icon
@@ -45,8 +45,8 @@
                     </div>
                 </div> -->
                 </div>
-                <span v-if="!promqlMode" class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
-                <q-btn v-if="promqlMode" round flat @click.stop="addTab" icon="add" style="margin-right: 10px;"></q-btn>
+                <span v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')" class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
+                <q-btn v-if="promqlMode || dashboardPanelData.data.type == 'geomap'" round flat @click.stop="addTab" icon="add" style="margin-right: 10px;"></q-btn>
             </div>
             <div>
                 <QueryTypeSelector></QueryTypeSelector>
@@ -139,6 +139,7 @@ export default defineComponent({
             dashboardPanelData.meta.errors.queryErrors = []
         })
 
+        let query = "";
         // Generate the query when the fields are updated
         watch(() => [
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
@@ -146,16 +147,59 @@ export default defineComponent({
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y,
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z,
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter,
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight 
         ], () => {
             // only continue if current mode is auto query generation
             if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
-
-                // STEP 1: first check if there is at least 1 field selected
-                if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length == 0 && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length == 0 && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.length == 0) {
-                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = ""
-                    return;
+                if(dashboardPanelData.data.type == 'geomap'){
+                    query = geoMapChart()
+                }else{
+                    query = sqlchart()
                 }
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = query
+            }
+        }, { deep: true })
+
+        const geoMapChart = () => {
+            let query = "";
+
+            const { latitude, longitude, weight } = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
+
+            if (latitude && longitude) {
+                query += `SELECT ${latitude.column} as ${latitude.alias}, ${longitude.column} as ${longitude.alias}`;
+            } else if (latitude) {
+                query += `SELECT ${latitude.column} as ${latitude.alias}`;
+            } else if (longitude) {
+                query += `SELECT ${longitude.column} as ${longitude.alias}`;
+            } 
+
+            if (query) {
+                if (weight) {
+                    const weightField = weight.aggregationFunction
+                        ? (weight.aggregationFunction == 'count-distinct') 
+                            ? `count(distinct(${weight.column}))` 
+                            : `${weight.aggregationFunction}(${weight.column})`
+                        : `${weight.column}`;
+                    query += `, ${weightField} as ${weight.alias}`;
+                } 
+                query += ` FROM "${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream}" `;
+                if (weight && weight.aggregationFunction) {
+                    query += `GROUP BY ${latitude.alias}, ${longitude.alias}`; 
+                }
+
+            }
+            return query; 
+        }
+
+        const sqlchart =() => {
+            // STEP 1: first check if there is at least 1 field selected
+            if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length == 0 && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length == 0 && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.length == 0) {
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = ""
+                return;
+            }
 
                 // STEP 2: Now, continue if we have at least 1 field selected
                 // merge the fields list
@@ -231,22 +275,19 @@ export default defineComponent({
                     query += "WHERE " + filterItems.join(" AND ")
                 }
 
-                // add group by statement
-                const xAxisAlias = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.map((it: any) => it.alias)
-                const yAxisAlias = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.map((it: any) => it.alias)
+            // add group by statement
+            const xAxisAlias = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.map((it: any) => it.alias)
+            const yAxisAlias = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.map((it: any) => it.alias)
 
-                if(dashboardPanelData.data.type == "heatmap"){
-                    query += xAxisAlias.length && yAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") + ", " + yAxisAlias.join(", ") : '';
-                }
-                else{
-                    query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : ''
-                }
-                query += xAxisAlias.length ? " ORDER BY " + xAxisAlias.join(", ") : ''
-
-                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = query
+            if (dashboardPanelData.data.type == "heatmap") {
+                query += xAxisAlias.length && yAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") + ", " + yAxisAlias.join(", ") : '';
             }
-        }, { deep: true })
-
+            else {
+                query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : ''
+            }
+            query += xAxisAlias.length ? " ORDER BY " + xAxisAlias.join(", ") : ''
+            return query
+        }
 
         watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery, dashboardPanelData.meta.stream.selectedStreamFields], () => {
 
@@ -260,6 +301,7 @@ export default defineComponent({
                 dashboardPanelData.meta.stream.customQueryFields = []
             }
         }, { deep: true })
+
 
         // This function parses the custom query and generates the errors and custom fields
         const updateQueryValue = () => {
@@ -343,7 +385,7 @@ export default defineComponent({
             onUpdateToggle,
             addTab,
             removeTab,
-            currentQuery
+            currentQuery,
         };
     },
 });

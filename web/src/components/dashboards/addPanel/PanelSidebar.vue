@@ -24,8 +24,8 @@
       <div class="expanded-title">{{ title }}</div>
       <q-btn square icon="unfold_less" class="collapse-button rotate-90" @click="toggleSidebar"/>
     </div>
-    <div class="sidebar-content" v-if="isOpen">
-      <q-separator />
+    <q-separator style="margin-top: -1px;"/>
+    <div class="sidebar-content scroll" v-if="isOpen">
       <slot></slot>
     </div>
   </div>
@@ -122,5 +122,7 @@ export default defineComponent({
 
 .sidebar-content {
   padding: 0px 10px;
+  height: calc(100vh - 176px);
+  overflow-y: auto;
 }
 </style>

@@ -15,6 +15,7 @@
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { convertSQLData } from "@/utils/dashboard/convertSQLData";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
+import { convertMapData } from "@/utils/dashboard/convertMapData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -24,6 +25,7 @@ import { convertTableData } from "@/utils/dashboard/convertTableData";
  */
 export const convertPanelData = (panelSchema: any, data: any, store: any) => {
   // based on the panel config, using the switch calling the appropriate converter
+  // based on panel Data chartType is taken for ignoring unnecessary api calls 
   switch (panelSchema.type) {
     case "area":
     case "area-stacked":
@@ -42,16 +44,16 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
         // panelSchema?.customQuery &&
         panelSchema?.queryType == "promql"
       ) {
-        return convertPromQLData(panelSchema, data, store);
+        return {chartType: panelSchema.type, ...convertPromQLData(panelSchema, data, store)};
       } else {
-        return convertSQLData(panelSchema, data, store);
+        return {chartType: panelSchema.type, ...convertSQLData(panelSchema, data, store)};
       }
     }
     case "table": {
-      return convertTableData(panelSchema, data);
+      return {chartType: panelSchema.type, ...convertTableData(panelSchema, data)};
     }
     case "geomap": {
-      return convertMapData();
+      return {chartType: panelSchema.type, ...convertMapData(panelSchema, data)};
     }
     default: {
       console.log("No Chart Type found, skipping");
@@ -60,4 +62,3 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
   }
 };
 
-const convertMapData = () => {};
