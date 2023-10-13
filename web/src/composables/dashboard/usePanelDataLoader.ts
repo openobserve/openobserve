@@ -152,7 +152,6 @@ export const usePanelDataLoader = (
       );
       // Wait for all query promises to resolve
       const sqlqueryResults = await Promise.all(sqlqueryPromise);
-      console.log("sqlqueryResults", sqlqueryResults);
       state.loading = false;
       state.data = sqlqueryResults;
     }

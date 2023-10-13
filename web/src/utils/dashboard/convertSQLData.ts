@@ -60,10 +60,8 @@ export const convertSQLData = (
         yAxisKeys.every((key: any) => item[key] != null)
       );
     });
-    console.log("getAxisDataFromKey", data);
 
     const keys = Object.keys(data[0] || {}); // Assuming there's at least one object
-    console.log("keys", keys);
 
     const keyArrays: any = {};
 

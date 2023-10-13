@@ -58,24 +58,13 @@ export default defineComponent({
             await nextTick();
             await nextTick();
             await nextTick();
-            // const theme = store.state.theme === 'dark' ? 'dark' : 'light';
             chart = echarts.init(chartRef.value);
-            // console.log("theme ", theme);
-
             const options = {
                 ...props.data.options,
                 lmap: lmapOptions,
             };
-
-            console.log("options ", props.data.options);
-
-            // echarts.registerMap('world', mapData);
             chart.setOption(options || {}, true);
             window.addEventListener("resize", windowResizeEventCallback);
-
-            console.log("props.data.options", props?.data?.options);
-            console.log("chart model", chart.getModel());
-            
 
             // Get Leaflet extension component
             // getModel and getComponent do not seem to be exported in echarts typescript
@@ -83,7 +72,6 @@ export default defineComponent({
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             lmapComponent = chart.getModel().getComponent('lmap');
-            console.log("lmapComponent ", lmapComponent);
             
             // Get the instance of Leaflet
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -112,22 +100,7 @@ export default defineComponent({
             }
         });
 
-        // watch(() => store.state.theme, (newTheme) => {
-        //     console.log("Theme changed to:", newTheme);
-        //     const theme = newTheme === 'dark' ? 'dark' : 'light';
-        //     chart.dispose();
-        //     chart = echarts.init(chartRef.value, theme);
-        //     const options = {
-        //         ...props.data.options,
-        //         lmap: lmapOptions,
-        //     };
-        //     options.animation = false;
-        //     chart.setOption(options, true);
-        //     chart.setOption({ animation: true });
-        // });
-
         watch(() => props.data.options, async (newOptions) => {
-            console.log("props.data.options changed:", newOptions);
             await nextTick();
             chart.resize();
             const options = {

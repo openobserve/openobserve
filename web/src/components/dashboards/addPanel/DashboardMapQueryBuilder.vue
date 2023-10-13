@@ -149,9 +149,6 @@ export default defineComponent({
   name: "DashboardMapQueryBuilder",
   components: {},
   setup() {
-    // const showXAxis = ref(true);
-    // const panelName = ref("");
-    // const panelDesc = ref("");
     const { t } = useI18n();
     const expansionItems = reactive({
       latitude: true,
@@ -179,7 +176,6 @@ export default defineComponent({
       { label: "Min", value: "min" },
       { label: "Max", value: "max" },
     ]
-    // const triggerOperatorsWithHistogram: any = [{ label: "Histogram", value: "histogram" }]
 
     watch(() => dashboardPanelData.meta.dragAndDrop.dragging, (newVal: boolean, oldVal: boolean) => {
       if (oldVal == false && newVal == true) {
@@ -212,11 +208,6 @@ export default defineComponent({
 
 
     const onDragEnter = (e: any, area: string) => {
-
-      // // don't drop on other draggables
-      // if (e.target.draggable !== true) {
-      //   e.target.classList.add('drag-enter')
-      // }
     }
 
     const onDragStart = (e: any, item: any) => {
@@ -272,10 +263,7 @@ export default defineComponent({
     });
 
     return {
-      // showXAxis,
       t,
-      // panelName,
-      // panelDesc,
       dashboardPanelData,
       removeLatitude,
       removeLongitude,
@@ -287,7 +275,6 @@ export default defineComponent({
       }),
       model: ref([]),
       tab: ref("General"),
-      // options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains", 'Is Null', 'Is Not Null'],
       getImageURL,
       onDrop,
       onDragStart,
@@ -297,12 +284,9 @@ export default defineComponent({
       handler2,
       currentDragArea,
       expansionItems,
-      // triggerOperatorsWithHistogram,
       Hint,
       WeightHint,
       promqlMode,
-      // xLabel,
-      // yLabel,
       weightLabel,
     };
   },
@@ -406,7 +390,6 @@ export default defineComponent({
   .index-table {
     width: 100%;
 
-    // border: 1px solid rgba(0, 0, 0, 0.02);
     .q-table {
       display: block;
     }
@@ -460,7 +443,6 @@ export default defineComponent({
       padding: 0px 10px;
       align-items: center;
       position: absolute;
-      // line-height: 2rem;
       overflow: hidden;
       inset: 0;
       display: flex;
@@ -490,7 +472,6 @@ export default defineComponent({
         display: inline;
         z-index: 2;
         left: 0;
-        // text-transform: capitalize;
       }
     }
 
@@ -529,7 +510,6 @@ export default defineComponent({
 }
 
 .q-item {
-  // color: $dark-page;
   min-height: 1.3rem;
   padding: 5px 10px;
 

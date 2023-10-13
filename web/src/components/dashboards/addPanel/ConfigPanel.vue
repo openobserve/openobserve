@@ -192,7 +192,6 @@ export default defineComponent({
       promqlMode,
       basemapTypeOptions,
       layerTypeOptions,
-      // legends position options
       legendsPositionOptions,
       unitOptions,
       isWeightFieldPresent

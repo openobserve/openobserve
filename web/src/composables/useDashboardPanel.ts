@@ -829,7 +829,6 @@ const loadFilterItem = (name:any)=>{
 
         if (field && field.alias == oldName) {
           const newName = newArray[changedIndex[0]]?.name;
-          console.log("newName", newName);
 
           // Update the field alias and column to the new name
           field.alias = newName;
@@ -844,7 +843,6 @@ const loadFilterItem = (name:any)=>{
 
         if (field && field.alias == oldName) {
           const newName = newArray[changedIndex[0]]?.name;
-          console.log("newName", newName);
 
           // Update the field alias and column to the new name
           field.alias = newName;

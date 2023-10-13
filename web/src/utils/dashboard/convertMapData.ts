@@ -20,9 +20,6 @@
  * @return {Object} - the option object for rendering the map chart
  */
 export const convertMapData = (panelSchema: any, mapData: any) => {
-  console.log("panelSchema", panelSchema);
-
-  console.log("mapData", mapData);
 
   //if no latitude and longitude than return it 
   if (
@@ -49,12 +46,9 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
           throw new Error("All weight values should be numeric value.");
         }
       });
-      console.log("queryField", queryField);
       return queryField;
     }
   );
-
-  console.log(nonNumericValues, "nonNumericValues");
 
   const options: any = {
     lmap: {
@@ -130,10 +124,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     series: [],
   };
 
-  console.log("Number of queries in panelSchema:", panelSchema.queries.length);
   options.series = panelSchema.queries.map((query: any, index: any) => {
-    console.log("query", query);
-    console.log("query.config.weight_fixed", query.config.weight_fixed);
 
     return {
       name: `Layer ${index + 1}`,
@@ -146,8 +137,6 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       },
       data: mapData[index]?.map((item: any) => {
         if (query.customQuery) {
-          console.log("item[query.fields.longitude.alias]", item[query.fields.longitude]);
-          console.log("item[query.fields.latitude.alias]", item[query.fields.latitude]);
           
           // For custom queries
           return [
@@ -177,9 +166,6 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       },
     };
   });
-  console.log("panelSchema.queries.fields.latitude.alias", panelSchema.queries[0]?.fields?.latitude?.alias);
-  console.log("panelSchema.queries.fields.longitude.alias", panelSchema.queries[0]?.fields?.longitude?.alias);
-
 
   const seriesData = options.series.flatMap((series: any) => series.data);
    if (seriesData.length > 0) {
@@ -192,7 +178,6 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
      options.visualMap = [];
      options.series = [];
    }
-  console.log("options convertMapData", options);
 
   return { options };
 };
