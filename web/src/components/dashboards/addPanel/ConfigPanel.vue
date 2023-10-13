@@ -49,7 +49,7 @@
 
     <q-select
       outlined
-      v-model="dashboardPanelData.data.config.unit"
+      v-if="dashboardPanelData.data.type != 'table'" v-model="dashboardPanelData.data.config.unit"
       :options="unitOptions"
       dense
       :label="t('dashboard.unitLabel')"
