@@ -16,28 +16,16 @@ use sysinfo::SystemExt;
 
 /// Get cpu limit by cgroup or return the node cpu cores
 pub fn get_cpu_limit() -> usize {
-    let cpu_num = if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu.max") {
-        if !val.is_empty() && !val.to_lowercase().starts_with("max") {
-            let columns = val.split(' ').collect::<Vec<&str>>();
-            let val = columns[0].parse::<usize>().unwrap_or_default();
-            if val > 0 {
-                if val < 100000 {
-                    1 // maybe the limit less than 1 core
-                } else {
-                    val / 100000
-                }
-            } else {
-                read_cpu_cgroup_v1()
-            }
-        } else {
-            read_cpu_cgroup_v1()
-        }
-    } else {
-        read_cpu_cgroup_v1()
-    };
-
+    let mut cpu_num = read_cpu_cgroup_v1();
+    if cpu_num == 0 {
+        cpu_num = read_cpu_cgroup_v2();
+    }
     if cpu_num > 0 {
-        cpu_num
+        if cpu_num < 100000 {
+            1 // maybe the limit less than 1 core
+        } else {
+            cpu_num / 100000
+        }
     } else {
         let mut system = sysinfo::System::new();
         system.refresh_cpu();
@@ -47,39 +35,52 @@ pub fn get_cpu_limit() -> usize {
 
 /// Get memory limit by cgroup or return the node memory size
 pub fn get_memory_limit() -> usize {
-    let mem_size = if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory.max") {
-        if !val.is_empty() && !val.to_lowercase().starts_with("max") {
-            val.trim_end().parse::<usize>().unwrap_or_default()
-        } else {
-            read_memory_cgroup_v1()
-        }
-    } else {
-        read_memory_cgroup_v1()
+    let mut mem_size = read_memory_cgroup_v1();
+    if mem_size == 0 {
+        mem_size = read_memory_cgroup_v2();
     };
-
-    if mem_size > 0 {
-        mem_size
-    } else {
+    let node_mem_size = {
         let mut system = sysinfo::System::new();
         system.refresh_memory();
         system.total_memory() as usize
+    };
+    if mem_size == 0 || mem_size > node_mem_size {
+        node_mem_size
+    } else {
+        mem_size
     }
 }
 
 fn read_cpu_cgroup_v1() -> usize {
-    if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") {
-        let ret_val = val.trim().to_string().parse::<usize>().unwrap_or_default();
-        if ret_val > 0 && ret_val < 100000 {
-            1 // maybe the limit less than 1 core
-        } else {
-            ret_val / 100000
+    if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu.max") {
+        if !val.is_empty() && !val.to_lowercase().starts_with("max") {
+            let columns = val.split(' ').collect::<Vec<&str>>();
+            return columns[0].parse::<usize>().unwrap_or_default();
         }
+    };
+    0
+}
+
+fn read_memory_cgroup_v1() -> usize {
+    if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory.max") {
+        if !val.is_empty() && !val.to_lowercase().starts_with("max") {
+            return val.trim_end().parse::<usize>().unwrap_or_default();
+        }
+    };
+    0
+}
+
+/// Get cpu limit by cgroup v2: if there is no limit, default is: -1
+fn read_cpu_cgroup_v2() -> usize {
+    if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu/cpu.cfs_quota_us") {
+        val.trim().to_string().parse::<usize>().unwrap_or_default()
     } else {
         0
     }
 }
 
-fn read_memory_cgroup_v1() -> usize {
+/// Get memory limit by cgroup v2: if there is no limit, default is: 9223372036854775807
+fn read_memory_cgroup_v2() -> usize {
     if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory/memory.limit_in_bytes") {
         val.trim_end().parse::<usize>().unwrap_or_default()
     } else {

@@ -19,6 +19,7 @@ report.json
 
 /tmp/
 /data/
+/.idea/
 /.env
 /.env*
 /integration-tests
