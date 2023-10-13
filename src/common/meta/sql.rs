@@ -16,8 +16,9 @@ use chrono::DateTime;
 use regex::Regex;
 use serde::Serialize;
 use sqlparser::ast::{
-    BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr, Offset as SqlOffset,
-    OrderByExpr, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, Value,
+    BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr, GroupByExpr,
+    Offset as SqlOffset, OrderByExpr, Select, SelectItem, SetExpr, Statement, TableFactor,
+    TableWithJoins, Value,
 };
 use sqlparser::parser::Parser;
 
@@ -124,9 +125,13 @@ impl TryFrom<&Statement> for Sql {
                     order_by.push(Order(expr).try_into()?);
                 }
 
+                // TODO: support Group by all
+                // https://docs.snowflake.com/en/sql-reference/constructs/group-by#label-group-by-all-columns
                 let mut group_by = Vec::new();
-                for expr in groups {
-                    group_by.push(Group(expr).try_into()?);
+                if let GroupByExpr::Expressions(exprs) = groups {
+                    for expr in exprs {
+                        group_by.push(Group(expr).try_into()?);
+                    }
                 }
 
                 let offset = offset.map_or(0, |v| Offset(v).into());

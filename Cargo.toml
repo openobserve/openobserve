@@ -75,7 +75,7 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { path="../arrow-datafusion/datafusion/core", version = "31", features = ["simd"] }
+datafusion = { path="../arrow-datafusion/datafusion/core", version = "32", features = ["simd"] }
 arrow = { path="../arrow-rs/arrow", version = "47", features = ["simd", "ipc_compression"] }
 arrow-schema = { path="../arrow-rs/arrow-schema", version = "47", features = ["serde"] }
 parquet = { path="../arrow-rs/parquet", version = "47", features = ["arrow", "async"] }
@@ -134,7 +134,7 @@ serde_json = "1"
 simd-json = "0.10.3"
 sled = "0.34"
 snap = "1"
-sqlparser = { version = "0.37", features = ["serde"] }
+sqlparser = { version = "0.38", features = ["serde", "visitor"] }
 sqlx = { version = "0.7", features = [
   "runtime-tokio-rustls",
   "postgres",
@@ -170,7 +170,7 @@ prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
-datafusion-expr = { path="../arrow-datafusion/datafusion/expr", version = "31" }
+datafusion-expr = { path="../arrow-datafusion/datafusion/expr", version = "32" }
 
 expect-test = "1.4"
 float-cmp = "0.9"
