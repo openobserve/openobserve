@@ -97,7 +97,8 @@ export default defineComponent({
       if (!errorDetail.value) {
 
         try {
-          panelData.value = convertPanelData(panelSchema.value, data.value, store);
+          // passing chartpanelref to get width and height of DOM element
+          panelData.value = convertPanelData(panelSchema.value, data.value, store, chartPanelRef);
           errorDetail.value = "";
         } catch (error: any) {
           errorDetail.value = error.message;

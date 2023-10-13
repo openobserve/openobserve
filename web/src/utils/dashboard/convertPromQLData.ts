@@ -24,6 +24,52 @@ import { utcToZonedTime } from "date-fns-tz";
 //   return newFontSize;
 // };
 
+// it is used to create grid array for gauge chart
+function calculateGridPositions(width: any, height: any, numGrids: any) {
+  const gridArray: any = [];
+
+  // if no grid then return empty array
+  if (numGrids <= 0) {
+    return gridArray;
+  }
+
+  // if only one grid then return single grid
+  if(numGrids == 1){
+    return [{
+      left: `0%`,
+      top: `0%`,
+      width: `100%`,
+      height: `100%`,
+    }]
+  }
+
+  // total area of chart element
+  const totalArea = width * height;
+  // per gauge area
+  const perChartArea = Math.sqrt(totalArea / numGrids);  
+  // number of row and column for gauge rendering
+  let numRows = Math.ceil(height / perChartArea);
+  let numCols = Math.ceil(width / perChartArea);
+  
+  // width and height for single gauge
+  const cellWidth = 100 / numCols;
+  const cellHeight = 100 / numRows;
+
+  // will create 2D grid array
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numCols; col++) {
+      const grid = {
+        left: `${col * cellWidth}%`,
+        top: `${row * cellHeight}%`,
+        width: `${cellWidth}%`,
+        height: `${cellHeight}%`,
+      };
+      gridArray.push(grid);
+    }
+  }
+
+  return gridArray;
+}
 
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
@@ -36,7 +82,8 @@ import { utcToZonedTime } from "date-fns-tz";
 export const convertPromQLData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any
+  store: any,
+  chartPanelRef: any
 ) => {
   
   // if no data than return it
@@ -103,7 +150,7 @@ export const convertPromQLData = (
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
-    grid: [{
+    grid: {
       containLabel: true,
       left: "30",
       right:
@@ -112,7 +159,7 @@ export const convertPromQLData = (
           : "40",
       top: "15",
       bottom: "30",
-    }],
+    },
     tooltip: {
       show: true,
       trigger: "axis",
@@ -217,17 +264,27 @@ export const convertPromQLData = (
     series: [],
   };
 
-  // To pass grid index in gauge chart
-  let gaugeIndex = 1;
+  // to pass grid index in gauge chart
+  let gaugeIndex = 0;
 
+  // for gauge chart we need total no. of gague to calculate grid positions
   let totalLength = 0;
   
-  searchQueryData.forEach((metric: any) => {
-    if (metric.result && Array.isArray(metric.result)) {
-      totalLength += metric.result.length;
-    }
-  });  
+  if(panelSchema.type === "gauge"){
+    // calculate total length of all metrics
+    searchQueryData.forEach((metric: any) => {
+      if (metric.result && Array.isArray(metric.result)) {
+        totalLength += metric.result.length;
+      }
+    });
 
+    // create grid array based on chart panel width, height and total no. of gauge
+    options.grid = calculateGridPositions(
+      chartPanelRef.value.offsetWidth,
+      chartPanelRef.value.offsetHeight,
+      totalLength
+    )
+  }
   options.series = searchQueryData.map((it: any, index: number) => {
 
     switch (panelSchema.type) {
@@ -274,21 +331,7 @@ export const convertPromQLData = (
       }
 
       case "gauge" :{
-        const numGaugesPerRow = 5;
-        const numRows = Math.ceil(totalLength / numGaugesPerRow); // Calculate the number of rows
-        const numGaugesInRow = Math.min(numGaugesPerRow, (totalLength - gaugeIndex + 1) * numGaugesPerRow);
-        const cellWidth = 100 / numGaugesInRow; // Calculate the width of each cell in percentage
-        const cellHeight = 100 / numRows; // Calculate the height of each cell in percentage
-
-
-        console.log(cellWidth, cellHeight);
-        
-
-        const series = it?.result?.map((metric: any, seriesIndex: any) => {          
-            options.grid.push({
-              left: `${((seriesIndex) * cellWidth)%100}%`,
-              top: `${Number.parseInt(((gaugeIndex - 1) / 5).toString()) * cellHeight}%`,
-            })
+        const series = it?.result?.map((metric: any) => {          
             const values = metric.values.sort(
               (a: any, b: any) => a[0] - b[0]
             );
@@ -302,12 +345,19 @@ export const convertPromQLData = (
               ...getPropsByChartTypeForSeries(panelSchema.type),
               min: panelSchema?.config?.gauge_min || 0,
               max: panelSchema?.config?.gauge_max || 100,
-              gridIndex: gaugeIndex,
-              radius:`${cellHeight}%`,
+
+              //which grid will be used
+              gridIndex: gaugeIndex - 1,
+              // radius of gauge using width
+              radius: parseFloat(options.grid[gaugeIndex - 1].width)/1.2,
               title:{
                 fontSize: 10,
               },
-              center:[`${(seriesIndex * cellWidth)%100 + 10}%`,`${Number.parseInt(((gaugeIndex - 2) / 5).toString()) * cellHeight + 10}%`],
+
+              // center of gauge
+              // x: left + width / 2,
+              // y: top + height / 2,
+              center:[`${parseFloat(options.grid[gaugeIndex - 1].left) + parseFloat(options.grid[gaugeIndex - 1].width) / 2}%`, `${parseFloat(options.grid[gaugeIndex - 1].top) + parseFloat(options.grid[gaugeIndex - 1].height) / 2}%`],
               data:[{
                 // name: JSON.stringify(metric.metric),
                 value:parseFloat(unitValue.value).toFixed(2),
