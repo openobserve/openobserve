@@ -32,67 +32,79 @@ const colors = [
   '#c4ccd3'
 ]
 
-const getDefaultDashboardPanelData :any = () => ({
-    data: {
-      version: 2,
-      id: "",
-      type: "bar",
-      title: "",
-      description: "",
-      config: {
-        show_legends: true,
-        legends_position: null,
-        unit: null,
-        unit_custom: null,
+const getDefaultDashboardPanelData: any = () => ({
+  data: {
+    version: 2,
+    id: "",
+    type: "bar",
+    title: "",
+    description: "",
+    config: {
+      show_legends: true,
+      legends_position: null,
+      unit: null,
+      unit_custom: null,
+      base_map: {
+        type: "osm",
       },
-      queryType: "sql",
-      queries: [
-        {
-          query: "",
-          customQuery: false,
-          fields: {
-            stream: "",
-            stream_type: "logs",
-            x: [],
-            y: [],
-            z: [],
-            filter: [],
-          },
-          config: {
-            promql_legend: "",
-          },
+      map_view: {
+        zoom: 1,
+        lat: 0,
+        lng: 0,
+      }
+    },
+    queryType: "sql",
+    queries: [
+      {
+        query: "",
+        customQuery: false,
+        fields: {
+          stream: "",
+          stream_type: "logs",
+          x: [],
+          y: [],
+          z: [],
+          filter: [],
+          latitude: null,
+          longitude: null,
+          weight: null,
         },
-      ],
+        config: {
+          promql_legend: "",
+          layer_type: "scatter",
+          weight_fixed: 1,
+        },
+      },
+    ],
+  },
+  layout: {
+    splitter: 20,
+    querySplitter: 20,
+    showQueryBar: false,
+    isConfigPanelOpen: false,
+    currentQueryIndex: 0,
+  },
+  meta: {
+    parsedQuery: "",
+    dragAndDrop: {
+      dragging: false,
+      dragElement: null,
     },
-    layout: {
-      splitter: 20,
-      querySplitter: 20,
-      showQueryBar: false,
-      isConfigPanelOpen: false,
-      currentQueryIndex: 0
+    errors: {
+      queryErrors: [],
     },
-    meta: {
-      parsedQuery: "",
-      dragAndDrop: {
-        dragging: false,
-        dragElement: null
-      },
-      errors: {
-        queryErrors: []
-      },
-      editorValue: "",
-      dateTime: {start_time: "", end_time: ""},
-      filterValue: <any>[],
-      stream: {
-        selectedStreamFields: [],
-        customQueryFields: [],
-        functions: [],
-        streamResults: <any>[],
-        filterField: "",
-      },
-    }
-  }
-)
+    editorValue: "",
+    dateTime: { start_time: "", end_time: "" },
+    filterValue: <any>[],
+    stream: {
+      selectedStreamFields: [],
+      customQueryFields: [],
+      functions: [],
+      streamResults: <any>[],
+      filterField: "",
+    },
+  },
+});
 
 let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData()});
 
@@ -101,21 +113,36 @@ const useDashboardPanelData = () => {
   const $q = useQuasar();
 
 const addQuery = () => {
-  const newQuery:any = {
+  const queryType =
+    dashboardPanelData.data.queryType === "sql"
+      ? "sql"
+      : "promql";
+  const newQuery: any = {
     query: "",
-    customQuery: true,
+    customQuery: queryType === "promql",
     fields: {
-      stream: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
-      stream_type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type,
+      stream:
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+      stream_type:
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type,
       x: [],
       y: [],
-      z:[],
+      z: [],
       filter: [],
+      latitude: null,
+      longitude: null,
+      weight: null,
     },
     config: {
       promql_legend: "",
+      layer_type: "scatter",
+      weight_fixed: 1,
     },
-  }
+  };
   dashboardPanelData.data.queries.push(newQuery);
 };
 
@@ -279,6 +306,64 @@ const removeQuery = (index: number) => {
     updateArrayAlias();
   };
 
+  const addLatitude = (row: any) => {
+    if (
+      
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.latitude
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.latitude = {
+        label: generateLabelFromName(row.name),
+        alias: "latitude",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: null, // You can set the appropriate aggregation function here
+      };
+    }
+  };
+
+  const addLongitude = (row: any) => {
+    if (
+      
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.longitude
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.longitude = {
+        label: generateLabelFromName(row.name),
+        alias: "longitude",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: null, // You can set the appropriate aggregation function here
+      };
+    }
+  };
+
+  const addWeight = (row: any) => {
+    if (
+      
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.weight
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.weight = {
+        label: generateLabelFromName(row.name),
+        alias: "weight",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: "count", // You can set the appropriate aggregation function here
+      };
+    }
+  };
+
+
   // get new color value based on existing color from the chart
   const getNewColorValue = () => {
    const YAxisColor = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.map((it: any)=> it.color)
@@ -297,6 +382,16 @@ const removeQuery = (index: number) => {
         ].fields.y.forEach((itemY: any) => {
           itemY.aggregationFunction = null;
         })
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+        });
+        if (dashboardPanelData.data.queryType === "sql") {
+          dashboardPanelData.layout.currentQueryIndex = 0;
+          dashboardPanelData.data.queries =
+            dashboardPanelData.data.queries.slice(0, 1);
+        }
         break;
 
         case "area":
@@ -321,8 +416,33 @@ const removeQuery = (index: number) => {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.z = [];
+          // we have multiple queries for geomap, so if we are moving away, we need to reset
+          // the values of lat, lng and weight in all the queries
+          dashboardPanelData.data.queries?.forEach((query: any) => {
+            query.fields.latitude = null;
+            query.fields.longitude = null;
+            query.fields.weight = null;
+          })
+          if (dashboardPanelData.data.queryType === "sql") {
+            dashboardPanelData.layout.currentQueryIndex = 0;
+            dashboardPanelData.data.queries =
+              dashboardPanelData.data.queries.slice(0, 1);
+          }
       break;
-
+       case "geomap":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter = [];
+        break;
       default:
         break;
     };
@@ -377,6 +497,24 @@ const removeQuery = (index: number) => {
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.splice(index, 1)
     }
   }
+
+  const removeLatitude = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.latitude = null;
+  };
+
+  const removeLongitude = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.longitude = null;
+  };
+
+  const removeWeight = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.weight = null;
+  };
 
   const addFilteredItem = (name: string) => {
     if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter) {
@@ -499,6 +637,9 @@ const loadFilterItem = (name:any)=>{
         ].fields.z.length
       );
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.splice(0,dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter.length);
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude = null;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude = null;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight = null;
     }
   }
 
@@ -508,54 +649,96 @@ const loadFilterItem = (name:any)=>{
     if (!promqlMode.value &&dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery == true) {
       // Loop through each custom query field in the dashboard panel data's stream meta
       dashboardPanelData.meta.stream.customQueryFields.forEach((it: any, index: number) => {
-        // Determine if the current field is an x or y field
-        let currentFieldType;
-        if (
-          index <
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.x.length
-        ) {
-          currentFieldType = "x";
-        } else if (
-          index <
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.x.length +
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.y.length
-        ) {
-          currentFieldType = "y";
-        } else {
-          currentFieldType = "z";
-        }
-        // Get the current field based on its index and whether it's an x or y field
-        let field;
-        if (currentFieldType === "x") {
-          field = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index];
-        } else if (currentFieldType === "y") {
-          field = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index - dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length];
-        } else {
-          field = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[index - dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.length - dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.length];
-        }
         // Get the name of the current custom query field
         const { name } = it;
 
-          // Update the properties of the current field
-          field.alias = name; // Set the alias to the name of the custom query field
-          field.column = name; // Set the column to the name of the custom query field
-          field.color = null; // Reset the color to null
-          // If the current field is a y field, set the aggregation function to "count"
+        // Determine the current field type based on the name
+        let field;
+        if (name === "latitude") {
+          field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.latitude;
+        } else if (name === "longitude") {
+          field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.longitude;
+        } else if (name === "weight") {
+          field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.weight;
+        } else {
+          // For other field types (x, y, z), determine the type and index as before
+          let currentFieldType;
+
+          if (
+            index <
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.x.length
+          ) {
+            currentFieldType = "x";
+          } else if (
+            index <
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.x.length +
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.y.length
+          ) {
+            currentFieldType = "y";
+          } else {
+            currentFieldType = "z";
+          }
+
+          if (currentFieldType === "x") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.x[index];
+          } else if (currentFieldType === "y") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.y[
+                index -
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields.x.length
+              ];
+          } else {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.z[
+                index -
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields.x.length -
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields.y.length
+              ];
+          }
+
+          // If the current field is a y or z field, set the aggregation function to "count"
           if (currentFieldType === "y" || currentFieldType === "z") {
             field.aggregationFunction = "count";
           }
         }
-      );
+
+        // Update the properties of the current field
+        field.alias = name; // Set the alias to the name of the custom query field
+        field.column = name; // Set the column to the name of the custom query field
+        field.color = null; // Reset the color to null
+      });
     }
   };
 
-
+  // this updates the fields when you switch from the auto to custom
   const updateXYFieldsOnCustomQueryChange = (oldCustomQueryFields: any) => {
     // Create a copy of the old custom query fields array
     const oldArray = oldCustomQueryFields;
@@ -577,26 +760,93 @@ const loadFilterItem = (name:any)=>{
       // Check if there is only one changed field
       if (changedIndex.length == 1) {
         const oldName = oldArray[changedIndex[0]]?.name;
-        let fieldIndex = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.findIndex((it: any) => it.alias == oldName);
+
+        let fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x.findIndex((it: any) => it.alias == oldName);
         // Check if the field is in the x fields array
         if (fieldIndex >= 0) {
           const newName = newArray[changedIndex[0]]?.name;
-          const field =dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[fieldIndex];
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.x[fieldIndex];
 
           // Update the field alias and column to the new name
           field.alias = newName;
           field.column = newName;
-        } else {
-          // Check if the field is in the y fields array
-          fieldIndex = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.findIndex((it: any) => it.alias == oldName);
-          if (fieldIndex >= 0) {
-            const newName = newArray[changedIndex[0]]?.name;
-            const field =dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[fieldIndex];
+        }
+        // Check if the field is in the y fields array
+        fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.findIndex((it: any) => it.alias == oldName);
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.y[fieldIndex];
 
-            // Update the field alias and column to the new name
-            field.alias = newName;
-            field.column = newName;
-          }
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+        // Check if the field is in the z fields array
+        fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z.findIndex((it: any) => it.alias == oldName);
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.z[fieldIndex];
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the latitude fields 
+        let field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.latitude;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the longitude fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.longitude;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the weight fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.weight;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
         }
       }
     }
@@ -608,10 +858,16 @@ const loadFilterItem = (name:any)=>{
     addXAxisItem,
     addYAxisItem,
     addZAxisItem,
+    addLatitude,
+    addLongitude,
+    addWeight,
     removeXAxisItem,
     removeYAxisItem,
     removeZAxisItem,
     removeFilterItem,
+    removeLatitude,
+    removeLongitude,
+    removeWeight,
     addFilteredItem,
     loadFilterItem,
     removeXYFilters,

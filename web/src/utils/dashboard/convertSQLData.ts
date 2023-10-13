@@ -1,7 +1,4 @@
 // Copyright 2023 Zinc Labs Inc.
-
-import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
-
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
 //  You may obtain a copy of the License at
@@ -16,17 +13,24 @@ import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnit
 
 /**
  * Converts SQL data into a format suitable for rendering a chart.
- *
- * @param {any} panelSchema - the panel schema object
- * @param {any} searchQueryData - the search query data
- * @param {any} store - the store object
- * @return {Object} - the options object for rendering the chart
- */
+*
+* @param {any} panelSchema - the panel schema object
+* @param {any} searchQueryData - the search query data
+* @param {any} store - the store object
+* @return {Object} - the options object for rendering the chart
+*/
+import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 export const convertSQLData = (
   panelSchema: any,
   searchQueryData: any,
   store: any
 ) => {
+
+  // if no data than return it
+  if (!Array.isArray(searchQueryData) || searchQueryData.length === 0 || !searchQueryData[0] || !panelSchema.queries[0].fields.x || !panelSchema.queries[0].fields.y) {
+    return { options: null };
+  }
+
   // get the x axis key
   const getXAxisKeys = () => {
     return panelSchema?.queries[0]?.fields?.x?.length
@@ -50,14 +54,15 @@ export const convertSQLData = (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    const data = searchQueryData.filter((item: any) => {
+    const data = searchQueryData[0].filter((item: any) => {
       return (
         xAxisKeys.every((key: any) => item[key] != null) &&
         yAxisKeys.every((key: any) => item[key] != null)
       );
     });
 
-    const keys = Object.keys(data[0]); // Assuming there's at least one object
+    const keys = Object.keys(data[0] || {}); // Assuming there's at least one object
+
     const keyArrays: any = {};
 
     for (const key of keys) {
@@ -381,7 +386,7 @@ export const convertSQLData = (
         options.xAxis[0].nameGap = 20;
 
         // get the unique value of the first xAxis's key
-        options.xAxis[0].data = Array.from(new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]])));
+        options.xAxis[0].data = Array.from(new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]])));
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
         
         // stacked with xAxis's second value
@@ -390,7 +395,7 @@ export const convertSQLData = (
         const key1 = xAxisKeys[1];
         // get the unique value of the second xAxis's key
         const stackedXAxisUniqueValue = [
-          ...new Set(searchQueryData.map((obj: any) => obj[key1])),
+          ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
         ].filter((it) => it);
   
         // create a trace based on second xAxis's unique values
@@ -405,10 +410,10 @@ export const convertSQLData = (
               name: yAxisKeys.length == 1 ? key : key + " (" + yAxisName +")",
               ...getPropsByChartTypeForSeries(panelSchema.type),
               data: Array.from(
-                  new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
+                  new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
                 ).map(
                   (it: any) =>
-                    searchQueryData.find(
+                    searchQueryData[0].find(
                       (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
                     )?.[yAxis] || 0
                 ),
@@ -572,6 +577,7 @@ export const convertSQLData = (
         };
         return seriesObj;
       });
+      
       options.xAxis = [];
       options.yAxis = [];
       break;
@@ -608,6 +614,7 @@ export const convertSQLData = (
         };
         return seriesObj;
       });
+
       options.xAxis = [];
       options.yAxis = [];
       break;
@@ -645,7 +652,7 @@ export const convertSQLData = (
       const key1 = xAxisKeys[1];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData.map((obj: any) => obj[key1])),
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key1]))
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
@@ -653,10 +660,10 @@ export const convertSQLData = (
           name: key,
           ...getPropsByChartTypeForSeries(panelSchema.type),
           data: Array.from(
-            new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
+            new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
           ).map(
             (it: any) =>
-              searchQueryData.find(
+              searchQueryData[0].find(
                 (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
               )?.[yAxisKeys[0]] || 0
           ),
@@ -670,21 +677,21 @@ export const convertSQLData = (
       const key0 = xAxisKeys[0];
       // get the unique value of the first xAxis's key
       const xAxisZerothPositionUniqueValue = [
-        ...new Set(searchQueryData.map((obj: any) => obj[key0])),
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key0])),
       ].filter((it) => it);
 
       // get second x axis key
       const key1 = yAxisKeys[0];
       // get the unique value of the second xAxis's key
       const xAxisFirstPositionUniqueValue = [
-        ...new Set(searchQueryData.map((obj: any) => obj[key1])),
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       const yAxisKey0 = zAxisKeys[0];
       const Zvalues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
         return xAxisZerothPositionUniqueValue.map((zero: any) => {
           return (
-            searchQueryData.find(
+            searchQueryData[0].find(
               (it: any) => it[key0] == zero && it[key1] == first
             )?.[yAxisKey0] || "-"
           );
@@ -774,7 +781,7 @@ export const convertSQLData = (
       const key1 = xAxisKeys[1];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData.map((obj: any) => obj[key1])),
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
@@ -782,10 +789,10 @@ export const convertSQLData = (
           name: key,
           ...getPropsByChartTypeForSeries(panelSchema.type),
           data: Array.from(
-            new Set(searchQueryData.map((it: any) => it[xAxisKeys[0]]))
+            new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
           ).map(
             (it: any) =>
-              searchQueryData.find(
+              searchQueryData[0].find(
                 (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
               )?.[yAxisKeys[0]] || 0
           ),
@@ -1026,6 +1033,15 @@ export const convertSQLData = (
     }
   }
 
+  //check if is there any data else filter out axis or series data
+  options.series = options.series.filter((it: any) => it.data.length);
+  if(panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"){
+    options.xAxis = options.series.length ? options.xAxis : {};
+  }else{
+    options.yAxis = options.series.length ? options.yAxis : {};
+  }
+  
+  
   // extras will be used to return other data to chart renderer
   // e.g. setCurrentSeriesIndex to set the current series index which is hovered
   return {
@@ -1093,7 +1109,6 @@ const largestLabel = (data: any) =>
       : largest;
   }, "");
 
-  
 /**
  * Retrieves the properties for a given chart type and returns them as an object.
  *

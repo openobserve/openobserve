@@ -93,7 +93,7 @@
                     </div>
 
                     <div style="flex:1;">
-                      <PanelSchemaRenderer :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
+                      <PanelSchemaRenderer :key="dashboardPanelData.data.type" :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                     </div>
                     <DashboardErrorsComponent :errors="errorData" />
                     </div>
@@ -306,7 +306,8 @@ export default defineComponent({
       return dashboardPanelData.data.type == 'table' ? 'Other Columns' : dashboardPanelData.data.type == 'h-bar' ? 'X-Axis' : 'Y-Axis'
     })
 
-    watch(() => dashboardPanelData.data.type, () => {
+    watch(() => dashboardPanelData.data.type, async() => {
+      await nextTick();
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
     })
 
@@ -406,6 +407,16 @@ export default defineComponent({
           }
         })
       }
+
+      //check each query is empty or not for geomap
+      if (dashboardData.data.type == "geomap") {
+        dashboardData.data.queries.map((q: any, index: number) => {
+          if (q && q.query == "") {
+            errors.push(`Query-${index + 1} is empty`)
+          }
+        })
+      }
+
       if (promqlMode.value) {
         // 1. chart type: only line chart is supported
         const allowedChartTypes = ['area','line','bar','scatter','area-stacked','metric']
@@ -505,6 +516,14 @@ export default defineComponent({
             }
 
             break;
+          }
+          case 'geomap':{
+            if(dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.latitude == null){
+              errors.push("Add one field for the latitude")
+            }
+            if(dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.longitude == null){
+              errors.push("Add one field for the longitude")
+            }
           }
           default:
             break;

@@ -70,7 +70,7 @@
                   {{ props.row.name }}
                 </div>
                 <div class="field_icons"
-                  v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))">
+                  v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length) || dashboardPanelData.data.type == 'geomap')">
                   <q-btn padding="sm" :disabled="isAddXAxisNotAllowed" @click="addXAxisItem(props.row)"  data-test="dashboard-add-x-data">
                     <div>
                       {{
@@ -92,6 +92,22 @@
                     <div>+F</div>
                   </q-btn>
                 </div>
+                <div class="field_icons"
+                    v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length)) && dashboardPanelData.data.type == 'geomap'">
+                    <q-btn :disabled="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude != null"  no-caps padding="sm" @click="addLatitude(props.row)"  data-test="dashboard-add-x-data">
+                      <div>
+                        +Lat
+                      </div>
+                    </q-btn>
+                    <q-btn :disabled="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude != null" no-caps padding="sm" @click="addLongitude(props.row)" data-test="dashboard-add-y-data">
+                      <div>
+                        +Lng
+                      </div>
+                    </q-btn>
+                    <q-btn :disabled="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight != null" padding="sm" @click="addWeight(props.row)">
+                       <div>+W</div>
+                      </q-btn>
+                  </div>
               </div>
             </q-td>
           </q-tr>
@@ -135,7 +151,7 @@ export default defineComponent({
     });
     const filteredStreams = ref([]);
     const $q = useQuasar();
-    const { dashboardPanelData, addXAxisItem, addYAxisItem, addZAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, isAddZAxisNotAllowed, promqlMode } =
+    const { dashboardPanelData, addXAxisItem, addYAxisItem, addZAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, isAddZAxisNotAllowed, promqlMode, addLatitude, addLongitude, addWeight } =
       useDashboardPanelData();
       
     const streamDataLoading = useLoading(async ()=>{
@@ -158,6 +174,12 @@ export default defineComponent({
           fields?.schema || [];
       }
     );
+    const selectedStreamForQueries: any = ref({});
+
+    // Watch for changes in the current query selected stream
+    watch(() => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream, (newStream) => {
+      selectedStreamForQueries.value[dashboardPanelData.layout.currentQueryIndex] = newStream;
+    });
 
     watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type, dashboardPanelData.meta.stream.streamResults], () => {
 
@@ -176,7 +198,12 @@ export default defineComponent({
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream &&
         data.indexOptions.length > 0
       ) {
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream = data.indexOptions[0];
+        const currentIndex = dashboardPanelData.layout.currentQueryIndex;
+        if (selectedStreamForQueries.value[currentIndex]) {
+          dashboardPanelData.data.queries[currentIndex].fields.stream = selectedStreamForQueries.value[currentIndex];
+        } else {
+          dashboardPanelData.data.queries[currentIndex].fields.stream = data.indexOptions[0];
+        }
       }
     })
 
@@ -269,6 +296,9 @@ export default defineComponent({
       addXAxisItem,
       addYAxisItem,
       addZAxisItem,
+      addLatitude,
+      addLongitude,
+      addWeight,
       addFilteredItem,
       data,
       getStreamList,

@@ -38,9 +38,33 @@
 
     <div class="space"></div>
 
+    <q-select v-if="dashboardPanelData.data.type == 'geomap'" outlined
+        v-model="dashboardPanelData.data.config.base_map.type" :options="basemapTypeOptions" dense
+        label="Base Map" class="showLabelOnTop" stack-label emit-value
+        :display-value="'OpenStreetMap'">
+      </q-select>
+
+      <div class="space"></div>
+      <div v-if="dashboardPanelData.data.type == 'geomap'">
+        <span>Initial View:</span>
+        <div class="row">
+          <q-input  v-model.number="dashboardPanelData.data.config.map_view.lat" label="Latitude" color="input-border"
+            bg-color="input-bg" class="col-6 q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
+          </q-input>
+          <q-input v-model.number="dashboardPanelData.data.config.map_view.lng" label="Longitude" color="input-border"
+            bg-color="input-bg" class="col-6 q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
+          </q-input>
+        </div>
+        <q-input v-model.number="dashboardPanelData.data.config.map_view.zoom" label="Zoom" color="input-border"
+            bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
+          </q-input>
+      </div>
+          
+    <div class="space"></div>
+
     <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
-      <div v-if="promqlMode"  class="q-py-md showLabelOnTop">Query
+      <div v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"  class="q-py-md showLabelOnTop">Query
     <q-tabs v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows mobile-arrows>
       <q-tab no-caps v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
         :label="'Query ' + (index + 1)">
@@ -64,17 +88,48 @@
         </div>
       </template>
     </q-input>
+
+    <div class="space"></div>
+
+    <q-select v-if="dashboardPanelData.data.type == 'geomap'" outlined
+      v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.layer_type" :options="layerTypeOptions" dense
+      label="Layer Type" class="showLabelOnTop" stack-label emit-value
+      :display-value="`${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.layer_type}`">
+    </q-select>
+
+    <div class="space"></div>
+
+   <q-input v-if="dashboardPanelData.data.type == 'geomap' && !isWeightFieldPresent" v-model.number="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.weight_fixed" label="Weight" color="input-border"
+      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
+    </q-input>
   </div>
 </template>
 
 <script lang="ts">
 import useDashboardPanelData from '@/composables/useDashboardPanel';
-import { defineComponent, watch } from 'vue';
+import { computed, defineComponent, watch } from 'vue';
 
 export default defineComponent({
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData()
 
+    const basemapTypeOptions = [
+      {
+        label: 'OpenStreetMap',
+        value: 'osm'
+      }
+    ]
+
+    const layerTypeOptions = [
+      {
+        label: 'Scatter',
+        value: 'scatter'
+      },
+      {
+        label: 'Heatmap',
+        value: 'heatmap'
+      }
+    ]
     // options for legends position
     const legendsPositionOptions = [
       {
@@ -128,13 +183,18 @@ export default defineComponent({
         value: 'custom'
       },
     ]
+    const isWeightFieldPresent = computed(() => {
+      const layoutFields = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields; 
+      return !!layoutFields?.weight;
+    });
     return {
       dashboardPanelData,
       promqlMode,
-
-      // legends position options
+      basemapTypeOptions,
+      layerTypeOptions,
       legendsPositionOptions,
-      unitOptions
+      unitOptions,
+      isWeightFieldPresent
     };
   }
 });
