@@ -151,15 +151,26 @@ pub async fn ingest(
 
     // write to file
     let mut stream_file_name = "".to_string();
-    let mut req_stats =
-        write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
-
-    if stream_file_name.is_empty() {
+    let mut req_stats = match tokio::task::spawn_blocking(move || async move {
+        write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await
+    })
+    .await
+    {
+        Ok(result) => result.await,
+        Err(err) => {
+            log::error!("error writing data : {}", err);
+            return Ok(IngestionResponse::new(
+                http::StatusCode::OK.into(),
+                vec![stream_status],
+            ));
+        }
+    };
+    /* if stream_file_name.is_empty() {
         return Ok(IngestionResponse::new(
             http::StatusCode::OK.into(),
             vec![stream_status],
         ));
-    }
+    } */
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, &stream_alerts_map).await;
