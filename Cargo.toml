@@ -76,9 +76,9 @@ cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
 datafusion = { path="../arrow-datafusion/datafusion/core", version = "32", features = ["simd"] }
-arrow = { path="../arrow-rs/arrow", version = "47", features = ["simd", "ipc_compression"] }
-arrow-schema = { path="../arrow-rs/arrow-schema", version = "47", features = ["serde"] }
-parquet = { path="../arrow-rs/parquet", version = "47", features = ["arrow", "async"] }
+arrow = { git="https://github.com/apache/arrow-rs.git", rev = "90bc5ec96b5ae5162f469f9784dde7b1a53a5bdd", version = "47", features = ["simd", "ipc_compression"] }
+arrow-schema = { git="https://github.com/apache/arrow-rs.git", rev = "90bc5ec96b5ae5162f469f9784dde7b1a53a5bdd", version = "47", features = ["serde"] }
+parquet = { git="https://github.com/apache/arrow-rs.git", rev = "90bc5ec96b5ae5162f469f9784dde7b1a53a5bdd", version = "47", features = ["arrow", "async"] }
 object_store = { version = "0.7", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"

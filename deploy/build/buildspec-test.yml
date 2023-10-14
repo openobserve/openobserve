@@ -29,9 +29,7 @@ phases:
       - touch web/dist/index.html
 
       # download dependencies
-      - git clone https://github.com/openobserve/arrow-rs.git ../arrow-rs
       - git clone https://github.com/openobserve/arrow-datafusion.git ../arrow-datafusion
-      # - cd ../arrow-rs && git checkout 47-read-bloomfilter && cd ../openobserve
       - cd ../arrow-datafusion && git checkout read-bloomfilter && cd ../openobserve
       # run tests
       - cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
