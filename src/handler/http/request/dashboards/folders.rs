@@ -33,7 +33,7 @@ use crate::common::meta::dashboards::Folder;
         content = Folder,
         description = "Folder details",
         example = json!({
-            "title": "Infrastructure",
+            "name": "Infrastructure",
             "description": "Traffic patterns and network performance of the infrastructure",
         }),
     ),
