@@ -52,7 +52,9 @@ pub async fn schema_evolution(
             org_id,
             stream_name,
             stream_type,
-            &inferred_schema.as_ref().clone().with_metadata(metadata),
+            &Arc::into_inner(inferred_schema)
+                .unwrap()
+                .with_metadata(metadata),
             Some(min_ts),
             false,
         )
@@ -87,7 +89,7 @@ pub async fn schema_evolution(
             field_datatype_delta,
             new_field_delta
         );
-        match try_merge(vec![schema.clone(), inferred_schema.as_ref().clone()]) {
+        match try_merge(vec![schema, Arc::into_inner(inferred_schema).unwrap()]) {
             Err(e) => {
                 log::error!(
                     "schema_evolution: schema merge failed for {:?} err: {:?}",
@@ -102,10 +104,9 @@ pub async fn schema_evolution(
 
                     let metadata = merged.metadata().clone();
 
-                    for field in merged.to_cloned_fields().into_iter() {
-                        let mut field = field.clone();
-                        let mut new_meta = field.metadata().clone();
-                        if new_meta.contains_key("zo_cast") {
+                    for mut field in merged.to_cloned_fields().into_iter() {
+                        if field.metadata().contains_key("zo_cast") {
+                            let mut new_meta = field.metadata().clone();
                             new_meta.remove_entry("zo_cast");
                             field.set_metadata(new_meta);
                         }
@@ -403,7 +404,7 @@ async fn handle_existing_schema(
         let local_map = LOCAL_SCHEMA_LOCKER.clone();
         let mut schema_locker = local_map.write().await;
         let value = schema_locker
-            .entry(key.clone())
+            .entry(key)
             .or_insert_with(|| tokio::sync::RwLock::new(false));
 
         let lock_acquired = value.write().await; // lock acquired
@@ -439,10 +440,10 @@ async fn handle_existing_schema(
                 )
                 .await
                 .unwrap();
-                stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
+                stream_schema_map.insert(stream_name.to_string(), final_schema);
             } else {
                 //No Change in schema.
-                stream_schema_map.insert(stream_name.to_string(), schema.clone());
+                stream_schema_map.insert(stream_name.to_string(), schema);
             }
             drop(lock_acquired); // release lock
 
@@ -552,7 +553,7 @@ async fn handle_new_schema(
 
             let mut schema_locker = map.write().await; // lock it for writing a key for stream
             let value = schema_locker
-                .entry(key.clone())
+                .entry(key)
                 .or_insert_with(|| tokio::sync::RwLock::new(false)); // if stream schema doesn't exist, create a new key set value as false or for existing key get the value
 
             let lock_acquired = value.write().await; //  acquire lock for writing
