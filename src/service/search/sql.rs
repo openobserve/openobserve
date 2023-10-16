@@ -554,11 +554,13 @@ impl Sql {
                     crate::common::utils::functions::get_all_transform_keys(&org_id).await
                 {
                     let str_re = format!(r"(?i){}[ ]*\(.*\)", fn_name);
-                    let re1 = Regex::new(&str_re).unwrap();
-                    let cap = re1.captures(&origin_sql);
-                    if cap.is_some() {
-                        for _ in 0..cap.unwrap().len() {
-                            used_fns.push(fn_name.clone());
+
+                    if let Ok(re1) = Regex::new(&str_re) {
+                        let cap = re1.captures(&origin_sql);
+                        if cap.is_some() {
+                            for _ in 0..cap.unwrap().len() {
+                                used_fns.push(fn_name.clone());
+                            }
                         }
                     }
                 }
