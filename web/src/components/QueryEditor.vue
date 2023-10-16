@@ -138,7 +138,10 @@ export default defineComponent({
       registerAutoCompleteProvider();
 
       const editorElement = document.getElementById(props.editorId);
-      if (editorElement?.hasChildNodes()) return;
+
+      if (!editorElement) console.error("Query Editor element not found");
+      if (editorElement && editorElement?.hasChildNodes()) return;
+
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query,
         language: "sql",
