@@ -69,7 +69,7 @@
               dense
               flat
               title="Run query"
-              class="q-pa-none search-button"
+              class="q-pa-none bg-secondary search-button"
               @click="searchData"
               :disable="
                 searchObj.loading || searchObj.data.streamResults.length == 0
@@ -79,7 +79,7 @@
             </q-btn>
           </div>
           <div>
-            <div class="row query-editor-container">
+            <div class="row metrics-query-editor-container">
               <div
                 class="col q-pa-sm"
                 style="border-top: 1px solid #dbdbdb; height: 100%"
@@ -121,7 +121,7 @@
                 </div>
 
                 <query-editor
-                  id="metrics-query-editor"
+                  editor-id="metrics-query-editor"
                   ref="metricsQueryEditorRef"
                   class="monaco-editor"
                   v-model:query="searchObj.data.query"
@@ -883,8 +883,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.query-editor-container {
+<style lang="scss">
+.metrics-query-editor-container {
   .monaco-editor {
     height: 80px !important;
   }
@@ -966,6 +966,9 @@ export default defineComponent({
         color: #ffffff;
       }
     }
+  }
+  div.plotly-notifier {
+    visibility: hidden;
   }
 }
 </style>
