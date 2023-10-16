@@ -50,7 +50,7 @@ export const convertTraceData = (
     },
     series: [
       {
-        data: [...props.data[0]?.x].map((it: any,index: any) => ([it, props.data[0]?.y[index]||0])),
+        data: [...((props.data[0]?.x) || [])]?.map((it: any,index: any) => ([it, props.data[0]?.y[index]||0])),
         type: "scatter",
         emphasis: { focus: "series" },
         symbolSize: 5
