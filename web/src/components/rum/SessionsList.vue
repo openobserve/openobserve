@@ -31,6 +31,15 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { date } from "quasar";
+import AppTable from "./AppTable.vue";
+import { formatDuration } from "@/utils/zincutils";
+import SearchBar from "./SearchBar.vue";
+import FieldList from "@/components/common/sidebar/FieldList.vue";
+import { useRouter } from "vue-router";
+
 interface SessionColumn {
   name: string;
   field: (row: any) => any;
@@ -48,16 +57,6 @@ interface Session {
   initial_view_name: string;
   id: string;
 }
-import { onMounted, ref } from "vue";
-import { sessions } from "./sessions.js";
-import { useI18n } from "vue-i18n";
-import { date } from "quasar";
-import AppTable from "./AppTable.vue";
-import { formatDuration } from "@/utils/zincutils";
-import SearchBar from "./SearchBar.vue";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
-import { useRouter } from "vue-router";
-import userActivityTracking from "./composables/activityTracking";
 
 const { t } = useI18n();
 
@@ -118,39 +117,23 @@ const columns = ref([
 const rows = ref<Session[]>([]);
 const router = useRouter();
 
-onMounted(() => {
-  sessions.forEach((session: any) => {
-    rows.value.push({
-      timestamp: getFormattedDate(session.event.discovery_timestamp),
-      type: session.event.custom.session.type,
-      time_spent: session.event.custom.session.time_spent,
-      error_count: session.event.custom.session.error.count,
-      initial_view_name: session.event.custom.session.initial_view.name,
-      id: session.event_id,
-    });
-  });
-});
-
-const handleTableEvents = (event, payload) => {
-  const eventMapping = {
+const handleTableEvents = (event: string, payload: any) => {
+  const eventMapping: { [key: string]: (payload: any) => void } = {
     "cell-click": handleCellClick,
   };
 
   eventMapping[event](payload);
 };
 
-const handleCellClick = (payload) => {
+const handleCellClick = (payload: any) => {
   router.push({
     name: "SessionViewer",
     params: { id: payload.row.id },
   });
 };
-
-const getFormattedDate = (timestamp: number) =>
-  date.formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss.SSS Z");
 </script>
 
-<style>
+<style lang="scss">
 .sessions_page {
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,

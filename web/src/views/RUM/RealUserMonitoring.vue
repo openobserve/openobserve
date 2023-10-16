@@ -12,13 +12,13 @@
 
 <script setup lang="ts">
 import AppTabs from "@/components/common/AppTabs.vue";
-import { computed, onBeforeMount, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
 const showTabs = computed(() => {
   const routes = ["Sessions", "ErrorTracking", "Dashboard"];
-  return routes.includes(router.currentRoute.value.name);
+  return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
 
 const activeTab = ref<string>("sessions");
@@ -31,27 +31,22 @@ const tabs = [
     label: "Error Tracking",
     value: "error_tracking",
   },
-  {
-    label: "Dashboard",
-    value: "dashboard",
-  },
 ];
-
-onBeforeMount(() => {
-  console.log("Rum on before mount");
-});
 
 onMounted(() => {
   const routes = ["SessionViewer", "ErrorTracking", "Dashboard", "ErrorViewer"];
-  const routeNameMapping = {
+  const routeNameMapping: { [key: string]: string } = {
     SessionViewer: "sessions",
     ErrorTracking: "error_tracking",
     Dashboard: "dashboard",
     ErrorViewer: "error_tracking",
   };
 
-  if (routes.includes(router.currentRoute.value.name)) {
-    activeTab.value = routeNameMapping[router.currentRoute.value.name];
+  if (routes.includes(router.currentRoute.value.name?.toString() || "")) {
+    activeTab.value =
+      routeNameMapping[
+        router.currentRoute.value.name?.toString() || "placeholder"
+      ];
   } else {
     router.push({
       name: "Sessions",
@@ -60,7 +55,6 @@ onMounted(() => {
 });
 
 const changeTab = (tab: string) => {
-  console.log("change tab");
   router.push({
     name: tab === "sessions" ? "Sessions" : "ErrorTracking",
   });

@@ -23,15 +23,6 @@
         </template>
       </div>
     </div>
-    <!-- <div
-      class="col-4"
-      style="font-size: 12px; height: 300px; overflow-y: scroll"
-    >
-      <pre>
-            {{ error }}
-        </pre
-      >
-    </div> -->
   </div>
 </template>
 

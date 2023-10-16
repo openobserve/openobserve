@@ -5,7 +5,7 @@
       <div class="flex align-center justify-end metrics-date-time q-mr-md">
         <date-time
           auto-apply
-          :default-type="sessionState.data.datetime.type"
+          :default-type="sessionState.data.datetime.valueType"
           :default-absolute-time="{
             startTime: sessionState.data.datetime.startTime,
             endTime: sessionState.data.datetime.endTime,
@@ -82,6 +82,7 @@
           <AppTable
             :columns="columns"
             :rows="rows"
+            class="app-table-container"
             @event-emitted="handleTableEvents"
           >
             <template v-slot:session_location_column="slotProps">
@@ -95,6 +96,27 @@
 </template>
 
 <script setup lang="ts">
+import { onActivated, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import AppTable from "@/components/AppTable.vue";
+import {
+  formatDuration,
+  b64DecodeUnicode,
+  b64EncodeUnicode,
+} from "@/utils/zincutils";
+import FieldList from "@/components/common/sidebar/FieldList.vue";
+import { useRouter } from "vue-router";
+import streamService from "@/services/stream";
+import { useStore } from "vuex";
+import useQuery from "@/composables/useQuery";
+import searchService from "@/services/search";
+import { date } from "quasar";
+import useSession from "@/composables/useSessionReplay";
+import QueryEditor from "@/components/QueryEditor.vue";
+import DateTime from "@/components/DateTime.vue";
+import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
+import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
+
 interface Session {
   timestamp: string;
   type: string;
@@ -103,23 +125,6 @@ interface Session {
   initial_view_name: string;
   id: string;
 }
-import { onBeforeMount, ref } from "vue";
-import { useI18n } from "vue-i18n";
-import AppTable from "@/components/AppTable.vue";
-import { formatDuration } from "@/utils/zincutils";
-import SearchBar from "@/components/rum/SearchBar.vue";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
-import { useRouter } from "vue-router";
-import streamService from "@/services/stream";
-import { useStore } from "vuex";
-import useQuery from "@/composables/useQuery";
-import searchService from "@/services/search";
-import { date, is } from "quasar";
-import useSession from "@/composables/useSessionReplay";
-import QueryEditor from "@/components/QueryEditor.vue";
-import DateTime from "@/components/DateTime.vue";
-import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
-import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 
 const streamFields = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
@@ -152,7 +157,7 @@ const columns = ref([
   },
   {
     name: "user_email",
-    field: (row: any) => row["user_email"],
+    field: (row: any) => row["user_email"] || "Unknown",
     label: "User Email",
     align: "left",
     sortable: true,
@@ -164,7 +169,10 @@ const columns = ref([
     align: "left",
     sortable: true,
     sort: (a: any, b: any, rowA: Session, rowB: Session) => {
-      return parseInt(rowA.time_spent) - parseInt(rowB.time_spent);
+      return (
+        parseInt(rowA.time_spent.toString()) -
+        parseInt(rowB.time_spent.toString())
+      );
     },
   },
   {
@@ -184,14 +192,20 @@ const columns = ref([
     slotName: "session_location_column",
     sortable: true,
     sort: (a: any, b: any, rowA: Session, rowB: Session) => {
-      return parseInt(rowA.time_spent) - parseInt(rowB.time_spent);
+      return (
+        parseInt(rowA.time_spent.toString()) -
+        parseInt(rowB.time_spent.toString())
+      );
     },
   },
 ]);
 
-onBeforeMount(async () => {
-  await getStreamFields();
-  getSessions();
+onActivated(async () => {
+  if (router.currentRoute.value.name === "Sessions") {
+    await getStreamFields();
+    getSessions();
+    restoreUrlQueryParams();
+  }
 });
 
 const getStreamFields = () => {
@@ -222,7 +236,8 @@ const getSessions = () => {
     dateTime.value.endTime
   );
   const parsedQuery = parseQuery(sessionState.data.editorValue, false);
-  const queryPayload = {
+
+  const queryPayload: any = {
     from: Object.keys(sessionState.data.sessions).length,
     size: sessionState.data.resultGrid.size,
     timestamp_column: store.state.zoConfig.timestamp_column,
@@ -250,6 +265,9 @@ const getSessions = () => {
   req.query.sql_mode = "full";
   delete req.aggs;
   isLoading.value.push(true);
+
+  updateUrlQueryParams();
+
   searchService
     .search({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -299,6 +317,7 @@ const getSessionLogs = (req: any) => {
 };
 
 const updateDateChange = (date: any) => {
+  if (JSON.stringify(date) === JSON.stringify(dateTime.value)) return;
   dateTime.value = date;
   sessionState.data.datetime = date;
   getSessions();
@@ -310,7 +329,7 @@ const rows = ref<Session[]>([]);
 const router = useRouter();
 
 const handleTableEvents = (event: string, payload: any) => {
-  const eventMapping = {
+  const eventMapping: { [key: string]: (payload: any) => void } = {
     "cell-click": handleCellClick,
     scroll: handleScroll,
   };
@@ -335,13 +354,13 @@ const handleCellClick = (payload: any) => {
     name: "SessionViewer",
     params: { id: payload.row.session_id },
     query: {
-      start_time: payload.row.start_time,
-      end_time: payload.row.end_time,
+      start_time: payload.row.start_time * 1000,
+      end_time: payload.row.end_time * 1000,
     },
   });
 };
 
-const handleSidebarEvent = (event, value) => {
+const handleSidebarEvent = (event: string, value: any) => {
   if (event === "add-field") {
     if (sessionState.data.editorValue.length) {
       sessionState.data.editorValue += " and " + value;
@@ -359,11 +378,52 @@ const runQuery = () => {
   sessionState.data.sessions = {};
   getSessions();
 };
+
+function restoreUrlQueryParams() {
+  const queryParams = router.currentRoute.value.query;
+
+  const date = {
+    startTime: Number(queryParams.from) as number,
+    endTime: Number(queryParams.to) as number,
+    relativeTimePeriod: (queryParams.period as string) || "",
+    valueType: queryParams.period ? "relative" : "absolute",
+  };
+
+  if (date && ((date.startTime && date.endTime) || date.relativeTimePeriod)) {
+    sessionState.data.datetime = date;
+  }
+
+  if (queryParams.query) {
+    sessionState.data.editorValue =
+      b64DecodeUnicode(queryParams.query as string) || "";
+  }
+}
+
+function updateUrlQueryParams() {
+  const date = sessionState.data.datetime;
+  const query: any = {};
+
+  if (date.valueType == "relative") {
+    query["period"] = date.relativeTimePeriod;
+  } else {
+    query["from"] = date.startTime;
+    query["to"] = date.endTime;
+  }
+
+  query["query"] = b64EncodeUnicode(sessionState.data.editorValue);
+
+  query["org_identifier"] = store.state.selectedOrganization.identifier;
+  router.push({ query });
+}
 </script>
 <style scoped lang="scss">
 .sessions_page {
   .monaco-editor {
     height: 80px !important;
+  }
+
+  .app-table-container {
+    height: calc(100vh - 224px) !important;
   }
 }
 </style>

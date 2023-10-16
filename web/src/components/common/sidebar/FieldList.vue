@@ -225,7 +225,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 export default defineComponent({
-  name: "ComponentSearchIndexSelect",
+  name: "IndexList",
   components: {
     EqualIcon,
     NotEqualIcon,

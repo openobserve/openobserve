@@ -15,14 +15,16 @@
 </template>
 
 <script setup lang="ts">
+import { defineProps } from "vue";
+
 interface Tab {
   label: string;
   value: string;
   style?: Record<string, string>;
 }
-import { defineProps } from "vue";
+
 const emit = defineEmits(["update:activeTab"]);
-const props = defineProps({
+defineProps({
   show: {
     type: Boolean,
     default: true,

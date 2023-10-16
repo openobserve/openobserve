@@ -27,7 +27,7 @@
       <q-separator vertical />
       <div class="q-mx-lg items-center">
         <img
-          :src="osIcons"
+          :src="osIcon"
           alt="Chrome"
           class="q-mr-md inline-block"
           style="height: auto; width: 30px"
@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import ErrorTag from "@/components/rum/errorTracking/view/ErrorTag.vue";
 import chrome from "@/assets/images/rum/chrome.png";
 import firefox from "@/assets/images/rum/firefox.png";
@@ -66,42 +66,54 @@ const props = defineProps({
   },
 });
 
-const browserIcon = computed(() => {
+const osIcon = ref("");
+const browserIcon = ref("");
+
+onMounted(() => {
+  osIcon.value = getOsIcon();
+  browserIcon.value = getBrowserIcon();
+});
+
+const getBrowserIcon = () => {
+  if (!props.error.user_agent_user_agent_family) return chrome;
+
   if (
-    props.error.user_agent_user_agent_family.toLowerCase().includes("chrome")
+    props.error.user_agent_user_agent_family?.toLowerCase().includes("chrome")
   ) {
     return chrome;
   } else if (
-    props.error.user_agent_user_agent_family.toLowerCase().includes("opera")
+    props.error.user_agent_user_agent_family?.toLowerCase().includes("opera")
   ) {
     return opera;
   } else if (
-    props.error.user_agent_user_agent_family.toLowerCase().includes("firefox")
+    props.error.user_agent_user_agent_family?.toLowerCase().includes("firefox")
   ) {
     return firefox;
   } else if (
-    props.error.user_agent_user_agent_family.toLowerCase().includes("edge")
+    props.error.user_agent_user_agent_family?.toLowerCase().includes("edge")
   ) {
     return edge;
   } else if (
-    props.error.user_agent_user_agent_family.toLowerCase().includes("safari")
+    props.error.user_agent_user_agent_family?.toLowerCase().includes("safari")
   ) {
     return safari;
   }
   return chrome;
-});
+};
 
-const osIcons = computed(() => {
-  if (props.error.user_agent_os_family.toLowerCase().includes("windows")) {
+const getOsIcon = () => {
+  if (props.error?.user_agent_os_family?.toLowerCase().includes("windows")) {
     return windows;
-  } else if (props.error.user_agent_os_family.toLowerCase().includes("mac")) {
+  } else if (props.error?.user_agent_os_family?.toLowerCase().includes("mac")) {
     return mac;
-  } else if (props.error.user_agent_os_family.toLowerCase().includes("linux")) {
+  } else if (
+    props.error?.user_agent_os_family?.toLowerCase().includes("linux")
+  ) {
     return linux;
   } else {
     return windows;
   }
-});
+};
 
 const getOsVersion = computed(
   () =>

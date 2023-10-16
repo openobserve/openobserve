@@ -5,7 +5,7 @@
       <div class="flex align-center justify-end metrics-date-time q-mr-md">
         <date-time
           auto-apply
-          :default-type="errorTrackingState.data.datetime.type"
+          :default-type="errorTrackingState.data.datetime?.valueType"
           :default-absolute-time="{
             startTime: errorTrackingState.data.datetime.startTime,
             endTime: errorTrackingState.data.datetime.endTime,
@@ -97,29 +97,9 @@
 </template>
 
 <script setup lang="ts">
-interface SessionColumn {
-  name: string;
-  field: (row: any) => any;
-  prop: (row: any) => any;
-  label: string;
-  align: string;
-  sortable: boolean;
-}
-
-interface Session {
-  timestamp: string;
-  type: string;
-  time_spent: string;
-  error_count: string;
-  initial_view_name: string;
-  id: string;
-}
-import { h, onActivated, onBeforeMount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
-import { date } from "quasar";
+import { nextTick, onActivated, ref, type Ref } from "vue";
 import AppTable from "@/components/AppTable.vue";
-import { formatDuration } from "@/utils/zincutils";
-import IndexList from "@/plugins/traces/IndexList.vue";
+import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import ErrorDetail from "@/components/rum/ErrorDetail.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
@@ -133,7 +113,6 @@ import { cloneDeep } from "lodash-es";
 import streamService from "@/services/stream";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 
-const { t } = useI18n();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
@@ -143,7 +122,7 @@ const splitterModel = ref(250);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { errorTrackingState } = useErrorTracking();
 const store = useStore();
-const isLoading = ref([]);
+const isLoading: Ref<true[]> = ref([]);
 const columns = ref([
   {
     name: "error",
@@ -173,15 +152,14 @@ const columns = ref([
   },
 ]);
 
-const rows = ref<Session[]>([]);
 const router = useRouter();
 
 onActivated(async () => {
-  console.log("app errors before mount");
   await getStreamFields();
+  restoreUrlQueryParams();
 });
 
-const handleSidebarEvent = (event, value) => {
+const handleSidebarEvent = (event: string, value: any) => {
   if (event === "add-field") {
     if (errorTrackingState.data.editorValue.length) {
       errorTrackingState.data.editorValue += " and " + value;
@@ -219,7 +197,7 @@ const getErrorLogs = () => {
     dateTime.value.endTime
   );
   const parsedQuery = parseQuery(errorTrackingState.data.editorValue, false);
-  const queryPayload = {
+  const queryPayload: any = {
     from: Object.keys(errorTrackingState.data.errors).length,
     size: errorTrackingState.data.resultGrid.size,
     timestamp_column: store.state.zoConfig.timestamp_column,
@@ -237,21 +215,23 @@ const getErrorLogs = () => {
 
   const req = buildQueryPayload(queryPayload);
 
-  req.query.sql = `select min(${
+  req.query.sql = `select max(${
     store.state.zoConfig.timestamp_column
-  }) as zo_sql_timestamp, type, error_message, service, MIN(
-        CASE
-            WHEN error_stack IS NOT NULL THEN error_stack
-            ELSE error_handling_stack
-        END
-    ) AS error_stack, COUNT(*) as events, error_handling, min(error_id) as error_id, min(view_url) as view_url, min(session_id) as session_id from '_rumdata' ${
-      errorTrackingState.data.editorValue.length
-        ? " where type='error' and " + errorTrackingState.data.editorValue
-        : " where type='error' "
-    } group by type, error_message, service, error_stack, error_handling order by zo_sql_timestamp DESC`;
+  }) as zo_sql_timestamp, min(${
+    store.state.zoConfig.timestamp_column
+  }) as min_zo_sql_timestamp, type, error_message, service, MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack ELSE error_handling_stack END ) AS error_stack, COUNT(*) as events, error_handling, max(error_id) as error_id,  min(error_id) as min_error_id, max(view_url) as view_url, max(session_id) as session_id from '_rumdata' where type='error' ${
+    errorTrackingState.data.editorValue.length
+      ? " and " + errorTrackingState.data.editorValue
+      : ""
+  } group by type, error_message, service, error_stack, error_handling order by zo_sql_timestamp DESC`;
+
+  req.query.sql.replace("\n", " ");
   req.query.sql_mode = "full";
   delete req.aggs;
   isLoading.value.push(true);
+
+  updateUrlQueryParams();
+
   searchService
     .search({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -264,11 +244,10 @@ const getErrorLogs = () => {
     .finally(() => isLoading.value.pop());
 };
 
-const updateDateChange = (date) => {
+const updateDateChange = (date: any) => {
   dateTime.value = date;
-  console.log("updated date", date);
   errorTrackingState.data.datetime = date;
-  if (!isLoading.value.length) getErrorLogs();
+  if (!isLoading.value.length) runQuery();
 };
 
 const runQuery = () => {
@@ -277,8 +256,9 @@ const runQuery = () => {
   getErrorLogs();
 };
 
-const handleErrorTypeClick = (payload) => {
+const handleErrorTypeClick = async (payload: any) => {
   errorTrackingState.data.selectedError = cloneDeep(payload.row);
+  await nextTick();
   router.push({
     name: "ErrorViewer",
     params: { id: payload.row.error_id },
@@ -288,12 +268,49 @@ const handleErrorTypeClick = (payload) => {
   });
 };
 
-const handleTableEvent = (event, payload) => {
-  const eventMapping = {
+const handleTableEvent = (event: string, payload: any) => {
+  const eventMapping: { [key: string]: (payload: any) => Promise<void> } = {
     "cell-click": handleErrorTypeClick,
   };
   eventMapping[event](payload);
 };
+
+function restoreUrlQueryParams() {
+  const queryParams = router.currentRoute.value.query;
+
+  const date = {
+    startTime: Number(queryParams.from) as number,
+    endTime: Number(queryParams.to) as number,
+    relativeTimePeriod: (queryParams.period as string) || "",
+    valueType: queryParams.period ? "relative" : "absolute",
+  };
+
+  if (date && ((date.startTime && date.endTime) || date.relativeTimePeriod)) {
+    errorTrackingState.data.datetime = date;
+  }
+
+  if (queryParams.query) {
+    errorTrackingState.data.editorValue =
+      b64DecodeUnicode(queryParams.query as string) || "";
+  }
+}
+
+function updateUrlQueryParams() {
+  const date = errorTrackingState.data.datetime;
+  const query: any = {};
+
+  if (date.valueType == "relative") {
+    query["period"] = date.relativeTimePeriod;
+  } else {
+    query["from"] = date.startTime;
+    query["to"] = date.endTime;
+  }
+
+  query["query"] = b64EncodeUnicode(errorTrackingState.data.editorValue);
+
+  query["org_identifier"] = store.state.selectedOrganization.identifier;
+  router.push({ query });
+}
 </script>
 
 <style scoped lang="scss">

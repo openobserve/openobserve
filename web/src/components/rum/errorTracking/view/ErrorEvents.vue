@@ -1,7 +1,7 @@
 <template>
   <div class="q-mt-lg">
     <div class="tags-title text-grey-8 text-bold q-mb-sm q-ml-xs">Events</div>
-    <AppTable :columns="columns" :rows="error.events">
+    <AppTable :columns="columns || []" :rows="error.events || []">
       <template v-slot:error-type="slotProps">
         <ErrorTypeIcons :column="slotProps.column.row" />
       </template>
@@ -19,7 +19,7 @@ import ErrorEventDescription from "@/components/rum/errorTracking/view/ErrorEven
 import { date } from "quasar";
 import ErrorTypeIcons from "./ErrorTypeIcons.vue";
 
-const props = defineProps({
+defineProps({
   error: {
     type: Object,
     required: true,

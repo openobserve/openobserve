@@ -16,7 +16,7 @@
       ref="tableRef"
       :title="title"
       :rows="rows"
-      :columns="columns"
+      :columns="columns as []"
       :table-colspan="9"
       row-key="index"
       virtual-scroll

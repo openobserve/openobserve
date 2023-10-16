@@ -19,7 +19,7 @@
         ref="tableRef"
         :title="title"
         :rows="rows"
-        :columns="columns"
+        :columns="(columns as [])"
         :table-colspan="9"
         row-key="index"
         :virtual-scroll="virtualScroll"
@@ -123,7 +123,7 @@ const handleDataClick = (columnName: string, row: any) => {
   emit("event-emitted", "cell-click", { columnName, row });
 };
 
-const onScroll = (e) => {
+const onScroll = (e: any) => {
   emit("event-emitted", "scroll", e);
 };
 </script>

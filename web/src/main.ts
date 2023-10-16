@@ -29,6 +29,7 @@ import "./styles/quasar-overrides.scss";
 import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
+import { H } from "highlight.run";
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -52,7 +53,7 @@ const getConfig = async () => {
         app,
         dsn: config.sentryDSN,
         integrations: [
-          new BrowserTracing({
+          new Sentry.BrowserTracing({
             routingInstrumentation: Sentry.vueRouterInstrumentation(router),
             tracingOrigins: [
               "localhost",

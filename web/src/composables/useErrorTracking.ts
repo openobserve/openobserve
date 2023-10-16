@@ -76,7 +76,7 @@ const defaultObject = {
       startTime: 0,
       endTime: 0,
       relativeTimePeriod: "15m",
-      type: "relative",
+      valueType: "relative",
     },
     selectedError: {},
   },

@@ -1,5 +1,21 @@
 <template>
   <div ref="playerContainerRef" class="player-container full-height q-ma-sm">
+    <div
+      v-if="isLoading"
+      class="q-pb-lg flex items-center justify-center text-center full-width"
+      style="height: calc(100vh - 200px)"
+    >
+      <div>
+        <q-spinner-hourglass
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; display: block"
+        />
+        <div class="text-center full-width">
+          Hold on tight, we're fetching session.
+        </div>
+      </div>
+    </div>
     <div ref="playerRef" id="player" class="player flex items-center"></div>
     <div class="full-width q-pa-sm q-pt-md controls-container">
       <div
@@ -29,7 +45,7 @@
         />
 
         <div
-          v-for="event in events"
+          v-for="event in (events as any[])"
           :key="event.id"
           class="progressTime bg-secondary absolute cursor-pointer"
           :style="{
@@ -101,9 +117,10 @@
 </template>
 
 <script setup lang="ts">
+import { cloneDeep } from "lodash-es";
 import rrwebPlayer from "rrweb-player";
 import "rrweb-player/dist/style.css";
-import { nextTick, ref, onMounted, watch } from "vue";
+import { nextTick, ref, watch } from "vue";
 
 const props = defineProps({
   events: {
@@ -114,9 +131,13 @@ const props = defineProps({
     type: Array,
     required: true,
   },
+  isLoading: {
+    type: Boolean,
+    required: true,
+  },
 });
 
-const player = ref<rrwebPlayer>(null);
+const player = ref<rrwebPlayer>();
 
 const playerRef = ref<HTMLElement | null>(null);
 
@@ -179,36 +200,51 @@ const playerState = ref({
 watch(
   () => props.segments,
   (value) => {
-    console.log("segments changed", value.length);
     if (value.length) setupSession();
   },
   { deep: true, immediate: true }
 );
 
 const setupSession = async () => {
+  session.value = [];
   if (!props.segments.length) return;
 
   props.segments.forEach((segment: any) => {
-    session.value.push(...segment.records);
-    session.value = [
-      ...session.value.sort((a: any, b: any) => a.timestamp - b.timestamp),
-    ];
+    segment.records.forEach((record: any) => {
+      let segCopy = cloneDeep(record);
+      const supportedTypes = [2, 3, 4, 8];
+      if (!supportedTypes.includes(segCopy.type)) return;
+      if (segCopy.type === 8) {
+        const seg = {
+          ...segCopy,
+          data: {
+            payload: {
+              ...segCopy.data,
+            },
+            tag: "viewport",
+          },
+          type: 5,
+        };
+        segCopy = seg;
+      }
+      session.value.push(segCopy);
+    });
   });
 
-  let lastEventTime = 1692884586897;
-  const inactivityThreshold = 5000; // 5 seconds
+  // let lastEventTime = 1692884586897;
+  // const inactivityThreshold = 5000; // 5 seconds
 
-  session.value.forEach((event) => {
-    const currentTime = event.timestamp;
-    if (currentTime - lastEventTime > inactivityThreshold) {
-      console.log(
-        `Inactivity detected between timestamps ${lastEventTime} and ${currentTime} is of ${formatTimeDifference(
-          currentTime - lastEventTime
-        )} ms.`
-      );
-    }
-    lastEventTime = currentTime;
-  });
+  // session.value.forEach((event) => {
+  //   const currentTime = event.timestamp;
+  //   if (currentTime - lastEventTime > inactivityThreshold) {
+  //     console.log(
+  //       `Inactivity detected between timestamps ${lastEventTime} and ${currentTime} is of ${formatTimeDifference(
+  //         currentTime - lastEventTime
+  //       )} ms.`
+  //     );
+  //   }
+  //   lastEventTime = currentTime;
+  // });
 
   const playerWidth = playerContainerRef.value?.clientWidth || 0;
   const playerHeight =
@@ -224,18 +260,34 @@ const setupSession = async () => {
     target: playerRef.value as HTMLElement,
     props: {
       events: session.value,
+      UNSAFE_replayCanvas: true,
+      mouseTail: false,
       autoPlay: false,
       showController: false,
-      UNSAFE_replayCanvas: true,
       width: playerWidth,
       height: playerHeight,
     },
   });
 
+  // events.forEach((event) => {
+  //   if (event.type === 2 || event.type === 4) {
+  //     player.value?.addEvent(event);
+  //   }
+  // });
+
   player.value.addEventListener("ui-update-current-time", updateProgressBar);
+
   player.value.addEventListener("finish", () => {
     playerState.value.isPlaying = false;
   });
+
+  player.value.addEventListener("error", (error) => {
+    console.error("Playback error:", error);
+  });
+
+  // player.value.addEventListener("event-cast", (e) => {
+  //   // console.log("event casted:", e);
+  // });
 
   if (!player.value) return;
   const playerMeta = player.value?.getMetaData();

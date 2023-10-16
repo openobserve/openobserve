@@ -1,21 +1,5 @@
 <template>
   <div class="row qp-2 full-height">
-    <div
-      class="q-pb-lg flex items-center justify-center text-center full-width"
-      style="height: calc(100vh - 200px)"
-    >
-      <div>
-        <q-spinner-hourglass
-          color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
-        />
-        <div class="text-center full-width">
-          Hold on tight, we're fetching session.
-        </div>
-      </div>
-    </div>
-
     <div class="col-12 q-px-sm q-pt-md row items-end bg-grey-2">
       <div class="col-9 row">
         <div
@@ -37,6 +21,7 @@
         ref="videoPlayerRef"
         :events="segmentEvents"
         :segments="segments"
+        :is-loading="!!isLoading.length"
       />
     </div>
     <div class="col-3 row">
@@ -111,7 +96,6 @@ const getSessionDetails = computed(() => {
 });
 
 const getSession = () => {
-  console.log(router.currentRoute.value.query.start_time);
   return new Promise((resolve) => {
     const req = {
       query: {
@@ -154,9 +138,9 @@ const getSession = () => {
 const getSessionSegments = () => {
   if (!sessionState.data.selectedSession) return;
 
-  const queryPayload = {
+  const queryPayload: any = {
     from: 0,
-    size: 150,
+    size: 1000,
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
       startTime:
@@ -170,7 +154,7 @@ const getSessionSegments = () => {
   };
 
   const req = buildQueryPayload(queryPayload);
-  req.query.sql = `select * from "_sessionreplay" where session_id='${sessionId.value}' order by ${store.state.zoConfig.timestamp_column} asc`;
+  req.query.sql = `select * from "_sessionreplay" where session_id='${sessionId.value}' order by start asc`;
   delete req.aggs;
   isLoading.value.push(true);
   searchService
@@ -180,23 +164,39 @@ const getSessionSegments = () => {
       page_type: "logs",
     })
     .then((res) => {
+      // const segmentsCopy = [];
+      // const viewIds = [];
       res.data.hits.forEach((hit: any) => {
         segments.value.push(JSON.parse(hit.segment));
       });
+
+      // res.data.hits.forEach((hit: any) => {
+      //   if (!viewIds.includes(hit.view_id)) viewIds.push(hit.view_id);
+      // });
+
+      // // loop over view_id Group ( array of array) segments from view_id and sort each group by start_time
+      // viewIds.forEach((view_id) => {
+      //   const group = res.data.hits
+      //     .filter((hit: any) => hit.view_id === view_id)
+      //     .sort((a, b) => a.start - b.start);
+
+      //   segmentsCopy.push(group.map((hit: any) => JSON.parse(hit.segment)));
+      // });
+
+      // segments.value = segmentsCopy.flat();
     })
     .finally(() => isLoading.value.pop());
 };
 
 const getSessionEvents = () => {
-  const queryPayload = {
+  const queryPayload: any = {
     from: 0,
     size: 150,
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
       startTime:
-        Number(sessionState.data.selectedSession?.start_time) * 1000 - 300000,
-      endTime:
-        Number(sessionState.data.selectedSession?.start_time) * 1000 + 300000,
+        Number(sessionState.data.selectedSession?.start_time) * 1000 - 1,
+      endTime: Number(sessionState.data.selectedSession?.end_time) * 1000 + 1,
     },
     sqlMode: false,
     currentPage: 0,
@@ -204,7 +204,7 @@ const getSessionEvents = () => {
   };
 
   const req = buildQueryPayload(queryPayload);
-  req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' order by ${store.state.zoConfig.timestamp_column} asc`;
+  req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' and type='error' or type='action' or type='view' order by ${store.state.zoConfig.timestamp_column} asc`;
   delete req.aggs;
   isLoading.value.push(true);
   searchService
@@ -233,10 +233,10 @@ const getDefaultEvent = (event: any) => {
   _event.timestamp = event[store.state.zoConfig.timestamp_column];
   const relativeTime = formatTimeDifference(
     _event.timestamp / 1000,
-    Number(router.currentRoute.value.query.start_time)
+    Number(router.currentRoute.value.query.start_time) / 1000
   );
-  _event.relativeTime = relativeTime[0];
-  _event.displayTime = relativeTime[1];
+  _event.relativeTime = relativeTime[0] as number;
+  _event.displayTime = relativeTime[1] as string;
   return _event;
 };
 
@@ -248,6 +248,7 @@ const handleErrorEvent = (event: any) => {
 
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
+  _event.name = event.action_type + ' on "' + event.action_target_name + '"';
   // if (event.event.custom.error) {
   //   _event.name = event.event.custom.error.message;
   // }
@@ -268,7 +269,7 @@ const handleViewEvent = (event: any) => {
 
 const formatEvent = (event: any) => {
   try {
-    const eventTypes = {
+    const eventTypes: { [key: string]: (event: any) => void } = {
       error: handleErrorEvent,
       action: handleActionEvent,
       view: handleViewEvent,
@@ -311,7 +312,7 @@ function formatTimeDifference(start_time: number, end_time: number) {
 const getFormattedDate = (timestamp: number) =>
   date.formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 
-const handleSidebarEvent = (event, payload) => {
+const handleSidebarEvent = (event: string, payload: any) => {
   videoPlayerRef.value.goto(
     payload.relativeTime,
     !!videoPlayerRef.value.playerState?.isPlaying

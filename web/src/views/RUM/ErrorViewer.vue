@@ -25,7 +25,7 @@
       <div class="q-px-lg q-py-md">
         <ErrorTags :error="errorDetails" />
         <ErrorStackTrace
-          :error_stack="errorDetails.error_stack"
+          :error_stack="errorDetails.error_stack || []"
           :error="errorDetails"
         />
         <ErrorSessionReplay :error="errorDetails" />
@@ -36,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeMount, ref } from "vue";
+import { computed, onActivated, ref } from "vue";
 import ErrorHeader from "@/components/rum/errorTracking/view/ErrorHeader.vue";
 import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
 import ErrorEvents from "@/components/rum/errorTracking/view/ErrorEvents.vue";
@@ -55,9 +55,8 @@ const store = useStore();
 const { errorTrackingState } = useErrorTracking();
 const errorDetails = ref<any>({});
 
-onBeforeMount(() => {
-  console.log("on before mount");
-  getError();
+onActivated(async () => {
+  await getError();
   getErrorLogs();
 });
 
@@ -69,15 +68,15 @@ const getErrorLogs = () => {
   const req = {
     query: {
       sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
-      start_time: getTimestamp.value - 300000,
-      end_time: getTimestamp.value + 300000,
+      start_time: getTimestamp.value - 3600000000,
+      end_time: getTimestamp.value + 1,
       from: 0,
-      size: 10,
+      size: 150,
       sql_mode: "full",
     },
   };
 
-  req.query.sql = `select * from ${errorTrackingState.data.stream.errorStream} where ${store.state.zoConfig.timestamp_column}<=${router.currentRoute.value.query.timestamp} and type='error' or type='action' or type='view' or (type='resource' and resource_type='xhr') order by ${store.state.zoConfig.timestamp_column} DESC limit 150`;
+  req.query.sql = `select * from ${errorTrackingState.data.stream.errorStream} where type='error' or type='action' or type='view' or (type='resource' and resource_type='xhr') order by ${store.state.zoConfig.timestamp_column}`;
   isLoading.value.push(true);
   searchService
     .search({
@@ -87,7 +86,7 @@ const getErrorLogs = () => {
     })
     .then((res) => {
       const errorIndex = res.data.hits.findIndex(
-        (hit: any) => hit.error_id === router.currentRoute.value.params.id
+        (hit: any) => hit.error_id === errorDetails.value.error_id
       );
       errorDetails.value.events = res.data.hits.slice(
         errorIndex,
@@ -115,35 +114,39 @@ const getErrorCategory = (row: any) => {
 };
 
 const getError = () => {
-  const req = {
-    query: {
-      sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
-      start_time: getTimestamp.value - 300000,
-      end_time: getTimestamp.value + 86400000000,
-      from: 0,
-      size: 10,
-      sql_mode: "full",
-    },
-  };
+  return new Promise((resolve) => {
+    const req = {
+      query: {
+        sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
+        start_time: getTimestamp.value - 1,
+        end_time: getTimestamp.value + 1,
+        from: 0,
+        size: 10,
+        sql_mode: "full",
+      },
+    };
 
-  req.query.sql = `select * from ${errorTrackingState.data.stream.errorStream} where error_id='${router.currentRoute.value.params.id}'`;
-  isLoading.value.push(true);
-  searchService
-    .search({
-      org_identifier: store.state.selectedOrganization.identifier,
-      query: req,
-      page_type: "logs",
-    })
-    .then((res) => {
-      errorDetails.value = { ...res.data.hits[0] };
-      errorDetails.value["category"] = [];
-      const errorStack =
-        errorDetails.value.error_handling_stack ||
-        errorDetails.value.error_stack;
-      console.log(errorStack);
-      errorDetails.value.error_stack = errorStack.split("\n");
-    })
-    .finally(() => isLoading.value.pop());
+    req.query.sql = `select * from ${errorTrackingState.data.stream.errorStream} where type='error' and ${store.state.zoConfig.timestamp_column}=${getTimestamp.value} order by ${store.state.zoConfig.timestamp_column} desc`;
+    isLoading.value.push(true);
+    searchService
+      .search({
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: req,
+        page_type: "logs",
+      })
+      .then((res) => {
+        errorDetails.value = { ...res.data.hits[0] };
+        errorDetails.value["category"] = [];
+        const errorStack =
+          errorDetails.value.error_handling_stack ||
+          errorDetails.value.error_stack;
+        errorDetails.value.error_stack = errorStack.split("\n");
+      })
+      .finally(() => {
+        isLoading.value.pop();
+        resolve(true);
+      });
+  });
 };
 </script>
 
