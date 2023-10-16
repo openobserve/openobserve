@@ -28,6 +28,7 @@ import "./styles/quasar-overrides.scss";
 import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
+import { H } from "highlight.run";
 
 const app = createApp(App);
 const router = createRouter(store);
