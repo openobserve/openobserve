@@ -50,7 +50,8 @@ export const convertPanelData = (panelSchema: any, data: any, store: any, chartP
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {chartType: panelSchema.type, ...convertPromQLData(panelSchema, data, store, chartPanelRef)};
       } else {
-        return {chartType: panelSchema.type, ...convertSQLData(panelSchema, data, store)};
+        // chartpanelref will be used to get width and height of the chart element from DOM
+        return {chartType: panelSchema.type, ...convertSQLData(panelSchema, data, store, chartPanelRef)};
       }
     }
     case "table": {
