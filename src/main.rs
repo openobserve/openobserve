@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{middleware, web, App, HttpServer};
+use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
 use log::LevelFilter;
 use opentelemetry::{
@@ -33,6 +33,7 @@ use std::{
         atomic::{AtomicU16, Ordering},
         Arc,
     },
+    time::Duration,
 };
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
@@ -237,6 +238,10 @@ async fn main() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
+        CONFIG.limit.keep_alive,
+    )))
+    .client_request_timeout(Duration::from_secs(CONFIG.limit.request_timeout))
     .bind(haddr)?;
 
     tokio::task::spawn(async move { zo_logger::send_logs().await });
