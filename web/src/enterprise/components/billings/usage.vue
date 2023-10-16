@@ -87,7 +87,7 @@ export default defineComponent({
       )
         .then((res) => {
           dataLoading.value = false;
-          chartData.value = convertBillingData(res);
+          chartData.value = convertBillingData(res?.data);
           dismiss();
         })
         .catch((e) => {

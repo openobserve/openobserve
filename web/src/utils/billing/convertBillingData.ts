@@ -76,6 +76,13 @@ export const convertBillingData = (params:any) => {
         label: {
           show: true,
           fontsize: 12,
+          formatter: function (params: any) {
+            if (params.axisDimension == "y") {
+              return params?.value?.toFixed(2) + "MB";
+            } else {
+              return `${formatDate(new Date(params.value))}`;
+            }
+          },
         },
       },
       formatter: function (name: any) {
