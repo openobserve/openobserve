@@ -51,7 +51,10 @@ const getDefaultDashboardPanelData: any = () => ({
         zoom: 1,
         lat: 0,
         lng: 0,
-      }
+      },
+      // gauge min and max values
+      min: 0,
+      max: 100,
     },
     queryType: "sql",
     queries: [

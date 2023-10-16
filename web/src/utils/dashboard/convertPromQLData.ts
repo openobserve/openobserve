@@ -343,8 +343,8 @@ export const convertPromQLData = (
             gaugeIndex++;           
             return {
               ...getPropsByChartTypeForSeries(panelSchema.type),
-              min: panelSchema?.config?.gauge_min || 0,
-              max: panelSchema?.config?.gauge_max || 100,
+              min: panelSchema?.config?.min || 0,
+              max: panelSchema?.config?.max || 100,
 
               //which grid will be used
               gridIndex: gaugeIndex - 1,
@@ -458,9 +458,6 @@ export const convertPromQLData = (
 });
 
   options.series = options.series.flat();
-
-  console.log(JSON.parse(JSON.stringify(options)));
-  
 
   // extras will be used to return other data to chart renderer
   // e.g. setCurrentSeriesValue to set the current series index which is hovered
