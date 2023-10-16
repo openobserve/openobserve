@@ -1371,9 +1371,6 @@ export default defineComponent({
 }
 </style>
 <style lang="scss">
-div.plotly-notifier {
-  visibility: hidden;
-}
 .tracePage {
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,

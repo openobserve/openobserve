@@ -595,10 +595,6 @@ export default defineComponent({
 <style lang="scss">
 $navbarHeight: 64px;
 
-div.plotly-notifier {
-  visibility: hidden;
-}
-
 .logPage {
   height: calc(100vh - $navbarHeight);
   min-height: calc(100vh - $navbarHeight) !important;

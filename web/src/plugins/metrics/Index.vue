@@ -889,9 +889,6 @@ export default defineComponent({
     height: 80px !important;
   }
 }
-div.plotly-notifier {
-  visibility: hidden;
-}
 .metrics-page {
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
