@@ -21,12 +21,18 @@ export const convertTraceData = (
         label: {
           show: true,
           fontsize: 12,
+          formatter: (name: any) => {
+            if(name.axisDimension == "x")
+              return `${formatDate(new Date(name.value))}`;
+            else
+              return `${name?.value?.toFixed(2)}ms`
+          }
         },
       },
       formatter: function (name: any) {
         if (name.length == 0) return "";
         const date = new Date(name[0].data[0]);
-        return `(${formatDate(date)}, <b>${name[0].value[1]}</b>)`;
+        return `(${formatDate(date)}, <b>${name[0].value[1]}ms</b>)`;
       },
     },
     xAxis: {
@@ -37,6 +43,11 @@ export const convertTraceData = (
       axisLine: {
         show: true,
       },
+      axisLabel: {
+        formatter: function (name: any) {
+          return `${name} ms`;
+        },
+      }
     },
     toolbox: {
       orient: "vertical",
