@@ -233,8 +233,6 @@ pub struct Common {
     pub wal_memory_mode_enabled: bool,
     #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
     pub wal_line_mode_enabled: bool,
-    #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
-    pub parquet_compression: String,
     #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
     pub column_timestamp: String,
     #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = true)]
@@ -861,18 +859,6 @@ fn check_dynamo_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 #[inline]
-pub fn get_parquet_compression() -> parquet::basic::Compression {
-    match CONFIG.common.parquet_compression.to_lowercase().as_str() {
-        "snappy" => parquet::basic::Compression::SNAPPY,
-        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
-        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
-        "lz4" => parquet::basic::Compression::LZ4_RAW,
-        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
-        _ => parquet::basic::Compression::ZSTD(Default::default()),
-    }
-}
-
-#[inline]
 pub fn is_local_disk_storage() -> bool {
     CONFIG.common.local_mode && CONFIG.common.local_mode_storage.eq("disk")
 }
@@ -902,12 +888,6 @@ mod tests {
         check_memory_cache_config(&mut cfg).unwrap();
         assert_eq!(cfg.memory_cache.max_size, 1024 * 1024 * 1024);
         assert_eq!(cfg.memory_cache.release_size, 1024 * 1024 * 1024);
-
-        cfg.common.parquet_compression = "zstd".to_string();
-        assert_eq!(
-            get_parquet_compression(),
-            parquet::basic::Compression::ZSTD(Default::default())
-        );
 
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
