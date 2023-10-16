@@ -33,14 +33,20 @@ function calculateGridPositions(width: any, height: any, numGrids: any) {
     return gridArray;
   }
 
-  // if only one grid then return single grid
+  // if only one grid then return single grid array, width, height, gridNoOfRow, gridNoOfCol
   if(numGrids == 1){
-    return [{
-      left: `0%`,
-      top: `0%`,
-      width: `100%`,
-      height: `100%`,
-    }]
+    return {
+      gridArray: [{
+      left: "0%",
+      top: "0%",
+      width: "100%",
+      height: "100%",
+    }],
+    gridWidth : width,
+    gridHeight : height,
+    gridNoOfRow: 1,
+    gridNoOfCol: 1
+  }
   }
 
   // total area of chart element
@@ -68,7 +74,14 @@ function calculateGridPositions(width: any, height: any, numGrids: any) {
     }
   }
 
-  return gridArray;
+  // return grid array, width, height, gridNoOfRow, gridNoOfCol
+  return {
+    gridArray: gridArray,
+    gridWidth : (cellWidth * width) / 100,
+    gridHeight : (cellHeight * height) / 100,
+    gridNoOfRow: numRows,
+    gridNoOfCol: numCols
+  }
 }
 
 /**
@@ -267,8 +280,10 @@ export const convertPromQLData = (
   // to pass grid index in gauge chart
   let gaugeIndex = 0;
 
-  // for gauge chart we need total no. of gague to calculate grid positions
+  // for gauge chart we need total no. of gauge to calculate grid positions
   let totalLength = 0;
+  // for gauge chart, it contains grid array, single chart height and width, no. of charts per row and no. of columns
+  let gridDataForGauge: any = {};
   
   if(panelSchema.type === "gauge"){
     // calculate total length of all metrics
@@ -279,11 +294,14 @@ export const convertPromQLData = (
     });
 
     // create grid array based on chart panel width, height and total no. of gauge
-    options.grid = calculateGridPositions(
+    gridDataForGauge = calculateGridPositions(
       chartPanelRef.value.offsetWidth,
       chartPanelRef.value.offsetHeight,
       totalLength
-    )
+    );
+
+    //assign grid array to gauge chart options
+    options.grid = gridDataForGauge.gridArray;
   }
   options.series = searchQueryData.map((it: any, index: number) => {
 
@@ -348,10 +366,23 @@ export const convertPromQLData = (
 
               //which grid will be used
               gridIndex: gaugeIndex - 1,
-              // radius of gauge using width
-              radius: parseFloat(options.grid[gaugeIndex - 1].width)/1.2,
+              // radius, progress and axisline width will be calculated based on grid height
+              radius: `${options.grid[gaugeIndex - 1].height}`,
+              progress: {
+                show: true,
+                width: parseFloat(options.grid[gaugeIndex - 1].height)/2,
+              },
+              axisLine: {
+                lineStyle: {
+                  width: parseFloat(options.grid[gaugeIndex - 1].height)/2,
+                }
+              },
               title:{
                 fontSize: 10,
+                offsetCenter: [0, "70%"],
+                // width: upto chart width
+                width: `${gridDataForGauge.gridWidth}`,
+                overflow: "truncate"
               },
 
               // center of gauge
@@ -359,7 +390,7 @@ export const convertPromQLData = (
               // y: top + height / 2,
               center:[`${parseFloat(options.grid[gaugeIndex - 1].left) + parseFloat(options.grid[gaugeIndex - 1].width) / 2}%`, `${parseFloat(options.grid[gaugeIndex - 1].top) + parseFloat(options.grid[gaugeIndex - 1].height) / 2}%`],
               data:[{
-                // name: JSON.stringify(metric.metric),
+                name: JSON.stringify(metric.metric),
                 value:parseFloat(unitValue.value).toFixed(2),
                 detail: {
                   formatter: function (value:any) {
@@ -369,14 +400,15 @@ export const convertPromQLData = (
               }],
               detail: {
                 valueAnimation: true,
-                offsetCenter: [0, 20],
-                fontSize:15,
+                offsetCenter: [0, 0],
+                fontSize:12,
               },
             };
           });
           options.dataset = { source: [[]] };
           options.tooltip = {
-            show: false,
+            show: true,
+            trigger: "item",
           };
           options.angleAxis = {
             show: false,
@@ -584,17 +616,8 @@ const getPropsByChartTypeForSeries = (type: string) => {
           type: 'gauge',
           startAngle: 205,
           endAngle: -25,
-          progress: {
-            show: true,
-            width: 10
-          },
           pointer: {
             show: false
-          },
-          axisLine: {
-            lineStyle: {
-              width: 10,
-            }
           },
           axisTick: {
             show:false
