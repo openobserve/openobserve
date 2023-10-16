@@ -59,8 +59,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             }
         }
         extract_num_args(&mut func);
-        let name = func.name.to_owned();
-        if let Err(error) = db::functions::set(&org_id, name.as_str(), func).await {
+        if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -112,8 +111,7 @@ pub async fn update_function(
         }
     }
     extract_num_args(&mut func);
-    let name = func.name.to_owned();
-    if let Err(error) = db::functions::set(&org_id, &name, func).await {
+    if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -214,7 +212,7 @@ pub async fn delete_stream_function(
                     .collect::<Vec<StreamOrder>>(),
             );
         }
-        if let Err(error) = db::functions::set(&org_id, &fn_name, existing_fn).await {
+        if let Err(error) = db::functions::set(&org_id, &fn_name, &existing_fn).await {
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -266,7 +264,7 @@ pub async fn add_function_to_stream(
         existing_fn.streams = Some(vec![stream_order]);
     }
 
-    if let Err(error) = db::functions::set(&org_id, &fn_name, existing_fn).await {
+    if let Err(error) = db::functions::set(&org_id, &fn_name, &existing_fn).await {
         Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
