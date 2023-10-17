@@ -43,9 +43,9 @@ impl FS {
         path.into()
     }
 
-    async fn get_cache(&self, location: &Path) -> Option<Bytes> {
+    async fn get_cache(&self, location: &Path, range: Option<Range<usize>>) -> Option<Bytes> {
         let path = location.to_string();
-        let data = file_data::memory::get(&path).await;
+        let data = file_data::memory::get(&path, range).await;
         tokio::task::yield_now().await;
         data
     }
@@ -61,7 +61,7 @@ impl std::fmt::Display for FS {
 impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let location = &self.format_location(location);
-        match self.get_cache(location).await {
+        match self.get_cache(location, None).await {
             Some(data) => {
                 let meta = ObjectMeta {
                     location: location.clone(),
@@ -90,7 +90,7 @@ impl ObjectStore for FS {
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         let location = &self.format_location(location);
-        match self.get_cache(location).await {
+        match self.get_cache(location, None).await {
             Some(data) => {
                 let meta = ObjectMeta {
                     location: location.clone(),
@@ -131,15 +131,15 @@ impl ObjectStore for FS {
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
         let location = &self.format_location(location);
-        match self.get_cache(location).await {
+        match self.get_cache(location, Some(range.clone())).await {
             Some(data) => {
-                if range.end > data.len() {
-                    return Err(super::Error::OutOfRange(location.to_string()).into());
-                }
                 if range.start > range.end {
                     return Err(super::Error::BadRange(location.to_string()).into());
                 }
-                Ok(data.slice(range))
+                if range.end - range.start != data.len() {
+                    return Err(super::Error::BadRange(location.to_string()).into());
+                }
+                Ok(data)
             }
             None => match storage::LOCAL_CACHE
                 .get_range(location, range.clone())
@@ -152,16 +152,19 @@ impl ObjectStore for FS {
     }
 
     async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
+        if ranges.is_empty() {
+            return Ok(vec![]);
+        }
         let location = &self.format_location(location);
-        match self.get_cache(location).await {
+        match self.get_cache(location, None).await {
             Some(data) => ranges
                 .iter()
                 .map(|range| {
-                    if range.end > data.len() {
-                        return Err(super::Error::OutOfRange(location.to_string()).into());
-                    }
                     if range.start > range.end {
                         return Err(super::Error::BadRange(location.to_string()).into());
+                    }
+                    if range.end > data.len() {
+                        return Err(super::Error::OutOfRange(location.to_string()).into());
                     }
                     Ok(data.slice(range.clone()))
                 })
@@ -175,7 +178,7 @@ impl ObjectStore for FS {
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
         let location = &self.format_location(location);
-        match self.get_cache(location).await {
+        match self.get_cache(location, None).await {
             Some(data) => Ok(ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,

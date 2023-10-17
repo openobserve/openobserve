@@ -14,15 +14,18 @@
 
 use datafusion::arrow::datatypes::Schema;
 use parquet::{
-    arrow::ArrowWriter, file::properties::WriterProperties, format::SortingColumn,
+    arrow::ArrowWriter,
+    basic::{Compression, Encoding},
+    file::properties::WriterProperties,
+    format::SortingColumn,
     schema::types::ColumnPath,
 };
 use std::{str::FromStr, sync::Arc};
 
 use crate::common::{
     infra::config::{
-        get_parquet_compression, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
-        PARQUET_PAGE_SIZE, SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA,
+        CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE, PARQUET_PAGE_SIZE,
+        SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA,
     },
     meta::functions::ZoFunction,
 };
@@ -101,14 +104,23 @@ pub fn new_parquet_writer<'a>(
         .index_of(&CONFIG.common.column_timestamp)
         .expect("Not found timestamp field");
     let mut writer_props = WriterProperties::builder()
-        .set_compression(get_parquet_compression())
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
+        .set_compression(Compression::ZSTD(Default::default()))
         .set_dictionary_enabled(true)
+        .set_encoding(Encoding::PLAIN)
         .set_sorting_columns(Some(
-            [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),
-        ));
+            [SortingColumn::new(sort_column_id as i32, false, false)].to_vec(),
+        ))
+        .set_column_dictionary_enabled(
+            ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
+            false,
+        )
+        .set_column_encoding(
+            ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
+            Encoding::DELTA_BINARY_PACKED,
+        );
     for field in SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA.iter() {
         writer_props = writer_props
             .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);

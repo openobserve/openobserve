@@ -15,7 +15,7 @@
 use bytes::Bytes;
 use lru::LruCache;
 use once_cell::sync::Lazy;
-use std::cmp::max;
+use std::{cmp::max, ops::Range};
 use tokio::sync::RwLock;
 
 use crate::common::infra::{
@@ -55,8 +55,13 @@ impl FileData {
         self.data.get(file).is_some()
     }
 
-    pub async fn get(&self, file: &str) -> Option<Bytes> {
-        DATA.get(file).map(|v| v.value().clone())
+    pub async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+        let data = DATA.get(file)?;
+        Some(if let Some(range) = range {
+            data.value().slice(range)
+        } else {
+            data.value().clone()
+        })
     }
 
     pub async fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
@@ -130,17 +135,17 @@ impl FileData {
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let files = FILES.read().await;
-    _ = files.get("").await;
+    _ = files.get("", None).await;
     Ok(())
 }
 
 #[inline]
-pub async fn get(file: &str) -> Option<Bytes> {
+pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     if !CONFIG.memory_cache.enabled {
         return None;
     }
     let files = FILES.read().await;
-    files.get(file).await
+    files.get(file, range).await
 }
 
 #[inline]
@@ -211,11 +216,11 @@ mod tests {
         let content = Bytes::from("Some text");
 
         file_data.set(file_key, content.clone()).await.unwrap();
-        assert_eq!(file_data.get(file_key).await.unwrap(), content);
+        assert_eq!(file_data.get(file_key, None).await.unwrap(), content);
 
         file_data.set(file_key, content.clone()).await.unwrap();
         assert!(file_data.exist(file_key).await);
-        assert_eq!(file_data.get(file_key).await.unwrap(), content);
+        assert_eq!(file_data.get(file_key, None).await.unwrap(), content);
         assert!(file_data.size().0 > 0);
     }
 
@@ -227,11 +232,11 @@ mod tests {
         let content = Bytes::from("Some text");
         // set one key
         file_data.set(file_key1, content.clone()).await.unwrap();
-        assert_eq!(file_data.get(file_key1).await.unwrap(), content);
+        assert_eq!(file_data.get(file_key1, None).await.unwrap(), content);
         // set another key, will release first key
         file_data.set(file_key2, content.clone()).await.unwrap();
-        assert_eq!(file_data.get(file_key2).await.unwrap(), content);
+        assert_eq!(file_data.get(file_key2, None).await.unwrap(), content);
         // get first key, should get error
-        assert!(file_data.get(file_key1).await.is_none());
+        assert!(file_data.get(file_key1, None).await.is_none());
     }
 }

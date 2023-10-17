@@ -285,7 +285,7 @@ impl Sql {
                         let pos_start = origin_sql.find(where_str.as_str()).unwrap();
                         let pos_end = pos_start + where_str.len();
                         origin_sql = format!(
-                            "{}{} AND {}{}",
+                            "{}{} AND ({}){}",
                             &origin_sql[0..pos_start],
                             time_range_sql,
                             where_str,
