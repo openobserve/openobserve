@@ -52,6 +52,7 @@ function calculateGridPositions(width: any, height: any, numGrids: any) {
   // total area of chart element
   const totalArea = width * height;
   // per gauge area
+  // chart will be square, so width and height are same, that's why used sqrt
   const perChartArea = Math.sqrt(totalArea / numGrids);  
   // number of row and column for gauge rendering
   let numRows = Math.ceil(height / perChartArea);
