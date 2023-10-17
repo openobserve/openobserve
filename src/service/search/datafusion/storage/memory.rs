@@ -156,25 +156,17 @@ impl ObjectStore for FS {
             return Ok(vec![]);
         }
         let location = &self.format_location(location);
-        let merged_range = Range {
-            start: ranges[0].start,
-            end: ranges[ranges.len() - 1].end,
-        };
-        let merged_range_start = merged_range.start;
-        match self.get_cache(location, Some(merged_range)).await {
+        match self.get_cache(location, None).await {
             Some(data) => ranges
                 .iter()
                 .map(|range| {
                     if range.start > range.end {
                         return Err(super::Error::BadRange(location.to_string()).into());
                     }
-                    if range.end - merged_range_start > data.len() {
+                    if range.end > data.len() {
                         return Err(super::Error::OutOfRange(location.to_string()).into());
                     }
-                    Ok(data.slice(Range {
-                        start: range.start - merged_range_start,
-                        end: range.end - merged_range_start,
-                    }))
+                    Ok(data.slice(range.clone()))
                 })
                 .collect(),
             None => match storage::LOCAL_CACHE.get_ranges(location, ranges).await {
