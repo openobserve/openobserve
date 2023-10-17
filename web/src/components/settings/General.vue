@@ -15,13 +15,12 @@
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <!-- <q-page class="page q-pa-md"> General Settings </q-page> -->
-  <q-card class="column full-height">
+  <div>
     <div class="q-px-md q-py-md">
       <div class="text-body1 text-bold">
-          Organization Settings
+        General Settings
+      </div>
     </div>
-  </div>
     <q-separator />
     <div class="q-w-md q-mx-lg">
       <q-form @submit.stop="onSubmit.execute">
