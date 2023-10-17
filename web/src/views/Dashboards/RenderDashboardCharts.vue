@@ -22,7 +22,7 @@
       <grid-layout v-if="dashboardData.panels?.length > 0" :layout.sync="getDashboardLayout(dashboardData)" :col-num="12" :row-height="30"
         :is-draggable="!viewOnly" :is-resizable="!viewOnly" :vertical-compact="true" :autoSize="true"
         :restore-on-drag="true" :use-css-transforms="false">
-        <grid-item class="plotlyBackground" v-for="item in dashboardData.panels" :key="item.id"
+        <grid-item class="gridBackground" v-for="item in dashboardData.panels" :key="item.id"
           :x="getPanelLayout(item,'x')" :y="getPanelLayout(item,'y')"
           :w="getPanelLayout(item,'w')" :h="getPanelLayout(item,'h')"
           :i="getPanelLayout(item,'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent"
@@ -287,7 +287,7 @@ export default defineComponent({
   // overflow: auto;
 }
 
-.plotlyBackground {
+.gridBackground {
   background: #00000000 !important;
   border-radius: 4px;
   border-color: #c2c2c27a !important;

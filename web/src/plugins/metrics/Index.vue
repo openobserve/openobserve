@@ -194,11 +194,13 @@
               >
             </div>
             <div style="height: 500px">
-              <chart-render
+              <PanelSchemaRenderer
                 v-if="chartData"
                 :height="6"
-                :data="chartData"
-                :selected-time-date="dashboardPanelData.meta.dateTime"
+                :width="6"
+                :panelSchema="chartData"
+                :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                :variablesData="{}"
               />
             </div>
           </template>
@@ -245,7 +247,6 @@ import DateTime from "@/components/DateTime.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
 import QueryEditor from "@/components/QueryEditor.vue";
-import ChartRender from "@/components/dashboards/addPanel/ChartRender.vue";
 import useMetricsExplorer from "@/composables/useMetricsExplorer";
 import { cloneDeep } from "lodash-es";
 import AddToDashboard from "./AddToDashboard.vue";
@@ -254,6 +255,7 @@ import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import useNotifications from "@/composables/useNotifications";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -262,9 +264,9 @@ export default defineComponent({
     DateTime,
     AutoRefreshInterval,
     QueryEditor,
-    ChartRender,
     AddToDashboard,
     SyntaxGuideMetrics,
+    PanelSchemaRenderer
   },
   methods: {
     searchData() {
@@ -359,8 +361,8 @@ export default defineComponent({
       }
       dashboardPanelData.data.type = "line";
       dashboardPanelData.data.queryType = "promql";
-      dashboardPanelData.data.fields.stream_type = "metrics";
-      dashboardPanelData.data.customQuery = true;
+      dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
+      dashboardPanelData.data.queries[0].customQuery = true;
     });
 
     onMounted(() => {
@@ -589,13 +591,14 @@ export default defineComponent({
 
     function runQuery() {
       try {
+        
         if (
           !searchObj.data.metrics.selectedMetric?.value ||
           !searchObj.data.query
         ) {
           return false;
         }
-
+        
         searchObj.data.errorMsg = "";
         const timestamps: any =
           searchObj.data.datetime.type === "relative"
@@ -608,6 +611,7 @@ export default defineComponent({
           end_time: new Date(timestamps.endTime / 1000),
         };
         chartData.value = cloneDeep(dashboardPanelData.data);
+        
         updateUrlQueryParams();
       } catch (e) {
         showErrorNotification("Request failed.");
@@ -673,7 +677,7 @@ export default defineComponent({
     };
 
     const updateQueryValue = async (event, value) => {
-      dashboardPanelData.data.query = value;
+      dashboardPanelData.data.queries[0].query = value;
       autoCompleteData.value.query = value;
       autoCompleteData.value.text = event.changes[0].text;
       autoCompleteData.value.dateTime = searchObj.data.datetime;
@@ -749,7 +753,7 @@ export default defineComponent({
       }
       if (queryParams.query) {
         searchObj.data.query = b64DecodeUnicode(queryParams.query);
-        dashboardPanelData.data.query = searchObj.data.query;
+        dashboardPanelData.data.queries[0].query = searchObj.data.query;
       }
       if (queryParams.refresh) {
         searchObj.meta.refreshInterval = queryParams.refresh;
@@ -786,14 +790,14 @@ export default defineComponent({
         const parsedQuery = parsePromQlQuery(searchObj.data.query);
         let query = "";
         if (!parsedQuery.label.hasLabels) {
-          query = dashboardPanelData.data.query + `{${label}}`;
+          query = dashboardPanelData.data.queries[0].query + `{${label}}`;
         } else {
           query =
-            dashboardPanelData.data.query.slice(
+            dashboardPanelData.data.queries[0].query.slice(
               0,
               parsedQuery.label.position.end
             ) +
-            (dashboardPanelData.data.query[
+            (dashboardPanelData.data.queries[0].query[
               parsedQuery.label.position.end - 1
             ] !== "," &&
             parsedQuery.label.position.end - parsedQuery.label.position.start >
@@ -801,9 +805,9 @@ export default defineComponent({
               ? ","
               : "") +
             label +
-            dashboardPanelData.data.query.slice(
+            dashboardPanelData.data.queries[0].query.slice(
               parsedQuery.label.position.end,
-              dashboardPanelData.data.query.length
+              dashboardPanelData.data.queries[0].query.length
             );
         }
         metricsQueryEditorRef.value.setValue(query);
@@ -884,9 +888,6 @@ export default defineComponent({
   .monaco-editor {
     height: 80px !important;
   }
-}
-div.plotly-notifier {
-  visibility: hidden;
 }
 .metrics-page {
   .index-menu .field_list .field_overlay .field_label,

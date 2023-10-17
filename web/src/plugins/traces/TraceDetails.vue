@@ -67,16 +67,16 @@
         </div>
       </div>
       <div class="col-12" v-if="activeVisual === 'timeline'">
-        <trace-chart
+          <ChartRenderer
           class="trace-details-chart"
           id="trace_details_gantt_chart"
-          ref="plotChart"
-          :chart="traceChart"
+          :data="ChartData"
           @updated:chart="updateChart"
+          style="height: 200px;"
         />
       </div>
       <div class="col-12" v-else>
-        <d3-chart :data="traceServiceMap" />
+        <ChartRenderer :data="traceServiceMap" style="height: 200px;"/>
       </div>
       <q-separator style="width: 100%" class="q-mb-sm" />
       <div
@@ -142,13 +142,14 @@ import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceHeader from "./TraceHeader.vue";
-import TraceChart from "./TraceChart.vue";
 import { useStore } from "vuex";
 import { duration } from "moment";
 import D3Chart from "@/components/D3Chart.vue";
 import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
+import { convertTimelineData,convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
+import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -163,10 +164,10 @@ export default defineComponent({
     TraceDetailsSidebar,
     TraceTree,
     TraceHeader,
-    TraceChart,
     D3Chart,
     TraceTimelineIcon,
     ServiceMapIcon,
+    ChartRenderer
   },
 
   setup() {
@@ -180,7 +181,7 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
-    const traceServiceMap: Ref<any[]> = ref([]);
+    const traceServiceMap: any = ref({});
     const spanDimensions = {
       height: 25,
       barHeight: 8,
@@ -204,11 +205,10 @@ export default defineComponent({
     const activeVisual = ref("timeline");
 
     const traceChart = ref({
-      data: [{}],
-      layout: {},
+      data: [],
     });
 
-    const plotChart: any = ref(null);
+    const ChartData: any = ref({});
 
     const spanList: any = computed(() => {
       return searchObj.data.traceDetails.spanList;
@@ -386,11 +386,16 @@ export default defineComponent({
         if (serviceName !== span.serviceName) {
           const children: any[] = [];
           currentColumn.push({
-            name: span.serviceName,
+            name: `${span.serviceName} \n (${span.durationMs}ms)`,
             parent: serviceName,
             duration: span.durationMs,
             children: children,
-            color: serviceColors[span.serviceName],
+            itemStyle: {
+              color: serviceColors[span.serviceName]
+            },
+            emphasis:{
+              disabled: true
+            }
           });
           if (span.spans && span.spans.length) {
             span.spans.forEach((_span: any) =>
@@ -412,7 +417,7 @@ export default defineComponent({
       traceTree.value.forEach((span: any) => {
         getService(span, serviceTree, "", 1, 1);
       });
-      traceServiceMap.value = cloneDeep(serviceTree);
+      traceServiceMap.value = convertTraceServiceMapData(cloneDeep(serviceTree));      
     };
 
     // Convert span object to required format
@@ -424,7 +429,7 @@ export default defineComponent({
         startTimeMs: converTimeFromNsToMs(span.start_time),
         endTimeMs: converTimeFromNsToMs(span.end_time),
         durationMs: Number((span.duration / 1000).toFixed(2)), // This key is standard, we use for calculating width of span block. This should always be in ms
-        durationUs: span.duration, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
+        durationUs: Number(span.duration.toFixed(2)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: convertTime(span.idle_ns),
         busyMs: convertTime(span.busy_ns),
         spanId: span.span_id,
@@ -475,111 +480,28 @@ export default defineComponent({
       });
     };
     const buildTraceChart = () => {
-      const layout: any = {
-        autosize: true,
-        scrollZoom: true,
-        paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-        plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-        title: {
-          text: "",
-          font: {
-            size: 12,
-            color: store.state.theme === "dark" ? "#fff" : "#181a1b",
-          },
-        },
-        font: {
-          size: 12,
-          color: store.state.theme === "dark" ? "#fff" : "#181a1b",
-        },
-        height: 200,
-        margin: {
-          l: 16,
-          r: 16,
-          t: 16,
-          b: 16,
-        },
-        xaxis: {
-          ticklen: 5,
-          nticks: 10,
-          tickvals: [],
-          type: "-",
-          ticksuffix: "ms",
-          showgrid: true,
-          zeroline: true,
-          range: [],
-          rangeslider: {
-            visible: true,
-            bgcolor: "#d5d5d5",
-          },
-        },
-        yaxis: {
-          showgrid: false,
-          zeroline: false,
-          autorange: true,
-          showticklabels: false,
-        },
-        shapes: [],
-        hovermode: "closest",
-        showlegend: true,
-      };
-      const shapes: any = [];
-      let size = 0;
+      const data :any = [];
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
           spanPositionList.value[i].startTimeMs -
           traceTree.value[0].lowestStartTime;
 
-        shapes.push({
+        data.push({
           x0: absoluteStartTime,
           x1: Number(
             (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(
               2
             )
           ),
-          y0: size,
-          y1: size + 0.5,
-          line: {
-            width: 0,
-          },
-          type: "rect",
-          xref: "x",
-          yref: "y",
-          opacity: 1,
           fillcolor: spanPositionList.value[i].style.color,
         });
-        size += 0.5;
       }
-      baseTracePosition.value.tics.forEach((tic: any) => {
-        layout.xaxis.tickvals.push(tic.value);
-      });
-      layout.shapes = shapes;
-      const endTime = Math.ceil(
-        traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime
-      );
-      layout.xaxis.range = [0, endTime > 0 ? endTime : 1];
-      traceChart.value.layout = layout;
-      if (plotChart.value) plotChart.value?.reDraw();
+      traceChart.value.data = data;
+      ChartData.value = convertTimelineData(traceChart);
     };
-    const updateChart = ({ data }: { data: any }) => {
-      let range1 = 0;
-      let range2 = 0;
-      if (data["xaxis.range[0]"] && data["xaxis.range[1]"]) {
-        range1 = data["xaxis.range[0]"];
-        range2 = data["xaxis.range[1]"];
-      } else if (data["xaxis.range"]?.length) {
-        range1 = data["xaxis.range"][0];
-        range2 = data["xaxis.range"][1];
-      } else {
-        timeRange.value.start = 0;
-        range2 = Number(
-          (
-            traceTree.value[0].highestEndTime -
-            traceTree.value[0].lowestStartTime
-          ).toFixed(2)
-        );
-      }
-      timeRange.value.start = range1;
-      timeRange.value.end = range2;
+    const updateChart = (data:any) => {
+      timeRange.value.start = data.start || 0;
+      timeRange.value.end = data.end || 0;
       calculateTracePosition();
     };
     const mockServiceMap = [
@@ -691,7 +613,7 @@ export default defineComponent({
       spanPositionList,
       spanDimensions,
       splitterModel,
-      plotChart,
+      ChartData,
       traceChart,
       updateChart,
       traceServiceMap,

@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div class="plotlycontainer">
+  <div class="panelcontainer">
     <div class="drag-allow">
       <q-bar :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'" dense class="q-px-xs" style="border-top-left-radius: 3px; border-top-right-radius: 3px;">
         <q-icon v-if="!viewOnly" name="drag_indicator" />
@@ -151,7 +151,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.plotlycontainer {
+.panelcontainer {
   height: calc(100% - 24px);
 }
 .panelHeader{

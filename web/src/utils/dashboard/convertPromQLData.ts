@@ -198,6 +198,7 @@ export const convertPromQLData = (
       show: !["pie", "donut", "metric"].includes(panelSchema.type),
       feature: {
         dataZoom: {
+          filterMode: 'none',
           yAxisIndex: "none",
         },
       },

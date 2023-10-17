@@ -138,7 +138,7 @@ export default defineConfig({
       manualChunks: {
         analytics: ["@sentry/vue", "@sentry/tracing", "rudder-sdk-js"],
         "monaco-editor": ["monaco-editor"],
-        plotly: ["plotly.js-dist-min"],
+        // plotly: ["plotly.js-dist-min"],
         "node-sql-parser": ["node-sql-parser/build/mysql"],
         d3: ["d3-hierarchy", "d3-selection"],
         lodash: ["lodash-es", "lodash/lodash.js", "moment"],
@@ -157,7 +157,8 @@ export default defineConfig({
     global: true,
     setupFiles: "src/test/unit/helpers/setupTests.ts",
     deps: {
-      inline: ["monaco-editor", "plotly.js"],
+      // inline: ["monaco-editor", "plotly.js"],
+      inline: ["monaco-editor"],
     },
     coverage: {
       reporter: ["text", "json", "html"],
