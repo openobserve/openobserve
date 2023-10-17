@@ -131,7 +131,7 @@ jobs:
 
       - name: Run cargo build
         if: contains(matrix.file_name, '-simd') == false
-        run: cargo build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}rustc --print cfg
+        run: cargo build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
 
       - name: Run cargo build
         if: contains(matrix.file_name, '-simd')
