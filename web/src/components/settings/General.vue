@@ -82,24 +82,34 @@ export default defineComponent({
     });
     
     const onSubmit = useLoading(async () => {
-      //set organizations settings in store
-      //scrape interval will be in number
-      store.dispatch("setOrganizationSettings", {
-        ...store.state?.organizationData?.organizationSettings,
-        scrape_interval: scrapeIntereval.value
-      });
+      try {
+        //set organizations settings in store
+        //scrape interval will be in number
+        store.dispatch("setOrganizationSettings", {
+          ...store.state?.organizationData?.organizationSettings,
+          scrape_interval: scrapeIntereval.value
+        });
 
-      //update settings in backend
-      await organizations.post_organization_settings(
-        store.state?.selectedOrganization?.identifier,
-        store.state?.organizationData?.organizationSettings
-      );
+        //update settings in backend
+        await organizations.post_organization_settings(
+          store.state?.selectedOrganization?.identifier,
+          store.state?.organizationData?.organizationSettings
+        );
 
-      q.notify({
-        type: "positive",
-        message: "Organization settings updated",
-        timeout: 2000,
-      })
+        q.notify({
+          type: "positive",
+          message: "Organization settings updated",
+          timeout: 2000,
+        })
+      } catch (err: any) {
+        console.log(err);
+        
+        q.notify({
+          type: "negative",
+          message: err?.message || "something went wrong",
+          timeout: 2000,
+        })
+      }
     });
 
     return {

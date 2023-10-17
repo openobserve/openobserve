@@ -208,15 +208,6 @@ export const usePanelDataLoader = (
     } else {
       return;
     }
-    const query = {
-      query: {
-        sql: replaceQueryValue(queryData, endISOTimestamp, startISOTimestamp),
-        sql_mode: "full",
-        start_time: startISOTimestamp,
-        end_time: endISOTimestamp,
-        size: 0,
-      },
-    };
 
     state.loading = true;
 
@@ -230,7 +221,7 @@ export const usePanelDataLoader = (
         return queryService
           .metrics_query_range({
             org_identifier: store.state.selectedOrganization.identifier,
-            query: replaceQueryValue(it.query, endISOTimestamp, startISOTimestamp),
+            query: replaceQueryValue(it.query, startISOTimestamp, endISOTimestamp),
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
           })
@@ -264,7 +255,7 @@ export const usePanelDataLoader = (
               org_identifier: store.state.selectedOrganization.identifier,
               query: {
                 query: {
-                  sql: replaceQueryValue(it.query),
+                  sql: replaceQueryValue(it.query, startISOTimestamp, endISOTimestamp),
                   sql_mode: "full",
                   start_time: startISOTimestamp,
                   end_time: endISOTimestamp,
@@ -361,7 +352,7 @@ export const usePanelDataLoader = (
    * @param {any} query - The query to be modified.
    * @return {any} The modified query with replaced values.
    */
-  const replaceQueryValue = (query: any, endISOTimestamp: any, startISOTimestamp: any) => {
+  const replaceQueryValue = (query: any, startISOTimestamp: any, endISOTimestamp: any) => {
 
     //fixed variables value calculations
     //scrape interval by default 15 seconds
