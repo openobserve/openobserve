@@ -204,6 +204,8 @@ pub struct TCP {
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
+    #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
+    pub ingester_srv_url: String,
 }
 
 #[derive(EnvConfig)]

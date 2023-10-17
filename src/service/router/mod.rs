@@ -164,7 +164,16 @@ async fn dispatch(
 
 fn get_url(path: &str) -> URLDetails {
     let node_type;
-    let nodes = if check_querier_route(path) {
+    let is_querier_path = check_querier_route(path);
+
+    if is_querier_path && !CONFIG.route.ingester_srv_url.is_empty() {
+        return URLDetails {
+            is_error: false,
+            value: CONFIG.route.ingester_srv_url.to_string(),
+        };
+    }
+
+    let nodes = if is_querier_path {
         node_type = cluster::Role::Querier;
         cluster::get_cached_online_querier_nodes()
     } else {
