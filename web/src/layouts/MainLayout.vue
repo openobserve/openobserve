@@ -433,15 +433,15 @@ export default defineComponent({
         link: "/ingestion/",
       },
       {
-        title: t("menu.settings"),
-        icon: outlinedSettings,
-        link: "/settings/",
-      },
-      {
         title: t("menu.user"),
         icon: outlinedPerson,
         link: "/users",
         display: store.state?.currentuser?.role == "admin" ? true : false,
+      },
+      {
+        title: t("menu.settings"),
+        icon: outlinedSettings,
+        link: "/settings/",
       },
       {
         title: t("menu.slack"),
