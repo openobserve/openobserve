@@ -440,12 +440,11 @@ export const histogramDateTimezone = (
   timezone: string = "UTC"
 ) => {
   if (timezone == "UTC") return Math.floor(new Date(utcTime).getTime());
-  else
+  else {
     return (
       Math.floor(
-        DateTime.fromISO(utcTime + "Z")
-          .setZone(timezone)
-          .toSeconds()
+        DateTime.fromISO(utcTime, { zone: "UTC" }).setZone(timezone).toSeconds()
       ) * 1000
     );
+  }
 };

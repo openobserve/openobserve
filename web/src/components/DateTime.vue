@@ -216,15 +216,20 @@
         </q-tab-panels>
         <q-select
           v-model="timezone"
-          :options="timezoneOptions"
+          :options="filteredTimezone"
+          @blur="timezone = timezone == '' ? 'UTC' : timezone"
+          use-input
+          @filter="timezoneFilterFn"
+          input-debounce="0"
           dense
           filled
           emit-value
+          fill-input
+          hide-selected
+          :label="t('logStream.timezone')"
           @update:modelValue="onTimezoneChange"
+          :display-value="`Timezone: ${timezone}`"
         >
-          <template v-slot:selected-item>
-            <div class="text-subtitle2"><b>Timezone:</b> {{ timezone }}</div>
-          </template>
         </q-select>
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
           <q-separator class="q-my-sm" />
@@ -257,6 +262,7 @@ import {
 import { getImageURL, useLocalTimezone } from "../utils/zincutils";
 import { date } from "quasar";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   props: {
@@ -282,6 +288,7 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00",
@@ -295,13 +302,14 @@ export default defineComponent({
     const relativeValue = ref(15);
     const currentTimezone = useLocalTimezone() || "UTC";
     const timezone = ref(currentTimezone);
-    const timezoneOptions = [
-      { label: "UTC", value: "UTC" },
-      {
-        label: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        value: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-    ];
+    let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
+      return tz;
+    });
+
+    // Add the UTC option
+    timezoneOptions.unshift("UTC");
+
+    const filteredTimezone: any = ref([]);
 
     const relativePeriods = [
       { label: "Minutes", value: "m" },
@@ -577,7 +585,29 @@ export default defineComponent({
       }
     };
 
+    const timezoneFilterFn = (val, update) => {
+      filteredTimezone.value = filterColumns(timezoneOptions, val, update);
+    };
+
+    const filterColumns = (options: any[], val: String, update: Function) => {
+      let filteredOptions: any[] = [];
+      if (val === "") {
+        update(() => {
+          filteredOptions = [...options];
+        });
+        return filteredOptions;
+      }
+      update(() => {
+        const value = val.toLowerCase();
+        filteredOptions = options.filter(
+          (column: any) => column.toLowerCase().indexOf(value) > -1
+        );
+      });
+      return filteredOptions;
+    };
+
     return {
+      t,
       datetimeBtn,
       getImageURL,
       onCustomPeriodSelect,
@@ -598,7 +628,8 @@ export default defineComponent({
       resetTime,
       onTimezoneChange,
       timezone,
-      timezoneOptions,
+      filteredTimezone,
+      timezoneFilterFn,
     };
   },
 });
