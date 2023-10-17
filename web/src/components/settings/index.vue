@@ -23,7 +23,7 @@
     <q-splitter
       v-model="splitterModel"
       unit="px"
-      style="min-height: calc(100vh - 130px)"
+      style="min-height: calc(100vh - 136px)"
     >
       <template v-slot:before>
         <q-tabs
@@ -37,7 +37,7 @@
             default
             name="general"
             :to="'/settings/general'"
-            icon="general"
+            :icon="outlinedSettings"
             label="general"
             content-class="tab_content"
           />
@@ -69,6 +69,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
+import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -99,6 +100,7 @@ export default defineComponent({
       config,
       settingsTab,
       splitterModel: ref(200),
+      outlinedSettings
     };
   },
 });
