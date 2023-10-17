@@ -169,7 +169,7 @@ fn get_url(path: &str) -> URLDetails {
     if !is_querier_path && !CONFIG.route.ingester_srv_url.is_empty() {
         return URLDetails {
             is_error: false,
-            value: CONFIG.route.ingester_srv_url.to_string(),
+            value: format!("{}{}", CONFIG.route.ingester_srv_url, path),
         };
     }
 
