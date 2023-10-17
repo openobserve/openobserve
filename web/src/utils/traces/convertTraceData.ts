@@ -1,5 +1,7 @@
+import { utcToZonedTime, format } from "date-fns-tz";
 export const convertTraceData = (
     props:any,
+    timezone: string
   ) => {
   const options: any = {
     backgroundColor: "transparent",
@@ -32,7 +34,23 @@ export const convertTraceData = (
       formatter: function (name: any) {
         if (name.length == 0) return "";
         const date = new Date(name[0].data[0]);
-        return `(${formatDate(date)}, <b>${name[0].value[1]}ms</b>)`;
+
+
+        const options = {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          hourCycle: "h23", // Use a 24-hour cycle format without a day period.
+          minute: "2-digit",
+          second: "2-digit",
+          timeZoneName: "short",
+          timeZone: timezone, // specify the target timezone here
+        };
+
+        const formatter = new Intl.DateTimeFormat("en-US", options);
+        const formattedDate = formatter.format(new Date(date));
+        return `(${formattedDate}, <b>${name[0].value[1]}</b>)`;
       },
     },
     xAxis: {
@@ -61,11 +79,14 @@ export const convertTraceData = (
     },
     series: [
       {
-        data: [...((props.data[0]?.x) || [])]?.map((it: any,index: any) => ([it, props.data[0]?.y[index]||0])),
+        data: [...((props.data[0]?.x) || [])]?.map((it: any,index: any) => ([timezone != "UTC" ? utcToZonedTime(it, timezone) : it, props.data[0]?.y[index]||0])),
         type: "scatter",
         emphasis: { focus: "series" },
-        symbolSize: 5
-      }
+        symbolSize: 5,
+        itemStyle: {
+          color: "#7A80C2",
+        },
+      },
     ],
    }
     return {options};

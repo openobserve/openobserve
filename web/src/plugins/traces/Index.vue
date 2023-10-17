@@ -900,7 +900,7 @@ export default defineComponent({
               "MMM dd, YYYY HH:mm:ss.SSS Z"
             ),
           prop: (row: any) =>
-          timestampToTimezoneDate(
+            timestampToTimezoneDate(
               row["start_time"] / 1000000,
               store.state.timezone,
               "MMM dd, YYYY HH:mm:ss.SSS Z"
@@ -997,7 +997,12 @@ export default defineComponent({
             unparsed_x_data.push(bucket.zo_sql_timestamp);
             let histDate = new Date(Math.floor(bucket.zo_sql_timestamp / 1000));
             // xData.push(Math.floor(histDate.getTime()));
-            xData.push(histogramDateTimezone(Math.floor(bucket.zo_sql_timestamp / 1000), store.state.timezone));
+            xData.push(
+              histogramDateTimezone(
+                Math.floor(bucket.zo_sql_timestamp / 1000),
+                store.state.timezone
+              )
+            );
             yData.push(Number((bucket.duration / 1000).toFixed(2)));
           }
         );

@@ -864,16 +864,7 @@ const useLogs = () => {
             zo_sql_num: string;
           }) => {
             unparsed_x_data.push(bucket.zo_sql_key);
-            const histDate = new Date(bucket.zo_sql_key);
-            // console.log(
-            //   DateTime.fromRFC2822(bucket.zo_sql_key).toFormat("HH:MM")
-            // );
-            // console.log(timestampToTimezoneDate(Math.floor(histDate.getTime())/1000, store.state.timezone, "HH:mm"))
-            // console.log(
-            //   Math.floor((DateTime.fromISO(bucket.zo_sql_key + "Z")
-            //     .setZone(store.state.timezone).toSeconds()) *1000)
-            // );
-            // xData.push(Math.floor(DateTime.fromISO(bucket.zo_sql_key + "Z").setZone(store.state.timezone).toSeconds()) *1000);
+            // const histDate = new Date(bucket.zo_sql_key);
             xData.push(
               histogramDateTimezone(bucket.zo_sql_key, store.state.timezone)
             );
@@ -886,6 +877,7 @@ const useLogs = () => {
       const chartParams = {
         title: getHistogramTitle(),
         unparsed_x_data: unparsed_x_data,
+        timezone: store.state.timezone,
       };
       searchObj.data.histogram = { xData, yData, chartParams };
     } catch (e: any) {

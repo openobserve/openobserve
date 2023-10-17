@@ -1,9 +1,9 @@
+import { utcToZonedTime, format } from "date-fns-tz";
 export const convertLogData = (
-    x: any,
-    y: any,
-    params: { title: any; unparsed_x_data: any}
-  ) => {
-
+  x: any,
+  y: any,
+  params: { title: any; unparsed_x_data: any; timezone: string }
+) => {
   const options: any = {
     title: {
       left: "center",
@@ -16,12 +16,12 @@ export const convertLogData = (
     grid: {
       containLabel: true,
       left: "20",
-      right:"20",
+      right: "20",
       top: "30",
       bottom: "0",
     },
     tooltip: {
-      show:true,
+      show: true,
       trigger: "axis",
       textStyle: {
         fontSize: 12,
@@ -36,7 +36,22 @@ export const convertLogData = (
       formatter: function (name: any) {
         if (name.length == 0) return "";
         const date = new Date(name[0].data[0]);
-        return `(${formatDate(date)}, <b>${name[0].value[1]}</b>)`;
+
+        const options = {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          hourCycle: "h23", // Use a 24-hour cycle format without a day period.
+          minute: "2-digit",
+          second: "2-digit",
+          timeZoneName: "short",
+          timeZone: params.timezone, // specify the target timezone here
+        };
+
+        const formatter = new Intl.DateTimeFormat("en-US", options);
+        const formattedDate = formatter.format(new Date(date));
+        return `(${formattedDate}, <b>${name[0].value[1]}</b>)`;
       },
     },
     xAxis: {
@@ -50,24 +65,31 @@ export const convertLogData = (
     },
     toolbox: {
       orient: "vertical",
-      show:true,
+      show: true,
       feature: {
         dataZoom: {
-          show:true,
+          show: true,
           yAxisIndex: "none",
         },
       },
     },
     series: [
       {
-        data: [...x].map((it: any,index: any) => ([it, y[index]||0])),
-        type:"bar",
-        emphasis: { focus: "series" }
-      }
+        data: [...x].map((it: any, index: any) => [
+          params.timezone != "UTC" ? utcToZonedTime(it, params.timezone) : it,
+          y[index] || 0,
+        ]),
+        type: "bar",
+        emphasis: { focus: "series" },
+        itemStyle: {
+          color: "#7A80C2",
+        },
+      },
     ],
-   }
-    return {options};
-}
+  };
+  console.log("options:", options);
+  return { options };
+};
 
 const formatDate = (date: any) => {
   const day = String(date.getDate()).padStart(2, "0");
@@ -78,4 +100,4 @@ const formatDate = (date: any) => {
   const seconds = String(date.getSeconds()).padStart(2, "0");
 
   return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
-}
+};
