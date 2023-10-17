@@ -33,12 +33,12 @@ jobs:
             file_ext: .tar.gz
           - arch: x86_64-apple-darwin
             os: macos-latest
-            features: ""
+            features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-darwin-amd64
             file_ext: .tar.gz
           - arch: aarch64-apple-darwin
             os: macos-latest
-            features: ""
+            features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-darwin-arm64
             file_ext: .tar.gz
           - arch: x86_64-pc-windows-msvc
