@@ -23,13 +23,13 @@ use crate::common::{
     utils::json,
 };
 
-pub async fn set(org_id: &str, name: &str, js_func: Transform) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), anyhow::Error> {
     let db = &infra_db::DEFAULT;
     let key = format!("/function/{org_id}/{name}");
     match db
         .put(
             &key,
-            json::to_vec(&js_func).unwrap().into(),
+            json::to_vec(js_func).unwrap().into(),
             infra_db::NEED_WATCH,
         )
         .await
