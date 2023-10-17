@@ -166,7 +166,7 @@ fn get_url(path: &str) -> URLDetails {
     let node_type;
     let is_querier_path = check_querier_route(path);
 
-    if is_querier_path && !CONFIG.route.ingester_srv_url.is_empty() {
+    if !is_querier_path && !CONFIG.route.ingester_srv_url.is_empty() {
         return URLDetails {
             is_error: false,
             value: CONFIG.route.ingester_srv_url.to_string(),
