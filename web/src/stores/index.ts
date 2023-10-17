@@ -13,7 +13,7 @@
 //  limitations under the License.
 
 import { createStore } from "vuex";
-import { useLocalOrganization, useLocalCurrentUser } from "../utils/zincutils";
+import { useLocalOrganization, useLocalCurrentUser, useLocalTimezone } from "../utils/zincutils";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -53,6 +53,7 @@ export default createStore({
     theme: "",
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: {},
+    timezone: useLocalTimezone() ? useLocalTimezone() : "UTC",
   },
   mutations: {
     login(state, payload) {
@@ -134,6 +135,9 @@ export default createStore({
     appTheme(state, payload) {
       state.theme = payload;
     },
+    setTimezone(state, payload) {
+      state.timezone = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -207,6 +211,9 @@ export default createStore({
     },
     appTheme(context, payload) {
       context.commit("appTheme", payload);
+    },
+    setTimezone(context, payload) {
+      context.commit("setTimezone", payload);
     },
   },
   modules: {},

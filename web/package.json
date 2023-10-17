@@ -39,6 +39,7 @@
     "jwt-decode": "^3.1.2",
     "leaflet": "^1.9.4",
     "lodash-es": "^4.17.21",
+    "luxon": "^3.4.3",
     "moment": "^2.15.2",
     "node-polyfill-webpack-plugin": "^2.0.1",
     "node-sql-parser": "^4.6.4",

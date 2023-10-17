@@ -214,6 +214,18 @@
             </div>
           </q-tab-panel>
         </q-tab-panels>
+        <q-select
+          v-model="timezone"
+          :options="timezoneOptions"
+          dense
+          filled
+          emit-value
+          @update:modelValue="onTimezoneChange"
+        >
+          <template v-slot:selected-item>
+            <div class="text-subtitle2"><b>Timezone:</b> {{ timezone }}</div>
+          </template>
+        </q-select>
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
           <q-separator class="q-my-sm" />
           <q-btn
@@ -242,8 +254,9 @@ import {
   onBeforeMount,
   watch,
 } from "vue";
-import { getImageURL } from "../utils/zincutils";
+import { getImageURL, useLocalTimezone } from "../utils/zincutils";
 import { date } from "quasar";
+import { useStore } from "vuex";
 
 export default defineComponent({
   props: {
@@ -265,9 +278,10 @@ export default defineComponent({
     },
   },
 
-  emits: ["on:date-change"],
+  emits: ["on:date-change", "on:timezone-change"],
 
   setup(props, { emit }) {
+    const store = useStore();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00",
@@ -279,6 +293,15 @@ export default defineComponent({
     });
     const relativePeriod = ref("m");
     const relativeValue = ref(15);
+    const currentTimezone = useLocalTimezone() || "UTC";
+    const timezone = ref(currentTimezone);
+    const timezoneOptions = [
+      { label: "UTC", value: "UTC" },
+      {
+        label: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        value: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      },
+    ];
 
     const relativePeriods = [
       { label: "Minutes", value: "m" },
@@ -372,6 +395,12 @@ export default defineComponent({
 
     const onCustomPeriodSelect = () => {
       if (props.autoApply) saveDate("relative-custom");
+    };
+
+    const onTimezoneChange = () => {
+      useLocalTimezone(timezone.value);
+      store.dispatch("setTimezone", timezone.value);
+      emit("on:timezone-change");
     };
 
     const setRelativeTime = (period) => {
@@ -567,6 +596,9 @@ export default defineComponent({
       refresh,
       dateLocale,
       resetTime,
+      onTimezoneChange,
+      timezone,
+      timezoneOptions,
     };
   },
 });
