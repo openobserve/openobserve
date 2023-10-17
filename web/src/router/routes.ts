@@ -13,7 +13,7 @@
 //  limitations under the License.
 
 import { createRouter, createWebHistory } from "vue-router";
-import { getPath } from "@/utils/zincutils";
+import { getPath, mergeRoutes } from "@/utils/zincutils";
 
 import userRoutes from "@/composables/shared/router";
 import useOSRoutes from "@/composables/router";
@@ -21,8 +21,11 @@ let { parentRoutes, homeChildRoutes } = userRoutes();
 
 const envRoutes: any = useOSRoutes();
 
-parentRoutes = parentRoutes.concat(envRoutes.parentRoutes);
-homeChildRoutes = homeChildRoutes.concat(envRoutes.homeChildRoutes);
+// parentRoutes = parentRoutes.concat(envRoutes.parentRoutes);
+// homeChildRoutes = homeChildRoutes.concat(envRoutes.homeChildRoutes);
+parentRoutes = mergeRoutes(parentRoutes, envRoutes.parentRoutes);
+homeChildRoutes = mergeRoutes(homeChildRoutes, envRoutes.homeChildRoutes);
+
 const routes = [
   ...parentRoutes,
   {
@@ -31,7 +34,6 @@ const routes = [
     children: [...homeChildRoutes],
   },
 ];
-
 interface RouterMap {
   history: any;
   routes: any;
