@@ -19,7 +19,6 @@ import "@quasar/extras/roboto-font/roboto-font.css";
 import "@quasar/extras/material-icons/material-icons.css";
 
 import * as Sentry from "@sentry/vue";
-import { BrowserTracing } from "@sentry/tracing";
 
 import store from "./stores";
 import App from "./App.vue";
@@ -29,7 +28,6 @@ import "./styles/quasar-overrides.scss";
 import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
-import { H } from "highlight.run";
 
 const app = createApp(App);
 const router = createRouter(store);
