@@ -1,3 +1,4 @@
+<!-- eslint-disable no-prototype-builtins -->
 <!-- Copyright 2023 Zinc Labs Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,12 +21,39 @@
       {{ t("ingestion.header") }}
 
       <q-btn
+        v-if="
+          rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+          store.state.organizationData.rumToken.rum_token != ''
+        "
         class="q-ml-md q-mb-xs text-bold no-border right float-right"
         padding="sm lg"
         color="secondary"
         no-caps
         icon="lock_reset"
-        :label="t(`ingestion.passwordLabel`)"
+        :label="t(`ingestion.resetRUMTokenLabel`)"
+        @click="showRUMUpdateDialogFn"
+      />
+      <q-btn
+        v-else-if="
+          rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+          store.state.organizationData.rumToken.rum_token == ''
+        "
+        class="q-ml-md q-mb-xs text-bold no-border right float-right"
+        padding="sm lg"
+        color="secondary"
+        no-caps
+        icon="lock_reset"
+        :label="t(`ingestion.generateRUMTokenLabel`)"
+        @click="generateRUMToken"
+      />
+      <q-btn
+        v-else
+        class="q-ml-md q-mb-xs text-bold no-border right float-right"
+        padding="sm lg"
+        color="secondary"
+        no-caps
+        icon="lock_reset"
+        :label="t(`ingestion.resetTokenBtnLabel`)"
         @click="showUpdateDialogFn"
       />
       <ConfirmDialog
@@ -34,6 +62,13 @@
         @update:ok="updatePasscode"
         @update:cancel="confirmUpdate = false"
         v-model="confirmUpdate"
+      />
+      <ConfirmDialog
+        title="Reset RUM Token"
+        message="Are you sure you want to update rum token for this organization?"
+        @update:ok="updateRUMToken"
+        @update:cancel="confirmRUMUpdate = false"
+        v-model="confirmRUMUpdate"
       />
     </div>
     <q-separator class="separator" />
@@ -84,6 +119,17 @@
             label="Traces"
             content-class="tab_content"
           />
+          <q-route-tab
+            name="rumMonitoring"
+            :to="{
+              name: 'rumMonitoring',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            label="RUM"
+            content-class="tab_content"
+          />
         </q-tabs>
       </template>
 
@@ -109,6 +155,10 @@
             <router-view :currOrgIdentifier="currentOrgIdentifier">
             </router-view>
           </q-tab-panel>
+          <q-tab-panel name="rumMonitoring">
+            <router-view :currOrgIdentifier="currentOrgIdentifier">
+            </router-view>
+          </q-tab-panel>
         </q-tab-panels>
       </template>
     </q-splitter>
@@ -128,11 +178,69 @@ import config from "../aws-exports";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import segment from "../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
+import apiKeysService from "@/services/api_keys";
 
 export default defineComponent({
   name: "PageIngestion",
   components: { ConfirmDialog },
+  methods: {
+    generateRUMToken() {
+      apiKeysService
+        .createRUMToken(this.store.state.selectedOrganization.identifier)
+        .then((res) => {
+          this.store.dispatch("setRUMToken", res.data.data.keys);
+          this.getRUMToken();
+          this.q.notify({
+            type: "positive",
+            message: "RUM Token generated successfully.",
+            timeout: 5000,
+          });
+        })
+        .catch((e) => {
+          this.q.notify({
+            type: "negative",
+            message: "Error while generating RUM Token." + e.error,
+            timeout: 5000,
+          });
+        });
 
+      segment.track("Button Click", {
+        button: "Generate RUM Token",
+        user_org: this.store.state.selectedOrganization.identifier,
+        user_id: this.store.state.userInfo.email,
+        page: "Ingestion",
+      });
+    },
+    updateRUMToken() {
+      apiKeysService
+        .updateRUMToken(
+          this.store.state.selectedOrganization.identifier,
+          this.store.state.organizationData.rumToken.id
+        )
+        .then((res) => {
+          this.getRUMToken();
+          this.q.notify({
+            type: "positive",
+            message: "RUM Token updated successfully.",
+            timeout: 5000,
+          });
+        })
+        .catch((e) => {
+          this.q.notify({
+            type: "negative",
+            message: "Error while refreshing RUM Token." + e.error,
+            timeout: 5000,
+          });
+        });
+
+      segment.track("Button Click", {
+        button: "Update RUM Token",
+        user_org: this.store.state.selectedOrganization.identifier,
+        user_id: this.store.state.userInfo.email,
+        page: "Ingestion",
+      });
+    },
+  },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -140,13 +248,22 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
+    const confirmRUMUpdate = ref<boolean>(false);
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
     );
     const ingestTabType = ref("curl");
+    const metricRoutes = ["prometheus", "otelCollector", "telegraf"];
+    const traceRoutes = ["tracesOTLP"];
+    const rumRoutes = ["rumWeb"];
 
     onBeforeMount(() => {
-      const ingestRoutes = ["ingestLogs", "ingestTraces", "ingestMetrics"];
+      const ingestRoutes = [
+        "ingestLogs",
+        "ingestTraces",
+        "ingestMetrics",
+        "rumMonitoring",
+      ];
       const logRoutes = [
         "curl",
         "fluentbit",
@@ -157,8 +274,6 @@ export default defineComponent({
         "syslog",
         "gcpLogs",
       ];
-      const metricRoutes = ["prometheus", "otelCollector", "telegraf"];
-      const traceRoutes = ["tracesOTLP"];
 
       if (logRoutes.includes(router.currentRoute.value.name)) {
         ingestTabType.value = "ingestLogs";
@@ -168,6 +283,8 @@ export default defineComponent({
         ingestTabType.value = "ingestTraces";
       } else if (ingestRoutes.includes(router.currentRoute.value.name)) {
         ingestTabType.value = router.currentRoute.value.name;
+      } else if (rumRoutes.includes(router.currentRoute.value.name)) {
+        ingestTabType.value = "rumMonitoring";
       } else if (router.currentRoute.value.name === "ingestion") {
         ingestTabType.value = "ingestLogs";
         router.push({
@@ -185,6 +302,7 @@ export default defineComponent({
         router.currentRoute.value.name != "ingestion"
       ) {
         getOrganizationPasscode();
+        getRUMToken();
       }
     });
 
@@ -203,6 +321,14 @@ export default defineComponent({
             currentOrgIdentifier.value =
               store.state.selectedOrganization.identifier;
           }
+        });
+    };
+
+    const getRUMToken = () => {
+      apiKeysService
+        .listRUMTokens(store.state.selectedOrganization.identifier)
+        .then((res) => {
+          store.dispatch("setRUMToken", res.data.data);
         });
     };
 
@@ -249,8 +375,13 @@ export default defineComponent({
       confirmUpdate.value = true;
     };
 
+    const showRUMUpdateDialogFn = () => {
+      confirmRUMUpdate.value = true;
+    };
+
     return {
       t,
+      q,
       store,
       router,
       config,
@@ -260,9 +391,13 @@ export default defineComponent({
       currentOrgIdentifier,
       updatePasscode,
       showUpdateDialogFn,
+      showRUMUpdateDialogFn,
       confirmUpdate,
+      confirmRUMUpdate,
       getImageURL,
       ingestTabType,
+      rumRoutes,
+      getRUMToken,
     };
   },
 });

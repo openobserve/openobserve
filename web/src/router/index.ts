@@ -13,7 +13,12 @@
 //  limitations under the License.
 
 import { createRouter, createWebHistory } from "vue-router";
-import { getDecodedUserInfo, useLocalToken, getPath } from "@/utils/zincutils";
+import {
+  getDecodedUserInfo,
+  useLocalToken,
+  getPath,
+  mergeRoutes,
+} from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 
@@ -31,8 +36,10 @@ export default function (store: any) {
     envRoutes = useOSRoutes();
   }
 
-  parentRoutes = parentRoutes.concat(envRoutes.parentRoutes);
-  homeChildRoutes = homeChildRoutes.concat(envRoutes.homeChildRoutes);
+  // parentRoutes = parentRoutes.concat(envRoutes.parentRoutes);
+  // homeChildRoutes = homeChildRoutes.concat(envRoutes.homeChildRoutes);
+  parentRoutes = mergeRoutes(parentRoutes, envRoutes.parentRoutes);
+  homeChildRoutes = mergeRoutes(homeChildRoutes, envRoutes.homeChildRoutes);
   const routes = [
     ...parentRoutes,
     {

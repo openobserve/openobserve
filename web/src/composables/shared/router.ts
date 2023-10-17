@@ -30,6 +30,7 @@ const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 const DestinationList = () => import("@/components/alerts/DestinationList.vue");
+const Settings = () => import("@/components/settings/index.vue");
 
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 const Functions = () => import("@/views/Functions.vue");
@@ -185,6 +186,24 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuardPendingSubscriptions(to, from, next);
       },
+    },
+    {
+      path: "settings",
+      name: "settings",
+      component: Settings,
+      meta: {
+        keepAlive: true,
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
+      children: [
+        {
+          path: "general",
+          name: "general",
+          component: () => import("@/components/settings/General.vue"),
+        },
+      ],
     },
     {
       path: "functions",
