@@ -30,7 +30,7 @@
       </div>
     </div>
     <div v-if="!dataLoading">
-      <div v-if="chartData.value">
+      <div v-if="chartData?.options?.series?.length == 0">
         <div class="text-h6 text-weight-medium text-center">
           {{ t("billing.messageDataNotFound") }}
         </div>
