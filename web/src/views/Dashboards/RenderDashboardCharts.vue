@@ -59,7 +59,7 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 
 export default defineComponent({
   name: "RenderDashboardCharts",
-  emits:["onDeletePanel"],
+  emits:["onDeletePanel","variablesData"],
   props:["viewOnly","dashboardData","currentTimeObj"],
   components: {
     GridLayout: VueGridLayout.GridLayout,
@@ -68,7 +68,7 @@ export default defineComponent({
     NoPanel,
     VariablesValueSelector
 },
-  setup(props) {
+  setup(props: any, { emit }) {
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
@@ -79,6 +79,7 @@ export default defineComponent({
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData,data)
+      emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
     }
 
     // save the dashboard value

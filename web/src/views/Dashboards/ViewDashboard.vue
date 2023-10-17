@@ -82,17 +82,12 @@
     </div>
     <q-separator></q-separator>
     <RenderDashboardCharts
-      :viewOnly="false"
+      @variablesData="variablesDataUpdated" :viewOnly="false"
       :dashboardData="currentDashboardData.data"
       :currentTimeObj="currentTimeObj"
       @onDeletePanel="onDeletePanel"
     />
-    <q-dialog
-      v-model="showDashboardSettingsDialog"
-      position="right"
-      full-height
-      maximized
-    >
+    <q-dialog v-model="showDashboardSettingsDialog" position="right" full-height maximized>
       <DashboardSettings @refresh="loadDashboard" />
     </q-dialog>
   </q-page>
@@ -147,8 +142,17 @@ export default defineComponent({
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
-    };
+      Object.assign(variablesData, data)
+      const names = variablesData?.values?.map((v: any) => v?.name);
+      const values = variablesData?.values?.map((v: any) => v?.value);
+      const variable = names.map((name, index) => `var-${name}=${values[index]}`).join('&');
+      router.replace({
+        query:{
+          ...route.query,
+          variable
+        }
+      })
+    }
 
     onActivated(async () => {
       await loadDashboard();
