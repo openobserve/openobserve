@@ -149,6 +149,25 @@
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
+              <q-item
+                v-if="config.isCloud == 'true'"
+                v-ripple
+                v-close-popup
+                clickable
+                :to="{ path: '/settings' }"
+              >
+                <q-item-section avatar>
+                  <q-avatar
+                    size="md"
+                    icon="settings"
+                    color="red"
+                    text-color="white"
+                  />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>{{ t("menu.settings") }}</q-item-label>
+                </q-item-section>
+              </q-item>
               <q-item v-ripple v-close-popup clickable @click="signout">
                 <q-item-section avatar>
                   <q-avatar
