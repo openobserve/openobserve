@@ -83,9 +83,6 @@
                     <q-separator />
                     <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables"
                       :selectedTimeDate="dashboardPanelData.meta.dateTime" @variablesData="variablesDataUpdated" />
-                  <!-- <div style="flex:1;">
-                    <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
-                  </div> -->
 
                     <div v-if="isOutDated" :style="{ borderColor: '#c3920d', borderWidth: '1px', borderStyle: 'solid', backgroundColor: store.state.theme == 'dark' ? '#2a1f03' : '#faf2da', padding: '1%', margin: '1%', borderRadius: '5px' }">
                       <div style="font-weight: 700;">Your chart is not up to date</div>
@@ -155,7 +152,6 @@ import { useStore } from "vuex";
 import DashboardQueryBuilder from "../../../components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePicker from "../../../components/DateTimePicker.vue";
-import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue"
 import DashboardQueryEditor from "../../../components/dashboards/addPanel/DashboardQueryEditor.vue"
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
@@ -170,7 +166,6 @@ export default defineComponent({
     FieldList,
     DashboardQueryBuilder,
     DateTimePicker,
-    ChartRender,
     DashboardErrorsComponent,
     PanelSidebar,
     ConfigPanel,

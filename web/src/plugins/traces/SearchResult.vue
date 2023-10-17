@@ -18,13 +18,18 @@
 <template>
   <div class="col column oveflow-hidden">
     <div class="search-list" style="width: 100%">
-      <trace-chart
-        data-test="logs-search-result-bar-chart"
+      <!-- <trace-chart
         ref="plotChart"
-        id="traces_scatter_chart"
-        v-show="searchObj.meta.showHistogram"
         :chart="searchObj.data.histogram"
         @updated:chart="onChartUpdate"
+        /> -->
+        <ChartRenderer
+        data-test="logs-search-result-bar-chart"
+        id="traces_scatter_chart"
+        :data="plotChart"
+        v-show="searchObj.meta.showHistogram"
+        style="height: 150px;"
+        @updated:dataZoom="onChartUpdate"
         @click="onChartClick"
       />
 
@@ -167,14 +172,15 @@ import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import TraceDetails from "./TraceDetails.vue";
-import TraceChart from "./TraceChart.vue";
+import {convertTraceData} from "@/utils/traces/convertTraceData";
+import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     HighLight,
     TraceDetails,
-    TraceChart,
+    ChartRenderer
   },
   emits: [
     "update:scroll",
@@ -237,7 +243,7 @@ export default defineComponent({
 
     const searchTableRef: any = ref(null);
 
-    const plotChart: any = ref(null);
+    const plotChart: any = ref({});
 
     const reDrawChart = () => {
       if (
@@ -246,8 +252,8 @@ export default defineComponent({
         searchObj.data.histogram.layout
       ) {
         nextTick(() => {
-          plotChart.value.reDraw();
-          plotChart.value.forceReLayout();
+          plotChart.value = convertTraceData(searchObj.data.histogram);
+          // plotChart.value.forceReLayout();
         });
       }
     };
@@ -295,7 +301,7 @@ export default defineComponent({
 
     const onChartClick = (data: any) => {
       expandRowDetail(
-        searchObj.data.queryResults.hits[data.points[0].pointIndex]
+        searchObj.data.queryResults.hits[data.dataIndex]
       );
     };
 
