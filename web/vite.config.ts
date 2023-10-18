@@ -143,7 +143,7 @@ export default defineConfig({
         d3: ["d3-hierarchy", "d3-selection"],
         lodash: ["lodash-es", "lodash/lodash.js", "moment"],
       },
-      external: ["rrweb-player"],
+      external: ["rrweb-player", "rrweb-player/dist/style.css"],
     },
     outDir: path.resolve(__dirname, "dist"),
   },
