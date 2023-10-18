@@ -142,16 +142,16 @@ export default defineComponent({
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data)
-      const names = variablesData?.values?.map((v: any) => v?.name);
-      const values = variablesData?.values?.map((v: any) => v?.value);
-      const variable = names.map((name, index) => `var-${name}=${values[index]}`).join('&');
-      router.replace({
-        query:{
+      const variableObj = {};
+      data.values.forEach((v) => {
+        variableObj[`var-${v.name}`] = v.value;
+      });
+       router.replace({
+        query: {
           ...route.query,
-          variable
-        }
-      })
+          ...variableObj,
+        },
+      });
     }
 
     onActivated(async () => {
