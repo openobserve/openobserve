@@ -282,6 +282,11 @@ impl Sql {
                                 [0..where_str.to_lowercase().rfind(" order ").unwrap()]
                                 .to_string();
                         }
+                        if !meta.group_by.is_empty() {
+                            where_str = where_str
+                                [0..where_str.to_lowercase().rfind(" group ").unwrap()]
+                                .to_string();
+                        }
                         let pos_start = origin_sql.find(where_str.as_str()).unwrap();
                         let pos_end = pos_start + where_str.len();
                         origin_sql = format!(
