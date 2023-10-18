@@ -520,7 +520,11 @@ async fn cli() -> Result<bool, anyhow::Error> {
         }
     }
 
-    println!("command {name} execute succeeded");
+    // flush db
+    if let Err(e) = infra::db::DEFAULT.close().await {
+        log::error!("waiting for db close failed, error: {}", e);
+    }
 
+    println!("command {name} execute succeeded");
     Ok(true)
 }
