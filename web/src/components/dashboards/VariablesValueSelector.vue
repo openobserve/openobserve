@@ -48,7 +48,7 @@ import VariableQueryValueSelector from './settings/VariableQueryValueSelector.vu
 
 export default defineComponent({
     name: "VariablesValueSelector",
-    props: ["selectedTimeDate", "variablesConfig"],
+    props: ["selectedTimeDate", "variablesConfig", "variableValues"],
     emits: ["variablesData"],
     components: {
       VariableQueryValueSelector

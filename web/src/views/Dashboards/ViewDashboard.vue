@@ -82,7 +82,7 @@
     </div>
     <q-separator></q-separator>
     <RenderDashboardCharts
-      @variablesData="variablesDataUpdated" :viewOnly="false"
+      @variablesData="variablesDataUpdated" :variableValues="variablesData" :viewOnly="false"
       :dashboardData="currentDashboardData.data"
       :currentTimeObj="currentTimeObj"
       @onDeletePanel="onDeletePanel"
@@ -142,6 +142,7 @@ export default defineComponent({
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
+      Object.assign(variablesData, data)
       const variableObj = {};
       data.values.forEach((v) => {
         variableObj[`var-${v.name}`] = v.value;
@@ -268,6 +269,7 @@ export default defineComponent({
       if (params.period || (params.to && params.from)) {
         selectedDate.value = getSelectedDateFromQueryParams(params);
       }
+      console.log("params", params);
 
       // resize charts if needed
       await nextTick();

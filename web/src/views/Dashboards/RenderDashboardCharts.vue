@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-    <VariablesValueSelector :variablesConfig="dashboardData?.variables" :selectedTimeDate="currentTimeObj" 
+    <VariablesValueSelector :variablesConfig="dashboardData?.variables" :selectedTimeDate="currentTimeObj" :variableValues="variablesData"
       @variablesData="variablesDataUpdated"/>
     <div class="displayDiv">
       <grid-layout v-if="dashboardData.panels?.length > 0" :layout.sync="getDashboardLayout(dashboardData)" :col-num="12" :row-height="30"
@@ -60,7 +60,7 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 export default defineComponent({
   name: "RenderDashboardCharts",
   emits:["onDeletePanel","variablesData"],
-  props:["viewOnly","dashboardData","currentTimeObj"],
+  props:["viewOnly","dashboardData","currentTimeObj", "variableValues"],
   components: {
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,
