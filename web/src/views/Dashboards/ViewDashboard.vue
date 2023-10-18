@@ -232,7 +232,9 @@ export default defineComponent({
     }
 
     const updateDateTime = (data: any) => {
+      console.log("updateDateTime", data)
       currentDurationSelectionObj.value = data
+      console.log("currentTimeObj", currentTimeObj.value);
       currentTimeObj.value = {
         start_time: new Date(data.startTime),
         end_time: new Date(data.endTime)
@@ -261,16 +263,29 @@ export default defineComponent({
       await nextTick();
       window.dispatchEvent(new Event("resize"))
     })
-
+    const getQueryParamsForDuration = (data: any) => {    
+      console.log("getQueryParamsForDuration", data)   
+      if (data.relativeTimePeriod) {
+        return {
+          period: data.relativeTimePeriod
+        }
+      } else {
+        return {
+          from: data.startTime,
+          to: data.endTime
+        }
+      }
+    }
+    
     // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, selectedDate], () => {
+    watch([refreshInterval, currentDurationSelectionObj], () => {
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
           refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value)
+          ...getQueryParamsForDuration(currentDurationSelectionObj.value)
         }
       })
     })
@@ -315,7 +330,8 @@ export default defineComponent({
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,
-      updateDateTime
+      updateDateTime,
+      getQueryParamsForDuration
     };
   }
 });
