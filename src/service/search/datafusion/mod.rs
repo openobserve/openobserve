@@ -124,6 +124,12 @@ pub fn new_parquet_writer<'a>(
         writer_props = writer_props
             .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
     }
+    // Bloom filter stored by row_group, so if the num_rows can limit to PARQUET_MAX_ROW_GROUP_SIZE,
+    let num_rows = if num_rows > PARQUET_MAX_ROW_GROUP_SIZE as u64 {
+        PARQUET_MAX_ROW_GROUP_SIZE as u64
+    } else {
+        num_rows
+    };
     if let Some(fields) = BLOOM_FILTER_DEFAULT_COLUMNS.as_ref() {
         for field in fields {
             writer_props = writer_props
