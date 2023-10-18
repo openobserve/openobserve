@@ -36,6 +36,12 @@
         /> -->
         <date-time
             auto-apply
+            :default-type="defaultDateTimeValues.type"
+            :default-absolute-time="{
+              startTime: defaultDateTimeValues.startTime,
+              endTime: defaultDateTimeValues.endTime,
+            }"
+            :default-relative-time="defaultDateTimeValues.relativeTimePeriod"
             @on:date-change="updateDateTime"
           />
         <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="refreshData"/>
@@ -116,6 +122,15 @@ export default defineComponent({
     const currentTimeObj = ref({});
     const refreshInterval = ref(0);
     const selectedDate = ref()
+
+    const defaultDateTimeValues = {
+      type: route.query.period ? "relative" : route.query.from && route.query.to ? "absolute" : "relative",
+      startTime: route.query.from ? route.query.from : null,
+      endTime:route.query.to ? route.query.to : null,
+      relativeTimePeriod: route.query.period ? route.query.period : '15m',
+    }
+
+    console.log("defaultDateTimeValues",defaultDateTimeValues);
 
     // variables data
     const variablesData = reactive({});
@@ -331,7 +346,8 @@ export default defineComponent({
       showDashboardSettingsDialog,
       loadDashboard,
       updateDateTime,
-      getQueryParamsForDuration
+      getQueryParamsForDuration,
+      defaultDateTimeValues
     };
   }
 });
