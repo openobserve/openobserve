@@ -367,15 +367,15 @@ export const convertPromQLData = (
 
               //which grid will be used
               gridIndex: gaugeIndex - 1,
-              // radius, progress and axisline width will be calculated based on grid height
-              radius: `${options.grid[gaugeIndex - 1].height}`,
+              // radius, progress and axisline width will be calculated based on grid width and height
+              radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
               progress: {
                 show: true,
-                width: parseFloat(options.grid[gaugeIndex - 1].height)/2,
+                width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
               },
               axisLine: {
                 lineStyle: {
-                  width: parseFloat(options.grid[gaugeIndex - 1].height)/2,
+                  width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
                 }
               },
               title:{
