@@ -32,7 +32,7 @@ use crate::common::{
     },
     meta::{
         alert::{Alert, Trigger},
-        functions::{StreamTransform, VRLRuntimeConfig},
+        functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
         stream::{PartitionTimeLevel, PartitioningDetails, StreamParams},
         usage::RequestStats,
         StreamType,
@@ -80,7 +80,7 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
     }
 }
 
-pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLRuntimeConfig, row: &Value) -> Value {
+pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLResultResolver, row: &Value) -> Value {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
         value: &mut vrl::value::Value::from(row),
@@ -110,7 +110,7 @@ pub async fn get_stream_transforms<'a>(
     stream_type: StreamType,
     stream_name: &str,
     stream_transform_map: &mut AHashMap<String, Vec<StreamTransform>>,
-    stream_vrl_map: &mut AHashMap<String, VRLRuntimeConfig>,
+    stream_vrl_map: &mut AHashMap<String, VRLResultResolver>,
 ) {
     let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
     if stream_transform_map.contains_key(&key) {
@@ -212,9 +212,9 @@ pub fn register_stream_transforms(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-) -> (Vec<StreamTransform>, AHashMap<String, VRLRuntimeConfig>) {
+) -> (Vec<StreamTransform>, AHashMap<String, VRLResultResolver>) {
     let mut local_trans = vec![];
-    let mut stream_vrl_map: AHashMap<String, VRLRuntimeConfig> = AHashMap::new();
+    let mut stream_vrl_map: AHashMap<String, VRLResultResolver> = AHashMap::new();
     let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
 
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
@@ -229,7 +229,13 @@ pub fn register_stream_transforms(
                     .get_custom::<TableRegistry>()
                     .unwrap();
                 registry.finish_load();
-                stream_vrl_map.insert(func_key, vrl_runtime_config);
+                stream_vrl_map.insert(
+                    func_key,
+                    VRLResultResolver {
+                        program: vrl_runtime_config.program,
+                        fields: vrl_runtime_config.fields,
+                    },
+                );
             }
         }
     }
@@ -240,7 +246,7 @@ pub fn register_stream_transforms(
 pub fn apply_stream_transform<'a>(
     local_trans: &Vec<StreamTransform>,
     value: &'a Value,
-    stream_vrl_map: &'a AHashMap<String, VRLRuntimeConfig>,
+    stream_vrl_map: &'a AHashMap<String, VRLResultResolver>,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Result<Value, anyhow::Error> {

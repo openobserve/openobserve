@@ -24,7 +24,7 @@ use vrl::compiler::runtime::Runtime;
 
 use super::StreamMeta;
 use crate::common::infra::{config::CONFIG, metrics};
-use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
+use crate::common::meta::functions::{StreamTransform, VRLResultResolver};
 use crate::common::meta::ingestion::{
     AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
     IngestionRequest, KinesisFHData, KinesisFHIngestionResponse,
@@ -231,7 +231,7 @@ pub async fn ingest(
 fn apply_functions<'a>(
     item: &'a json::Value,
     local_trans: &Vec<StreamTransform>,
-    stream_vrl_map: &'a AHashMap<String, VRLRuntimeConfig>,
+    stream_vrl_map: &'a AHashMap<String, VRLResultResolver>,
     stream_name: &'a str,
     runtime: &mut Runtime,
 ) -> Result<json::Value, anyhow::Error> {
