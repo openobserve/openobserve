@@ -18,7 +18,8 @@ use std::io::{Error, ErrorKind};
 
 use crate::common::meta::{
     self,
-    stream::{ListStream, StreamSettings},
+    http::HttpResponse as MetaHttpResponse,
+    stream::{ListStream, StreamDeleteFields, StreamSettings},
     StreamType,
 };
 use crate::common::utils::http::get_stream_type_from_request;
@@ -116,6 +117,62 @@ async fn settings(
     };
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
+}
+
+/** DeleteStreamFields */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "StreamDeleteFields",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+    ),
+    request_body(content = StreamDeleteFields, description = "Stream delete fields", content_type = "application/json"),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/{stream_name}/delete_fields")]
+async fn delete_fields(
+    path: web::Path<(String, String)>,
+    fields: web::Json<StreamDeleteFields>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    match stream::delete_fields(
+        &org_id,
+        &stream_name,
+        stream_type,
+        &fields.into_inner().fields,
+    )
+    .await
+    {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "fields deleted".to_string(),
+        ))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            e.to_string(),
+        ))),
+    }
 }
 
 /** DeleteStream */
