@@ -14,6 +14,7 @@
 
 use ::datafusion::{
     arrow::{ipc, record_batch::RecordBatch},
+    common::SchemaError,
     error::DataFusionError,
 };
 use ahash::AHashMap as HashMap;
@@ -225,6 +226,14 @@ pub async fn search(
 }
 
 pub fn handle_datafusion_error(err: DataFusionError) -> Error {
+    if let DataFusionError::SchemaError(SchemaError::FieldNotFound {
+        field,
+        valid_fields: _,
+    }) = err
+    {
+        return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(field.name));
+    }
+
     let err = err.to_string();
     if err.contains("Schema error: No field named") {
         let pos = err.find("Schema error: No field named").unwrap();
