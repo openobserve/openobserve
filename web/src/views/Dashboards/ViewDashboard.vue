@@ -84,6 +84,7 @@ export default defineComponent({
   name: "ViewDashboard",
   emits: ["onDeletePanel"],
   components: {
+    DateTime,
     DateTimePicker,
     DateTimePickerDashboard,
     AutoRefreshInterval,
