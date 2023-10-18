@@ -266,6 +266,7 @@ const setupSession = async () => {
       showController: false,
       width: playerWidth,
       height: playerHeight,
+      mutateChildNodes: true,
     },
   });
 
