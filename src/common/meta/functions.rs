@@ -130,6 +130,11 @@ pub struct VRLRuntimeConfig {
     pub fields: Vec<String>,
 }
 
+pub struct VRLResultResolver {
+    pub program: Program,
+    pub fields: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -70,6 +70,7 @@ pub async fn handle_grpc_request(
         )));
     }
     let start = std::time::Instant::now();
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<alert::Alert>> = AHashMap::new();
@@ -110,6 +111,15 @@ pub async fn handle_grpc_request(
                 let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
                 crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
                 // End get stream alert
+
+                // Start Register Transforms for stream
+                let (local_trans, stream_vrl_map) =
+                    crate::service::ingestion::register_stream_transforms(
+                        org_id,
+                        StreamType::Metrics,
+                        metric_name,
+                    );
+                // End Register Transforms for stream
 
                 let buf = metric_data_map.entry(metric_name.to_owned()).or_default();
                 let mut rec = json::json!({});
@@ -171,6 +181,17 @@ pub async fn handle_grpc_request(
                 for mut rec in records {
                     // flattening
                     rec = flatten::flatten(&rec)?;
+
+                    if !local_trans.is_empty() {
+                        rec = crate::service::ingestion::apply_stream_transform(
+                            &local_trans,
+                            &rec,
+                            &stream_vrl_map,
+                            metric_name,
+                            &mut runtime,
+                        )?;
+                    }
+
                     // get json object
                     let val_map: &mut serde_json::Map<String, serde_json::Value> =
                         rec.as_object_mut().unwrap();

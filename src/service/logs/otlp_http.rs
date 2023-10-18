@@ -106,6 +106,7 @@ pub async fn logs_json_handler(
     };
 
     let stream_name = &stream_name;
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
@@ -123,6 +124,14 @@ pub async fn logs_json_handler(
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
+
+    // Start Register Transforms for stream
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+    );
+    // End Register Transforms for stream
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
@@ -219,7 +228,7 @@ pub async fn logs_json_handler(
                     value = flatten::flatten(&value).unwrap();
 
                     // get json object
-                    let local_val = value.as_object_mut().unwrap();
+                    let mut local_val = value.as_object_mut().unwrap();
 
                     if log.get("attributes").is_some() {
                         let attributes = log.get("attributes").unwrap().as_array().unwrap();
@@ -262,10 +271,19 @@ pub async fn logs_json_handler(
 
                     local_val.append(&mut service_att_map.clone());
 
-                    /*  local_val.insert(
-                        "service_attributes".to_owned(),
-                        json::Value::Object(service_att_map.clone()),
-                    ); */
+                    value = json::to_value(local_val).unwrap();
+                    if !local_trans.is_empty() {
+                        value = crate::service::ingestion::apply_stream_transform(
+                            &local_trans,
+                            &value,
+                            &stream_vrl_map,
+                            stream_name,
+                            &mut runtime,
+                        )
+                        .unwrap_or(value);
+                    }
+
+                    local_val = value.as_object_mut().unwrap();
 
                     let local_trigger = super::add_valid_record(
                         StreamMeta {
