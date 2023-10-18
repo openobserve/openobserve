@@ -30,6 +30,7 @@ mod compact;
 pub(crate) mod file_list;
 pub(crate) mod files;
 mod metrics;
+mod mmdb_downloader;
 mod prom;
 mod stats;
 pub(crate) mod syslog_server;
@@ -62,6 +63,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await;
     }
 
+    if !CONFIG.common.mmdb_disable_download {
+        // Try to download the mmdb files, if its not disabled.
+        tokio::task::spawn(async move { mmdb_downloader::run().await });
+    }
     // cache users
     tokio::task::spawn(async move { db::user::watch().await });
     db::user::cache().await.expect("user cache failed");

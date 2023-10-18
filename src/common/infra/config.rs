@@ -23,12 +23,14 @@ use parking_lot::RwLock;
 use reqwest::Client;
 use std::{path::Path, sync::Arc, time::Duration};
 use sysinfo::{DiskExt, SystemExt};
+use tokio::sync::RwLock as TRwLock;
 use vector_enrichment::TableRegistry;
 
 use crate::common::{
     meta::{
         alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer},
         functions::{StreamFunctionsList, Transform},
+        maxmind::MaxmindClient,
         prom::ClusterLeader,
         syslog::SyslogRoute,
         user::User,
@@ -100,6 +102,8 @@ pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
     Lazy::new(DashMap::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
 pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
+pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
+    Lazy::new(|| Arc::new(DashMap::default()));
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
@@ -120,6 +124,9 @@ pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
 pub static LOCAL_SCHEMA_LOCKER: Lazy<Arc<RwAHashMap<String, tokio::sync::RwLock<bool>>>> =
     Lazy::new(|| Arc::new(Default::default)());
+
+pub static MAXMIND_DB_CLIENT: Lazy<Arc<TRwLock<Option<MaxmindClient>>>> =
+    Lazy::new(|| Arc::new(TRwLock::new(None)));
 
 #[derive(EnvConfig)]
 pub struct Config {
@@ -286,6 +293,24 @@ pub struct Common {
     pub usage_org: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
+    #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
+    pub mmdb_data_dir: String,
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = "false")]
+    pub mmdb_disable_download: bool,
+    #[env_config(name = "ZO_MMDB_UPDATE_DURATION", default = "86400")] // Everyday to test
+    pub mmdb_update_duration: u64,
+
+    #[env_config(
+        name = "ZO_MMDB_GEOLITE_CITYDB_URL",
+        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.mmdb"
+    )]
+    pub mmdb_geolite_citydb_url: String,
+
+    #[env_config(
+        name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
+        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.sha256"
+    )]
+    pub mmdb_geolite_citydb_sha256_url: String,
 }
 
 #[derive(EnvConfig)]
@@ -679,6 +704,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.sled.data_dir.ends_with('/') {
         cfg.sled.data_dir = format!("{}/", cfg.sled.data_dir);
+    }
+    if cfg.common.mmdb_data_dir.is_empty() {
+        cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);
+    }
+    if !cfg.common.mmdb_data_dir.ends_with('/') {
+        cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
     }
     Ok(())
 }
