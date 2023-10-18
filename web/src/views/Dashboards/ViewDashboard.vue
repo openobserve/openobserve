@@ -29,11 +29,15 @@
         <q-btn outline padding="xs" class="q-ml-sm" no-caps icon="settings" @click="addSettingsData">
           <q-tooltip>{{ t('dashboard.setting') }}</q-tooltip>
         </q-btn>
-        <DateTimePicker 
+        <!-- <DateTimePicker 
           class="q-ml-sm"
           ref="refDateTime"
           v-model="selectedDate"
-        />
+        /> -->
+        <date-time
+            auto-apply
+            @on:date-change="updateDateTime"
+          />
         <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="refreshData"/>
         <q-btn class="q-ml-sm" outline padding="xs" no-caps icon="refresh" @click="refreshData">
         </q-btn>
@@ -66,6 +70,7 @@ import {
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import DateTimePicker from "../../components/DateTimePicker.vue";
+import DateTime from "@/components/DateTime.vue";
 import { useRouter } from "vue-router";
 import {
   getConsumableDateTime,
@@ -86,6 +91,7 @@ export default defineComponent({
   name: "ViewDashboard",
   emits:["onDeletePanel"],
   components: {
+    DateTime,
     DateTimePicker,
     AutoRefreshInterval,
     ExportDashboard,
@@ -225,6 +231,14 @@ export default defineComponent({
       currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value)
     }
 
+    const updateDateTime = (data: any) => {
+      currentDurationSelectionObj.value = data
+      currentTimeObj.value = {
+        start_time: new Date(data.startTime),
+        end_time: new Date(data.endTime)
+      }
+    }
+
     watch(selectedDate, () => {
       const c = toRaw(unref(selectedDate.value));
       currentDurationSelectionObj.value = selectedDate.value
@@ -301,6 +315,7 @@ export default defineComponent({
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,
+      updateDateTime
     };
   }
 });
