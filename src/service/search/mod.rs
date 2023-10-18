@@ -38,7 +38,7 @@ use crate::common::{
     utils::{flatten, json, str::find},
 };
 use crate::handler::grpc::cluster_rpc;
-use crate::service::{db, file_list, format_partition_key, format_stream_name, stream};
+use crate::service::{db, file_list, format_partition_key, stream};
 
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
@@ -523,8 +523,6 @@ pub async fn match_source(
 
 fn filter_source_by_partition_key(source: &str, filters: &[(&str, &str)]) -> bool {
     !filters.iter().any(|(k, v)| {
-        let k = format_stream_name(k);
-        let v = format_stream_name(v);
         let field = format_partition_key(&format!("{k}="));
         let value = format_partition_key(&format!("{k}={v}"));
         find(source, &format!("/{field}")) && !find(source, &format!("/{value}/"))
