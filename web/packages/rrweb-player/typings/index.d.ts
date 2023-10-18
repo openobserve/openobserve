@@ -1,8 +1,8 @@
-import { playerConfig } from 'rrweb/typings/types';
-import { eventWithTime } from '@rrweb/types';
-import { Replayer } from 'rrweb';
-import { Mirror } from 'rrweb-snapshot';
-import { SvelteComponent } from 'svelte';
+import { playerConfig } from "rrweb/typings/types";
+import { eventWithTime } from "@rrweb/types";
+import { Replayer } from "rrweb";
+import { Mirror } from "rrweb-snapshot";
+import { SvelteComponent } from "svelte";
 
 export type RRwebPlayerOptions = {
   target: HTMLElement;
@@ -57,6 +57,8 @@ export type RRwebPlayerOptions = {
      * @defaultValue `#D4D4D4`
      */
     inactiveColor?: string;
+
+    mutateChildNodes?: boolean;
   } & Partial<playerConfig>;
 };
 
@@ -66,7 +68,7 @@ export default class rrwebPlayer extends SvelteComponent {
   addEventListener(event: string, handler: (params: any) => unknown): void;
 
   addEvent(event: eventWithTime): void;
-  getMetaData: Replayer['getMetaData'];
+  getMetaData: Replayer["getMetaData"];
   getReplayer: () => Replayer;
   getMirror: () => Mirror;
 
@@ -82,6 +84,6 @@ export default class rrwebPlayer extends SvelteComponent {
     timeOffset: number,
     endTimeOffset: number,
     startLooping?: boolean,
-    afterHook?: undefined | (() => void),
+    afterHook?: undefined | (() => void)
   ) => void;
 }
