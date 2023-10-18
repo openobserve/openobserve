@@ -1,1 +1,375 @@
-{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"nodejs-typescript-service"}},{"key":"telemetry.sdk.language","value":{"stringValue":"nodejs"}},{"key":"telemetry.sdk.name","value":{"stringValue":"opentelemetry"}},{"key":"telemetry.sdk.version","value":{"stringValue":"1.8.0"}},{"key":"process.pid","value":{"intValue":87092}},{"key":"process.executable.name","value":{"stringValue":"node"}},{"key":"process.command","value":{"stringValue":"/Users/ashishkolhe/Documents/GitHub/sample-tracing-nodejs-typescript/node_modules/.bin/ts-node"}},{"key":"process.command_line","value":{"stringValue":"/opt/homebrew/Cellar/node/19.1.0/bin/node /Users/ashishkolhe/Documents/GitHub/sample-tracing-nodejs-typescript/node_modules/.bin/ts-node --require ./tracing.ts app.ts"}},{"key":"process.runtime.version","value":{"stringValue":"19.1.0"}},{"key":"process.runtime.name","value":{"stringValue":"nodejs"}},{"key":"process.runtime.description","value":{"stringValue":"Node.js"}}],"droppedAttributesCount":0},"scopeSpans":[{"scope":{"name":"@opentelemetry/instrumentation-fs","version":"0.6.0"},"spans":[{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"fcca1617996aa1ec","parentSpanId":"e2c6b713d07a0c71","name":"fs existsSync","kind":1,"startTimeUnixNano":1670820273550486500,"endTimeUnixNano":1670820273550613800,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"8dc51bd024913a60","parentSpanId":"e2c6b713d07a0c71","name":"fs existsSync","kind":1,"startTimeUnixNano":1670820273551483400,"endTimeUnixNano":1670820273551527200,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"893b4240a0a48e1a","parentSpanId":"e2c6b713d07a0c71","name":"fs existsSync","kind":1,"startTimeUnixNano":1670820273551807700,"endTimeUnixNano":1670820273551837400,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"f93ff1a1186b7683","parentSpanId":"e2c6b713d07a0c71","name":"fs existsSync","kind":1,"startTimeUnixNano":1670820273552105200,"endTimeUnixNano":1670820273552183600,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"fda4b639df2e1875","parentSpanId":"e2c6b713d07a0c71","name":"fs readFileSync","kind":1,"startTimeUnixNano":1670820273552214500,"endTimeUnixNano":1670820273552366300,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"3c5d983dc58d304d","parentSpanId":"e2c6b713d07a0c71","name":"fs existsSync","kind":1,"startTimeUnixNano":1670820273552820000,"endTimeUnixNano":1670820273552855300,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"dacbbe465d1e3a84","parentSpanId":"e2c6b713d07a0c71","name":"fs readFileSync","kind":1,"startTimeUnixNano":1670820273552892700,"endTimeUnixNano":1670820273554052000,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"ae8b5e5252a49942","parentSpanId":"e2c6b713d07a0c71","name":"fs existsSync","kind":1,"startTimeUnixNano":1670820273557216500,"endTimeUnixNano":1670820273557264000,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"18c033c907fea89b","parentSpanId":"e2c6b713d07a0c71","name":"fs readFileSync","kind":1,"startTimeUnixNano":1670820273557291500,"endTimeUnixNano":1670820273557398800,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"8435df361db8bb3c","parentSpanId":"e2c6b713d07a0c71","name":"fs existsSync","kind":1,"startTimeUnixNano":1670820273557531400,"endTimeUnixNano":1670820273557553700,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"79338bc16ed83414","parentSpanId":"e2c6b713d07a0c71","name":"fs readFileSync","kind":1,"startTimeUnixNano":1670820273557568500,"endTimeUnixNano":1670820273557873700,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"e1dea9ecf866f4ee","parentSpanId":"e2c6b713d07a0c71","name":"fs existsSync","kind":1,"startTimeUnixNano":1670820273558357500,"endTimeUnixNano":1670820273558386000,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"09194421781fc712","parentSpanId":"e2c6b713d07a0c71","name":"fs existsSync","kind":1,"startTimeUnixNano":1670820273558663000,"endTimeUnixNano":1670820273558686700,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"5cd8725b66736085","parentSpanId":"e2c6b713d07a0c71","name":"fs readFileSync","kind":1,"startTimeUnixNano":1670820273558697500,"endTimeUnixNano":1670820273558763000,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"84b1897ca50dc68f","parentSpanId":"e2c6b713d07a0c71","name":"fs existsSync","kind":1,"startTimeUnixNano":1670820273558829800,"endTimeUnixNano":1670820273558847000,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0},{"traceId":"29bc14368d7e8ae9d17ae2ebff851747","spanId":"3fe27e3c7fc877ca","parentSpanId":"e2c6b713d07a0c71","name":"fs readFileSync","kind":1,"startTimeUnixNano":1670820273558860000,"endTimeUnixNano":1670820273559340300,"attributes":[],"droppedAttributesCount":0,"events":[],"droppedEventsCount":0,"status":{"code":0},"links":[],"droppedLinksCount":0}]}]}]}
+{
+    "resourceSpans": [
+        {
+            "resource": {
+                "attributes": [
+                    {
+                        "key": "service.name",
+                        "value": {
+                            "stringValue": "nodejs-typescript-service"
+                        }
+                    },
+                    {
+                        "key": "telemetry.sdk.language",
+                        "value": {
+                            "stringValue": "nodejs"
+                        }
+                    },
+                    {
+                        "key": "telemetry.sdk.name",
+                        "value": {
+                            "stringValue": "opentelemetry"
+                        }
+                    },
+                    {
+                        "key": "telemetry.sdk.version",
+                        "value": {
+                            "stringValue": "1.8.0"
+                        }
+                    },
+                    {
+                        "key": "process.pid",
+                        "value": {
+                            "intValue": 87092
+                        }
+                    },
+                    {
+                        "key": "process.executable.name",
+                        "value": {
+                            "stringValue": "node"
+                        }
+                    },
+                    {
+                        "key": "process.command",
+                        "value": {
+                            "stringValue": "/Users/ashishkolhe/Documents/GitHub/sample-tracing-nodejs-typescript/node_modules/.bin/ts-node"
+                        }
+                    },
+                    {
+                        "key": "process.command_line",
+                        "value": {
+                            "stringValue": "/opt/homebrew/Cellar/node/19.1.0/bin/node /Users/ashishkolhe/Documents/GitHub/sample-tracing-nodejs-typescript/node_modules/.bin/ts-node --require ./tracing.ts app.ts"
+                        }
+                    },
+                    {
+                        "key": "process.runtime.version",
+                        "value": {
+                            "stringValue": "19.1.0"
+                        }
+                    },
+                    {
+                        "key": "process.runtime.name",
+                        "value": {
+                            "stringValue": "nodejs"
+                        }
+                    },
+                    {
+                        "key": "process.runtime.description",
+                        "value": {
+                            "stringValue": "Node.js"
+                        }
+                    }
+                ],
+                "droppedAttributesCount": 0
+            },
+            "scopeSpans": [
+                {
+                    "scope": {
+                        "name": "@opentelemetry/instrumentation-fs",
+                        "version": "0.6.0"
+                    },
+                    "spans": [
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "fcca1617996aa1ec",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs existsSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273550486500,
+                            "endTimeUnixNano": 1670820273550613800,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "8dc51bd024913a60",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs existsSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273551483400,
+                            "endTimeUnixNano": 1670820273551527200,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "893b4240a0a48e1a",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs existsSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273551807700,
+                            "endTimeUnixNano": 1670820273551837400,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "f93ff1a1186b7683",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs existsSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273552105200,
+                            "endTimeUnixNano": 1670820273552183600,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "fda4b639df2e1875",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs readFileSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273552214500,
+                            "endTimeUnixNano": 1670820273552366300,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "3c5d983dc58d304d",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs existsSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273552820000,
+                            "endTimeUnixNano": 1670820273552855300,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "dacbbe465d1e3a84",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs readFileSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273552892700,
+                            "endTimeUnixNano": 1670820273554052000,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "ae8b5e5252a49942",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs existsSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273557216500,
+                            "endTimeUnixNano": 1670820273557264000,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "18c033c907fea89b",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs readFileSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273557291500,
+                            "endTimeUnixNano": 1670820273557398800,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "8435df361db8bb3c",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs existsSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273557531400,
+                            "endTimeUnixNano": 1670820273557553700,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "79338bc16ed83414",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs readFileSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273557568500,
+                            "endTimeUnixNano": 1670820273557873700,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "e1dea9ecf866f4ee",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs existsSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273558357500,
+                            "endTimeUnixNano": 1670820273558386000,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "09194421781fc712",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs existsSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273558663000,
+                            "endTimeUnixNano": 1670820273558686700,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "5cd8725b66736085",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs readFileSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273558697500,
+                            "endTimeUnixNano": 1670820273558763000,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "84b1897ca50dc68f",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs existsSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273558829800,
+                            "endTimeUnixNano": 1670820273558847000,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        },
+                        {
+                            "traceId": "29bc14368d7e8ae9d17ae2ebff851747",
+                            "spanId": "3fe27e3c7fc877ca",
+                            "parentSpanId": "e2c6b713d07a0c71",
+                            "name": "fs readFileSync",
+                            "kind": 1,
+                            "startTimeUnixNano": 1670820273558860000,
+                            "endTimeUnixNano": 1670820273559340300,
+                            "attributes": [],
+                            "droppedAttributesCount": 0,
+                            "events": [],
+                            "droppedEventsCount": 0,
+                            "status": {
+                                "code": 0
+                            },
+                            "links": [],
+                            "droppedLinksCount": 0
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

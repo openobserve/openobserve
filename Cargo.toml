@@ -42,9 +42,10 @@ codegen-units = 4
 
 [dependencies]
 actix-cors = "0.6"
-actix-multipart = "0.6"
+actix-multipart = { version = "0.6", features = ["derive"] }
 actix-web = "4.4"
 actix-web-httpauth = "0.8"
+actix-web-lab = "0.19.1"
 actix-web-opentelemetry = { version = "0.15", features = ["metrics"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
@@ -96,6 +97,7 @@ itertools = "0.11"
 lazy_static = "1.4"
 log = "0.4"
 lru = "0.10"
+maxminddb = "0.23.0"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 object_store = { version = "0.7", features = ["aws", "azure", "gcp"] }
@@ -123,9 +125,7 @@ rand = "0.8"
 rayon = "1.7.0"
 regex = "1.7"
 regex-syntax = "0.6"
-reqwest = { version = "0.11", default-features = false, features = [
-  "rustls-tls",
-] }
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "stream"] }
 rs-snowflake = "0.6"
 rust-embed-for-web = "11.1"
 segment = "0.2"
@@ -154,6 +154,7 @@ tonic = { version = "0.8", features = ["prost", "gzip"] }
 tracing = { version = "0.1.37", features = ["attributes"] }
 tracing-opentelemetry = "0.18"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uaparser = "0.6.1"
 url = "2.2"
 utoipa = { version = "3", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
@@ -163,6 +164,8 @@ vrl = { version = "0.6.0", features = ["value", "compiler"] }
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.12"
+sha256 = "1.4.0"
+
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
