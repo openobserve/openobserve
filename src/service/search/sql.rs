@@ -706,14 +706,23 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
     "10 second".to_string()
 }
 
-fn split_sql_token_unwrap_brace(s: &str) -> Vec<String> {
-    if s.is_empty() {
+fn split_sql_token_unwrap_brace(token: &str) -> Vec<String> {
+    if token.is_empty() {
         return vec![];
     }
-    if s.starts_with('(') && s.ends_with(')') {
-        return split_sql_token_unwrap_brace(&s[1..s.len() - 1]);
+    if token.starts_with('(') && token.ends_with(')') {
+        return split_sql_token_unwrap_brace(&token[1..token.len() - 1]);
     }
-    split_sql_token(s)
+    let tokens = split_sql_token(token);
+    let mut fin_tokens = Vec::with_capacity(tokens.len());
+    for token in tokens {
+        if token.starts_with('(') && token.ends_with(')') {
+            fin_tokens.extend(split_sql_token_unwrap_brace(&token[1..token.len() - 1]));
+        } else {
+            fin_tokens.push(token);
+        }
+    }
+    fin_tokens
 }
 
 fn split_sql_token(text: &str) -> Vec<String> {
