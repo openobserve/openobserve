@@ -29,6 +29,7 @@
       :class="selectedType + 'type'"
     >
       <q-menu
+        no-route-dismiss
         id="date-time-menu"
         class="date-time-dialog"
         anchor="bottom left"
