@@ -93,8 +93,8 @@
               <q-item
                 v-for="lang in langList"
                 :key="lang.code"
-                v-ripple
-                v-close-popup
+                v-ripple="true"
+                v-close-popup="true"
                 clickable
                 v-bind="lang"
                 active-class="activeLang"
@@ -151,8 +151,8 @@
 
               <q-item
                 v-if="config.isCloud == 'true'"
-                v-ripple
-                v-close-popup
+                v-ripple="true"
+                v-close-popup="true"
                 clickable
                 :to="{ path: '/settings' }"
               >
@@ -168,7 +168,12 @@
                   <q-item-label>{{ t("menu.settings") }}</q-item-label>
                 </q-item-section>
               </q-item>
-              <q-item v-ripple v-close-popup clickable @click="signout">
+              <q-item
+                v-ripple="true"
+                v-close-popup="true"
+                clickable
+                @click="signout"
+              >
                 <q-item-section avatar>
                   <q-avatar
                     size="md"

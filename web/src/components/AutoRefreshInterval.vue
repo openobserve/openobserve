@@ -18,7 +18,7 @@
               'no-border full-width ' +
               (modelValue.toString() === '0' ? 'selected' : '')
             "
-            v-close-popup
+            v-close-popup="true"
             @click="onItemClick({ label: 'Off', value: 0 })"
           >
             Off
@@ -43,7 +43,7 @@
               (Number(modelValue) === item.value ? 'selected' : '')
             "
             @click="onItemClick(item)"
-            v-close-popup
+            v-close-popup="true"
           >
             {{ item.label }}
           </q-btn>

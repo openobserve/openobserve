@@ -1,16 +1,39 @@
 <template>
-  <q-btn id="date-time-button" ref="datetimeBtn" data-cy="date-time-button" outline no-caps :label="displayValue"
-    icon="schedule" icon-right="arrow_drop_down" class="date-time-button"
-    color="">
-    <q-menu no-route-dismiss id="date-time-menu" class="date-time-dialog" anchor="bottom left" self="top left">
+  <q-btn
+    id="date-time-button"
+    ref="datetimeBtn"
+    data-cy="date-time-button"
+    outline
+    no-caps
+    :label="displayValue"
+    icon="schedule"
+    icon-right="arrow_drop_down"
+    class="date-time-button"
+    color=""
+  >
+    <q-menu
+      no-route-dismiss
+      id="date-time-menu"
+      class="date-time-dialog"
+      anchor="bottom left"
+      self="top left"
+    >
       <div class="flex justify-evenly q-py-sm">
-        <q-btn class="tab-button no-border" color="primary" :flat="data.selectedDate.tab !== 'relative'"
-          @click="data.selectedDate.tab = 'relative'">
+        <q-btn
+          class="tab-button no-border"
+          color="primary"
+          :flat="data.selectedDate.tab !== 'relative'"
+          @click="data.selectedDate.tab = 'relative'"
+        >
           RELATIVE
         </q-btn>
         <q-separator vertical inset />
-        <q-btn class="tab-button no-border" color="primary" :flat="data.selectedDate.tab !== 'absolute'"
-          @click="data.selectedDate.tab = 'absolute'">
+        <q-btn
+          class="tab-button no-border"
+          color="primary"
+          :flat="data.selectedDate.tab !== 'absolute'"
+          @click="data.selectedDate.tab = 'absolute'"
+        >
           ABSOLUTE
         </q-btn>
       </div>
@@ -18,19 +41,33 @@
       <q-tab-panels v-model="data.selectedDate.tab" animated>
         <q-tab-panel name="relative" class="q-pa-none">
           <div class="date-time-table relative column">
-            <div class="relative-row q-px-md q-py-sm" v-for="(period, index) in relativePeriods" :key="'date_' + index">
+            <div
+              class="relative-row q-px-md q-py-sm"
+              v-for="(period, index) in relativePeriods"
+              :key="'date_' + index"
+            >
               <div class="relative-period-name">
                 {{ period.value }}
               </div>
-              <div v-for="(item, item_index) in (relativeDates as any)[period.value]" :key="item">
-                <q-btn :class="
-                  data.selectedDate.tab == 'relative' &&
+              <div
+                v-for="(item, item_index) in (relativeDates as any)[period.value]"
+                :key="item"
+              >
+                <q-btn
+                  :class="
+                    data.selectedDate.tab == 'relative' &&
                     data.selectedDate.relative.period.value == period.value &&
                     data.selectedDate.relative.value == item
-                    ? 'rp-selector-selected'
-                    : `rp-selector ${data.selectedDate.relative.period.value}`
-                " :label="item" outline dense flat @click="setRelativeDate(period, item)"
-                  :key="'period_' + item_index" />
+                      ? 'rp-selector-selected'
+                      : `rp-selector ${data.selectedDate.relative.period.value}`
+                  "
+                  :label="item"
+                  outline
+                  dense
+                  flat
+                  @click="setRelativeDate(period, item)"
+                  :key="'period_' + item_index"
+                />
               </div>
             </div>
 
@@ -39,12 +76,23 @@
 
               <div class="row q-gutter-sm">
                 <div class="col">
-                  <q-input v-model="data.selectedDate.relative.value" type="number" dense filled min="1"
-                    @change="calculateMaxValue"></q-input>
+                  <q-input
+                    v-model="data.selectedDate.relative.value"
+                    type="number"
+                    dense
+                    filled
+                    min="1"
+                    @change="calculateMaxValue"
+                  ></q-input>
                 </div>
                 <div class="col">
-                  <q-select v-model="data.selectedDate.relative.period" :options="relativePeriods" dense filled
-                    @update:modelValue="onCustomPeriodSelect"></q-select>
+                  <q-select
+                    v-model="data.selectedDate.relative.period"
+                    :options="relativePeriods"
+                    dense
+                    filled
+                    @update:modelValue="onCustomPeriodSelect"
+                  ></q-select>
                 </div>
               </div>
             </div>
@@ -53,9 +101,14 @@
         <q-tab-panel name="absolute" class="q-pa-none">
           <div class="date-time-table">
             <div class="flex justify-center q-pa-none">
-              <q-date v-model="data.selectedDate.absolute.date" class="absolute-calendar" range :locale="{
-                daysShort: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
-              }" />
+              <q-date
+                v-model="data.selectedDate.absolute.date"
+                class="absolute-calendar"
+                range
+                :locale="{
+                  daysShort: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
+                }"
+              />
             </div>
             <div class="notePara">* You can choose multiple date</div>
             <q-separator class="q-my-sm" />
@@ -67,13 +120,29 @@
               </tr>
               <tr>
                 <td>
-                  <q-input v-model="data.selectedDate.absolute.startTime" dense filled mask="time" :rules="['time']">
+                  <q-input
+                    v-model="data.selectedDate.absolute.startTime"
+                    dense
+                    filled
+                    mask="time"
+                    :rules="['time']"
+                  >
                     <template #append>
                       <q-icon name="access_time" class="cursor-pointer">
-                        <q-popup-proxy transition-show="scale" transition-hide="scale">
-                          <q-time v-model="data.selectedDate.absolute.startTime">
+                        <q-popup-proxy
+                          transition-show="scale"
+                          transition-hide="scale"
+                        >
+                          <q-time
+                            v-model="data.selectedDate.absolute.startTime"
+                          >
                             <div class="row items-center justify-end">
-                              <q-btn v-close-popup label="Close" color="primary" flat />
+                              <q-btn
+                                v-close-popup="true"
+                                label="Close"
+                                color="primary"
+                                flat
+                              />
                             </div>
                           </q-time>
                         </q-popup-proxy>
@@ -82,13 +151,27 @@
                   </q-input>
                 </td>
                 <td>
-                  <q-input v-model="data.selectedDate.absolute.endTime" dense filled mask="time" :rules="['time']">
+                  <q-input
+                    v-model="data.selectedDate.absolute.endTime"
+                    dense
+                    filled
+                    mask="time"
+                    :rules="['time']"
+                  >
                     <template #append>
                       <q-icon name="access_time" class="cursor-pointer">
-                        <q-popup-proxy transition-show="scale" transition-hide="scale">
+                        <q-popup-proxy
+                          transition-show="scale"
+                          transition-hide="scale"
+                        >
                           <q-time v-model="data.selectedDate.absolute.endTime">
                             <div class="row items-center justify-end">
-                              <q-btn v-close-popup label="Close" color="primary" flat />
+                              <q-btn
+                                v-close-popup="true"
+                                label="Close"
+                                color="primary"
+                                flat
+                              />
                             </div>
                           </q-time>
                         </q-popup-proxy>
@@ -140,18 +223,21 @@ export default defineComponent({
     // v-model computed value which is used for the getvalue and setvalue for the props
     const selectedDateEmitValue = computed({
       get() {
-        return props.modelValue
+        return props.modelValue;
       },
       set(value) {
-        emit('update:modelValue', value)
-      }
-    })
+        emit("update:modelValue", value);
+      },
+    });
 
-    // when the props value is changed copy in to the data.selectedDate 
+    // when the props value is changed copy in to the data.selectedDate
     // because data.selectedDate has actual value
     watch(selectedDateEmitValue, () => {
-      Object.assign(data.selectedDate, JSON.parse(JSON.stringify(props.modelValue)))
-    })
+      Object.assign(
+        data.selectedDate,
+        JSON.parse(JSON.stringify(props.modelValue))
+      );
+    });
 
     const relativePeriods = [
       { label: "Minutes", value: "Minutes" },
@@ -171,7 +257,7 @@ export default defineComponent({
 
     // Internal date object, who is containing actual value
     const data = reactive({
-      selectedDate: JSON.parse(JSON.stringify(props.modelValue))
+      selectedDate: JSON.parse(JSON.stringify(props.modelValue)),
     });
 
     // this method set the value of date when the relative tab is selected
@@ -253,26 +339,26 @@ export default defineComponent({
       }
     };
 
-    // set watcher on date selected variable. 
+    // set watcher on date selected variable.
     // when, the old value and new value is not same at that time copy the new value in selectedDateEmit
     watch(
       data.selectedDate,
       () => {
-        if (
-          !isEqual(selectedDateEmitValue.value, data.selectedDate)
-        ) {
-          updateEmitValue()
+        if (!isEqual(selectedDateEmitValue.value, data.selectedDate)) {
+          updateEmitValue();
         }
       },
       { deep: true }
     );
 
     const updateEmitValue = () => {
-      selectedDateEmitValue.value = JSON.parse(JSON.stringify(data.selectedDate));
-    }
+      selectedDateEmitValue.value = JSON.parse(
+        JSON.stringify(data.selectedDate)
+      );
+    };
 
     // on the initial call emit the value once
-    updateEmitValue()
+    updateEmitValue();
 
     return {
       relativePeriods,
@@ -283,7 +369,7 @@ export default defineComponent({
       datetimeBtn,
       displayValue,
       calculateMaxValue,
-      getImageURL
+      getImageURL,
     };
   },
 });
@@ -370,7 +456,7 @@ export default defineComponent({
       }
     }
 
-    >* {
+    > * {
       margin-right: 6px;
     }
   }
@@ -399,7 +485,7 @@ export default defineComponent({
   height: 32px;
   width: 32px;
   // border: $secondary;
-  background: rgba(0,0,0,0.07);
+  background: rgba(0, 0, 0, 0.07);
 }
 
 .rp-selector-selected {
@@ -424,11 +510,11 @@ export default defineComponent({
     padding: 0 0.5rem;
 
     .q-date__arrow {
-      &+.q-date__arrow {
+      & + .q-date__arrow {
         margin-left: auto;
       }
 
-      &+.col {
+      & + .col {
         flex: initial;
       }
     }
@@ -446,7 +532,7 @@ export default defineComponent({
       font-weight: 700;
     }
 
-    &-weekdays>div {
+    &-weekdays > div {
       font-size: 0.875rem;
       font-weight: 700;
       opacity: 1;
@@ -454,7 +540,6 @@ export default defineComponent({
   }
 
   &__range {
-
     &,
     &-from,
     &-to {
@@ -491,7 +576,7 @@ export default defineComponent({
     }
 
     .q-btn-group {
-      &>.q-btn-item {
+      & > .q-btn-item {
         border-radius: 2px;
       }
 

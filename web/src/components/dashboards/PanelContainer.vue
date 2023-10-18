@@ -24,17 +24,17 @@
         <q-space />
         <q-btn-dropdown dense flat label="" no-caps v-if="!viewOnly">
           <q-list dense>
-            <q-item clickable v-close-popup @click="onPanelModifyClick('EditPanel')">
+            <q-item clickable v-close-popup="true" @click="onPanelModifyClick('EditPanel')">
               <q-item-section>
                 <q-item-label class="q-pa-sm">Edit Panel</q-item-label>
               </q-item-section>
             </q-item>
-            <q-item clickable v-close-popup @click="onPanelModifyClick('DuplicatePanel')">
+            <q-item clickable v-close-popup="true" @click="onPanelModifyClick('DuplicatePanel')">
               <q-item-section>
                 <q-item-label class="q-pa-sm">Duplicate</q-item-label>
               </q-item-section>
             </q-item>
-            <q-item clickable v-close-popup @click="onPanelModifyClick('DeletePanel')">
+            <q-item clickable v-close-popup="true" @click="onPanelModifyClick('DeletePanel')">
               <q-item-section>
                 <q-item-label class="q-pa-sm">Delete Panel</q-item-label>
               </q-item-section>

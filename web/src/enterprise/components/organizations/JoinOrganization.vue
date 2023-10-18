@@ -27,7 +27,7 @@
         </div>
         <div class="col-auto">
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             round
             flat
             icon="img:/src/assets/images/common/close_icon.svg"

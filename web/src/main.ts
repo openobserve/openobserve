@@ -34,7 +34,10 @@ const router = createRouter(store);
 
 app
   .use(Quasar, {
-    plugins: [Dialog, Notify], // import Quasar plugins and add here
+    plugins: {
+      Dialog,
+      Notify,
+    },
   })
   .use(i18n);
 

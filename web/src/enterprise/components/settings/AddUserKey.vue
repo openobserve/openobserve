@@ -31,7 +31,7 @@
         </div>
         <div class="col-auto">
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             round
             flat
             icon="img:/src/assets/images/common/close_icon.svg"
@@ -77,7 +77,7 @@
 
       <div class="flex justify-center q-mt-lg">
         <q-btn
-          v-close-popup
+          v-close-popup="true"
           class="q-mb-md text-bold"
           :label="t('settings.cancel')"
           text-color="light-text"
