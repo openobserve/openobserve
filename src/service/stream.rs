@@ -327,6 +327,11 @@ pub async fn delete_fields(
     stream_type: Option<StreamType>,
     fields: &[String],
 ) -> Result<(), anyhow::Error> {
+    if !CONFIG.common.widening_schema_evolution {
+        return Err(anyhow::anyhow!(
+            "widening schema evolution is disabled, can't delete fields"
+        ));
+    }
     let schema =
         db::schema::get_from_db(org_id, stream_name, stream_type.unwrap_or_default()).await?;
     let fields = schema
