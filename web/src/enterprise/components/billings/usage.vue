@@ -30,17 +30,17 @@
       </div>
     </div>
     <div v-if="!dataLoading">
-      <div v-if="chartData.data.length == 0">
+      <div v-if="chartData?.options?.series?.length == 0">
         <div class="text-h6 text-weight-medium text-center">
           {{ t("billing.messageDataNotFound") }}
         </div>
       </div>
       <div v-else>
-        <trace-chart
-          ref="usageChart"
+        <ChartRenderer
           id="billing-usage"
-          :chart="chartData"
-        ></trace-chart>
+          :data="chartData"
+          style="height: 400px;"
+        />
       </div>
     </div>
     <div v-else class="text-h6 text-weight-medium text-center">Loading...</div>
@@ -50,44 +50,28 @@
 import { defineComponent, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
-import TraceChart from "@/plugins/traces/TraceChart.vue";
 import { useI18n } from "vue-i18n";
 import BillingService from "@/services/billings";
+import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
+import { convertBillingData } from "@/utils/billing/convertBillingData";
 
 let currentDate = new Date(); // Get the current date and time
 
 // Subtract 30 days from the current date
 let thirtyDaysAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-const blankChartObj: any = {
-  data: [],
-  layout: {
-    xaxis: {
-      type: "date",
-    },
-    yaxis: {
-      ticksuffix: " MB",
-      type: "linear",
-    },
-    autosize: true,
-    barmode: "group",
-  },
-};
-
 export default defineComponent({
   name: "Usage",
   components: {
-    TraceChart,
-  },
+    ChartRenderer
+},
   setup() {
     const { t } = useI18n();
     const $q = useQuasar();
     const store = useStore();
     const usageDate = ref("30days");
-    const usageChart = ref();
     const dataLoading = ref(false);
-    let chartData = ref(blankChartObj);
-    let eventIndexMap: any = [];
+    let chartData:any = ref({});
     onMounted(() => {
       selectUsageDate();
     });
@@ -102,56 +86,8 @@ export default defineComponent({
         usageDate.value
       )
         .then((res) => {
-          const chartRes = res.data.data;
-          var chartObj: any = JSON.parse(JSON.stringify(blankChartObj));
-          if (chartRes?.length > 0) {
-            chartRes.forEach(
-              (data: {
-                event: string;
-                usage_timestamp: string;
-                size: string;
-              }) => {
-                let eventIndex = eventIndexMap.indexOf(data.event);
-                if (eventIndex > -1) {
-                  if (chartObj.data[eventIndex] === undefined) {
-                    chartObj.data[eventIndex] = {
-                      x: [],
-                      y: [],
-                      name: data.event,
-                      type: "bar",
-                    };
-                  }
-                  chartObj.data[eventIndex].x.push(data.usage_timestamp);
-                  chartObj.data[eventIndex].y.push(
-                    Math.round(parseInt(data.size) / 1024 / 1024)
-                  );
-                } else {
-                  // If the event value is not found, add it to eventIndexMap and chartObj
-                  // let newIndex = eventIndexMap.length;
-                  eventIndexMap.push(data.event);
-                  eventIndex = eventIndexMap.indexOf(data.event);
-                  chartObj.data[eventIndex] = {
-                    x: [],
-                    y: [],
-                    name: data.event,
-                    type: "bar",
-                  };
-
-                  // Update the newly added index with the data values
-                  chartObj.data[eventIndex].x.push(data.usage_timestamp);
-                  chartObj.data[eventIndex].y.push(
-                    Math.round(parseInt(data.size) / 1024 / 1024)
-                  );
-                }
-              }
-            );
-          }
-          chartData.value = chartObj;
-          setTimeout(() => {
-            dataLoading.value = false;
-            if (usageChart.value) usageChart.value.reDraw();
-            if (usageChart.value) usageChart.value.forceReLayout();
-          }, 1000);
+          dataLoading.value = false;
+          chartData.value = convertBillingData(res?.data);
           dismiss();
         })
         .catch((e) => {
@@ -170,7 +106,6 @@ export default defineComponent({
       t,
       store,
       chartData,
-      usageChart,
       usageDate,
       dataLoading,
       options: ["30days", "60days", "3months", "6months"],

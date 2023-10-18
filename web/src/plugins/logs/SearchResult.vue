@@ -22,16 +22,17 @@
       ref="searchListContainer"
       style="width: 100%"
     >
-      <BarChart
+      <ChartRenderer
         data-test="logs-search-result-bar-chart"
-        ref="plotChart"
+        :data="plotChart"
         v-show="
           searchObj.meta.showHistogram &&
           !searchObj.meta.sqlMode &&
           searchObj.data.stream.streamType !== 'enrichment_tables'
         "
-        @updated:chart="onChartUpdate"
-      ></BarChart>
+        style="max-height: 150px;"
+        @updated:dataZoom="onChartUpdate"
+      />
 
       <q-virtual-scroll
         data-test="logs-search-result-logs-table"
@@ -247,22 +248,23 @@ import { useI18n } from "vue-i18n";
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import DetailTable from "./DetailTable.vue";
-import BarChart from "../../components/logBarChart.vue";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "../../components/icons/EqualIcon.vue";
 import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
 import JsonPreview from "./JsonPreview.vue";
+import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
+import {convertLogData} from "@/utils/logs/convertLogData";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     HighLight,
-    BarChart,
     DetailTable,
     EqualIcon,
     NotEqualIcon,
     JsonPreview,
+    ChartRenderer
   },
   emits: [
     "update:scroll",
@@ -333,28 +335,29 @@ export default defineComponent({
 
     const searchTableRef: any = ref(null);
 
-    const plotChart: any = ref(null);
+    const plotChart: any = ref({});
     const expandedLogs: any = ref({});
 
     onMounted(() => {
-      setTimeout(() => {
-        reDrawChart();
-      }, 500);
+      reDrawChart();
+      // setTimeout(() => {
+      // }, 500);
     });
 
     const reDrawChart = () => {
       if (
         // eslint-disable-next-line no-prototype-builtins
         searchObj.data.histogram.hasOwnProperty("xData") &&
-        searchObj.data.histogram.xData.length > 0 &&
-        plotChart.value?.reDraw
+        searchObj.data.histogram.xData.length > 0 
+        // && plotChart.value?.reDraw
       ) {
-        plotChart.value.reDraw(
+        //format data in form of echarts options
+        plotChart.value = convertLogData(
           searchObj.data.histogram.xData,
           searchObj.data.histogram.yData,
           searchObj.data.histogram.chartParams
-        );
-        plotChart.value.forceReLayout();
+        );        
+        // plotChart.value.forceReLayout();
       }
     };
 

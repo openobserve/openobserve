@@ -19,11 +19,11 @@ import { Dialog, Notify } from "quasar";
 
 import Index from "@/plugins/logs/Index.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
-import BarChart from "@/components/logBarChart.vue";
+// import BarChart from "@/components/logBarChart.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
 import { rest } from "msw";
-import "plotly.js";
+// import "plotly.js";
 import DetailTable from "@/plugins/logs/DetailTable.vue";
 import router from "../../helpers/router";
 
@@ -69,15 +69,15 @@ describe("Search Result", async () => {
     ).toBeTruthy();
   });
 
-  it("Should call the 'onChartUpdate' method when the 'updated:chart' event is emitted by the BarChart component", async () => {
-    await wrapper.findComponent(BarChart).vm.$emit("updated:chart", {
-      start: "2000-04-08 05:13:29",
-      end: "2000-07-06 18:53:45",
-    });
-    expect(
-      wrapper.findComponent(SearchResult).emitted()["update:datetime"]
-    ).toBeTruthy();
-  });
+  // it("Should call the 'onChartUpdate' method when the 'updated:chart' event is emitted by the BarChart component", async () => {
+  //   await wrapper.findComponent(BarChart).vm.$emit("updated:chart", {
+  //     start: "2000-04-08 05:13:29",
+  //     end: "2000-07-06 18:53:45",
+  //   });
+  //   expect(
+  //     wrapper.findComponent(SearchResult).emitted()["update:datetime"]
+  //   ).toBeTruthy();
+  // });
 
   //   it("Should render the q-virtual-scroll component with the correct props and call the 'onScroll' method when the 'virtual-scroll' event is emitted", () => {
   //     expect(

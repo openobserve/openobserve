@@ -18,12 +18,13 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
+import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick, onActivated } from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
 
 export default defineComponent({
     name: "ChartRenderer",
+    emits: ["updated:chart","click","updated:dataZoom"],
     props: {
         data: {
             required: true,
@@ -31,26 +32,26 @@ export default defineComponent({
             default: () => ({ options: {} })
         },
     },
-    setup(props: any) {
+    setup(props: any,{ emit }) {
         const chartRef: any = ref(null);
         let chart: any;
         const store = useStore();
         const windowResizeEventCallback = async () => {
             await nextTick();
             await nextTick();
-            chart.resize();
+            chart?.resize();
         }
 
         const mouseHoverEffectFn = (params: any) => {
 
           // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
           // seriesName and seriesIndex will used in the same function
-          if(params.componentSubType === "pie"){
-            params.seriesName = params.data?.name;
-            params.seriesIndex = params.dataIndex;
+          if(params?.componentSubType === "pie"){
+            params.seriesName = params?.data?.name;
+            params.seriesIndex = params?.dataIndex;
           }
           
-          props.data?.extras?.setCurrentSeriesValue(params.seriesName);
+          props?.data?.extras?.setCurrentSeriesValue(params?.seriesName);
 
           // scroll legend upto current series index
           const legendOption = chart.getOption()?.legend[0];
@@ -81,26 +82,26 @@ export default defineComponent({
           }              
 
           // get legend
-          const legendOption = chart.getOption().legend[0];
+          const legendOption = chart?.getOption()?.legend[0];
 
           // set options with selected object
           if (legendOption && params?.selected) {
             legendOption.selected = params.selected;
-            chart.setOption({ legend: [legendOption] });
+            chart?.setOption({ legend: [legendOption] });
           }
         }
 
         watch(() => store.state.theme, (newTheme) => {
           const theme = newTheme === 'dark' ? 'dark' : 'light';
-          chart.dispose();  
+          chart?.dispose();  
           chart = echarts.init(chartRef.value, theme);
           const options = props.data.options || {}
           options.animation = false
-          chart.setOption(options, true);
-          chart.setOption({animation: true});
-          chart.on("mouseover", mouseHoverEffectFn);
-          chart.on("globalout", () => {mouseHoverEffectFn({})});
-          chart.on("legendselectchanged",legendSelectChangedFn);
+          chart?.setOption(options, true);
+          chart?.setOption({animation: true});
+          chart?.on("mouseover", mouseHoverEffectFn);
+          chart?.on("globalout", () => {mouseHoverEffectFn({})});
+          chart?.on("legendselectchanged",legendSelectChangedFn);
         });
 
         onMounted(async () => {
@@ -113,19 +114,46 @@ export default defineComponent({
             await nextTick();
             const theme = store.state.theme === 'dark' ? 'dark' : 'light';
             chart = echarts.init(chartRef.value, theme);
-            chart.setOption(props?.data?.options || {}, true);
-            chart.on("mouseover", mouseHoverEffectFn);
-            chart.on("globalout", () => {mouseHoverEffectFn({})});
-            chart.on("legendselectchanged",legendSelectChangedFn);
+            chart?.setOption(props?.data?.options || {}, true);
+            chart?.on("mouseover", mouseHoverEffectFn);
+            chart?.on("globalout", () => {mouseHoverEffectFn({})});
+            chart?.on("legendselectchanged",legendSelectChangedFn);
+
+            //on dataZoom emit an event of start x and end x
+            chart?.on('dataZoom', function (params:any) {
+                //if batch then emit dataZoom event
+                if(params?.batch){
+                    emit("updated:dataZoom", {
+                        start: params?.batch[0]?.startValue||0,
+                        end: params?.batch[0]?.endValue||0,
+                    });
+                }
+                //else if daatazoom then emit dataZoom event
+                else if(chart?.getOption()?.dataZoom){
+                    emit("updated:chart", {
+                        start: chart?.getOption()?.dataZoom[0]?.startValue||0,
+                        end: chart?.getOption()?.dataZoom[0]?.endValue||0,
+                    });
+                }
+            });
+            chart?.on('click', function (params:any) {                                
+                emit("click", params);
+            });
             window.addEventListener("resize", windowResizeEventCallback);
         });
         onUnmounted(() => {
             window.removeEventListener("resize", windowResizeEventCallback);
         });
+
+        //need to resize chart on activated
+        onActivated(()=>{
+            windowResizeEventCallback();
+        })
+        
         watch(() => props.data.options, async () => {
             await nextTick();
-            chart.resize();
-            chart.setOption(props?.data?.options || {}, true);
+            chart?.resize();
+            chart?.setOption(props?.data?.options || {}, true);
         }, { deep: true });
         return { chartRef };
     },
