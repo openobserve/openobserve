@@ -12,22 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod alerts;
-pub mod dashboards;
-pub mod enrichment_table;
-pub mod functions;
-pub mod kv;
-pub mod logs;
-pub mod metrics;
-pub mod organization;
-pub mod prom;
-pub mod rum;
-pub mod search;
-pub mod status;
-pub mod stream;
-pub mod syslog;
-pub mod traces;
-pub mod users;
-
-pub const CONTENT_TYPE_JSON: &str = "application/json";
-pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+mod client;
+pub use client::MaxmindClient;

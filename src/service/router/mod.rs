@@ -97,6 +97,18 @@ pub async fn gcp(
     dispatch(req, payload).await
 }
 
+#[route(
+    "/rum/{path:.*}",
+    // method = "GET",
+    method = "POST",
+)]
+pub async fn rum(
+    req: HttpRequest,
+    payload: web::Payload,
+) -> actix_web::Result<HttpResponse, Error> {
+    dispatch(req, payload).await
+}
+
 async fn dispatch(
     req: HttpRequest,
     payload: web::Payload,

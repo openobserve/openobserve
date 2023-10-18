@@ -14,12 +14,14 @@
 
 use std::sync::Arc;
 
+use anyhow::bail;
+
 use crate::common::{
     infra::{
-        config::{ROOT_USER, USERS},
+        config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
         db as infra_db,
     },
-    meta::user::{DBUser, User, UserRole},
+    meta::user::{DBUser, User, UserOrg, UserRole},
     utils::json,
 };
 
@@ -33,13 +35,53 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
         return Ok(Some(user.clone()));
     }
 
-    let org_id = org_id.expect("BUG");
+    let org_id = org_id.expect("Missing org_id");
 
     let db = &infra_db::DEFAULT;
     let key = format!("/user/{name}");
     let val = db.get(&key).await?;
     let db_user: DBUser = json::from_slice(&val).unwrap();
     Ok(db_user.get_user(org_id.to_string()))
+}
+
+/// Retrieve the user object given token and the requested org
+pub async fn get_by_token(
+    org_id: Option<&str>,
+    token: &str,
+) -> Result<Option<User>, anyhow::Error> {
+    let user = match org_id {
+        None => ROOT_USER.get("root"),
+        Some(org_id) => USERS_RUM_TOKEN.get(&format!("{org_id}/{token}")),
+    };
+
+    if let Some(user) = user {
+        return Ok(Some(user.clone()));
+    }
+
+    let org_id = org_id.expect("Missing org_id");
+
+    let db = &infra_db::DEFAULT;
+    let key = "/user/";
+    let ret = db.list_values(key).await.unwrap();
+
+    let normal_valid_user = |org: &UserOrg| {
+        org.name == org_id && org.rum_token.is_some() && org.rum_token.as_ref().unwrap() == token
+    };
+
+    let users: Vec<DBUser> = ret
+        .iter()
+        .map(|item| {
+            let user: DBUser = json::from_slice(item).unwrap();
+            user
+        })
+        .filter(|user| user.organizations.iter().any(|org| normal_valid_user(org)))
+        .collect();
+
+    if users.len() != 1 {
+        bail!("Found invalid token for the given org");
+    }
+
+    Ok(users[0].get_user(org_id.to_string()))
 }
 
 pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
@@ -58,21 +100,30 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
         infra_db::NEED_WATCH,
     )
     .await?;
+
     // cache user
     for org in user.organizations {
+        let user = User {
+            email: user.email.clone(),
+            first_name: user.first_name.clone(),
+            last_name: user.last_name.clone(),
+            password: user.password.clone(),
+            role: org.role,
+            org: org.name.clone(),
+            token: org.token,
+            rum_token: org.rum_token.clone(),
+            salt: user.salt.clone(),
+        };
         USERS.insert(
-            format!("{}/{}", org.name, user.email),
-            User {
-                email: user.email.clone(),
-                first_name: user.first_name.clone(),
-                last_name: user.last_name.clone(),
-                password: user.password.clone(),
-                role: org.role,
-                org: org.name,
-                token: org.token,
-                salt: user.salt.clone(),
-            },
+            format!("{}/{}", org.name.clone(), user.email.clone()),
+            user.clone(),
         );
+
+        if let Some(rum_token) = org.rum_token {
+            USERS_RUM_TOKEN
+                .clone()
+                .insert(format!("{}/{}", org.name.clone(), rum_token), user);
+        }
     }
     Ok(())
 }
@@ -143,7 +194,12 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             if user.role.eq(&UserRole::Root) {
                 ROOT_USER.insert("root".to_string(), user.clone());
             }
-            USERS.insert(format!("{}/{}", user.org, user.email), user);
+            USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
+            if let Some(rum_token) = &user.rum_token {
+                USERS_RUM_TOKEN
+                    .clone()
+                    .insert(format!("{}/{}", user.org, rum_token), user);
+            }
         }
     }
     log::info!("Users Cached");
@@ -192,6 +248,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Admin,
                 name: org_id.clone(),
                 token: "Abcd".to_string(),
+                rum_token: Some("rumAbcd".to_string()),
             }],
         })
         .await;

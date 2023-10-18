@@ -103,6 +103,7 @@ mod tests {
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 token: "token".to_string(),
+                rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
             },
         );
@@ -130,6 +131,7 @@ mod tests {
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 token: "token".to_string(),
+                rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
             },
         );
@@ -155,6 +157,7 @@ mod tests {
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 token: "token".to_string(),
+                rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
             },
         );
