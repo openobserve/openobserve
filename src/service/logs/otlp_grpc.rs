@@ -226,6 +226,7 @@ pub async fn handle_grpc_request(
 
     let stream_name = &stream_name;
 
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
 
@@ -238,6 +239,14 @@ pub async fn handle_grpc_request(
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, stream_name);
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
+
+    // Start Register Transforms for stream
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+    );
+    // End Register Transforms for stream
 
     let mut trigger: Option<Trigger> = None;
 
@@ -320,6 +329,16 @@ pub async fn handle_grpc_request(
 
                 //flattening
                 rec = flatten::flatten(&rec)?;
+
+                if !local_trans.is_empty() {
+                    rec = crate::service::ingestion::apply_stream_transform(
+                        &local_trans,
+                        &rec,
+                        &stream_vrl_map,
+                        stream_name,
+                        &mut runtime,
+                    )?;
+                }
                 // get json object
                 let local_val = rec.as_object_mut().unwrap();
 

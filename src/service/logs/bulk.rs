@@ -23,7 +23,7 @@ use crate::common::{
     infra::{cluster, config::CONFIG, metrics},
     meta::{
         alert::{Alert, Trigger},
-        functions::{StreamTransform, VRLRuntimeConfig},
+        functions::{StreamTransform, VRLResultResolver},
         ingestion::{
             BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
             StreamSchemaChk,
@@ -68,7 +68,7 @@ pub async fn ingest(
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
-    let mut stream_vrl_map: AHashMap<String, VRLRuntimeConfig> = AHashMap::new();
+    let mut stream_vrl_map: AHashMap<String, VRLResultResolver> = AHashMap::new();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_data_map = AHashMap::new();
 

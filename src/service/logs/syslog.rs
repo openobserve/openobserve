@@ -38,7 +38,7 @@ use crate::common::{
 };
 use crate::service::{db, get_formatted_stream_name, ingestion::write_file};
 
-pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
+pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow::Error> {
     let start = std::time::Instant::now();
     let ip = addr.ip();
     let matching_route = get_org_for_ip(ip).await;
@@ -59,6 +59,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
 
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let stream_name = &get_formatted_stream_name(
         StreamParams::new(org_id, in_stream_name, StreamType::Logs),
@@ -99,26 +100,32 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
 
+    // Start Register Transforms for stream
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+    );
+    // End Register Transforms for stream
+
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
     value = flatten::flatten(&value).unwrap();
 
-    /*
-    let mut value = crate::service::ingestion::apply_stream_transform(
-        &local_tans,
-        &value,
-        None,
-        None,
-        &stream_vrl_map,
-        stream_name,
-        &mut runtime,
-    );
-
+    if !local_trans.is_empty() {
+        value = crate::service::ingestion::apply_stream_transform(
+            &local_trans,
+            &value,
+            &stream_vrl_map,
+            stream_name,
+            &mut runtime,
+        )?;
+    }
     if value.is_null() || !value.is_object() {
         stream_status.status.failed += 1; // transform failed or dropped
-    } */
+    }
     // End row based transform
 
     // get json object
@@ -174,10 +181,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
-
-    /*     req_stats.response_time = start.elapsed().as_secs_f64();
-    //metric + data usage
-    report_ingest_stats(&req_stats, org_id, StreamType::Logs, UsageEvent::Syslog).await; */
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME

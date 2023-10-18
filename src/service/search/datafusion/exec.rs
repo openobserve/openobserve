@@ -49,6 +49,7 @@ use crate::common::{
     },
     meta::{
         common::{FileKey, FileMeta},
+        functions::VRLResultResolver,
         search::Session as SearchSession,
         sql, StreamType,
     },
@@ -1105,7 +1106,10 @@ fn apply_query_fn(
                 .filter_map(|hit| {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
-                        &program,
+                        &VRLResultResolver {
+                            program: program.program.clone(),
+                            fields: program.fields.clone(),
+                        },
                         &json::Value::Object(hit.clone()),
                     );
                     (!ret_val.is_null()).then_some(flatten::flatten(&ret_val).unwrap_or(ret_val))

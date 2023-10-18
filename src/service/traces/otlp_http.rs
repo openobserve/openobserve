@@ -89,6 +89,7 @@ pub async fn traces_json(
 
     let traces_stream_name = &traces_stream_name;
 
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
         AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -125,19 +126,15 @@ pub async fn traces_json(
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
 
+    // Start Register Transforms for stream
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+        org_id,
+        StreamType::Traces,
+        traces_stream_name,
+    );
+    // End Register Transforms for stream
+
     let mut trigger: Option<Trigger> = None;
-    /*   // Start Register Transforms for stream
-
-    let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
-
-    let (local_tans, stream_lua_map, stream_vrl_map) =
-        crate::service::ingestion::register_stream_transforms(
-            org_id,
-            traces_stream_name,
-            StreamType::Traces,
-            &lua,
-        );
-    // End Register Transforms for stream */
 
     let mut service_name: String = traces_stream_name.to_string();
     //let export_req: ExportTraceServiceRequest = json::from_slice(body.as_ref()).unwrap();
@@ -297,23 +294,17 @@ pub async fn traces_json(
                     //JSON Flattening
                     value = flatten::flatten(&value).unwrap();
 
-                    /*     // Start row based transform
-
-                    let mut value = crate::service::ingestion::apply_stream_transform(
-                        &local_tans,
-                        &value,
-                        &lua,
-                        &stream_lua_map,
-                        &stream_vrl_map,
-                        traces_stream_name,
-                        &mut runtime,
-                    );
-
-                    if value.is_null() || !value.is_object() {
-                        continue;
+                    if !local_trans.is_empty() {
+                        value = crate::service::ingestion::apply_stream_transform(
+                            &local_trans,
+                            &value,
+                            &stream_vrl_map,
+                            traces_stream_name,
+                            &mut runtime,
+                        )
+                        .unwrap_or(value);
                     }
                     // End row based transform */
-
                     // get json object
                     let val_map = value.as_object_mut().unwrap();
 
