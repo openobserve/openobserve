@@ -309,6 +309,24 @@ impl SqliteDbChannel {
                             log::error!("[SQLITE] reset stream stats min_ts error: {}", e);
                         }
                     }
+                    DbEvent::StreamStats(DbEventStreamStats::ResetAll) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match sqlite_file_list::reset_stream_stats(&client).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] reset stream stats error: {}", e);
+                        }
+                    }
                     DbEvent::CreateTableMeta => {
                         let mut err: Option<String> = None;
                         for _ in 0..DB_RETRY_TIMES {
