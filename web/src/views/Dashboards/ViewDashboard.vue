@@ -84,7 +84,6 @@ export default defineComponent({
   name: "ViewDashboard",
   emits: ["onDeletePanel"],
   components: {
-    DateTime,
     DateTimePicker,
     DateTimePickerDashboard,
     AutoRefreshInterval,
@@ -272,16 +271,81 @@ export default defineComponent({
         }
       }
     }
-    
+
+    // [END] date picker related variables
+
+    // variables data
+    const variablesData = reactive({});
+    const variablesDataUpdated = (data: any) => {
+      Object.assign(variablesData, data)
+    }
+
+    const loadDashboard = async () => {
+
+      currentDashboardData.data = await getDashboard(
+        store,
+        route.query.dashboard,
+        route.query.folder ?? "default"
+      )
+      currentDashboardData.data = data;
+
+      // if variables data is null, set it to empty list
+      if (!(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)) {
+        variablesData.isVariablesLoading = false
+        variablesData.values = []
+      }
+    };
+
+    onActivated(async () => {
+      await loadDashboard();
+    })
+
+    // back button to render dashboard List page
+    const goBackToDashboardList = () => {
+      return router.push({
+        path: "/dashboards",
+        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
+      });
+    };
+
+    //add panel
+    const addPanelData = () => {
+      return router.push({
+        path: "/dashboards/add_panel",
+        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
+      });
+    };
+
+    const refreshData = () => {
+      dateTimePicker.value.refresh()
+    }
+
+    // ------- work with query params ----------
+    onActivated(async () => {
+      const params = route.query
+
+      if (params.refresh) {
+        refreshInterval.value = parseDuration(params.refresh)
+      }
+
+      if (params.period || (params.to && params.from)) {
+        selectedDate.value = getSelectedDateFromQueryParams(params)
+      }
+
+      // resize charts if needed
+      await nextTick();
+      window.dispatchEvent(new Event("resize"))
+    })
+
     // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, currentDurationSelectionObj], () => {
+    watch([refreshInterval, selectedDate], () => {
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
           refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(currentDurationSelectionObj.value)
+          ...getQueryParamsForDuration(selectedDate.value)
         }
       })
     })
