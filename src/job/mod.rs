@@ -71,6 +71,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::user::watch().await });
     db::user::cache().await.expect("user cache failed");
 
+    db::organization::cache()
+        .await
+        .expect("organization cache sync failed");
+
     //set instance id
     let instance_id = match db::get_instance().await {
         Ok(Some(instance)) => instance,
@@ -104,6 +108,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::destinations::watch().await });
     tokio::task::spawn(async move { db::alerts::watch().await });
     tokio::task::spawn(async move { db::triggers::watch().await });
+    tokio::task::spawn(async move { db::organization::watch().await });
     tokio::task::yield_now().await; // yield let other tasks run
 
     // cache core metadata
