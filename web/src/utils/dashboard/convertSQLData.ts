@@ -744,6 +744,18 @@ export const convertSQLData = (
         textStyle: {
           fontSize: 12,
         },
+        formatter: (params: any) => {
+          // we have value[1] which return yaxis index
+          // it is used to get y axis data
+          return `${options?.yAxis?.data[params?.value[1]] || params?.seriesName} <br/> ${params?.marker} ${params?.name} : ${formatUnitValue(
+            getUnitValue(
+              params?.value[2],
+              panelSchema?.config?.unit,
+              panelSchema?.config?.unit_custom
+            )
+          ) || params.value[2]}`;
+          
+        }
       }),
         (options.tooltip.axisPointer = {
           type: "cross",
@@ -752,20 +764,20 @@ export const convertSQLData = (
           },
         });
       options.grid.bottom = 60;
-      (options.xAxis = {
+      (options.xAxis = [{
         type: "category",
         data: xAxisZerothPositionUniqueValue,
         splitArea: {
           show: true,
         },
-      }),
-        (options.yAxis = {
+      }]),
+        ([options.yAxis = {
           type: "category",
           data: xAxisFirstPositionUniqueValue,
           splitArea: {
             show: true,
           },
-        });
+        }]);
       options.legend.show = false;
       break;
     }
@@ -858,7 +870,7 @@ export const convertSQLData = (
   }
 
   // auto SQL: if x axis has time series
-  if(panelSchema.type != "h-bar"&& panelSchema.type != "h-stacked"&& panelSchema?.queries[0]?.customQuery == false){
+  if(panelSchema.type != "h-bar"&& panelSchema.type != "h-stacked" && panelSchema.type != "heatmap" && panelSchema?.queries[0]?.customQuery == false){
     // auto SQL: if x axis has time series(aggregation function is histogram)
     const field = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
@@ -945,6 +957,7 @@ export const convertSQLData = (
   if (
     panelSchema.type != "h-bar" &&
     panelSchema.type != "h-stacked" &&
+    panelSchema.type != "heatmap" &&
     panelSchema?.queries[0]?.customQuery == true &&
     options.xAxis.length > 0 &&
     options.xAxis[0].data.length > 0
