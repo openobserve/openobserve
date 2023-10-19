@@ -372,7 +372,6 @@ export default defineComponent({
         selectedDate.value?.to;
       },
       () => {
-        console.log("selected time changed");
         if (props.autoApply && selectedType.value === "absolute")
           saveDate("absolute");
       },
