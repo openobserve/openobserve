@@ -73,6 +73,11 @@ export default defineComponent({
         id: "area-stacked",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
+        title: "Line",
+        id: "line",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/bar-chart.png"),
         title: "Bar",
         id: "bar",
@@ -101,11 +106,6 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
         title: "H-Stacked",
         id: "h-stacked",
-      },
-      {
-        image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
-        title: "Line",
-        id: "line",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/pie-chart.png"),
