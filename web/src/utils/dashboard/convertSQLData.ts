@@ -13,22 +13,34 @@
 
 /**
  * Converts SQL data into a format suitable for rendering a chart.
-*
-* @param {any} panelSchema - the panel schema object
-* @param {any} searchQueryData - the search query data
-* @param {any} store - the store object
-* @return {Object} - the options object for rendering the chart
-*/
+ *
+ * @param {any} panelSchema - the panel schema object
+ * @param {any} searchQueryData - the search query data
+ * @param {any} store - the store object
+ * @return {Object} - the options object for rendering the chart
+ */
 import { utcToZonedTime } from "date-fns-tz";
-import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import {
+  formatDate,
+  formatUnitValue,
+  getUnitValue,
+} from "./convertDataIntoUnitValue";
 export const convertSQLData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any
+  store: any,
+  params: any = {
+    timezone: "UTC",
+  }
 ) => {
-
   // if no data than return it
-  if (!Array.isArray(searchQueryData) || searchQueryData.length === 0 || !searchQueryData[0] || !panelSchema.queries[0].fields.x || !panelSchema.queries[0].fields.y) {
+  if (
+    !Array.isArray(searchQueryData) ||
+    searchQueryData.length === 0 ||
+    !searchQueryData[0] ||
+    !panelSchema.queries[0].fields.x ||
+    !panelSchema.queries[0].fields.y
+  ) {
     return { options: null };
   }
 
@@ -80,7 +92,7 @@ export const convertSQLData = (
     );
     if (field && field.alias == key) {
       // now we have the format, convert that format
-      result = result.map((it: any) => new Date(it+ "Z").getTime());
+      result = result.map((it: any) => new Date(it + "Z").getTime());
     }
     return result;
   };
@@ -114,16 +126,18 @@ export const convertSQLData = (
       overflow: "truncate",
       rich: {
         a: {
-            fontWeight: 'bold'
+          fontWeight: "bold",
         },
         b: {
-            fontStyle: 'normal'
-        }
-      }
+          fontStyle: "normal",
+        },
+      },
     },
     formatter: (name: any) => {
-      return name == currentSeriesName ? '{a|' + name + '}': '{b|' + name + '}'
-    }
+      return name == currentSeriesName
+        ? "{a|" + name + "}"
+        : "{b|" + name + "}";
+    },
   };
 
   // Additional logic to adjust the legend position
@@ -164,7 +178,8 @@ export const convertSQLData = (
         fontSize: 12,
       },
       enterable: true,
-      backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+      backgroundColor:
+        store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
       extraCssText: "max-height: 200px; overflow: auto;",
       axisPointer: {
         type: "cross",
@@ -221,19 +236,17 @@ export const convertSQLData = (
         // get the current series index from name
         const currentSeriesIndex = name.findIndex(
           (it: any) => it.seriesName == currentSeriesName
-        )
-        
+        );
+
         // swap current hovered series index to top in tooltip
         const temp = name[0];
         name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-
-        let hoverText = name.map((it: any) => {
-          
+        const hoverText = name.map((it: any) => {
           // check if the series is the current series being hovered
           // if have than bold it
-          if(it?.seriesName == currentSeriesName)
+          if (it?.seriesName == currentSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.value,
@@ -241,8 +254,8 @@ export const convertSQLData = (
                 panelSchema.config?.unit_custom
               )
             )} </strong>`;
-            // else normal text
-            else
+          // else normal text
+          else
             return `${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.value,
@@ -277,8 +290,10 @@ export const convertSQLData = (
             fontSize: 14,
           },
           axisLabel: {
-            interval: panelSchema.type =="h-stacked" ? "auto" : 
-              index == xAxisKeys.length - 1
+            interval:
+              panelSchema.type == "h-stacked"
+                ? "auto"
+                : index == xAxisKeys.length - 1
                 ? "auto"
                 : function (i: any) {
                     return arr.includes(i);
@@ -295,9 +310,12 @@ export const convertSQLData = (
             align: "left",
             alignWithLabel: false,
             length: 20 * (xAxisKeys.length - index),
-            interval: panelSchema.type =="h-stacked" ? "auto" : function (i: any) {
-              return arr.includes(i);
-            },
+            interval:
+              panelSchema.type == "h-stacked"
+                ? "auto"
+                : function (i: any) {
+                    return arr.includes(i);
+                  },
           },
           data: data,
         };
@@ -359,14 +377,19 @@ export const convertSQLData = (
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
   switch (panelSchema.type) {
-    case "area-stacked": 
+    case "area-stacked":
     case "line":
     case "area":
-    case "scatter": 
-       {
+    case "scatter": {
       //if area stacked then continue
       //or if area or line or scatter, then check x axis length
-      if((panelSchema.type == "area-stacked")||((panelSchema.type == "line" ||panelSchema.type == "area" || panelSchema.type == "scatter") && panelSchema.queries[0].fields.x.length == 2)){
+      if (
+        panelSchema.type == "area-stacked" ||
+        ((panelSchema.type == "line" ||
+          panelSchema.type == "area" ||
+          panelSchema.type == "scatter") &&
+          panelSchema.queries[0].fields.x.length == 2)
+      ) {
         options.xAxis = options.xAxis.slice(0, 1);
         options.tooltip.axisPointer.label = {
           show: true,
@@ -390,9 +413,11 @@ export const convertSQLData = (
         options.xAxis[0].nameGap = 20;
 
         // get the unique value of the first xAxis's key
-        options.xAxis[0].data = Array.from(new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]])));
+        options.xAxis[0].data = Array.from(
+          new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+        );
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
-        
+
         // stacked with xAxis's second value
         // allow 2 xAxis and 1 yAxis value for stack chart
         // get second x axis key
@@ -401,19 +426,21 @@ export const convertSQLData = (
         const stackedXAxisUniqueValue = [
           ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
         ].filter((it) => it);
-  
+
         // create a trace based on second xAxis's unique values
-        options.series = yAxisKeys.map((yAxis: any) => {
-          const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == yAxis
-          ).label;
-          
-          return stackedXAxisUniqueValue?.map((key: any) => {
-            const seriesObj = {
-              //only append if yaxiskeys length is more than 1
-              name: yAxisKeys.length == 1 ? key : key + " (" + yAxisName +")",
-              ...getPropsByChartTypeForSeries(panelSchema.type),
-              data: Array.from(
+        options.series = yAxisKeys
+          .map((yAxis: any) => {
+            const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
+              (it: any) => it.alias == yAxis
+            ).label;
+
+            return stackedXAxisUniqueValue?.map((key: any) => {
+              const seriesObj = {
+                //only append if yaxiskeys length is more than 1
+                name:
+                  yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
+                ...getPropsByChartTypeForSeries(panelSchema.type),
+                data: Array.from(
                   new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
                 ).map(
                   (it: any) =>
@@ -422,11 +449,11 @@ export const convertSQLData = (
                     )?.[yAxis] || 0
                 ),
               };
-            return seriesObj;
-          });
-        }).flat();
-      }
-      else if(panelSchema.type == "line" ||panelSchema.type == "area"){        
+              return seriesObj;
+            });
+          })
+          .flat();
+      } else if (panelSchema.type == "line" || panelSchema.type == "area") {
         //if x and y length is not 2 and 1 respectively then do following
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
@@ -434,34 +461,33 @@ export const convertSQLData = (
               (it: any) => it.alias == key
             )?.label,
             color:
-              panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-                ?.color || "#5960b2",
+              panelSchema.queries[0]?.fields?.y.find(
+                (it: any) => it.alias == key
+              )?.color || "#5960b2",
             opacity: 0.8,
             ...getPropsByChartTypeForSeries(panelSchema.type),
             data: getAxisDataFromKey(key),
           };
           return seriesObj;
         });
-      }
-      else{
+      } else {
         options.tooltip.formatter = function (name: any) {
           if (name.length == 0) return "";
 
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
             (it: any) => it.seriesName == currentSeriesName
-          )
-          
+          );
+
           // swap current hovered series index to top in tooltip
           const temp = name[0];
           name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
           name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-            let hoverText = name.map((it: any) => { 
-              
+          const hoverText = name.map((it: any) => {
             // check if the series is the current series being hovered
             // if have than bold it
-            if(it?.seriesName == currentSeriesName)
+            if (it?.seriesName == currentSeriesName)
               return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                 getUnitValue(
                   it.data[1],
@@ -478,18 +504,19 @@ export const convertSQLData = (
                   panelSchema.config?.unit_custom
                 )
               )}`;
-            });
+          });
 
-            return `${name[0].data[0]} <br/> ${hoverText.join("<br/>")}`;
-          };
+          return `${name[0].data[0]} <br/> ${hoverText.join("<br/>")}`;
+        };
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key
             )?.label,
             color:
-              panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-                ?.color || "#5960b2",
+              panelSchema.queries[0]?.fields?.y.find(
+                (it: any) => it.alias == key
+              )?.color || "#5960b2",
             opacity: 0.8,
             ...getPropsByChartTypeForSeries(panelSchema.type),
             data: getAxisDataFromKey(key).map((it: any, i: number) => {
@@ -498,10 +525,10 @@ export const convertSQLData = (
           };
           return seriesObj;
         });
-      } 
+      }
       break;
     }
-    case "bar":{
+    case "bar": {
       options.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
           name: panelSchema?.queries[0]?.fields?.y.find(
@@ -556,7 +583,10 @@ export const convertSQLData = (
           color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
         },
-        backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+        backgroundColor:
+          store.state.theme === "dark"
+            ? "rgba(0,0,0,1)"
+            : "rgba(255,255,255,1)",
         formatter: function (name: any) {
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
@@ -583,7 +613,7 @@ export const convertSQLData = (
         };
         return seriesObj;
       });
-      
+
       options.xAxis = [];
       options.yAxis = [];
       break;
@@ -595,7 +625,10 @@ export const convertSQLData = (
           color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
         },
-        backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+        backgroundColor:
+          store.state.theme === "dark"
+            ? "rgba(0,0,0,1)"
+            : "rgba(255,255,255,1)",
         formatter: function (name: any) {
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
@@ -660,7 +693,7 @@ export const convertSQLData = (
       const key1 = xAxisKeys[1];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(searchQueryData[0].map((obj: any) => obj[key1]))
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
@@ -705,7 +738,7 @@ export const convertSQLData = (
           );
         });
       });
-    
+
       (options.visualMap = {
         min: 0,
         max: Zvalues.reduce(
@@ -750,22 +783,28 @@ export const convertSQLData = (
       (options.tooltip = {
         position: "top",
         textStyle: {
-        color: store.state.theme === "dark" ? "#fff" : "#000",
+          color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
         },
-        backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+        backgroundColor:
+          store.state.theme === "dark"
+            ? "rgba(0,0,0,1)"
+            : "rgba(255,255,255,1)",
         formatter: (params: any) => {
           // we have value[1] which return yaxis index
           // it is used to get y axis data
-          return `${options?.yAxis?.data[params?.value[1]] || params?.seriesName} <br/> ${params?.marker} ${params?.name} : ${formatUnitValue(
-            getUnitValue(
-              params?.value[2],
-              panelSchema?.config?.unit,
-              panelSchema?.config?.unit_custom
-            )
-          ) || params.value[2]}`;
-          
-        }
+          return `${
+            options?.yAxis?.data[params?.value[1]] || params?.seriesName
+          } <br/> ${params?.marker} ${params?.name} : ${
+            formatUnitValue(
+              getUnitValue(
+                params?.value[2],
+                panelSchema?.config?.unit,
+                panelSchema?.config?.unit_custom
+              )
+            ) || params.value[2]
+          }`;
+        },
       }),
         (options.tooltip.axisPointer = {
           type: "cross",
@@ -774,20 +813,24 @@ export const convertSQLData = (
           },
         });
       options.grid.bottom = 60;
-      (options.xAxis = [{
-        type: "category",
-        data: xAxisZerothPositionUniqueValue,
-        splitArea: {
-          show: true,
-        },
-      }]),
-        ([options.yAxis = {
+      (options.xAxis = [
+        {
           type: "category",
-          data: xAxisFirstPositionUniqueValue,
+          data: xAxisZerothPositionUniqueValue,
           splitArea: {
             show: true,
           },
-        }]);
+        },
+      ]),
+        [
+          (options.yAxis = {
+            type: "category",
+            data: xAxisFirstPositionUniqueValue,
+            splitArea: {
+              show: true,
+            },
+          }),
+        ];
       options.legend.show = false;
       break;
     }
@@ -880,13 +923,15 @@ export const convertSQLData = (
   }
 
   // auto SQL: if x axis has time series
-  if(panelSchema.type != "h-bar" &&
+  if (
+    panelSchema.type != "h-bar" &&
     panelSchema.type != "h-stacked" &&
     panelSchema.type != "heatmap" &&
     panelSchema.type != "metric" &&
     panelSchema.type != "pie" &&
     panelSchema.type != "donut" &&
-    panelSchema?.queries[0]?.customQuery == false){
+    panelSchema?.queries[0]?.customQuery == false
+  ) {
     // auto SQL: if x axis has time series(aggregation function is histogram)
     const field = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
@@ -899,12 +944,16 @@ export const convertSQLData = (
       // if timezone is UTC then simply return x axis value which will be in UTC (note that need to remove Z from timezone string)
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
-      // if no then create new datetime object and get in milliseconds using getTime method      
+      // if no then create new datetime object and get in milliseconds using getTime method
       options.series.map((seriesObj: any) => {
         seriesObj.data = seriesObj.data.map((it: any, index: any) => [
           store.state.timezone != "UTC"
-            ? utcToZonedTime( Number.isInteger(options.xAxis[0].data[index])
-              ? options.xAxis[0].data[index] : new Date(options.xAxis[0].data[index]).getTime(), store.state.timezone) 
+            ? utcToZonedTime(
+                Number.isInteger(options.xAxis[0].data[index])
+                  ? options.xAxis[0].data[index]
+                  : new Date(options.xAxis[0].data[index]).getTime(),
+                store.state.timezone
+              )
             : new Date(options.xAxis[0].data[index]).toISOString().slice(0, -1),
           it,
         ]);
@@ -913,25 +962,23 @@ export const convertSQLData = (
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
         if (name.length == 0) return "";
-  
+
         const date = new Date(name[0].data[0]);
 
         // get the current series index from name
         const currentSeriesIndex = name.findIndex(
           (it: any) => it.seriesName == currentSeriesName
-        )
-        
+        );
+
         // swap current hovered series index to top in tooltip
         const temp = name[0];
         name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-  
-        let hoverText = name.map((it: any) => {
-          
+        const hoverText = name.map((it: any) => {
           // check if the series is the current series being hovered
           // if have than bold it
-          if(it?.seriesName == currentSeriesName)
+          if (it?.seriesName == currentSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -939,8 +986,8 @@ export const convertSQLData = (
                 panelSchema.config?.unit_custom
               )
             )} </strong>`;
-            // else normal text
-            else
+          // else normal text
+          else
             return `${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -980,7 +1027,7 @@ export const convertSQLData = (
   if (
     panelSchema.type != "h-bar" &&
     panelSchema.type != "h-stacked" &&
-    panelSchema.type != "heatmap" && 
+    panelSchema.type != "heatmap" &&
     panelSchema.type != "metric" &&
     panelSchema.type != "pie" &&
     panelSchema.type != "donut" &&
@@ -1000,34 +1047,36 @@ export const convertSQLData = (
     if (isTimeSeries) {
       options.series.map((seriesObj: any) => {
         seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-          store.state.timezone != "UTC" ? utcToZonedTime( new Date(options.xAxis[0].data[index] + "Z").getTime(), store.state.timezone) : new Date(options.xAxis[0].data[index]).getTime(),
+          store.state.timezone != "UTC"
+            ? utcToZonedTime(
+                new Date(options.xAxis[0].data[index] + "Z").getTime(),
+                store.state.timezone
+              )
+            : new Date(options.xAxis[0].data[index]).getTime(),
           it,
         ]);
       });
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
-
         if (name.length == 0) return "";
-  
+
         const date = new Date(name[0].data[0]);
 
         // get the current series index from name
         const currentSeriesIndex = name.findIndex(
           (it: any) => it.seriesName == currentSeriesName
-        )
-        
+        );
+
         // swap current hovered series index to top in tooltip
         const temp = name[0];
         name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-  
-        let hoverText = name.map((it: any) => {
-          
+        const hoverText = name.map((it: any) => {
           // check if the series is the current series being hovered
           // if have than bold it
-          if(it?.seriesName == currentSeriesName)
+          if (it?.seriesName == currentSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -1035,8 +1084,8 @@ export const convertSQLData = (
                 panelSchema.config?.unit_custom
               )
             )} </strong>`;
-            // else normal text
-            else
+          // else normal text
+          else
             return `${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -1074,23 +1123,22 @@ export const convertSQLData = (
 
   //check if is there any data else filter out axis or series data
   // for metric we does not have data field
-  if(panelSchema.type != "metric"){
+  if (panelSchema.type != "metric") {
     options.series = options.series.filter((it: any) => it.data?.length);
-    if(panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"){
+    if (panelSchema.type == "h-bar" || panelSchema.type == "h-stacked") {
       options.xAxis = options.series.length ? options.xAxis : {};
-    }else{
+    } else {
       options.yAxis = options.series.length ? options.yAxis : {};
     }
   }
-  
-  
+
   // extras will be used to return other data to chart renderer
   // e.g. setCurrentSeriesIndex to set the current series index which is hovered
   return {
     options,
     extras: {
-      setCurrentSeriesValue
-    }
+      setCurrentSeriesValue,
+    },
   };
 };
 
