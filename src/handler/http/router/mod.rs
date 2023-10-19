@@ -170,6 +170,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(list_stream_alerts)
             .service(delete_alert)
             .service(organization::organizations)
+            .service(organization::settings::get)
+            .service(organization::settings::create)
             .service(organization::org_summary)
             .service(organization::get_user_passcode)
             .service(organization::update_user_passcode)

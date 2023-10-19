@@ -31,6 +31,7 @@ use crate::common::{
         alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer},
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
+        organization::OrganizationSetting,
         prom::ClusterLeader,
         syslog::SyslogRoute,
         user::User,
@@ -105,6 +106,8 @@ pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
     Lazy::new(|| Arc::new(DashMap::default()));
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
+pub static ORGANIZATION_SETTING: Lazy<Arc<RwAHashMap<String, OrganizationSetting>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
@@ -313,6 +316,9 @@ pub struct Common {
         default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.sha256"
     )]
     pub mmdb_geolite_citydb_sha256_url: String,
+    #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
+    // Default scrape_interval value 15s
+    pub default_scrape_interval: u32,
 }
 
 #[derive(EnvConfig)]
@@ -670,6 +676,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    // If the default scrape interval is less than 5s, raise an error
+    if cfg.common.default_scrape_interval < 5 {
+        return Err(anyhow::anyhow!(
+            "Default scrape interval can not be set to lesser than 5s ."
+        ));
+    }
     Ok(())
 }
 
