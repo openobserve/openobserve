@@ -50,7 +50,7 @@ const defaultObject = {
     splitterModel: 20,
     lastSplitterPosition: 0,
     splitterLimit: [0, 40],
-    fnSplitterModel: 60,
+    fnSplitterModel: 99.5,
     fnLastSplitterPosition: 0,
     fnSplitterLimit: [40, 100],
     refreshTimes: [
@@ -82,7 +82,7 @@ const defaultObject = {
     showQuery: true,
     showHistogram: true,
     showDetailTab: false,
-    toggleFunction: true,
+    toggleFunction: false,
     histogramDirtyFlag: false,
     sqlMode: false,
     queryEditorPlaceholderFlag: true,

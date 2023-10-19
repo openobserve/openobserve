@@ -799,7 +799,7 @@ export default defineComponent({
     },
     toggleFunction(newVal) {
       if (newVal == false) {
-        this.searchObj.config.fnSplitterModel = 100;
+        this.searchObj.config.fnSplitterModel = 99.5;
         this.resetFunctionContent();
       } else {
         this.searchObj.config.fnSplitterModel = 60;
