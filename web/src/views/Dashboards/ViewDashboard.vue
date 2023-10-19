@@ -26,7 +26,7 @@
         <q-btn outline padding="xs" no-caps icon="add" @click="addPanelData" data-test="dashboard-panel-add">
           <q-tooltip>{{ t('panel.add') }}</q-tooltip>
         </q-btn>
-        <q-btn outline padding="xs" class="q-ml-sm" no-caps icon="settings" @click="addSettingsData">
+        <q-btn outline padding="xs" class="q-ml-sm" no-caps icon="settings" @click="openSettingsDialog">
           <q-tooltip>{{ t('dashboard.setting') }}</q-tooltip>
         </q-btn>
         <!-- <DateTimePicker 
@@ -34,33 +34,20 @@
           ref="refDateTime"
           v-model="selectedDate"
         /> -->
-        <date-time
-            auto-apply
-            :default-type="defaultDateTimeValues.type"
-            :default-absolute-time="{
-              startTime: defaultDateTimeValues.startTime,
-              endTime: defaultDateTimeValues.endTime,
-            }"
-            :default-relative-time="defaultDateTimeValues.relativeTimePeriod"
-            @on:date-change="updateDateTime"
-          />
-        <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="refreshData"/>
+        <DateTimePickerDashboard ref="dateTimePicker" v-model="selectedDate" />
+        <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="refreshData" />
         <q-btn class="q-ml-sm" outline padding="xs" no-caps icon="refresh" @click="refreshData">
         </q-btn>
-        <ExportDashboard :dashboardId="currentDashboardData.data?.dashboardId"/>
+        <ExportDashboard :dashboardId="currentDashboardData.data?.dashboardId" />
       </div>
     </div>
     <q-separator></q-separator>
-    <RenderDashboardCharts :viewOnly="viewOnly" :dashboardData="currentDashboardData.data" :currentTimeObj="currentTimeObj" @onDeletePanel="onDeletePanel"/>
-    <q-dialog
-      v-model="showDashboardSettingsDialog"
-      position="right"
-      full-height
-      maximized
-    >
-     <DashboardSettings @refresh="loadDashboard" />
+    <RenderDashboardCharts :viewOnly="false" :dashboardData="currentDashboardData.data" :currentTimeObj="currentTimeObj"
+      @onDeletePanel="onDeletePanel" />
+    <q-dialog v-model="showDashboardSettingsDialog" position="right" full-height maximized>
+      <DashboardSettings @refresh="loadDashboard" />
     </q-dialog>
-    
+
   </q-page>
 </template>
 
@@ -76,7 +63,7 @@ import {
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import DateTimePicker from "../../components/DateTimePicker.vue";
-import DateTime from "@/components/DateTime.vue";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
 import {
   getConsumableDateTime,
@@ -95,16 +82,16 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 
 export default defineComponent({
   name: "ViewDashboard",
-  emits:["onDeletePanel"],
+  emits: ["onDeletePanel"],
   components: {
-    DateTime,
     DateTimePicker,
+    DateTimePickerDashboard,
     AutoRefreshInterval,
     ExportDashboard,
     DashboardSettings,
     VariablesValueSelector,
     RenderDashboardCharts
-},
+  },
   setup() {
     const { t } = useI18n();
     const route = useRoute();
@@ -113,9 +100,9 @@ export default defineComponent({
     const currentDashboardData = reactive({
       data: {},
     });
+
+    // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
-    const viewOnly = ref(false);
-    const eventLog = ref([])
 
     const refDateTime: any = ref(null);
     const currentDurationSelectionObj = ref ({})
@@ -161,125 +148,40 @@ export default defineComponent({
       showDashboardSettingsDialog.value = true;
     };
 
-    // back button to render dashboard List page
-    const goBackToDashboardList = () => {
-      return router.push({
-        path:"/dashboards",
-        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
-      });
-    };
+    // [START] date picker related variables --------
 
-    //create a duplicate panel
-    const onDuplicatePanel = async (data: any): Promise<void> => {
-
-      // Show a loading spinner notification.
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
-
-      // Generate a unique panel ID.
-      const panelId = "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
-
-      // Duplicate the panel data with the new ID.
-      const panelData = JSON.parse(JSON.stringify(data));
-      panelData.id = panelId;
-
-      try {
-        // Add the duplicated panel to the dashboard.
-        await addPanel(store, route.query.dashboard, panelData, route.query.folder ?? "default");
-
-        // Show a success notification.
-        $q.notify({
-          type: "positive",
-          message: `Panel Duplicated Successfully`,
-        });
-
-        // Navigate to the new panel.
-        return router.push({
-          path: "/dashboards/add_panel",
-          query: { dashboard: String(route.query.dashboard), panelId: panelId, folder: route.query.folder ?? "default" },
-        });
-      } catch (err) {
-        // Show an error notification.
-        $q.notify({
-          type: "negative",
-          message: err?.response?.data["error"]
-            ? JSON.stringify(err?.response?.data["error"])
-            : 'Panel duplication failed',
-        });
-      }
-
-      // Hide the loading spinner notification.
-      dismiss();
-
-    };
-
-    // save the dashboard value
-    const saveDashboard = async () => {
-      const dashboardId = route.query.dashboard
-      await updateDashboard(
-        store,
-        store.state.selectedOrganization.identifier,
-        dashboardId,
-        currentDashboardData.data
-      );
-
-      $q.notify({
-        type: "positive",
-        message: "Dashboard updated successfully.",
-        timeout: 5000,
-      });
-
-    };
-
-    //add panel
-    const addPanelData = () => {
-      return router.push({
-        path: "/dashboards/add_panel",
-        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
-      });
-    };
+    /**
+     * Retrieves the selected date from the query parameters.
+     */
+    const getSelectedDateFromQueryParams = (params) => ({
+      valueType: params.period ? "relative" : params.from && params.to ? "absolute" : "relative",
+      startTime: params.from ? params.from : null,
+      endTime: params.to ? params.to : null,
+      relativeTimePeriod: params.period ? params.period : '15m',
+    })
     
-    const refreshData = () => {
-      currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value)
-    }
+    const dateTimePicker = ref(null); // holds a reference to the date time picker
 
-    const updateDateTime = (data: any) => {
-      console.log("updateDateTime", data)
-      currentDurationSelectionObj.value = data
-      console.log("currentTimeObj", currentTimeObj.value);
-      currentTimeObj.value = {
-        start_time: new Date(data.startTime),
-        end_time: new Date(data.endTime)
-      }
-    }
+    // holds the date picker v-modal
+    const selectedDate = ref(getSelectedDateFromQueryParams(route.query))
 
+    // holds the current time for the dashboard
+    const currentTimeObj = ref({});
+
+    // refresh interval v-model
+    const refreshInterval = ref(0);
+
+    
+
+    // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
-      const c = toRaw(unref(selectedDate.value));
-      currentDurationSelectionObj.value = selectedDate.value
-      currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value);
+      currentTimeObj.value = {
+        start_time: new Date(selectedDate.value.startTime),
+        end_time: new Date(selectedDate.value.endTime)
+      }
     })
 
-    // ------- work with query params ----------
-    onActivated(async() => {
-      const params = route.query
-
-      if(params.refresh) {
-        refreshInterval.value = parseDuration(params.refresh)
-      }
-
-      if(params.period || (params.to && params.from)){
-        selectedDate.value = getDurationObjectFromParams(params)
-      }
-
-      // resize charts if needed
-      await nextTick();
-      window.dispatchEvent(new Event("resize"))
-    })
-    const getQueryParamsForDuration = (data: any) => {    
-      console.log("getQueryParamsForDuration", data)   
+    const getQueryParamsForDuration = (data: any) => {
       if (data.relativeTimePeriod) {
         return {
           period: data.relativeTimePeriod
@@ -291,21 +193,86 @@ export default defineComponent({
         }
       }
     }
-    
+
+    // [END] date picker related variables
+
+    // variables data
+    const variablesData = reactive({});
+    const variablesDataUpdated = (data: any) => {
+      Object.assign(variablesData, data)
+    }
+
+    const loadDashboard = async () => {
+
+      currentDashboardData.data = await getDashboard(
+        store,
+        route.query.dashboard,
+        route.query.folder ?? "default"
+      )
+      currentDashboardData.data = data;
+
+      // if variables data is null, set it to empty list
+      if (!(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)) {
+        variablesData.isVariablesLoading = false
+        variablesData.values = []
+      }
+    };
+
+    onActivated(async () => {
+      await loadDashboard();
+    })
+
+    // back button to render dashboard List page
+    const goBackToDashboardList = () => {
+      return router.push({
+        path: "/dashboards",
+        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
+      });
+    };
+
+    //add panel
+    const addPanelData = () => {
+      return router.push({
+        path: "/dashboards/add_panel",
+        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
+      });
+    };
+
+    const refreshData = () => {
+      dateTimePicker.value.refresh()
+    }
+
+    // ------- work with query params ----------
+    onActivated(async () => {
+      const params = route.query
+
+      if (params.refresh) {
+        refreshInterval.value = parseDuration(params.refresh)
+      }
+
+      if (params.period || (params.to && params.from)) {
+        selectedDate.value = getSelectedDateFromQueryParams(params)
+      }
+
+      // resize charts if needed
+      await nextTick();
+      window.dispatchEvent(new Event("resize"))
+    })
+
     // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, currentDurationSelectionObj], () => {
+    watch([refreshInterval, selectedDate], () => {
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
           refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(currentDurationSelectionObj.value)
+          ...getQueryParamsForDuration(selectedDate.value)
         }
       })
     })
 
-    const onDeletePanel = async(panelId: any) => {      
+    const onDeletePanel = async (panelId: any) => {
       await deletePanel(
         store,
         route.query.dashboard,
@@ -314,6 +281,7 @@ export default defineComponent({
       );
       await loadDashboard()
     }
+
     return {
       currentDashboardData,
       goBackToDashboardList,
@@ -321,33 +289,20 @@ export default defineComponent({
       t,
       getDashboard,
       store,
-      refDateTime,
-      filterQuery: ref(""),
-      filterData(rows: string | any[], terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      // date variables
+      dateTimePicker,
+      selectedDate,
       currentTimeObj,
       refreshInterval,
+      // ----------------
       refreshData,
-      selectedDate,
       onDeletePanel,
-      viewOnly,
-      eventLog,
       variablesData,
       variablesDataUpdated,
-      addSettingsData,
+      openSettingsDialog,
       showDashboardSettingsDialog,
       loadDashboard,
-      updateDateTime,
       getQueryParamsForDuration,
-      defaultDateTimeValues
     };
   }
 });
