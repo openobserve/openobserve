@@ -221,13 +221,6 @@ pub async fn ingest(
     drop(stream_params);
     drop(stream_alerts_map);
 
-    drop(runtime);
-    drop(stream_schema_map);
-    drop(buf);
-    drop(stream_vrl_map);
-    drop(stream_params);
-    drop(stream_alerts_map);
-
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
         vec![stream_status],

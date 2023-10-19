@@ -229,7 +229,6 @@ pub async fn process(
     let mut stream_file_name = "".to_string();
     let mut req_stats =
         write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
-    }
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, &stream_alerts_map).await;
