@@ -34,7 +34,7 @@
           ref="refDateTime"
           v-model="selectedDate"
         /> -->
-        <DateTimePickerDashboard ref="dateTimePicker" v-model="selectedDate" />
+        <DateTimePickerDashboard ref="dateTimePicker" class="q-ml-sm" v-model="selectedDate" />
         <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="refreshData" />
         <q-btn class="q-ml-sm" outline padding="xs" no-caps icon="refresh" @click="refreshData">
         </q-btn>
@@ -157,7 +157,7 @@ export default defineComponent({
       valueType: params.period ? "relative" : params.from && params.to ? "absolute" : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
-      relativeTimePeriod: params.period ? params.period : '15m',
+      relativeTimePeriod: params.period ? params.period : null,
     })
     
     const dateTimePicker = ref(null); // holds a reference to the date time picker

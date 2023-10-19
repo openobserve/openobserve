@@ -13,7 +13,7 @@
  limitations under the License. 
 -->
 <template>
-  <date-time ref="dateTimePicker" auto-apply :default-type="modelValue.type" :default-absolute-time="{
+  <date-time ref="dateTimePicker" auto-apply :default-type="modelValue.valueType" :default-absolute-time="{
     startTime: modelValue.startTime,
     endTime: modelValue.endTime,
   }" :default-relative-time="modelValue.relativeTimePeriod" @on:date-change="updateDateTime">
