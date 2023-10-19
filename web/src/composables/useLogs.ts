@@ -85,6 +85,8 @@ const defaultObject = {
     toggleFunction: true,
     histogramDirtyFlag: false,
     sqlMode: false,
+    queryEditorPlaceholderFlag: true,
+    functionEditorPlaceholderFlag: true,
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
