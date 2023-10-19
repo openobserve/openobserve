@@ -357,9 +357,9 @@ pub async fn remote_write(
         };
 
         let mut req_stats = write_file(
-            stream_data,
+            &stream_data,
             thread_id,
-            StreamParams::new(org_id, &stream_name, StreamType::Metrics),
+            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
         )
