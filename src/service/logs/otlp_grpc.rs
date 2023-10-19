@@ -51,7 +51,7 @@ pub async fn usage_ingest(
     let start = std::time::Instant::now();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let stream_name = &get_formatted_stream_name(
-        StreamParams::new(org_id, in_stream_name, StreamType::Logs),
+        &StreamParams::new(org_id, in_stream_name, StreamType::Logs),
         &mut stream_schema_map,
     )
     .await;
@@ -123,12 +123,12 @@ pub async fn usage_ingest(
         );
 
         let local_trigger = super::add_valid_record(
-            StreamMeta {
+            &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
-                partition_keys: partition_keys.clone(),
-                partition_time_level,
-                stream_alerts_map: stream_alerts_map.clone(),
+                partition_keys: &partition_keys,
+                partition_time_level: &partition_time_level,
+                stream_alerts_map: &stream_alerts_map,
             },
             &mut stream_schema_map,
             &mut stream_status.status,
@@ -145,9 +145,9 @@ pub async fn usage_ingest(
     // write to file
     let mut stream_file_name = "".to_string();
     let _ = write_file(
-        buf,
+        &buf,
         thread_id,
-        StreamParams::new(org_id, stream_name, StreamType::Logs),
+        &StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
     )
@@ -161,7 +161,7 @@ pub async fn usage_ingest(
     }
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, stream_alerts_map).await;
+    super::evaluate_trigger(trigger, &stream_alerts_map).await;
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -216,7 +216,7 @@ pub async fn handle_grpc_request(
     let stream_name = match in_stream_name {
         Some(name) => {
             get_formatted_stream_name(
-                StreamParams::new(org_id, name, StreamType::Logs),
+                &StreamParams::new(org_id, name, StreamType::Logs),
                 &mut stream_schema_map,
             )
             .await
@@ -343,12 +343,12 @@ pub async fn handle_grpc_request(
                 let local_val = rec.as_object_mut().unwrap();
 
                 let local_trigger = super::add_valid_record(
-                    StreamMeta {
+                    &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
-                        partition_keys: partition_keys.clone(),
-                        partition_time_level,
-                        stream_alerts_map: stream_alerts_map.clone(),
+                        partition_keys: &partition_keys,
+                        partition_time_level: &partition_time_level,
+                        stream_alerts_map: &stream_alerts_map,
                     },
                     &mut stream_schema_map,
                     &mut stream_status.status,
@@ -367,16 +367,16 @@ pub async fn handle_grpc_request(
     // write to file
     let mut stream_file_name = "".to_string();
     let mut req_stats = write_file(
-        data_buf,
+        &data_buf,
         thread_id,
-        StreamParams::new(org_id, stream_name, StreamType::Logs),
+        &StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,
         None,
     )
     .await;
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, stream_alerts_map).await;
+    super::evaluate_trigger(trigger, &stream_alerts_map).await;
 
     let ep = if is_grpc {
         "grpc/export/logs"

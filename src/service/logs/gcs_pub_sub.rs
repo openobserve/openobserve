@@ -27,11 +27,8 @@ pub async fn process(
     let start = std::time::Instant::now();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let stream_name = &get_formatted_stream_name(
-        StreamParams::new(org_id, in_stream_name, StreamType::Logs),
-        &mut stream_schema_map,
-    )
-    .await;
+    let stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
+    let stream_name = &get_formatted_stream_name(&stream_params, &mut stream_schema_map).await;
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
@@ -126,12 +123,12 @@ pub async fn process(
 
             // write data
             let local_trigger = super::add_valid_record(
-                StreamMeta {
+                &StreamMeta {
                     org_id: org_id.to_string(),
                     stream_name: stream_name.to_string(),
-                    partition_keys: partition_keys.clone(),
-                    partition_time_level,
-                    stream_alerts_map: stream_alerts_map.clone(),
+                    partition_keys: &partition_keys,
+                    partition_time_level: &partition_time_level,
+                    stream_alerts_map: &stream_alerts_map,
                 },
                 &mut stream_schema_map,
                 &mut stream_status.status,
@@ -162,17 +159,11 @@ pub async fn process(
     }
     let mut stream_file_name = "".to_string();
     // write to file
-    let mut req_stats = write_file(
-        buf,
-        thread_id,
-        StreamParams::new(org_id, stream_name, StreamType::Logs),
-        &mut stream_file_name,
-        None,
-    )
-    .await;
+    let mut req_stats =
+        write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, stream_alerts_map).await;
+    super::evaluate_trigger(trigger, &stream_alerts_map).await;
 
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[

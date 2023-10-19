@@ -33,20 +33,61 @@ use crate::service::{
     usage::report_request_usage_stats,
 };
 
+/// Ingest a multiline json body but add extra keys to each json row
+///
+/// ### Args
+/// - org_id: org id to ingest data in
+/// - in_stream_name: stream to write data in
+/// - body: incoming payload
+/// - extend_json: a hashmap of string -> string values which should be extended in each json row
+/// - thread_id: a unique thread-id associated with this process
+///
+pub async fn ingest_with_keys(
+    org_id: &str,
+    in_stream_name: &str,
+    body: web::Bytes,
+    extend_json: &AHashMap<String, serde_json::Value>,
+    thread_id: usize,
+) -> Result<IngestionResponse, anyhow::Error> {
+    ingest_inner(org_id, in_stream_name, body, extend_json, thread_id).await
+}
+
+/// Ingest a multiline json body
+///
+/// ### Args
+/// - org_id: org id to ingest data in
+/// - in_stream_name: stream to write data in
+/// - body: incoming payload
+/// - thread_id: a unique thread-id associated with this process
+///
 pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
     body: web::Bytes,
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
+    ingest_inner(
+        org_id,
+        in_stream_name,
+        body,
+        &AHashMap::default(),
+        thread_id,
+    )
+    .await
+}
+
+async fn ingest_inner(
+    org_id: &str,
+    in_stream_name: &str,
+    body: web::Bytes,
+    extend_json: &AHashMap<String, serde_json::Value>,
+    thread_id: usize,
+) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let stream_name = &get_formatted_stream_name(
-        StreamParams::new(org_id, in_stream_name, StreamType::Logs),
-        &mut stream_schema_map,
-    )
-    .await;
+    let stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
+    let stream_name = &get_formatted_stream_name(&stream_params, &mut stream_schema_map).await;
 
     if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
         return Err(value);
@@ -88,6 +129,10 @@ pub async fn ingest(
         }
 
         let mut value: json::Value = json::from_slice(line.as_bytes())?;
+
+        for (key, val) in extend_json.iter() {
+            value[key] = val.clone();
+        }
 
         // JSON Flattening
         value = flatten::flatten(&value)?;
@@ -141,12 +186,12 @@ pub async fn ingest(
 
         // write data
         let local_trigger = super::add_valid_record(
-            StreamMeta {
+            &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
-                partition_keys: partition_keys.clone(),
-                partition_time_level,
-                stream_alerts_map: stream_alerts_map.clone(),
+                partition_keys: &partition_keys,
+                partition_time_level: &partition_time_level,
+                stream_alerts_map: &stream_alerts_map,
             },
             &mut stream_schema_map,
             &mut stream_status.status,
@@ -164,9 +209,9 @@ pub async fn ingest(
     let mut stream_file_name = "".to_string();
 
     let mut req_stats = write_file(
-        buf,
+        &buf,
         thread_id,
-        StreamParams::new(org_id, stream_name, StreamType::Logs),
+        &stream_params,
         &mut stream_file_name,
         partition_time_level,
     )
@@ -180,7 +225,7 @@ pub async fn ingest(
     }
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, stream_alerts_map).await;
+    super::evaluate_trigger(trigger, &stream_alerts_map).await;
 
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage

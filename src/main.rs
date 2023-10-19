@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{middleware, web, App, HttpServer};
+use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
 use log::LevelFilter;
 use opentelemetry::{
@@ -33,9 +33,11 @@ use std::{
         atomic::{AtomicU16, Ordering},
         Arc,
     },
+    time::Duration,
 };
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
+use uaparser::UserAgentParser;
 
 use openobserve::{
     common::{
@@ -85,6 +87,11 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/ua_regex/regexes.yaml"
+));
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -184,11 +191,17 @@ async fn main() -> Result<(), anyhow::Error> {
         .event("OpenObserve - Starting server", None, false)
         .await;
 
+    let ua_parser = web::Data::new(
+        UserAgentParser::builder()
+            .build_from_bytes(USER_AGENT_REGEX_FILE)
+            .expect("User Agent Parser creation failed"),
+    );
     let server = HttpServer::new(move || {
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
         if CONFIG.common.feature_per_thread_lock {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
+
         log::info!(
             "starting HTTP server at: {}, thread_id: {}",
             haddr,
@@ -203,6 +216,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     .service(router::api)
                     .service(router::aws)
                     .service(router::gcp)
+                    .service(router::rum)
                     .configure(get_basic_routes),
             )
         } else {
@@ -217,12 +231,17 @@ async fn main() -> Result<(), anyhow::Error> {
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
+            .app_data(ua_parser.clone())
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
             .wrap(RequestTracing::new())
     })
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
+        CONFIG.limit.keep_alive,
+    )))
+    .client_request_timeout(Duration::from_secs(CONFIG.limit.request_timeout))
     .bind(haddr)?;
 
     tokio::task::spawn(async move { zo_logger::send_logs().await });
@@ -520,7 +539,11 @@ async fn cli() -> Result<bool, anyhow::Error> {
         }
     }
 
-    println!("command {name} execute succeeded");
+    // flush db
+    if let Err(e) = infra::db::DEFAULT.close().await {
+        log::error!("waiting for db close failed, error: {}", e);
+    }
 
+    println!("command {name} execute succeeded");
     Ok(true)
 }

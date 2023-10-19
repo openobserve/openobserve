@@ -97,34 +97,24 @@ pub async fn gcp(
     dispatch(req, payload).await
 }
 
+#[route(
+    "/rum/{path:.*}",
+    // method = "GET",
+    method = "POST",
+)]
+pub async fn rum(
+    req: HttpRequest,
+    payload: web::Payload,
+) -> actix_web::Result<HttpResponse, Error> {
+    dispatch(req, payload).await
+}
+
 async fn dispatch(
     req: HttpRequest,
     payload: web::Payload,
 ) -> actix_web::Result<HttpResponse, Error> {
     // get online nodes
     let path = req.uri().path_and_query().map(|x| x.as_str()).unwrap_or("");
-    let node_type;
-    let nodes = if check_querier_route(path) {
-        node_type = cluster::Role::Querier;
-        cluster::get_cached_online_querier_nodes()
-    } else {
-        node_type = cluster::Role::Ingester;
-        cluster::get_cached_online_ingester_nodes()
-    };
-    if nodes.is_none() {
-        return Ok(HttpResponse::ServiceUnavailable().body(format!("No online {node_type} nodes")));
-    }
-
-    // checking nodes
-    let mut nodes = nodes.unwrap();
-    if nodes.is_empty() {
-        return Ok(HttpResponse::ServiceUnavailable().body(format!("No online {node_type} nodes")));
-        //std::process::exit(1);
-    }
-
-    // random nodes
-    let mut rng = thread_rng();
-    nodes.shuffle(&mut rng);
 
     let client = awc::Client::builder()
         .connector(
@@ -136,15 +126,19 @@ async fn dispatch(
         .finish();
 
     // send query
-    let node = nodes.first().unwrap();
-    let new_url = format!("{}{}", node.http_addr, path);
+    let new_url = get_url(path);
+
+    if new_url.is_error {
+        return Ok(HttpResponse::ServiceUnavailable().body(new_url.value));
+    }
+
     let resp = client
-        .request_from(new_url.clone(), req.head())
+        .request_from(new_url.value.clone(), req.head())
         .send_stream(payload)
         .await;
     if resp.is_err() {
         let e = resp.unwrap_err();
-        log::error!("{}: {}", new_url, e);
+        log::error!("{}: {}", new_url.value, e);
         return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
     }
 
@@ -166,6 +160,55 @@ async fn dispatch(
         .await
         .unwrap();
     Ok(new_resp.body(body))
+}
+
+fn get_url(path: &str) -> URLDetails {
+    let node_type;
+    let is_querier_path = check_querier_route(path);
+
+    if !is_querier_path && !CONFIG.route.ingester_srv_url.is_empty() {
+        return URLDetails {
+            is_error: false,
+            value: format!("{}{}", CONFIG.route.ingester_srv_url, path),
+        };
+    }
+
+    let nodes = if is_querier_path {
+        node_type = cluster::Role::Querier;
+        cluster::get_cached_online_querier_nodes()
+    } else {
+        node_type = cluster::Role::Ingester;
+        cluster::get_cached_online_ingester_nodes()
+    };
+    if nodes.is_none() {
+        return URLDetails {
+            is_error: true,
+            value: format!("No online {node_type} nodes"),
+        };
+    }
+
+    // checking nodes
+    let mut nodes = nodes.unwrap();
+    if nodes.is_empty() {
+        return URLDetails {
+            is_error: true,
+            value: format!("No online {node_type} nodes"),
+        };
+    }
+
+    // random nodes
+    let mut rng = thread_rng();
+    nodes.shuffle(&mut rng);
+    let node = nodes.first().unwrap();
+    URLDetails {
+        is_error: false,
+        value: format!("{}{}", node.http_addr, path),
+    }
+}
+
+struct URLDetails {
+    is_error: bool,
+    value: String,
 }
 
 #[cfg(test)]

@@ -59,6 +59,16 @@ pub async fn progress(
                 e
             );
         }
+        // update stream stats realtime
+        if CONFIG.common.local_mode {
+            if let Err(e) = cache::stats::incr_stream_stats(key, data.unwrap()) {
+                log::error!(
+                    "service:db:file_list: add {}, incr_stream_stats error: {}",
+                    key,
+                    e
+                );
+            }
+        }
         if download
             && CONFIG.memory_cache.cache_latest_files
             && cluster::is_querier(&cluster::LOCAL_NODE_ROLE)

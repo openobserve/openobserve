@@ -23,12 +23,15 @@ use parking_lot::RwLock;
 use reqwest::Client;
 use std::{path::Path, sync::Arc, time::Duration};
 use sysinfo::{DiskExt, SystemExt};
+use tokio::sync::RwLock as TRwLock;
 use vector_enrichment::TableRegistry;
 
 use crate::common::{
     meta::{
         alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer},
         functions::{StreamFunctionsList, Transform},
+        maxmind::MaxmindClient,
+        organization::OrganizationSetting,
         prom::ClusterLeader,
         syslog::SyslogRoute,
         user::User,
@@ -122,7 +125,11 @@ pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
     Lazy::new(DashMap::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
 pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
+pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
+    Lazy::new(|| Arc::new(DashMap::default()));
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
+pub static ORGANIZATION_SETTING: Lazy<Arc<RwAHashMap<String, OrganizationSetting>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
@@ -142,6 +149,9 @@ pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
 pub static LOCAL_SCHEMA_LOCKER: Lazy<Arc<RwAHashMap<String, tokio::sync::RwLock<bool>>>> =
     Lazy::new(|| Arc::new(Default::default)());
+
+pub static MAXMIND_DB_CLIENT: Lazy<Arc<TRwLock<Option<MaxmindClient>>>> =
+    Lazy::new(|| Arc::new(TRwLock::new(None)));
 
 #[derive(EnvConfig)]
 pub struct Config {
@@ -219,6 +229,8 @@ pub struct TCP {
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
+    #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
+    pub ingester_srv_url: String,
 }
 
 #[derive(EnvConfig)]
@@ -312,6 +324,27 @@ pub struct Common {
     pub usage_org: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
+    #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
+    pub mmdb_data_dir: String,
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = "false")]
+    pub mmdb_disable_download: bool,
+    #[env_config(name = "ZO_MMDB_UPDATE_DURATION", default = "86400")] // Everyday to test
+    pub mmdb_update_duration: u64,
+
+    #[env_config(
+        name = "ZO_MMDB_GEOLITE_CITYDB_URL",
+        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.mmdb"
+    )]
+    pub mmdb_geolite_citydb_url: String,
+
+    #[env_config(
+        name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
+        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.sha256"
+    )]
+    pub mmdb_geolite_citydb_sha256_url: String,
+    #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
+    // Default scrape_interval value 15s
+    pub default_scrape_interval: u32,
 }
 
 #[derive(EnvConfig)]
@@ -361,6 +394,10 @@ pub struct Limit {
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] //size in mb
     pub enrichment_table_limit: usize,
+    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] //in second
+    pub request_timeout: u64,
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] //in second
+    pub keep_alive: u64,
 }
 
 #[derive(EnvConfig)]
@@ -469,6 +506,8 @@ pub struct Etcd {
     pub domain_name: String,
     #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
+    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 30)]
+    pub node_heartbeat_ttl: i64,
 }
 
 #[derive(EnvConfig)]
@@ -663,6 +702,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    // If the default scrape interval is less than 5s, raise an error
+    if cfg.common.default_scrape_interval < 5 {
+        return Err(anyhow::anyhow!(
+            "Default scrape interval can not be set to lesser than 5s ."
+        ));
+    }
     Ok(())
 }
 
@@ -705,6 +750,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.sled.data_dir.ends_with('/') {
         cfg.sled.data_dir = format!("{}/", cfg.sled.data_dir);
+    }
+    if cfg.common.mmdb_data_dir.is_empty() {
+        cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);
+    }
+    if !cfg.common.mmdb_data_dir.ends_with('/') {
+        cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
     }
     Ok(())
 }

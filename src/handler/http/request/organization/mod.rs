@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{get, put, web, HttpResponse, Result};
+use actix_web::{get, post, put, web, HttpResponse, Result};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use std::collections::HashSet;
 use std::io::Error;
 
 use crate::common::infra::config::{STREAM_SCHEMAS, USERS};
 use crate::common::meta::organization::{
-    OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
+    OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, RumIngestionResponse, CUSTOM,
+    DEFAULT_ORG, THRESHOLD,
 };
 use crate::common::utils::auth::is_root_user;
-use crate::service::organization::get_passcode;
 use crate::service::organization::{self, update_passcode};
+use crate::service::organization::{get_passcode, get_rum_token, update_rum_token};
 
 pub mod es;
+pub mod settings;
 
 /** GetOrganizations */
 #[utoipa::path(
@@ -202,4 +204,94 @@ async fn update_user_passcode(
     }
     let passcode = update_passcode(org_id, user_id).await;
     Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
+}
+
+/** GetRumIngestToken */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetOrganizationUserRumIngestToken",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = RumIngestionResponse),
+    )
+)]
+#[get("/{org_id}/organizations/rumtoken")]
+async fn get_user_rumtoken(
+    credentials: BasicAuth,
+    org_id: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let org = org_id.into_inner();
+    let user_id = credentials.user_id();
+    let mut org_id = Some(org.as_str());
+    if is_root_user(user_id) {
+        org_id = None;
+    }
+    let rumtoken = get_rum_token(org_id, user_id).await;
+    Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
+}
+
+/** UpdateRumIngestToken */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "UpdateOrganizationUserRumIngestToken",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = RumIngestionResponse),
+    )
+)]
+#[put("/{org_id}/organizations/rumtoken")]
+async fn update_user_rumtoken(
+    credentials: BasicAuth,
+    org_id: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let org = org_id.into_inner();
+    let user_id = credentials.user_id();
+    let mut org_id = Some(org.as_str());
+    if is_root_user(user_id) {
+        org_id = None;
+    }
+    let rumtoken = update_rum_token(org_id, user_id).await;
+    Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
+}
+
+/** CreateRumIngestToken */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "CreateOrganizationUserRumIngestToken",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = RumIngestionResponse),
+    )
+)]
+#[post("/{org_id}/organizations/rumtoken")]
+async fn create_user_rumtoken(
+    credentials: BasicAuth,
+    org_id: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let org = org_id.into_inner();
+    let user_id = credentials.user_id();
+    let mut org_id = Some(org.as_str());
+    if is_root_user(user_id) {
+        org_id = None;
+    }
+    let rumtoken = update_rum_token(org_id, user_id).await;
+    Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
 }

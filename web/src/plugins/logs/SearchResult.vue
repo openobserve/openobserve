@@ -22,6 +22,7 @@
       ref="searchListContainer"
       style="width: 100%"
     >
+      <div class="text-center">{{ searchObj.data.histogram.chartParams.title }}</div>
       <ChartRenderer
         data-test="logs-search-result-bar-chart"
         :data="plotChart"
@@ -30,7 +31,7 @@
           !searchObj.meta.sqlMode &&
           searchObj.data.stream.streamType !== 'enrichment_tables'
         "
-        style="max-height: 150px;"
+        style="max-height: 150px"
         @updated:dataZoom="onChartUpdate"
       />
 
@@ -254,7 +255,7 @@ import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
 import JsonPreview from "./JsonPreview.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-import {convertLogData} from "@/utils/logs/convertLogData";
+import { convertLogData } from "@/utils/logs/convertLogData";
 
 export default defineComponent({
   name: "SearchResult",
@@ -264,7 +265,7 @@ export default defineComponent({
     EqualIcon,
     NotEqualIcon,
     JsonPreview,
-    ChartRenderer
+    ChartRenderer,
   },
   emits: [
     "update:scroll",
@@ -348,7 +349,7 @@ export default defineComponent({
       if (
         // eslint-disable-next-line no-prototype-builtins
         searchObj.data.histogram.hasOwnProperty("xData") &&
-        searchObj.data.histogram.xData.length > 0 
+        searchObj.data.histogram.xData.length > 0
         // && plotChart.value?.reDraw
       ) {
         //format data in form of echarts options
@@ -356,7 +357,7 @@ export default defineComponent({
           searchObj.data.histogram.xData,
           searchObj.data.histogram.yData,
           searchObj.data.histogram.chartParams
-        );        
+        );
         // plotChart.value.forceReLayout();
       }
     };

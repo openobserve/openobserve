@@ -223,7 +223,7 @@ pub async fn merge_by_stream(
     db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
 
     // update stream stats
-    if CONFIG.common.meta_store_external && stream_stats.doc_num != 0 {
+    if stream_stats.doc_num != 0 {
         infra_file_list::set_stream_stats(
             org_id,
             &[(

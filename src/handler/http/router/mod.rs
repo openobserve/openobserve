@@ -25,13 +25,13 @@ use std::rc::Rc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use super::auth::{validator, validator_aws, validator_gcp};
+use super::auth::{validator, validator_aws, validator_gcp, validator_rum};
 use super::request::{
     alerts::*, dashboards::folders::*, dashboards::*, enrichment_table, functions, kv, logs,
-    metrics, organization, prom, search, status, stream, syslog, traces, users,
+    metrics, organization, prom, rum, search, status, stream, syslog, traces, users,
 };
-use crate::common::infra::config::CONFIG;
-
+use crate::common::{infra::config::CONFIG, meta::middleware_data::RumExtraData};
+use actix_web_lab::middleware::from_fn;
 pub mod openapi;
 pub mod ui;
 
@@ -130,6 +130,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::values)
             .service(stream::schema)
             .service(stream::settings)
+            .service(stream::delete_fields)
             .service(stream::delete)
             .service(stream::list)
             .service(functions::save_function)
@@ -169,9 +170,14 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(list_stream_alerts)
             .service(delete_alert)
             .service(organization::organizations)
+            .service(organization::settings::get)
+            .service(organization::settings::create)
             .service(organization::org_summary)
             .service(organization::get_user_passcode)
             .service(organization::update_user_passcode)
+            .service(organization::create_user_rumtoken)
+            .service(organization::get_user_rumtoken)
+            .service(organization::update_user_rumtoken)
             .service(organization::es::org_index)
             .service(organization::es::org_license)
             .service(organization::es::org_xpack)
@@ -227,8 +233,22 @@ pub fn get_other_service_routes(cfg: &mut web::ServiceConfig) {
     let gcp_auth = HttpAuthentication::with_fn(validator_gcp);
     cfg.service(
         web::scope("/gcp")
-            .wrap(cors)
+            .wrap(cors.clone())
             .wrap(gcp_auth)
             .service(logs::ingest::handle_gcp_request),
+    );
+
+    //NOTE: Here the order of middlewares matter. Once we consume the api-token in `rum_auth`,
+    //we drop it in the RumExtraData data.
+    //https://docs.rs/actix-web/latest/actix_web/middleware/index.html#ordering
+    let rum_auth = HttpAuthentication::with_fn(validator_rum);
+    cfg.service(
+        web::scope("/rum")
+            .wrap(cors)
+            .wrap(from_fn(RumExtraData::extractor))
+            .wrap(rum_auth)
+            .service(rum::ingest::log)
+            .service(rum::ingest::sessionreplay)
+            .service(rum::ingest::data),
     );
 }

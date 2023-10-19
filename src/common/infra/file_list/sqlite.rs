@@ -326,10 +326,10 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
     }
 
     async fn reset_stream_stats(&self) -> Result<()> {
-        let pool = CLIENT.clone();
-        sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0;"#)
-             .execute(&pool)
-            .await?;
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::StreamStats(DbEventStreamStats::ResetAll))
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
@@ -580,6 +580,13 @@ pub async fn reset_stream_stats_min_ts(
     Ok(())
 }
 
+pub async fn reset_stream_stats(client: &Pool<Sqlite>) -> Result<()> {
+    sqlx::query(r#"UPDATE stream_stats SET file_num = 0, min_ts = 0, max_ts = 0, records = 0, original_size = 0, compressed_size = 0;"#)
+         .execute(client)
+        .await?;
+    Ok(())
+}
+
 pub async fn create_table(client: &Pool<Sqlite>) -> Result<()> {
     sqlx::query(
         r#"
@@ -676,17 +683,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (strea
     .execute(client)
     .await?;
 
-    // create trigger
-    sqlx::query(
-    r#"
-CREATE TRIGGER IF NOT EXISTS update_stream_stats_delete AFTER DELETE ON file_list
-    BEGIN
-        UPDATE stream_stats SET file_num = file_num - 1, records = records - OLD.records, original_size = original_size - OLD.original_size, compressed_size = compressed_size - OLD.compressed_size WHERE stream = OLD.stream;
-    END;
-        "#,
-    )
-    .execute(client)
-    .await?;
+    // delete trigger for old version
+    // compitable for old version <= 0.6.4
+    sqlx::query(r#"DROP TRIGGER IF EXISTS update_stream_stats_delete;"#)
+        .execute(client)
+        .await?;
 
     Ok(())
 }

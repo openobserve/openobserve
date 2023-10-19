@@ -30,6 +30,7 @@ mod compact;
 pub(crate) mod file_list;
 pub(crate) mod files;
 mod metrics;
+mod mmdb_downloader;
 mod prom;
 mod stats;
 pub(crate) mod syslog_server;
@@ -62,9 +63,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await;
     }
 
+    if !CONFIG.common.mmdb_disable_download {
+        // Try to download the mmdb files, if its not disabled.
+        tokio::task::spawn(async move { mmdb_downloader::run().await });
+    }
     // cache users
     tokio::task::spawn(async move { db::user::watch().await });
     db::user::cache().await.expect("user cache failed");
+
+    db::organization::cache()
+        .await
+        .expect("organization cache sync failed");
 
     //set instance id
     let instance_id = match db::get_instance().await {
@@ -99,6 +108,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::destinations::watch().await });
     tokio::task::spawn(async move { db::alerts::watch().await });
     tokio::task::spawn(async move { db::triggers::watch().await });
+    tokio::task::spawn(async move { db::organization::watch().await });
     tokio::task::yield_now().await; // yield let other tasks run
 
     // cache core metadata

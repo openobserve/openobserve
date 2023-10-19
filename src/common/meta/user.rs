@@ -35,6 +35,7 @@ impl UserRequest {
         salt: String,
         org: String,
         token: String,
+        rum_token: String,
     ) -> DBUser {
         DBUser {
             email: self.email.clone(),
@@ -45,6 +46,7 @@ impl UserRequest {
             organizations: vec![UserOrg {
                 name: org,
                 token,
+                rum_token: Some(rum_token),
                 role: self.role.clone(),
             }],
         }
@@ -85,6 +87,7 @@ impl DBUser {
             role: org.role.clone(),
             org: org.name.clone(),
             token: org.token.clone(),
+            rum_token: org.rum_token.clone(),
             salt: local.salt,
         })
     }
@@ -103,6 +106,7 @@ impl DBUser {
                     role: org.role,
                     org: org.name,
                     token: org.token,
+                    rum_token: org.rum_token,
                     salt: self.salt.clone(),
                 })
             }
@@ -122,6 +126,8 @@ pub struct User {
     pub salt: String,
     #[serde(default)]
     pub token: String,
+    #[serde(default)]
+    pub rum_token: Option<String>,
     pub role: UserRole,
     pub org: String,
 }
@@ -131,6 +137,8 @@ pub struct UserOrg {
     pub name: String,
     #[serde(default)]
     pub token: String,
+    #[serde(default)]
+    pub rum_token: Option<String>,
     #[serde(default)]
     pub role: UserRole,
 }
