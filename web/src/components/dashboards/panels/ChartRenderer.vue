@@ -56,8 +56,8 @@ export default defineComponent({
           // scroll legend upto current series index
           const legendOption = chart.getOption()?.legend[0];
 
-          if (legendOption && params?.seriesIndex) {
-                legendOption.scrollDataIndex = params?.seriesIndex;
+          if (legendOption) {
+                legendOption.scrollDataIndex = params?.seriesIndex || 0;
             chart?.setOption({ legend: [legendOption] });
           } 
         }
@@ -85,8 +85,8 @@ export default defineComponent({
           const legendOption = chart?.getOption()?.legend[0];
 
           // set options with selected object
-          if (legendOption && params?.selected) {
-            legendOption.selected = params.selected;
+          if (legendOption) {
+            legendOption.selected = params?.selected || 0;
             chart?.setOption({ legend: [legendOption] });
           }
         }
