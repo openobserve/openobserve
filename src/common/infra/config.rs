@@ -362,9 +362,9 @@ pub struct Limit {
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] //size in mb
     pub enrichment_table_limit: usize,
-    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] //size in mb
+    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] //in second
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] //size in mb
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] //in second
     pub keep_alive: u64,
 }
 
