@@ -19,9 +19,12 @@ use bytes::Bytes;
 use etcd_client::{
     Certificate, DeleteOptions, EventType, GetOptions, Identity, SortOrder, SortTarget, TlsOptions,
 };
-use std::sync::{
-    atomic::{AtomicU8, Ordering},
-    Arc,
+use std::{
+    cmp::min,
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
 };
 use tokio::{sync::mpsc, task::JoinHandle, time};
 
@@ -373,7 +376,7 @@ pub async fn keepalive_lease_id<F>(id: i64, ttl: i64, stopper: F) -> Result<()>
 where
     F: Fn() -> bool,
 {
-    let mut ttl_keep_alive = (ttl / 2) as u64;
+    let mut ttl_keep_alive = min(10, (ttl / 2) as u64);
     loop {
         if stopper() {
             break;
@@ -408,7 +411,7 @@ where
                             "lease expired or revoked".to_string(),
                         )));
                     }
-                    ttl_keep_alive = (ttl / 2) as u64;
+                    ttl_keep_alive = min(10, (ttl / 2) as u64);
                 }
                 Err(e) => {
                     log::error!("lease {:?} keep alive receive message: {:?}", id, e);
