@@ -683,6 +683,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (strea
     .execute(client)
     .await?;
 
+    // delete trigger for old version
+    sqlx::query(r#"DROP TRIGGER IF EXISTS update_stream_stats_delete;"#)
+        .execute(client)
+        .await?;
+
     Ok(())
 }
 
