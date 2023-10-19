@@ -243,12 +243,12 @@ pub async fn ingest(
             // only for bulk insert
             let mut status = RecordStatus::default();
             let local_trigger = super::add_valid_record(
-                StreamMeta {
+                &StreamMeta {
                     org_id: org_id.to_string(),
                     stream_name: stream_name.clone(),
-                    partition_keys,
-                    partition_time_level,
-                    stream_alerts_map: stream_alerts_map.clone(),
+                    partition_keys: &partition_keys,
+                    partition_time_level: &partition_time_level,
+                    stream_alerts_map: &stream_alerts_map,
                 },
                 &mut stream_schema_map,
                 &mut status,
@@ -296,9 +296,9 @@ pub async fn ingest(
         let mut stream_file_name = "".to_string();
 
         let mut req_stats = write_file(
-            stream_data.data,
+            &stream_data.data,
             thread_id,
-            StreamParams::new(org_id, &stream_name, StreamType::Logs),
+            &StreamParams::new(org_id, &stream_name, StreamType::Logs),
             &mut stream_file_name,
             None,
         )
@@ -319,7 +319,7 @@ pub async fn ingest(
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in &stream_trigger_map {
-        super::evaluate_trigger(Some(entry.clone()), stream_alerts_map.clone()).await;
+        super::evaluate_trigger(Some(entry.clone()), &stream_alerts_map).await;
     }
 
     metrics::HTTP_RESPONSE_TIME

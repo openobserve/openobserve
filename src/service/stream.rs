@@ -321,6 +321,47 @@ pub fn unwrap_partition_time_level(
     }
 }
 
+pub async fn delete_fields(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: Option<StreamType>,
+    fields: &[String],
+) -> Result<(), anyhow::Error> {
+    if !CONFIG.common.widening_schema_evolution {
+        return Err(anyhow::anyhow!(
+            "widening schema evolution is disabled, can't delete fields"
+        ));
+    }
+    if fields.is_empty() {
+        return Ok(());
+    }
+    let schema =
+        db::schema::get_from_db(org_id, stream_name, stream_type.unwrap_or_default()).await?;
+    let fields = schema
+        .all_fields()
+        .into_iter()
+        .filter_map(|f| {
+            if !fields.contains(f.name()) {
+                Some(f.clone())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    let schema = Schema::new(fields);
+    let min_ts = chrono::Utc::now().timestamp_micros();
+    db::schema::set(
+        org_id,
+        stream_name,
+        stream_type.unwrap_or_default(),
+        &schema,
+        Some(min_ts),
+        true,
+    )
+    .await?;
+    Ok(())
+}
+
 /// get stream stats from usage report
 async fn _get_stream_stats(
     org_id: &str,

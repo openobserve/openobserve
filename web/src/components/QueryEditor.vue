@@ -42,6 +42,7 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
+import useLogs from "@/composables/useLogs";
 
 export default defineComponent({
   props: {
@@ -79,6 +80,7 @@ export default defineComponent({
     const store = useStore();
     const editorRef: any = ref();
     let editorObj: any = null;
+    const { searchObj } = useLogs();
 
     let provider: Ref<monaco.IDisposable | null> = ref(null);
 
@@ -184,6 +186,14 @@ export default defineComponent({
         },
         "ctrlenter"
       );
+
+      editorObj.onDidFocusEditorWidget(() => {
+        searchObj.meta.queryEditorPlaceholderFlag = false;
+      });
+
+      editorObj.onDidBlurEditorWidget(() => {
+        searchObj.meta.queryEditorPlaceholderFlag = true;
+      });
 
       window.addEventListener("click", () => {
         editorObj.layout();
@@ -306,8 +316,22 @@ export default defineComponent({
       disableSuggestionPopup,
       triggerAutoComplete,
       getCursorIndex,
+      searchObj,
     };
   },
+  computed: {
+    editorFocus() {
+      return this.editorRef;
+    },
+  },
+  watch: {
+    editorFocus: {
+      handler: function (newVal, oldVal) {
+        console.log(newVal, oldVal);
+      },
+      immediate: true,
+    },
+    },
 });
 </script>
 

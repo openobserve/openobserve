@@ -207,6 +207,8 @@ pub struct TCP {
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
+    #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
+    pub ingester_srv_url: String,
 }
 
 #[derive(EnvConfig)]
@@ -366,6 +368,10 @@ pub struct Limit {
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] //size in mb
     pub enrichment_table_limit: usize,
+    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] //in second
+    pub request_timeout: u64,
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] //in second
+    pub keep_alive: u64,
 }
 
 #[derive(EnvConfig)]
@@ -474,6 +480,8 @@ pub struct Etcd {
     pub domain_name: String,
     #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
+    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 30)]
+    pub node_heartbeat_ttl: i64,
 }
 
 #[derive(EnvConfig)]

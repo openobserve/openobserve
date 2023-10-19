@@ -60,6 +60,18 @@ pub async fn search(
                 files.retain(|x| x != file);
             }
             Ok(file_data) => {
+                let mut file_data = file_data;
+                // check json file is complete
+                if !file_data.ends_with(b"\n") {
+                    if let Ok(s) = String::from_utf8(file_data.clone()) {
+                        if let Some(last_line) = s.lines().last() {
+                            if serde_json::from_str::<serde_json::Value>(last_line).is_err() {
+                                // remove last line
+                                file_data = file_data[..file_data.len() - last_line.len()].to_vec();
+                            }
+                        }
+                    }
+                }
                 scan_stats.original_size += file_data.len() as i64;
                 let file_key = file.key.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
                 let file_name = format!("/{work_dir}/{file_key}");

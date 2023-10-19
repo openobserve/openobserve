@@ -162,7 +162,7 @@
               :suggestions="autoCompleteSuggestions"
               @update:query="updateQueryValue"
               @run-query="handleRunQuery"
-              :class="searchObj.data.editorValue == '' ? 'empty-query' : ''"
+              :class="searchObj.data.editorValue == '' && searchObj.meta.queryEditorPlaceholderFlag ? 'empty-query' : ''"
             ></query-editor>
           </template>
           <template #after>
@@ -176,7 +176,7 @@
                 id="fnEditor"
                 style="height: 100%"
                 :class="
-                  searchObj.data.tempFunctionContent == ''
+                  searchObj.data.tempFunctionContent == '' && searchObj.meta.functionEditorPlaceholderFlag
                     ? 'empty-function'
                     : ''
                 "
@@ -510,6 +510,14 @@ export default defineComponent({
         // saveFunction(fnEditorobj.getValue());
       });
 
+      fnEditorobj.onDidFocusEditorWidget(() => {
+        searchObj.meta.functionEditorPlaceholderFlag = false;
+      });
+
+      fnEditorobj.onDidBlurEditorWidget(() => {
+        searchObj.meta.functionEditorPlaceholderFlag = true;
+      });
+
       fnEditorobj.layout();
     };
 
@@ -791,7 +799,7 @@ export default defineComponent({
     },
     toggleFunction(newVal) {
       if (newVal == false) {
-        this.searchObj.config.fnSplitterModel = 100;
+        this.searchObj.config.fnSplitterModel = 99.5;
         this.resetFunctionContent();
       } else {
         this.searchObj.config.fnSplitterModel = 60;
@@ -840,7 +848,7 @@ export default defineComponent({
 .empty-query .monaco-editor-background {
   background-image: url("../../assets/images/common/query-editor.png");
   background-repeat: no-repeat;
-  background-size: 170px;
+  background-size: 115px;
 }
 
 .empty-function .monaco-editor-background {

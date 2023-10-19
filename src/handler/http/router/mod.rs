@@ -130,6 +130,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::values)
             .service(stream::schema)
             .service(stream::settings)
+            .service(stream::delete_fields)
             .service(stream::delete)
             .service(stream::list)
             .service(functions::save_function)
