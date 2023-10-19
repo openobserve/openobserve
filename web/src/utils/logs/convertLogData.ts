@@ -6,7 +6,6 @@ export const convertLogData = (
 
   const options: any = {
     title: {
-      text: params.title,
       left: "center",
       textStyle: {
         fontSize: 12,
