@@ -24,10 +24,7 @@ import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnit
 export const convertSQLData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any,
-  params: any = {
-    timezone:"UTC"
-  }
+  store: any
 ) => {
 
   // if no data than return it
@@ -905,9 +902,9 @@ export const convertSQLData = (
       // if no then create new datetime object and get in milliseconds using getTime method      
       options.series.map((seriesObj: any) => {
         seriesObj.data = seriesObj.data.map((it: any, index: any) => [
-          params.timezone != "UTC"
+          store.state.timezone != "UTC"
             ? utcToZonedTime( Number.isInteger(options.xAxis[0].data[index])
-              ? options.xAxis[0].data[index] : new Date(options.xAxis[0].data[index]).getTime(), params?.timezone) 
+              ? options.xAxis[0].data[index] : new Date(options.xAxis[0].data[index]).getTime(), store.state.timezone) 
             : new Date(options.xAxis[0].data[index]).toISOString().slice(0, -1),
           it,
         ]);
@@ -1003,7 +1000,7 @@ export const convertSQLData = (
     if (isTimeSeries) {
       options.series.map((seriesObj: any) => {
         seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-          params.timezone != "UTC" ? utcToZonedTime( new Date(options.xAxis[0].data[index] + "Z").getTime(), params?.timezone) : new Date(options.xAxis[0].data[index]).getTime(),
+          store.state.timezone != "UTC" ? utcToZonedTime( new Date(options.xAxis[0].data[index] + "Z").getTime(), store.state.timezone) : new Date(options.xAxis[0].data[index]).getTime(),
           it,
         ]);
       });
