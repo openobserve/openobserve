@@ -162,6 +162,8 @@ export const convertSQLData = (
       textStyle: {
         fontSize: 12,
       },
+      enterable: true,
+      extraCssText: "max-height: 200px; overflow: auto;",
       axisPointer: {
         type: "cross",
         label: {
