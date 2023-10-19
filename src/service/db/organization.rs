@@ -64,7 +64,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             .await
             .insert(key, json_val);
     }
-    log::info!("Organization settings Cached {:?}", &ORGANIZATION_SETTING);
+    log::info!("Organization settings Cached");
     Ok(())
 }
 

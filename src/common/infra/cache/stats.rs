@@ -15,6 +15,7 @@
 use once_cell::sync::Lazy;
 
 use crate::common::infra::config::RwHashMap;
+use crate::common::meta::common::FileMeta;
 use crate::common::meta::stream::StreamStats;
 use crate::common::meta::StreamType;
 
@@ -48,6 +49,40 @@ pub fn set_stream_stats(
 ) {
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     STATS.insert(key, val);
+}
+
+#[inline]
+pub fn incr_stream_stats(key: &str, val: &FileMeta) -> Result<(), anyhow::Error> {
+    if val.records == 0 {
+        return Ok(());
+    }
+
+    // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
+    let columns = key.split('/').collect::<Vec<&str>>();
+    if columns.len() < 9 {
+        return Err(anyhow::anyhow!(
+            "[incr_stream_stats] Invalid file path: {}",
+            key
+        ));
+    }
+    // let _ = columns[0];
+    let org_id = columns[1];
+    let stream_type = columns[2];
+    let stream_name = columns[3];
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
+    let mut stats = STATS.entry(key).or_default();
+    if stats.doc_time_min > val.min_ts || stats.doc_time_min == 0 {
+        stats.doc_time_min = val.min_ts;
+    }
+    if stats.doc_time_max < val.max_ts {
+        stats.doc_time_max = val.max_ts;
+    }
+    stats.doc_num += val.records;
+    stats.file_num += 1;
+    stats.storage_size += val.original_size as f64;
+    stats.compressed_size += val.compressed_size as f64;
+
+    Ok(())
 }
 
 #[inline]
