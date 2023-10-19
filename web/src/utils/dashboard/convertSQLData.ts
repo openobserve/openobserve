@@ -19,11 +19,15 @@
 * @param {any} store - the store object
 * @return {Object} - the options object for rendering the chart
 */
+import { utcToZonedTime } from "date-fns-tz";
 import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 export const convertSQLData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any
+  store: any,
+  params: any = {
+    timezone:"UTC"
+  }
 ) => {
 
   // if no data than return it
@@ -895,9 +899,16 @@ export const convertSQLData = (
 
     //if x axis has time series
     if (field) {
+      // if timezone is UTC then simply return x axis value which will be in UTC (note that need to remove Z from timezone string)
+      // else check if xaxis value is interger(ie time will be in milliseconds)
+      // if yes then return to convert into other timezone
+      // if no then create new datetime object and get in milliseconds using getTime method      
       options.series.map((seriesObj: any) => {
         seriesObj.data = seriesObj.data.map((it: any, index: any) => [
-          Number.isInteger(options.xAxis[0].data[index]) ? options.xAxis[0].data[index] : new Date(options.xAxis[0].data[index]+ "Z").getTime(),
+          params.timezone != "UTC"
+            ? utcToZonedTime( Number.isInteger(options.xAxis[0].data[index])
+              ? options.xAxis[0].data[index] : new Date(options.xAxis[0].data[index]).getTime(), params?.timezone) 
+            : new Date(options.xAxis[0].data[index]).toISOString().slice(0, -1),
           it,
         ]);
       });
@@ -992,7 +1003,7 @@ export const convertSQLData = (
     if (isTimeSeries) {
       options.series.map((seriesObj: any) => {
         seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-          new Date(options.xAxis[0].data[index] + "Z").getTime(),
+          params.timezone != "UTC" ? utcToZonedTime( new Date(options.xAxis[0].data[index] + "Z").getTime(), params?.timezone) : new Date(options.xAxis[0].data[index]).getTime(),
           it,
         ]);
       });
