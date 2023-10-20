@@ -96,6 +96,10 @@ export default defineComponent({
           chart?.dispose();  
           chart = echarts.init(chartRef.value, theme);
           const options = props.data.options || {}
+
+          // change color and background color of tooltip
+          options.tooltip && options.tooltip.textStyle && (options.tooltip.textStyle.color = theme === 'dark' ? '#fff' : '#000');
+          options.tooltip && (options.tooltip.backgroundColor = theme === 'dark' ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
           options.animation = false
           chart?.setOption(options, true);
           chart?.setOption({animation: true});

@@ -19,7 +19,6 @@ import "@quasar/extras/roboto-font/roboto-font.css";
 import "@quasar/extras/material-icons/material-icons.css";
 
 import * as Sentry from "@sentry/vue";
-import { BrowserTracing } from "@sentry/tracing";
 
 import store from "./stores";
 import App from "./App.vue";
@@ -35,7 +34,10 @@ const router = createRouter(store);
 
 app
   .use(Quasar, {
-    plugins: [Dialog, Notify], // import Quasar plugins and add here
+    plugins: {
+      Dialog,
+      Notify,
+    },
   })
   .use(i18n);
 
@@ -52,7 +54,7 @@ const getConfig = async () => {
         app,
         dsn: config.sentryDSN,
         integrations: [
-          new BrowserTracing({
+          new Sentry.BrowserTracing({
             routingInstrumentation: Sentry.vueRouterInstrumentation(router),
             tracingOrigins: [
               "localhost",

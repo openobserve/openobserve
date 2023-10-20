@@ -27,7 +27,7 @@
         </div>
         <div class="col-auto">
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             round
             flat
             icon="cancel"
@@ -133,7 +133,7 @@
                     name="'img:' + getImageURL('images/common/add_icon.svg')"
                   >
                     <q-list data-test="field-list-modal">
-                      <q-item clickable v-close-popup>
+                      <q-item clickable v-close-popup="true">
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-include-field-btn"
@@ -154,7 +154,7 @@
                         </q-item-section>
                       </q-item>
 
-                      <q-item clickable v-close-popup>
+                      <q-item clickable v-close-popup="true">
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-exclude-field-btn"
