@@ -470,6 +470,7 @@ async fn write_file_list_db_only(events: &[FileKey]) -> Result<(), anyhow::Error
 }
 
 async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
+    // write new data into file_list
     let (_stream_key, date_key, _file_name) =
         infra_file_list::parse_file_key_columns(&events.first().unwrap().key)?;
     // upload the new file_list to storage
@@ -482,6 +483,29 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
     }
     let compressed_bytes = buf.finish().unwrap();
     storage::put(&new_file_list_key, compressed_bytes.into()).await?;
+
+    // write deleted files into file_list_deleted
+    let del_items = events
+        .iter()
+        .filter(|v| v.deleted)
+        .map(|v| v.key.clone())
+        .collect::<Vec<_>>();
+    if !del_items.is_empty() {
+        // upload to storage
+        let deleted_file_list_key = format!(
+            "file_list_deleted/{}/{}.json.zst",
+            date_key,
+            ider::generate()
+        );
+        let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
+        for file in del_items.iter() {
+            let mut write_buf = json::to_vec(&file)?;
+            write_buf.push(b'\n');
+            buf.write_all(&write_buf)?;
+        }
+        let compressed_bytes = buf.finish().unwrap();
+        storage::put(&deleted_file_list_key, compressed_bytes.into()).await?;
+    }
 
     // set to local cache & send broadcast
     // retry 5 times
