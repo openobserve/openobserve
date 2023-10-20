@@ -1049,7 +1049,7 @@ export const convertSQLData = (
   }
 
   //check if is there any data else filter out axis or series data
-  options.series = options.series.filter((it: any) => it.data.length);
+  options.series = options.series.filter((it: any) => it.data?.length);
   if(panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"){
     options.xAxis = options.series.length ? options.xAxis : {};
   }else{
