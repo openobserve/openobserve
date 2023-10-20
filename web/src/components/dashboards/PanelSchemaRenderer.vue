@@ -34,9 +34,9 @@
     <div
       v-if="loading"
       class="row"
-      style="position: absolute; top: 0px; width: 100%"
+      style="position: absolute; top: 0px; width: 100%; z-index: 999;"
     >
-      <q-spinner-dots color="primary" size="40px" style="margin: 0 auto" />
+      <q-spinner-dots color="primary" size="40px" style="margin: 0 auto; z-index: 999;" />
     </div>
   </div>
 </template>

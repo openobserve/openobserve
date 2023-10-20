@@ -62,7 +62,6 @@ export const convertPromQLData = (
       textStyle: {
         fontSize: 12,
       },
-      backgroundColor: "rgba(255,255,255,0.8)",
     },
     textStyle: {
       width: 150,
@@ -108,9 +107,11 @@ export const convertPromQLData = (
       show: true,
       trigger: "axis",
       textStyle: {
+        color: store.state.theme === "dark" ? "#fff" : "#000",
         fontSize: 12,
       },
       enterable: true,
+      backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
       extraCssText: "max-height: 200px; overflow: auto;",
       formatter: function (name: any) {
         if (name.length == 0) return "";
