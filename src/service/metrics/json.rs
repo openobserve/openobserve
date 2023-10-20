@@ -32,7 +32,8 @@ use crate::common::{
 };
 use crate::service::{
     db, format_stream_name, ingestion::get_wal_time_key, ingestion::write_file,
-    stream::unwrap_partition_time_level, usage::report_request_usage_stats,
+    schema::filter_schema_null_fields, stream::unwrap_partition_time_level,
+    usage::report_request_usage_stats,
 };
 
 pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
@@ -167,7 +168,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             let mut schema = db::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
             if schema.fields().is_empty() {
                 let mut schema_reader = BufReader::new(record_str.as_bytes());
-                schema = infer_json_schema(&mut schema_reader, None).unwrap();
+                let mut inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
+                filter_schema_null_fields(&mut inferred_schema);
                 let metadata = Metadata {
                     metric_family_name: stream_name.clone(),
                     metric_type: metrics_type.as_str().into(),
@@ -179,7 +181,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                     METADATA_LABEL.to_string(),
                     json::to_string(&metadata).unwrap(),
                 );
-                schema = schema.with_metadata(extra_metadata);
+                schema = inferred_schema.with_metadata(extra_metadata);
                 db::schema::set(
                     org_id,
                     &stream_name,

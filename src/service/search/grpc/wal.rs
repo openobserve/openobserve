@@ -34,6 +34,7 @@ use crate::common::{
 };
 use crate::service::{
     db,
+    schema::filter_schema_null_fields,
     search::{
         datafusion::{exec, storage::StorageType},
         sql::Sql,
@@ -150,6 +151,7 @@ pub async fn search(
                 return Err(Error::from(err));
             }
         };
+        filter_schema_null_fields(&mut inferred_schema);
         // calulate schema diff
         let mut diff_fields = HashMap::new();
         let group_fields = inferred_schema.fields();

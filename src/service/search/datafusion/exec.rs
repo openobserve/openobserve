@@ -55,6 +55,7 @@ use crate::common::{
     },
     utils::{flatten, json},
 };
+use crate::service::schema::filter_schema_null_fields;
 use crate::service::search::sql::Sql;
 
 use super::storage::{file_list, StorageType};
@@ -1109,14 +1110,12 @@ fn apply_query_fn(
                 })
                 .collect();
 
-            /*  let first_rec = json::to_string(&rows_val.first()).unwrap();
-            let mut schema_reader = std::io::BufReader::new(first_rec.as_bytes());
-            let inf_schema = arrowJson::reader::infer_json_schema(&mut schema_reader, None)?; */
             let value_iter = rows_val.iter().map(Ok);
-            let inf_schema =
+            let mut inferred_schema =
                 arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap();
+            filter_schema_null_fields(&mut inferred_schema);
             let mut decoder =
-                arrow::json::ReaderBuilder::new(Arc::new(inf_schema)).build_decoder()?;
+                arrow::json::ReaderBuilder::new(Arc::new(inferred_schema)).build_decoder()?;
 
             for value in rows_val {
                 decoder

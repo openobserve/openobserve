@@ -23,7 +23,9 @@ use crate::common::{
     utils::{json, stream::populate_file_meta},
 };
 use crate::service::{
-    db, schema::schema_evolution, search::datafusion::new_parquet_writer,
+    db,
+    schema::{filter_schema_null_fields, schema_evolution},
+    search::datafusion::new_parquet_writer,
     usage::report_compression_stats,
 };
 
@@ -160,8 +162,9 @@ async fn upload_file(
     let mut res_records: Vec<json::Value> = vec![];
     let mut schema_reader = BufReader::new(buf.as_ref());
     let inferred_schema = match infer_json_schema(&mut schema_reader, None) {
-        Ok(inferred_schema) => {
+        Ok(mut inferred_schema) => {
             drop(schema_reader);
+            filter_schema_null_fields(&mut inferred_schema);
             inferred_schema
         }
         Err(err) => {
@@ -189,7 +192,10 @@ async fn upload_file(
                 return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
             }
             let value_iter = res_records.iter().map(Ok);
-            arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap()
+            let mut inferred_schema =
+                arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap();
+            filter_schema_null_fields(&mut inferred_schema);
+            inferred_schema
         }
     };
     let arrow_schema = Arc::new(inferred_schema);
