@@ -19,6 +19,7 @@ use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use std::sync::Arc;
 
 use super::Engine;
+use crate::common::infra::config::FxIndexMap;
 use crate::common::meta::prom::NAME_LABEL;
 use crate::service::promql::value::{Label, Labels, LabelsExt, Signature, Value};
 
@@ -237,7 +238,7 @@ pub async fn eval_top(
         }
     };
 
-    let mut score_values: HashMap<Signature, Vec<TopItem>> = HashMap::default();
+    let mut score_values: FxIndexMap<Signature, Vec<TopItem>> = Default::default();
     match modifier {
         Some(v) => match v {
             LabelModifier::Include(labels) => {
