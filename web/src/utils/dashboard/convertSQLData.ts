@@ -107,7 +107,6 @@ export const convertSQLData = (
       textStyle: {
         fontSize: 12,
       },
-      backgroundColor: "rgba(255,255,255,0.8)",
     },
     textStyle: {
       width: 100,
@@ -160,9 +159,11 @@ export const convertSQLData = (
     tooltip: {
       trigger: "axis",
       textStyle: {
+        color: store.state.theme === "dark" ? "#fff" : "#000",
         fontSize: 12,
       },
       enterable: true,
+      backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
       extraCssText: "max-height: 200px; overflow: auto;",
       axisPointer: {
         type: "cross",
@@ -551,8 +552,10 @@ export const convertSQLData = (
       options.tooltip = {
         trigger: "item",
         textStyle: {
+          color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
         },
+        backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
         formatter: function (name: any) {
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
@@ -588,8 +591,10 @@ export const convertSQLData = (
       options.tooltip = {
         trigger: "item",
         textStyle: {
+          color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
         },
+        backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
         formatter: function (name: any) {
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
@@ -744,8 +749,10 @@ export const convertSQLData = (
       (options.tooltip = {
         position: "top",
         textStyle: {
+        color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
         },
+        backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
         formatter: (params: any) => {
           // we have value[1] which return yaxis index
           // it is used to get y axis data
