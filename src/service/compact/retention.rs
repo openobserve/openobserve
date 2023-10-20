@@ -194,7 +194,7 @@ pub async fn delete_by_date(
     let mut date_start =
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc);
     let date_end =
-        DateTime::parse_from_rfc3339(&format!("{}T23:59:59Z", date_range.1))?.with_timezone(&Utc);
+        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc);
     let time_range = { (date_start.timestamp_micros(), date_end.timestamp_micros()) };
 
     if is_local_disk_storage() {
