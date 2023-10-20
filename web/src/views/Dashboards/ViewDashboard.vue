@@ -82,7 +82,7 @@
     </div>
     <q-separator></q-separator>
     <RenderDashboardCharts
-      @variablesData="variablesDataUpdated" :variableValues="variablesData" :viewOnly="false"
+      @variablesData="variablesDataUpdated" :initialVariableValues="initialVariableValues" :viewOnly="false"
       :dashboardData="currentDashboardData.data"
       :currentTimeObj="currentTimeObj"
       @onDeletePanel="onDeletePanel"
@@ -147,13 +147,25 @@ export default defineComponent({
       data.values.forEach((v) => {
         variableObj[`var-${v.name}`] = v.value;
       });
-       router.replace({
+      router.replace({
         query: {
           ...route.query,
           ...variableObj,
         },
       });
     }
+
+    // ======= [START] default variable values
+    
+    const initialVariableValues = {};
+    Object.keys(route.query).forEach(key => {
+      if (key.startsWith('var-')) {
+        const newKey = key.slice(4);
+        initialVariableValues[newKey] = route.query[key];
+      }
+    });
+    // ======= [END] default variable values
+
 
     onActivated(async () => {
       await loadDashboard();
@@ -231,7 +243,7 @@ export default defineComponent({
     };
 
     // [END] date picker related variables
-
+    
     // back button to render dashboard List page
     const goBackToDashboardList = () => {
       return router.push({
@@ -319,6 +331,7 @@ export default defineComponent({
       showDashboardSettingsDialog,
       openSettingsDialog,
       loadDashboard,
+      initialVariableValues,
       getQueryParamsForDuration,
     };
   },

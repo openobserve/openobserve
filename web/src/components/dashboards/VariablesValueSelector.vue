@@ -48,7 +48,7 @@ import VariableQueryValueSelector from './settings/VariableQueryValueSelector.vu
 
 export default defineComponent({
     name: "VariablesValueSelector",
-    props: ["selectedTimeDate", "variablesConfig", "variableValues"],
+    props: ["selectedTimeDate", "variablesConfig", "initialVariableValues"],
     emits: ["variablesData"],
     components: {
       VariableQueryValueSelector
@@ -60,6 +60,7 @@ export default defineComponent({
             isVariablesLoading: false,
             values: []
         });
+        console.log("variablesData from the setup", JSON.stringify(variablesData.values));
         onMounted(() => {
             getVariablesData();
         });
@@ -73,11 +74,14 @@ export default defineComponent({
 
         const emitVariablesData = () => {
             emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
+            console.log("variablesData", JSON.parse(JSON.stringify(variablesData.values)));
+            
         };
 
         const getVariablesData = async () => {
             // do we have variables & date?
             if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
+                console.log('broken return');
                 
                 variablesData.values = [];
                 variablesData.isVariablesLoading = false;
@@ -86,7 +90,15 @@ export default defineComponent({
             }
             
             // get old variable values
-            const oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
+            let oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
+            if(!oldVariableValue.length) {
+                oldVariableValue = Object.keys(props.initialVariableValues).map((key: any) => ({
+                    name: key,
+                    value: props.initialVariableValues[key],
+                }))
+            }
+            console.log('old values' , JSON.stringify(oldVariableValue));
+            
             // continue as we have variables
             
             // reset the values
@@ -121,6 +133,8 @@ export default defineComponent({
                                     .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key : "null");
                                 // find old value is exists in the dropdown
                                 let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
+                                console.log("oldVariableObjectSelectedValue", oldVariableObjectSelectedValue);
+                                
                                 // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
                                 if (oldVariableObjectSelectedValue) {
                                     obj.value = obj.options.includes(oldVariableObjectSelectedValue.value) ? oldVariableObjectSelectedValue.value : obj.options.length ? obj.options[0] : "";
