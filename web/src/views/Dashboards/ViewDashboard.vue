@@ -250,9 +250,15 @@ export default defineComponent({
         refreshInterval.value = parseDuration(params.refresh)
       }
 
-      if (params.period || (params.to && params.from)) {
-        selectedDate.value = getSelectedDateFromQueryParams(params)
-      }
+      // if (params.period || (params.to && params.from)) {
+      //   console.log("params.period", params.period);
+      //   console.log("params.to", params.to);
+      //   console.log("params.from", params.from);
+        
+      //   selectedDate.value = getSelectedDateFromQueryParams(params)
+        
+      //   selectedDate.value = getSelectedDateFromQueryParams(params)
+      // }
 
       // resize charts if needed
       await nextTick();
