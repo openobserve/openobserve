@@ -154,7 +154,7 @@
         >
           <template #before>
             <query-editor
-              id="logsQueryEditor"
+              editor-id="logsQueryEditor"
               ref="queryEditorRef"
               class="monaco-editor"
               v-model:query="searchObj.data.query"

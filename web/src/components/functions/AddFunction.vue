@@ -105,7 +105,7 @@
         }}</pre>
         <div class="flex justify-center q-mt-lg">
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             class="q-mb-md text-bold"
             :label="t('function.cancel')"
             text-color="light-text"

@@ -81,8 +81,7 @@
             {{ t("billing.manageCards") }}
           </div>
           <q-space />
-          <q-btn icon="close"
-flat round dense v-close-popup />
+          <q-btn icon="close" flat round dense v-close-popup="true" />
         </q-card-section>
         <q-card-section>
           <iframe
@@ -107,8 +106,7 @@ flat round dense v-close-popup />
             {{ t("billing.subscriptionCheckout") }}
           </div>
           <q-space />
-          <q-btn icon="close"
-flat round dense v-close-popup />
+          <q-btn icon="close" flat round dense v-close-popup="true" />
         </q-card-section>
 
         <q-card-section>
@@ -142,12 +140,11 @@ flat round dense v-close-popup />
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn label="Cancel"
-color="secondary" v-close-popup />
+          <q-btn label="Cancel" color="secondary" v-close-popup="true" />
           <q-btn
             label="Confirm"
             color="primary"
-            v-close-popup
+            v-close-popup="true"
             @click="onUnsubscribe"
           />
         </q-card-actions>

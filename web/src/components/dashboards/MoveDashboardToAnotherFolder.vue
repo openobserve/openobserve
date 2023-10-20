@@ -23,12 +23,7 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup
-            round
-            flat
-            icon="cancel"
-          />
+          <q-btn v-close-popup="true" round flat icon="cancel" />
         </div>
       </div>
     </q-card-section>
@@ -50,11 +45,11 @@
         <span>&nbsp;</span>
 
         <!-- select folder or create new folder and select -->
-        <SelectFolderDropdown @folder-selected="selectedFolder = $event"/>
+        <SelectFolderDropdown @folder-selected="selectedFolder = $event" />
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             class="q-mb-md text-bold"
             :label="t('dashboard.cancel')"
             text-color="light-text"
@@ -90,15 +85,15 @@ import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
-  components:{ SelectFolderDropdown },
+  components: { SelectFolderDropdown },
   props: {
     activeFolderId: {
       type: String,
       default: "default",
     },
-    dashboardId:{
+    dashboardId: {
       type: String,
-      default: ""
+      default: "",
     },
   },
   emits: ["updated"],
@@ -107,21 +102,27 @@ export default defineComponent({
     const moveFolderForm: any = ref(null);
     //dropdown selected folder
     const selectedFolder = ref({
-      label: store.state.organizationData.folders.find((item: any) => item.folderId === props.activeFolderId).name,
-      value: props.activeFolderId
+      label: store.state.organizationData.folders.find(
+        (item: any) => item.folderId === props.activeFolderId
+      ).name,
+      value: props.activeFolderId,
     });
-    const { t } = useI18n(); 
+    const { t } = useI18n();
     const $q = useQuasar();
 
-    const onSubmit = useLoading(async () => {   
-
+    const onSubmit = useLoading(async () => {
       await moveFolderForm.value.validate().then(async (valid: any) => {
         if (!valid) {
           return false;
         }
 
         try {
-          await moveDashboardToAnotherFolder(store, props.dashboardId, props.activeFolderId, selectedFolder.value.value);
+          await moveDashboardToAnotherFolder(
+            store,
+            props.dashboardId,
+            props.activeFolderId,
+            selectedFolder.value.value
+          );
           $q.notify({
             type: "positive",
             message: "Dashboard Moved successfully",
@@ -130,18 +131,17 @@ export default defineComponent({
 
           emit("updated");
           moveFolderForm.value.resetValidation();
-
         } catch (err: any) {
           $q.notify({
             type: "negative",
             message: JSON.stringify(
               err.response.data.message || "Dashboard move failed."
-              ),
+            ),
             timeout: 2000,
           });
-        };
+        }
       });
-    })
+    });
 
     return {
       t,
@@ -149,8 +149,8 @@ export default defineComponent({
       store,
       getImageURL,
       selectedFolder,
-      onSubmit
+      onSubmit,
     };
-  }
+  },
 });
 </script>
