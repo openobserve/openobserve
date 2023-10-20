@@ -872,7 +872,13 @@ export const convertSQLData = (
   }
 
   // auto SQL: if x axis has time series
-  if(panelSchema.type != "h-bar"&& panelSchema.type != "h-stacked" && panelSchema.type != "heatmap" && panelSchema?.queries[0]?.customQuery == false){
+  if(panelSchema.type != "h-bar" &&
+    panelSchema.type != "h-stacked" &&
+    panelSchema.type != "heatmap" &&
+    panelSchema.type != "metric" &&
+    panelSchema.type != "pie" &&
+    panelSchema.type != "donut" &&
+    panelSchema?.queries[0]?.customQuery == false){
     // auto SQL: if x axis has time series(aggregation function is histogram)
     const field = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
@@ -959,7 +965,10 @@ export const convertSQLData = (
   if (
     panelSchema.type != "h-bar" &&
     panelSchema.type != "h-stacked" &&
-    panelSchema.type != "heatmap" &&
+    panelSchema.type != "heatmap" && 
+    panelSchema.type != "metric" &&
+    panelSchema.type != "pie" &&
+    panelSchema.type != "donut" &&
     panelSchema?.queries[0]?.customQuery == true &&
     options.xAxis.length > 0 &&
     options.xAxis[0].data.length > 0
@@ -1049,11 +1058,14 @@ export const convertSQLData = (
   }
 
   //check if is there any data else filter out axis or series data
-  options.series = options.series.filter((it: any) => it.data?.length);
-  if(panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"){
-    options.xAxis = options.series.length ? options.xAxis : {};
-  }else{
-    options.yAxis = options.series.length ? options.yAxis : {};
+  // for metric we does not have data field
+  if(panelSchema.type != "metric"){
+    options.series = options.series.filter((it: any) => it.data?.length);
+    if(panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"){
+      options.xAxis = options.series.length ? options.xAxis : {};
+    }else{
+      options.yAxis = options.series.length ? options.yAxis : {};
+    }
   }
   
   
