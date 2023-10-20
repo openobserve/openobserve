@@ -108,7 +108,7 @@ export default defineComponent({
           chart?.on("legendselectchanged",legendSelectChangedFn);
 
           // we need that toolbox datazoom button initally selected
-          chart.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
+          chart?.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
         });
 
         onMounted(async () => {
@@ -149,7 +149,7 @@ export default defineComponent({
             window.addEventListener("resize", windowResizeEventCallback);
 
             // we need that toolbox datazoom button initally selected
-            chart.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
+            chart?.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
         });
         onUnmounted(() => {
             window.removeEventListener("resize", windowResizeEventCallback);
@@ -160,7 +160,7 @@ export default defineComponent({
             windowResizeEventCallback();
 
             // we need that toolbox datazoom button initally selected
-            chart.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
+            chart?.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
         })
         
         watch(() => props.data.options, async () => {
@@ -171,7 +171,7 @@ export default defineComponent({
             // for that we required to dispatch an event
             // while dispatching an event we need to pass a datazoomselectactive as true
             // this action is available in the echarts docs in list of brush actions
-            chart.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
+            chart?.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
         }, { deep: true });
         return { chartRef };
     },
