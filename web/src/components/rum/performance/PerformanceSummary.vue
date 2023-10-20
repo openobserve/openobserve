@@ -17,42 +17,12 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
-    <div class="flex justify-between items-center q-py-sm q-px-md">
-      <div class="performance_title">Performance Monitoring</div>
-      <div class="flex items-center">
-        <DateTimePicker
-          class="q-ml-sm"
-          ref="refDateTime"
-          v-model="selectedDate"
-        />
-        <AutoRefreshInterval
-          v-model="refreshInterval"
-          trigger
-          @trigger="refreshData"
-        />
-        <q-btn
-          class="q-ml-sm"
-          outline
-          padding="xs"
-          no-caps
-          icon="refresh"
-          @click="refreshData"
-        >
-        </q-btn>
-        <ExportDashboard
-          :dashboardId="currentDashboardData.data?.dashboardId"
-        />
-      </div>
-    </div>
-    <AppTabs class="q-px-md" :tabs="tabs" v-model:active-tab="activeTab" />
-    <q-separator></q-separator>
-    <div class="q-mx-sm">
-      <RenderDashboardCharts
-        :viewOnly="viewOnly"
-        :dashboardData="currentDashboardData.data"
-        :currentTimeObj="currentTimeObj"
-      />
-    </div>
+    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" />
+    <RenderDashboardCharts
+      :viewOnly="viewOnly"
+      :dashboardData="currentDashboardData.data"
+      :currentTimeObj="currentTimeObj"
+    />
   </q-page>
 </template>
 
@@ -61,7 +31,6 @@
 import { defineComponent, ref, watch, onActivated, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import DateTimePicker from "@/components/DateTimePicker.vue";
 import { useRouter } from "vue-router";
 import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
 import {
@@ -72,18 +41,14 @@ import {
 } from "@/utils/date";
 import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
-import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
-import overviewDashboard from "@/utils/rum/overview.json";
 import AppTabs from "@/components/common/AppTabs.vue";
+import type { style } from "d3-selection";
 
 export default defineComponent({
-  name: "AppPerformance",
+  name: "PerformanceSummary",
   components: {
-    DateTimePicker,
-    AutoRefreshInterval,
-    ExportDashboard,
     RenderDashboardCharts,
     AppTabs,
   },
@@ -104,73 +69,38 @@ export default defineComponent({
     const currentTimeObj = ref({});
     const refreshInterval = ref(0);
     const selectedDate = ref();
-
-    // variables data
-    const variablesData = reactive({});
-    const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
-    };
-
     const activeTab = ref("overview");
-
-    const tabs = [
-      {
-        label: "Overview",
-        value: "overview",
-        style: {
-          width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
-        },
-      },
-      {
-        label: "Web Vitals",
-        value: "web_vitals",
-        style: {
-          width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
-        },
-      },
-      {
-        label: "Errors",
-        value: "errors",
-        style: {
-          width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
-        },
-      },
-      {
-        label: "API",
-        value: "api",
-        style: {
-          width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
-        },
-      },
-    ];
-
     onActivated(async () => {
-      console.log("onActivated");
       await loadDashboard();
     });
 
-    const loadDashboard = async () => {
-      currentDashboardData.data = overviewDashboard;
-
-      // if variables data is null, set it to empty list
-      if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
-      ) {
-        variablesData.isVariablesLoading = false;
-        variablesData.values = [];
-      }
-    };
+    const tabs = [
+      {
+        value: "overview",
+        label: "Overview",
+        style: {
+          "margin-left": "32px",
+          width: "100px",
+          padding: "8px 12px",
+        },
+      },
+      {
+        value: "web_vitals",
+        label: "Web Vitals",
+        style: {
+          width: "100px",
+          padding: "8px 12px",
+        },
+      },
+      {
+        value: "errors",
+        label: "Errors",
+        style: {
+          width: "100px",
+          padding: "8px 12px",
+        },
+      },
+    ];
 
     const addSettingsData = () => {
       showDashboardSettingsDialog.value = true;
@@ -267,11 +197,8 @@ export default defineComponent({
       selectedDate,
       viewOnly,
       eventLog,
-      variablesData,
-      variablesDataUpdated,
       addSettingsData,
       showDashboardSettingsDialog,
-      loadDashboard,
       tabs,
       activeTab,
     };
@@ -280,9 +207,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.performance_title {
-  font-size: 24px;
-}
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;

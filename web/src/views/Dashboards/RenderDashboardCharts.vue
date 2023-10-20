@@ -38,7 +38,7 @@
     </div>
     <div v-if="!dashboardData.panels?.length">
      <!-- if data not available show nodata component -->
-      <NoPanel @update:Panel="addPanelData" />
+      <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
     </div>
 </template>
 

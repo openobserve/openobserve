@@ -19,7 +19,7 @@
       <div
         class="q-px-lg q-py-sm rum-tab text-center"
         :style="tab.style"
-        :class="activeTab === tab.value ? 'active' : ''"
+        :class="activeTab === tab.value ? 'active text-primary' : ''"
         @click="changeTab(tab.value)"
       >
         {{ tab.label }}
