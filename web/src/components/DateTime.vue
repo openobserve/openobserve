@@ -325,6 +325,7 @@ export default defineComponent({
     watch(
       () => selectedType.value,
       (value) => {
+        console.log("selected type changed");
         displayValue.value = getDisplayValue();
         if (props.autoApply)
           saveDate(value === "absolute" ? "absolute" : "relative-custom");
@@ -339,7 +340,9 @@ export default defineComponent({
         selectedDate.value?.to;
       },
       () => {
-        if (props.autoApply) saveDate("absolute");
+        console.log("selected time changed");
+        if (props.autoApply && selectedType.value === "absolute")
+          saveDate("absolute");
       },
       { deep: true }
     );
@@ -442,6 +445,7 @@ export default defineComponent({
     };
 
     const saveDate = (dateType) => {
+      console.log("saveDate", dateType);
       displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
       datePayload.value = date;

@@ -15,31 +15,48 @@
 
 <template>
   <div style="height: 100%">
-    <div class="q-pa-none" style="max-width: 90px;">
+    <div class="q-pa-none" style="max-width: 90px">
       <q-list separator>
         <q-item
           :class="[
             'q-pa-none',
-            selectedChartType === item.id ? (store.state.theme === 'dark' ? 'bg-grey-5' : 'bg-grey-3') : ''
+            selectedChartType === item.id
+              ? store.state.theme === 'dark'
+                ? 'bg-grey-5'
+                : 'bg-grey-3'
+              : '',
           ]"
-
           v-for="(item, index) in ChartsArray"
-          :disable="promqlMode && item.id != 'line' && item.id != 'area' && item.id != 'bar' && item.id != 'scatter' && item.id != 'area-stacked' && item.id != 'metric'"
+          :disable="
+            promqlMode &&
+            item.id != 'line' &&
+            item.id != 'area' &&
+            item.id != 'bar' &&
+            item.id != 'scatter' &&
+            item.id != 'area-stacked' &&
+            item.id != 'metric'
+          "
           :key="index"
           clickable
-          v-ripple
+          v-ripple="true"
           @click="$emit('update:selectedChartType', item.id)"
         >
-          <q-item-section :data-test="`selected-chart-${item.id}-item`" class="">
+          <q-item-section
+            :data-test="`selected-chart-${item.id}-item`"
+            class=""
+          >
             <q-icon
               size="sm"
               color="primary"
               :name="item.image"
               class="q-mx-auto q-mb-sm"
             />
-            <q-item-label class="q-pa-none q-mx-auto" style="text-align: center" caption>{{
-              item.title
-            }}</q-item-label>
+            <q-item-label
+              class="q-pa-none q-mx-auto"
+              style="text-align: center"
+              caption
+              >{{ item.title }}</q-item-label
+            >
           </q-item-section>
         </q-item>
       </q-list>
@@ -129,27 +146,22 @@ export default defineComponent({
         id: "table",
       },
       {
-        image:
-          "img:" + getImageURL("images/dashboard/charts/123.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/123.png"),
         title: "Metric Text",
         id: "metric",
       },
     ]);
 
-    const {
-      promqlMode,
-      dashboardPanelData,
-    } = useDashboardPanelData()
+    const { promqlMode, dashboardPanelData } = useDashboardPanelData();
     return {
       ChartsArray: chartsArray,
       promqlMode,
       dashboardPanelData,
-      store
+      store,
     };
   },
   components: {},
 });
 </script>
 
-<style lang="sass" scoped>
-</style>
+<style lang="sass" scoped></style>

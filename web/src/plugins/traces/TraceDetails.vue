@@ -37,7 +37,7 @@
           </div>
           <div class="q-pb-xs">Spans: {{ spanList.length - 1 }}</div>
         </div>
-        <q-btn v-close-popup round flat icon="cancel" size="md" />
+        <q-btn v-close-popup="true" round flat icon="cancel" size="md" />
       </div>
       <q-separator style="width: 100%" />
       <div class="col-12 flex justify-between items-end q-px-sm q-pt-sm">
@@ -67,16 +67,16 @@
         </div>
       </div>
       <div class="col-12" v-if="activeVisual === 'timeline'">
-          <ChartRenderer
+        <ChartRenderer
           class="trace-details-chart"
           id="trace_details_gantt_chart"
           :data="ChartData"
           @updated:chart="updateChart"
-          style="height: 200px;"
+          style="height: 200px"
         />
       </div>
       <div class="col-12" v-else>
-        <ChartRenderer :data="traceServiceMap" style="height: 200px;"/>
+        <ChartRenderer :data="traceServiceMap" style="height: 200px" />
       </div>
       <q-separator style="width: 100%" class="q-mb-sm" />
       <div
@@ -148,7 +148,10 @@ import D3Chart from "@/components/D3Chart.vue";
 import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
-import { convertTimelineData,convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
+import {
+  convertTimelineData,
+  convertTraceServiceMapData,
+} from "@/utils/traces/convertTraceData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 
 export default defineComponent({
@@ -167,7 +170,7 @@ export default defineComponent({
     D3Chart,
     TraceTimelineIcon,
     ServiceMapIcon,
-    ChartRenderer
+    ChartRenderer,
   },
 
   setup() {
@@ -391,11 +394,11 @@ export default defineComponent({
             duration: span.durationMs,
             children: children,
             itemStyle: {
-              color: serviceColors[span.serviceName]
+              color: serviceColors[span.serviceName],
             },
-            emphasis:{
-              disabled: true
-            }
+            emphasis: {
+              disabled: true,
+            },
           });
           if (span.spans && span.spans.length) {
             span.spans.forEach((_span: any) =>
@@ -417,7 +420,9 @@ export default defineComponent({
       traceTree.value.forEach((span: any) => {
         getService(span, serviceTree, "", 1, 1);
       });
-      traceServiceMap.value = convertTraceServiceMapData(cloneDeep(serviceTree));      
+      traceServiceMap.value = convertTraceServiceMapData(
+        cloneDeep(serviceTree)
+      );
     };
 
     // Convert span object to required format
@@ -480,7 +485,7 @@ export default defineComponent({
       });
     };
     const buildTraceChart = () => {
-      const data :any = [];
+      const data: any = [];
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
           spanPositionList.value[i].startTimeMs -
@@ -499,7 +504,7 @@ export default defineComponent({
       traceChart.value.data = data;
       ChartData.value = convertTimelineData(traceChart);
     };
-    const updateChart = (data:any) => {
+    const updateChart = (data: any) => {
       timeRange.value.start = data.start || 0;
       timeRange.value.end = data.end || 0;
       calculateTracePosition();

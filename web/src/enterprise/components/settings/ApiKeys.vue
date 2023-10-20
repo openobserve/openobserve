@@ -111,9 +111,9 @@
             flat
             label="OK"
             @click="deleteUserKey(deleteID)"
-            v-close-popup
+            v-close-popup="true"
           />
-          <q-btn flat label="CANCLE" v-close-popup />
+          <q-btn flat label="CANCLE" v-close-popup="true" />
         </q-card-actions>
       </q-card>
     </q-dialog>

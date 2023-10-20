@@ -1,0 +1,62 @@
+{
+  "name": "rrweb-player",
+  "version": "2.0.0-alpha.11",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^22.0.0",
+    "@rollup/plugin-node-resolve": "^13.2.1",
+    "@rrweb/types": "^2.0.0-alpha.11",
+    "@types/offscreencanvas": "^2019.6.4",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-svelte3": "^4.0.0",
+    "postcss-easy-import": "^3.0.0",
+    "rollup": "^2.71.1",
+    "rollup-plugin-css-only": "^3.1.0",
+    "rollup-plugin-livereload": "^2.0.0",
+    "rollup-plugin-svelte": "^7.1.0",
+    "rollup-plugin-terser": "^7.0.2",
+    "rollup-plugin-typescript2": "^0.31.2",
+    "rollup-plugin-web-worker-loader": "^1.6.1",
+    "sirv-cli": "^0.4.4",
+    "svelte": "^3.59.2",
+    "svelte-check": "^3.0.1",
+    "svelte-preprocess": "^5.0.0",
+    "tslib": "^2.0.0"
+  },
+  "dependencies": {
+    "@tsconfig/svelte": "^1.0.0",
+    "rrweb": "^2.0.0-alpha.11"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "prepublishOnly": "yarn build",
+    "start": "sirv public",
+    "validate": "svelte-check",
+    "prepublish": "yarn build",
+    "lint": "yarn eslint src/**/*.ts"
+  },
+  "description": "rrweb's replayer UI",
+  "main": "lib/index.cjs",
+  "module": "dist/index.mjs",
+  "unpkg": "dist/index.js",
+  "files": [
+    "lib",
+    "dist",
+    "typings"
+  ],
+  "typings": "typings/index.d.ts",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rrweb-io/rrweb.git"
+  },
+  "keywords": [
+    "rrweb"
+  ],
+  "author": "yanzhen@smartx.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rrweb-io/rrweb/issues"
+  },
+  "homepage": "https://github.com/rrweb-io/rrweb#readme"
+}

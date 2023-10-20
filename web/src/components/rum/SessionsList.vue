@@ -1,0 +1,198 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http:www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License. 
+-->
+
+<template>
+  <div class="sessions_page">
+    <SearchBar></SearchBar>
+    <q-splitter
+      class="logs-horizontal-splitter full-height"
+      v-model="splitterModel"
+      unit="px"
+      vertical
+    >
+      <template #before>
+        <FieldList></FieldList>
+      </template>
+      <template #separator>
+        <q-avatar
+          color="primary"
+          text-color="white"
+          size="20px"
+          icon="drag_indicator"
+          style="top: 10px"
+        />
+      </template>
+      <template #after>
+        <AppTable
+          :columns="columns"
+          :rows="rows"
+          @event-emitted="handleTableEvents"
+        />
+      </template>
+    </q-splitter>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { date } from "quasar";
+import AppTable from "./AppTable.vue";
+import { formatDuration } from "@/utils/zincutils";
+import SearchBar from "./SearchBar.vue";
+import FieldList from "@/components/common/sidebar/FieldList.vue";
+import { useRouter } from "vue-router";
+
+interface SessionColumn {
+  name: string;
+  field: (row: any) => any;
+  prop: (row: any) => any;
+  label: string;
+  align: string;
+  sortable: boolean;
+}
+
+interface Session {
+  timestamp: string;
+  type: string;
+  time_spent: string;
+  error_count: string;
+  initial_view_name: string;
+  id: string;
+}
+
+const { t } = useI18n();
+
+const splitterModel = ref(250);
+const columns = ref([
+  {
+    name: "action_play",
+    field: "",
+    label: "",
+    type: "action",
+    icon: "play_circle_filled",
+    style: { width: "56px" },
+  },
+  {
+    name: "timestamp",
+    field: (row: any) => row["timestamp"],
+    prop: (row: any) => row["timestamp"],
+    label: "Timestamp",
+    align: "left",
+    sortable: true,
+  },
+  {
+    name: "type",
+    field: (row: any) => row["type"],
+    prop: (row: any) => row["type"],
+    label: "Session Type",
+    align: "left",
+    sortable: true,
+  },
+  {
+    name: "time_spent",
+    field: (row: any) => formatDuration(row["time_spent"] / 1000000),
+    label: "Time Spent",
+    align: "left",
+    sortable: true,
+    sort: (a: any, b: any, rowA: Session, rowB: Session) => {
+      return parseInt(rowA.time_spent) - parseInt(rowB.time_spent);
+    },
+  },
+  {
+    name: "error_count",
+    field: (row: any) => row["error_count"],
+    prop: (row: any) => row["error_count"],
+    label: "Error Count",
+    align: "left",
+    sortable: true,
+  },
+  {
+    name: "initial_view_name",
+    field: (row: any) => row["initial_view_name"],
+    prop: (row: any) => row["initial_view_name"],
+    label: "Intital View Name",
+    align: "left",
+    sortable: true,
+  },
+]);
+
+const rows = ref<Session[]>([]);
+const router = useRouter();
+
+const handleTableEvents = (event: string, payload: any) => {
+  const eventMapping: { [key: string]: (payload: any) => void } = {
+    "cell-click": handleCellClick,
+  };
+
+  eventMapping[event](payload);
+};
+
+const handleCellClick = (payload: any) => {
+  router.push({
+    name: "SessionViewer",
+    params: { id: payload.row.id },
+  });
+};
+</script>
+
+<style lang="scss">
+.sessions_page {
+  .index-menu .field_list .field_overlay .field_label,
+  .q-field__native,
+  .q-field__input,
+  .q-table tbody td {
+    font-size: 12px !important;
+  }
+
+  .q-splitter__after {
+    overflow: hidden;
+  }
+
+  .q-item__label span {
+    /* text-transform: capitalize; */
+  }
+
+  .index-table :hover::-webkit-scrollbar,
+  #tracesSearchGridComponent:hover::-webkit-scrollbar {
+    height: 13px;
+    width: 13px;
+  }
+
+  .index-table ::-webkit-scrollbar-track,
+  #tracesSearchGridComponent::-webkit-scrollbar-track {
+    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+  }
+
+  .index-table ::-webkit-scrollbar-thumb,
+  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+  }
+
+  .q-table__top {
+    padding: 0px !important;
+  }
+
+  .q-table__control {
+    width: 100%;
+  }
+
+  .q-field__control-container {
+    padding-top: 0px !important;
+  }
+}
+</style>

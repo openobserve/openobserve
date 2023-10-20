@@ -174,11 +174,11 @@
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             unelevated
             no-caps
             class="no-border"

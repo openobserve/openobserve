@@ -9,7 +9,7 @@
             </div>
           </div>
           <div class="col-auto">
-            <q-btn v-close-popup round flat icon="cancel" />
+            <q-btn v-close-popup="true" round flat icon="cancel" />
           </div>
         </div>
       </q-card-section>
@@ -78,7 +78,7 @@
           </template>
           <div class="q-mt-lg text-center">
             <q-btn
-              v-close-popup
+              v-close-popup="true"
               data-test="schema-cancel-button"
               class="q-mb-md text-bold"
               :label="t('metrics.cancel')"
@@ -119,7 +119,7 @@ export default defineComponent({
   emits: ["save"],
   setup(props, { emit }) {
     const store = useStore();
-    const route:any = useRoute();
+    const route: any = useRoute();
     const q = useQuasar();
     const dashboardList: Ref<any[]> = ref([]);
     const filteredDashboards: Ref<any[]> = ref([]);
@@ -134,21 +134,25 @@ export default defineComponent({
     onBeforeMount(() => {
       // if (!store.state.organizationData.allDashboardList[route.query.folder ?? "default"] ||
       //     store.state.organizationData.allDashboardList[route.query.folder ?? "default"].length == 0) {
-            // getAllDashboards(store, route.query.folder).then(() => {
+      // getAllDashboards(store, route.query.folder).then(() => {
       //       updateDashboardOptions();
       //   });
       // } else {
       //   updateDashboardOptions();
       // }
-        getAllDashboardsByFolderId(store, route.query.folder ?? "default").then(() => {
+      getAllDashboardsByFolderId(store, route.query.folder ?? "default").then(
+        () => {
           updateDashboardOptions();
-        })
+        }
+      );
     });
 
     const updateDashboardOptions = () => {
       dashboardList.value = [];
       filteredDashboards.value = [];
-      store.state.organizationData.allDashboardList[route?.query?.folder ?? "default"].forEach((dashboard: any) => {
+      store.state.organizationData.allDashboardList[
+        route?.query?.folder ?? "default"
+      ].forEach((dashboard: any) => {
         dashboardList.value.push({
           id: dashboard.dashboardId,
           label: dashboard.title,
