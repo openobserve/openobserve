@@ -23,7 +23,7 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup round flat icon="close" />
+          <q-btn v-close-popup="true" round flat icon="close" />
         </div>
       </div>
     </q-card-section>
@@ -164,7 +164,7 @@
           class="flex justify-center q-mt-sm"
         >
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             data-test="schema-cancel-button"
             class="q-mb-md text-bold"
             :label="t('logStream.cancel')"

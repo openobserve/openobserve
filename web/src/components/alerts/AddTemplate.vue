@@ -71,7 +71,7 @@
           <div class="col-12 flex justify-center q-mt-lg">
             <q-btn
               data-test="add-template-cancel-btn"
-              v-close-popup
+              v-close-popup="true"
               class="q-mb-md text-bold"
               :label="t('alerts.cancel')"
               text-color="light-text"

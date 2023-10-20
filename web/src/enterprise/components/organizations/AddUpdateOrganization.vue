@@ -25,17 +25,13 @@
           >
             {{ t("organization.updateOrganization") }}
           </div>
-          <div
-            v-else
-            class="text-body1 text-bold"
-            data-test="create-org"
-          >
+          <div v-else class="text-body1 text-bold" data-test="create-org">
             {{ t("organization.createOrganization") }}
           </div>
         </div>
         <div class="col-auto">
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             round
             flat
             icon="img:/src/assets/images/common/close_icon.svg"
@@ -72,7 +68,7 @@
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             class="q-mb-md text-bold"
             :label="t('organization.cancel')"
             text-color="light-text"
@@ -257,7 +253,7 @@ export default defineComponent({
                   action: "subscribe",
                   update_org: Date.now(),
                 },
-              })
+              });
             }
           })
           .catch((err: any) => {

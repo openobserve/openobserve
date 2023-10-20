@@ -16,7 +16,7 @@
 <template>
   <q-item
     :data-test="`menu-link-${link}-item`"
-    v-ripple
+    v-ripple="true"
     :to="
       !external
         ? {

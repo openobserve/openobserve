@@ -18,20 +18,11 @@
     <q-card-section class="q-px-md q-py-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div v-if="editMode" class="text-body1 text-bold">
-            Update Folder
-          </div>
-          <div v-else class="text-body1 text-bold">
-            New Folder
-          </div>
+          <div v-if="editMode" class="text-body1 text-bold">Update Folder</div>
+          <div v-else class="text-body1 text-bold">New Folder</div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup
-            round
-            flat
-            icon="cancel"
-          />
+          <q-btn v-close-popup="true" round flat icon="cancel" />
         </div>
       </div>
     </q-card-section>
@@ -48,7 +39,7 @@
           outlined
           filled
           dense
-          :rules="[(val) => !!(val.trim()) || t('dashboard.nameRequired')]"
+          :rules="[(val) => !!val.trim() || t('dashboard.nameRequired')]"
           :lazy-rules="true"
         />
         <span>&nbsp;</span>
@@ -66,7 +57,7 @@
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             class="q-mb-md text-bold"
             :label="t('dashboard.cancel')"
             text-color="light-text"
@@ -101,7 +92,7 @@ import { useLoading } from "@/composables/useLoading";
 
 const defaultValue = () => {
   return {
-    folderId:"",
+    folderId: "",
     name: "",
     description: "",
   };
@@ -116,15 +107,25 @@ export default defineComponent({
     },
     editMode: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   emits: ["update:modelValue"],
-  setup(props, {emit}) {
+  setup(props, { emit }) {
     const store: any = useStore();
     const addFolderForm: any = ref(null);
     const disableColor: any = ref("");
-    const folderData: any = ref(props.editMode ? JSON.parse(JSON.stringify(store.state.organizationData.folders.find((item: any) => item.folderId === props.folderId))) : defaultValue());
+    const folderData: any = ref(
+      props.editMode
+        ? JSON.parse(
+            JSON.stringify(
+              store.state.organizationData.folders.find(
+                (item: any) => item.folderId === props.folderId
+              )
+            )
+          )
+        : defaultValue()
+    );
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const $q = useQuasar();
@@ -137,8 +138,12 @@ export default defineComponent({
 
         try {
           //if edit mode
-          if(props.editMode) {            
-            await updateFolder(store, folderData.value.folderId, folderData.value);            
+          if (props.editMode) {
+            await updateFolder(
+              store,
+              folderData.value.folderId,
+              folderData.value
+            );
             $q.notify({
               type: "positive",
               message: "Folder updated",
@@ -147,7 +152,7 @@ export default defineComponent({
             emit("update:modelValue", folderData.value);
           }
           //else new folder
-          else{
+          else {
             const newFolder: any = await createFolder(store, folderData.value);
             emit("update:modelValue", newFolder);
             $q.notify({
@@ -156,7 +161,6 @@ export default defineComponent({
               timeout: 2000,
             });
           }
-          
         } catch (err: any) {
           $q.notify({
             type: "negative",
@@ -186,8 +190,8 @@ export default defineComponent({
       store,
       isValidIdentifier,
       getImageURL,
-      onSubmit
+      onSubmit,
     };
-  }
+  },
 });
 </script>
