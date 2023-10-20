@@ -106,6 +106,9 @@ export default defineComponent({
           chart?.on("mouseover", mouseHoverEffectFn);
           chart?.on("globalout", () => {mouseHoverEffectFn({})});
           chart?.on("legendselectchanged",legendSelectChangedFn);
+
+          // we need that toolbox datazoom button initally selected
+          chart.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
         });
 
         onMounted(async () => {
@@ -144,6 +147,9 @@ export default defineComponent({
                 emit("click", params);
             });
             window.addEventListener("resize", windowResizeEventCallback);
+
+            // we need that toolbox datazoom button initally selected
+            chart.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
         });
         onUnmounted(() => {
             window.removeEventListener("resize", windowResizeEventCallback);
@@ -152,12 +158,20 @@ export default defineComponent({
         //need to resize chart on activated
         onActivated(()=>{
             windowResizeEventCallback();
+
+            // we need that toolbox datazoom button initally selected
+            chart.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
         })
         
         watch(() => props.data.options, async () => {
             await nextTick();
             chart?.resize();
             chart?.setOption(props?.data?.options || {}, true);
+            // we need that toolbox datazoom button initally selected
+            // for that we required to dispatch an event
+            // while dispatching an event we need to pass a datazoomselectactive as true
+            // this action is available in the echarts docs in list of brush actions
+            chart.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive:true });
         }, { deep: true });
         return { chartRef };
     },
