@@ -717,7 +717,7 @@ export const convertSQLData = (
       // get first x axis key
       const key0 = xAxisKeys[0];
       // get the unique value of the first xAxis's key
-      const xAxisZerothPositionUniqueValue = [
+      let xAxisZerothPositionUniqueValue = [
         ...new Set(searchQueryData[0].map((obj: any) => obj[key0])),
       ].filter((it) => it);
 
@@ -812,6 +812,39 @@ export const convertSQLData = (
             fontsize: 12,
           },
         });
+        // if auto sql
+        if(panelSchema?.queries[0]?.customQuery == false){        
+        // check if x axis has histogram or not 
+        // for heatmap we only have one field in x axis event we have used find fn
+        
+        const field = panelSchema.queries[0].fields?.x.find(
+          (it: any) =>
+          it.aggregationFunction == "histogram" &&
+          it.column == store.state.zoConfig.timestamp_column
+          );
+          // if histogram
+          if(field){
+          // convert time string to selected timezone
+          xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map((it: any) => {
+            return formatDate(utcToZonedTime(it + "Z", store.state.timezone));
+          }); 
+        }
+        // else custom sql
+      }else{
+        // sampling data to know whether data is timeseries or not
+        const sample = xAxisZerothPositionUniqueValue.slice(
+          0,
+          Math.min(20, xAxisZerothPositionUniqueValue.length)
+        );
+        // if timeseries
+        if(isTimeSeries(sample)){
+          // convert time string to selected timezone
+          xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map((it: any) => {
+            return formatDate(utcToZonedTime(it + "Z", store.state.timezone));
+          });
+        }
+      }
+      
       options.grid.bottom = 60;
       (options.xAxis = [
         {
@@ -1040,11 +1073,7 @@ export const convertSQLData = (
       Math.min(20, options.xAxis[0].data.length)
     );
 
-    const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
-    const isTimeSeries = sample.every((value: any) => {
-      return iso8601Pattern.test(value);
-    });
-    if (isTimeSeries) {
+    if (isTimeSeries(sample)) {
       options.series.map((seriesObj: any) => {
         seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
           store.state.timezone != "UTC"
@@ -1158,6 +1187,13 @@ const getLegendPosition = (legendPosition: string) => {
       return "horizontal";
   }
 };
+
+const isTimeSeries = (sample: any) =>{
+  const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
+  return sample.every((value: any) => {
+    return iso8601Pattern.test(value);
+  });
+}
 
 /**
  * Calculates the width of a given text.
