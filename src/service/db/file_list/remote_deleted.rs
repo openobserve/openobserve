@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::HashMap;
 use bytes::Buf;
 use futures::future::try_join_all;
 use std::io::{BufRead, BufReader};
@@ -48,10 +49,14 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                             if files.is_empty() {
                                 continue;
                             }
-                            stats.file_count += files.len();
-                            if let Err(e) = infra_file_list::batch_add_deleted(&files).await {
-                                log::error!("Error sending file: {:?} {:?}", file, e);
-                                continue;
+                            for (created_at, files) in files {
+                                stats.file_count += files.len();
+                                if let Err(e) =
+                                    infra_file_list::batch_add_deleted(created_at, &files).await
+                                {
+                                    log::error!("Error sending file: {:?} {:?}", file, e);
+                                    continue;
+                                }
                             }
                         }
                     }
@@ -84,12 +89,12 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn process_file(file: &str) -> Result<Vec<String>, anyhow::Error> {
+async fn process_file(file: &str) -> Result<HashMap<i64, Vec<String>>, anyhow::Error> {
     // download file list from storage
     let data = match storage::get(file).await {
         Ok(data) => data,
         Err(_) => {
-            return Ok(vec![]);
+            return Ok(HashMap::default());
         }
     };
 
@@ -97,13 +102,16 @@ async fn process_file(file: &str) -> Result<Vec<String>, anyhow::Error> {
     let uncompress = zstd::decode_all(data.reader())?;
     let uncompress_reader = BufReader::new(uncompress.reader());
     // parse file list
-    let mut records = Vec::with_capacity(1024);
+    let mut records = HashMap::default();
     for line in uncompress_reader.lines() {
         let line = line?;
         if line.is_empty() {
             continue;
         }
-        records.push(line);
+        let (created_at, file) = line.split_once(';').unwrap();
+        let created_at: i64 = created_at.parse()?;
+        let entry = records.entry(created_at).or_insert_with(Vec::new);
+        entry.push(file.to_string());
     }
 
     Ok(records)

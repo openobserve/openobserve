@@ -430,8 +430,9 @@ async fn write_file_list_db_only(events: &[FileKey]) -> Result<(), anyhow::Error
     // set to external db
     // retry 5 times
     let mut success = false;
+    let created_at = Utc::now().timestamp_micros();
     for _ in 0..5 {
-        if let Err(e) = infra_file_list::batch_add_deleted(&del_items).await {
+        if let Err(e) = infra_file_list::batch_add_deleted(created_at, &del_items).await {
             log::error!(
                 "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
                 e
@@ -484,8 +485,10 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
         .map(|v| v.key.clone())
         .collect::<Vec<_>>();
     if !del_items.is_empty() {
+        let now = Utc::now();
         // write to local cache
-        if let Err(e) = infra_file_list::batch_add_deleted(&del_items).await {
+        if let Err(e) = infra_file_list::batch_add_deleted(now.timestamp_micros(), &del_items).await
+        {
             log::error!(
                 "[COMPACT] set local cache for file_list_deleted failed: {}",
                 e
@@ -494,13 +497,12 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
         // upload to storage
         let deleted_file_list_key = format!(
             "file_list_deleted/{}/{}.json.zst",
-            Utc::now().format("%Y/%m/%d/%H").to_string(),
+            now.format("%Y/%m/%d/%H").to_string(),
             ider::generate()
         );
         let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
         for file in del_items.iter() {
-            _ = buf.write(file.as_bytes())?;
-            _ = buf.write(b"\n")?;
+            buf.write_all(format!("{};{}\n", now.timestamp_micros(), file).as_bytes())?;
         }
         let compressed_bytes = buf.finish().unwrap();
         storage::put(&deleted_file_list_key, compressed_bytes.into()).await?;

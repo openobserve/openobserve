@@ -126,12 +126,13 @@ impl super::FileList for SqliteFileList {
         Ok(())
     }
 
-    async fn batch_add_deleted(&self, files: &[String]) -> Result<()> {
+    async fn batch_add_deleted(&self, created_at: i64, files: &[String]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
         let tx = CHANNEL.db_tx.clone();
         tx.send(DbEvent::FileListDeleted(DbEventFileListDeleted::BatchAdd(
+            created_at,
             files.to_vec(),
         )))
         .await
@@ -244,7 +245,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<String>> {
+    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<(i64, String)>> {
         if time_min == 0 {
             return Ok(Vec::new());
         }
@@ -258,7 +259,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         .await?;
         Ok(ret
             .iter()
-            .map(|r| format!("files/{}/{}/{}", r.stream, r.date, r.file))
+            .map(|r| {
+                (
+                    r.created_at,
+                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                )
+            })
             .collect())
     }
 
@@ -534,8 +540,11 @@ pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()>
     Ok(())
 }
 
-pub async fn batch_add_deleted(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
-    let created_at = Utc::now().timestamp_micros();
+pub async fn batch_add_deleted(
+    client: &Pool<Sqlite>,
+    created_at: i64,
+    files: &[String],
+) -> Result<()> {
     let chunks = files.chunks(100);
     for files in chunks {
         let mut tx = client.begin().await?;

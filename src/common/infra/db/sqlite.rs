@@ -267,10 +267,15 @@ impl SqliteDbChannel {
                             log::error!("[SQLITE] batch remove file_list error: {}", e);
                         }
                     }
-                    DbEvent::FileListDeleted(DbEventFileListDeleted::BatchAdd(files)) => {
+                    DbEvent::FileListDeleted(DbEventFileListDeleted::BatchAdd(
+                        created_at,
+                        files,
+                    )) => {
                         let mut err: Option<String> = None;
                         for _ in 0..DB_RETRY_TIMES {
-                            match sqlite_file_list::batch_add_deleted(&client, &files).await {
+                            match sqlite_file_list::batch_add_deleted(&client, created_at, &files)
+                                .await
+                            {
                                 Ok(_) => {
                                     err = None;
                                     break;

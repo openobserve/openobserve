@@ -174,11 +174,11 @@ impl super::FileList for DynamoFileList {
         Ok(())
     }
 
-    async fn batch_add_deleted(&self, files: &[String]) -> Result<()> {
+    async fn batch_add_deleted(&self, created_at: i64, files: &[String]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
-        let created_at = Utc::now().timestamp_micros().to_string();
+        let created_at = created_at.to_string();
         for batch in files.chunks(25) {
             let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
             for file in batch {
@@ -333,7 +333,7 @@ impl super::FileList for DynamoFileList {
         Ok(resp)
     }
 
-    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<String>> {
+    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<(i64, String)>> {
         if time_min == 0 {
             return Ok(Vec::new());
         }
@@ -354,15 +354,23 @@ impl super::FileList for DynamoFileList {
             .collect()
             .await;
         let resp = resp.map_err(|e| Error::Message(e.to_string()))?;
-        let resp: Vec<String> = resp
+        let resp: Vec<(i64, String)> = resp
             .iter()
             .filter(|v| v.count() > 0)
             .flat_map(|v| v.items().unwrap())
             .map(|v| {
-                format!(
-                    "files/{}/{}",
-                    v.get("stream").unwrap().as_s().unwrap(),
-                    v.get("file").unwrap().as_s().unwrap()
+                (
+                    v.get("created_at")
+                        .unwrap()
+                        .as_n()
+                        .unwrap()
+                        .parse::<i64>()
+                        .unwrap(),
+                    format!(
+                        "files/{}/{}",
+                        v.get("stream").unwrap().as_s().unwrap(),
+                        v.get("file").unwrap().as_s().unwrap()
+                    ),
                 )
             })
             .collect();

@@ -218,14 +218,14 @@ impl std::fmt::Debug for DbEventFileList {
 }
 
 pub enum DbEventFileListDeleted {
-    BatchAdd(Vec<String>),
+    BatchAdd(i64, Vec<String>),
     BatchRemove(Vec<String>),
 }
 
 impl std::fmt::Debug for DbEventFileListDeleted {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DbEventFileListDeleted::BatchAdd(keys) => write!(f, "BatchAdd({})", keys.len()),
+            DbEventFileListDeleted::BatchAdd(_, keys) => write!(f, "BatchAdd({})", keys.len()),
             DbEventFileListDeleted::BatchRemove(keys) => write!(f, "BatchRemove({})", keys.len()),
         }
     }

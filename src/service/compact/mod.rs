@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use ahash::AHashSet;
-use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
@@ -293,8 +293,13 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
             continue;
         }
         // delete files from storage
-        if let Err(e) =
-            infra_storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
+        if let Err(e) = infra_storage::del(
+            &files
+                .iter()
+                .map(|(_, file)| file.as_str())
+                .collect::<Vec<_>>(),
+        )
+        .await
         {
             // maybe the file already deleted, so we just skip the `not found` error
             if !e.to_string().to_lowercase().contains("not found") {
@@ -307,12 +312,11 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         if !CONFIG.common.meta_store_external {
             let mut prefixes =
                 AHashSet::with_capacity(CONFIG.compact.delete_files_delay_hours as usize);
-            for file in &files {
-                let columns = file.split('/').collect::<Vec<&str>>();
-                let prefix = format!(
-                    "{}/{}/{}/{}/{}",
-                    columns[0], columns[1], columns[2], columns[3], columns[4]
-                );
+            for (created_at, _) in &files {
+                let created_time: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
+                let prefix = created_time
+                    .format("file_list_deleted/%Y/%m/%d/%H/")
+                    .to_string();
                 prefixes.insert(prefix);
             }
             for prefix in prefixes {
@@ -329,7 +333,14 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         }
 
         // delete files from file_list_deleted table
-        if let Err(e) = infra_file_list::batch_remove_deleted(&files).await {
+        if let Err(e) = infra_file_list::batch_remove_deleted(
+            &files
+                .iter()
+                .map(|(_, file)| file.to_owned())
+                .collect::<Vec<_>>(),
+        )
+        .await
+        {
             log::error!("[COMPACT] delete files from table failed: {}", e);
             continue;
         }

@@ -74,7 +74,12 @@ impl Event for Eventer {
 
         if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE) {
             // cache deleted files
-            if let Err(e) = infra_file_list::batch_add_deleted(&del_items).await {
+            if let Err(e) = infra_file_list::batch_add_deleted(
+                chrono::Utc::now().timestamp_micros(),
+                &del_items,
+            )
+            .await
+            {
                 log::error!("[GRPC] event batch add deleted error: {}", e);
             }
         }

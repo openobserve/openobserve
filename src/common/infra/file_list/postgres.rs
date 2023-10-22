@@ -197,11 +197,10 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
         Ok(())
     }
 
-    async fn batch_add_deleted(&self, files: &[String]) -> Result<()> {
+    async fn batch_add_deleted(&self, created_at: i64, files: &[String]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
-        let created_at = Utc::now().timestamp_micros();
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
@@ -221,7 +220,10 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             });
             if let Err(e) = query_builder.build().execute(&mut *tx).await {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[POSTGRES] rollback file_list_deleted batch add error: {}", e);
+                    log::error!(
+                        "[POSTGRES] rollback file_list_deleted batch add error: {}",
+                        e
+                    );
                 }
                 return Err(e.into());
             };
@@ -360,7 +362,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<String>> {
+    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<(i64, String)>> {
         if time_min == 0 {
             return Ok(Vec::new());
         }
@@ -374,7 +376,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         .await?;
         Ok(ret
             .iter()
-            .map(|r| format!("files/{}/{}/{}", r.stream, r.date, r.file))
+            .map(|r| {
+                (
+                    r.created_at,
+                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                )
+            })
             .collect())
     }
 

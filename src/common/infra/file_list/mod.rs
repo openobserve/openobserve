@@ -56,7 +56,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_remove(&self, files: &[String]) -> Result<()>;
-    async fn batch_add_deleted(&self, files: &[String]) -> Result<()>;
+    async fn batch_add_deleted(&self, created_at: i64, files: &[String]) -> Result<()>;
     async fn batch_remove_deleted(&self, files: &[String]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
@@ -69,7 +69,7 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<String>>;
+    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<(i64, String)>>;
     async fn get_max_pk_value(&self) -> Result<i64>;
     async fn stats(
         &self,
@@ -135,8 +135,8 @@ pub async fn batch_remove(files: &[String]) -> Result<()> {
 }
 
 #[inline]
-pub async fn batch_add_deleted(files: &[String]) -> Result<()> {
-    CLIENT.batch_add_deleted(files).await
+pub async fn batch_add_deleted(created_at: i64, files: &[String]) -> Result<()> {
+    CLIENT.batch_add_deleted(created_at, files).await
 }
 
 #[inline]
@@ -173,7 +173,7 @@ pub async fn query(
 }
 
 #[inline]
-pub async fn query_deleted(org_id: &str, time_min: i64) -> Result<Vec<String>> {
+pub async fn query_deleted(org_id: &str, time_min: i64) -> Result<Vec<(i64, String)>> {
     CLIENT.query_deleted(org_id, time_min).await
 }
 
@@ -362,4 +362,5 @@ pub struct FileDeletedRecord {
     pub stream: String,
     pub date: String,
     pub file: String,
+    pub created_at: i64,
 }
