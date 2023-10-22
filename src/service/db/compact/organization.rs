@@ -22,7 +22,7 @@ fn mk_key(org_id: &str) -> String {
     format!("/compact/organization/{org_id}")
 }
 
-pub async fn get_offset(org_id: &str) -> (i64, String) {
+pub async fn get_mark(org_id: &str) -> String {
     let db = &infra_db::DEFAULT;
     let key = mk_key(org_id);
     let value = match db.get(&key).await {
@@ -31,25 +31,20 @@ pub async fn get_offset(org_id: &str) -> (i64, String) {
     };
     if value.contains(';') {
         let mut parts = value.split(';');
-        let offset: i64 = parts.next().unwrap().parse().unwrap();
-        let node = parts.next().unwrap().to_string();
-        (offset, node)
+        _ = parts.next();
+        parts.next().unwrap().to_string()
     } else {
-        (value.parse().unwrap(), String::from(""))
+        String::from("")
     }
 }
 
-pub async fn set_offset(
-    org_id: &str,
-    offset: i64,
-    node: Option<&str>,
-) -> Result<(), anyhow::Error> {
+pub async fn set_mark(org_id: &str, node: Option<&str>) -> Result<(), anyhow::Error> {
     let db = &infra_db::DEFAULT;
     let key = mk_key(org_id);
     let val = if let Some(node) = node {
-        format!("{};{}", offset, node)
+        format!("0;{node}")
     } else {
-        offset.to_string()
+        "0".to_string()
     };
     Ok(db.put(&key, val.into(), infra_db::NO_NEED_WATCH).await?)
 }
@@ -60,23 +55,4 @@ pub async fn del_offset(org_id: &str) -> Result<(), anyhow::Error> {
     db.delete_if_exists(&key, false, infra_db::NO_NEED_WATCH)
         .await
         .map_err(Into::into)
-}
-
-pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
-    let mut items = Vec::new();
-    let db = &infra_db::DEFAULT;
-    let key = "/compact/organization/";
-    let ret = db.list(key).await?;
-    for (item_key, item_value) in ret {
-        let item_key = item_key.strip_prefix(key).unwrap();
-        let value = String::from_utf8_lossy(&item_value).to_string();
-        let offset = if value.contains(';') {
-            let mut parts = value.split(';');
-            parts.next().unwrap().parse().unwrap()
-        } else {
-            value.parse().unwrap()
-        };
-        items.push((item_key.to_string(), offset));
-    }
-    Ok(items)
 }

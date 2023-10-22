@@ -244,6 +244,24 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
+    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<String>> {
+        if time_min == 0 {
+            return Ok(Vec::new());
+        }
+        let pool = CLIENT.clone();
+        let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
+            r#"SELECT stream, date, file FROM file_list_deleted WHERE org = $1 AND created_at < $2;"#,
+        )
+        .bind(org_id)
+        .bind(time_min)
+        .fetch_all(&pool)
+        .await?;
+        Ok(ret
+            .iter()
+            .map(|r| format!("files/{}/{}/{}", r.stream, r.date, r.file))
+            .collect())
+    }
+
     async fn get_max_pk_value(&self) -> Result<i64> {
         let pool = CLIENT.clone();
         let ret: i64 = sqlx::query_scalar(r#"SELECT MAX(id) AS id FROM file_list;"#)
@@ -466,14 +484,12 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
             for item in files {
                 if let Err(e) = add(client, &item.key, &item.meta).await {
                     log::error!("[SQLITE] single insert file_list add error: {}", e);
-                    return Err(e.into());
+                    return Err(e);
                 }
             }
-        } else {
-            if let Err(e) = tx.commit().await {
-                log::error!("[SQLITE] commit file_list batch add error: {}", e);
-                return Err(e.into());
-            }
+        } else if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit file_list batch add error: {}", e);
+            return Err(e.into());
         }
     }
     Ok(())
@@ -528,7 +544,7 @@ pub async fn batch_add_deleted(client: &Pool<Sqlite>, files: &[String]) -> Resul
         );
         query_builder.push_values(files, |mut b, item: &String| {
             let (stream_key, date_key, file_name) =
-                super::parse_file_key_columns(&item).expect("parse file key failed");
+                super::parse_file_key_columns(item).expect("parse file key failed");
             let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
             b.push_bind(org_id)
                 .push_bind(stream_key)

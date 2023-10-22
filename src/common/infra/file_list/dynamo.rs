@@ -182,7 +182,7 @@ impl super::FileList for DynamoFileList {
         for batch in files.chunks(25) {
             let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
             for file in batch {
-                let (stream_key, date_key, file_name) = parse_file_key_columns(&file).unwrap();
+                let (stream_key, date_key, file_name) = parse_file_key_columns(file).unwrap();
                 let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
                 let file_name = format!("{date_key}/{file_name}");
                 let mut item = HashMap::new();
@@ -328,6 +328,42 @@ impl super::FileList for DynamoFileList {
                 } else {
                     None
                 }
+            })
+            .collect();
+        Ok(resp)
+    }
+
+    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<String>> {
+        if time_min == 0 {
+            return Ok(Vec::new());
+        }
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        let resp: std::result::Result<Vec<QueryOutput>, _> = client
+            .query()
+            .table_name(&self.file_list_deleted_table)
+            .index_name("org-created-at-index")
+            .key_condition_expression("#org = :org AND #created_at < :ts")
+            .expression_attribute_names("#org", "org".to_string())
+            .expression_attribute_names("#created_at", "created_at".to_string())
+            .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
+            .expression_attribute_values(":ts", AttributeValue::N(time_min.to_string()))
+            .select(Select::AllAttributes)
+            .into_paginator()
+            .page_size(1000)
+            .send()
+            .collect()
+            .await;
+        let resp = resp.map_err(|e| Error::Message(e.to_string()))?;
+        let resp: Vec<String> = resp
+            .iter()
+            .filter(|v| v.count() > 0)
+            .flat_map(|v| v.items().unwrap())
+            .map(|v| {
+                format!(
+                    "files/{}/{}",
+                    v.get("stream").unwrap().as_s().unwrap(),
+                    v.get("file").unwrap().as_s().unwrap()
+                )
             })
             .collect();
         Ok(resp)

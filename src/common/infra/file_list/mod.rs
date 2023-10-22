@@ -69,6 +69,7 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<String>>;
     async fn get_max_pk_value(&self) -> Result<i64>;
     async fn stats(
         &self,
@@ -169,6 +170,11 @@ pub async fn query(
     CLIENT
         .query(org_id, stream_type, stream_name, time_level, time_range)
         .await
+}
+
+#[inline]
+pub async fn query_deleted(org_id: &str, time_min: i64) -> Result<Vec<String>> {
+    CLIENT.query_deleted(org_id, time_min).await
 }
 
 #[inline]
@@ -349,4 +355,11 @@ impl From<&HashMap<String, AttributeValue>> for StatsRecord {
                 .unwrap(),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct FileDeletedRecord {
+    pub stream: String,
+    pub date: String,
+    pub file: String,
 }

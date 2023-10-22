@@ -157,14 +157,12 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
                 for item in files {
                     if let Err(e) = self.add(&item.key, &item.meta).await {
                         log::error!("[POSTGRES] single insert file_list add error: {}", e);
-                        return Err(e.into());
+                        return Err(e);
                     }
                 }
-            } else {
-                if let Err(e) = tx.commit().await {
-                    log::error!("[POSTGRES] commit file_list batch add error: {}", e);
-                    return Err(e.into());
-                }
+            } else if let Err(e) = tx.commit().await {
+                log::error!("[POSTGRES] commit file_list batch add error: {}", e);
+                return Err(e.into());
             }
         }
         Ok(())
@@ -213,7 +211,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
-                    super::parse_file_key_columns(&item).expect("parse file key failed");
+                    super::parse_file_key_columns(item).expect("parse file key failed");
                 let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
                 b.push_bind(org_id)
                     .push_bind(stream_key)
@@ -359,6 +357,24 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     FileMeta::from(&r),
                 )
             })
+            .collect())
+    }
+
+    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<String>> {
+        if time_min == 0 {
+            return Ok(Vec::new());
+        }
+        let pool = CLIENT.clone();
+        let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
+            r#"SELECT stream, date, file FROM file_list_deleted WHERE org = $1 AND created_at < $2;"#,
+        )
+        .bind(org_id)
+        .bind(time_min)
+        .fetch_all(&pool)
+        .await?;
+        Ok(ret
+            .iter()
+            .map(|r| format!("files/{}/{}/{}", r.stream, r.date, r.file))
             .collect())
     }
 
