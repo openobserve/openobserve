@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashSet;
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use once_cell::sync::Lazy;
 use std::sync::Arc;
@@ -249,7 +250,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 /// 2. delete files from storage
 pub async fn run_delete_files() -> Result<(), anyhow::Error> {
     let now = Utc::now();
-    let time_min = now - Duration::seconds(CONFIG.compact.delete_files_delay);
+    let time_min = now - Duration::hours(CONFIG.compact.delete_files_delay_hours);
     let time_min = Utc
         .with_ymd_and_hms(
             time_min.year(),
@@ -301,13 +302,37 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
                 continue;
             }
         }
+
+        // delete files from file_list_deleted in s3
+        if !CONFIG.common.meta_store_external {
+            let mut prefixes =
+                AHashSet::with_capacity(CONFIG.compact.delete_files_delay_hours as usize);
+            for file in &files {
+                let columns = file.split('/').collect::<Vec<&str>>();
+                let prefix = format!(
+                    "{}/{}/{}/{}/{}",
+                    columns[0], columns[1], columns[2], columns[3], columns[4]
+                );
+                prefixes.insert(prefix);
+            }
+            for prefix in prefixes {
+                let files = infra_storage::list(&prefix).await?;
+                if files.is_empty() {
+                    continue;
+                }
+                if let Err(e) =
+                    infra_storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
+                {
+                    log::error!("[COMPACT] delete files from s3 failed: {}", e);
+                }
+            }
+        }
+
         // delete files from file_list_deleted table
         if let Err(e) = infra_file_list::batch_remove_deleted(&files).await {
-            log::error!("[COMPACT] delete file from table failed: {}", e);
+            log::error!("[COMPACT] delete files from table failed: {}", e);
             continue;
         }
-        // delete froms from file_list_deleted s3
-        // TODO: delete from s3
     }
 
     Ok(())

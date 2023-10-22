@@ -389,8 +389,8 @@ pub struct Compact {
     pub max_file_size: u64,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
-    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY", default = 3600)] // seconds
-    pub delete_files_delay: i64,
+    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
+    pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
 }
@@ -676,6 +676,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
         return Err(anyhow::anyhow!(
             "Data retention is not allowed to be less than 3 days."
+        ));
+    }
+    if cfg.compact.delete_files_delay_hours < 1 {
+        return Err(anyhow::anyhow!(
+            "Delete files delay is not allowed to be less than 1 hour."
         ));
     }
 
