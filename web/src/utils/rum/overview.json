@@ -1,94 +1,36 @@
 {
   "version": 2,
   "dashboardId": "",
-  "title": "Rum",
+  "title": "Metrics",
   "description": "",
   "role": "",
   "owner": "",
-  "created": "2023-10-17T11:25:09.483Z",
+  "created": "2023-10-20T11:50:23.912Z",
   "panels": [
     {
-      "id": "Panel_ID5135110",
-      "type": "bar",
-      "title": "Error Count",
-      "description": "",
-      "config": {
-        "show_legends": true,
-        "legends_position": null,
-        "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
-      },
-      "queryType": "sql",
-      "queries": [
-        {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(view_error_count) as \"y_axis_1\"  FROM \"_rumdata\"  GROUP BY x_axis_1 ORDER BY x_axis_1",
-          "customQuery": false,
-          "fields": {
-            "stream": "_rumdata",
-            "stream_type": "logs",
-            "x": [
-              {
-                "label": "Timestamp",
-                "alias": "x_axis_1",
-                "column": "_timestamp",
-                "color": null,
-                "aggregationFunction": "histogram"
-              }
-            ],
-            "y": [
-              {
-                "label": "View Error Count",
-                "alias": "y_axis_1",
-                "column": "view_error_count",
-                "color": "#5960b2",
-                "aggregationFunction": "count"
-              }
-            ],
-            "z": [],
-            "filter": []
-          },
-          "config": {
-            "promql_legend": "",
-            "layer_type": "scatter",
-            "weight_fixed": 1
-          }
-        }
-      ],
-      "layout": { "x": 0, "y": 8, "w": 4, "h": 9, "i": 1 }
-    },
-    {
-      "id": "Panel_ID9969310",
-      "type": "bar",
+      "id": "Panel_ID3649610",
+      "type": "metric",
       "title": "Largest Contentful Paint ( LCP )",
       "description": "",
       "config": {
         "show_legends": true,
         "legends_position": null,
-        "unit": "seconds",
-        "unit_custom": "",
+        "unit": "milliseconds",
         "base_map": { "type": "osm" },
         "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
       },
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_largest_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\"  GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT avg(view_largest_contentful_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" ",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
             "stream_type": "logs",
-            "x": [
-              {
-                "label": "Timestamp",
-                "alias": "x_axis_1",
-                "column": "x_axis_1",
-                "color": null,
-                "aggregationFunction": "histogram"
-              }
-            ],
+            "x": [],
             "y": [
               {
-                "label": "Largest Contentful Paint ( LCP )nds",
+                "label": "View Largest Contentful Paint",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -105,61 +47,11 @@
           }
         }
       ],
-      "layout": { "x": 0, "y": 0, "w": 4, "h": 8, "i": 2 }
+      "layout": { "x": 0, "y": 0, "w": 4, "h": 5, "i": 1 }
     },
     {
-      "id": "Panel_ID7341310",
-      "type": "bar",
-      "title": "First Contentful Paint ( FCP )",
-      "description": "",
-      "config": {
-        "show_legends": true,
-        "legends_position": null,
-        "unit": "seconds",
-        "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
-      },
-      "queryType": "sql",
-      "queries": [
-        {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\"  GROUP BY x_axis_1 ORDER BY x_axis_1",
-          "customQuery": true,
-          "fields": {
-            "stream": "_rumdata",
-            "stream_type": "logs",
-            "x": [
-              {
-                "label": "Timestamp",
-                "alias": "x_axis_1",
-                "column": "x_axis_1",
-                "color": null,
-                "aggregationFunction": "histogram"
-              }
-            ],
-            "y": [
-              {
-                "label": "Seconds",
-                "alias": "y_axis_1",
-                "column": "y_axis_1",
-                "color": null,
-                "aggregationFunction": "count"
-              }
-            ],
-            "z": [],
-            "filter": []
-          },
-          "config": {
-            "promql_legend": "",
-            "layer_type": "scatter",
-            "weight_fixed": 1
-          }
-        }
-      ],
-      "layout": { "x": 4, "y": 8, "w": 4, "h": 9, "i": 3 }
-    },
-    {
-      "id": "Panel_ID3232610",
-      "type": "bar",
+      "id": "Panel_ID4891410",
+      "type": "metric",
       "title": "First Input Delay ( FID )",
       "description": "",
       "config": {
@@ -172,23 +64,15 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_input_delay/1000000) as \"y_axis_1\"  FROM \"_rumdata\"  GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT avg(view_first_input_delay/1000000) as \"y_axis_1\"  FROM \"_rumdata\" ",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
             "stream_type": "logs",
-            "x": [
-              {
-                "label": "Timestamp",
-                "alias": "x_axis_1",
-                "column": "x_axis_1",
-                "color": null,
-                "aggregationFunction": "histogram"
-              }
-            ],
+            "x": [],
             "y": [
               {
-                "label": "Milliseconds",
+                "label": "View First Input Delay",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -205,11 +89,11 @@
           }
         }
       ],
-      "layout": { "x": 4, "y": 0, "w": 4, "h": 8, "i": 4 }
+      "layout": { "x": 0, "y": 5, "w": 4, "h": 6, "i": 2 }
     },
     {
-      "id": "Panel_ID4984310",
-      "type": "bar",
+      "id": "Panel_ID4568010",
+      "type": "metric",
       "title": "Cumulative Layout Shift ( CLS )",
       "description": "",
       "config": {
@@ -221,20 +105,12 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\"  GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\" ",
           "customQuery": false,
           "fields": {
             "stream": "_rumdata",
             "stream_type": "logs",
-            "x": [
-              {
-                "label": "Timestamp",
-                "alias": "x_axis_1",
-                "column": "_timestamp",
-                "color": null,
-                "aggregationFunction": "histogram"
-              }
-            ],
+            "x": [],
             "y": [
               {
                 "label": "View Cumulative Layout Shift",
@@ -254,89 +130,173 @@
           }
         }
       ],
-      "layout": { "x": 8, "y": 0, "w": 4, "h": 8, "i": 5 }
+      "layout": { "x": 0, "y": 11, "w": 4, "h": 6, "i": 3 }
+    },
+    {
+      "id": "Panel_ID4260310",
+      "type": "metric",
+      "title": "Total Errors",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT count(distinct(error_id)) as \"y_axis_1\"  FROM \"_rumdata\" ",
+          "customQuery": false,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "Error Id",
+                "alias": "y_axis_1",
+                "column": "error_id",
+                "color": "#5960b2",
+                "aggregationFunction": "count-distinct"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 4, "y": 0, "w": 4, "h": 5, "i": 4 }
+    },
+    {
+      "id": "Panel_ID9858810",
+      "type": "metric",
+      "title": "Total Sessions",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT count(distinct(session_id)) as \"y_axis_1\"  FROM \"_sessionreplay\" ",
+          "customQuery": false,
+          "fields": {
+            "stream": "_sessionreplay",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "Session Id",
+                "alias": "y_axis_1",
+                "column": "session_id",
+                "color": "#5960b2",
+                "aggregationFunction": "count-distinct"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 8, "y": 0, "w": 4, "h": 5, "i": 5 }
+    },
+    {
+      "id": "Panel_ID2216110",
+      "type": "metric",
+      "title": "Session with Errors",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "custom",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT count(distinct(session_id)) as \"y_axis_1\" FROM \"_rumdata\" WHERE type='error'",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "y_axis_1",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": "#5960b2",
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 4, "y": 11, "w": 4, "h": 6, "i": 7 }
+    },
+    {
+      "id": "Panel_ID1825610",
+      "type": "metric",
+      "title": "Total Unhandled Errors",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT count(distinct(error_id)) as \"y_axis_1\"  FROM \"_rumdata\" where error_handling='unhandled'",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "y_axis_1",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": "#5960b2",
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 4, "y": 5, "w": 4, "h": 6, "i": 8 }
     }
   ],
-  "variables": {
-    "list": [
-      {
-        "type": "query_values",
-        "name": "service",
-        "label": "Service",
-        "query_data": {
-          "stream_type": "logs",
-          "stream": "_rumdata",
-          "field": "service",
-          "max_record_size": null
-        },
-        "value": "",
-        "options": []
-      },
-      {
-        "type": "query_values",
-        "name": "env",
-        "label": "Env",
-        "query_data": {
-          "stream_type": "logs",
-          "stream": "_rumdata",
-          "field": "env",
-          "max_record_size": null
-        },
-        "value": "",
-        "options": []
-      },
-      {
-        "type": "query_values",
-        "name": "version",
-        "label": "Version",
-        "query_data": {
-          "stream_type": "logs",
-          "stream": "_rumdata",
-          "field": "version",
-          "max_record_size": null
-        },
-        "value": "",
-        "options": []
-      },
-      {
-        "type": "query_values",
-        "name": "session_type",
-        "label": "Session Type",
-        "query_data": {
-          "stream_type": "logs",
-          "stream": "_rumdata",
-          "field": "session_type",
-          "max_record_size": null
-        },
-        "value": "",
-        "options": []
-      },
-      {
-        "type": "query_values",
-        "name": "country",
-        "label": "Country",
-        "query_data": {
-          "stream_type": "logs",
-          "stream": "_rumdata",
-          "field": "geo_info_country",
-          "max_record_size": null
-        },
-        "value": "",
-        "options": []
-      },
-      {
-        "type": "query_values",
-        "name": "device_type",
-        "label": "Device Type",
-        "query_data": {
-          "stream_type": "logs",
-          "stream": "_rumdata",
-          "field": "user_agent_device_family",
-          "max_record_size": null
-        },
-        "value": "",
-        "options": []
-      }
-    ]
-  }
+  "variables": null
 }
