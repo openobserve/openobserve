@@ -27,6 +27,7 @@ use crate::common::{
 pub mod broadcast;
 pub mod local;
 pub mod remote;
+pub mod remote_deleted;
 
 pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
     Lazy::new(|| DashSet::with_capacity_and_hasher(1024, Default::default()));

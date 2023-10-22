@@ -158,6 +158,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 .expect("file list remote calculate stats failed");
         }
     }
+
+    // cache file list deleted
+    if !CONFIG.common.meta_store_external && cluster::is_compactor(&cluster::LOCAL_NODE_ROLE) {
+        db::file_list::remote_deleted::cache()
+            .await
+            .expect("file list deleted remote cache failed");
+    }
+
     infra_file_list::create_table_index().await?;
     infra_file_list::set_initialised().await?;
     db::file_list::remote::cache_stats()

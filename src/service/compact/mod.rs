@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
@@ -36,8 +37,8 @@ pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
 pub async fn run_delete() -> Result<(), anyhow::Error> {
     // check data retention
     if CONFIG.compact.data_retention_days > 0 {
-        let now = chrono::Utc::now();
-        let date = now - chrono::Duration::days(CONFIG.compact.data_retention_days);
+        let now = Utc::now();
+        let date = now - Duration::days(CONFIG.compact.data_retention_days);
         let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
         let orgs = db::schema::list_organizations_from_cache();
@@ -79,7 +80,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
                     let schema = db::schema::get(&org_id, &stream_name, stream_type).await?;
                     let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
                     let stream_data_retention_end = if stream.settings.data_retention > 0 {
-                        let date = now - chrono::Duration::days(stream.settings.data_retention);
+                        let date = now - Duration::days(stream.settings.data_retention);
                         date.format("%Y-%m-%d").to_string()
                     } else {
                         data_lifecycle_end.clone()
@@ -247,8 +248,18 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 /// 1. get pending deleted files from file_list_deleted table, created_at > 2 hours
 /// 2. delete files from storage
 pub async fn run_delete_files() -> Result<(), anyhow::Error> {
-    let now = chrono::Utc::now();
-    let time_min = now - chrono::Duration::seconds(CONFIG.compact.delete_files_delay);
+    let now = Utc::now();
+    let time_min = now - Duration::seconds(CONFIG.compact.delete_files_delay);
+    let time_min = Utc
+        .with_ymd_and_hms(
+            time_min.year(),
+            time_min.month(),
+            time_min.day(),
+            time_min.hour(),
+            0,
+            0,
+        )
+        .unwrap();
     let time_min = time_min.timestamp_micros();
     let orgs = db::schema::list_organizations_from_cache();
     for org_id in orgs {
@@ -284,8 +295,11 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         if let Err(e) =
             infra_storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
         {
-            log::error!("[COMPACT] delete files from storage failed: {}", e);
-            continue;
+            // maybe the file already deleted, so we just skip the `not found` error
+            if !e.to_string().to_lowercase().contains("not found") {
+                log::error!("[COMPACT] delete files from storage failed: {}", e);
+                continue;
+            }
         }
         // delete files from file_list_deleted table
         if let Err(e) = infra_file_list::batch_remove_deleted(&files).await {

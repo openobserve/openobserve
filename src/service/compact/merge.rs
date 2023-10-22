@@ -499,9 +499,8 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
         );
         let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
         for file in del_items.iter() {
-            let mut write_buf = json::to_vec(&file)?;
-            write_buf.push(b'\n');
-            buf.write_all(&write_buf)?;
+            _ = buf.write(file.as_bytes())?;
+            _ = buf.write(b"\n")?;
         }
         let compressed_bytes = buf.finish().unwrap();
         storage::put(&deleted_file_list_key, compressed_bytes.into()).await?;
