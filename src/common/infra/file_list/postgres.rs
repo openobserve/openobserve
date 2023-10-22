@@ -137,14 +137,14 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
                         true
                     } else {
                         if let Err(e) = tx.rollback().await {
-                            log::error!("[SQLITE] rollback file_list batch add error: {}", e);
+                            log::error!("[POSTGRES] rollback file_list batch add error: {}", e);
                         }
                         return Err(Error::Message(e.to_string()));
                     }
                 }
                 Err(e) => {
                     if let Err(e) = tx.rollback().await {
-                        log::error!("[SQLITE] rollback file_list batch add error: {}", e);
+                        log::error!("[POSTGRES] rollback file_list batch add error: {}", e);
                     }
                     return Err(e.into());
                 }
@@ -221,7 +221,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             });
             if let Err(e) = query_builder.build().execute(&mut *tx).await {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[SQLITE] rollback file_list_deleted batch add error: {}", e);
+                    log::error!("[POSTGRES] rollback file_list_deleted batch add error: {}", e);
                 }
                 return Err(e.into());
             };
