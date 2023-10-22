@@ -284,8 +284,16 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         if let Err(e) =
             infra_storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
         {
-            log::error!("[COMPACT] delete file failed: {}", e);
+            log::error!("[COMPACT] delete files from storage failed: {}", e);
+            continue;
         }
+        // delete files from file_list_deleted table
+        if let Err(e) = infra_file_list::batch_remove_deleted(&files).await {
+            log::error!("[COMPACT] delete file from table failed: {}", e);
+            continue;
+        }
+        // delete froms from file_list_deleted s3
+        // TODO: delete from s3
     }
 
     Ok(())

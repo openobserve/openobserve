@@ -494,7 +494,7 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
         // upload to storage
         let deleted_file_list_key = format!(
             "file_list_deleted/{}/{}.json.zst",
-            date_key,
+            Utc::now().format("%Y/%m/%d/%H").to_string(),
             ider::generate()
         );
         let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
