@@ -199,20 +199,8 @@ pub async fn merge_by_stream(
                 }
             }
 
-            // delete small files from storage
-            match storage::del(
-                &new_file_list
-                    .iter()
-                    .map(|v| v.key.as_str())
-                    .collect::<Vec<_>>(),
-            )
-            .await
-            {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!("[COMPACT] delete file failed: {}", e);
-                }
-            }
+            // No need delete file here, will use another task to delete files
+
             // delete files from file list
             files_with_size.retain(|f| !&new_file_list.contains(f));
         }
@@ -443,11 +431,16 @@ async fn write_file_list_db_only(events: &[FileKey]) -> Result<(), anyhow::Error
     // retry 5 times
     let mut success = false;
     for _ in 0..5 {
-        if let Err(e) = infra_file_list::batch_add(&put_items).await {
+        if let Err(e) = infra_file_list::batch_add_deleted(&del_items).await {
             log::error!(
-                "[COMPACT] batch_write to external db failed, retrying: {}",
+                "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
                 e
             );
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        if let Err(e) = infra_file_list::batch_add(&put_items).await {
+            log::error!("[COMPACT] batch_add to external db failed, retrying: {}", e);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
@@ -491,6 +484,13 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
         .map(|v| v.key.clone())
         .collect::<Vec<_>>();
     if !del_items.is_empty() {
+        // write to local cache
+        if let Err(e) = infra_file_list::batch_add_deleted(&del_items).await {
+            log::error!(
+                "[COMPACT] set local cache for file_list_deleted failed: {}",
+                e
+            );
+        }
         // upload to storage
         let deleted_file_list_key = format!(
             "file_list_deleted/{}/{}.json.zst",
@@ -517,7 +517,10 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
                 db::file_list::progress(&event.key, Some(&event.meta), event.deleted, false).await
             {
                 cache_success = false;
-                log::error!("[COMPACT] set local cache failed, retrying: {}", e);
+                log::error!(
+                    "[COMPACT] set local cache for file_list failed, retrying: {}",
+                    e
+                );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 break;
             }
@@ -527,7 +530,10 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
         }
         // send broadcast to other nodes
         if let Err(e) = db::file_list::broadcast::send(events, None).await {
-            log::error!("[COMPACT] send broadcast failed, retrying: {}", e);
+            log::error!(
+                "[COMPACT] send broadcast for file_list failed, retrying: {}",
+                e
+            );
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
