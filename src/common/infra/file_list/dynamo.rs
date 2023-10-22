@@ -35,8 +35,11 @@ use crate::common::{
     utils::time::BASE_TIME,
 };
 
+use super::parse_file_key_columns;
+
 pub struct DynamoFileList {
     file_list_table: String,
+    file_list_deleted_table: String,
     stream_stats_table: String,
 }
 
@@ -44,6 +47,7 @@ impl DynamoFileList {
     pub fn new() -> Self {
         Self {
             file_list_table: CONFIG.dynamo.file_list_table.clone(),
+            file_list_deleted_table: CONFIG.dynamo.file_list_deleted_table.clone(),
             stream_stats_table: CONFIG.dynamo.stream_stats_table.clone(),
         }
     }
@@ -163,6 +167,65 @@ impl super::FileList for DynamoFileList {
             client
                 .batch_write_item()
                 .request_items(&self.file_list_table, reqs)
+                .send()
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    async fn batch_add_deleted(&self, files: &[String]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+        let created_at = Utc::now().timestamp_micros().to_string();
+        for batch in files.chunks(25) {
+            let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
+            for file in batch {
+                let (stream_key, date_key, file_name) = parse_file_key_columns(&file).unwrap();
+                let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+                let file_name = format!("{date_key}/{file_name}");
+                let mut item = HashMap::new();
+                item.insert("org".to_string(), AttributeValue::S(org_id));
+                item.insert("stream".to_string(), AttributeValue::S(stream_key));
+                item.insert("file".to_string(), AttributeValue::S(file_name));
+                item.insert(
+                    "created_at".to_string(),
+                    AttributeValue::N(created_at.clone()),
+                );
+                let req = PutRequest::builder().set_item(Some(item)).build();
+                reqs.push(WriteRequest::builder().put_request(req).build());
+            }
+            let client = DYNAMO_DB_CLIENT.get().await.clone();
+            client
+                .batch_write_item()
+                .request_items(&self.file_list_deleted_table, reqs)
+                .send()
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+        for batch in files.chunks(25) {
+            let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
+            for file in batch {
+                let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+                let file_name = format!("{date_key}/{file_name}");
+                let mut key = HashMap::new();
+                key.insert("stream".to_string(), AttributeValue::S(stream_key));
+                key.insert("file".to_string(), AttributeValue::S(file_name));
+                let req = DeleteRequest::builder().set_key(Some(key)).build();
+                reqs.push(WriteRequest::builder().delete_request(req).build());
+            }
+            let client = DYNAMO_DB_CLIENT.get().await.clone();
+            client
+                .batch_write_item()
+                .request_items(&self.file_list_deleted_table, reqs)
                 .send()
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;

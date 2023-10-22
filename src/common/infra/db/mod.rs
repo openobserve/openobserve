@@ -177,6 +177,7 @@ pub struct MetaRecord {
 pub enum DbEvent {
     Meta(DbEventMeta),
     FileList(DbEventFileList),
+    FileListDeleted(DbEventFileListDeleted),
     StreamStats(DbEventStreamStats),
     CreateTableMeta,
     CreateTableFileList,
@@ -201,7 +202,7 @@ impl std::fmt::Debug for DbEventMeta {
 pub enum DbEventFileList {
     Add(String, FileMeta),
     BatchAdd(Vec<FileKey>),
-    Remove(Vec<String>),
+    BatchRemove(Vec<String>),
     Initialized,
 }
 
@@ -210,8 +211,22 @@ impl std::fmt::Debug for DbEventFileList {
         match self {
             DbEventFileList::Add(key, _) => write!(f, "Add({})", key),
             DbEventFileList::BatchAdd(keys) => write!(f, "BatchAdd({})", keys.len()),
-            DbEventFileList::Remove(keys) => write!(f, "Remove({})", keys.len()),
+            DbEventFileList::BatchRemove(keys) => write!(f, "BatchRemove({})", keys.len()),
             DbEventFileList::Initialized => write!(f, "Initialized"),
+        }
+    }
+}
+
+pub enum DbEventFileListDeleted {
+    BatchAdd(Vec<String>),
+    BatchRemove(Vec<String>),
+}
+
+impl std::fmt::Debug for DbEventFileListDeleted {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DbEventFileListDeleted::BatchAdd(keys) => write!(f, "BatchAdd({})", keys.len()),
+            DbEventFileListDeleted::BatchRemove(keys) => write!(f, "BatchRemove({})", keys.len()),
         }
     }
 }

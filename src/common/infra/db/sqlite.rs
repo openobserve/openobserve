@@ -36,7 +36,10 @@ use tokio::{
 use crate::common::infra::{
     cluster,
     config::{FxIndexMap, CONFIG},
-    db::{DbEvent, DbEventFileList, DbEventMeta, DbEventStreamStats, Event, EventData},
+    db::{
+        DbEvent, DbEventFileList, DbEventFileListDeleted, DbEventMeta, DbEventStreamStats, Event,
+        EventData,
+    },
     errors::*,
     file_list::sqlite as sqlite_file_list,
 };
@@ -246,7 +249,7 @@ impl SqliteDbChannel {
                             log::error!("[SQLITE] batch add file_list error: {}", e);
                         }
                     }
-                    DbEvent::FileList(DbEventFileList::Remove(files)) => {
+                    DbEvent::FileList(DbEventFileList::BatchRemove(files)) => {
                         let mut err: Option<String> = None;
                         for _ in 0..DB_RETRY_TIMES {
                             match sqlite_file_list::batch_remove(&client, &files).await {
@@ -262,6 +265,42 @@ impl SqliteDbChannel {
                         }
                         if let Some(e) = err {
                             log::error!("[SQLITE] batch remove file_list error: {}", e);
+                        }
+                    }
+                    DbEvent::FileListDeleted(DbEventFileListDeleted::BatchAdd(files)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match sqlite_file_list::batch_add_deleted(&client, &files).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] batch add file_list_deleted error: {}", e);
+                        }
+                    }
+                    DbEvent::FileListDeleted(DbEventFileListDeleted::BatchRemove(files)) => {
+                        let mut err: Option<String> = None;
+                        for _ in 0..DB_RETRY_TIMES {
+                            match sqlite_file_list::batch_remove_deleted(&client, &files).await {
+                                Ok(_) => {
+                                    err = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    err = Some(e.to_string());
+                                }
+                            }
+                            time::sleep(time::Duration::from_secs(1)).await;
+                        }
+                        if let Some(e) = err {
+                            log::error!("[SQLITE] batch remove file_list_deleted error: {}", e);
                         }
                     }
                     DbEvent::FileList(DbEventFileList::Initialized) => {

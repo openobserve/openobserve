@@ -56,6 +56,8 @@ pub trait FileList: Sync + Send + 'static {
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_remove(&self, files: &[String]) -> Result<()>;
+    async fn batch_add_deleted(&self, files: &[String]) -> Result<()>;
+    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn list(&self) -> Result<Vec<(String, FileMeta)>>;
@@ -129,6 +131,16 @@ pub async fn batch_add(files: &[FileKey]) -> Result<()> {
 #[inline]
 pub async fn batch_remove(files: &[String]) -> Result<()> {
     CLIENT.batch_remove(files).await
+}
+
+#[inline]
+pub async fn batch_add_deleted(files: &[String]) -> Result<()> {
+    CLIENT.batch_add_deleted(files).await
+}
+
+#[inline]
+pub async fn batch_remove_deleted(files: &[String]) -> Result<()> {
+    CLIENT.batch_remove_deleted(files).await
 }
 
 #[inline]
