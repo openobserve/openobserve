@@ -534,12 +534,14 @@ impl super::FileList for DynamoFileList {
 
 pub async fn create_table() -> Result<()> {
     create_table_file_list().await?;
+    create_table_file_list_deleted().await?;
     create_table_stream_stats().await?;
     Ok(())
 }
 
 pub async fn create_table_index() -> Result<()> {
     create_table_file_list_index().await?;
+    create_table_file_list_deleted_index().await?;
     create_table_stream_stats_index().await?;
     Ok(())
 }
@@ -547,6 +549,86 @@ pub async fn create_table_index() -> Result<()> {
 pub async fn create_table_file_list() -> Result<()> {
     let client = DYNAMO_DB_CLIENT.get().await.clone();
     let table_name = &CONFIG.dynamo.file_list_table;
+    let tables = client
+        .list_tables()
+        .send()
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+    if tables
+        .table_names()
+        .unwrap_or(&[])
+        .contains(&table_name.to_string())
+    {
+        return Ok(());
+    }
+
+    let key_schema = vec![
+        KeySchemaElement::builder()
+            .attribute_name("stream")
+            .key_type(KeyType::Hash)
+            .build(),
+        KeySchemaElement::builder()
+            .attribute_name("file")
+            .key_type(KeyType::Range)
+            .build(),
+    ];
+    let attribute_definitions = vec![
+        AttributeDefinition::builder()
+            .attribute_name("org")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("stream")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("file")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("created_at")
+            .attribute_type(ScalarAttributeType::N)
+            .build(),
+    ];
+
+    let index_created = GlobalSecondaryIndex::builder()
+        .index_name("org-created-at-index")
+        .set_key_schema(Some(vec![
+            KeySchemaElement::builder()
+                .attribute_name("org")
+                .key_type(KeyType::Hash)
+                .build(),
+            KeySchemaElement::builder()
+                .attribute_name("created_at")
+                .key_type(KeyType::Range)
+                .build(),
+        ]))
+        .set_projection(Some(
+            Projection::builder()
+                .projection_type(ProjectionType::All)
+                .build(),
+        ))
+        .build();
+
+    client
+        .create_table()
+        .table_name(table_name)
+        .set_key_schema(Some(key_schema))
+        .set_attribute_definitions(Some(attribute_definitions))
+        .set_global_secondary_indexes(Some(vec![index_created]))
+        .billing_mode(BillingMode::PayPerRequest)
+        .send()
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+
+    log::info!("Table {} created successfully", table_name);
+
+    Ok(())
+}
+
+pub async fn create_table_file_list_deleted() -> Result<()> {
+    let client = DYNAMO_DB_CLIENT.get().await.clone();
+    let table_name = &CONFIG.dynamo.file_list_deleted_table;
     let tables = client
         .list_tables()
         .send()
@@ -736,6 +818,10 @@ pub async fn create_table_stream_stats() -> Result<()> {
 }
 
 pub async fn create_table_file_list_index() -> Result<()> {
+    Ok(())
+}
+
+pub async fn create_table_file_list_deleted_index() -> Result<()> {
     Ok(())
 }
 

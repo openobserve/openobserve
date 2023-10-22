@@ -497,6 +497,7 @@ pub struct Dynamo {
     #[env_config(name = "ZO_META_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
     pub prefix: String,
     pub file_list_table: String,
+    pub file_list_deleted_table: String,
     pub stream_stats_table: String,
     pub org_meta_table: String,
     pub meta_table: String,
@@ -900,6 +901,7 @@ fn check_dynamo_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         };
     }
     cfg.dynamo.file_list_table = format!("{}-file-list", cfg.dynamo.prefix);
+    cfg.dynamo.file_list_deleted_table = format!("{}-file-list-deleted", cfg.dynamo.prefix);
     cfg.dynamo.stream_stats_table = format!("{}-stream-stats", cfg.dynamo.prefix);
     cfg.dynamo.org_meta_table = format!("{}-org-meta", cfg.dynamo.prefix);
     cfg.dynamo.meta_table = format!("{}-meta", cfg.dynamo.prefix);

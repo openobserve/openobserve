@@ -499,6 +499,22 @@ CREATE TABLE IF NOT EXISTS file_list
 
     sqlx::query(
         r#"
+CREATE TABLE IF NOT EXISTS file_list_deleted
+(
+    id      BIGINT GENERATED ALWAYS AS IDENTITY,
+    org       VARCHAR not null,
+    stream    VARCHAR not null,
+    date      VARCHAR not null,
+    file      VARCHAR not null,
+    created_at BIGINT not null
+);
+        "#,
+    )
+    .execute(&pool)
+    .await?;
+
+    sqlx::query(
+        r#"
 CREATE TABLE IF NOT EXISTS stream_stats
 (
     id      BIGINT GENERATED ALWAYS AS IDENTITY,
@@ -571,6 +587,22 @@ pub async fn create_table_index() -> Result<()> {
         if let Err(e) = tx.rollback().await {
             log::error!(
                 "[POSTGRES] rollback create table file_list index error: {}",
+                e
+            );
+        }
+        return Err(e.into());
+    }
+
+    // create index for file_list_deleted
+    if let Err(e) = sqlx::query(
+        "CREATE INDEX IF NOT EXISTS file_list_deleted_created_at_idx on file_list_deleted (org, created_at);",
+    )
+    .execute(&mut *tx)
+    .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!(
+                "[POSTGRES] rollback create table file_list_deleted index error: {}",
                 e
             );
         }

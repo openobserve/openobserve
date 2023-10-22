@@ -592,7 +592,7 @@ pub async fn create_table(client: &Pool<Sqlite>) -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS file_list
 (
-    id      INTEGER  not null primary key autoincrement,
+    id      INTEGER not null primary key autoincrement,
     org     VARCHAR not null,
     stream  VARCHAR not null,
     date    VARCHAR not null,
@@ -611,9 +611,25 @@ CREATE TABLE IF NOT EXISTS file_list
 
     sqlx::query(
         r#"
+CREATE TABLE IF NOT EXISTS file_list_deleted
+(
+    id        INTEGER not null primary key autoincrement,
+    org       VARCHAR not null,
+    stream    VARCHAR not null,
+    date      VARCHAR not null,
+    file      VARCHAR not null,
+    created_at BIGINT not null
+);
+        "#,
+    )
+    .execute(client)
+    .await?;
+
+    sqlx::query(
+        r#"
 CREATE TABLE IF NOT EXISTS stream_stats
 (
-    id      INTEGER  not null primary key autoincrement,
+    id      INTEGER not null primary key autoincrement,
     org     VARCHAR not null,
     stream  VARCHAR not null,
     file_num BIGINT not null,
@@ -632,13 +648,13 @@ CREATE TABLE IF NOT EXISTS stream_stats
 }
 
 pub async fn create_table_index(client: &Pool<Sqlite>) -> Result<()> {
+    // create index for file_list
     let index_sql = r#"
 CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);
 CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);
 CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);
 CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);
         "#;
-    // create index for file_list
     if let Err(e) = sqlx::query(index_sql).execute(client).await {
         if e.to_string().contains("UNIQUE constraint failed") {
             // delete duplicate records
@@ -672,6 +688,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream
             return Err(e.into());
         }
     }
+
+    // create index for file_list_deleted
+    sqlx::query(
+        r#"
+CREATE INDEX IF NOT EXISTS file_list_deleted_created_at_idx on file_list_deleted (org, created_at);
+        "#,
+    )
+    .execute(client)
+    .await?;
 
     // create index for stream_stats
     sqlx::query(
