@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::common::meta::organization::OrganizationSettingResponse;
 use crate::common::utils::json;
 use crate::service::db::organization::get_org_setting;
 use crate::{
-    common::meta::{self, organization::OrganizationSetting},
-    service::db::organization::set_org_setting,
+    common::meta::organization::OrganizationSetting, service::db::organization::set_org_setting,
 };
-use actix_web::{get, http, post, web, HttpResponse};
+use actix_web::{get, post, web, HttpResponse};
 use std::io::Error;
 
 /** Organization specific settings */
@@ -45,13 +45,15 @@ async fn create(
     settings: web::Json<OrganizationSetting>,
 ) -> Result<HttpResponse, Error> {
     if settings.scrape_interval == 0 {
-        return bad_request("scrape_interval should be a positive value");
+        return Ok(MetaHttpResponse::bad_request(
+            "scrape_interval should be a positive value",
+        ));
     }
 
     let org_id = path.into_inner();
     match set_org_setting(&org_id, &settings).await {
         Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
-        Err(e) => bad_request(e.to_string().as_str()),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
     }
 }
 
@@ -87,18 +89,9 @@ async fn get(path: web::Path<String>) -> Result<HttpResponse, Error> {
                     );
                 }
             }
-            return bad_request(&err);
+            return Ok(MetaHttpResponse::bad_request(&err));
         }
     };
     let data: OrganizationSetting = json::from_slice(&org_settings).unwrap();
     Ok(HttpResponse::Ok().json(OrganizationSettingResponse { data }))
-}
-
-fn bad_request(message: &str) -> Result<HttpResponse, Error> {
-    Ok(
-        HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            message.to_string(),
-        )),
-    )
 }
