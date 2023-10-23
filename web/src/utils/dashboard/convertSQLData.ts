@@ -28,10 +28,7 @@ import {
 export const convertSQLData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any,
-  params: any = {
-    timezone: "UTC",
-  }
+  store: any
 ) => {
   // if no data than return it
   if (
