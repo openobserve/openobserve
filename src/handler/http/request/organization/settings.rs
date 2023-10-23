@@ -15,7 +15,7 @@
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::common::meta::organization::OrganizationSettingResponse;
 use crate::common::utils::json;
-use crate::service::db::organization::get_org_setting;
+use crate::service::db::organization::{get_org_setting, ORG_SETTINGS_KEY_PREFIX};
 use crate::{
     common::meta::organization::OrganizationSetting, service::db::organization::set_org_setting,
 };
@@ -80,7 +80,10 @@ async fn get(path: web::Path<String>) -> Result<HttpResponse, Error> {
         Ok(s) => s,
         Err(e) => {
             let err = e.to_string();
-            let expected_err = format!("DbError# key /organization/{org_id} does not exist");
+            let expected_err = format!(
+                "DbError# key {}/{} does not exist",
+                ORG_SETTINGS_KEY_PREFIX, org_id
+            );
             if err.contains(&expected_err) {
                 let setting = OrganizationSetting::default();
                 if let Ok(()) = set_org_setting(&org_id, &setting).await {
