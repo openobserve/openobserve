@@ -130,7 +130,7 @@ export default defineComponent({
                                 //set options value from the api response
                                 obj.options = res.data.hits
                                     .find((field: any) => field.field === it.query_data.field)
-                                    .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key : "null");
+                                    .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key.toString() : "null");
                                 // find old value is exists in the dropdown
                                 let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
                                 console.log("oldVariableObjectSelectedValue", oldVariableObjectSelectedValue);
