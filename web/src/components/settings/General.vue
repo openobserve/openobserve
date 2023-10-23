@@ -102,8 +102,6 @@ export default defineComponent({
           timeout: 2000,
         })
       } catch (err: any) {
-        console.log(err);
-        
         q.notify({
           type: "negative",
           message: err?.message || "something went wrong",
