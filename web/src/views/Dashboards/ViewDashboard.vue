@@ -105,8 +105,6 @@ import { getConsumableDateTime, getDashboard } from "../../utils/commons.ts";
 import {
   parseDuration,
   generateDurationLabel,
-  getDurationObjectFromParams,
-  getQueryParamsForDuration,
 } from "../../utils/date";
 import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
@@ -149,8 +147,12 @@ export default defineComponent({
       });
       router.replace({
         query: {
-          ...route.query,
-          ...variableObj,
+        org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: route.query.dashboard,
+          folder: route.query.folder,
+          refresh: generateDurationLabel(refreshInterval.value),
+          ...getQueryParamsForDuration(selectedDate.value),
+          ...variableObj
         },
       });
     }
@@ -278,9 +280,12 @@ export default defineComponent({
         refreshInterval.value = parseDuration(params.refresh);
       }
 
-      if (params.period || (params.to && params.from)) {
-        selectedDate.value = getSelectedDateFromQueryParams(params);
-      }
+      // This is removed due to the bug of the new date time component
+      // and is now rendered when the setup method is called
+      // instead of onActivated
+      // if (params.period || (params.to && params.from)) {
+      //   selectedDate.value = getSelectedDateFromQueryParams(params);
+      // }
       console.log("params", params);
 
       // resize charts if needed

@@ -118,8 +118,8 @@ export default defineComponent({
                             .fieldValues({
                             org_identifier: store.state.selectedOrganization.identifier,
                             stream_name: it.query_data.stream,
-                            start_time: new Date(props.selectedTimeDate?.start_time?.toISOString()).getTime() * 1000,
-                            end_time: new Date(props.selectedTimeDate?.end_time?.toISOString()).getTime() * 1000,
+                            start_time: new Date(props.selectedTimeDate?.start_time?.toISOString()).getTime(),
+                            end_time: new Date(props.selectedTimeDate?.end_time?.toISOString()).getTime(),
                             fields: [it.query_data.field],
                             size: it?.query_data?.max_record_size ? it?.query_data?.max_record_size : 10,
                             type: it.query_data.stream_type,
