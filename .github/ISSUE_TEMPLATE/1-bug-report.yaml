@@ -21,7 +21,7 @@ body:
         - routing
         - metrics
         - traces
-        -real user monitoring
+        - real user monitoring
         - Don't known / other
       multiple: true
     validations:
