@@ -29,6 +29,7 @@
       :class="selectedType + 'type'"
     >
       <q-menu
+        no-route-dismiss
         id="date-time-menu"
         class="date-time-dialog"
         anchor="bottom left"
@@ -214,6 +215,23 @@
             </div>
           </q-tab-panel>
         </q-tab-panels>
+        <q-select
+          v-model="timezone"
+          :options="filteredTimezone"
+          @blur="timezone = timezone == '' ? 'UTC' : timezone"
+          use-input
+          @filter="timezoneFilterFn"
+          input-debounce="0"
+          dense
+          filled
+          emit-value
+          fill-input
+          hide-selected
+          :label="t('logStream.timezone')"
+          @update:modelValue="onTimezoneChange"
+          :display-value="`Timezone: ${timezone}`"
+        >
+        </q-select>
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
           <q-separator class="q-my-sm" />
           <q-btn
@@ -242,8 +260,10 @@ import {
   onBeforeMount,
   watch,
 } from "vue";
-import { getImageURL } from "../utils/zincutils";
+import { getImageURL, useLocalTimezone } from "../utils/zincutils";
 import { date } from "quasar";
+import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   props: {
@@ -265,9 +285,11 @@ export default defineComponent({
     },
   },
 
-  emits: ["on:date-change"],
+  emits: ["on:date-change", "on:timezone-change"],
 
   setup(props, { emit }) {
+    const store = useStore();
+    const { t } = useI18n();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00",
@@ -279,6 +301,16 @@ export default defineComponent({
     });
     const relativePeriod = ref("m");
     const relativeValue = ref(15);
+    const currentTimezone = useLocalTimezone() || "UTC";
+    const timezone = ref(currentTimezone);
+    let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
+      return tz;
+    });
+
+    // Add the UTC option
+    timezoneOptions.unshift("UTC");
+
+    const filteredTimezone: any = ref([]);
 
     const relativePeriods = [
       { label: "Minutes", value: "m" },
@@ -340,7 +372,6 @@ export default defineComponent({
         selectedDate.value?.to;
       },
       () => {
-        console.log("selected time changed");
         if (props.autoApply && selectedType.value === "absolute")
           saveDate("absolute");
       },
@@ -372,6 +403,12 @@ export default defineComponent({
 
     const onCustomPeriodSelect = () => {
       if (props.autoApply) saveDate("relative-custom");
+    };
+
+    const onTimezoneChange = () => {
+      useLocalTimezone(timezone.value);
+      store.dispatch("setTimezone", timezone.value);
+      emit("on:timezone-change");
     };
 
     const setRelativeTime = (period) => {
@@ -548,7 +585,29 @@ export default defineComponent({
       }
     };
 
+    const timezoneFilterFn = (val, update) => {
+      filteredTimezone.value = filterColumns(timezoneOptions, val, update);
+    };
+
+    const filterColumns = (options: any[], val: String, update: Function) => {
+      let filteredOptions: any[] = [];
+      if (val === "") {
+        update(() => {
+          filteredOptions = [...options];
+        });
+        return filteredOptions;
+      }
+      update(() => {
+        const value = val.toLowerCase();
+        filteredOptions = options.filter(
+          (column: any) => column.toLowerCase().indexOf(value) > -1
+        );
+      });
+      return filteredOptions;
+    };
+
     return {
+      t,
       datetimeBtn,
       getImageURL,
       onCustomPeriodSelect,
@@ -567,6 +626,10 @@ export default defineComponent({
       refresh,
       dateLocale,
       resetTime,
+      onTimezoneChange,
+      timezone,
+      filteredTimezone,
+      timezoneFilterFn,
     };
   },
 });
@@ -588,6 +651,7 @@ export default defineComponent({
   border-radius: 3px;
 }
 .date-time-button {
+  height: 100%;
   border-radius: 3px;
   padding: 0px 5px;
   font-size: 12px;

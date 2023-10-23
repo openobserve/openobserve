@@ -252,7 +252,7 @@ export default defineComponent({
         searchObj.data.histogram.layout
       ) {
         nextTick(() => {
-          plotChart.value = convertTraceData(searchObj.data.histogram);
+          plotChart.value = convertTraceData(searchObj.data.histogram, store.state.timezone);
           // plotChart.value.forceReLayout();
         });
       }

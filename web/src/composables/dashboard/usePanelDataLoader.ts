@@ -67,9 +67,9 @@ export const usePanelDataLoader = (
       timestamps.end_time != "Invalid Date"
     ) {
       startISOTimestamp =
-        new Date(timestamps.start_time.toISOString()).getTime() * 1000;
+        new Date(timestamps.start_time.toISOString()).getTime();
       endISOTimestamp =
-        new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+        new Date(timestamps.end_time.toISOString()).getTime();
     } else {
       return;
     }

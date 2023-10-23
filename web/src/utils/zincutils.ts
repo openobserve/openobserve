@@ -14,6 +14,7 @@
 
 import config from "../aws-exports";
 import { ref } from "vue";
+import { DateTime } from "luxon";
 
 const useLocalStorage = (
   key: string,
@@ -186,6 +187,11 @@ export const useLocalTraceFilterField = (val = "", isDelete = false) => {
 export const useLocalUserInfo = (val = "", isDelete = false) => {
   const userInfo: any = useLocalStorage("userInfo", val, isDelete);
   return userInfo.value;
+};
+
+export const useLocalTimezone = (val = "", isDelete = false) => {
+  const timezone: any = useLocalStorage("timezone", val, isDelete);
+  return timezone.value;
 };
 
 export const deleteSessionStorageVal = (key: string) => {
@@ -419,3 +425,26 @@ export function formatDuration(ms: number) {
 
   return formatted.trim();
 }
+export const timestampToTimezoneDate = (
+  unixMilliTimestamp: number,
+  timezone: string = "UTC",
+  format: string = "MMM dd, yyyy HH:mm:ss.SSS Z"
+) => {
+  return DateTime.fromMillis(Math.floor(unixMilliTimestamp))
+    .setZone(timezone)
+    .toFormat(format);
+};
+
+export const histogramDateTimezone: any = (
+  utcTime: any,
+  timezone: string = "UTC"
+) => {
+  if (timezone == "UTC") return Math.floor(new Date(utcTime).getTime());
+  else {
+    return (
+      Math.floor(
+        DateTime.fromISO(utcTime, { zone: "UTC" }).setZone(timezone).toSeconds()
+      ) * 1000
+    );
+  }
+};
