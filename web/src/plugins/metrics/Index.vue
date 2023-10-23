@@ -266,7 +266,7 @@ export default defineComponent({
     QueryEditor,
     AddToDashboard,
     SyntaxGuideMetrics,
-    PanelSchemaRenderer
+    PanelSchemaRenderer,
   },
   methods: {
     searchData() {
@@ -514,7 +514,6 @@ export default defineComponent({
               chartParams: {},
             };
           }
-          console.log("metrics updated", searchObj.data.metrics.metricList);
         }
       } catch (e) {
         console.log("Error while loading streams");
@@ -591,14 +590,13 @@ export default defineComponent({
 
     function runQuery() {
       try {
-        
         if (
           !searchObj.data.metrics.selectedMetric?.value ||
           !searchObj.data.query
         ) {
           return false;
         }
-        
+
         searchObj.data.errorMsg = "";
         const timestamps: any =
           searchObj.data.datetime.type === "relative"
@@ -611,7 +609,7 @@ export default defineComponent({
           end_time: new Date(timestamps.endTime / 1000),
         };
         chartData.value = cloneDeep(dashboardPanelData.data);
-        
+
         updateUrlQueryParams();
       } catch (e) {
         showErrorNotification("Request failed.");
@@ -716,7 +714,6 @@ export default defineComponent({
           });
         })
         .catch((err) => {
-          console.log(err);
           $q.notify({
             message: "Error while adding panel",
             type: "negative",
