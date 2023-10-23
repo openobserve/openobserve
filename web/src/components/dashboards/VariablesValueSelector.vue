@@ -60,7 +60,6 @@ export default defineComponent({
             isVariablesLoading: false,
             values: []
         });
-        console.log("variablesData from the setup", JSON.stringify(variablesData.values));
         onMounted(() => {
             getVariablesData();
         });
@@ -74,15 +73,11 @@ export default defineComponent({
 
         const emitVariablesData = () => {
             emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
-            console.log("variablesData", JSON.parse(JSON.stringify(variablesData.values)));
-            
         };
 
         const getVariablesData = async () => {
             // do we have variables & date?
             if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
-                console.log('broken return');
-                
                 variablesData.values = [];
                 variablesData.isVariablesLoading = false;
                 emitVariablesData();
@@ -97,7 +92,6 @@ export default defineComponent({
                     value: props.initialVariableValues[key],
                 }))
             }
-            console.log('old values' , JSON.stringify(oldVariableValue));
             
             // continue as we have variables
             
@@ -133,7 +127,6 @@ export default defineComponent({
                                     .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key.toString() : "null");
                                 // find old value is exists in the dropdown
                                 let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
-                                console.log("oldVariableObjectSelectedValue", oldVariableObjectSelectedValue);
                                 
                                 // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
                                 if (oldVariableObjectSelectedValue) {

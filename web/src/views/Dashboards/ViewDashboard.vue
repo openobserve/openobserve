@@ -286,7 +286,6 @@ export default defineComponent({
       // if (params.period || (params.to && params.from)) {
       //   selectedDate.value = getSelectedDateFromQueryParams(params);
       // }
-      console.log("params", params);
 
       // resize charts if needed
       await nextTick();
@@ -295,7 +294,6 @@ export default defineComponent({
 
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate], () => {
-      console.log("refreshInterval", refreshInterval.value);
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
