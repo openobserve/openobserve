@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap as HashMap;
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use futures::future::try_join_all;
-use std::{
-    collections::HashMap,
-    io::{BufRead, BufReader},
-};
+use std::io::{BufRead, BufReader};
 
 use crate::common::infra::{config::CONFIG, file_list as infra_file_list, storage};
 
