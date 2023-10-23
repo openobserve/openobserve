@@ -356,7 +356,7 @@ export const usePanelDataLoader = (
 
     //fixed variables value calculations
     //scrape interval by default 15 seconds
-    let scrapeInterval = store.state.organizationData.organizationSettings.scrapeInterval ?? 15;
+    let scrapeInterval = store.state.organizationData.organizationSettings.scrape_interval ?? 15;
 
     // timestamp in seconds / chart panel width
     let __interval = ((endISOTimestamp - startISOTimestamp)/(chartPanelRef.value?.offsetWidth ?? 1000))/1000;
