@@ -22,23 +22,26 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
-use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
-    meta::{
-        alert::{Alert, Trigger},
-        http::HttpResponse as MetaHttpResponse,
-        ingestion::StreamStatus,
-        stream::StreamParams,
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{flatten, json},
-};
 use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
     db, get_formatted_stream_name,
     ingestion::{grpc::get_val_for_attr, write_file},
     usage::report_request_usage_stats,
+};
+use crate::{
+    common::{
+        infra::{cluster, config::CONFIG, metrics},
+        meta::{
+            alert::{Alert, Trigger},
+            http::HttpResponse as MetaHttpResponse,
+            ingestion::StreamStatus,
+            stream::StreamParams,
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json},
+    },
+    service::schema::stream_schema_exists,
 };
 
 use super::StreamMeta;
@@ -102,7 +105,12 @@ pub async fn logs_json_handler(
             )
             .await
         }
-        None => "default".to_owned(),
+        None => {
+            let _schema_exists =
+                stream_schema_exists(org_id, "default", StreamType::Logs, &mut stream_schema_map)
+                    .await;
+            "default".to_owned()
+        }
     };
 
     let stream_name = &stream_name;

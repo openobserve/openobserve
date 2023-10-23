@@ -24,22 +24,25 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use super::StreamMeta;
-use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
-    meta::{
-        alert::{Alert, Trigger},
-        http::HttpResponse as MetaHttpResponse,
-        ingestion::{IngestionResponse, StreamStatus},
-        stream::StreamParams,
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-};
 use crate::service::{
     db, get_formatted_stream_name,
     ingestion::{grpc::get_val, write_file},
     usage::report_request_usage_stats,
+};
+use crate::{
+    common::{
+        infra::{cluster, config::CONFIG, metrics},
+        meta::{
+            alert::{Alert, Trigger},
+            http::HttpResponse as MetaHttpResponse,
+            ingestion::{IngestionResponse, StreamStatus},
+            stream::StreamParams,
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    },
+    service::schema::stream_schema_exists,
 };
 
 pub async fn usage_ingest(
@@ -221,7 +224,12 @@ pub async fn handle_grpc_request(
             )
             .await
         }
-        None => "default".to_owned(),
+        None => {
+            let _schema_exists =
+                stream_schema_exists(org_id, "default", StreamType::Logs, &mut stream_schema_map)
+                    .await;
+            "default".to_owned()
+        }
     };
 
     let stream_name = &stream_name;
