@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ahash::HashMap;
+use arrow::{ipc::writer::StreamWriter, record_batch::RecordBatch};
+use arrow_schema::Schema;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use once_cell::sync::Lazy;
@@ -58,6 +60,7 @@ pub struct MemoryFiles {
 pub struct RwFile {
     use_cache: bool,
     file: Option<RwLock<File>>,
+    arrow_file: Option<RwLock<StreamWriter<std::fs::File>>>,
     cache: Option<RwLock<BytesMut>>,
     org_id: String,
     stream_name: String,
@@ -65,6 +68,7 @@ pub struct RwFile {
     dir: String,
     name: String,
     expired: i64,
+    use_arrow: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -82,7 +86,36 @@ pub async fn get_or_create(
     use_cache: bool,
 ) -> Arc<RwFile> {
     MANAGER
-        .get_or_create(thread_id, stream, partition_time_level, key, use_cache)
+        .get_or_create(
+            thread_id,
+            stream,
+            partition_time_level,
+            key,
+            use_cache,
+            false,
+            None,
+        )
+        .await
+}
+
+pub async fn get_or_create_arrow(
+    thread_id: usize,
+    stream: StreamParams,
+    partition_time_level: Option<PartitionTimeLevel>,
+    key: &str,
+    use_cache: bool,
+    schema: Option<Schema>,
+) -> Arc<RwFile> {
+    MANAGER
+        .get_or_create(
+            thread_id,
+            stream,
+            partition_time_level,
+            key,
+            use_cache,
+            true,
+            schema,
+        )
         .await
 }
 
@@ -199,6 +232,8 @@ impl Manager {
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
+        use_arrow: bool,
+        schema: Option<Schema>,
     ) -> Arc<RwFile> {
         let stream_type = stream.stream_type;
         let full_key = format!(
@@ -210,8 +245,18 @@ impl Manager {
             return f.clone();
         }
 
-        let file =
-            Arc::new(RwFile::new(thread_id, stream, partition_time_level, key, use_cache).await);
+        let file = Arc::new(
+            RwFile::new(
+                thread_id,
+                stream,
+                partition_time_level,
+                key,
+                use_cache,
+                use_arrow,
+                schema,
+            )
+            .await,
+        );
         if !stream_type.eq(&StreamType::EnrichmentTables) {
             data.insert(full_key, file.clone());
         };
@@ -225,12 +270,22 @@ impl Manager {
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
+        use_arrow: bool,
+        schema: Option<Schema>,
     ) -> Arc<RwFile> {
         if let Some(file) = self.get(thread_id, stream.clone(), key).await {
             file
         } else {
-            self.create(thread_id, stream, partition_time_level, key, use_cache)
-                .await
+            self.create(
+                thread_id,
+                stream,
+                partition_time_level,
+                key,
+                use_cache,
+                use_arrow,
+                schema,
+            )
+            .await
         }
     }
 
@@ -295,12 +350,52 @@ impl MemoryFiles {
 }
 
 impl RwFile {
+    pub async fn write_for_schema(
+        &self,
+        data: RecordBatch,
+        thread_id: usize,
+        stream: StreamParams,
+        partition_time_level: Option<PartitionTimeLevel>,
+        key: &str,
+        use_cache: bool,
+        schema: Option<Schema>,
+    ) {
+        if self.arrow_file.as_ref().is_some() {
+            self.arrow_file
+                .as_ref()
+                .unwrap()
+                .write()
+                .await
+                .write(&data)
+                .unwrap()
+        } else {
+            crate::common::infra::wal::get_or_create_arrow(
+                0,
+                StreamParams::new("default", "in_stream_name", StreamType::Logs),
+                None,
+                "aa",
+                false,
+                Some(schema.as_ref().unwrap().clone()),
+            )
+            .await;
+            self.arrow_file
+                .as_ref()
+                .unwrap()
+                .write()
+                .await
+                .write(&data)
+                .unwrap()
+        }
+    }
+
     async fn new(
         thread_id: usize,
         stream: StreamParams,
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
+        use_arrow: bool,
+        schema: Option<Schema>,
     ) -> RwFile {
         let mut dir_path = format!(
             "{}files/{}/{}/{}/",
@@ -318,8 +413,23 @@ impl RwFile {
             .await
             .unwrap();
 
-        let (file, cache) = if use_cache {
-            (None, Some(RwLock::new(BytesMut::with_capacity(524288)))) // 512KB
+        let (file, cache, arrow_file) = if use_cache {
+            (
+                None,
+                Some(RwLock::new(BytesMut::with_capacity(524288))),
+                None,
+            )
+        } else if use_arrow {
+            let file_path = format!("{dir_path}{}", file_name.replace(".json", ".arrow"));
+            let file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .append(true)
+                .open(file_path)
+                .unwrap();
+            let writer = StreamWriter::try_new(file, &schema.unwrap()).unwrap();
+
+            (None, None, Some(RwLock::new(writer)))
         } else {
             let f = OpenOptions::new()
                 .write(true)
@@ -328,7 +438,7 @@ impl RwFile {
                 .open(&file_path)
                 .await
                 .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
-            (Some(RwLock::new(f)), None)
+            (Some(RwLock::new(f)), None, None)
         };
 
         let time_now: DateTime<Utc> = Utc::now();
@@ -360,12 +470,14 @@ impl RwFile {
             use_cache,
             file,
             cache,
+            arrow_file,
             org_id: stream.org_id.to_string(),
             stream_name: stream.stream_name.to_string(),
             stream_type: stream.stream_type,
             dir: dir_path,
             name: file_name,
             expired: ttl,
+            use_arrow,
         }
     }
 
@@ -431,6 +543,10 @@ impl RwFile {
                         .freeze(),
                 )
                 .await;
+        } else if self.use_arrow {
+            let mut writer = self.arrow_file.as_ref();
+            writer.unwrap().write().await.finish().unwrap();
+            writer = None;
         } else {
             self.file
                 .as_ref()
@@ -447,6 +563,16 @@ impl RwFile {
     pub async fn size(&self) -> i64 {
         if self.use_cache {
             self.cache.as_ref().unwrap().write().await.len() as i64
+        } else if self.use_arrow {
+            self.arrow_file
+                .as_ref()
+                .unwrap()
+                .read()
+                .await
+                .get_ref()
+                .metadata()
+                .unwrap()
+                .len() as i64
         } else {
             self.file
                 .as_ref()
@@ -546,7 +672,7 @@ mod tests {
         let stream = StreamParams::new(org_id, stream_name, stream_type);
         let key = "test_key";
         let use_cache = false;
-        let file = RwFile::new(thread_id, stream, None, key, use_cache).await;
+        let file = RwFile::new(thread_id, stream, None, key, use_cache, false, None).await;
         let data = "test_data".to_string().into_bytes();
         file.write(&data).await;
         assert_eq!(file.read().await.unwrap(), data);

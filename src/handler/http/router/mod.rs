@@ -30,6 +30,18 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::common::{
     infra::config::CONFIG,
     meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
+use super::auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum};
+use super::request::{
+    alerts::*, dashboards::folders::*, dashboards::*, enrichment_table, functions, kv, logs,
+    metrics, organization, prom, rum, search, status, stream, syslog, traces, users,
+};
+
+use crate::{
+    common::{
+        infra::config::CONFIG,
+        meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
+    },
+    service::logs::arrow,
 };
 
 use super::auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum};
@@ -263,6 +275,25 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(syslog::delete_route)
             .service(syslog::update_route)
             .service(syslog::toggle_state),
+            .service(syslog::toggle_state)
+            .service(enrichment_table::save_enrichment_table)
+            .service(metrics::ingest::otlp_metrics_write)
+            .service(logs::ingest::otlp_logs_write)
+            .service(traces::otlp_traces_write)
+            .service(create_folder)
+            .service(list_folders)
+            .service(update_folder)
+            .service(get_folder)
+            .service(delete_folder)
+            .service(move_dashboard)
+            .service(traces::get_latest_traces)
+            .service(logs::ingest::multi)
+            .service(logs::ingest::json)
+            .service(logs::ingest::handle_kinesis_request)
+            .service(logs::ingest::handle_gcp_request)
+            .service(arrow::json_to_arrow)
+            .service(arrow::data)
+            .service(logs::ingest::json_arrow),
     );
 }
 

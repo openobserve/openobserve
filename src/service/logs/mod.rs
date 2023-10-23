@@ -32,6 +32,7 @@ use crate::service::{
     stream::unwrap_partition_time_level,
 };
 
+pub mod arrow;
 pub mod bulk;
 pub mod gcs_pub_sub;
 pub mod ingest;
@@ -297,6 +298,117 @@ async fn add_valid_record<'a>(
     } else {
         Some(trigger)
     }
+}
+
+async fn add_valid_record_arrow(
+    stream_meta: &StreamMeta<'_>,
+    stream_schema_map: &mut AHashMap<String, Schema>,
+    status: &mut RecordStatus,
+    buf: &mut AHashMap<String, Vec<utils::json::Value>>,
+    local_val: &mut Map<String, Value>,
+) -> Option<Trigger> {
+    let mut trigger: Option<Trigger> = None;
+    let timestamp: i64 = local_val
+        .get(&CONFIG.common.column_timestamp)
+        .unwrap()
+        .as_i64()
+        .unwrap();
+
+    let mut value_str = utils::json::to_string(&local_val).unwrap();
+    // check schema
+    let schema_evolution = check_for_schema(
+        &stream_meta.org_id,
+        &stream_meta.stream_name,
+        StreamType::Logs,
+        &value_str,
+        stream_schema_map,
+        timestamp,
+    )
+    .await;
+
+    // get hour key
+    let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
+    let hour_key = get_wal_time_key(
+        timestamp,
+        stream_meta.partition_keys,
+        unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
+        local_val,
+        Some(&schema_key),
+    );
+    let hour_buf = buf.entry(hour_key).or_default();
+
+    if schema_evolution.schema_compatible {
+        let valid_record = if schema_evolution.types_delta.is_some() {
+            let delta = schema_evolution.types_delta.unwrap();
+            let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
+            let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
+                cast_to_type(loc_value, delta)
+            } else if schema_evolution.is_schema_changed {
+                let local_delta = delta
+                    .into_iter()
+                    .filter(|x| x.metadata().contains_key("zo_cast"))
+                    .collect::<Vec<_>>();
+
+                if local_delta.is_empty() {
+                    (Some(value_str.clone()), None)
+                } else {
+                    cast_to_type(loc_value, local_delta)
+                }
+            } else {
+                cast_to_type(loc_value, delta)
+            };
+            if ret_val.is_some() {
+                value_str = ret_val.unwrap();
+                true
+            } else {
+                status.failed += 1;
+                status.error = error.unwrap();
+                false
+            }
+        } else {
+            true
+        };
+
+        if valid_record {
+            if !stream_meta.stream_alerts_map.is_empty() {
+                // Start check for alert trigger
+                let key = format!(
+                    "{}/{}/{}",
+                    &stream_meta.org_id,
+                    StreamType::Logs,
+                    &stream_meta.stream_name
+                );
+                if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
+                    for alert in alerts {
+                        if alert.is_real_time {
+                            let set_trigger = alert.condition.evaluate(local_val.clone());
+                            if set_trigger {
+                                // let _ = triggers::save_trigger(alert.name.clone(), trigger).await;
+                                trigger = Some(Trigger {
+                                    timestamp,
+                                    is_valid: true,
+                                    alert_name: alert.name.clone(),
+                                    stream: stream_meta.stream_name.to_string(),
+                                    org: stream_meta.org_id.to_string(),
+                                    stream_type: StreamType::Logs,
+                                    last_sent_at: 0,
+                                    count: 0,
+                                    is_ingest_time: true,
+                                });
+                            }
+                        }
+                    }
+                }
+                // End check for alert trigger
+            }
+            let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
+            hour_buf.push(loc_value);
+            status.successful += 1;
+        };
+    } else {
+        status.failed += 1;
+    }
+    trigger
 }
 
 fn set_parsing_error(parse_error: &mut String, field: &Field) {
