@@ -142,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { onActivated, ref, defineProps } from "vue";
+import { ref, defineProps, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import {
@@ -174,8 +174,8 @@ interface Session {
 
 const props = defineProps({
   isSessionReplayEnabled: {
-    type: Object,
-    default: () => ({}),
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -253,10 +253,10 @@ const columns = ref([
   },
 ]);
 
-onActivated(async () => {
+onMounted(async () => {
+  // TODO OK : Store stream fields in composable
   if (router.currentRoute.value.name === "Sessions") {
     await getStreamFields();
-    getSessions();
     restoreUrlQueryParams();
   }
 });

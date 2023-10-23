@@ -133,7 +133,6 @@ const getSession = () => {
       })
       .then((res) => {
         if (res.data.hits.length === 0) {
-          console.log("No session found");
           return;
         }
         sessionState.data.selectedSession = {
@@ -161,7 +160,7 @@ const getSessionSegments = () => {
       startTime:
         Number(sessionState.data.selectedSession?.start_time) * 1000 - 300000,
       endTime:
-        Number(sessionState.data.selectedSession?.end_time) * 1000 + 300000,
+        Number(sessionState.data.selectedSession?.end_time) * 1000 + 300000000,
     },
     sqlMode: false,
     currentPage: 0,
@@ -219,7 +218,7 @@ const getSessionEvents = () => {
   };
 
   const req = buildQueryPayload(queryPayload);
-  req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' and type='error' or type='action' or type='view' order by ${store.state.zoConfig.timestamp_column} asc`;
+  req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' and type='error' or type='action' or type='view' order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);
   searchService
@@ -231,7 +230,10 @@ const getSessionEvents = () => {
     .then((res) => {
       const events = ["action", "view", "error"];
       segmentEvents.value = res.data.hits.filter((hit: any) => {
-        return !!events.includes(hit.type);
+        return (
+          !!events.includes(hit.type) &&
+          hit.date >= Number(router.currentRoute.value.query.start_time) / 1000
+        );
       });
       segmentEvents.value = segmentEvents.value.map((hit: any) => {
         return formatEvent(hit);
@@ -245,9 +247,9 @@ const getDefaultEvent = (event: any) => {
   _event.id = event[`${event.type}_id`];
   _event.event_id = event[`${event.type}_id`];
   _event.type = event.type;
-  _event.timestamp = event[store.state.zoConfig.timestamp_column];
+  _event.timestamp = event.date;
   const relativeTime = formatTimeDifference(
-    _event.timestamp / 1000,
+    _event.timestamp,
     Number(router.currentRoute.value.query.start_time) / 1000
   );
   _event.relativeTime = relativeTime[0] as number;
