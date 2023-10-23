@@ -13,11 +13,12 @@
 // limitations under the License.
 
 use actix_multipart::Multipart;
-use actix_web::{http, post, web, HttpRequest, HttpResponse};
+use actix_web::{post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
 use crate::common::infra::config::{CONFIG, SIZE_IN_MB};
-use crate::{common::meta, service::enrichment_table::save_enrichment_data};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::service::enrichment_table::save_enrichment_data;
 
 /** CreateEnrichmentTable */
 #[utoipa::path(
@@ -57,7 +58,7 @@ pub async fn save_enrichment_table(
         }
     };
     if content_length > CONFIG.limit.enrichment_table_limit as f64 {
-        return Ok(bad_request(&format!(
+        return Ok(MetaHttpResponse::bad_request(format!(
             "exceeds allowed limit of {} mb",
             CONFIG.limit.enrichment_table_limit
         )));
@@ -71,20 +72,13 @@ pub async fn save_enrichment_table(
             {
                 save_enrichment_data(&org_id, &table_name, payload, **thread_id).await
             } else {
-                Ok(bad_request(
+                Ok(MetaHttpResponse::bad_request(
                     "Bad Request, content-type must be multipart/form-data",
                 ))
             }
         }
-        None => Ok(bad_request(
+        None => Ok(MetaHttpResponse::bad_request(
             "Bad Request, content-type must be multipart/form-data",
         )),
     }
-}
-
-fn bad_request(message: &str) -> HttpResponse {
-    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-        http::StatusCode::BAD_REQUEST.into(),
-        message.to_string(),
-    ))
 }

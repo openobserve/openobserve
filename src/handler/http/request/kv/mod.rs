@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::service::kv;
 use actix_web::http::header::ContentType;
 use actix_web::{delete, get, post, web, HttpRequest, HttpResponse};
 use ahash::HashMap;
 use std::io::Error;
-
-use crate::service::kv;
 
 /** GetValue */
 #[utoipa::path(
@@ -141,11 +141,11 @@ pub async fn list(org_id: web::Path<String>, in_req: HttpRequest) -> Result<Http
         None => "",
     };
     match kv::list(&org_id, prefix).await {
-        Ok(keys) => Ok(HttpResponse::Ok().json(keys)),
+        Ok(keys) => Ok(MetaHttpResponse::json(keys)),
         Err(err) => {
             log::error!("list KV keys: {}, error: {}", prefix, err);
             let keys: Vec<String> = Vec::new();
-            Ok(HttpResponse::Ok().json(keys))
+            Ok(MetaHttpResponse::json(keys))
         }
     }
 }
