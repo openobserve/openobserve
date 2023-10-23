@@ -87,7 +87,7 @@ export default defineComponent({
             // get old variable values
             let oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
             if(!oldVariableValue.length) {
-                oldVariableValue = Object.keys(props.initialVariableValues).map((key: any) => ({
+                oldVariableValue = Object.keys(props?.initialVariableValues ?? []).map((key: any) => ({
                     name: key,
                     value: props.initialVariableValues[key],
                 }))
