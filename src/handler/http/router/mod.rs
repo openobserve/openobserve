@@ -35,9 +35,13 @@ use super::request::{
     alerts::*, dashboards::folders::*, dashboards::*, enrichment_table, functions, kv, logs,
     metrics, organization, prom, rum, search, status, stream, syslog, traces, users,
 };
-use crate::common::{
-    infra::config::CONFIG,
-    meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
+
+use crate::{
+    common::{
+        infra::config::CONFIG,
+        meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
+    },
+    service::logs::arrow,
 };
 
 use super::auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum};
