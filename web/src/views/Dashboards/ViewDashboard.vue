@@ -173,7 +173,7 @@ export default defineComponent({
       }
     };
 
-    const addSettingsData = () => {
+    const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
     };
 
@@ -311,6 +311,7 @@ export default defineComponent({
       variablesData,
       variablesDataUpdated,
       showDashboardSettingsDialog,
+      openSettingsDialog,
       loadDashboard,
       getQueryParamsForDuration,
     };
