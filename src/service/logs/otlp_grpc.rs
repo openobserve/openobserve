@@ -39,6 +39,7 @@ use crate::common::{
 use crate::service::{
     db, get_formatted_stream_name,
     ingestion::{grpc::get_val, write_file},
+    schema::stream_schema_exists,
     usage::report_request_usage_stats,
 };
 
@@ -221,7 +222,12 @@ pub async fn handle_grpc_request(
             )
             .await
         }
-        None => "default".to_owned(),
+        None => {
+            let _schema_exists =
+                stream_schema_exists(org_id, "default", StreamType::Logs, &mut stream_schema_map)
+                    .await;
+            "default".to_owned()
+        }
     };
 
     let stream_name = &stream_name;
