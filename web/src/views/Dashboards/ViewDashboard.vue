@@ -290,6 +290,7 @@ export default defineComponent({
 
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate], () => {
+      console.log("refreshInterval", refreshInterval.value);
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -323,6 +324,7 @@ export default defineComponent({
       selectedDate,
       currentTimeObj,
       refreshInterval,
+      openSettingsDialog,
       // ----------------
       refreshData,
       onDeletePanel,
