@@ -293,18 +293,19 @@ export default defineComponent({
           deleteFieldList.value
         )
         .then((res) => {
-          if (res.code == 200) {
+          if (res.data.code == 200) {
             q.notify({
               color: "positive",
               message: "Field(s) deleted successfully.",
               timeout: 2000,
             });
             confirmQueryModeChangeDialog.value = false;
+            deleteFieldList.value = [];
             getSchema();
           } else {
             q.notify({
               color: "negative",
-              message: res.message,
+              message: res.data.message,
               timeout: 2000,
             });
           }
