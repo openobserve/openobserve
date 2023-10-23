@@ -181,6 +181,8 @@ import {
   verifyOrganizationStatus,
   b64DecodeUnicode,
   formatTimeWithSuffix,
+  timestampToTimezoneDate,
+  histogramDateTimezone,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -892,14 +894,16 @@ export default defineComponent({
         searchObj.data.resultGrid.columns.push({
           name: "@timestamp",
           field: (row: any) =>
-            date.formatDate(
-              Math.floor(row["start_time"] / 1000000),
-              "MMM DD, YYYY HH:mm:ss.SSS Z"
+            timestampToTimezoneDate(
+              row["start_time"] / 1000000,
+              store.state.timezone,
+              "MMM dd, YYYY HH:mm:ss.SSS Z"
             ),
           prop: (row: any) =>
-            date.formatDate(
-              Math.floor(row["start_time"] / 1000000),
-              "MMM DD, YYYY HH:mm:ss.SSS Z"
+            timestampToTimezoneDate(
+              row["start_time"] / 1000000,
+              store.state.timezone,
+              "MMM dd, YYYY HH:mm:ss.SSS Z"
             ),
           label: "Start Time",
           align: "left",
@@ -992,7 +996,13 @@ export default defineComponent({
           }) => {
             unparsed_x_data.push(bucket.zo_sql_timestamp);
             let histDate = new Date(Math.floor(bucket.zo_sql_timestamp / 1000));
-            xData.push(Math.floor(histDate.getTime()));
+            // xData.push(Math.floor(histDate.getTime()));
+            xData.push(
+              histogramDateTimezone(
+                Math.floor(bucket.zo_sql_timestamp / 1000),
+                store.state.timezone
+              )
+            );
             yData.push(Number((bucket.duration / 1000).toFixed(2)));
           }
         );
