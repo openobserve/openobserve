@@ -18,41 +18,39 @@ use crate::common::infra::{config::RwHashMap, db as infra_db};
 
 pub static STREAMS: Lazy<RwHashMap<String, RwHashMap<String, i64>>> = Lazy::new(Default::default);
 
-fn mk_key(org_id: &str) -> String {
-    format!("/compact/organization/{org_id}")
+fn mk_key(org_id: &str, module: &str) -> String {
+    format!("/compact/organization/{org_id}/{module}")
 }
 
-pub async fn get_mark(org_id: &str) -> String {
+pub async fn get_offset(org_id: &str, module: &str) -> (i64, String) {
     let db = &infra_db::DEFAULT;
-    let key = mk_key(org_id);
+    let key = mk_key(org_id, module);
     let value = match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
     if value.contains(';') {
         let mut parts = value.split(';');
-        _ = parts.next();
-        parts.next().unwrap().to_string()
+        let offset: i64 = parts.next().unwrap().parse().unwrap();
+        let node = parts.next().unwrap().to_string();
+        (offset, node)
     } else {
-        String::from("")
+        (value.parse().unwrap(), String::from(""))
     }
 }
 
-pub async fn set_mark(org_id: &str, node: Option<&str>) -> Result<(), anyhow::Error> {
+pub async fn set_offset(
+    org_id: &str,
+    module: &str,
+    offset: i64,
+    node: Option<&str>,
+) -> Result<(), anyhow::Error> {
     let db = &infra_db::DEFAULT;
-    let key = mk_key(org_id);
+    let key = mk_key(org_id, module);
     let val = if let Some(node) = node {
-        format!("0;{node}")
+        format!("{};{}", offset, node)
     } else {
-        "0".to_string()
+        offset.to_string()
     };
     Ok(db.put(&key, val.into(), infra_db::NO_NEED_WATCH).await?)
-}
-
-pub async fn del_offset(org_id: &str) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
-    let key = mk_key(org_id);
-    db.delete_if_exists(&key, false, infra_db::NO_NEED_WATCH)
-        .await
-        .map_err(Into::into)
 }

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ahash::AHashSet;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
@@ -21,12 +20,13 @@ use tokio::sync::{Mutex, Semaphore};
 use crate::common::infra::{
     cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
     config::CONFIG,
-    dist_lock, file_list as infra_file_list, storage as infra_storage,
+    dist_lock,
 };
 use crate::common::meta::StreamType;
 use crate::service::db;
 
 mod file_list;
+mod file_list_deleted;
 mod merge;
 pub mod retention;
 pub mod stats;
@@ -51,7 +51,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
         ];
         for org_id in orgs {
             // get the working node for the organization
-            let node = db::compact::organization::get_mark(&org_id).await;
+            let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
             if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
                 log::error!("[COMPACT] organization {org_id} is merging by {node}");
                 continue;
@@ -61,15 +61,20 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             let lock_key = format!("compact/organization/{org_id}");
             let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
             // check the working node for the organization again, maybe other node locked it first
-            let node = db::compact::organization::get_mark(&org_id).await;
+            let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
             if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
                 log::error!("[COMPACT] organization {org_id} is merging by {node}");
                 dist_lock::unlock(&locker).await?;
                 continue;
             }
             if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
-                db::compact::organization::set_mark(&org_id, Some(&LOCAL_NODE_UUID.clone()))
-                    .await?;
+                db::compact::organization::set_offset(
+                    &org_id,
+                    "retention",
+                    0,
+                    Some(&LOCAL_NODE_UUID.clone()),
+                )
+                .await?;
             }
             // already bind to this node, we can unlock now
             dist_lock::unlock(&locker).await?;
@@ -168,7 +173,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     ];
     for org_id in orgs {
         // get the working node for the organization
-        let node = db::compact::organization::get_mark(&org_id).await;
+        let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
             log::error!("[COMPACT] organization {org_id} is merging by {node}");
             continue;
@@ -178,14 +183,20 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         let lock_key = format!("compact/organization/{org_id}");
         let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
         // check the working node for the organization again, maybe other node locked it first
-        let node = db::compact::organization::get_mark(&org_id).await;
+        let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
             log::error!("[COMPACT] organization {org_id} is merging by {node}");
             dist_lock::unlock(&locker).await?;
             continue;
         }
         if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
-            db::compact::organization::set_mark(&org_id, Some(&LOCAL_NODE_UUID.clone())).await?;
+            db::compact::organization::set_offset(
+                &org_id,
+                "merge",
+                0,
+                Some(&LOCAL_NODE_UUID.clone()),
+            )
+            .await?;
         }
         // already bind to this node, we can unlock now
         dist_lock::unlock(&locker).await?;
@@ -250,22 +261,22 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 /// 2. delete files from storage
 pub async fn run_delete_files() -> Result<(), anyhow::Error> {
     let now = Utc::now();
-    let time_min = now - Duration::hours(CONFIG.compact.delete_files_delay_hours);
-    let time_min = Utc
+    let time_max = now - Duration::hours(CONFIG.compact.delete_files_delay_hours);
+    let time_max = Utc
         .with_ymd_and_hms(
-            time_min.year(),
-            time_min.month(),
-            time_min.day(),
-            time_min.hour(),
+            time_max.year(),
+            time_max.month(),
+            time_max.day(),
+            time_max.hour(),
             0,
             0,
         )
         .unwrap();
-    let time_min = time_min.timestamp_micros();
+    let time_max = time_max.timestamp_micros();
     let orgs = db::schema::list_organizations_from_cache();
     for org_id in orgs {
         // get the working node for the organization
-        let node = db::compact::organization::get_mark(&org_id).await;
+        let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
             log::error!("[COMPACT] organization {org_id} is merging by {node}");
             continue;
@@ -275,75 +286,38 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         let lock_key = format!("compact/organization/{org_id}");
         let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
         // check the working node for the organization again, maybe other node locked it first
-        let node = db::compact::organization::get_mark(&org_id).await;
+        let (offset, node) =
+            db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
             log::error!("[COMPACT] organization {org_id} is merging by {node}");
             dist_lock::unlock(&locker).await?;
             continue;
         }
         if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
-            db::compact::organization::set_mark(&org_id, Some(&LOCAL_NODE_UUID.clone())).await?;
+            db::compact::organization::set_offset(
+                &org_id,
+                "file_list_deleted",
+                offset,
+                Some(&LOCAL_NODE_UUID.clone()),
+            )
+            .await?;
         }
         // already bind to this node, we can unlock now
         dist_lock::unlock(&locker).await?;
         drop(locker);
 
-        let files = infra_file_list::query_deleted(&org_id, time_min).await?;
-        if files.is_empty() {
-            continue;
-        }
-        // delete files from storage
-        if let Err(e) = infra_storage::del(
-            &files
-                .iter()
-                .map(|(_, file)| file.as_str())
-                .collect::<Vec<_>>(),
-        )
-        .await
-        {
-            // maybe the file already deleted, so we just skip the `not found` error
-            if !e.to_string().to_lowercase().contains("not found") {
-                log::error!("[COMPACT] delete files from storage failed: {}", e);
-                continue;
-            }
+        if let Err(e) = file_list_deleted::delete(&org_id, offset, time_max).await {
+            log::error!("[COMPACTOR] delete files error: {}", e);
         }
 
-        // delete files from file_list_deleted in s3
-        if !CONFIG.common.meta_store_external {
-            let mut prefixes =
-                AHashSet::with_capacity(CONFIG.compact.delete_files_delay_hours as usize);
-            for (created_at, _) in &files {
-                let created_time: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
-                let prefix = created_time
-                    .format("file_list_deleted/%Y/%m/%d/%H/")
-                    .to_string();
-                prefixes.insert(prefix);
-            }
-            for prefix in prefixes {
-                let files = infra_storage::list(&prefix).await?;
-                if files.is_empty() {
-                    continue;
-                }
-                if let Err(e) =
-                    infra_storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
-                {
-                    log::error!("[COMPACT] delete files from s3 failed: {}", e);
-                }
-            }
-        }
-
-        // delete files from file_list_deleted table
-        if let Err(e) = infra_file_list::batch_remove_deleted(
-            &files
-                .iter()
-                .map(|(_, file)| file.to_owned())
-                .collect::<Vec<_>>(),
+        // update offset
+        db::compact::organization::set_offset(
+            &org_id,
+            "file_list_deleted",
+            time_max,
+            Some(&LOCAL_NODE_UUID.clone()),
         )
-        .await
-        {
-            log::error!("[COMPACT] delete files from table failed: {}", e);
-            continue;
-        }
+        .await?;
     }
 
     Ok(())

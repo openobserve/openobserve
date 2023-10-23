@@ -268,13 +268,16 @@ impl SqliteDbChannel {
                         }
                     }
                     DbEvent::FileListDeleted(DbEventFileListDeleted::BatchAdd(
+                        org_id,
                         created_at,
                         files,
                     )) => {
                         let mut err: Option<String> = None;
                         for _ in 0..DB_RETRY_TIMES {
-                            match sqlite_file_list::batch_add_deleted(&client, created_at, &files)
-                                .await
+                            match sqlite_file_list::batch_add_deleted(
+                                &client, &org_id, created_at, &files,
+                            )
+                            .await
                             {
                                 Ok(_) => {
                                     err = None;

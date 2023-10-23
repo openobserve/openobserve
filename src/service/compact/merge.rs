@@ -190,7 +190,7 @@ pub async fn merge_by_stream(
             events.sort_by(|a, b| a.key.cmp(&b.key));
 
             // write file list to storage
-            match write_file_list(&events).await {
+            match write_file_list(org_id, &events).await {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("[COMPACT] write file list failed: {}", e);
@@ -405,18 +405,18 @@ async fn merge_files(
     }
 }
 
-async fn write_file_list(events: &[FileKey]) -> Result<(), anyhow::Error> {
+async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
     if events.is_empty() {
         return Ok(());
     }
     if CONFIG.common.meta_store_external {
-        write_file_list_db_only(events).await
+        write_file_list_db_only(org_id, events).await
     } else {
-        write_file_list_s3(events).await
+        write_file_list_s3(org_id, events).await
     }
 }
 
-async fn write_file_list_db_only(events: &[FileKey]) -> Result<(), anyhow::Error> {
+async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
     let put_items = events
         .iter()
         .filter(|v| !v.deleted)
@@ -432,7 +432,7 @@ async fn write_file_list_db_only(events: &[FileKey]) -> Result<(), anyhow::Error
     let mut success = false;
     let created_at = Utc::now().timestamp_micros();
     for _ in 0..5 {
-        if let Err(e) = infra_file_list::batch_add_deleted(created_at, &del_items).await {
+        if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await {
             log::error!(
                 "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
                 e
@@ -463,7 +463,7 @@ async fn write_file_list_db_only(events: &[FileKey]) -> Result<(), anyhow::Error
     }
 }
 
-async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
+async fn write_file_list_s3(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
     // write new data into file_list
     let (_stream_key, date_key, _file_name) =
         infra_file_list::parse_file_key_columns(&events.first().unwrap().key)?;
@@ -485,24 +485,14 @@ async fn write_file_list_s3(events: &[FileKey]) -> Result<(), anyhow::Error> {
         .map(|v| v.key.clone())
         .collect::<Vec<_>>();
     if !del_items.is_empty() {
-        let now = Utc::now();
-        // write to local cache
-        if let Err(e) = infra_file_list::batch_add_deleted(now.timestamp_micros(), &del_items).await
-        {
-            log::error!(
-                "[COMPACT] set local cache for file_list_deleted failed: {}",
-                e
-            );
-        }
-        // upload to storage
         let deleted_file_list_key = format!(
-            "file_list_deleted/{}/{}.json.zst",
-            now.format("%Y/%m/%d/%H").to_string(),
+            "file_list_deleted/{org_id}/{}/{}.json.zst",
+            Utc::now().format("%Y/%m/%d/%H").to_string(),
             ider::generate()
         );
         let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
         for file in del_items.iter() {
-            buf.write_all(format!("{};{}\n", now.timestamp_micros(), file).as_bytes())?;
+            buf.write_all((file.to_owned() + "\n").as_bytes())?;
         }
         let compressed_bytes = buf.finish().unwrap();
         storage::put(&deleted_file_list_key, compressed_bytes.into()).await?;

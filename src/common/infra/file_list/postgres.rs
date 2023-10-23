@@ -197,7 +197,12 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
         Ok(())
     }
 
-    async fn batch_add_deleted(&self, created_at: i64, files: &[String]) -> Result<()> {
+    async fn batch_add_deleted(
+        &self,
+        org_id: &str,
+        created_at: i64,
+        files: &[String],
+    ) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
@@ -211,7 +216,6 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
                     super::parse_file_key_columns(item).expect("parse file key failed");
-                let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
                 b.push_bind(org_id)
                     .push_bind(stream_key)
                     .push_bind(date_key)
@@ -362,8 +366,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<(i64, String)>> {
-        if time_min == 0 {
+    async fn query_deleted(&self, org_id: &str, time_max: i64) -> Result<Vec<String>> {
+        if time_max == 0 {
             return Ok(Vec::new());
         }
         let pool = CLIENT.clone();
@@ -371,17 +375,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             r#"SELECT stream, date, file FROM file_list_deleted WHERE org = $1 AND created_at < $2;"#,
         )
         .bind(org_id)
-        .bind(time_min)
+        .bind(time_max)
         .fetch_all(&pool)
         .await?;
         Ok(ret
             .iter()
-            .map(|r| {
-                (
-                    r.created_at,
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
-                )
-            })
+            .map(|r| format!("files/{}/{}/{}", r.stream, r.date, r.file))
             .collect())
     }
 

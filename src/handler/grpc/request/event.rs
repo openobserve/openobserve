@@ -17,7 +17,7 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::common::{
-    infra::{cluster, file_list as infra_file_list, metrics},
+    infra::{file_list as infra_file_list, metrics},
     meta::common::FileKey,
 };
 use crate::handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
@@ -70,18 +70,6 @@ impl Event for Eventer {
                 .with_label_values(&["/event/send_file_list", "500", "", "", ""])
                 .inc();
             return Err(Status::internal(e.to_string()));
-        }
-
-        if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE) {
-            // cache deleted files
-            if let Err(e) = infra_file_list::batch_add_deleted(
-                chrono::Utc::now().timestamp_micros(),
-                &del_items,
-            )
-            .await
-            {
-                log::error!("[GRPC] event batch add deleted error: {}", e);
-            }
         }
 
         // metrics

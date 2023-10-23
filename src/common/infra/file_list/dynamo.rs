@@ -174,7 +174,12 @@ impl super::FileList for DynamoFileList {
         Ok(())
     }
 
-    async fn batch_add_deleted(&self, created_at: i64, files: &[String]) -> Result<()> {
+    async fn batch_add_deleted(
+        &self,
+        org_id: &str,
+        created_at: i64,
+        files: &[String],
+    ) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
@@ -183,10 +188,9 @@ impl super::FileList for DynamoFileList {
             let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
             for file in batch {
                 let (stream_key, date_key, file_name) = parse_file_key_columns(file).unwrap();
-                let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
                 let file_name = format!("{date_key}/{file_name}");
                 let mut item = HashMap::new();
-                item.insert("org".to_string(), AttributeValue::S(org_id));
+                item.insert("org".to_string(), AttributeValue::S(org_id.to_string()));
                 item.insert("stream".to_string(), AttributeValue::S(stream_key));
                 item.insert("file".to_string(), AttributeValue::S(file_name));
                 item.insert(
@@ -333,8 +337,8 @@ impl super::FileList for DynamoFileList {
         Ok(resp)
     }
 
-    async fn query_deleted(&self, org_id: &str, time_min: i64) -> Result<Vec<(i64, String)>> {
-        if time_min == 0 {
+    async fn query_deleted(&self, org_id: &str, time_max: i64) -> Result<Vec<String>> {
+        if time_max == 0 {
             return Ok(Vec::new());
         }
         let client = DYNAMO_DB_CLIENT.get().await.clone();
@@ -346,7 +350,7 @@ impl super::FileList for DynamoFileList {
             .expression_attribute_names("#org", "org".to_string())
             .expression_attribute_names("#created_at", "created_at".to_string())
             .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
-            .expression_attribute_values(":ts", AttributeValue::N(time_min.to_string()))
+            .expression_attribute_values(":ts", AttributeValue::N(time_max.to_string()))
             .select(Select::AllAttributes)
             .into_paginator()
             .page_size(1000)
@@ -354,23 +358,15 @@ impl super::FileList for DynamoFileList {
             .collect()
             .await;
         let resp = resp.map_err(|e| Error::Message(e.to_string()))?;
-        let resp: Vec<(i64, String)> = resp
+        let resp: Vec<_> = resp
             .iter()
             .filter(|v| v.count() > 0)
             .flat_map(|v| v.items().unwrap())
             .map(|v| {
-                (
-                    v.get("created_at")
-                        .unwrap()
-                        .as_n()
-                        .unwrap()
-                        .parse::<i64>()
-                        .unwrap(),
-                    format!(
-                        "files/{}/{}",
-                        v.get("stream").unwrap().as_s().unwrap(),
-                        v.get("file").unwrap().as_s().unwrap()
-                    ),
+                format!(
+                    "files/{}/{}",
+                    v.get("stream").unwrap().as_s().unwrap(),
+                    v.get("file").unwrap().as_s().unwrap()
                 )
             })
             .collect();
