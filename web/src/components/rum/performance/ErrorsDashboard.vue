@@ -17,71 +17,28 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
-    <div class="flex justify-between items-center q-py-sm q-px-md">
-      <div class="performance_title">Performance Summary</div>
-      <div class="flex items-center">
-        <DateTimePicker
-          class="q-ml-sm"
-          ref="refDateTime"
-          v-model="selectedDate"
-        />
-        <AutoRefreshInterval
-          v-model="refreshInterval"
-          trigger
-          @trigger="refreshData"
-        />
-        <q-btn
-          class="q-ml-sm"
-          outline
-          padding="xs"
-          no-caps
-          icon="refresh"
-          @click="refreshData"
-        >
-        </q-btn>
-        <ExportDashboard
-          :dashboardId="currentDashboardData.data?.dashboardId"
-        />
-      </div>
+    <div class="q-mx-sm performance-dashboard">
+      <RenderDashboardCharts
+        :viewOnly="false"
+        :dashboardData="currentDashboardData.data"
+        :currentTimeObj="dateTime"
+      />
     </div>
-    <AppTabs
-      class="q-px-md"
-      :tabs="tabs"
-      v-model:active-tab="activePerformanceTab"
-    />
-    <q-separator></q-separator>
-    <template v-if="activePerformanceTab === 'web_vitals'">
-      <WebVitalsDashboard :date-time="currentTimeObj" />
-    </template>
-    <template v-else-if="activePerformanceTab === 'errors'"></template>
-    <template v-else-if="activePerformanceTab === 'api'"></template>
-    <template v-else>
-      <div class="q-mx-sm performance-dashboard">
-        <RenderDashboardCharts
-          :viewOnly="false"
-          :dashboardData="currentDashboardData.data"
-          :currentTimeObj="currentTimeObj"
-        >
-          <template v-slot:before_panels>
-            <q-separator class="q-mt-md"></q-separator>
-            <div class="flex items-center q-pb q-pt-md text-h6 text-bold">
-              <div class="col text-center">Web Vitals</div>
-              <div class="col text-center">Errors</div>
-              <div class="col text-center">Sessions</div>
-            </div>
-          </template>
-        </RenderDashboardCharts>
-      </div>
-    </template>
   </q-page>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onActivated, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onActivated,
+  nextTick,
+  onMounted,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import DateTimePicker from "@/components/DateTimePicker.vue";
 import { useRouter } from "vue-router";
 import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
 import {
@@ -92,22 +49,19 @@ import {
 } from "@/utils/date";
 import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
-import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
-import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
-import overviewDashboard from "@/utils/rum/overview.json";
-import AppTabs from "@/components/common/AppTabs.vue";
-import WebVitalsDashboard from "@/components/rum/performance/WebVitalsDashboard.vue";
+import overviewDashboard from "@/utils/rum/web_vitals.json";
 
 export default defineComponent({
   name: "AppPerformance",
   components: {
-    DateTimePicker,
-    AutoRefreshInterval,
-    ExportDashboard,
     RenderDashboardCharts,
-    AppTabs,
-    WebVitalsDashboard,
+  },
+  props: {
+    dateTime: {
+      type: Object,
+      default: () => ({}),
+    },
   },
   setup() {
     const { t } = useI18n();
@@ -123,7 +77,6 @@ export default defineComponent({
 
     const refDateTime: any = ref(null);
     const currentDurationSelectionObj = ref({});
-    const currentTimeObj = ref({});
     const refreshInterval = ref(0);
     const selectedDate = ref();
 
@@ -133,77 +86,12 @@ export default defineComponent({
       Object.assign(variablesData, data);
     };
 
-    const activePerformanceTab = ref("overview");
-
-    const tabs = [
-      {
-        label: "Overview",
-        value: "overview",
-        style: {
-          width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
-        },
-      },
-      {
-        label: "Web Vitals",
-        value: "web_vitals",
-        style: {
-          width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
-        },
-      },
-      {
-        label: "Errors",
-        value: "errors",
-        style: {
-          width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
-        },
-      },
-      {
-        label: "API",
-        value: "api",
-        style: {
-          width: "fit-content",
-          padding: "8px 12px",
-          margin: "0px 4px",
-        },
-      },
-    ];
-
-    onActivated(async () => {
+    onMounted(async () => {
       await loadDashboard();
-      if (activePerformanceTab.value === "overview") {
-        // Add ?tab=overview in url
-        router.replace({
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            refresh: generateDurationLabel(refreshInterval.value),
-            ...getQueryParamsForDuration(selectedDate.value),
-            dashboard: "overview",
-          },
-        });
-      }
     });
 
-    watch(
-      () => activePerformanceTab.value,
-      () => {
-        router.replace({
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            refresh: generateDurationLabel(refreshInterval.value),
-            ...getQueryParamsForDuration(selectedDate.value),
-            dashboard: activePerformanceTab.value,
-          },
-        });
-      }
-    );
-
     const loadDashboard = async () => {
+      console.log("loadDashboard");
       currentDashboardData.data = overviewDashboard;
 
       // if variables data is null, set it to empty list
@@ -243,20 +131,6 @@ export default defineComponent({
         },
       });
     };
-
-    const refreshData = () => {
-      currentTimeObj.value = getConsumableDateTime(
-        currentDurationSelectionObj.value
-      );
-    };
-
-    watch(selectedDate, () => {
-      const c = toRaw(unref(selectedDate.value));
-      currentDurationSelectionObj.value = selectedDate.value;
-      currentTimeObj.value = getConsumableDateTime(
-        currentDurationSelectionObj.value
-      );
-    });
 
     // ------- work with query params ----------
     onActivated(async () => {
@@ -307,9 +181,7 @@ export default defineComponent({
         }
         return filtered;
       },
-      currentTimeObj,
       refreshInterval,
-      refreshData,
       selectedDate,
       viewOnly,
       eventLog,
@@ -318,8 +190,6 @@ export default defineComponent({
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,
-      tabs,
-      activePerformanceTab,
     };
   },
 });

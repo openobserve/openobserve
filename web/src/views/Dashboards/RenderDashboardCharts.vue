@@ -18,6 +18,7 @@
 <template>
     <VariablesValueSelector :variablesConfig="dashboardData?.variables" :selectedTimeDate="currentTimeObj" :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"/>
+      <slot name="before_panels"/>
     <div class="displayDiv">
       <grid-layout v-if="dashboardData.panels?.length > 0" :layout.sync="getDashboardLayout(dashboardData)" :col-num="12" :row-height="30"
         :is-draggable="!viewOnly" :is-resizable="!viewOnly" :vertical-compact="true" :autoSize="true"

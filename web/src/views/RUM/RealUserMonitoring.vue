@@ -85,7 +85,7 @@ import { useStore } from "vuex";
 const router = useRouter();
 const store = useStore();
 const showTabs = computed(() => {
-  const routes = ["Sessions", "ErrorTracking", "Performance"];
+  const routes = ["Sessions", "ErrorTracking", "RumPerformance"];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
 
@@ -120,7 +120,7 @@ onMounted(async () => {
   const routeNameMapping: { [key: string]: string } = {
     SessionViewer: "sessions",
     ErrorTracking: "error_tracking",
-    Performance: "performance",
+    RumPerformance: "performance",
     ErrorViewer: "error_tracking",
   };
 
