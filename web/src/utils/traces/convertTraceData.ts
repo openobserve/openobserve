@@ -36,7 +36,7 @@ export const convertTraceData = (
         const date = new Date(name[0].data[0]);
 
 
-        const options = {
+        const options:any = {
           year: "numeric",
           month: "long",
           day: "numeric",

@@ -43,7 +43,6 @@ import useStreams from "@/composables/useStreams";
 
 import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
-import { DateTime } from "luxon";
 
 const defaultObject = {
   organizationIdetifier: "",

@@ -37,7 +37,7 @@ export const convertLogData = (
         if (name.length == 0) return "";
         const date = new Date(name[0].data[0]);
 
-        const options = {
+        const DateFormatOptions: any = {
           year: "numeric",
           month: "long",
           day: "numeric",
@@ -49,7 +49,7 @@ export const convertLogData = (
           timeZone: params.timezone, // specify the target timezone here
         };
 
-        const formatter = new Intl.DateTimeFormat("en-US", options);
+        const formatter = new Intl.DateTimeFormat("en-US", DateFormatOptions);
         const formattedDate = formatter.format(new Date(date));
         return `(${formattedDate}, <b>${name[0].value[1]}</b>)`;
       },
@@ -87,7 +87,6 @@ export const convertLogData = (
       },
     ],
   };
-  console.log("options:", options);
   return { options };
 };
 

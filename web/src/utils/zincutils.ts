@@ -435,8 +435,8 @@ export const timestampToTimezoneDate = (
     .toFormat(format);
 };
 
-export const histogramDateTimezone = (
-  utcTime: string | number | Date,
+export const histogramDateTimezone: any = (
+  utcTime: any,
   timezone: string = "UTC"
 ) => {
   if (timezone == "UTC") return Math.floor(new Date(utcTime).getTime());

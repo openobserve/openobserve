@@ -68,6 +68,7 @@
     "@types/jsdom": "^16.2.14",
     "@types/leaflet": "^1.9.4",
     "@types/lodash-es": "^4.17.6",
+    "@types/luxon": "^3.3.3",
     "@types/node": "^16.11.45",
     "@vitejs/plugin-vue": "^3.0.1",
     "@vitejs/plugin-vue-jsx": "^2.1.1",
