@@ -249,7 +249,7 @@ import { useI18n } from "vue-i18n";
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import DetailTable from "./DetailTable.vue";
-import { getImageURL } from "../../utils/zincutils";
+import { getImageURL, timestampToTimezoneDate } from "../../utils/zincutils";
 import EqualIcon from "../../components/icons/EqualIcon.vue";
 import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
@@ -341,8 +341,6 @@ export default defineComponent({
 
     onMounted(() => {
       reDrawChart();
-      // setTimeout(() => {
-      // }, 500);
     });
 
     const reDrawChart = () => {

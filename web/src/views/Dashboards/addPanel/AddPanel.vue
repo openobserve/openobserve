@@ -27,7 +27,7 @@
         </div>
       </div>
       <div class="flex q-gutter-sm">
-        <DateTimePicker v-model="selectedDate" />
+        <DateTimePickerDashboard v-model="selectedDate" />
         <q-btn class="q-ml-md text-bold" outline padding="sm lg" color="red" no-caps :label="t('panel.discard')"
           @click="goBackToDashboardList" />
         <q-btn class="q-ml-md text-bold" outline padding="sm lg"  no-caps
@@ -151,7 +151,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DashboardQueryBuilder from "../../../components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
-import DateTimePicker from "../../../components/DateTimePicker.vue";
+import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue"
 import DashboardQueryEditor from "../../../components/dashboards/addPanel/DashboardQueryEditor.vue"
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
@@ -165,7 +165,7 @@ export default defineComponent({
     ChartSelection,
     FieldList,
     DashboardQueryBuilder,
-    DateTimePicker,
+    DateTimePickerDashboard,
     DashboardErrorsComponent,
     PanelSidebar,
     ConfigPanel,
@@ -337,7 +337,10 @@ export default defineComponent({
     };
 
     const updateDateTime = (value: object) => {
-      dashboardPanelData.meta.dateTime = getConsumableDateTime(value);
+      dashboardPanelData.meta.dateTime = {
+        start_time: new Date(selectedDate.value.startTime),
+        end_time: new Date(selectedDate.value.endTime)
+      }
     };
     const goBack = () => {
       return router.push({

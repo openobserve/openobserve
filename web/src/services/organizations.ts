@@ -75,6 +75,12 @@ const organizations = {
   get_organization_summary: (orgIdentifier: string) => {
     return http().get(`/api/${orgIdentifier}/summary`);
   },
+  get_organization_settings: (orgIdentifier: string) => {
+    return http().get(`/api/${orgIdentifier}/settings`);
+  },
+  post_organization_settings: (orgIdentifier: string, data: any) => {
+    return http().post(`/api/${orgIdentifier}/settings`, data);
+  }
 };
 
 export default organizations;

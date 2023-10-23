@@ -23,7 +23,7 @@
     <q-splitter
       v-model="splitterModel"
       unit="px"
-      style="min-height: calc(100vh - 130px)"
+      style="min-height: calc(100vh - 136px)"
     >
       <template v-slot:before>
         <q-tabs
@@ -32,6 +32,15 @@
           inline-label
           vertical
         >
+          <q-route-tab
+            exact
+            default
+            name="general"
+            :to="'/settings/general'"
+            :icon="outlinedSettings"
+            label="general"
+            content-class="tab_content"
+          />
           <q-route-tab
             v-if="config.isCloud == 'true'"
             exact
@@ -54,12 +63,13 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
+import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -68,13 +78,19 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const settingsTab = ref("usage");
+    const settingsTab = ref("general");
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name == "settings") {
-        settingsTab.value = "api_keys";
-        router.push({ path: "/settings/apikeys" });
+        settingsTab.value = "general";
+        router.push({ path: "/settings/general" });
       }
+    });
+
+    // render general settings component
+    onActivated(() => {
+      settingsTab.value = "general";
+      router.push({ path: "/settings/general" });
     });
 
     return {
@@ -84,7 +100,35 @@ export default defineComponent({
       config,
       settingsTab,
       splitterModel: ref(200),
+      outlinedSettings
     };
   },
 });
 </script>
+<style scoped lang="scss">
+.q-tabs {
+    &--vertical {
+      margin: 1.5rem 1rem 0 1rem;
+      .q-tab {
+        justify-content: flex-start;
+        padding: 0 0.6rem 0 0.6rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+        text-transform: capitalize;
+
+        &__content.tab_content {
+          .q-tab {
+            &__icon + &__label {
+              padding-left: 0.875rem;
+              font-weight: 600;
+            }
+          }
+        }
+        &--active {
+          color: black;
+          background-color: $accent;
+        }
+      }
+    }
+  }
+</style>
