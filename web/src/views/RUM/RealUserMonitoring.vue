@@ -15,22 +15,55 @@
 
 <template>
   <div :style="{ height: 'calc(100vh - 57px)', overflow: 'hidden' }">
-    <AppTabs
-      :show="showTabs"
-      :tabs="tabs"
-      v-model:active-tab="activeTab"
-      @update:active-tab="changeTab"
-    />
-    <RouterView />
+    <template v-if="isRumEnabled || isSessionReplayEnabled">
+      <AppTabs
+        :show="showTabs"
+        :tabs="tabs"
+        v-model:active-tab="activeTab"
+        @update:active-tab="changeTab"
+      />
+      <RouterView />
+    </template>
+    <template v-else>
+      <div class="q-pa-lg enable-rum">
+        <div class="q-pb-lg">
+          <div class="text-left text-h6 text-bold q-pb-md">
+            Discover Real User Monitoring to Enhance Your User Experience
+          </div>
+          <div class="text-subtitle1">
+            Real User Monitoring allows you to track and analyze the performance
+            of your website or application from the perspective of real users.
+            This means understanding how actual users experience your site,
+            where they face slowdowns, which pages they frequently use, and
+            more.
+          </div>
+          <div>
+            <div></div>
+          </div>
+        </div>
+        <q-btn
+          class="bg-secondary rounded text-white"
+          no-caps
+          title="Get started with Real User Monitoring"
+          @click="getStarted"
+        >
+          Get Started
+          <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
+        </q-btn>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import AppTabs from "@/components/common/AppTabs.vue";
-import { computed, onMounted, ref } from "vue";
+import streamService from "@/services/stream";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 
 const router = useRouter();
+const store = useStore();
 const showTabs = computed(() => {
   const routes = ["Sessions", "ErrorTracking", "Dashboard"];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
@@ -48,7 +81,13 @@ const tabs = [
   },
 ];
 
-onMounted(() => {
+const isRumEnabled = ref<boolean>(false);
+const isSessionReplayEnabled = ref<boolean>(false);
+
+onMounted(async () => {
+  await checkIfRumEnabled();
+  if (!isRumEnabled.value && !isSessionReplayEnabled.value) return;
+
   const routes = ["SessionViewer", "ErrorTracking", "Dashboard", "ErrorViewer"];
   const routeNameMapping: { [key: string]: string } = {
     SessionViewer: "sessions",
@@ -69,9 +108,34 @@ onMounted(() => {
   }
 });
 
+const checkIfRumEnabled = async () => {
+  await nextTick();
+  return new Promise((resolve) => {
+    streamService
+      .nameList(store.state.selectedOrganization.identifier, "logs", false)
+      .then((response: any) => {
+        response.data.list.forEach((stream: any) => {
+          if (stream.name === "_rumdata") isRumEnabled.value = true;
+          if (stream.name === "_sessionreplay")
+            isSessionReplayEnabled.value = true;
+        });
+        resolve(true);
+      })
+      .finally(() => {
+        resolve(true);
+      });
+  });
+};
+
 const changeTab = (tab: string) => {
   router.push({
     name: tab === "sessions" ? "Sessions" : "ErrorTracking",
+  });
+};
+
+const getStarted = () => {
+  router.push({
+    name: "rumMonitoring",
   });
 };
 </script>
@@ -85,5 +149,9 @@ const changeTab = (tab: string) => {
   .active {
     border-bottom: 2px solid $primary;
   }
+}
+
+.enable-rum {
+  max-width: 1024px;
 }
 </style>
