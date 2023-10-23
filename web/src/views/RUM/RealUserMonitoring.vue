@@ -15,7 +15,24 @@
 
 <template>
   <div :style="{ height: 'calc(100vh - 57px)', overflow: 'hidden' }">
-    <template v-if="isRumEnabled || isSessionReplayEnabled">
+    <template v-if="isLoading.length">
+      <div
+        class="q-pb-lg flex items-center justify-center text-center"
+        style="height: calc(100vh - 200px)"
+      >
+        <div>
+          <q-spinner-hourglass
+            color="primary"
+            size="40px"
+            style="margin: 0 auto; display: block"
+          />
+          <div class="text-center full-width">
+            Hold on tight, we're loading RUM data.
+          </div>
+        </div>
+      </div>
+    </template>
+    <template v-else-if="isRumEnabled || isSessionReplayEnabled">
       <AppTabs
         :show="showTabs"
         :tabs="tabs"
@@ -61,7 +78,7 @@
 <script setup lang="ts">
 import AppTabs from "@/components/common/AppTabs.vue";
 import streamService from "@/services/stream";
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onActivated, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -71,6 +88,8 @@ const showTabs = computed(() => {
   const routes = ["Sessions", "ErrorTracking", "Dashboard"];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
+
+const isLoading = ref<boolean[]>([]);
 
 const activeTab = ref<string>("sessions");
 const tabs = [
@@ -88,7 +107,9 @@ const isRumEnabled = ref<boolean>(false);
 const isSessionReplayEnabled = ref<boolean>(false);
 
 onMounted(async () => {
+  isLoading.value.push(true);
   await checkIfRumEnabled();
+  isLoading.value.pop();
   if (!isRumEnabled.value && !isSessionReplayEnabled.value) return;
 
   const routes = ["SessionViewer", "ErrorTracking", "Dashboard", "ErrorViewer"];
@@ -109,6 +130,10 @@ onMounted(async () => {
       name: "Sessions",
     });
   }
+});
+
+onActivated(async () => {
+  await checkIfRumEnabled();
 });
 
 const checkIfRumEnabled = async () => {

@@ -15,7 +15,7 @@
 
 <template>
   <div class="sessions_page">
-    <template v-if="isSessionReplayEnabled && false">
+    <template v-if="isSessionReplayEnabled">
       <div class="text-right q-py-sm flex align-center justify-between">
         <syntax-guide class="q-mr-sm" />
         <div class="flex align-center justify-end metrics-date-time q-mr-md">
