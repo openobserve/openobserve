@@ -22,7 +22,7 @@ use crate::common::{
     },
     utils::json,
 };
-use crate::service::db::organization::{get_org_setting, ORG_SETTINGS_KEY_PREFIX, set_org_setting};
+use crate::service::db::organization::{get_org_setting, set_org_setting, ORG_SETTINGS_KEY_PREFIX};
 
 /** Organization specific settings */
 #[utoipa::path(
