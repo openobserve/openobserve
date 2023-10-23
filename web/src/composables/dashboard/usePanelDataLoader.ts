@@ -363,7 +363,7 @@ export const usePanelDataLoader = (
 
     // if less than 1, set it to 1
     // minimum will be 15000 millisecond
-    __interval = Math.max(15000, __interval);
+    // __interval = Math.max(15000, __interval);
     
     // round interval
     const formattedInterval = formatInterval(__interval);
