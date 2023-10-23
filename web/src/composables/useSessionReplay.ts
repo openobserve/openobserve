@@ -70,7 +70,7 @@ const defaultObject = {
       columns: <any>[],
       size: 150,
     },
-    sessions: <any>{},
+    sessions: <any>[],
     streamResults: <any>[],
     histogram: <any>{},
     editorValue: "",
