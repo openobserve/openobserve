@@ -82,17 +82,12 @@
     </div>
     <q-separator></q-separator>
     <RenderDashboardCharts
-      :viewOnly="false"
+      @variablesData="variablesDataUpdated" :initialVariableValues="initialVariableValues" :viewOnly="false"
       :dashboardData="currentDashboardData.data"
       :currentTimeObj="currentTimeObj"
       @onDeletePanel="onDeletePanel"
     />
-    <q-dialog
-      v-model="showDashboardSettingsDialog"
-      position="right"
-      full-height
-      maximized
-    >
+    <q-dialog v-model="showDashboardSettingsDialog" position="right" full-height maximized>
       <DashboardSettings @refresh="loadDashboard" />
     </q-dialog>
   </q-page>
@@ -110,8 +105,6 @@ import { getConsumableDateTime, getDashboard } from "../../utils/commons.ts";
 import {
   parseDuration,
   generateDurationLabel,
-  getDurationObjectFromParams,
-  getQueryParamsForDuration,
 } from "../../utils/date";
 import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
@@ -147,8 +140,34 @@ export default defineComponent({
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
-    };
+      Object.assign(variablesData, data)
+      const variableObj = {};
+      data.values.forEach((v) => {
+        variableObj[`var-${v.name}`] = v.value;
+      });
+      router.replace({
+        query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: route.query.dashboard,
+          folder: route.query.folder,
+          refresh: generateDurationLabel(refreshInterval.value),
+          ...getQueryParamsForDuration(selectedDate.value),
+          ...variableObj
+        },
+      });
+    }
+
+    // ======= [START] default variable values
+    
+    const initialVariableValues = {};
+    Object.keys(route.query).forEach(key => {
+      if (key.startsWith('var-')) {
+        const newKey = key.slice(4);
+        initialVariableValues[newKey] = route.query[key];
+      }
+    });
+    // ======= [END] default variable values
+
 
     onActivated(async () => {
       await loadDashboard();
@@ -226,7 +245,7 @@ export default defineComponent({
     };
 
     // [END] date picker related variables
-
+    
     // back button to render dashboard List page
     const goBackToDashboardList = () => {
       return router.push({
@@ -261,9 +280,12 @@ export default defineComponent({
         refreshInterval.value = parseDuration(params.refresh);
       }
 
-      if (params.period || (params.to && params.from)) {
-        selectedDate.value = getSelectedDateFromQueryParams(params);
-      }
+      // This is removed due to the bug of the new date time component
+      // and is now rendered when the setup method is called
+      // instead of onActivated
+      // if (params.period || (params.to && params.from)) {
+      //   selectedDate.value = getSelectedDateFromQueryParams(params);
+      // }
 
       // resize charts if needed
       await nextTick();
@@ -305,6 +327,7 @@ export default defineComponent({
       selectedDate,
       currentTimeObj,
       refreshInterval,
+      openSettingsDialog,
       // ----------------
       refreshData,
       onDeletePanel,
@@ -313,6 +336,7 @@ export default defineComponent({
       showDashboardSettingsDialog,
       openSettingsDialog,
       loadDashboard,
+      initialVariableValues,
       getQueryParamsForDuration,
     };
   },
