@@ -108,9 +108,7 @@ async fn query_deleted_from_s3(
             return Ok(HashMap::default());
         }
         files.sort();
-        // file_list_deleted/{org_id}/{year}/{month}/{day}/{hour}/{file}
-        println!("fist: {}", files.first().unwrap());
-        println!("last: {}", files.last().unwrap());
+        // file_list_deleted/{org_id}/{year}/{month}/{day}/{hour}/{file}.json.zst
         let file = files.first().unwrap();
         let columns = file.split('/').collect::<Vec<_>>();
         let time = Utc
