@@ -15,103 +15,134 @@
 
 <template>
   <div class="sessions_page">
-    <div class="text-right q-py-sm flex align-center justify-between">
-      <syntax-guide class="q-mr-sm" />
-      <div class="flex align-center justify-end metrics-date-time q-mr-md">
-        <date-time
-          auto-apply
-          :default-type="sessionState.data.datetime.valueType"
-          :default-absolute-time="{
-            startTime: sessionState.data.datetime.startTime,
-            endTime: sessionState.data.datetime.endTime,
-          }"
-          :default-relative-time="sessionState.data.datetime.relativeTimePeriod"
-          data-test="logs-search-bar-date-time-dropdown"
-          class="q-mr-md"
-          @on:date-change="updateDateChange"
-        />
-        <q-btn
-          data-test="metrics-explorer-run-query-button"
-          data-cy="metrics-explorer-run-query-button"
-          dense
-          flat
-          title="Run query"
-          class="q-pa-none search-button"
-          @click="runQuery"
-        >
-          Run query
-        </q-btn>
-      </div>
-    </div>
-    <query-editor
-      editorId="session-replay-query-editor"
-      class="monaco-editor"
-      v-model:query="sessionState.data.editorValue"
-      :debounce-time="300"
-    />
-    <q-splitter
-      class="logs-horizontal-splitter full-height"
-      v-model="splitterModel"
-      unit="px"
-      vertical
-    >
-      <template #before>
-        <FieldList
-          :fields="streamFields"
-          :time-stamp="{
-            startTime: dateTime.startTime,
-            endTime: dateTime.endTime,
-          }"
-          :stream-name="rumSessionStreamName"
-          @event-emitted="handleSidebarEvent"
-        />
-      </template>
-      <template #separator>
-        <q-avatar
-          color="primary"
-          text-color="white"
-          size="20px"
-          icon="drag_indicator"
-          style="top: 10px"
-        />
-      </template>
-      <template #after>
-        <template v-if="isLoading.length">
-          <div
-            class="q-pb-lg flex items-center justify-center text-center"
-            style="height: calc(100vh - 200px)"
+    <template v-if="isSessionReplayEnabled && false">
+      <div class="text-right q-py-sm flex align-center justify-between">
+        <syntax-guide class="q-mr-sm" />
+        <div class="flex align-center justify-end metrics-date-time q-mr-md">
+          <date-time
+            auto-apply
+            :default-type="sessionState.data.datetime.valueType"
+            :default-absolute-time="{
+              startTime: sessionState.data.datetime.startTime,
+              endTime: sessionState.data.datetime.endTime,
+            }"
+            :default-relative-time="
+              sessionState.data.datetime.relativeTimePeriod
+            "
+            data-test="logs-search-bar-date-time-dropdown"
+            class="q-mr-md"
+            @on:date-change="updateDateChange"
+          />
+          <q-btn
+            data-test="metrics-explorer-run-query-button"
+            data-cy="metrics-explorer-run-query-button"
+            dense
+            flat
+            title="Run query"
+            class="q-pa-none search-button"
+            @click="runQuery"
           >
-            <div>
-              <q-spinner-hourglass
-                color="primary"
-                size="40px"
-                style="margin: 0 auto; display: block"
-              />
-              <div class="text-center full-width">
-                Hold on tight, we're fetching your sessions.
+            Run query
+          </q-btn>
+        </div>
+      </div>
+      <query-editor
+        editorId="session-replay-query-editor"
+        class="monaco-editor"
+        v-model:query="sessionState.data.editorValue"
+        :debounce-time="300"
+      />
+      <q-splitter
+        class="logs-horizontal-splitter full-height"
+        v-model="splitterModel"
+        unit="px"
+        vertical
+      >
+        <template #before>
+          <FieldList
+            :fields="streamFields"
+            :time-stamp="{
+              startTime: dateTime.startTime,
+              endTime: dateTime.endTime,
+            }"
+            :stream-name="rumSessionStreamName"
+            @event-emitted="handleSidebarEvent"
+          />
+        </template>
+        <template #separator>
+          <q-avatar
+            color="primary"
+            text-color="white"
+            size="20px"
+            icon="drag_indicator"
+            style="top: 10px"
+          />
+        </template>
+        <template #after>
+          <template v-if="isLoading.length">
+            <div
+              class="q-pb-lg flex items-center justify-center text-center"
+              style="height: calc(100vh - 200px)"
+            >
+              <div>
+                <q-spinner-hourglass
+                  color="primary"
+                  size="40px"
+                  style="margin: 0 auto; display: block"
+                />
+                <div class="text-center full-width">
+                  Hold on tight, we're fetching your sessions.
+                </div>
               </div>
             </div>
+          </template>
+          <template v-else>
+            <AppTable
+              :columns="columns"
+              :rows="rows"
+              class="app-table-container"
+              @event-emitted="handleTableEvents"
+            >
+              <template v-slot:session_location_column="slotProps">
+                <SessionLocationColumn :column="slotProps.column.row" />
+              </template>
+            </AppTable>
+          </template>
+        </template>
+      </q-splitter>
+    </template>
+    <template v-else>
+      <div class="q-pa-lg enable-rum" style="max-width: 1024px">
+        <div class="q-pb-lg">
+          <div class="text-left text-h6 text-bold q-pb-md">
+            Discover Session Replay to Understand User Interactions in Detail
           </div>
-        </template>
-        <template v-else>
-          <AppTable
-            :columns="columns"
-            :rows="rows"
-            class="app-table-container"
-            @event-emitted="handleTableEvents"
-          >
-            <template v-slot:session_location_column="slotProps">
-              <SessionLocationColumn :column="slotProps.column.row" />
-            </template>
-          </AppTable>
-        </template>
-      </template>
-    </q-splitter>
+          <div class="text-subtitle1">
+            Session Replay captures and replays user interactions on your
+            website or application. This allows you to visually review how users
+            navigate, where they click, what they type, and how they engage with
+            your content
+          </div>
+          <div>
+            <div></div>
+          </div>
+        </div>
+        <q-btn
+          class="bg-secondary rounded text-white"
+          no-caps
+          title="Get started with Real User Monitoring"
+          @click="getStarted"
+        >
+          Get Started
+          <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
+        </q-btn>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onActivated, ref } from "vue";
+import { onActivated, ref, defineProps } from "vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import {
@@ -140,6 +171,13 @@ interface Session {
   initial_view_name: string;
   id: string;
 }
+
+const props = defineProps({
+  isSessionReplayEnabled: {
+    type: Object,
+    default: () => ({}),
+  },
+});
 
 const streamFields = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
@@ -430,6 +468,12 @@ function updateUrlQueryParams() {
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   router.push({ query });
 }
+
+const getStarted = () => {
+  router.push({
+    name: "rumMonitoring",
+  });
+};
 </script>
 <style scoped lang="scss">
 .sessions_page {
