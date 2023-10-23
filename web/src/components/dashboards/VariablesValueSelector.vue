@@ -20,7 +20,7 @@
           readonly></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
-        <q-input style="max-width: 150px !important" debounce="500" v-model="item.value" :label="item.label || item.name" dense
+        <q-input style="max-width: 150px !important" debounce="1000" v-model="item.value" :label="item.label || item.name" dense
           outlined></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
@@ -177,7 +177,13 @@ export default defineComponent({
                         return obj;
                     }
                     case "textbox": {
-                        obj.value = it.value;
+                        let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
+                        if (oldVariableObjectSelectedValue) {
+                            obj.value = oldVariableObjectSelectedValue.value;
+                        }
+                        else {
+                            obj.value = it.value;
+                        }
                         return obj;
                     }
                     case "custom": {
