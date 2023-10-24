@@ -16,8 +16,10 @@ use actix_multipart::Multipart;
 use actix_web::{post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
-use crate::common::infra::config::{CONFIG, SIZE_IN_MB};
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::{
+    infra::config::{CONFIG, SIZE_IN_MB},
+    meta::http::HttpResponse as MetaHttpResponse,
+};
 use crate::service::enrichment_table::save_enrichment_data;
 
 /** CreateEnrichmentTable */

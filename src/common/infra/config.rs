@@ -387,8 +387,10 @@ pub struct Compact {
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
     pub max_file_size: u64,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // in days
+    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
+    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
+    pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
 }
@@ -497,6 +499,7 @@ pub struct Dynamo {
     #[env_config(name = "ZO_META_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
     pub prefix: String,
     pub file_list_table: String,
+    pub file_list_deleted_table: String,
     pub stream_stats_table: String,
     pub org_meta_table: String,
     pub meta_table: String,
@@ -673,6 +676,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
         return Err(anyhow::anyhow!(
             "Data retention is not allowed to be less than 3 days."
+        ));
+    }
+    if cfg.compact.delete_files_delay_hours < 1 {
+        return Err(anyhow::anyhow!(
+            "Delete files delay is not allowed to be less than 1 hour."
         ));
     }
 
@@ -900,6 +908,7 @@ fn check_dynamo_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         };
     }
     cfg.dynamo.file_list_table = format!("{}-file-list", cfg.dynamo.prefix);
+    cfg.dynamo.file_list_deleted_table = format!("{}-file-list-deleted", cfg.dynamo.prefix);
     cfg.dynamo.stream_stats_table = format!("{}-stream-stats", cfg.dynamo.prefix);
     cfg.dynamo.org_meta_table = format!("{}-org-meta", cfg.dynamo.prefix);
     cfg.dynamo.meta_table = format!("{}-meta", cfg.dynamo.prefix);
