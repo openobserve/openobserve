@@ -28,9 +28,6 @@ phases:
       - mkdir -p web/dist 
       - touch web/dist/index.html
 
-      # download dependencies
-      - git clone https://github.com/openobserve/arrow-datafusion.git ../arrow-datafusion
-      - cd ../arrow-datafusion && git checkout read-bloomfilter && cd ../openobserve
       # run tests
       - cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
       - ./coverage.sh

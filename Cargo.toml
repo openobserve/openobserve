@@ -76,10 +76,10 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { path="../arrow-datafusion/datafusion/core", version = "32", features = ["simd"] }
-arrow = { git="https://github.com/apache/arrow-rs.git", rev = "90bc5ec96b5ae5162f469f9784dde7b1a53a5bdd", version = "47", features = ["simd", "ipc_compression"] }
-arrow-schema = { git="https://github.com/apache/arrow-rs.git", rev = "90bc5ec96b5ae5162f469f9784dde7b1a53a5bdd", version = "47", features = ["serde"] }
-parquet = { git="https://github.com/apache/arrow-rs.git", rev = "90bc5ec96b5ae5162f469f9784dde7b1a53a5bdd", version = "47", features = ["arrow", "async"] }
+datafusion = { git="https://github.com/openobserve/arrow-datafusion.git", rev = "e4442fceb9e4200c3639697dfb0f800a35b28bec", version = "32", features = ["simd"] }
+arrow = { version = "48", features = ["simd", "ipc_compression"] }
+arrow-schema = { version = "48", features = ["serde"] }
+parquet = { version = "48", features = ["arrow", "async"] }
 object_store = { version = "0.7", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
@@ -173,7 +173,7 @@ prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
-datafusion-expr = { path="../arrow-datafusion/datafusion/expr", version = "32" }
+datafusion-expr = { git="https://github.com/openobserve/arrow-datafusion.git", rev = "e4442fceb9e4200c3639697dfb0f800a35b28bec", version = "32" }
 
 expect-test = "1.4"
 float-cmp = "0.9"
