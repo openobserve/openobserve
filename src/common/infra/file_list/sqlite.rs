@@ -23,7 +23,7 @@ use crate::common::{
         config::CONFIG,
         db::{
             sqlite::{CHANNEL, CLIENT_RO as CLIENT},
-            DbEvent, DbEventFileList, DbEventStreamStats,
+            DbEvent, DbEventFileList, DbEventFileListDeleted, DbEventStreamStats,
         },
         errors::{Error, Result},
     },
@@ -94,7 +94,7 @@ impl super::FileList for SqliteFileList {
 
     async fn remove(&self, file: &str) -> Result<()> {
         let tx = CHANNEL.db_tx.clone();
-        tx.send(DbEvent::FileList(DbEventFileList::Remove(vec![
+        tx.send(DbEvent::FileList(DbEventFileList::BatchRemove(vec![
             file.to_string()
         ])))
         .await
@@ -118,9 +118,44 @@ impl super::FileList for SqliteFileList {
             return Ok(());
         }
         let tx = CHANNEL.db_tx.clone();
-        tx.send(DbEvent::FileList(DbEventFileList::Remove(files.to_vec())))
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
+        tx.send(DbEvent::FileList(DbEventFileList::BatchRemove(
+            files.to_vec(),
+        )))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn batch_add_deleted(
+        &self,
+        org_id: &str,
+        created_at: i64,
+        files: &[String],
+    ) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileListDeleted(DbEventFileListDeleted::BatchAdd(
+            org_id.to_string(),
+            created_at,
+            files.to_vec(),
+        )))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+        let tx = CHANNEL.db_tx.clone();
+        tx.send(DbEvent::FileListDeleted(
+            DbEventFileListDeleted::BatchRemove(files.to_vec()),
+        ))
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
         Ok(())
     }
 
@@ -213,6 +248,24 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     r.into(),
                 )
             })
+            .collect())
+    }
+
+    async fn query_deleted(&self, org_id: &str, time_max: i64) -> Result<Vec<String>> {
+        if time_max == 0 {
+            return Ok(Vec::new());
+        }
+        let pool = CLIENT.clone();
+        let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
+            r#"SELECT stream, date, file FROM file_list_deleted WHERE org = $1 AND created_at < $2;"#,
+        )
+        .bind(org_id)
+        .bind(time_max)
+        .fetch_all(&pool)
+        .await?;
+        Ok(ret
+            .iter()
+            .map(|r| format!("files/{}/{}/{}", r.stream, r.date, r.file))
             .collect())
     }
 
@@ -430,19 +483,20 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
                 return Err(e.into());
             }
         };
-        if !need_single_insert {
-            if let Err(e) = tx.commit().await {
-                log::error!("[SQLITE] commit file_list batch add error: {}", e);
-            }
-        } else {
+        if need_single_insert {
             if let Err(e) = tx.rollback().await {
                 log::error!("[SQLITE] rollback file_list batch add error: {}", e);
+                return Err(e.into());
             }
             for item in files {
                 if let Err(e) = add(client, &item.key, &item.meta).await {
                     log::error!("[SQLITE] single insert file_list add error: {}", e);
+                    return Err(e);
                 }
             }
+        } else if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit file_list batch add error: {}", e);
+            return Err(e.into());
         }
     }
     Ok(())
@@ -473,7 +527,7 @@ pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()>
             };
             if CONFIG.common.print_key_event {
                 log::info!(
-                    "[SQLITE] delete file: {}, affected: {}",
+                    "[SQLITE] delete file from file_list: {}, affected: {}",
                     file,
                     rows_affected
                 );
@@ -481,6 +535,86 @@ pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()>
         }
         if let Err(e) = tx.commit().await {
             log::error!("[SQLITE] commit file_list batch remove error: {}", e);
+            return Err(e.into());
+        }
+    }
+    Ok(())
+}
+
+pub async fn batch_add_deleted(
+    client: &Pool<Sqlite>,
+    org_id: &str,
+    created_at: i64,
+    files: &[String],
+) -> Result<()> {
+    let chunks = files.chunks(100);
+    for files in chunks {
+        let mut tx = client.begin().await?;
+        let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+            "INSERT INTO file_list_deleted (org, stream, date, file, created_at)",
+        );
+        query_builder.push_values(files, |mut b, item: &String| {
+            let (stream_key, date_key, file_name) =
+                super::parse_file_key_columns(item).expect("parse file key failed");
+            b.push_bind(org_id)
+                .push_bind(stream_key)
+                .push_bind(date_key)
+                .push_bind(file_name)
+                .push_bind(created_at);
+        });
+        if let Err(e) = query_builder.build().execute(&mut *tx).await {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SQLITE] rollback file_list_deleted batch add error: {}", e);
+            }
+            return Err(e.into());
+        };
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit file_list_deleted batch add error: {}", e);
+            return Err(e.into());
+        }
+    }
+    Ok(())
+}
+
+pub async fn batch_remove_deleted(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
+    let chunks = files.chunks(100);
+    for files in chunks {
+        let mut tx = client.begin().await?;
+        for file in files {
+            let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+            let rows_affected = match sqlx::query(
+                r#"DELETE FROM file_list_deleted WHERE stream = $1 AND date = $2 AND file = $3;"#,
+            )
+            .bind(stream_key)
+            .bind(date_key)
+            .bind(file_name)
+            .execute(&mut *tx)
+            .await
+            {
+                Ok(ret) => ret.rows_affected(),
+                Err(e) => {
+                    if let Err(e) = tx.rollback().await {
+                        log::error!(
+                            "[SQLITE] rollback file_list_deleted batch remove error: {}",
+                            e
+                        );
+                    }
+                    return Err(e.into());
+                }
+            };
+            if CONFIG.common.print_key_event {
+                log::info!(
+                    "[SQLITE] delete file from file_list_deleted: {}, affected: {}",
+                    file,
+                    rows_affected
+                );
+            }
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!(
+                "[SQLITE] commit file_list_deleted batch remove error: {}",
+                e
+            );
             return Err(e.into());
         }
     }
@@ -592,7 +726,7 @@ pub async fn create_table(client: &Pool<Sqlite>) -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS file_list
 (
-    id      INTEGER  not null primary key autoincrement,
+    id      INTEGER not null primary key autoincrement,
     org     VARCHAR not null,
     stream  VARCHAR not null,
     date    VARCHAR not null,
@@ -611,9 +745,25 @@ CREATE TABLE IF NOT EXISTS file_list
 
     sqlx::query(
         r#"
+CREATE TABLE IF NOT EXISTS file_list_deleted
+(
+    id        INTEGER not null primary key autoincrement,
+    org       VARCHAR not null,
+    stream    VARCHAR not null,
+    date      VARCHAR not null,
+    file      VARCHAR not null,
+    created_at BIGINT not null
+);
+        "#,
+    )
+    .execute(client)
+    .await?;
+
+    sqlx::query(
+        r#"
 CREATE TABLE IF NOT EXISTS stream_stats
 (
-    id      INTEGER  not null primary key autoincrement,
+    id      INTEGER not null primary key autoincrement,
     org     VARCHAR not null,
     stream  VARCHAR not null,
     file_num BIGINT not null,
@@ -632,20 +782,53 @@ CREATE TABLE IF NOT EXISTS stream_stats
 }
 
 pub async fn create_table_index(client: &Pool<Sqlite>) -> Result<()> {
-    let index_sql = r#"
-CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);
-CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);
-CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);
-CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);
-        "#;
-    // create index for file_list
-    if let Err(e) = sqlx::query(index_sql).execute(client).await {
+    let sqls = vec![
+        (
+            "file_list", 
+            "CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);"),
+        (
+            "file_list",
+            "CREATE INDEX IF NOT EXISTS file_list_stream_idx on file_list (stream);",
+        ),
+        (
+            "file_list",
+            "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
+        ),
+        // (
+        //     "file_list",
+        //     "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);",
+        // ),
+        (
+            "file_list_deleted",
+            "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_idx on file_list_deleted (stream);",
+        ),
+        (
+            "file_list_deleted",
+            "CREATE INDEX IF NOT EXISTS file_list_deleted_created_at_idx on file_list_deleted (org, created_at);",
+        ),
+        (
+            "stream_stats",
+            "CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);",
+        ),
+        (
+            "stream_stats",
+            "CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (stream);",
+        ),
+    ];
+    for (table, sql) in sqls {
+        if let Err(e) = sqlx::query(sql).execute(client).await {
+            log::error!("[SQLITE] create table {} index error: {}", table, e);
+            return Err(e.into());
+        }
+    }
+
+    // create UNIQUE index for file_list
+    let unique_index_sql = r#"CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);"#;
+    if let Err(e) = sqlx::query(unique_index_sql).execute(client).await {
         if e.to_string().contains("UNIQUE constraint failed") {
             // delete duplicate records
             let ret = sqlx::query(
-                r#"
-                SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;
-                    "#,
+                r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
             ).fetch_all(client).await?;
             for r in ret {
                 let stream = r.get::<String, &str>("stream");
@@ -661,27 +844,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream
                     );
                 }
                 sqlx::query(
-                    r#"
-                    DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;
-                        "#,
+                    r#"DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;"#,
                 ).bind(id).bind(stream).bind(date).bind(file).execute(client).await?;
             }
             // create index again
-            sqlx::query(index_sql).execute(client).await?;
+            sqlx::query(unique_index_sql).execute(client).await?;
         } else {
             return Err(e.into());
         }
     }
-
-    // create index for stream_stats
-    sqlx::query(
-        r#"
-CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);
-CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (stream);
-        "#,
-    )
-    .execute(client)
-    .await?;
 
     // delete trigger for old version
     // compitable for old version <= 0.6.4

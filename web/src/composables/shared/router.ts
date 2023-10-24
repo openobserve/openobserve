@@ -244,6 +244,9 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuardPendingSubscriptions(to, from, next);
       },
+      meta: {
+        keepAlive: true,
+      },
       children: [
         {
           path: "alerts",
@@ -269,17 +272,11 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuardPendingSubscriptions(to, from, next);
       },
-      meta: {
-        keepAlive: true,
-      },
       children: [
         {
           path: "sessions",
           name: "Sessions",
           component: AppSessions,
-          meta: {
-            keepAlive: true,
-          },
         },
         {
           path: "sessions/view/:id",
@@ -291,22 +288,6 @@ const useRoutes = () => {
           path: "errors",
           name: "ErrorTracking",
           component: AppErrors,
-          props: true,
-          meta: {
-            keepAlive: true,
-          },
-        },
-        {
-          path: "errors/view/:id",
-          name: "ErrorViewer",
-          component: ErrorViewer,
-          props: true,
-        },
-        {
-          path: "errors/view/:id",
-          name: "ErrorViewer",
-          component: ErrorViewer,
-          props: true,
         },
         {
           path: "errors/view/:id",

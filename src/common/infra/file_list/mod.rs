@@ -56,6 +56,13 @@ pub trait FileList: Sync + Send + 'static {
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_remove(&self, files: &[String]) -> Result<()>;
+    async fn batch_add_deleted(
+        &self,
+        org_id: &str,
+        created_at: i64,
+        files: &[String],
+    ) -> Result<()>;
+    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn list(&self) -> Result<Vec<(String, FileMeta)>>;
@@ -67,6 +74,7 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_deleted(&self, org_id: &str, time_max: i64) -> Result<Vec<String>>;
     async fn get_max_pk_value(&self) -> Result<i64>;
     async fn stats(
         &self,
@@ -132,6 +140,16 @@ pub async fn batch_remove(files: &[String]) -> Result<()> {
 }
 
 #[inline]
+pub async fn batch_add_deleted(org_id: &str, created_at: i64, files: &[String]) -> Result<()> {
+    CLIENT.batch_add_deleted(org_id, created_at, files).await
+}
+
+#[inline]
+pub async fn batch_remove_deleted(files: &[String]) -> Result<()> {
+    CLIENT.batch_remove_deleted(files).await
+}
+
+#[inline]
 pub async fn get(file: &str) -> Result<FileMeta> {
     CLIENT.get(file).await
 }
@@ -157,6 +175,11 @@ pub async fn query(
     CLIENT
         .query(org_id, stream_type, stream_name, time_level, time_range)
         .await
+}
+
+#[inline]
+pub async fn query_deleted(org_id: &str, time_max: i64) -> Result<Vec<String>> {
+    CLIENT.query_deleted(org_id, time_max).await
 }
 
 #[inline]
@@ -337,4 +360,11 @@ impl From<&HashMap<String, AttributeValue>> for StatsRecord {
                 .unwrap(),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct FileDeletedRecord {
+    pub stream: String,
+    pub date: String,
+    pub file: String,
 }

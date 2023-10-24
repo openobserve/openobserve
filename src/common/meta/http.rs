@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::http::StatusCode;
-use actix_web::HttpResponse as ActixHttpResponse;
-
+use actix_web::{http::StatusCode, HttpResponse as ActixHttpResponse};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

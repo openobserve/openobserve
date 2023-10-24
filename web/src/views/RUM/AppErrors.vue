@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onActivated, ref, type Ref } from "vue";
+import { nextTick, onActivated, onMounted, ref, type Ref } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -169,7 +169,7 @@ const columns = ref([
 
 const router = useRouter();
 
-onActivated(async () => {
+onMounted(async () => {
   await getStreamFields();
   restoreUrlQueryParams();
 });
@@ -227,18 +227,15 @@ const getErrorLogs = () => {
     parsedQuery,
     streamName: errorTrackingState.data.stream.errorStream,
   };
-
   const req = buildQueryPayload(queryPayload);
 
   req.query.sql = `select max(${
     store.state.zoConfig.timestamp_column
-  }) as zo_sql_timestamp, min(${
-    store.state.zoConfig.timestamp_column
-  }) as min_zo_sql_timestamp, type, error_message, service, MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack ELSE error_handling_stack END ) AS error_stack, COUNT(*) as events, error_handling, max(error_id) as error_id,  min(error_id) as min_error_id, max(view_url) as view_url, max(session_id) as session_id from '_rumdata' where type='error' ${
+  }) as zo_sql_timestamp, type, error_message, service, MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack ELSE error_handling_stack END ) AS error_stack, COUNT(*) as events, error_handling, max(error_id) as error_id, max(view_url) as view_url, max(session_id) as session_id from '_rumdata' where type='error'${
     errorTrackingState.data.editorValue.length
       ? " and " + errorTrackingState.data.editorValue
       : ""
-  } group by type, error_message, service, error_stack, error_handling order by zo_sql_timestamp DESC`;
+  } GROUP BY type, error_message, service, error_stack, error_handling order by zo_sql_timestamp DESC`;
 
   req.query.sql.replace("\n", " ");
   req.query.sql_mode = "full";
@@ -284,6 +281,9 @@ const handleErrorTypeClick = async (payload: any) => {
 };
 
 const handleTableEvent = (event: string, payload: any) => {
+  const eventsToHandle = ["cell-click"];
+  if (eventsToHandle.indexOf(event) === -1) return;
+
   const eventMapping: { [key: string]: (payload: any) => Promise<void> } = {
     "cell-click": handleErrorTypeClick,
   };

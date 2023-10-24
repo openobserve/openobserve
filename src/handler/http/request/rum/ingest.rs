@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::meta::middleware_data::RumExtraData;
-use crate::common::{meta::http::HttpResponse as MetaHttpResponse, utils::json};
-use crate::service::logs;
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
 use actix_web::{post, web, HttpResponse};
 use ahash::AHashMap;
-
-use std::io::Error;
-
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
-use std::io::prelude::*;
+use std::io::{prelude::*, Error};
+
+use crate::common::{
+    meta::{http::HttpResponse as MetaHttpResponse, middleware_data::RumExtraData},
+    utils::json,
+};
+use crate::service::logs;
 
 pub const RUM_LOG_STREAM: &str = "_rumlog";
 pub const RUM_SESSION_REPLAY_STREAM: &str = "_sessionreplay";
