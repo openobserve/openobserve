@@ -174,7 +174,7 @@ pub async fn remote_write(
                 min_ts = timestamp;
             }
 
-            if first_line && dedup_enabled {
+            if first_line && dedup_enabled && !cluster_name.is_empty() {
                 let lock = METRIC_CLUSTER_LEADER.read().await;
                 match lock.get(&cluster_name) {
                     Some(leader) => {
@@ -186,14 +186,18 @@ pub async fn remote_write(
                     }
                 }
                 drop(lock);
-                accept_record = prom_ha_handler(
-                    has_entry,
-                    &cluster_name,
-                    &replica_label,
-                    last_received,
-                    election_interval,
-                )
-                .await;
+                accept_record = if !replica_label.is_empty() {
+                    prom_ha_handler(
+                        has_entry,
+                        &cluster_name,
+                        &replica_label,
+                        last_received,
+                        election_interval,
+                    )
+                    .await
+                } else {
+                    true
+                };
                 has_entry = true;
                 first_line = false;
             }
@@ -283,7 +287,7 @@ pub async fn remote_write(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
-                value.as_object().unwrap(),
+                val_map,
                 None,
             );
             let hour_buf = buf.entry(hour_key).or_default();
