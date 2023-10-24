@@ -360,10 +360,7 @@ async fn write_file_list_db_only(
         let mut success = false;
         for _ in 0..5 {
             if let Err(e) = infra_file_list::batch_add(&put_items).await {
-                log::error!(
-                    "[COMPACT] batch_write to external db failed, retrying: {}",
-                    e
-                );
+                log::error!("[COMPACT] batch_add to external db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }

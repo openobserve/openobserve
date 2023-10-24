@@ -267,9 +267,7 @@ export default defineComponent({
             150 -
           1;
 
-        console.log("get more data started");
         await this.getQueryData(true);
-        console.log("get more data completed");
         this.refreshHistogramChart();
 
         if (config.isCloud == "true") {

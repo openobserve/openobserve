@@ -139,7 +139,10 @@ export default defineComponent({
 
       const editorElement = document.getElementById(props.editorId);
 
-      if (!editorElement) console.error("Query Editor element not found");
+      if (!editorElement) {
+        console.error("Query Editor element not found");
+        return;
+      }
       if (editorElement && editorElement?.hasChildNodes()) return;
 
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
@@ -326,14 +329,6 @@ export default defineComponent({
   computed: {
     editorFocus() {
       return this.editorRef;
-    },
-  },
-  watch: {
-    editorFocus: {
-      handler: function (newVal, oldVal) {
-        console.log(newVal, oldVal);
-      },
-      immediate: true,
     },
   },
 });

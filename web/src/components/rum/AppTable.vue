@@ -126,9 +126,7 @@ const handleDataClick = (columnName: string, row: any) => {
   emit("event-emitted", "cell-click", { columnName, row });
 };
 
-const onScroll = () => {
-  console.log("handle table scroll");
-};
+const onScroll = () => {};
 </script>
 
 <style>

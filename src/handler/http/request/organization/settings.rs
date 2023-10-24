@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::common::meta::organization::OrganizationSettingResponse;
-use crate::common::utils::json;
-use crate::service::db::organization::{get_org_setting, ORG_SETTINGS_KEY_PREFIX};
-use crate::{
-    common::meta::organization::OrganizationSetting, service::db::organization::set_org_setting,
-};
 use actix_web::{get, post, web, HttpResponse};
 use std::io::Error;
+
+use crate::common::{
+    meta::{
+        http::HttpResponse as MetaHttpResponse,
+        organization::{OrganizationSetting, OrganizationSettingResponse},
+    },
+    utils::json,
+};
+use crate::service::db::organization::{get_org_setting, set_org_setting, ORG_SETTINGS_KEY_PREFIX};
 
 /** Organization specific settings */
 #[utoipa::path(

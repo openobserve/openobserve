@@ -139,7 +139,11 @@ const handleDataClick = (columnName: string, row: any) => {
 };
 
 const onScroll = (e: any) => {
-  emit("event-emitted", "scroll", e);
+  try {
+    emit("event-emitted", "scroll", e);
+  } catch (e) {
+    console.log("error", e);
+  }
 };
 </script>
 

@@ -12,34 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::{BufRead, Read};
-
 use actix_web::http;
 use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
+use std::io::{BufRead, Read};
 use vrl::compiler::runtime::Runtime;
 
 use super::StreamMeta;
-use crate::common::infra::{config::CONFIG, metrics};
-use crate::common::meta::functions::{StreamTransform, VRLResultResolver};
-use crate::common::meta::ingestion::{
-    AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
-    IngestionRequest, KinesisFHData, KinesisFHIngestionResponse,
+use crate::common::{
+    infra::{config::CONFIG, metrics},
+    meta::{
+        alert::{Alert, Trigger},
+        functions::{StreamTransform, VRLResultResolver},
+        ingestion::{
+            AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
+            IngestionRequest, KinesisFHData, KinesisFHIngestionResponse,
+        },
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
-use crate::common::meta::{
-    alert::{Alert, Trigger},
-    ingestion::{IngestionResponse, StreamStatus},
-    stream::StreamParams,
-    usage::UsageType,
-    StreamType,
-};
-use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::ingestion::is_ingestion_allowed;
 use crate::service::{
-    get_formatted_stream_name, ingestion::write_file, usage::report_request_usage_stats,
+    get_formatted_stream_name, ingestion::is_ingestion_allowed, ingestion::write_file,
+    usage::report_request_usage_stats,
 };
 
 pub async fn ingest(

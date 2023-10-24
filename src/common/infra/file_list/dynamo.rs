@@ -35,8 +35,11 @@ use crate::common::{
     utils::time::BASE_TIME,
 };
 
+use super::parse_file_key_columns;
+
 pub struct DynamoFileList {
     file_list_table: String,
+    file_list_deleted_table: String,
     stream_stats_table: String,
 }
 
@@ -44,6 +47,7 @@ impl DynamoFileList {
     pub fn new() -> Self {
         Self {
             file_list_table: CONFIG.dynamo.file_list_table.clone(),
+            file_list_deleted_table: CONFIG.dynamo.file_list_deleted_table.clone(),
             stream_stats_table: CONFIG.dynamo.stream_stats_table.clone(),
         }
     }
@@ -170,6 +174,69 @@ impl super::FileList for DynamoFileList {
         Ok(())
     }
 
+    async fn batch_add_deleted(
+        &self,
+        org_id: &str,
+        created_at: i64,
+        files: &[String],
+    ) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+        let created_at = created_at.to_string();
+        for batch in files.chunks(25) {
+            let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
+            for file in batch {
+                let (stream_key, date_key, file_name) = parse_file_key_columns(file).unwrap();
+                let file_name = format!("{date_key}/{file_name}");
+                let mut item = HashMap::new();
+                item.insert("org".to_string(), AttributeValue::S(org_id.to_string()));
+                item.insert("stream".to_string(), AttributeValue::S(stream_key));
+                item.insert("file".to_string(), AttributeValue::S(file_name));
+                item.insert(
+                    "created_at".to_string(),
+                    AttributeValue::N(created_at.clone()),
+                );
+                let req = PutRequest::builder().set_item(Some(item)).build();
+                reqs.push(WriteRequest::builder().put_request(req).build());
+            }
+            let client = DYNAMO_DB_CLIENT.get().await.clone();
+            client
+                .batch_write_item()
+                .request_items(&self.file_list_deleted_table, reqs)
+                .send()
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+        for batch in files.chunks(25) {
+            let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
+            for file in batch {
+                let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+                let file_name = format!("{date_key}/{file_name}");
+                let mut key = HashMap::new();
+                key.insert("stream".to_string(), AttributeValue::S(stream_key));
+                key.insert("file".to_string(), AttributeValue::S(file_name));
+                let req = DeleteRequest::builder().set_key(Some(key)).build();
+                reqs.push(WriteRequest::builder().delete_request(req).build());
+            }
+            let client = DYNAMO_DB_CLIENT.get().await.clone();
+            client
+                .batch_write_item()
+                .request_items(&self.file_list_deleted_table, reqs)
+                .send()
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
     async fn get(&self, file: &str) -> Result<FileMeta> {
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
         let file_name = format!("{date_key}/{file_name}");
@@ -265,6 +332,42 @@ impl super::FileList for DynamoFileList {
                 } else {
                     None
                 }
+            })
+            .collect();
+        Ok(resp)
+    }
+
+    async fn query_deleted(&self, org_id: &str, time_max: i64) -> Result<Vec<String>> {
+        if time_max == 0 {
+            return Ok(Vec::new());
+        }
+        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        let resp: std::result::Result<Vec<QueryOutput>, _> = client
+            .query()
+            .table_name(&self.file_list_deleted_table)
+            .index_name("org-created-at-index")
+            .key_condition_expression("#org = :org AND #created_at < :ts")
+            .expression_attribute_names("#org", "org".to_string())
+            .expression_attribute_names("#created_at", "created_at".to_string())
+            .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
+            .expression_attribute_values(":ts", AttributeValue::N(time_max.to_string()))
+            .select(Select::AllAttributes)
+            .into_paginator()
+            .page_size(1000)
+            .send()
+            .collect()
+            .await;
+        let resp = resp.map_err(|e| Error::Message(e.to_string()))?;
+        let resp: Vec<_> = resp
+            .iter()
+            .filter(|v| v.count() > 0)
+            .flat_map(|v| v.items().unwrap())
+            .map(|v| {
+                format!(
+                    "files/{}/{}",
+                    v.get("stream").unwrap().as_s().unwrap(),
+                    v.get("file").unwrap().as_s().unwrap()
+                )
             })
             .collect();
         Ok(resp)
@@ -534,12 +637,14 @@ impl super::FileList for DynamoFileList {
 
 pub async fn create_table() -> Result<()> {
     create_table_file_list().await?;
+    create_table_file_list_deleted().await?;
     create_table_stream_stats().await?;
     Ok(())
 }
 
 pub async fn create_table_index() -> Result<()> {
     create_table_file_list_index().await?;
+    create_table_file_list_deleted_index().await?;
     create_table_stream_stats_index().await?;
     Ok(())
 }
@@ -547,6 +652,86 @@ pub async fn create_table_index() -> Result<()> {
 pub async fn create_table_file_list() -> Result<()> {
     let client = DYNAMO_DB_CLIENT.get().await.clone();
     let table_name = &CONFIG.dynamo.file_list_table;
+    let tables = client
+        .list_tables()
+        .send()
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+    if tables
+        .table_names()
+        .unwrap_or(&[])
+        .contains(&table_name.to_string())
+    {
+        return Ok(());
+    }
+
+    let key_schema = vec![
+        KeySchemaElement::builder()
+            .attribute_name("stream")
+            .key_type(KeyType::Hash)
+            .build(),
+        KeySchemaElement::builder()
+            .attribute_name("file")
+            .key_type(KeyType::Range)
+            .build(),
+    ];
+    let attribute_definitions = vec![
+        AttributeDefinition::builder()
+            .attribute_name("org")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("stream")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("file")
+            .attribute_type(ScalarAttributeType::S)
+            .build(),
+        AttributeDefinition::builder()
+            .attribute_name("created_at")
+            .attribute_type(ScalarAttributeType::N)
+            .build(),
+    ];
+
+    let index_created = GlobalSecondaryIndex::builder()
+        .index_name("org-created-at-index")
+        .set_key_schema(Some(vec![
+            KeySchemaElement::builder()
+                .attribute_name("org")
+                .key_type(KeyType::Hash)
+                .build(),
+            KeySchemaElement::builder()
+                .attribute_name("created_at")
+                .key_type(KeyType::Range)
+                .build(),
+        ]))
+        .set_projection(Some(
+            Projection::builder()
+                .projection_type(ProjectionType::All)
+                .build(),
+        ))
+        .build();
+
+    client
+        .create_table()
+        .table_name(table_name)
+        .set_key_schema(Some(key_schema))
+        .set_attribute_definitions(Some(attribute_definitions))
+        .set_global_secondary_indexes(Some(vec![index_created]))
+        .billing_mode(BillingMode::PayPerRequest)
+        .send()
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+
+    log::info!("Table {} created successfully", table_name);
+
+    Ok(())
+}
+
+pub async fn create_table_file_list_deleted() -> Result<()> {
+    let client = DYNAMO_DB_CLIENT.get().await.clone();
+    let table_name = &CONFIG.dynamo.file_list_deleted_table;
     let tables = client
         .list_tables()
         .send()
@@ -736,6 +921,10 @@ pub async fn create_table_stream_stats() -> Result<()> {
 }
 
 pub async fn create_table_file_list_index() -> Result<()> {
+    Ok(())
+}
+
+pub async fn create_table_file_list_deleted_index() -> Result<()> {
     Ok(())
 }
 
