@@ -13,7 +13,11 @@
 // limitations under the License.
 
 use crate::common::{
-    infra::{config::ORGANIZATION_SETTING, db as infra_db},
+    infra::{
+        config::ORGANIZATION_SETTING,
+        db as infra_db,
+        errors::{self, Error},
+    },
     meta::organization::OrganizationSetting,
     utils::json,
 };
@@ -23,10 +27,7 @@ use std::sync::Arc;
 // DBKey to set settings for an org
 pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 
-pub async fn set_org_setting(
-    org_name: &str,
-    setting: &OrganizationSetting,
-) -> Result<(), anyhow::Error> {
+pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
     let db = &infra_db::DEFAULT;
     let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_name);
     db.put(
@@ -45,10 +46,9 @@ pub async fn set_org_setting(
     Ok(())
 }
 
-pub async fn get_org_setting(org_name: &str) -> Result<Bytes, anyhow::Error> {
+pub async fn get_org_setting(org_id: &str) -> Result<Bytes, Error> {
     let db = &infra_db::DEFAULT;
-    let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_name);
-
+    let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_id);
     match ORGANIZATION_SETTING.clone().read().await.get(&key) {
         Some(v) => Ok(json::to_vec(v).unwrap().into()),
         None => Ok(db.get(&key).await?),
