@@ -13,7 +13,7 @@
 //  limitations under the License.
 
 import { createStore } from "vuex";
-import { useLocalOrganization, useLocalCurrentUser } from "../utils/zincutils";
+import { useLocalOrganization, useLocalCurrentUser, useLocalTimezone } from "../utils/zincutils";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -37,6 +37,9 @@ const organizationObj = {
   functions: [],
   streams: {},
   folders: [],
+  organizationSettings: {
+    scrape_interval: 15
+  }
 };
 
 export default createStore({
@@ -53,6 +56,7 @@ export default createStore({
     theme: "",
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: {},
+    timezone: useLocalTimezone() ? useLocalTimezone() : "UTC",
   },
   mutations: {
     login(state, payload) {
@@ -104,6 +108,9 @@ export default createStore({
     setAllDashboardList(state, payload) {
       state.organizationData.allDashboardList = payload;
     },
+    setOrganizationSettings(state, payload) {
+      state.organizationData.organizationSettings = payload;
+    },
     setFunctions(state, payload) {
       state.organizationData.functions = payload;
     },
@@ -133,6 +140,9 @@ export default createStore({
     },
     appTheme(state, payload) {
       state.theme = payload;
+    },
+    setTimezone(state, payload) {
+      state.timezone = payload;
     },
   },
   actions: {
@@ -178,6 +188,9 @@ export default createStore({
     setAllDashboardList(context, payload) {
       context.commit("setAllDashboardList", payload);
     },
+    setOrganizationSettings(context, payload) {
+      context.commit("setOrganizationSettings", payload);
+    },
     setFolders(context, payload) {
       context.commit("setFolders", payload);
     },
@@ -207,6 +220,9 @@ export default createStore({
     },
     appTheme(context, payload) {
       context.commit("appTheme", payload);
+    },
+    setTimezone(context, payload) {
+      context.commit("setTimezone", payload);
     },
   },
   modules: {},

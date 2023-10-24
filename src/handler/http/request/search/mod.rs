@@ -107,16 +107,16 @@ pub async fn search(
     let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(bad_request(e)),
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
     // handle encoding for query and aggs
     let mut req: meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => return Ok(bad_request(e)),
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
     if let Err(e) = req.decode() {
-        return Ok(bad_request(e));
+        return Ok(MetaHttpResponse::bad_request(e));
     }
 
     let mut query_fn = req.query.query_fn.and_then(|v| base64::decode(&v).ok());
@@ -274,12 +274,12 @@ pub async fn around(
     let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(bad_request(e)),
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
     let around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),
-        None => return Ok(bad_request("around key is empty")),
+        None => return Ok(MetaHttpResponse::bad_request("around key is empty")),
     };
     let query_fn = query.get("query_fn").and_then(|v| base64::decode(v).ok());
 
@@ -527,12 +527,12 @@ pub async fn values(
     let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(bad_request(e)),
+        Err(e) => return Ok(meta::http::HttpResponse::bad_request(e)),
     };
 
     let fields = match query.get("fields") {
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
-        None => return Ok(bad_request("fields is empty")),
+        None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
     };
     let mut query_fn = query.get("query_fn").and_then(|v| base64::decode(v).ok());
     if let Some(vrl_function) = &query_fn {
@@ -578,7 +578,7 @@ pub async fn values(
         .get("start_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if start_time == 0 {
-        return Ok(bad_request("start_time is empty"));
+        return Ok(MetaHttpResponse::bad_request("start_time is empty"));
     }
     let mut end_time = query
         .get("end_time")
@@ -711,11 +711,4 @@ pub async fn values(
     .await;
 
     Ok(HttpResponse::Ok().json(resp))
-}
-
-fn bad_request(error: impl ToString) -> HttpResponse {
-    HttpResponse::BadRequest().json(MetaHttpResponse::error(
-        StatusCode::BAD_REQUEST.into(),
-        error.to_string(),
-    ))
 }

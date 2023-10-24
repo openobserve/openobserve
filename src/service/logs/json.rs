@@ -18,18 +18,20 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
-use crate::common::infra::{config::CONFIG, metrics};
-use crate::common::meta::{
-    alert::{Alert, Trigger},
-    ingestion::{IngestionResponse, StreamStatus},
-    stream::StreamParams,
-    usage::UsageType,
-    StreamType,
+use crate::common::{
+    infra::{config::CONFIG, metrics},
+    meta::{
+        alert::{Alert, Trigger},
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
-use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::service::ingestion::is_ingestion_allowed;
 use crate::service::{
-    get_formatted_stream_name, ingestion::write_file, usage::report_request_usage_stats,
+    get_formatted_stream_name, ingestion::is_ingestion_allowed, ingestion::write_file,
+    usage::report_request_usage_stats,
 };
 
 pub async fn ingest(

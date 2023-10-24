@@ -246,7 +246,6 @@ export default defineComponent({
         traceTree.value[0].startTimeMs + timeRange.value.start;
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
-      console.log(time);
       for (let i = 0; i <= 4; i++) {
         tics.push({
           value: Number(time.toFixed(2)),

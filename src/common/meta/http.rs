@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use actix_web::{http::StatusCode, HttpResponse as ActixHttpResponse};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -63,6 +64,21 @@ impl HttpResponse {
             message: err.get_message(),
             error_detail: Some(err.get_error_detail()),
         }
+    }
+
+    /// Send a bad request response in json format and associate the
+    /// provided error as `error` field.
+    pub fn bad_request(error: impl ToString) -> ActixHttpResponse {
+        ActixHttpResponse::BadRequest().json(Self::error(
+            StatusCode::BAD_REQUEST.into(),
+            error.to_string(),
+        ))
+    }
+
+    /// Send a response in json format, status code is 200.
+    /// The payload should be serde-serializable.
+    pub fn json(payload: impl Serialize) -> ActixHttpResponse {
+        ActixHttpResponse::Ok().json(payload)
     }
 }
 

@@ -14,6 +14,7 @@
 
 import moment from "moment";
 import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { utcToZonedTime } from "date-fns-tz";
 
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
@@ -227,7 +228,10 @@ export const convertPromQLData = (
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
-                data: values.map((value: any) => [value[0] * 1000, value[1]]),
+                // if utc then simply return the values by removing z from string
+                // else convert time from utc to zoned
+                // used slice to remove Z from isostring to pass as a utc
+                data: values.map((value: any) => [store.state.timezone != "UTC" ? utcToZonedTime(value[0] * 1000, store.state.timezone) : new Date(value[0] * 1000).toISOString().slice(0, -1), value[1]]),
                 ...getPropsByChartTypeForSeries(panelSchema.type),
               };
             });

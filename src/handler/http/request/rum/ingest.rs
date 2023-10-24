@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::meta::middleware_data::RumExtraData;
-use crate::common::{meta::http::HttpResponse as MetaHttpResponse, utils::json};
-use crate::service::logs;
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
-use actix_web::{http, post, web, HttpResponse};
+use actix_web::{post, web, HttpResponse};
 use ahash::AHashMap;
-
-use std::io::Error;
-
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
-use std::io::prelude::*;
+use std::io::{prelude::*, Error};
+
+use crate::common::{
+    meta::{http::HttpResponse as MetaHttpResponse, middleware_data::RumExtraData},
+    utils::json,
+};
+use crate::service::logs;
 
 pub const RUM_LOG_STREAM: &str = "_rumlog";
 pub const RUM_SESSION_REPLAY_STREAM: &str = "_sessionreplay";
@@ -172,7 +172,9 @@ pub async fn sessionreplay(
     if let Err(_e) =
         ZlibDecoder::new(&payload.segment.data[..]).read_to_string(&mut segment_payload)
     {
-        return Ok(bad_request("Failed to decompress the incoming payload"));
+        return Ok(MetaHttpResponse::bad_request(
+            "Failed to decompress the incoming payload",
+        ));
     }
 
     let event: Event = json::from_slice(&payload.event.data[..]).unwrap();
@@ -203,18 +205,8 @@ async fn ingest_multi_json(
     Ok(
         match logs::multi::ingest_with_keys(org_id, stream_name, body, extend_json, thread_id).await
         {
-            Ok(v) => HttpResponse::Ok().json(v),
-            Err(e) => bad_request(e.to_string()),
+            Ok(v) => MetaHttpResponse::json(v),
+            Err(e) => MetaHttpResponse::bad_request(e),
         },
     )
-}
-
-fn bad_request<T>(reason: T) -> HttpResponse
-where
-    T: Into<String>,
-{
-    HttpResponse::BadRequest().json(MetaHttpResponse::error(
-        http::StatusCode::BAD_REQUEST.into(),
-        reason.into(),
-    ))
 }

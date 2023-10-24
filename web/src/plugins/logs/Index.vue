@@ -31,6 +31,7 @@
             :key="searchObj.data.transforms.length || -1"
             @searchdata="searchData"
             @onChangeInterval="onChangeInterval"
+            @onChangeTimezone="refreshTimezone"
           />
         </template>
         <template v-slot:after>
@@ -266,9 +267,7 @@ export default defineComponent({
             150 -
           1;
 
-        console.log("get more data started");
         await this.getQueryData(true);
-        console.log("get more data completed");
         this.refreshHistogramChart();
 
         if (config.isCloud == "true") {
@@ -298,6 +297,7 @@ export default defineComponent({
       updateStreams,
       restoreUrlQueryParams,
       handleRunQuery,
+      generateHistogramData,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -367,6 +367,12 @@ export default defineComponent({
       // searchObj.runQuery = false;
       // expandedLogs.value = {};
       await getQueryData();
+      refreshHistogramChart();
+    };
+
+    const refreshTimezone = () => {
+      updateGridColumns();
+      generateHistogramData();
       refreshHistogramChart();
     };
 
@@ -473,6 +479,7 @@ export default defineComponent({
       refreshHistogramChart,
       onChangeInterval,
       handleRunQuery,
+      refreshTimezone,
     };
   },
   computed: {

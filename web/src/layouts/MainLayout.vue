@@ -215,17 +215,9 @@
     >
       <router-view v-slot="{ Component }">
         <keep-alive>
-          <component
-            :is="Component"
-            v-if="$route.meta.keepAlive"
-            :key="$route.name"
-          />
+          <component :is="Component" v-if="$route.meta.keepAlive" />
         </keep-alive>
-        <component
-          :is="Component"
-          v-if="!$route.meta.keepAlive"
-          :key="$route.name"
-        />
+        <component :is="Component" v-if="!$route.meta.keepAlive" />
       </router-view>
     </q-page-container>
   </q-layout>
@@ -294,8 +286,10 @@ import {
   outlinedFilterAlt,
   outlinedPerson,
   outlinedFormatListBulleted,
+  outlinedSettings
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
+import organizations from "@/services/organizations";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -437,6 +431,11 @@ export default defineComponent({
         display: store.state?.currentuser?.role == "admin" ? true : false,
       },
       {
+        title: t("menu.settings"),
+        icon: outlinedSettings,
+        link: "/settings/",
+      },
+      {
         title: t("menu.slack"),
         iconComponent: markRaw(SlackIcon),
         link: "https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
@@ -562,7 +561,7 @@ export default defineComponent({
       store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
     };
 
-    const setSelectedOrganization = () => {
+    const setSelectedOrganization = async () => {
       customOrganization = router.currentRoute.value.query.hasOwnProperty(
         "org_identifier"
       )
@@ -658,8 +657,26 @@ export default defineComponent({
         mainLayoutMixin.setup().getOrganizationThreshold(store);
       }
 
+      await getOrganizationSettings();
       isLoading.value = true;
     };
+
+    // get organizations settings on first load and identifier change
+    const getOrganizationSettings = async () => {
+      try {
+        //get organizations settings
+        const orgSettings: any = await organizations.get_organization_settings(
+            store.state?.selectedOrganization?.identifier
+          );
+  
+          //set settings in store
+          //scrape interval will be in number
+          store.dispatch("setOrganizationSettings",({
+            scrape_interval: orgSettings?.data?.data?.scrape_interval ?? 15,
+          }));
+      } catch (error) {}
+      return ;
+    }
 
     /**
      * Get configuration from the backend.
@@ -741,6 +758,7 @@ export default defineComponent({
       updateOrganization,
       setSelectedOrganization,
       redirectToParentRoute,
+      getOrganizationSettings
     };
   },
   computed: {
@@ -763,9 +781,14 @@ export default defineComponent({
         this.setSelectedOrganization();
       }, 500);
     },
-    changeOrganizationIdentifier() {
+    async changeOrganizationIdentifier() {
+      this.isLoading = false
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
+      
+      await this.getOrganizationSettings()
+
+      this.isLoading = true
       setTimeout(() => {
         this.redirectToParentRoute(this.$route.matched);
         // this.setSelectedOrganization();

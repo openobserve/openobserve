@@ -93,6 +93,12 @@ const stream = {
       `/api/${org_identifier}/${stream_name}?type=${stream_type}`
     );
   },
+
+  deleteFields: (org_identifier: string, stream_name: string, fields: []) => {
+    return http().post(`/api/${org_identifier}/${stream_name}/delete_fields`, {
+      fields,
+    });
+  },
 };
 
 export default stream;
