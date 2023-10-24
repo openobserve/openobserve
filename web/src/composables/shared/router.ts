@@ -296,6 +296,12 @@ const useRoutes = () => {
           component: ErrorViewer,
           props: true,
         },
+        {
+          path: "performance",
+          name: "RumPerformance",
+          component: AppPerformance,
+          props: true,
+        },
       ],
     },
     ...useIngestionRoutes(),

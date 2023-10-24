@@ -116,7 +116,12 @@ onMounted(async () => {
   isLoading.value.pop();
   if (!isRumEnabled.value && !isSessionReplayEnabled.value) return;
 
-  const routes = ["SessionViewer", "ErrorTracking", "Dashboard", "ErrorViewer"];
+  const routes = [
+    "SessionViewer",
+    "ErrorTracking",
+    "RumPerformance",
+    "ErrorViewer",
+  ];
   const routeNameMapping: { [key: string]: string } = {
     SessionViewer: "sessions",
     ErrorTracking: "error_tracking",

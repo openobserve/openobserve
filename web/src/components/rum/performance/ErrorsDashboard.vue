@@ -22,7 +22,13 @@
         :viewOnly="false"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
+        @variablesData="variablesDataUpdated"
       />
+    </div>
+    <div class="row q-px-md">
+      <div class="col-8">
+        <AppTable :columns="columns" :rows="errorsByView" />
+      </div>
     </div>
   </q-page>
 </template>
@@ -40,30 +46,37 @@ import {
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
 import {
   parseDuration,
   generateDurationLabel,
   getDurationObjectFromParams,
   getQueryParamsForDuration,
 } from "@/utils/date";
-import { toRaw, unref, reactive } from "vue";
+import { reactive } from "vue";
 import { useRoute } from "vue-router";
+import type { start } from "repl";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
-import overviewDashboard from "@/utils/rum/web_vitals.json";
+import errorDashboard from "@/utils/rum/errors.json";
+import AppTable from "@/components/AppTable.vue";
+import searchService from "@/services/search";
 
 export default defineComponent({
   name: "AppPerformance",
   components: {
     RenderDashboardCharts,
+    AppTable,
   },
   props: {
     dateTime: {
       type: Object,
       default: () => ({}),
     },
+    selectedDate: {
+      type: Object,
+      default: () => ({}),
+    },
   },
-  setup() {
+  setup(props) {
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
@@ -74,25 +87,75 @@ export default defineComponent({
     const showDashboardSettingsDialog = ref(false);
     const viewOnly = ref(true);
     const eventLog = ref([]);
+    const errorsByView = ref([]);
 
     const refDateTime: any = ref(null);
-    const currentDurationSelectionObj = ref({});
     const refreshInterval = ref(0);
-    const selectedDate = ref();
+
+    const getResourceErrors = () => {
+      errorsByView.value = [];
+      console.log(variablesData.value);
+      const req = {
+        query: {
+          sql: `SELECT SPLIT_PART(view_url, '?', 1) AS view_url, count(*) as error_count FROM "_rumdata" WHERE type='error' group by view_url order by error_count desc`,
+          start_time: props.selectedDate.startTime,
+          end_time: props.selectedDate.endTime,
+          from: 0,
+          size: 150,
+          sql_mode: "full",
+        },
+      };
+
+      // isLoading.value.push(true);
+
+      // updateUrlQueryParams();
+
+      searchService
+        .search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: req,
+          page_type: "logs",
+        })
+        .then((res) => {
+          res.data.hits.forEach((element: any) => {
+            errorsByView.value.push(element);
+          });
+        })
+        .finally(() => console.log(""));
+    };
 
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
+      console.log(data);
+      getResourceErrors();
       Object.assign(variablesData, data);
     };
+
+    const columns = [
+      {
+        name: "view_url",
+        label: "View URL",
+        field: (row) => row["view_url"],
+        align: "left",
+      },
+      {
+        name: "error_count",
+        label: "Error Count",
+        field: (row: any) => row["error_count"],
+        align: "left",
+        sortable: true,
+        style: { width: "56px" },
+      },
+    ];
 
     onMounted(async () => {
       await loadDashboard();
     });
 
     const loadDashboard = async () => {
-      console.log("loadDashboard");
-      currentDashboardData.data = overviewDashboard;
+      getResourceErrors();
+      currentDashboardData.data = errorDashboard;
 
       // if variables data is null, set it to empty list
       if (
@@ -110,79 +173,21 @@ export default defineComponent({
       showDashboardSettingsDialog.value = true;
     };
 
-    // back button to render dashboard List page
-    const goBackToDashboardList = () => {
-      return router.push({
-        path: "/dashboards",
-        query: {
-          dashboard: route.query.dashboard,
-          folder: route.query.folder ?? "default",
-        },
-      });
-    };
-
-    //add panel
-    const addPanelData = () => {
-      return router.push({
-        path: "/dashboards/add_panel",
-        query: {
-          dashboard: route.query.dashboard,
-          folder: route.query.folder ?? "default",
-        },
-      });
-    };
-
-    // ------- work with query params ----------
-    onActivated(async () => {
-      const params = route.query;
-
-      if (params.refresh) {
-        refreshInterval.value = parseDuration(params.refresh);
+    watch(
+      () => props.selectedDate,
+      (newVal, oldValue) => {
+        if (JSON.stringify(newVal) !== JSON.stringify(oldValue)) {
+          getResourceErrors();
+        }
       }
-
-      if (params.period || (params.to && params.from)) {
-        selectedDate.value = getDurationObjectFromParams(params);
-      }
-
-      // resize charts if needed
-      await nextTick();
-      window.dispatchEvent(new Event("resize"));
-    });
-
-    // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, selectedDate], () => {
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-        },
-      });
-    });
+    );
 
     return {
       currentDashboardData,
-      goBackToDashboardList,
-      addPanelData,
       t,
-      getDashboard,
       store,
       refDateTime,
-      filterQuery: ref(""),
-      filterData(rows: string | any[], terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
       refreshInterval,
-      selectedDate,
       viewOnly,
       eventLog,
       variablesData,
@@ -190,6 +195,8 @@ export default defineComponent({
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,
+      columns,
+      errorsByView,
     };
   },
 });
@@ -207,11 +214,4 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss">
-.performance-dashboard {
-  .displayDiv {
-    height: calc(100vh - 254px);
-    overflow-y: auto;
-  }
-}
-</style>
+<style lang="scss"></style>

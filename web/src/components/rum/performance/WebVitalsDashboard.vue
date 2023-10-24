@@ -208,10 +208,5 @@ export default defineComponent({
 </style>
 
 <style lang="scss">
-.performance-dashboard {
-  .displayDiv {
-    height: calc(100vh - 254px);
-    overflow-y: auto;
-  }
-}
+
 </style>
