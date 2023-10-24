@@ -214,10 +214,14 @@
       v-if="isLoading"
     >
       <router-view v-slot="{ Component }">
-        <keep-alive>
-          <component :is="Component" v-if="$route.meta.keepAlive" />
-        </keep-alive>
-        <component :is="Component" v-if="!$route.meta.keepAlive" />
+        <template v-if="$route.meta.keepAlive">
+          <keep-alive>
+            <component :is="Component" />
+          </keep-alive>
+        </template>
+        <template v-else>
+          <component :is="Component" />
+        </template>
       </router-view>
     </q-page-container>
   </q-layout>
@@ -286,7 +290,7 @@ import {
   outlinedFilterAlt,
   outlinedPerson,
   outlinedFormatListBulleted,
-  outlinedSettings
+  outlinedSettings,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import organizations from "@/services/organizations";
@@ -666,17 +670,17 @@ export default defineComponent({
       try {
         //get organizations settings
         const orgSettings: any = await organizations.get_organization_settings(
-            store.state?.selectedOrganization?.identifier
-          );
-  
-          //set settings in store
-          //scrape interval will be in number
-          store.dispatch("setOrganizationSettings",({
-            scrape_interval: orgSettings?.data?.data?.scrape_interval ?? 15,
-          }));
+          store.state?.selectedOrganization?.identifier
+        );
+
+        //set settings in store
+        //scrape interval will be in number
+        store.dispatch("setOrganizationSettings", {
+          scrape_interval: orgSettings?.data?.data?.scrape_interval ?? 15,
+        });
       } catch (error) {}
-      return ;
-    }
+      return;
+    };
 
     /**
      * Get configuration from the backend.
@@ -758,7 +762,7 @@ export default defineComponent({
       updateOrganization,
       setSelectedOrganization,
       redirectToParentRoute,
-      getOrganizationSettings
+      getOrganizationSettings,
     };
   },
   computed: {
@@ -782,13 +786,13 @@ export default defineComponent({
       }, 500);
     },
     async changeOrganizationIdentifier() {
-      this.isLoading = false
+      this.isLoading = false;
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
-      
-      await this.getOrganizationSettings()
 
-      this.isLoading = true
+      await this.getOrganizationSettings();
+
+      this.isLoading = true;
       setTimeout(() => {
         this.redirectToParentRoute(this.$route.matched);
         // this.setSelectedOrganization();
