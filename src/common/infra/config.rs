@@ -259,6 +259,8 @@ pub struct Common {
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_FILELIST_DEDUP_ENABLED", default = false)]
     pub feature_filelist_dedup_enabled: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
+    pub feature_query_queue_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -336,7 +338,7 @@ pub struct Limit {
     pub max_file_size_on_disk: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
-    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 60)] // seconds
+    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
@@ -462,7 +464,7 @@ pub struct Etcd {
     pub prefix: String,
     #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
-    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 10)]
+    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 5)]
     pub command_timeout: u64,
     #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
