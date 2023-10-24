@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, ref } from "vue";
+import { computed, onActivated, onMounted, ref } from "vue";
 import ErrorHeader from "@/components/rum/errorTracking/view/ErrorHeader.vue";
 import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
 import ErrorEvents from "@/components/rum/errorTracking/view/ErrorEvents.vue";
@@ -70,7 +70,7 @@ const store = useStore();
 const { errorTrackingState } = useErrorTracking();
 const errorDetails = ref<any>({});
 
-onActivated(async () => {
+onMounted(async () => {
   await getError();
   getErrorLogs();
 });
