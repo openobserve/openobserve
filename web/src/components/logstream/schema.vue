@@ -15,7 +15,7 @@
 
 <template>
   <q-card class="column full-height no-wrap" v-if="indexData.schema">
-    <q-card-section class="q-pa-md">
+    <q-card-section class="q-ma-none">
       <div class="row items-center no-wrap">
         <div class="col">
           <div class="text-body1 text-bold" data-test="schema-title-text">
@@ -23,12 +23,13 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="close" />
+          <q-btn v-close-popup="true" round
+flat icon="close" />
         </div>
       </div>
     </q-card-section>
     <q-separator />
-    <q-card-section>
+    <q-card-section class="q-ma-none q-pa-none">
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
         <div
           v-if="indexData.schema.length == 0"
@@ -118,8 +119,9 @@
               class="q-table"
               data-test="schema-log-stream-field-mapping-table"
             >
-              <thead>
+              <thead class="sticky-table-header">
                 <tr>
+                  <th width="30px">{{ t("logStream.deleteActionLabel") }}</th>
                   <th>{{ t("logStream.propertyName") }}</th>
                   <th>{{ t("logStream.propertyType") }}</th>
                   <th v-if="showFullTextSearchColumn">
@@ -136,10 +138,24 @@
                   :key="index + '_' + schema.name"
                   class="list-item"
                 >
+                  <td class="text-center">
+                    <q-checkbox
+                      v-if="
+                        schema.name !== store.state.zoConfig.timestamp_column
+                      "
+                      :data-test="`schema-stream-delete-${schema.name}-field-fts-key-checkbox`"
+                      v-model="schema.delete"
+                      size="sm"
+                      @click="addDeleteField(schema)"
+                    />
+                  </td>
                   <td>{{ schema.name }}</td>
                   <td>{{ schema.type }}</td>
                   <td v-if="showFullTextSearchColumn" class="text-center">
                     <q-checkbox
+                      v-if="
+                        schema.name !== store.state.zoConfig.timestamp_column
+                      "
                       :data-test="`schema-stream-${schema.name}-field-fts-key-checkbox`"
                       v-model="schema.ftsKey"
                       size="sm"
@@ -147,6 +163,9 @@
                   </td>
                   <td v-if="showPartitionColumn" class="text-center">
                     <q-checkbox
+                      v-if="
+                        schema.name !== store.state.zoConfig.timestamp_column
+                      "
                       :data-test="`schema-stream-${schema.name}-field-partition-key-checkbox`"
                       v-model="schema.partitionKey"
                       size="sm"
@@ -161,12 +180,23 @@
 
         <div
           v-if="indexData.schema.length > 0"
-          class="flex justify-center q-mt-sm"
+          class="flex q-mt-sm sticky-buttons"
         >
+          <q-btn
+            v-bind:disable="deleteFieldList.length == 0"
+            data-test="schema-delete-button"
+            class="q-my-sm text-bold btn-delete"
+            color="warning"
+            :label="t('logStream.delete')"
+            text-color="light-text"
+            padding="sm md"
+            no-caps
+            @click="confirmQueryModeChangeDialog = true"
+          />
           <q-btn
             v-close-popup="true"
             data-test="schema-cancel-button"
-            class="q-mb-md text-bold"
+            class="q-my-sm text-bold"
             :label="t('logStream.cancel')"
             text-color="light-text"
             padding="sm md"
@@ -175,7 +205,7 @@
           <q-btn
             data-test="schema-update-settings-button"
             :label="t('logStream.updateSettings')"
-            class="q-mb-md text-bold no-border q-ml-md"
+            class="q-my-sm text-bold no-border q-ml-md"
             color="secondary"
             padding="sm xl"
             type="submit"
@@ -188,6 +218,13 @@
   <q-card v-else class="column q-pa-md full-height no-wrap">
     <h5>Wait while loading...</h5>
   </q-card>
+  <ConfirmDialog
+    title="Delete Action"
+    :message="t('logStream.deleteActionMessage')"
+    @update:ok="deleteFields()"
+    @update:cancel="confirmQueryModeChangeDialog = false"
+    v-model="confirmQueryModeChangeDialog"
+  />
 </template>
 
 <script lang="ts">
@@ -200,7 +237,7 @@ import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
-import store from "@/test/unit/helpers/store";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const defaultValue: any = () => {
   return {
@@ -220,6 +257,9 @@ export default defineComponent({
       default: () => defaultValue(),
     },
   },
+  components: {
+    ConfirmDialog,
+  },
   setup({ modelValue }) {
     const { t } = useI18n();
     const store = useStore();
@@ -228,10 +268,57 @@ export default defineComponent({
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
     const dataRetentionDays = ref(0);
+    const deleteFieldList = ref([]);
+    const confirmQueryModeChangeDialog = ref(false);
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
     });
+
+    const addDeleteField = (schema: any) => {
+      if (schema.delete) {
+        deleteFieldList.value.push(schema.name);
+      } else {
+        deleteFieldList.value = deleteFieldList.value.filter(
+          (item) => item !== schema.name
+        );
+      }
+    };
+
+    const deleteFields = async () => {
+      await streamService
+        .deleteFields(
+          store.state.selectedOrganization.identifier,
+          indexData.value.name,
+          deleteFieldList.value
+        )
+        .then((res) => {
+          if (res.data.code == 200) {
+            q.notify({
+              color: "positive",
+              message: "Field(s) deleted successfully.",
+              timeout: 2000,
+            });
+            confirmQueryModeChangeDialog.value = false;
+            deleteFieldList.value = [];
+            getSchema();
+          } else {
+            q.notify({
+              color: "negative",
+              message: res.data.message,
+              timeout: 2000,
+            });
+          }
+        })
+        .catch((err: any) => {
+          console.log(err);
+          q.notify({
+            color: "negative",
+            message: err.message,
+            timeout: 2000,
+          });
+        });
+    };
 
     const getSchema = async () => {
       const dismiss = q.notify({
@@ -279,6 +366,8 @@ export default defineComponent({
             } else {
               property.ftsKey = false;
             }
+
+            property["delete"] = false;
 
             if (
               res.data.settings.partition_keys &&
@@ -408,6 +497,10 @@ export default defineComponent({
       dataRetentionDays,
       showDataRetention,
       formatSizeFromMB,
+      addDeleteField,
+      deleteFieldList,
+      confirmQueryModeChangeDialog,
+      deleteFields,
     };
   },
   created() {
@@ -507,5 +600,28 @@ export default defineComponent({
       padding: 8px 0;
     }
   }
+}
+
+.sticky-buttons {
+  position: sticky;
+  bottom: 0px;
+  margin: 0 auto;
+  background-color: white;
+  box-shadow: 6px 6px 18px lightgray;
+  justify-content: right;
+  width: 100%;
+  padding-right: 20px;
+}
+
+.btn-delete {
+  left: 20px;
+  position: absolute;
+}
+
+.sticky-table-header {
+  position: sticky;
+  top: 0px;
+  background: whitesmoke;
+  z-index: 1;
 }
 </style>

@@ -115,6 +115,7 @@
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
             @on:date-change="updateDateTime"
+            @on:timezone-change="updateTimezone"
           />
         </div>
         <div class="search-time q-pl-sm float-left q-mr-sm">
@@ -245,7 +246,7 @@ export default defineComponent({
     SyntaxGuide,
     AutoRefreshInterval,
   },
-  emits: ["searchdata", "onChangeInterval"],
+  emits: ["searchdata", "onChangeInterval", "onChangeTimezone"],
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
@@ -408,6 +409,10 @@ export default defineComponent({
       }
 
       if (value.valueType === "relative") emit("searchdata");
+    };
+
+    const updateTimezone = () => {
+      emit("onChangeTimezone");
     };
 
     const udpateQuery = () => {
@@ -731,6 +736,7 @@ export default defineComponent({
       autoCompleteKeywords,
       autoCompleteSuggestions,
       onRefreshIntervalUpdate,
+      updateTimezone,
     };
   },
   computed: {

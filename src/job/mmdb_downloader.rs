@@ -64,6 +64,33 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
     Ok(())
 }
 
+async fn run_download_files() {
+    // send request and await response
+    let client = reqwest::ClientBuilder::default().build().unwrap();
+    let fname = format!("{}/GeoLite2-City.mmdb", &CONFIG.common.mmdb_data_dir);
+
+    let download_files =
+        match is_digest_different(&fname, &CONFIG.common.mmdb_geolite_citydb_sha256_url).await {
+            Ok(is_different) => is_different,
+            Err(e) => {
+                log::error!("Well something broke. {e}");
+                false
+            }
+        };
+
+    if download_files {
+        match download_file(&client, &CONFIG.common.mmdb_geolite_citydb_url, &fname).await {
+            Ok(()) => {
+                let maxminddb_client = MaxmindClient::new_with_path(fname);
+                let mut client = MAXMIND_DB_CLIENT.write().await;
+                *client = maxminddb_client.ok();
+                log::info!("Updated geo-json data")
+            }
+            Err(e) => log::error!("failed to download the files {}", e),
+        }
+    }
+}
+
 pub async fn run() -> Result<(), anyhow::Error> {
     log::info!("spawned");
     if !is_ingester(&super::cluster::LOCAL_NODE_ROLE) {
@@ -77,37 +104,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     ));
 
     loop {
-        // send request and await response
-        let client = reqwest::ClientBuilder::default().build().unwrap();
-        let fname = format!("{}/GeoLite2-City.mmdb", &CONFIG.common.mmdb_data_dir);
-
-        let download_files = match is_digest_different(
-            &fname,
-            &CONFIG.common.mmdb_geolite_citydb_sha256_url,
-        )
-        .await
-        {
-            Ok(is_different) => is_different,
-            Err(e) => {
-                log::error!("Well something broke. {e}");
-                false
-            }
-        };
-
-        if download_files {
-            match download_file(&client, &CONFIG.common.mmdb_geolite_citydb_url, &fname).await {
-                Ok(()) => {
-                    let maxminddb_client = MaxmindClient::new_with_path(fname);
-                    let mut client = MAXMIND_DB_CLIENT.write().await;
-                    *client = maxminddb_client.ok();
-                    log::info!("Updated geo-json data")
-                }
-                Err(e) => log::error!("failed to download the files {}", e),
-            }
-        } else {
-            log::info!("No change in geo-json data")
-        }
         interval.tick().await;
+        run_download_files().await;
     }
 }
 

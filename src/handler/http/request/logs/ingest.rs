@@ -50,7 +50,7 @@ pub async fn bulk(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     Ok(match logs::bulk::ingest(&org_id, body, **thread_id).await {
-        Ok(v) => HttpResponse::Ok().json(v),
+        Ok(v) => MetaHttpResponse::json(v),
         Err(e) => {
             log::error!("Error processing request: {:?}", e);
             HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -95,7 +95,7 @@ pub async fn multi(
         )
         .await
         {
-            Ok(v) => HttpResponse::Ok().json(v),
+            Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -116,7 +116,7 @@ pub async fn multi_v1(
     let (org_id, stream_name) = path.into_inner();
     Ok(
         match logs::multi::ingest(&org_id, &stream_name, body, **thread_id).await {
-            Ok(v) => HttpResponse::Ok().json(v),
+            Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -162,7 +162,7 @@ pub async fn json(
         )
         .await
         {
-            Ok(v) => HttpResponse::Ok().json(v),
+            Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -183,7 +183,7 @@ pub async fn json_v1(
     let (org_id, stream_name) = path.into_inner();
     Ok(
         match logs::json::ingest(&org_id, &stream_name, body, **thread_id).await {
-            Ok(v) => HttpResponse::Ok().json(v),
+            Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -234,7 +234,7 @@ pub async fn handle_kinesis_request(
                     log::error!("Error processing request: {:?}", v);
                     HttpResponse::BadRequest().json(v)
                 } else { */
-                HttpResponse::Ok().json(v)
+                MetaHttpResponse::json(v)
                 //}
             }
             Err(e) => {
@@ -269,7 +269,7 @@ pub async fn handle_kinesis_request_v1(
                     log::error!("Error processing request: {:?}", v);
                     HttpResponse::BadRequest().json(v)
                 } else {
-                    HttpResponse::Ok().json(v)
+                    MetaHttpResponse::json(v)
                 }
             }
             Err(e) => {
@@ -299,7 +299,7 @@ pub async fn handle_gcp_request_v1(
                     log::error!("Error processing request: {:?}", v);
                     HttpResponse::BadRequest().json(v)
                 } else {
-                    HttpResponse::Ok().json(v)
+                    MetaHttpResponse::json(v)
                 }
             }
             Err(e) => {
@@ -329,7 +329,7 @@ pub async fn handle_gcp_request(
         )
         .await
         {
-            Ok(v) => HttpResponse::Ok().json(v),
+            Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(

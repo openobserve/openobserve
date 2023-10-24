@@ -293,10 +293,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-
-        return;
       }
-
       if (
         !store.state.organizationData.organizationPasscode &&
         router.currentRoute.value.name != "ingestion"

@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-    <VariablesValueSelector :variablesConfig="dashboardData?.variables" :selectedTimeDate="currentTimeObj" 
+    <VariablesValueSelector :variablesConfig="dashboardData?.variables" :selectedTimeDate="currentTimeObj" :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"/>
     <div class="displayDiv">
       <grid-layout v-if="dashboardData.panels?.length > 0" :layout.sync="getDashboardLayout(dashboardData)" :col-num="12" :row-height="30"
@@ -59,8 +59,8 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 
 export default defineComponent({
   name: "RenderDashboardCharts",
-  emits:["onDeletePanel"],
-  props:["viewOnly","dashboardData","currentTimeObj"],
+  emits:["onDeletePanel","variablesData"],
+  props:["viewOnly","dashboardData","currentTimeObj", "initialVariableValues"],
   components: {
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,
@@ -68,7 +68,7 @@ export default defineComponent({
     NoPanel,
     VariablesValueSelector
 },
-  setup(props) {
+  setup(props: any, { emit }) {
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
@@ -79,6 +79,7 @@ export default defineComponent({
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData,data)
+      emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
     }
 
     // save the dashboard value

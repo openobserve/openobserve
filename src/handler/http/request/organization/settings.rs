@@ -12,15 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::meta::organization::OrganizationSettingResponse;
-use crate::common::utils::json;
-use crate::service::db::organization::get_org_setting;
 use crate::{
-    common::meta::{self, organization::OrganizationSetting},
-    service::db::organization::set_org_setting,
+    common::{
+        infra::errors::{DbError, Error},
+        meta::{
+            http::HttpResponse as MetaHttpResponse, organization::OrganizationSetting,
+            organization::OrganizationSettingResponse,
+        },
+        utils::json,
+    },
+    service::db::organization::{get_org_setting, set_org_setting},
 };
-use actix_web::{get, http, post, web, HttpResponse};
-use std::io::Error;
+
+use actix_web::{get, post, web, HttpResponse};
+use std::io::Error as StdErr;
 
 /** Organization specific settings */
 #[utoipa::path(
@@ -43,15 +48,17 @@ use std::io::Error;
 async fn create(
     path: web::Path<String>,
     settings: web::Json<OrganizationSetting>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, StdErr> {
     if settings.scrape_interval == 0 {
-        return bad_request("scrape_interval should be a positive value");
+        return Ok(MetaHttpResponse::bad_request(
+            "scrape_interval should be a positive value",
+        ));
     }
 
     let org_id = path.into_inner();
     match set_org_setting(&org_id, &settings).await {
         Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
-        Err(e) => bad_request(e.to_string().as_str()),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
     }
 }
 
@@ -72,33 +79,23 @@ async fn create(
     )
 )]
 #[get("/{org_id}/settings")]
-async fn get(path: web::Path<String>) -> Result<HttpResponse, Error> {
+async fn get(path: web::Path<String>) -> Result<HttpResponse, StdErr> {
     let org_id = path.into_inner();
-    let org_settings = match get_org_setting(&org_id).await {
-        Ok(s) => s,
-        Err(e) => {
-            let err = e.to_string();
-            let expected_err = format!("DbError# key /organization/{org_id} does not exist");
-            if err.contains(&expected_err) {
+    match get_org_setting(&org_id).await {
+        Ok(s) => {
+            let data: OrganizationSetting = json::from_slice(&s).unwrap();
+            Ok(HttpResponse::Ok().json(OrganizationSettingResponse { data }))
+        }
+        Err(err) => {
+            if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 let setting = OrganizationSetting::default();
                 if let Ok(()) = set_org_setting(&org_id, &setting).await {
                     return Ok(
                         HttpResponse::Ok().json(OrganizationSettingResponse { data: setting })
                     );
                 }
-            }
-            return bad_request(&err);
+            };
+            Ok(MetaHttpResponse::bad_request(&err))
         }
-    };
-    let data: OrganizationSetting = json::from_slice(&org_settings).unwrap();
-    Ok(HttpResponse::Ok().json(OrganizationSettingResponse { data }))
-}
-
-fn bad_request(message: &str) -> Result<HttpResponse, Error> {
-    Ok(
-        HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            message.to_string(),
-        )),
-    )
+    }
 }

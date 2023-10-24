@@ -20,7 +20,7 @@
           readonly></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
-        <q-input style="max-width: 150px !important" debounce="500" v-model="item.value" :label="item.label || item.name" dense
+        <q-input style="max-width: 150px !important" debounce="1000" v-model="item.value" :label="item.label || item.name" dense
           outlined></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
@@ -48,7 +48,7 @@ import VariableQueryValueSelector from './settings/VariableQueryValueSelector.vu
 
 export default defineComponent({
     name: "VariablesValueSelector",
-    props: ["selectedTimeDate", "variablesConfig"],
+    props: ["selectedTimeDate", "variablesConfig", "initialVariableValues"],
     emits: ["variablesData"],
     components: {
       VariableQueryValueSelector
@@ -78,7 +78,6 @@ export default defineComponent({
         const getVariablesData = async () => {
             // do we have variables & date?
             if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
-                
                 variablesData.values = [];
                 variablesData.isVariablesLoading = false;
                 emitVariablesData();
@@ -86,7 +85,14 @@ export default defineComponent({
             }
             
             // get old variable values
-            const oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
+            let oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
+            if(!oldVariableValue.length) {
+                oldVariableValue = Object.keys(props?.initialVariableValues ?? []).map((key: any) => ({
+                    name: key,
+                    value: props.initialVariableValues[key],
+                }))
+            }
+            
             // continue as we have variables
             
             // reset the values
@@ -106,8 +112,8 @@ export default defineComponent({
                             .fieldValues({
                             org_identifier: store.state.selectedOrganization.identifier,
                             stream_name: it.query_data.stream,
-                            start_time: new Date(props.selectedTimeDate?.start_time?.toISOString()).getTime() * 1000,
-                            end_time: new Date(props.selectedTimeDate?.end_time?.toISOString()).getTime() * 1000,
+                            start_time: new Date(props.selectedTimeDate?.start_time?.toISOString()).getTime(),
+                            end_time: new Date(props.selectedTimeDate?.end_time?.toISOString()).getTime(),
                             fields: [it.query_data.field],
                             size: it?.query_data?.max_record_size ? it?.query_data?.max_record_size : 10,
                             type: it.query_data.stream_type,
@@ -118,9 +124,10 @@ export default defineComponent({
                                 //set options value from the api response
                                 obj.options = res.data.hits
                                     .find((field: any) => field.field === it.query_data.field)
-                                    .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key : "null");
+                                    .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key.toString() : "null");
                                 // find old value is exists in the dropdown
                                 let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
+                                
                                 // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
                                 if (oldVariableObjectSelectedValue) {
                                     obj.value = obj.options.includes(oldVariableObjectSelectedValue.value) ? oldVariableObjectSelectedValue.value : obj.options.length ? obj.options[0] : "";
@@ -163,7 +170,13 @@ export default defineComponent({
                         return obj;
                     }
                     case "textbox": {
-                        obj.value = it.value;
+                        let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
+                        if (oldVariableObjectSelectedValue) {
+                            obj.value = oldVariableObjectSelectedValue.value;
+                        }
+                        else {
+                            obj.value = it.value;
+                        }
                         return obj;
                     }
                     case "custom": {

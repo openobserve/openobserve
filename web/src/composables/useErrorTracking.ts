@@ -68,7 +68,7 @@ const defaultObject = {
       columns: <any>[],
       size: 10,
     },
-    errors: <any>{},
+    errors: <any>[],
     streamResults: <any>[],
     histogram: <any>{},
     editorValue: "",

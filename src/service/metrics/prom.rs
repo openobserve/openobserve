@@ -77,7 +77,7 @@ pub async fn remote_write(
     let election_interval = CONFIG.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
     let mut has_entry = false;
-    let mut accept_record = false;
+    let mut accept_record: bool;
     let mut cluster_name = String::new();
     let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
@@ -174,7 +174,7 @@ pub async fn remote_write(
                 min_ts = timestamp;
             }
 
-            if first_line && dedup_enabled {
+            if first_line && dedup_enabled && !cluster_name.is_empty() {
                 let lock = METRIC_CLUSTER_LEADER.read().await;
                 match lock.get(&cluster_name) {
                     Some(leader) => {
@@ -186,16 +186,22 @@ pub async fn remote_write(
                     }
                 }
                 drop(lock);
-                accept_record = prom_ha_handler(
-                    has_entry,
-                    &cluster_name,
-                    &replica_label,
-                    last_received,
-                    election_interval,
-                )
-                .await;
+                accept_record = if !replica_label.is_empty() {
+                    prom_ha_handler(
+                        has_entry,
+                        &cluster_name,
+                        &replica_label,
+                        last_received,
+                        election_interval,
+                    )
+                    .await
+                } else {
+                    true
+                };
                 has_entry = true;
                 first_line = false;
+            } else {
+                accept_record = true
             }
             if !accept_record {
                 //do not accept any entries for request
@@ -283,7 +289,7 @@ pub async fn remote_write(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
-                value.as_object().unwrap(),
+                val_map,
                 None,
             );
             let hour_buf = buf.entry(hour_key).or_default();

@@ -13,19 +13,23 @@
 // limitations under the License.
 
 use crate::common::{
-    infra::{config::ORGANIZATION_SETTING, db as infra_db},
+    infra::{
+        config::ORGANIZATION_SETTING,
+        db as infra_db,
+        errors::{self, Error},
+    },
     meta::organization::OrganizationSetting,
     utils::json,
 };
 use bytes::Bytes;
 use std::sync::Arc;
 
-pub async fn set_org_setting(
-    org_name: &str,
-    setting: &OrganizationSetting,
-) -> Result<(), anyhow::Error> {
+// DBKey to set settings for an org
+pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
+
+pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
     let db = &infra_db::DEFAULT;
-    let key = format!("/organization/setting/{}", org_name);
+    let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_name);
     db.put(
         &key,
         json::to_vec(&setting).unwrap().into(),
@@ -42,10 +46,9 @@ pub async fn set_org_setting(
     Ok(())
 }
 
-pub async fn get_org_setting(org_name: &str) -> Result<Bytes, anyhow::Error> {
+pub async fn get_org_setting(org_id: &str) -> Result<Bytes, Error> {
     let db = &infra_db::DEFAULT;
-    let key = format!("/organization/setting/{}", org_name);
-
+    let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_id);
     match ORGANIZATION_SETTING.clone().read().await.get(&key) {
         Some(v) => Ok(json::to_vec(v).unwrap().into()),
         None => Ok(db.get(&key).await?),
@@ -54,7 +57,7 @@ pub async fn get_org_setting(org_name: &str) -> Result<Bytes, anyhow::Error> {
 
 /// Cache the existing org settings in the beginning
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let prefix = "/organization/setting";
+    let prefix = ORG_SETTINGS_KEY_PREFIX;
     let ret = infra_db::DEFAULT.list(prefix).await?;
     for (key, item_value) in ret {
         let json_val: OrganizationSetting = json::from_slice(&item_value).unwrap();
@@ -69,7 +72,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/organization/setting";
+    let key = ORG_SETTINGS_KEY_PREFIX;
     let db = &infra_db::CLUSTER_COORDINATOR;
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();

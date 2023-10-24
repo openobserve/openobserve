@@ -198,7 +198,10 @@
     "type": "Type",
     "refreshStats": "Refresh Stats",
     "updateSettings": "Update Settings",
-    "explore": "Explore"
+    "explore": "Explore",
+    "timezone": "Timezone",
+    "deleteActionLabel": "Delete",
+    "deleteActionMessage": "Are you sure you want to delete selected field's. This action cannot be undone."
   },
   "function": {
     "header": "Functions",
