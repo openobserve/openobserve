@@ -138,7 +138,7 @@ pub async fn search(
     // get a local search queue lock
     let locker = SearchService::QUEUE_LOCKER.clone();
     let locker = locker.lock().await;
-    if !CONFIG.common.feature_query_queue {
+    if !CONFIG.common.feature_query_queue_enabled {
         drop(locker);
     }
     let took_wait = start.elapsed().as_millis() as usize;
