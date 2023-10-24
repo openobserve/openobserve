@@ -77,7 +77,7 @@ pub async fn remote_write(
     let election_interval = CONFIG.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
     let mut has_entry = false;
-    let mut accept_record = false;
+    let mut accept_record: bool;
     let mut cluster_name = String::new();
     let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
@@ -200,6 +200,8 @@ pub async fn remote_write(
                 };
                 has_entry = true;
                 first_line = false;
+            } else {
+                accept_record = true
             }
             if !accept_record {
                 //do not accept any entries for request
