@@ -77,6 +77,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     ));
 
     loop {
+        interval.tick().await;
         // send request and await response
         let client = reqwest::ClientBuilder::default().build().unwrap();
         let fname = format!("{}/GeoLite2-City.mmdb", &CONFIG.common.mmdb_data_dir);
@@ -107,7 +108,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         } else {
             log::info!("No change in geo-json data")
         }
-        interval.tick().await;
     }
 }
 
