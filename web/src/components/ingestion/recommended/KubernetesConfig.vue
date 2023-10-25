@@ -52,7 +52,7 @@ const props = defineProps({
   },
 });
 
-const endpoint: Ref<Endpoint> = ref({
+const endpoint: any = ref({
   url: "",
   host: "",
   port: "",
