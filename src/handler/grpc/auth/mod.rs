@@ -24,9 +24,11 @@ use tonic::{Request, Status};
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     let metadata = req.metadata();
+
     if !metadata.contains_key(&CONFIG.grpc.org_header_key)
         && !metadata.contains_key("authorization")
     {
+        log::error!("GRPC AUTH: missing authorization header");
         return Err(Status::unauthenticated("No valid auth token"));
     }
 
@@ -42,6 +44,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     } else {
         let org_id = metadata.get(&CONFIG.grpc.org_header_key);
         if org_id.is_none() {
+            log::error!("GRPC AUTH: missing organization header");
             return Err(Status::invalid_argument(format!(
                 "Please specify organization id with header key '{}' ",
                 &CONFIG.grpc.org_header_key
@@ -51,7 +54,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         let credentials = match Credentials::from_header(token) {
             Ok(c) => c,
             Err(err) => {
-                log::info!("Err authenticating {}", err);
+                log::error!("GRPC AUTH: No valid auth token {}", err);
                 return Err(Status::unauthenticated("No valid auth token"));
             }
         };
@@ -66,6 +69,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         )) {
             user
         } else {
+            log::error!("GRPC AUTH: No valid auth token");
             return Err(Status::unauthenticated("No valid auth token"));
         };
 
@@ -78,6 +82,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         {
             Ok(req)
         } else {
+            log::error!("GRPC AUTH: No valid auth token");
             Err(Status::unauthenticated("No valid auth token"))
         }
     }

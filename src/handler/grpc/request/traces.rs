@@ -42,6 +42,7 @@ impl TraceService for TraceServer {
         if org_id.is_none() {
             return Err(Status::invalid_argument(msg));
         }
+        log::info!("Received request for {:?}", org_id);
 
         let stream_name = metadata.get(&CONFIG.grpc.stream_header_key);
         let mut in_stream_name: Option<&str> = None;
@@ -62,7 +63,9 @@ impl TraceService for TraceServer {
                 partial_success: None,
             }));
         } else {
-            Err(Status::internal(resp.err().unwrap().to_string()))
+            let error = resp.err().unwrap();
+            log::error!("Error processing request {:?}", error);
+            Err(Status::internal(error.to_string()))
         }
     }
 }
