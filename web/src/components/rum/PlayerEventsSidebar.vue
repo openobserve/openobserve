@@ -17,7 +17,7 @@
   <div class="events-container relative-position">
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" />
     <template v-if="activeTab === 'tags'">
-      <div class="row q-pa-sm event-metadata bg-white">
+      <div class="row q-pa-sm event-metadata">
         <div class="col-12 row">
           <div class="col-12 q-pb-sm text-caption">
             <q-icon name="mail" size="16px" class="q-pr-xs" />
@@ -189,6 +189,7 @@ const handleEventClick = (event: any) => {
 
 .event-container:hover {
   background-color: #ededed;
+  color: black;
 }
 
 .event-type {

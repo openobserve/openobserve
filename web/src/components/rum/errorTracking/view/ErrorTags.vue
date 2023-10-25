@@ -15,7 +15,7 @@
 
 <template>
   <div>
-    <div class="tags-title text-grey-8 text-bold q-ml-xs">Tags</div>
+    <div class="tags-title text-bold q-ml-xs">Tags</div>
     <div class="row items-center">
       <div class="q-mr-lg row items-center">
         <img

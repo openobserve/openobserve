@@ -154,6 +154,5 @@ const onScroll = (e: any) => {
   top: 0;
   opacity: 1;
   z-index: 1;
-  background-color: #f5f5f5;
 }
 </style>
