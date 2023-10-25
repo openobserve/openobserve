@@ -39,10 +39,12 @@
         v-model:active-tab="activeTab"
         @update:active-tab="changeTab"
       />
-      <RouterView
-        :isRumEnabled="isRumEnabled"
-        :isSessionReplayEnabled="isSessionReplayEnabled"
-      />
+      <keep-alive>
+        <RouterView
+          :isRumEnabled="isRumEnabled"
+          :isSessionReplayEnabled="isSessionReplayEnabled"
+        />
+      </keep-alive>
     </template>
     <template v-else>
       <div class="q-pa-lg enable-rum">
@@ -85,7 +87,7 @@ import { useStore } from "vuex";
 const router = useRouter();
 const store = useStore();
 const showTabs = computed(() => {
-  const routes = ["Sessions", "ErrorTracking", "Dashboard"];
+  const routes = ["Sessions", "ErrorTracking", "RumPerformance"];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
 
@@ -93,6 +95,10 @@ const isLoading = ref<boolean[]>([]);
 
 const activeTab = ref<string>("sessions");
 const tabs = [
+  {
+    label: "Performance",
+    value: "performance",
+  },
   {
     label: "Sessions",
     value: "sessions",
@@ -112,11 +118,16 @@ onMounted(async () => {
   isLoading.value.pop();
   if (!isRumEnabled.value && !isSessionReplayEnabled.value) return;
 
-  const routes = ["SessionViewer", "ErrorTracking", "Dashboard", "ErrorViewer"];
+  const routes = [
+    "SessionViewer",
+    "ErrorTracking",
+    "RumPerformance",
+    "ErrorViewer",
+  ];
   const routeNameMapping: { [key: string]: string } = {
     SessionViewer: "sessions",
     ErrorTracking: "error_tracking",
-    Dashboard: "dashboard",
+    RumPerformance: "performance",
     ErrorViewer: "error_tracking",
   };
 
@@ -156,9 +167,26 @@ const checkIfRumEnabled = async () => {
 };
 
 const changeTab = (tab: string) => {
-  router.push({
-    name: tab === "sessions" ? "Sessions" : "ErrorTracking",
-  });
+  if (tab === "performance") {
+    router.push({
+      name: "RumPerformance",
+    });
+    return;
+  }
+
+  if (tab === "error_tracking") {
+    router.push({
+      name: "ErrorTracking",
+    });
+    return;
+  }
+
+  if (tab === "sessions") {
+    router.push({
+      name: "Sessions",
+    });
+    return;
+  }
 };
 
 const getStarted = () => {
