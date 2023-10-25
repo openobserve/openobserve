@@ -43,6 +43,7 @@
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
             @on:date-change="updateDateTime"
+            @on:timezone-change="updateTimezone"
           />
         </div>
         <div class="search-time q-pl-sm float-left">
@@ -270,6 +271,10 @@ export default defineComponent({
       URL.revokeObjectURL(url);
     };
 
+    const updateTimezone = () => {
+      emit("onChangeTimezone");
+    };
+
     return {
       t,
       router,
@@ -284,6 +289,7 @@ export default defineComponent({
       downloadLogs,
       setEditorValue,
       autoCompleteKeywords,
+      updateTimezone,
     };
   },
   computed: {
