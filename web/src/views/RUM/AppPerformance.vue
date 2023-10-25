@@ -62,7 +62,9 @@
         :selected-date="selectedDate"
       />
     </template>
-    <template v-else-if="activePerformanceTab === 'api'"></template>
+    <template v-else-if="activePerformanceTab === 'api'">
+      <ApiDashboard :date-time="currentTimeObj" :selected-date="selectedDate" />
+    </template>
     <template v-else>
       <div class="q-mx-sm performance-dashboard">
         <RenderDashboardCharts
@@ -115,6 +117,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import WebVitalsDashboard from "@/components/rum/performance/WebVitalsDashboard.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ErrorsDashboard from "@/components/rum/performance/ErrorsDashboard.vue";
+import ApiDashboard from "@/components/rum/performance/ApiDashboard.vue";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -126,6 +129,7 @@ export default defineComponent({
     WebVitalsDashboard,
     DateTimePickerDashboard,
     ErrorsDashboard,
+    ApiDashboard,
   },
   setup() {
     const activePerformanceTab = ref("overview");

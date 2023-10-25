@@ -19,14 +19,14 @@
   <q-page :key="store.state.selectedOrganization.identifier">
     <div class="q-mx-sm performance-dashboard">
       <RenderDashboardCharts
-        :viewOnly="false"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
         @variablesData="variablesDataUpdated"
       />
     </div>
     <div class="row q-px-md">
-      <div class="col-8">
+      <div class="col-8 view-error-table q-px-sm q-py-xs">
+        <div>Most Errors by View</div>
         <AppTable :columns="columns" :rows="errorsByView" />
       </div>
     </div>
@@ -54,11 +54,11 @@ import {
 } from "@/utils/date";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
-import type { start } from "repl";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import errorDashboard from "@/utils/rum/errors.json";
 import AppTable from "@/components/AppTable.vue";
 import searchService from "@/services/search";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -88,16 +88,25 @@ export default defineComponent({
     const viewOnly = ref(true);
     const eventLog = ref([]);
     const errorsByView = ref([]);
+    const variablesData = ref(null);
 
     const refDateTime: any = ref(null);
     const refreshInterval = ref(0);
 
     const getResourceErrors = () => {
       errorsByView.value = [];
-      console.log(variablesData.value);
+
+      let whereClause = `WHERE type='error'`;
+      variablesData.value?.values?.length &&
+        variablesData.value.values.forEach((element: any) => {
+          if (element.type === "query_values" && !!element.value) {
+            whereClause += ` and ${element.name}='${element.value}'`;
+          }
+        });
+
       const req = {
         query: {
-          sql: `SELECT SPLIT_PART(view_url, '?', 1) AS view_url, count(*) as error_count FROM "_rumdata" WHERE type='error' group by view_url order by error_count desc`,
+          sql: `SELECT SPLIT_PART(view_url, '?', 1) AS view_url, count(*) as error_count FROM "_rumdata" ${whereClause} group by view_url order by error_count desc`,
           start_time: props.selectedDate.startTime,
           end_time: props.selectedDate.endTime,
           from: 0,
@@ -125,11 +134,8 @@ export default defineComponent({
     };
 
     // variables data
-    const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
-      console.log(data);
-      getResourceErrors();
-      Object.assign(variablesData, data);
+      variablesData.value = data;
     };
 
     const columns = [
@@ -164,8 +170,8 @@ export default defineComponent({
           currentDashboardData.data?.variables?.list.length
         )
       ) {
-        variablesData.isVariablesLoading = false;
-        variablesData.values = [];
+        variablesData.value.isVariablesLoading = false;
+        variablesData.value.values = [];
       }
     };
 
@@ -211,6 +217,13 @@ export default defineComponent({
     border-bottom: 1px solid $border-color;
     justify-content: flex-end;
   }
+}
+
+.view-error-table {
+  margin-top: 20px;
+  border: 1px solid rgba(194, 194, 194, 0.4784313725) !important;
+  border-radius: 4px;
+  min-height: 200px;
 }
 </style>
 
