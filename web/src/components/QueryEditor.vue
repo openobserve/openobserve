@@ -326,11 +326,6 @@ export default defineComponent({
       searchObj,
     };
   },
-  computed: {
-    editorFocus() {
-      return this.editorRef;
-    },
-  },
 });
 </script>
 

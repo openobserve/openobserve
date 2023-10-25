@@ -728,7 +728,6 @@ export default defineComponent({
           machedRoutes[machedRoutes.length - 2].children.forEach(
             (route: any) => {
               if (route.name == machedRoutes[machedRoutes.length - 1].name) {
-                console.log(machedRoutes[machedRoutes.length - 2].path);
                 router.push({
                   path: machedRoutes[machedRoutes.length - 2].path,
                 });
