@@ -138,6 +138,38 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
         };
         // ${parseFloat(value)}`;
       }
+      case "kilobytes": {
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        for (let unit of units) {
+          if (value < 1024) {
+            return {
+              value: `${parseFloat(value).toFixed(2)}`,
+              unit: `${unit}`,
+            };
+          }
+          value /= 1024;
+        }
+        return {
+          value: `${parseFloat(value).toFixed(2)}`,
+          unit: "PB",
+        };
+      }
+      case "megabytes": {
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        for (let unit of units) {
+          if (value < 1024) {
+            return {
+              value: `${parseFloat(value).toFixed(2)}`,
+              unit: `${unit}`,
+            };
+          }
+          value /= 1024;
+        }
+        return {
+          value: `${parseFloat(value).toFixed(2)}`,
+          unit: "PB",
+        };
+      }
       case "default": {
         return {
           value: isNaN(value)
