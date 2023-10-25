@@ -72,6 +72,7 @@ const handleErrorTypeClick = () => {
 .error_type {
   font-size: 16px;
   color: $info;
+  text-transform: capitalize;
 }
 
 .error_description {

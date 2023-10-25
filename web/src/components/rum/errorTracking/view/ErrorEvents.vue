@@ -15,7 +15,7 @@
 
 <template>
   <div class="q-mt-lg">
-    <div class="tags-title text-grey-8 text-bold q-mb-sm q-ml-xs">Events</div>
+    <div class="tags-title text-bold q-mb-sm q-ml-xs">Events</div>
     <AppTable :columns="columns || []" :rows="error.events || []">
       <template v-slot:error-type="slotProps">
         <ErrorTypeIcons :column="slotProps.column.row" />
