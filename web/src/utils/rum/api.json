@@ -1,0 +1,32 @@
+{
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "service",
+        "label": "Service",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "_rumdata",
+          "field": "service",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      },
+      {
+        "type": "query_values",
+        "name": "env",
+        "label": "Env",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "_rumdata",
+          "field": "env",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      }
+    ]
+  }
+}

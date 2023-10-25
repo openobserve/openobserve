@@ -18,6 +18,7 @@
 <template>
     <VariablesValueSelector :variablesConfig="dashboardData?.variables" :selectedTimeDate="currentTimeObj" :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"/>
+      <slot name="before_panels"/>
     <div class="displayDiv">
       <grid-layout v-if="dashboardData.panels?.length > 0" :layout.sync="getDashboardLayout(dashboardData)" :col-num="12" :row-height="30"
         :is-draggable="!viewOnly" :is-resizable="!viewOnly" :vertical-compact="true" :autoSize="true"
@@ -38,7 +39,7 @@
     </div>
     <div v-if="!dashboardData.panels?.length">
      <!-- if data not available show nodata component -->
-      <NoPanel @update:Panel="addPanelData" />
+      <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
     </div>
 </template>
 

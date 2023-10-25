@@ -1061,9 +1061,6 @@ export default defineComponent({
     onBeforeMount(() => {
       if (searchObj.loading == false) {
         // eslint-disable-next-line no-prototype-builtins
-        if (!router.currentRoute.value.query.hasOwnProperty("query")) {
-          searchObj.data.editorValue = "duration>1000";
-        }
         loadPageData();
         restoreUrlQueryParams();
       }
