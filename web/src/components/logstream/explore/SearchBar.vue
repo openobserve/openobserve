@@ -62,7 +62,7 @@
       <div class="col" style="border-top: 1px solid #dbdbdb; height: 100px">
         <b>Query Editor:</b>
         <query-editor
-          id="logsQueryEditor"
+          editorId="logsQueryEditor"
           ref="queryEditorRef"
           class="monaco-editor"
           v-model:query="query"
