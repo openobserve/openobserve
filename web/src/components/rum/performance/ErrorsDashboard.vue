@@ -16,7 +16,10 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier">
+  <q-page
+    :key="store.state.selectedOrganization.identifier"
+    class="performance-error-dashboard"
+  >
     <div class="q-mx-sm performance-dashboard">
       <RenderDashboardCharts
         :dashboardData="currentDashboardData.data"
@@ -25,9 +28,13 @@
       />
     </div>
     <div class="row q-px-md">
-      <div class="col-8 view-error-table q-px-sm q-py-xs">
-        <div>Most Errors by View</div>
-        <AppTable :columns="columns" :rows="errorsByView" />
+      <div class="col-8 view-error-table q-pa-sm">
+        <div class="q-pb-sm text-bold q-pl-xs">Top Error Views</div>
+        <AppTable
+          :columns="columns"
+          :rows="errorsByView"
+          style="height: auto"
+        />
       </div>
     </div>
   </q-page>
@@ -58,7 +65,6 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import errorDashboard from "@/utils/rum/errors.json";
 import AppTable from "@/components/AppTable.vue";
 import searchService from "@/services/search";
-import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -78,8 +84,6 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
-    const route = useRoute();
-    const router = useRouter();
     const store = useStore();
     const currentDashboardData = reactive({
       data: {},
@@ -106,7 +110,7 @@ export default defineComponent({
 
       const req = {
         query: {
-          sql: `SELECT SPLIT_PART(view_url, '?', 1) AS view_url, count(*) as error_count FROM "_rumdata" ${whereClause} group by view_url order by error_count desc`,
+          sql: `SELECT SPLIT_PART(view_url, '?', 1) AS url, count(*) as error_count FROM "_rumdata" ${whereClause} group by url order by error_count desc`,
           start_time: props.selectedDate.startTime,
           end_time: props.selectedDate.endTime,
           from: 0,
@@ -114,10 +118,6 @@ export default defineComponent({
           sql_mode: "full",
         },
       };
-
-      // isLoading.value.push(true);
-
-      // updateUrlQueryParams();
 
       searchService
         .search({
@@ -135,14 +135,22 @@ export default defineComponent({
 
     // variables data
     const variablesDataUpdated = (data: any) => {
+      if (JSON.stringify(variablesData.value) === JSON.stringify(data)) return;
+
       variablesData.value = data;
+      if (variablesData.value?.values?.length) {
+        const areVariablesLoaded = variablesData.value.values.every(
+          (element: any) => element.value
+        );
+        if (areVariablesLoaded) getResourceErrors();
+      }
     };
 
     const columns = [
       {
-        name: "view_url",
+        name: "url",
         label: "View URL",
-        field: (row) => row["view_url"],
+        field: (row) => row["url"],
         align: "left",
       },
       {
@@ -160,7 +168,6 @@ export default defineComponent({
     });
 
     const loadDashboard = async () => {
-      getResourceErrors();
       currentDashboardData.data = errorDashboard;
 
       // if variables data is null, set it to empty list
@@ -220,10 +227,16 @@ export default defineComponent({
 }
 
 .view-error-table {
-  margin-top: 20px;
+  margin-top: 4px;
   border: 1px solid rgba(194, 194, 194, 0.4784313725) !important;
   border-radius: 4px;
   min-height: 200px;
+}
+
+.performance-error-dashboard {
+  min-height: auto !important;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
 }
 </style>
 

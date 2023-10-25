@@ -73,8 +73,9 @@
           :currentTimeObj="currentTimeObj"
         >
           <template v-slot:before_panels>
-            <q-separator class="q-mt-md"></q-separator>
-            <div class="flex items-center q-pb q-pt-md text-h6 text-bold">
+            <div
+              class="flex items-center q-pb q-pt-md text-subtitle1 text-bold"
+            >
               <div class="col text-center">Web Vitals</div>
               <div class="col text-center">Errors</div>
               <div class="col text-center">Sessions</div>
@@ -101,13 +102,8 @@ import { useI18n } from "vue-i18n";
 import DateTimePicker from "@/components/DateTimePicker.vue";
 import { useRouter } from "vue-router";
 import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
-import {
-  parseDuration,
-  generateDurationLabel,
-  getDurationObjectFromParams,
-  getQueryParamsForDuration,
-} from "@/utils/date";
-import { toRaw, unref, reactive } from "vue";
+import { parseDuration, generateDurationLabel } from "@/utils/date";
+import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
@@ -427,4 +423,10 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss"></style>
+<style lang="scss">
+.performance-dashboard {
+  min-height: auto !important;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+</style>

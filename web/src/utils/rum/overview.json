@@ -22,7 +22,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT avg(view_largest_contentful_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" ",
+          "query": "SELECT avg(view_largest_contentful_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env'",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -64,7 +64,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT avg(view_first_input_delay/1000000) as \"y_axis_1\"  FROM \"_rumdata\" ",
+          "query": "SELECT avg(view_first_input_delay/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env'",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -105,7 +105,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\" ",
+          "query": "SELECT avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env'",
           "customQuery": false,
           "fields": {
             "stream": "_rumdata",
@@ -146,7 +146,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT count(distinct(error_id)) as \"y_axis_1\"  FROM \"_rumdata\" ",
+          "query": "SELECT count(distinct(error_id)) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env'",
           "customQuery": false,
           "fields": {
             "stream": "_rumdata",
@@ -187,7 +187,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT count(distinct(session_id)) as \"y_axis_1\"  FROM \"_sessionreplay\" ",
+          "query": "SELECT count(distinct(session_id)) as \"y_axis_1\"  FROM \"_sessionreplay\" where service='$service' and env='$env'",
           "customQuery": false,
           "fields": {
             "stream": "_sessionreplay",
@@ -229,7 +229,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT count(distinct(session_id)) as \"y_axis_1\" FROM \"_rumdata\" WHERE type='error'",
+          "query": "SELECT count(distinct(session_id)) as \"y_axis_1\" FROM \"_rumdata\" WHERE type='error' and service='$service' and env='$env'",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -270,7 +270,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT count(distinct(error_id)) as \"y_axis_1\"  FROM \"_rumdata\" where error_handling='unhandled'",
+          "query": "SELECT count(distinct(error_id)) as \"y_axis_1\"  FROM \"_rumdata\" where error_handling='unhandled' and service='$service' and env='$env'",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -298,5 +298,34 @@
       "layout": { "x": 4, "y": 5, "w": 4, "h": 6, "i": 8 }
     }
   ],
-  "variables": null
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "service",
+        "label": "Service",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "_rumdata",
+          "field": "service",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      },
+      {
+        "type": "query_values",
+        "name": "env",
+        "label": "Env",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "_rumdata",
+          "field": "env",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      }
+    ]
+  }
 }

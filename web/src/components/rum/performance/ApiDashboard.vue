@@ -16,18 +16,35 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier">
+  <q-page
+    :key="store.state.selectedOrganization.identifier"
+    class="api-performance-dashboards"
+  >
+    <div class="q-px-md">
+      <VariablesValueSelector
+        :variablesConfig="apiDashboard?.variables"
+        :selectedTimeDate="dateTime"
+        :initialVariableValues="initialVariableValues"
+        @variablesData="variablesDataUpdated"
+      />
+    </div>
     <div class="row q-px-md">
       <div class="col-6 q-px-xs q-py-xs">
-        <div class="view-error-table q-px-sm q-py-xs">
-          <div>Top Slowest Resource</div>
+        <div class="view-error-table q-pa-sm">
+          <div class="q-pb-sm text-bold q-pl-xs">Top Slowest Resources</div>
           <AppTable :columns="slowResourceColumn" :rows="topSlowResources" />
         </div>
       </div>
       <div class="col-6 q-px-xs q-py-xs">
-        <div class="view-error-table q-px-sm q-py-xs">
-          <div>Top Heaviest Resource</div>
+        <div class="view-error-table q-pa-sm">
+          <div class="q-pb-sm text-bold q-pl-xs">Top Heaviest Resources</div>
           <AppTable :columns="heavyResourceColumn" :rows="topHeavyResources" />
+        </div>
+      </div>
+      <div class="col-6 q-px-xs q-py-xs">
+        <div class="view-error-table q-pa-sm">
+          <div class="q-pb-sm text-bold q-pl-xs">Top Error Resources</div>
+          <AppTable :columns="errorResourceColumns" :rows="topErrorResources" />
         </div>
       </div>
     </div>
@@ -36,28 +53,22 @@
 
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  watch,
-  onActivated,
-  nextTick,
-  onMounted,
-} from "vue";
+import { defineComponent, ref, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
-import errorDashboard from "@/utils/rum/errors.json";
 import AppTable from "@/components/AppTable.vue";
 import searchService from "@/services/search";
-import { cloneDeep } from "lodash-es";
+import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
+import apiDashboard from "@/utils/rum/api.json";
 
 export default defineComponent({
   name: "AppPerformance",
   components: {
     AppTable,
+    VariablesValueSelector,
   },
   props: {
     dateTime: {
@@ -82,6 +93,7 @@ export default defineComponent({
     const eventLog = ref([]);
     const topSlowResources = ref([]);
     const topHeavyResources = ref([]);
+    const topErrorResources = ref([]);
     const variablesData = ref(null);
 
     const refDateTime: any = ref(null);
@@ -90,17 +102,27 @@ export default defineComponent({
 
     // variables data
     const variablesDataUpdated = (data: any) => {
-      console.log(data);
+      if (JSON.stringify(variablesData.value) === JSON.stringify(data)) return;
+
       variablesData.value = data;
+      if (variablesData.value?.values?.length) {
+        const areVariablesLoaded = variablesData.value.values.every(
+          (element: any) => element.value
+        );
+        if (areVariablesLoaded) {
+          getTopErrorResources();
+          getTopHeavyResources();
+          getTopSlowResources();
+        }
+      }
     };
 
     const slowResourceColumn = [
       {
-        name: "resource_url",
+        name: "url",
         label: "Resource URL",
-        field: (row) => row["resource_url"],
+        field: (row) => row["url"],
         align: "left",
-        style: { flex: 2 },
       },
       {
         name: "max_duration",
@@ -108,15 +130,32 @@ export default defineComponent({
         field: (row: any) => row["max_duration"],
         align: "left",
         sortable: true,
-        style: { flex: 2 },
+        style: { width: "56px !important" },
+      },
+    ];
+
+    const errorResourceColumns = [
+      {
+        name: "url",
+        label: "Resource URL",
+        field: (row) => row["url"],
+        align: "left",
+      },
+      {
+        name: "error_count",
+        label: "Error Count",
+        field: (row: any) => row["error_count"],
+        align: "left",
+        sortable: true,
+        style: { width: "56px" },
       },
     ];
 
     const heavyResourceColumn = [
       {
-        name: "resource_url",
+        name: "url",
         label: "Resource URL",
-        field: (row) => row["resource_url"],
+        field: (row) => row["url"],
         align: "left",
       },
       {
@@ -131,37 +170,27 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
-      console.log;
     });
 
     const getTopSlowResources = () => {
-      topHeavyResources.value = [];
-      console.log(
-        "get resources",
-        variablesData.value?.values?.length,
-        cloneDeep(variablesData.value)
-      );
+      topSlowResources.value = [];
 
-      let whereClause = `where resource_duration is not null and resource_duration>=0 and resource_method is not null`;
+      let whereClause = `where resource_duration>=0 and resource_method is not null`;
       const variablesString = getVariablesString();
       if (variablesString && variablesString.length) {
-        whereClause += ` and ${variablesString}`;
+        whereClause += ` ${variablesString}`;
       }
 
       const req = {
         query: {
-          sql: `SELECT avg(resource_duration/1000000) as max_duration, SPLIT_PART(resource_url, '?', 1) AS resource_url FROM "_rumdata" ${whereClause} group by resource_url order by max_duration desc`,
+          sql: `SELECT avg(resource_duration/1000000) as max_duration, SPLIT_PART(resource_url, '?', 1) AS url FROM "_rumdata" ${whereClause} group by url order by max_duration desc`,
           start_time: props.selectedDate.startTime,
           end_time: props.selectedDate.endTime,
           from: 0,
-          size: 150,
+          size: 10,
           sql_mode: "full",
         },
       };
-
-      // isLoading.value.push(true);
-
-      // updateUrlQueryParams();
 
       searchService
         .search({
@@ -172,30 +201,29 @@ export default defineComponent({
         .then((res) => {
           res.data.hits.slice(0, topCount).forEach((element: any) => {
             topSlowResources.value.push({
-              resource_url: new URL(element.resource_url).pathname,
+              url: new URL(element.url).pathname,
               max_duration: element.max_duration.toFixed(2),
             });
           });
-        })
-        .finally(() => console.log(""));
+        });
     };
 
     const getTopHeavyResources = () => {
       topHeavyResources.value = [];
 
-      let whereClause = `WHERE resource_size is not null and resource_size>=0`;
+      let whereClause = `WHERE resource_size>=0`;
       const variablesString = getVariablesString();
       if (variablesString && variablesString.length) {
-        whereClause += ` and ${variablesString}`;
+        whereClause += ` ${variablesString}`;
       }
 
       const req = {
         query: {
-          sql: `SELECT max(resource_size/1024) as max_resource_size, SPLIT_PART(resource_url, '?', 1) AS resource_url FROM "_rumdata" ${whereClause} group by resource_url order by max_resource_size desc`,
+          sql: `SELECT avg(resource_size/1024) as max_resource_size, SPLIT_PART(resource_url, '?', 1) AS url FROM "_rumdata" ${whereClause} group by url order by max_resource_size desc`,
           start_time: props.selectedDate.startTime,
           end_time: props.selectedDate.endTime,
           from: 0,
-          size: 150,
+          size: topCount,
           sql_mode: "full",
         },
       };
@@ -207,14 +235,49 @@ export default defineComponent({
           page_type: "logs",
         })
         .then((res) => {
-          res.data.hits.slice(0, topCount).forEach((element: any) => {
+          res.data.hits.forEach((element: any) => {
             topHeavyResources.value.push({
               ...element,
-              resource_url: new URL(element.resource_url).pathname,
+              url: new URL(element.url).pathname,
             });
           });
+        });
+    };
+
+    const getTopErrorResources = () => {
+      topErrorResources.value = [];
+
+      let whereClause = `WHERE resource_status_code>400`;
+      const variablesString = getVariablesString();
+      if (variablesString && variablesString.length) {
+        whereClause += ` ${variablesString}`;
+      }
+
+      const req = {
+        query: {
+          sql: `SELECT SPLIT_PART(resource_url, '?', 1) AS url, count(*) as error_count FROM "_rumdata" ${whereClause}  group by url order by error_count desc`,
+          start_time: props.selectedDate.startTime,
+          end_time: props.selectedDate.endTime,
+          from: 0,
+          size: topCount,
+          sql_mode: "full",
+        },
+      };
+
+      searchService
+        .search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: req,
+          page_type: "logs",
         })
-        .finally(() => console.log(""));
+        .then((res) => {
+          res.data.hits.forEach((element: any) => {
+            topErrorResources.value.push({
+              ...element,
+              url: new URL(element.url).pathname,
+            });
+          });
+        });
     };
 
     const getVariablesString = () => {
@@ -222,17 +285,15 @@ export default defineComponent({
       variablesData.value?.values?.length &&
         variablesData.value.values.forEach((element: any) => {
           if (element.type === "query_values" && !!element.value) {
-            variablesString += `${element.name}=${element.value}&`;
+            variablesString += ` and ${element.name}='${element.value}'`;
           }
         });
+
       return variablesString;
     };
 
     const loadDashboard = async () => {
-      getTopSlowResources();
-      getTopHeavyResources();
-
-      currentDashboardData.data = errorDashboard;
+      currentDashboardData.data = apiDashboard;
 
       // if variables data is null, set it to empty list
       if (
@@ -277,6 +338,9 @@ export default defineComponent({
       topHeavyResources,
       heavyResourceColumn,
       slowResourceColumn,
+      errorResourceColumns,
+      topErrorResources,
+      apiDashboard,
     };
   },
 });
@@ -294,21 +358,35 @@ export default defineComponent({
 }
 
 .view-error-table {
-  margin-top: 20px;
+  margin-top: 4px;
   border: 1px solid rgba(194, 194, 194, 0.4784313725) !important;
   border-radius: 4px;
   min-height: 200px;
+}
+
+.api-performance-dashboards {
+  min-height: auto !important;
+  max-height: calc(100vh - 196px);
+  overflow-y: auto;
 }
 </style>
 
 <style lang="scss">
 .view-error-table {
-  .q-table td[name="resource_url"] {
-    width: 80%;
+  .q-table {
+    td {
+      padding: 6px 10px !important;
+      height: auto !important;
+    }
   }
 
-  .q-table td[name="max_duration"] {
-    flex: 1;
+  .q-table thead tr {
+    th {
+      padding: 6px 8px !important;
+      height: auto !important;
+    }
+    padding: 6px 0px !important;
+    height: auto !important;
   }
 }
 </style>
