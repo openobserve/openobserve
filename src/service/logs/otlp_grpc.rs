@@ -52,7 +52,7 @@ pub async fn usage_ingest(
     let start = std::time::Instant::now();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let stream_name = &get_formatted_stream_name(
-        &StreamParams::new(org_id, in_stream_name, StreamType::Logs),
+        &mut StreamParams::new(org_id, in_stream_name, StreamType::Logs),
         &mut stream_schema_map,
     )
     .await;
@@ -217,7 +217,7 @@ pub async fn handle_grpc_request(
     let stream_name = match in_stream_name {
         Some(name) => {
             get_formatted_stream_name(
-                &StreamParams::new(org_id, name, StreamType::Logs),
+                &mut StreamParams::new(org_id, name, StreamType::Logs),
                 &mut stream_schema_map,
             )
             .await
