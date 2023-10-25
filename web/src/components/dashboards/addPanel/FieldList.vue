@@ -22,6 +22,10 @@
       <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream" :label="t('dashboard.selectIndex')"
         :options="filteredStreams" data-test="index-dropdown-stream" input-debounce="0" behavior="menu" use-input filled borderless
         dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value">
+        <q-icon
+          size="xs"
+          :name="metricsIconMapping[dashboardPanelData.meta.stream.streamResults.map((it: any) => it.stream_type)] || ''"
+        />
         <template #no-option>
           <q-item>
             <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -154,6 +158,13 @@ export default defineComponent({
     const { dashboardPanelData, addXAxisItem, addYAxisItem, addZAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, isAddZAxisNotAllowed, promqlMode, addLatitude, addLongitude, addWeight } =
       useDashboardPanelData();
       
+    const metricsIconMapping: any = {
+      summary: "description",
+      gauge: "speed",
+      histogram: "bar_chart",
+      counter: "pin",
+    };
+
     const streamDataLoading = useLoading(async ()=>{
       await getStreamList();
     });
@@ -233,6 +244,7 @@ export default defineComponent({
         data.schemaList = res.data.list;
         dashboardPanelData.meta.stream.streamResults = res.data.list;
       });
+      console.log("stream results", dashboardPanelData.meta.stream.streamResults);
     };
 
     const filterFieldFn = (rows: any, terms: any) => {
@@ -309,7 +321,8 @@ export default defineComponent({
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
       promqlMode,
-      streamDataLoading
+      streamDataLoading,
+      metricsIconMapping
     };
   },
 });
