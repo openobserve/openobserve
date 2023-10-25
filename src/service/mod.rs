@@ -84,7 +84,7 @@ pub async fn get_formatted_stream_name(
     } else {
         schema_map.insert(stream_name.to_owned(), schema);
     }
-    params.stream_name = stream_name.to_string().into();
+    params.stream_name = stream_name.to_owned().into();
 
     stream_name
 }
