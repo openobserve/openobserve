@@ -52,8 +52,8 @@ pub async fn ingest(
     let start = std::time::Instant::now();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
-    let stream_name = &get_formatted_stream_name(&stream_params, &mut stream_schema_map).await;
+    let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
+    let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
 
     if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
         return Err(value);
