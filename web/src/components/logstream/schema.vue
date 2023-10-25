@@ -159,6 +159,7 @@ flat icon="close" />
                       :data-test="`schema-stream-${schema.name}-field-fts-key-checkbox`"
                       v-model="schema.ftsKey"
                       size="sm"
+                      @click="markFormDirty"
                     />
                   </td>
                   <td v-if="showPartitionColumn" class="text-center">
@@ -169,6 +170,7 @@ flat icon="close" />
                       :data-test="`schema-stream-${schema.name}-field-partition-key-checkbox`"
                       v-model="schema.partitionKey"
                       size="sm"
+                      @click="markFormDirty"
                     >
                     </q-checkbox>
                   </td>
@@ -203,6 +205,7 @@ flat icon="close" />
             no-caps
           />
           <q-btn
+            v-bind:disable="!formDirtyFlag"
             data-test="schema-update-settings-button"
             :label="t('logStream.updateSettings')"
             class="q-my-sm text-bold no-border q-ml-md"
@@ -270,6 +273,7 @@ export default defineComponent({
     const dataRetentionDays = ref(0);
     const deleteFieldList = ref([]);
     const confirmQueryModeChangeDialog = ref(false);
+    const formDirtyFlag = ref(false);
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
@@ -283,6 +287,10 @@ export default defineComponent({
           (item) => item !== schema.name
         );
       }
+    };
+
+    const markFormDirty = () => {
+      formDirtyFlag.value = true;
     };
 
     const deleteFields = async () => {
@@ -501,6 +509,8 @@ export default defineComponent({
       deleteFieldList,
       confirmQueryModeChangeDialog,
       deleteFields,
+      markFormDirty,
+      formDirtyFlag,
     };
   },
   created() {
@@ -606,8 +616,8 @@ export default defineComponent({
   position: sticky;
   bottom: 0px;
   margin: 0 auto;
-  background-color: white;
-  box-shadow: 6px 6px 18px lightgray;
+  background-color: var(--q-accent);
+  box-shadow: 6px 6px 18px var(--q-accent);
   justify-content: right;
   width: 100%;
   padding-right: 20px;
@@ -621,7 +631,18 @@ export default defineComponent({
 .sticky-table-header {
   position: sticky;
   top: 0px;
-  background: whitesmoke;
+  background: var(--q-accent);
   z-index: 1;
+}
+
+.body--dark {
+  .sticky-table-header {
+    background: var(--q-dark);
+  }
+
+  .sticky-buttons {
+    background-color: var(--q-dark);
+    box-shadow: 6px 6px 18px var(--q-dark);
+  }
 }
 </style>
