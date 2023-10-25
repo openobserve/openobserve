@@ -31,8 +31,12 @@ import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
 import IngestLogs from "@/components/ingestion/logs/Index.vue";
 import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
 import IngestTraces from "@/components/ingestion/traces/Index.vue";
-import RUM from "@/components/ingestion/rum/Index.vue";
-import RUMWeb from "@/components/ingestion/rum/Web.vue";
+
+import RUMWeb from "@/components/ingestion/recommended/FrontendRumConfig.vue";
+import KubernetesConfig from "@/components/ingestion/recommended/KubernetesConfig.vue";
+import LinuxConfig from "@/components/ingestion/recommended/LinuxConfig.vue";
+import OtelConfig from "@/components/ingestion/recommended/OtelConfig.vue";
+import WindowsConfig from "@/components/ingestion/recommended/WindowsConfig.vue";
 
 const useIngestionRoutes = () => {
   const ingestionRoutes: any = [
@@ -121,16 +125,29 @@ const useIngestionRoutes = () => {
           ],
         },
         {
-          path: "rum",
-          name: "rumMonitoring",
-          component: RUM,
-          children: [
-            {
-              path: "web",
-              name: "rumWeb",
-              component: RUMWeb,
-            },
-          ],
+          path: "kubernetes",
+          name: "ingestFromKubernetes",
+          component: KubernetesConfig,
+        },
+        {
+          path: "windows",
+          name: "ingestFromWindows",
+          component: WindowsConfig,
+        },
+        {
+          path: "linux",
+          name: "ingestFromLinux",
+          component: LinuxConfig,
+        },
+        {
+          path: "otel",
+          name: "ingestFromOtel",
+          component: OtelConfig,
+        },
+        {
+          path: "frontend-monitoring",
+          name: "frontendMonitoring",
+          component: RUMWeb,
         },
       ],
     },

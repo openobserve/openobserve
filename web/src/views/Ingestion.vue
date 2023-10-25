@@ -17,8 +17,8 @@
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-page class="ingestionPage">
-    <div class="head q-table__title q-pb-md q-px-md">
-      {{ t("ingestion.header") }}
+    <div class="q-px-md flex justify-between items-center full-width">
+      <span class="text-h6"> {{ t("ingestion.header") }}</span>
 
       <q-btn
         v-if="
@@ -72,96 +72,194 @@
       />
     </div>
     <q-separator class="separator" />
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      style="min-height: calc(100vh - 130px)"
-    >
-      <template v-slot:before>
-        <q-tabs
-          v-model="ingestTabType"
-          indicator-color="transparent"
-          inline-label
-          vertical
-        >
-          <q-route-tab
-            default
-            name="ingestLogs"
-            :to="{
-              name: 'ingestLogs',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Logs"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            default
-            name="ingestMetrics"
-            :to="{
-              name: 'ingestMetrics',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Metrics"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="ingestTraces"
-            :to="{
-              name: 'ingestTraces',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Traces"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="rumMonitoring"
-            :to="{
-              name: 'rumMonitoring',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="RUM"
-            content-class="tab_content"
-          />
-        </q-tabs>
-      </template>
+    <app-tabs :tabs="tabs" v-model:active-tab="activeTab" />
+    <template v-if="activeTab === 'custom'">
+      <q-splitter
+        v-model="splitterModel"
+        unit="px"
+        style="min-height: calc(100vh - 130px)"
+      >
+        <template v-slot:before>
+          <q-tabs
+            v-model="ingestTabType"
+            indicator-color="transparent"
+            inline-label
+            vertical
+          >
+            <q-route-tab
+              default
+              name="ingestLogs"
+              :to="{
+                name: 'ingestLogs',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              label="Logs"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              default
+              name="ingestMetrics"
+              :to="{
+                name: 'ingestMetrics',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              label="Metrics"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="ingestTraces"
+              :to="{
+                name: 'ingestTraces',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              label="Traces"
+              content-class="tab_content"
+            />
+          </q-tabs>
+        </template>
 
-      <template v-slot:after>
-        <q-tab-panels
-          v-model="ingestTabType"
-          animated
-          swipeable
-          vertical
-          transition-prev="jump-up"
-          transition-next="jump-up"
-        >
-          <q-tab-panel name="ingestLogs">
-            <router-view :currOrgIdentifier="currentOrgIdentifier">
-            </router-view>
-          </q-tab-panel>
-          <q-tab-panel name="ingestMetrics">
-            <router-view :currOrgIdentifier="currentOrgIdentifier">
-            </router-view>
-          </q-tab-panel>
+        <template v-slot:after>
+          <q-tab-panels
+            v-model="ingestTabType"
+            animated
+            swipeable
+            vertical
+            transition-prev="jump-up"
+            transition-next="jump-up"
+          >
+            <q-tab-panel name="ingestLogs">
+              <router-view :currOrgIdentifier="currentOrgIdentifier">
+              </router-view>
+            </q-tab-panel>
+            <q-tab-panel name="ingestMetrics">
+              <router-view :currOrgIdentifier="currentOrgIdentifier">
+              </router-view>
+            </q-tab-panel>
 
-          <q-tab-panel name="ingestTraces">
-            <router-view :currOrgIdentifier="currentOrgIdentifier">
-            </router-view>
-          </q-tab-panel>
-          <q-tab-panel name="rumMonitoring">
-            <router-view :currOrgIdentifier="currentOrgIdentifier">
-            </router-view>
-          </q-tab-panel>
-        </q-tab-panels>
-      </template>
-    </q-splitter>
+            <q-tab-panel name="ingestTraces">
+              <router-view :currOrgIdentifier="currentOrgIdentifier">
+              </router-view>
+            </q-tab-panel>
+          </q-tab-panels>
+        </template>
+      </q-splitter>
+    </template>
+    <template v-if="activeTab === 'recommended'">
+      <q-splitter
+        v-model="splitterModel"
+        unit="px"
+        style="min-height: calc(100vh - 130px)"
+      >
+        <template v-slot:before>
+          <q-tabs
+            v-model="ingestTabType"
+            indicator-color="transparent"
+            inline-label
+            vertical
+          >
+            <q-route-tab
+              default
+              name="ingestFromKubernetes"
+              :to="{
+                name: 'ingestFromKubernetes',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              label="Kubernetes"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              default
+              name="ingestFromWindows"
+              :to="{
+                name: 'ingestFromWindows',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              label="Windows"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="ingestFromLinux"
+              :to="{
+                name: 'ingestFromLinux',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              label="Linux"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="ingestFromOtel"
+              :to="{
+                name: 'ingestFromOtel',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              label="OTEL"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="frontendMonitoring"
+              :to="{
+                name: 'frontendMonitoring',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              label="Frontend Monitoring"
+              content-class="tab_content"
+            />
+          </q-tabs>
+        </template>
+
+        <template v-slot:after>
+          <q-tab-panels
+            v-model="ingestTabType"
+            animated
+            swipeable
+            vertical
+            transition-prev="jump-up"
+            transition-next="jump-up"
+          >
+            <q-tab-panel name="ingestFromKubernetes">
+              <router-view :currOrgIdentifier="currentOrgIdentifier">
+              </router-view>
+            </q-tab-panel>
+            <q-tab-panel name="ingestFromWindows">
+              <router-view :currOrgIdentifier="currentOrgIdentifier">
+              </router-view>
+            </q-tab-panel>
+
+            <q-tab-panel name="ingestFromLinux">
+              <router-view :currOrgIdentifier="currentOrgIdentifier">
+              </router-view>
+            </q-tab-panel>
+            <q-tab-panel name="ingestFromOtel">
+              <router-view :currOrgIdentifier="currentOrgIdentifier">
+              </router-view>
+            </q-tab-panel>
+            <q-tab-panel name="frontendMonitoring">
+              <router-view
+                :currOrgIdentifier="currentOrgIdentifier"
+                :currUserEmail="store.state.userInfo.email"
+              >
+              </router-view>
+            </q-tab-panel>
+          </q-tab-panels>
+        </template>
+      </q-splitter>
+    </template>
   </q-page>
 </template>
 
@@ -179,10 +277,11 @@ import ConfirmDialog from "../components/ConfirmDialog.vue";
 import segment from "../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
 import apiKeysService from "@/services/api_keys";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog },
+  components: { ConfirmDialog, AppTabs },
   methods: {
     generateRUMToken() {
       apiKeysService
@@ -256,6 +355,18 @@ export default defineComponent({
     const metricRoutes = ["prometheus", "otelCollector", "telegraf"];
     const traceRoutes = ["tracesOTLP"];
     const rumRoutes = ["rumWeb"];
+    const activeTab = ref("recommended");
+
+    const tabs = [
+      {
+        label: "Recommended",
+        value: "recommended",
+      },
+      {
+        label: "Custom",
+        value: "custom",
+      },
+    ];
 
     onBeforeMount(() => {
       const ingestRoutes = [
@@ -395,6 +506,8 @@ export default defineComponent({
       ingestTabType,
       rumRoutes,
       getRUMToken,
+      tabs,
+      activeTab,
     };
   },
 });
@@ -402,7 +515,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .ingestionPage {
-  padding: 1.5rem 0 0;
+  padding: 0.25rem 0 1.5rem 0;
   .head {
     padding-bottom: 1rem;
   }
