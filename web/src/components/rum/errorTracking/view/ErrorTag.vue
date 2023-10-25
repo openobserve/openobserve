@@ -37,7 +37,7 @@ defineProps({
 }
 
 .tag-bg {
-  background-color: #e7e8f0b2;
-  color: #5960b2;
+  background-color: lightgray;
+  color: black;
 }
 </style>

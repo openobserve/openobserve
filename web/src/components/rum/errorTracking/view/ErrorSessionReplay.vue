@@ -15,7 +15,7 @@
 
 <template>
   <div class="q-mt-lg">
-    <div class="tags-title text-grey-8 text-bold q-mb-sm q-ml-xs">
+    <div class="tags-title text-bold q-mb-sm q-ml-xs">
       Session Replay
     </div>
     <div class="row">

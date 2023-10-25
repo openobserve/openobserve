@@ -17,7 +17,7 @@
   <div>
     <div>
       <div class="row items-center no-wrap q-my-xs">
-        <div class="error_type text-bold text-grey-9">{{ error.type }}</div>
+        <div class="error_type text-bold ">{{ error.type }}</div>
       </div>
       <div class="error_message q-pt-xs row items-center">
         <div

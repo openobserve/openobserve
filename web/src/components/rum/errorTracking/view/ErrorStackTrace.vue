@@ -16,7 +16,7 @@
 <template>
   <div class="row q-mt-lg q-ml-xs">
     <div class="col-12">
-      <div class="tags-title text-grey-8 text-bold q-mb-xs">Error Stack</div>
+      <div class="tags-title text-bold q-mb-xs">Error Stack</div>
       <div class="q-mb-sm">{{ error_stack[0] }}</div>
       <div class="error-stacks">
         <template v-for="(stack, index) in error_stack" :key="stack">
