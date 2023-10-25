@@ -299,7 +299,6 @@ export default defineComponent({
       this.searchObj.data.datetime.type = "absolute";
       this.searchObj.data.datetime.startTime = new Date(start).getTime() * 1000;
       this.searchObj.data.datetime.endTime = new Date(end).getTime() * 1000;
-      console.log("onChartUpdate", this.searchObj.data.datetime);
       this.searchObj.runQuery = true;
       this.$emit("update:datetime");
     },
