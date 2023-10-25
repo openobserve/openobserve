@@ -39,10 +39,12 @@
         v-model:active-tab="activeTab"
         @update:active-tab="changeTab"
       />
-      <RouterView
-        :isRumEnabled="isRumEnabled"
-        :isSessionReplayEnabled="isSessionReplayEnabled"
-      />
+      <keep-alive>
+        <RouterView
+          :isRumEnabled="isRumEnabled"
+          :isSessionReplayEnabled="isSessionReplayEnabled"
+        />
+      </keep-alive>
     </template>
     <template v-else>
       <div class="q-pa-lg enable-rum">
