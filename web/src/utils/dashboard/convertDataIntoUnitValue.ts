@@ -139,7 +139,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
         // ${parseFloat(value)}`;
       }
       case "kilobytes": {
-        const units = ["B", "KB", "MB", "GB", "TB"];
+        const units = ["KB", "MB", "GB", "TB"];
         for (let unit of units) {
           if (value < 1024) {
             return {
@@ -155,7 +155,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
         };
       }
       case "megabytes": {
-        const units = ["B", "KB", "MB", "GB", "TB"];
+        const units = ["MB", "GB", "TB"];
         for (let unit of units) {
           if (value < 1024) {
             return {
