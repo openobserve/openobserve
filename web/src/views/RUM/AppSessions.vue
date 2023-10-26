@@ -373,7 +373,7 @@ const updateDateChange = (date: any) => {
   if (JSON.stringify(date) === JSON.stringify(dateTime.value)) return;
   dateTime.value = date;
   sessionState.data.datetime = date;
-  getSessions();
+  if (date.valueType === "relative") getSessions();
 };
 
 const splitterModel = ref(250);
