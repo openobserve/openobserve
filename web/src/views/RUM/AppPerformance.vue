@@ -67,6 +67,7 @@ import {
   watch,
   onMounted,
   nextTick,
+  computed,
   onActivated,
 } from "vue";
 import { useStore } from "vuex";
@@ -198,7 +199,7 @@ export default defineComponent({
 
       if (!routeNames[activePerformanceTab.value]) return;
 
-      router.replace({
+      router.push({
         name: routeNames[activePerformanceTab.value],
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -206,6 +207,29 @@ export default defineComponent({
           ...getQueryParamsForDuration(selectedDate.value),
         },
       });
+    };
+
+    const routeName = computed(() => router.currentRoute.value.name);
+
+    watch(
+      () => routeName.value,
+      () => updateTabOnRouteChange()
+    );
+
+    const updateTabOnRouteChange = () => {
+      const routeNameMapping: { [key: string]: string } = {
+        rumPerformanceSummary: "overview",
+        rumPerformanceWebVitals: "web_vitals",
+        rumPerformanceErrors: "errors",
+        rumPerformanceApis: "api",
+      };
+      const tab =
+        routeNameMapping[
+          router.currentRoute.value.name?.toString() || "placeholder"
+        ];
+      if (tab !== activePerformanceTab.value && tab !== undefined) {
+        activePerformanceTab.value = tab;
+      }
     };
 
     // boolean to show/hide settings sidebar
@@ -294,30 +318,6 @@ export default defineComponent({
       }
     };
 
-    // [END] date picker related variables
-
-    // back button to render dashboard List page
-    const goBackToDashboardList = () => {
-      return router.push({
-        path: "/dashboards",
-        query: {
-          dashboard: route.query.dashboard,
-          folder: route.query.folder ?? "default",
-        },
-      });
-    };
-
-    //add panel
-    const addPanelData = () => {
-      return router.push({
-        path: "/dashboards/add_panel",
-        query: {
-          dashboard: route.query.dashboard,
-          folder: route.query.folder ?? "default",
-        },
-      });
-    };
-
     const refreshData = () => {
       dateTimePicker.value.refresh();
     };
@@ -367,8 +367,6 @@ export default defineComponent({
 
     return {
       currentDashboardData,
-      goBackToDashboardList,
-      addPanelData,
       t,
       getDashboard,
       store,
