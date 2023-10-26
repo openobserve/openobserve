@@ -151,7 +151,7 @@ import {
   b64EncodeUnicode,
 } from "@/utils/zincutils";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
-import { useRouter } from "vue-router";
+import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
@@ -191,6 +191,8 @@ const dateTime = ref({
   endTime: 0,
 });
 const rumSessionStreamName = "_sessionreplay";
+
+const isMounted = ref(false);
 
 const columns = ref([
   {
@@ -255,6 +257,7 @@ const columns = ref([
 
 onMounted(async () => {
   // TODO OK : Store stream fields in composable
+  isMounted.value = true;
   if (router.currentRoute.value.name === "Sessions") {
     await getStreamFields();
     restoreUrlQueryParams();
@@ -453,6 +456,8 @@ function restoreUrlQueryParams() {
 }
 
 function updateUrlQueryParams() {
+  if (!isMounted.value) return;
+
   const date = sessionState.data.datetime;
   const query: any = {};
 

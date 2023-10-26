@@ -322,6 +322,9 @@ const useRoutes = () => {
           name: "RumPerformance",
           component: AppPerformance,
           props: true,
+          meta: {
+            keepAlive: true,
+          },
           children: [
             {
               path: "overview",

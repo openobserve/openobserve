@@ -92,10 +92,23 @@
 <script setup lang="ts">
 import AppTabs from "@/components/common/AppTabs.vue";
 import streamService from "@/services/stream";
-import { computed, nextTick, onActivated, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import {
+  computed,
+  nextTick,
+  onActivated,
+  onBeforeUnmount,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from "vue";
+import { onBeforeRouteUpdate, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import useSession from "@/composables/useSessionReplay";
+import useErrorTracking from "@/composables/useErrorTracking";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
+const route = useRoute();
 const router = useRouter();
 const store = useStore();
 const showTabs = computed(() => {
@@ -112,6 +125,8 @@ const showTabs = computed(() => {
 });
 
 const isLoading = ref<boolean[]>([]);
+const { sessionState } = useSession();
+const { errorTrackingState } = useErrorTracking();
 
 const activeTab = ref<string>("sessions");
 const tabs = [
@@ -144,6 +159,7 @@ onMounted(async () => {
     "RumPerformance",
     "ErrorViewer",
     "Sessions",
+    "rumPerformanceSummary",
   ];
 
   const routeNameMapping: { [key: string]: string } = {
@@ -152,6 +168,7 @@ onMounted(async () => {
     RumPerformance: "performance",
     ErrorViewer: "error_tracking",
     Sessions: "sessions",
+    rumPerformanceSummary: "performance",
   };
 
   if (routes.includes(router.currentRoute.value.name?.toString() || "")) {
@@ -174,6 +191,33 @@ onActivated(async () => {
   await checkIfRumEnabled();
 });
 
+const routeName = computed(() => router.currentRoute.value.name);
+
+watch(
+  () => routeName.value,
+  () => updateTabOnRouteChange()
+);
+
+const updateTabOnRouteChange = () => {
+  const routeNameMapping: { [key: string]: string } = {
+    SessionViewer: "sessions",
+    ErrorTracking: "error_tracking",
+    RumPerformance: "performance",
+    Sessions: "sessions",
+    rumPerformanceSummary: "performance",
+    rumPerformanceWebVitals: "performance",
+    rumPerformanceErrors: "performance",
+    rumPerformanceApis: "performance",
+  };
+  const tab =
+    routeNameMapping[
+      router.currentRoute.value.name?.toString() || "placeholder"
+    ];
+  if (tab !== activeTab.value && tab !== undefined) {
+    activeTab.value = tab;
+  }
+};
+
 const checkIfRumEnabled = async () => {
   await nextTick();
   return new Promise((resolve) => {
@@ -193,10 +237,30 @@ const checkIfRumEnabled = async () => {
   });
 };
 
+const getQueryParams = (dateTime: any, editorValue: string) => {
+  const query: any = {};
+
+  if (dateTime.valueType == "relative") {
+    query["period"] = dateTime.relativeTimePeriod;
+  } else {
+    query["from"] = dateTime.startTime;
+    query["to"] = dateTime.endTime;
+  }
+
+  query["query"] = b64EncodeUnicode(editorValue);
+
+  query["org_identifier"] = store.state.selectedOrganization.identifier;
+  return query;
+};
+
 const changeTab = (tab: string) => {
   if (tab === "performance") {
     router.push({
       name: "rumPerformanceSummary",
+      query: getQueryParams(
+        sessionState.data.datetime,
+        sessionState.data.editorValue
+      ),
     });
     return;
   }
@@ -204,6 +268,10 @@ const changeTab = (tab: string) => {
   if (tab === "error_tracking") {
     router.push({
       name: "ErrorTracking",
+      query: getQueryParams(
+        errorTrackingState.data.datetime,
+        errorTrackingState.data.editorValue
+      ),
     });
     return;
   }
@@ -211,6 +279,10 @@ const changeTab = (tab: string) => {
   if (tab === "sessions") {
     router.push({
       name: "Sessions",
+      query: getQueryParams(
+        sessionState.data.datetime,
+        sessionState.data.editorValue
+      ),
     });
     return;
   }

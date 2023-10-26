@@ -138,6 +138,7 @@ const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { errorTrackingState } = useErrorTracking();
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
+const isMounted = ref(false);
 const columns = ref([
   {
     name: "error",
@@ -170,6 +171,7 @@ const columns = ref([
 const router = useRouter();
 
 onMounted(async () => {
+  isMounted.value = true;
   await getStreamFields();
   restoreUrlQueryParams();
 });
@@ -311,6 +313,8 @@ function restoreUrlQueryParams() {
 }
 
 function updateUrlQueryParams() {
+  if (!isMounted.value) return;
+
   const date = errorTrackingState.data.datetime;
   const query: any = {};
 
