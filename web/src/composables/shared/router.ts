@@ -287,23 +287,35 @@ const useRoutes = () => {
           path: "sessions",
           name: "Sessions",
           component: AppSessions,
+          meta: {
+            keepAlive: true,
+          },
         },
         {
           path: "sessions/view/:id",
           name: "SessionViewer",
           component: SessionViewer,
           props: true,
+          meta: {
+            keepAlive: false,
+          },
         },
         {
           path: "errors",
           name: "ErrorTracking",
           component: AppErrors,
+          meta: {
+            keepAlive: true,
+          },
         },
         {
           path: "errors/view/:id",
           name: "ErrorViewer",
           component: ErrorViewer,
           props: true,
+          meta: {
+            keepAlive: true,
+          },
         },
         {
           path: "performance",

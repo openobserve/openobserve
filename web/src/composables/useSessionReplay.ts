@@ -89,6 +89,7 @@ const defaultObject = {
       user_email: "",
       city: "",
       country: "",
+      session_id: "",
     },
   },
 };

@@ -40,13 +40,22 @@
         @update:active-tab="changeTab"
       />
       <router-view v-slot="{ Component }">
-        <keep-alive>
+        <template v-if="$route.meta.keepAlive">
+          <keep-alive>
+            <component
+              :is="Component"
+              :isRumEnabled="isRumEnabled"
+              :isSessionReplayEnabled="isSessionReplayEnabled"
+            />
+          </keep-alive>
+        </template>
+        <template v-else>
           <component
             :is="Component"
             :isRumEnabled="isRumEnabled"
             :isSessionReplayEnabled="isSessionReplayEnabled"
           />
-        </keep-alive>
+        </template>
       </router-view>
     </template>
     <template v-else>
