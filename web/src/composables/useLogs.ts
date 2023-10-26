@@ -1161,9 +1161,9 @@ const useLogs = () => {
     // Iterate through the array of objects
     for (const item of searchObj.data.resultGrid.columns) {
       // Check if the item's name is 'source' (the static field)
-      if (item.name.toLowerCase() === "source") {
-        flag = true; // Set the flag to true if 'source' exists
-      }
+      // if (item.name.toLowerCase() === "source") {
+      //   flag = true; // Set the flag to true if 'source' exists
+      // }
       // Check if the item's name is in the ftsFields array
       if (ftsFields.value.includes(item.name.toLowerCase())) {
         flag = true; // Set the flag to true if an ftsField exists
