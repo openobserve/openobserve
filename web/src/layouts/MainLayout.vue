@@ -406,7 +406,7 @@ export default defineComponent({
       {
         title: t("menu.rum"),
         icon: "devices",
-        link: "/rum",
+        link: "/rum/performance",
       },
       {
         title: t("menu.dashboard"),
