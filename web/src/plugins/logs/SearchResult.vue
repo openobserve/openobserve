@@ -49,7 +49,11 @@
         :virtual-scroll-slice-ratio-before="10"
         :items="searchObj.data.queryResults.hits"
         @virtual-scroll="onScroll"
-        :wrap-cells="searchObj.meta.toggleSourceWrap ? true : false"
+        :wrap-cells="
+          searchObj.meta.toggleSourceWrap && searchObj.meta.flagWrapContent
+            ? true
+            : false
+        "
         :style="{
           wordBreak: 'break-word',
           height:
