@@ -21,26 +21,24 @@
         class="q-mb-xs"></q-select>
       <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream" :label="t('dashboard.selectIndex')"
         :options="filteredStreams" data-test="index-dropdown-stream" input-debounce="0" behavior="menu" use-input filled borderless
-        dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value">
-        <q-icon
-          size="xs"
-          :name="metricsIconMapping[dashboardPanelData.meta.stream.streamResults.map((it: any) => it.stream_type)] || ''"
-        />
-        <!-- <template v-if="metricTypes" v-slot:prepend>
-           <q-icon v-for="(result, index) in metricTypes" :key="index" size="xs"
-                  :name="metricsIconMapping[result] || ''" />
-        </template> -->
-          <!-- <template v-slot:option="scope"
+        dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value" 
+        option-label="name" option-value="name" emit-value>
+        
+        <template v-slot:option="scope"
           v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'">
-          <q-item> -->
-              <!-- <q-item-section>
-                {{ scope }}
-            </q-item-section> -->
-              <!-- <q-item-section>
-              <q-item-label> {{ scope.opt }} </q-item-label>
-            </q-item-section>
-          </q-item>
-        </template> -->
+            <q-item 
+                v-bind="scope.itemProps"
+              >
+              <q-item-section class="metric-explore-metric-icon">
+                <q-icon size="xs"
+                  :name="metricsIconMapping[scope.opt.metrics_meta.metric_type] || ''" />            
+              </q-item-section>
+              <q-item-section>
+                <!-- {{ scope }} -->
+              <q-item-label> {{ scope.opt.name }} </q-item-label>
+              </q-item-section>
+            </q-item>
+        </template>
 
         <template #no-option>
           <q-item>
@@ -48,6 +46,7 @@
           </q-item>
         </template>
       </q-select>
+      {{ dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream }}
     </div>
     <div class="column col index-table q-mt-xs">
       <q-table
@@ -180,7 +179,7 @@ export default defineComponent({
       Histogram: "bar_chart",
       Counter: "pin",
     };
-console.log("dashboardPanelData", dashboardPanelData);
+    console.log("dashboardPanelData", dashboardPanelData);
 
     const streamDataLoading = useLoading(async () => {
       await getStreamList();
@@ -217,10 +216,10 @@ console.log("dashboardPanelData", dashboardPanelData);
 
       data.indexOptions = dashboardPanelData.meta.stream.streamResults
         .filter((data: any) => data.stream_type == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type)
-        .map((data: any) => {
-          return data.name;
-        });
-
+        .map((data: any) => { return data });
+        console.log("dataaa",data)
+        console.log("data.indexOptions", data.indexOptions);
+       
       // set the first stream as the selected stream when the api loads the data
       if (!props.editMode &&
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream &&
@@ -230,7 +229,7 @@ console.log("dashboardPanelData", dashboardPanelData);
         if (selectedStreamForQueries.value[currentIndex]) {
           dashboardPanelData.data.queries[currentIndex].fields.stream = selectedStreamForQueries.value[currentIndex];
         } else {
-          dashboardPanelData.data.queries[currentIndex].fields.stream = data.indexOptions[0];
+          dashboardPanelData.data.queries[currentIndex].fields.stream = data.indexOptions[0]?.name;
         }
       }
     })
@@ -252,7 +251,6 @@ console.log("dashboardPanelData", dashboardPanelData);
     );
 
     // get the stream list by making an API call
-    const metricTypes: any = [];
     const getStreamList = async () => {
      await IndexService.nameList(
         store.state.selectedOrganization.identifier,
@@ -262,19 +260,12 @@ console.log("dashboardPanelData", dashboardPanelData);
         data.schemaList = res.data.list;
         dashboardPanelData.meta.stream.streamResults = res.data.list;
       });
-      console.log("stream list", JSON.parse(JSON.stringify(dashboardPanelData.meta.stream.streamResults)));
-      const streamResults = dashboardPanelData.meta.stream.streamResults.map((it: any) => {
-        const metricTypes = it.metrics_meta && it.metrics_meta.metric_type;
-        return metricTypes || "";
-      });
-
-      console.log("stream results", JSON.parse(JSON.stringify(streamResults)));
-      metricTypes.push(...streamResults);
     };
-
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
       if (terms != "") {
+        console.log("terms", terms);
+        
         terms = terms.toLowerCase();
         for (var i = 0; i < rows.length; i++) {
           if (rows[i]["name"].toLowerCase().includes(terms)) {
@@ -313,8 +304,9 @@ console.log("dashboardPanelData", dashboardPanelData);
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
         filteredStreams.value = data.indexOptions.filter(
-          (streamName: any) =>
-            streamName.toLowerCase().indexOf(val.toLowerCase()) > -1
+          (stream: any) => {
+           return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1
+          }
         );
       });
     };
@@ -348,13 +340,16 @@ console.log("dashboardPanelData", dashboardPanelData);
       promqlMode,
       streamDataLoading,
       metricsIconMapping,
-      metricTypes
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
+.metric-explore-metric-icon {
+  min-width: 28px !important;
+  padding-right: 8px !important;
+}
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
