@@ -16,10 +16,11 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier">
+  <q-page>
     <div class="q-mx-sm performance-dashboard">
       <RenderDashboardCharts
-        :viewOnly="false"
+        ref="webVitalsChartsRef"
+        :viewOnly="true"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
       />
@@ -53,7 +54,7 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import overviewDashboard from "@/utils/rum/web_vitals.json";
 
 export default defineComponent({
-  name: "AppPerformance",
+  name: "WebVitalsDashboard",
   components: {
     RenderDashboardCharts,
   },
@@ -79,6 +80,7 @@ export default defineComponent({
     const currentDurationSelectionObj = ref({});
     const refreshInterval = ref(0);
     const selectedDate = ref();
+    const webVitalsChartsRef = ref(null);
 
     // variables data
     const variablesData = reactive({});
@@ -88,10 +90,23 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
+      updateLayout();
     });
 
+    onActivated(() => {
+      updateLayout();
+    });
+
+    const updateLayout = async () => {
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      // emit window resize event to trigger the layout
+      webVitalsChartsRef.value.layoutUpdate();
+    };
+
     const loadDashboard = async () => {
-      console.log("loadDashboard");
       currentDashboardData.data = overviewDashboard;
 
       // if variables data is null, set it to empty list
@@ -190,6 +205,7 @@ export default defineComponent({
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,
+      webVitalsChartsRef,
     };
   },
 });
@@ -207,6 +223,4 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss">
-
-</style>
+<style lang="scss"></style>
