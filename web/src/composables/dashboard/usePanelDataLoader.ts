@@ -184,7 +184,7 @@ export const usePanelDataLoader = (
 
     isDirty.value = false;
     const controller = new AbortController();
-    state.loading = true;
+    // state.loading = true;
 
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
 
