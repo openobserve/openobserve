@@ -70,7 +70,7 @@ const store = useStore();
 const { errorTrackingState } = useErrorTracking();
 const errorDetails = ref<any>({});
 
-onMounted(async () => {
+onActivated(async () => {
   await getError();
   getErrorLogs();
 });
