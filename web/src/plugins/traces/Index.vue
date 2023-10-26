@@ -24,6 +24,7 @@
         :fieldValues="fieldValues"
         :key="searchObj.data.stream.streamLists.length"
         @searchdata="searchData"
+        @onChangeTimezone="refreshTimezone"
       />
       <div
         id="tracesThirdLevel"
@@ -996,13 +997,7 @@ export default defineComponent({
           }) => {
             unparsed_x_data.push(bucket.zo_sql_timestamp);
             let histDate = new Date(Math.floor(bucket.zo_sql_timestamp / 1000));
-            // xData.push(Math.floor(histDate.getTime()));
-            xData.push(
-              histogramDateTimezone(
-                Math.floor(bucket.zo_sql_timestamp / 1000),
-                store.state.timezone
-              )
-            );
+            xData.push(Math.floor(histDate.getTime()));
             yData.push(Number((bucket.duration / 1000).toFixed(2)));
           }
         );
@@ -1066,9 +1061,6 @@ export default defineComponent({
     onBeforeMount(() => {
       if (searchObj.loading == false) {
         // eslint-disable-next-line no-prototype-builtins
-        if (!router.currentRoute.value.query.hasOwnProperty("query")) {
-          searchObj.data.editorValue = "duration>1000";
-        }
         loadPageData();
         restoreUrlQueryParams();
       }
@@ -1257,6 +1249,12 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    const refreshTimezone = () => {
+      updateGridColumns();
+      generateHistogramData();
+      searchResultRef.value.reDrawChart();
+    };
+
     return {
       store,
       router,
@@ -1276,6 +1274,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       fieldValues,
       onSplitterUpdate,
+      refreshTimezone,
     };
   },
   computed: {

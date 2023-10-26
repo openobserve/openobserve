@@ -71,7 +71,9 @@ pub async fn schema_evolution(
 
             match schema_fields.iter().find(|f| f.name() == item_name) {
                 Some(existing_field) => {
-                    if existing_field.data_type() != item_data_type {
+                    if existing_field.data_type() != item_data_type
+                        && existing_field.data_type() != &DataType::Utf8
+                    {
                         field_datatype_delta.push(format!("{}:[{}]", item_name, item_data_type));
                     }
                 }

@@ -25,7 +25,7 @@
    -->
   <div :style="{ height: height }" class="app-table-container">
     <template v-if="!rows.length">
-      <h5 class="q-pt-md text-center">No data found</h5>
+      <div class="q-pt-md text-center text-subtitle">No Data Found</div>
     </template>
     <template v-else>
       <q-table
@@ -41,6 +41,8 @@
         :virtual-scroll-item-size="48"
         :rows-per-page-options="[0]"
         @virtual-scroll="onScroll"
+        no-data-label="I didn't find anything for you"
+        no-results-label="The filter didn't uncover any results"
         class="full-height"
         hide-bottom
       >
@@ -154,6 +156,5 @@ const onScroll = (e: any) => {
   top: 0;
   opacity: 1;
   z-index: 1;
-  background-color: #f5f5f5;
 }
 </style>

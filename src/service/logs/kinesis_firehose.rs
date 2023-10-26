@@ -46,8 +46,8 @@ pub async fn process(
 ) -> Result<KinesisFHIngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
-    let stream_name = &get_formatted_stream_name(&stream_params, &mut stream_schema_map).await;
+    let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
+    let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));

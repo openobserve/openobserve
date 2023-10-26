@@ -14,10 +14,7 @@
 -->
 
 <template>
-  <div
-  class="flex column justify-center q-pa-xs"
-  style="font-size: 1.5rem"
-  >
+  <div class="flex column justify-center q-pa-xs" style="font-size: 1.5rem">
     <q-img
       :src="getImageURL('images/common/clipboard_icon.svg')"
       style="width: 230px; margin: 5vh auto 2rem"
@@ -25,19 +22,18 @@
     <div class="flex justify-center q-mb-md">
       <span>Start by adding your first dashboard panel</span>
     </div>
-    <div class="flex justify-center">
-      <q-btn 
-          :label="t('panel.add')"
-          stack 
-          padding="md" 
-          outline icon="insert_drive_file"
-          class=""
-          @click="$emit('update:Panel')"
+    <div class="flex justify-center" v-if="!viewOnly">
+      <q-btn
+        :label="t('panel.add')"
+        stack
+        padding="md"
+        outline
+        icon="insert_drive_file"
+        class=""
+        @click="$emit('update:Panel')"
       >
-   
       </q-btn>
     </div>
-
   </div>
 </template>
 <script lang="ts">
@@ -47,13 +43,13 @@ import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
   name: "NoPanel",
-  props: ["Panel"],
+  props: ["Panel", "viewOnly"],
   emits: ["update:Panel"],
 
   setup() {
     const { t } = useI18n();
 
-    return { t , getImageURL};
+    return { t, getImageURL };
   },
 });
 </script>

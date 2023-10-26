@@ -64,7 +64,7 @@ pub fn format_partition_key(input: &str) -> String {
 
 // format stream name
 pub async fn get_formatted_stream_name(
-    params: &StreamParams,
+    params: &mut StreamParams,
     schema_map: &mut AHashMap<String, Schema>,
 ) -> String {
     let mut stream_name = params.stream_name.to_string();
@@ -84,6 +84,7 @@ pub async fn get_formatted_stream_name(
     } else {
         schema_map.insert(stream_name.to_owned(), schema);
     }
+    params.stream_name = stream_name.to_owned().into();
 
     stream_name
 }

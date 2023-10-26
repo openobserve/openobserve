@@ -98,7 +98,7 @@ pub async fn logs_json_handler(
     let stream_name = match in_stream_name {
         Some(name) => {
             get_formatted_stream_name(
-                &StreamParams::new(org_id, name, StreamType::Logs),
+                &mut StreamParams::new(org_id, name, StreamType::Logs),
                 &mut stream_schema_map,
             )
             .await

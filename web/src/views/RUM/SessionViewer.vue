@@ -15,7 +15,7 @@
 
 <template>
   <div class="row qp-2 full-height">
-    <div class="col-12 q-px-sm q-pt-md row items-end bg-grey-2">
+    <div class="col-12 q-px-sm q-pt-md row items-end">
       <div class="col-9 row">
         <div
           class="text-caption ellipsis row items-center q-mr-md"

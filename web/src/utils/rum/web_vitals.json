@@ -1,0 +1,191 @@
+{
+  "version": 2,
+  "dashboardId": "",
+  "title": "Rum",
+  "description": "",
+  "role": "",
+  "owner": "",
+  "created": "2023-10-17T11:25:09.483Z",
+  "panels": [
+    {
+      "id": "Panel_ID9969310",
+      "type": "bar",
+      "title": "Largest Contentful Paint ( LCP )",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "seconds",
+        "unit_custom": "",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_largest_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env'  GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "Timestamp",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": "Largest Contentful Paint ( LCP )nds",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 0, "y": 0, "w": 4, "h": 8, "i": 2 }
+    },
+    {
+      "id": "Panel_ID3232610",
+      "type": "bar",
+      "title": "First Input Delay ( FID )",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "milliseconds",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_input_delay/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "Timestamp",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": "Milliseconds",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 4, "y": 0, "w": 4, "h": 8, "i": 4 }
+    },
+    {
+      "id": "Panel_ID4984310",
+      "type": "bar",
+      "title": "Cumulative Layout Shift ( CLS )",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": false,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "Timestamp",
+                "alias": "x_axis_1",
+                "column": "_timestamp",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": "View Cumulative Layout Shift",
+                "alias": "y_axis_1",
+                "column": "view_cumulative_layout_shift",
+                "color": "#5960b2",
+                "aggregationFunction": "avg"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 8, "y": 0, "w": 4, "h": 8, "i": 5 }
+    }
+  ],
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "service",
+        "label": "Service",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "_rumdata",
+          "field": "service",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      },
+      {
+        "type": "query_values",
+        "name": "env",
+        "label": "Env",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "_rumdata",
+          "field": "env",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      }
+    ]
+  }
+}
