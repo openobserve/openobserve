@@ -46,6 +46,15 @@ const AppPerformance = () => import("@/views/RUM/AppPerformance.vue");
 const AppErrors = () => import("@/views/RUM/AppErrors.vue");
 const AppSessions = () => import("@/views/RUM/AppSessions.vue");
 
+const PerformanceSummary = () =>
+  import("@/components/rum/performance/PerformanceSummary.vue");
+const WebVitalsDashboard = () =>
+  import("@/components/rum/performance/WebVitalsDashboard.vue");
+const ErrorsDashboard = () =>
+  import("@/components/rum/performance/ErrorsDashboard.vue");
+const ApiDashboard = () =>
+  import("@/components/rum/performance/ApiDashboard.vue");
+
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
 const useRoutes = () => {
@@ -301,6 +310,28 @@ const useRoutes = () => {
           name: "RumPerformance",
           component: AppPerformance,
           props: true,
+          children: [
+            {
+              path: "overview",
+              name: "rumPerformanceSummary",
+              component: PerformanceSummary,
+            },
+            {
+              path: "web-vitals",
+              name: "rumPerformanceWebVitals",
+              component: WebVitalsDashboard,
+            },
+            {
+              path: "errors",
+              name: "rumPerformanceErrors",
+              component: ErrorsDashboard,
+            },
+            {
+              path: "apis",
+              name: "rumPerformanceApis",
+              component: ApiDashboard,
+            },
+          ],
         },
       ],
     },

@@ -16,95 +16,194 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier">
-    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" />
-    <RenderDashboardCharts
-      :viewOnly="viewOnly"
-      :dashboardData="currentDashboardData.data"
-      :currentTimeObj="currentTimeObj"
-    />
+  <q-page>
+    <div class="q-mx-sm performance-dashboard">
+      <RenderDashboardCharts
+        ref="performanceChartsRef"
+        :viewOnly="true"
+        :dashboardData="currentDashboardData.data"
+        :currentTimeObj="dateTime"
+      >
+        <template v-slot:before_panels>
+          <div class="flex items-center q-pb q-pt-md text-subtitle1 text-bold">
+            <div class="col text-center">Web Vitals</div>
+            <div class="col text-center">Errors</div>
+            <div class="col text-center">Sessions</div>
+          </div>
+        </template>
+      </RenderDashboardCharts>
+    </div>
   </q-page>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onActivated, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onMounted,
+  nextTick,
+  onActivated,
+  onDeactivated,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
-import {
-  parseDuration,
-  generateDurationLabel,
-  getDurationObjectFromParams,
-  getQueryParamsForDuration,
-} from "@/utils/date";
-import { toRaw, unref, reactive } from "vue";
+import { parseDuration, generateDurationLabel } from "@/utils/date";
+import { reactive } from "vue";
 import { useRoute } from "vue-router";
-import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
-import type { style } from "d3-selection";
+import overviewDashboard from "@/utils/rum/overview.json";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "PerformanceSummary",
   components: {
     RenderDashboardCharts,
-    AppTabs,
+  },
+  props: {
+    dateTime: {
+      type: Object,
+      default: () => ({}),
+    },
   },
   setup() {
+    // onMounted(async () => {
+    //   await loadDashboard();
+    // });
+
+    const performanceChartsRef = ref(null);
+
+    onMounted(async () => {
+      await loadDashboard();
+    });
+
+    onActivated(() => {
+      updateLayout();
+    });
+
+    const updateLayout = async () => {
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+
+      // emit window resize event to trigger the layout
+      performanceChartsRef.value.layoutUpdate();
+    };
+
+    const loadDashboard = async () => {
+      currentDashboardData.value.data = overviewDashboard;
+
+      // if variables data is null, set it to empty list
+      if (
+        !(
+          currentDashboardData.value.data?.variables &&
+          currentDashboardData.value.data?.variables?.list.length
+        )
+      ) {
+        variablesData.isVariablesLoading = false;
+        variablesData.values = [];
+      }
+    };
+
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
-    const currentDashboardData = reactive({
+    const currentDashboardData = ref({
       data: {},
     });
+
+    // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
-    const viewOnly = ref(true);
-    const eventLog = ref([]);
 
-    const refDateTime: any = ref(null);
-    const currentDurationSelectionObj = ref({});
-    const currentTimeObj = ref({});
-    const refreshInterval = ref(0);
-    const selectedDate = ref();
-    const activeTab = ref("overview");
-    onActivated(async () => {
-      await loadDashboard();
+    // variables data
+    const variablesData = reactive({});
+    const variablesDataUpdated = (data: any) => {
+      Object.assign(variablesData, data);
+      const variableObj = {};
+      data.values.forEach((v) => {
+        variableObj[`var-${v.name}`] = v.value;
+      });
+      router.replace({
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: route.query.dashboard,
+          folder: route.query.folder,
+          refresh: generateDurationLabel(refreshInterval.value),
+          ...getQueryParamsForDuration(selectedDate.value),
+          ...variableObj,
+        },
+      });
+    };
+
+    // ======= [START] default variable values
+
+    const initialVariableValues = {};
+    Object.keys(route.query).forEach((key) => {
+      if (key.startsWith("var-")) {
+        const newKey = key.slice(4);
+        initialVariableValues[newKey] = route.query[key];
+      }
     });
+    // ======= [END] default variable values
 
-    const tabs = [
-      {
-        value: "overview",
-        label: "Overview",
-        style: {
-          "margin-left": "32px",
-          width: "100px",
-          padding: "8px 12px",
-        },
-      },
-      {
-        value: "web_vitals",
-        label: "Web Vitals",
-        style: {
-          width: "100px",
-          padding: "8px 12px",
-        },
-      },
-      {
-        value: "errors",
-        label: "Errors",
-        style: {
-          width: "100px",
-          padding: "8px 12px",
-        },
-      },
-    ];
-
-    const addSettingsData = () => {
+    const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
     };
+
+    // [START] date picker related variables --------
+
+    /**
+     * Retrieves the selected date from the query parameters.
+     */
+    const getSelectedDateFromQueryParams = (params) => ({
+      valueType: params.period
+        ? "relative"
+        : params.from && params.to
+        ? "absolute"
+        : "relative",
+      startTime: params.from ? params.from : null,
+      endTime: params.to ? params.to : null,
+      relativeTimePeriod: params.period ? params.period : null,
+    });
+
+    const dateTimePicker = ref(null); // holds a reference to the date time picker
+
+    // holds the date picker v-modal
+    const selectedDate = ref(getSelectedDateFromQueryParams(route.query));
+
+    // holds the current time for the dashboard
+    const currentTimeObj = ref({});
+
+    // refresh interval v-model
+    const refreshInterval = ref(0);
+
+    // when the date changes from the picker, update the current time object for the dashboard
+    watch(selectedDate, () => {
+      currentTimeObj.value = {
+        start_time: new Date(selectedDate.value.startTime),
+        end_time: new Date(selectedDate.value.endTime),
+      };
+    });
+
+    const getQueryParamsForDuration = (data: any) => {
+      if (data.relativeTimePeriod) {
+        return {
+          period: data.relativeTimePeriod,
+        };
+      } else {
+        return {
+          from: data.startTime,
+          to: data.endTime,
+        };
+      }
+    };
+
+    // [END] date picker related variables
 
     // back button to render dashboard List page
     const goBackToDashboardList = () => {
@@ -129,18 +228,8 @@ export default defineComponent({
     };
 
     const refreshData = () => {
-      currentTimeObj.value = getConsumableDateTime(
-        currentDurationSelectionObj.value
-      );
+      dateTimePicker.value.refresh();
     };
-
-    watch(selectedDate, () => {
-      const c = toRaw(unref(selectedDate.value));
-      currentDurationSelectionObj.value = selectedDate.value;
-      currentTimeObj.value = getConsumableDateTime(
-        currentDurationSelectionObj.value
-      );
-    });
 
     // ------- work with query params ----------
     onActivated(async () => {
@@ -150,9 +239,12 @@ export default defineComponent({
         refreshInterval.value = parseDuration(params.refresh);
       }
 
-      if (params.period || (params.to && params.from)) {
-        selectedDate.value = getDurationObjectFromParams(params);
-      }
+      // This is removed due to the bug of the new date time component
+      // and is now rendered when the setup method is called
+      // instead of onActivated
+      // if (params.period || (params.to && params.from)) {
+      //   selectedDate.value = getSelectedDateFromQueryParams(params);
+      // }
 
       // resize charts if needed
       await nextTick();
@@ -172,6 +264,16 @@ export default defineComponent({
       });
     });
 
+    const onDeletePanel = async (panelId: any) => {
+      await deletePanel(
+        store,
+        route.query.dashboard,
+        panelId,
+        route.query.folder ?? "default"
+      );
+      await loadDashboard();
+    };
+
     return {
       currentDashboardData,
       goBackToDashboardList,
@@ -179,38 +281,41 @@ export default defineComponent({
       t,
       getDashboard,
       store,
-      refDateTime,
-      filterQuery: ref(""),
-      filterData(rows: string | any[], terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      // date variables
+      dateTimePicker,
+      selectedDate,
       currentTimeObj,
       refreshInterval,
       refreshData,
-      selectedDate,
-      viewOnly,
-      eventLog,
-      addSettingsData,
+      onDeletePanel,
+      variablesData,
+      variablesDataUpdated,
       showDashboardSettingsDialog,
-      tabs,
-      activeTab,
+      openSettingsDialog,
+      loadDashboard,
+      getQueryParamsForDuration,
+      performanceChartsRef,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
+.performance_title {
+  font-size: 24px;
+}
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
     justify-content: flex-end;
   }
+}
+</style>
+
+<style lang="scss">
+.performance-dashboard {
+  min-height: auto !important;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
 }
 </style>
