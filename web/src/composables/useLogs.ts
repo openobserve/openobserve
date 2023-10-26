@@ -27,6 +27,7 @@ import {
   formatSizeFromMB,
   timestampToTimezoneDate,
   histogramDateTimezone,
+  useLocalWrapContent,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -85,6 +86,9 @@ const defaultObject = {
     showHistogram: true,
     showDetailTab: false,
     toggleFunction: false,
+    toggleSourceWrap: useLocalWrapContent()
+      ? JSON.parse(useLocalWrapContent())
+      : false,
     histogramDirtyFlag: false,
     sqlMode: false,
     queryEditorPlaceholderFlag: true,
@@ -100,6 +104,7 @@ const defaultObject = {
       },
     },
     scrollInfo: {},
+    flagWrapContent: false,
   },
   data: {
     query: <any>"",
@@ -723,10 +728,7 @@ const useLogs = () => {
         searchObj.data.streamResults.list.forEach((stream: any) => {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
             queryResult.push(...stream.schema);
-            ftsKeys = new Set([
-              ...stream.settings.full_text_search_keys,
-              ...ignoreFields,
-            ]);
+            ftsKeys = new Set([...stream.settings.full_text_search_keys]);
           }
         });
 
@@ -831,6 +833,8 @@ const useLogs = () => {
           });
         });
       }
+      extractFTSFields();
+      evaluateWrapContentFlag();
     } catch (e: any) {
       console.log("Error while updating grid columns");
     }
@@ -1136,6 +1140,45 @@ const useLogs = () => {
     }
   };
 
+  const ftsFields = ref([]);
+  const extractFTSFields = () => {
+    if (searchObj.data.stream.selectedStreamFields.length > 0) {
+      ftsFields.value = searchObj.data.stream.selectedStreamFields
+        .filter((item) => item.ftsKey === true)
+        .map((item) => item.name);
+    }
+
+    // if there is no FTS fields set by user then use default FTS fields
+    if (ftsFields.value.length == 0) {
+      ftsFields.value = store.state.zoConfig.default_fts_keys;
+    }
+  };
+
+  const evaluateWrapContentFlag = () => {
+    // Initialize a flag to false
+    let flag = false;
+
+    // Iterate through the array of objects
+    for (const item of searchObj.data.resultGrid.columns) {
+      // Check if the item's name is 'source' (the static field)
+      if (item.name.toLowerCase() === "source") {
+        flag = true; // Set the flag to true if 'source' exists
+      }
+      // Check if the item's name is in the ftsFields array
+      if (ftsFields.value.includes(item.name.toLowerCase())) {
+        flag = true; // Set the flag to true if an ftsField exists
+      }
+
+      // If the flag is already true, no need to continue checking
+      if (flag) {
+        searchObj.meta.flagWrapContent = flag;
+        break;
+      }
+    }
+
+    searchObj.meta.flagWrapContent = flag;
+  };
+
   return {
     searchObj,
     resetSearchObj,
@@ -1154,6 +1197,8 @@ const useLogs = () => {
     updateStreams,
     handleRunQuery,
     generateHistogramData,
+    extractFTSFields,
+    evaluateWrapContentFlag,
   };
 };
 

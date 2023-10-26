@@ -810,10 +810,7 @@ export default defineComponent({
           searchObj.data.streamResults.list.forEach((stream: any) => {
             if (searchObj.data.stream.selectedStream.value == stream.name) {
               queryResult.push(...stream.schema);
-              ftsKeys = new Set([
-                ...stream.settings.full_text_search_keys,
-                ...ignoreFields,
-              ]);
+              ftsKeys = new Set([...stream.settings.full_text_search_keys]);
             }
           });
 

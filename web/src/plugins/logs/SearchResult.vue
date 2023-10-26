@@ -22,7 +22,9 @@
       ref="searchListContainer"
       style="width: 100%"
     >
-      <div class="text-center">{{ searchObj.data.histogram.chartParams.title }}</div>
+      <div class="text-center">
+        {{ searchObj.data.histogram.chartParams.title }}
+      </div>
       <ChartRenderer
         data-test="logs-search-result-bar-chart"
         :data="plotChart"
@@ -34,7 +36,6 @@
         style="max-height: 150px"
         @updated:dataZoom="onChartUpdate"
       />
-
       <q-virtual-scroll
         data-test="logs-search-result-logs-table"
         id="searchGridComponent"
@@ -48,7 +49,9 @@
         :virtual-scroll-slice-ratio-before="10"
         :items="searchObj.data.queryResults.hits"
         @virtual-scroll="onScroll"
+        :wrap-cells="searchObj.meta.toggleSourceWrap ? true : false"
         :style="{
+          wordBreak: 'break-word',
           height:
             !searchObj.meta.showHistogram || searchObj.meta.sqlMode
               ? 'calc(100% - 0px)'
@@ -249,7 +252,11 @@ import { useI18n } from "vue-i18n";
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import DetailTable from "./DetailTable.vue";
-import { getImageURL, timestampToTimezoneDate } from "../../utils/zincutils";
+import {
+  getImageURL,
+  timestampToTimezoneDate,
+  useLocalWrapContent,
+} from "../../utils/zincutils";
 import EqualIcon from "../../components/icons/EqualIcon.vue";
 import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
@@ -329,14 +336,18 @@ export default defineComponent({
     const $q = useQuasar();
     const searchListContainer = ref(null);
 
-    const { searchObj, updatedLocalLogFilterField, searchAroundData } =
-      useLogs();
+    const {
+      searchObj,
+      updatedLocalLogFilterField,
+      searchAroundData,
+      extractFTSFields,
+      evaluateWrapContentFlag,
+    } = useLogs();
     const totalHeight = ref(0);
 
     const searchTableRef: any = ref(null);
 
     const plotChart: any = ref({});
-    const expandedLogs: any = ref({});
 
     onMounted(() => {
       reDrawChart();
@@ -415,6 +426,7 @@ export default defineComponent({
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
+      evaluateWrapContentFlag();
     }
 
     const copyLogToClipboard = (log: any) => {
@@ -449,7 +461,27 @@ export default defineComponent({
       searchListContainer,
       getWidth,
       copyLogToClipboard,
+      extractFTSFields,
+      evaluateWrapContentFlag,
+      useLocalWrapContent,
     };
+  },
+  computed: {
+    toggleWrapFlag() {
+      return this.searchObj.meta.toggleSourceWrap;
+    },
+    findFTSFields() {
+      return this.searchObj.data.stream.selectedStreamFields;
+    },
+  },
+  watch: {
+    toggleWrapFlag() {
+      this.useLocalWrapContent(this.searchObj.meta.toggleSourceWrap);
+    },
+    findFTSFields() {
+      this.extractFTSFields();
+      this.evaluateWrapContentFlag();
+    },
   },
 });
 </script>
@@ -563,7 +595,7 @@ export default defineComponent({
     }
 
     &.isClosable {
-      padding-right: 26px;
+      padding-right: 30px;
       position: relative;
 
       .q-table-col-close {
