@@ -135,15 +135,23 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
+
       const routeNameMapping = {
         rumPerformanceSummary: "overview",
         rumPerformanceWebVitals: "web_vitals",
         rumPerformanceErrors: "errors",
         rumPerformanceApis: "api",
+        RumPerformance: "overview",
       };
-      // Add ?tab=overview in url
-      activePerformanceTab.value =
-        routeNameMapping[router.currentRoute.value.name];
+
+      if (routeNameMapping[router.currentRoute.value.name]) {
+        activePerformanceTab.value =
+          routeNameMapping[router.currentRoute.value.name];
+      } else {
+        activePerformanceTab.value = "overview";
+      }
+
+      updateRoute();
     });
 
     onActivated(async () => {
@@ -168,20 +176,7 @@ export default defineComponent({
     watch(
       () => activePerformanceTab.value,
       () => {
-        const routeNames = {
-          overview: "rumPerformanceSummary",
-          web_vitals: "rumPerformanceWebVitals",
-          errors: "rumPerformanceErrors",
-          api: "rumPerformanceApis",
-        };
-        router.replace({
-          name: routeNames[activePerformanceTab.value],
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            refresh: generateDurationLabel(refreshInterval.value),
-            ...getQueryParamsForDuration(selectedDate.value),
-          },
-        });
+        updateRoute();
       }
     );
 
@@ -192,6 +187,26 @@ export default defineComponent({
     const currentDashboardData = reactive({
       data: {},
     });
+
+    const updateRoute = () => {
+      const routeNames = {
+        overview: "rumPerformanceSummary",
+        web_vitals: "rumPerformanceWebVitals",
+        errors: "rumPerformanceErrors",
+        api: "rumPerformanceApis",
+      };
+
+      if (!routeNames[activePerformanceTab.value]) return;
+
+      router.replace({
+        name: routeNames[activePerformanceTab.value],
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          refresh: generateDurationLabel(refreshInterval.value),
+          ...getQueryParamsForDuration(selectedDate.value),
+        },
+      });
+    };
 
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
