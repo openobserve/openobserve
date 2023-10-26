@@ -208,8 +208,14 @@ pub async fn search(
         match ret {
             Ok(ret) => {
                 for (k, v) in ret {
-                    let group = results.entry(k).or_insert_with(Vec::new);
-                    group.extend(v);
+                    let v = v
+                        .into_iter()
+                        .filter(|r| r.num_rows() > 0)
+                        .collect::<Vec<_>>();
+                    if !v.is_empty() {
+                        let group = results.entry(k).or_insert_with(Vec::new);
+                        group.extend(v);
+                    }
                 }
             }
             Err(err) => {
