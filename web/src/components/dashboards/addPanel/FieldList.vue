@@ -26,6 +26,22 @@
           size="xs"
           :name="metricsIconMapping[dashboardPanelData.meta.stream.streamResults.map((it: any) => it.stream_type)] || ''"
         />
+        <!-- <template v-if="metricTypes" v-slot:prepend>
+           <q-icon v-for="(result, index) in metricTypes" :key="index" size="xs"
+                  :name="metricsIconMapping[result] || ''" />
+        </template> -->
+          <!-- <template v-slot:option="scope"
+          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'">
+          <q-item> -->
+              <!-- <q-item-section>
+                {{ scope }}
+            </q-item-section> -->
+              <!-- <q-item-section>
+              <q-item-label> {{ scope.opt }} </q-item-label>
+            </q-item-section>
+          </q-item>
+        </template> -->
+
         <template #no-option>
           <q-item>
             <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -159,13 +175,14 @@ export default defineComponent({
       useDashboardPanelData();
       
     const metricsIconMapping: any = {
-      summary: "description",
-      gauge: "speed",
-      histogram: "bar_chart",
-      counter: "pin",
+      Summary: "description",
+      Gauge: "speed",
+      Histogram: "bar_chart",
+      Counter: "pin",
     };
+console.log("dashboardPanelData", dashboardPanelData);
 
-    const streamDataLoading = useLoading(async ()=>{
+    const streamDataLoading = useLoading(async () => {
       await getStreamList();
     });
 
@@ -235,7 +252,8 @@ export default defineComponent({
     );
 
     // get the stream list by making an API call
-    const getStreamList = async() => {
+    const metricTypes: any = [];
+    const getStreamList = async () => {
      await IndexService.nameList(
         store.state.selectedOrganization.identifier,
         "",
@@ -244,7 +262,14 @@ export default defineComponent({
         data.schemaList = res.data.list;
         dashboardPanelData.meta.stream.streamResults = res.data.list;
       });
-      console.log("stream results", dashboardPanelData.meta.stream.streamResults);
+      console.log("stream list", JSON.parse(JSON.stringify(dashboardPanelData.meta.stream.streamResults)));
+      const streamResults = dashboardPanelData.meta.stream.streamResults.map((it: any) => {
+        const metricTypes = it.metrics_meta && it.metrics_meta.metric_type;
+        return metricTypes || "";
+      });
+
+      console.log("stream results", JSON.parse(JSON.stringify(streamResults)));
+      metricTypes.push(...streamResults);
     };
 
     const filterFieldFn = (rows: any, terms: any) => {
@@ -322,7 +347,8 @@ export default defineComponent({
       isAddZAxisNotAllowed,
       promqlMode,
       streamDataLoading,
-      metricsIconMapping
+      metricsIconMapping,
+      metricTypes
     };
   },
 });
