@@ -39,9 +39,6 @@
           @click="refreshData"
         >
         </q-btn>
-        <ExportDashboard
-          :dashboardId="currentDashboardData.data?.dashboardId"
-        />
       </div>
     </div>
     <AppTabs
@@ -50,40 +47,15 @@
       v-model:active-tab="activePerformanceTab"
     />
     <q-separator></q-separator>
-    <template v-if="activePerformanceTab === 'web_vitals'">
-      <WebVitalsDashboard
-        :date-time="currentTimeObj"
-        :selected-date="selectedDate"
-      />
-    </template>
-    <template v-else-if="activePerformanceTab === 'errors'">
-      <ErrorsDashboard
-        :date-time="currentTimeObj"
-        :selected-date="selectedDate"
-      />
-    </template>
-    <template v-else-if="activePerformanceTab === 'api'">
-      <ApiDashboard :date-time="currentTimeObj" :selected-date="selectedDate" />
-    </template>
-    <template v-else>
-      <div class="q-mx-sm performance-dashboard">
-        <RenderDashboardCharts
-          :viewOnly="true"
-          :dashboardData="currentDashboardData.data"
-          :currentTimeObj="currentTimeObj"
-        >
-          <template v-slot:before_panels>
-            <div
-              class="flex items-center q-pb q-pt-md text-subtitle1 text-bold"
-            >
-              <div class="col text-center">Web Vitals</div>
-              <div class="col text-center">Errors</div>
-              <div class="col text-center">Sessions</div>
-            </div>
-          </template>
-        </RenderDashboardCharts>
-      </div>
-    </template>
+    <router-view v-slot="{ Component }">
+      <keep-alive>
+        <component
+          :is="Component"
+          :date-time="currentTimeObj"
+          :selected-date="selectedDate"
+        />
+      </keep-alive>
+    </router-view>
   </q-page>
 </template>
 
@@ -106,26 +78,18 @@ import { parseDuration, generateDurationLabel } from "@/utils/date";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
-import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
 import AppTabs from "@/components/common/AppTabs.vue";
 import WebVitalsDashboard from "@/components/rum/performance/WebVitalsDashboard.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import ErrorsDashboard from "@/components/rum/performance/ErrorsDashboard.vue";
-import ApiDashboard from "@/components/rum/performance/ApiDashboard.vue";
 
 export default defineComponent({
   name: "AppPerformance",
   components: {
     AutoRefreshInterval,
-    ExportDashboard,
-    RenderDashboardCharts,
     AppTabs,
-    WebVitalsDashboard,
     DateTimePickerDashboard,
-    ErrorsDashboard,
-    ApiDashboard,
   },
   setup() {
     const activePerformanceTab = ref("overview");
@@ -171,17 +135,15 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
-      if (activePerformanceTab.value === "overview") {
-        // Add ?tab=overview in url
-        router.replace({
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            refresh: generateDurationLabel(refreshInterval.value),
-            ...getQueryParamsForDuration(selectedDate.value),
-            dashboard: "overview",
-          },
-        });
-      }
+      const routeNameMapping = {
+        rumPerformanceSummary: "overview",
+        rumPerformanceWebVitals: "web_vitals",
+        rumPerformanceErrors: "errors",
+        rumPerformanceApis: "api",
+      };
+      // Add ?tab=overview in url
+      activePerformanceTab.value =
+        routeNameMapping[router.currentRoute.value.name];
     });
 
     onActivated(async () => {
@@ -206,12 +168,18 @@ export default defineComponent({
     watch(
       () => activePerformanceTab.value,
       () => {
+        const routeNames = {
+          overview: "rumPerformanceSummary",
+          web_vitals: "rumPerformanceWebVitals",
+          errors: "rumPerformanceErrors",
+          api: "rumPerformanceApis",
+        };
         router.replace({
+          name: routeNames[activePerformanceTab.value],
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
             refresh: generateDurationLabel(refreshInterval.value),
             ...getQueryParamsForDuration(selectedDate.value),
-            dashboard: activePerformanceTab.value,
           },
         });
       }

@@ -8,55 +8,7 @@
   "created": "2023-10-24T07:44:23.588Z",
   "panels": [
     {
-      "id": "Panel_ID636310",
-      "type": "h-bar",
-      "title": "Error by Versions",
-      "description": "",
-      "config": {
-        "show_legends": true,
-        "legends_position": null,
-        "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
-      },
-      "queryType": "sql",
-      "queries": [
-        {
-          "query": "SELECT version as \"x_axis_1\", count(error_id) as \"y_axis_1\"  FROM \"_rumdata\" where type='error' and service='$service' and env='$env' GROUP BY x_axis_1 ORDER BY x_axis_1",
-          "customQuery": true,
-          "fields": {
-            "stream": "_rumdata",
-            "stream_type": "logs",
-            "x": [
-              {
-                "label": "Version",
-                "alias": "x_axis_1",
-                "column": "x_axis_1",
-                "color": null
-              }
-            ],
-            "y": [
-              {
-                "label": "Error Count",
-                "alias": "y_axis_1",
-                "column": "y_axis_1",
-                "color": "#5960b2",
-                "aggregationFunction": "count"
-              }
-            ],
-            "z": [],
-            "filter": []
-          },
-          "config": {
-            "promql_legend": "",
-            "layer_type": "scatter",
-            "weight_fixed": 1
-          }
-        }
-      ],
-      "layout": { "x": 0, "y": 8, "w": 4, "h": 9, "i": 6 }
-    },
-    {
-      "id": "Panel_ID636310",
+      "id": "Panel_ID646411",
       "type": "bar",
       "title": "Errors by Time",
       "description": "",
@@ -101,7 +53,7 @@
           }
         }
       ],
-      "layout": { "x": 4, "y": 8, "w": 4, "h": 9, "i": 6 }
+      "layout": { "x": 0, "y": 0, "w": 6, "h": 8, "i": 1 }
     }
   ],
   "variables": {

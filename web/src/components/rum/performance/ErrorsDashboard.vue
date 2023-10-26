@@ -16,19 +16,17 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page
-    :key="store.state.selectedOrganization.identifier"
-    class="performance-error-dashboard"
-  >
-    <div class="q-mx-sm performance-dashboard">
+  <q-page class="performance-error-dashboard">
+    <div class="q-px-sm performance-dashboard">
       <RenderDashboardCharts
+        ref="errorRenderDashboardChartsRef"
+        :viewOnly="true"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
-        @variablesData="variablesDataUpdated"
       />
     </div>
     <div class="row q-px-md">
-      <div class="col-8 view-error-table q-pa-sm">
+      <div class="col-6 view-error-table q-pa-sm">
         <div class="q-pb-sm text-bold q-pl-xs">Top Error Views</div>
         <AppTable
           :columns="columns"
@@ -67,7 +65,7 @@ import AppTable from "@/components/AppTable.vue";
 import searchService from "@/services/search";
 
 export default defineComponent({
-  name: "AppPerformance",
+  name: "ErrorsDashboard",
   components: {
     RenderDashboardCharts,
     AppTable,
@@ -90,14 +88,34 @@ export default defineComponent({
     });
     const showDashboardSettingsDialog = ref(false);
     const viewOnly = ref(true);
-    const eventLog = ref([]);
     const errorsByView = ref([]);
     const variablesData = ref(null);
+    const errorRenderDashboardChartsRef = ref(null);
 
     const refDateTime: any = ref(null);
     const refreshInterval = ref(0);
 
+    onMounted(async () => {
+      await loadDashboard();
+      updateLayout();
+    });
+
+    onActivated(() => {
+      updateLayout();
+    });
+
+    const updateLayout = async () => {
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+
+      // emit window resize event to trigger the layout
+      errorRenderDashboardChartsRef.value.layoutUpdate();
+    };
+
     const getResourceErrors = () => {
+      updateLayout();
       errorsByView.value = [];
 
       let whereClause = `WHERE type='error'`;
@@ -129,8 +147,7 @@ export default defineComponent({
           res.data.hits.forEach((element: any) => {
             errorsByView.value.push(element);
           });
-        })
-        .finally(() => console.log(""));
+        });
     };
 
     // variables data
@@ -162,10 +179,6 @@ export default defineComponent({
         style: { width: "56px" },
       },
     ];
-
-    onMounted(async () => {
-      await loadDashboard();
-    });
 
     const loadDashboard = async () => {
       currentDashboardData.data = errorDashboard;
@@ -202,7 +215,6 @@ export default defineComponent({
       refDateTime,
       refreshInterval,
       viewOnly,
-      eventLog,
       variablesData,
       variablesDataUpdated,
       addSettingsData,
@@ -210,6 +222,7 @@ export default defineComponent({
       loadDashboard,
       columns,
       errorsByView,
+      errorRenderDashboardChartsRef,
     };
   },
 });

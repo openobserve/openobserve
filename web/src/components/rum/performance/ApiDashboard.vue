@@ -24,7 +24,6 @@
       <VariablesValueSelector
         :variablesConfig="apiDashboard?.variables"
         :selectedTimeDate="dateTime"
-        :initialVariableValues="initialVariableValues"
         @variablesData="variablesDataUpdated"
       />
     </div>
@@ -65,7 +64,7 @@ import VariablesValueSelector from "@/components/dashboards/VariablesValueSelect
 import apiDashboard from "@/utils/rum/api.json";
 
 export default defineComponent({
-  name: "AppPerformance",
+  name: "ApiDashboard",
   components: {
     AppTable,
     VariablesValueSelector,

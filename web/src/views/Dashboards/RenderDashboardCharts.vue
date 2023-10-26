@@ -16,11 +16,16 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-    <VariablesValueSelector :variablesConfig="dashboardData?.variables" :selectedTimeDate="currentTimeObj" :initialVariableValues="initialVariableValues"
-      @variablesData="variablesDataUpdated"/>
-      <slot name="before_panels"/>
+  <div>
+    <VariablesValueSelector
+      :variablesConfig="dashboardData?.variables"
+      :selectedTimeDate="currentTimeObj"
+      :initialVariableValues="initialVariableValues"
+      @variablesData="variablesDataUpdated"
+    />
+    <slot name="before_panels" />
     <div class="displayDiv">
-      <grid-layout v-if="dashboardData.panels?.length > 0" :layout.sync="getDashboardLayout(dashboardData)" :col-num="12" :row-height="30"
+      <grid-layout ref="gridLayoutRef" v-if="dashboardData.panels?.length > 0" :layout.sync="getDashboardLayout(dashboardData)" :col-num="12" :row-height="30"
         :is-draggable="!viewOnly" :is-resizable="!viewOnly" :vertical-compact="true" :autoSize="true"
         :restore-on-drag="true" :use-css-transforms="false">
         <grid-item class="gridBackground" v-for="item in dashboardData.panels" :key="item.id"
@@ -38,14 +43,15 @@
       </grid-layout>
     </div>
     <div v-if="!dashboardData.panels?.length">
-     <!-- if data not available show nodata component -->
+      <!-- if data not available show nodata component -->
       <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
     </div>
+  </div>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent} from "vue";
+import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -60,31 +66,37 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 
 export default defineComponent({
   name: "RenderDashboardCharts",
-  emits:["onDeletePanel","variablesData"],
-  props:["viewOnly","dashboardData","currentTimeObj", "initialVariableValues"],
+  emits: ["onDeletePanel", "variablesData"],
+  props: [
+    "viewOnly",
+    "dashboardData",
+    "currentTimeObj",
+    "initialVariableValues",
+  ],
   components: {
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,
     PanelContainer,
     NoPanel,
-    VariablesValueSelector
-},
+    VariablesValueSelector,
+  },
   setup(props: any, { emit }) {
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
     const $q = useQuasar();
+    const gridLayoutRef = ref(null);
 
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData,data)
+      Object.assign(variablesData, data);
       emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
-    }
+    };
 
     // save the dashboard value
-    const saveDashboard = async () => {        
+    const saveDashboard = async () => {
       await updateDashboard(
         store,
         store.state.selectedOrganization.identifier,
@@ -98,45 +110,47 @@ export default defineComponent({
         message: "Dashboard updated successfully.",
         timeout: 5000,
       });
-
     };
 
     //add panel
     const addPanelData = () => {
       return router.push({
         path: "/dashboards/add_panel",
-        query: { dashboard: route.query.dashboard, folder: route.query.folder ?? "default" },
+        query: {
+          dashboard: route.query.dashboard,
+          folder: route.query.folder ?? "default",
+        },
       });
     };
 
     const movedEvent = (i, newX, newY) => {
-      saveDashboard()
-    }
+      saveDashboard();
+    };
 
     const resizedEvent = (i, newX, newY, newHPx, newWPx) => {
       window.dispatchEvent(new Event("resize"));
-      saveDashboard()
-    }
+      saveDashboard();
+    };
 
-    const getDashboardLayout = (dashboardData)=>{
+    const getDashboardLayout = (dashboardData) => {
       //map on each panels and return array of layouts
-      return dashboardData.panels?.map((item) => item.layout)||[];
-    }
+      return dashboardData.panels?.map((item) => item.layout) || [];
+    };
 
-    const getPanelLayout = (panelData, position) => {      
-          if (position == "x") {
-            return panelData.layout?.x;
-          } else if (position == "y") {
-            return panelData?.layout?.y;
-          } else if (position == "w") {
-            return panelData?.layout?.w;
-          } else if (position == "h") {
-            return panelData?.layout?.h;
-          } else if (position == "i") {
-            return panelData?.layout?.i;
-          }
+    const getPanelLayout = (panelData, position) => {
+      if (position == "x") {
+        return panelData.layout?.x;
+      } else if (position == "y") {
+        return panelData?.layout?.y;
+      } else if (position == "w") {
+        return panelData?.layout?.w;
+      } else if (position == "h") {
+        return panelData?.layout?.h;
+      } else if (position == "i") {
+        return panelData?.layout?.i;
+      }
       return 0;
-    }
+    };
 
     const getMinimumHeight = (type) => {
       switch (type) {
@@ -148,12 +162,11 @@ export default defineComponent({
         case "scatter":
         case "table":
           return 4;
-          break;
 
         default:
           break;
       }
-    }
+    };
 
     const getMinimumWidth = (type) => {
       switch (type) {
@@ -165,12 +178,17 @@ export default defineComponent({
         case "scatter":
         case "table":
           return 3;
-          break;
 
         default:
           break;
       }
-    }
+    };
+
+    const layoutUpdate = () => {
+      if (gridLayoutRef.value) {
+        gridLayoutRef.value.layoutUpdate();
+      }
+    };
 
     return {
       addPanelData,
@@ -182,14 +200,16 @@ export default defineComponent({
       getMinimumWidth,
       variablesData,
       variablesDataUpdated,
-      getDashboardLayout
+      getDashboardLayout,
+      gridLayoutRef,
+      layoutUpdate,
     };
   },
-  methods:{
-    OnDeletePanel(panelId){
-      this.$emit('onDeletePanel',panelId)
-    }
-  }
+  methods: {
+    OnDeletePanel(panelId) {
+      this.$emit("onDeletePanel", panelId);
+    },
+  },
 });
 </script>
 
@@ -202,12 +222,12 @@ export default defineComponent({
 }
 
 .vue-grid-layout {
-    transition: none;
-  }
+  transition: none;
+}
 
-  .vue-grid-item {
-    transition: none;
-  }
+.vue-grid-item {
+  transition: none;
+}
 
 // .vue-grid-item:not(.vue-grid-placeholder) {
 //   background: #ccc;
@@ -258,7 +278,8 @@ export default defineComponent({
   height: 20px;
   top: 0;
   left: 0;
-  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle cx='5' cy='5' r='5' fill='#999999'/></svg>") no-repeat;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle cx='5' cy='5' r='5' fill='#999999'/></svg>")
+    no-repeat;
   background-position: bottom right;
   padding: 0 8px 8px 0;
   background-repeat: no-repeat;
