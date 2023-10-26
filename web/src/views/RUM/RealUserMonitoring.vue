@@ -126,12 +126,15 @@ onMounted(async () => {
     "ErrorTracking",
     "RumPerformance",
     "ErrorViewer",
+    "Sessions",
   ];
+
   const routeNameMapping: { [key: string]: string } = {
     SessionViewer: "sessions",
     ErrorTracking: "error_tracking",
     RumPerformance: "performance",
     ErrorViewer: "error_tracking",
+    Sessions: "sessions",
   };
 
   if (routes.includes(router.currentRoute.value.name?.toString() || "")) {
@@ -140,9 +143,13 @@ onMounted(async () => {
         router.currentRoute.value.name?.toString() || "placeholder"
       ];
   } else {
-    router.push({
-      name: "Sessions",
-    });
+    activeTab.value = "performance";
+    // Settimeout is temp fix, need to find a better way to do this
+    setTimeout(() => {
+      router.push({
+        name: "RumPerformance",
+      });
+    }, 500);
   }
 });
 
