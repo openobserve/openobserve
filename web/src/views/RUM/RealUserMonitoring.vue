@@ -90,7 +90,15 @@ import { useStore } from "vuex";
 const router = useRouter();
 const store = useStore();
 const showTabs = computed(() => {
-  const routes = ["Sessions", "ErrorTracking", "RumPerformance"];
+  const routes = [
+    "Sessions",
+    "ErrorTracking",
+    "RumPerformance",
+    "rumPerformanceSummary",
+    "rumPerformanceWebVitals",
+    "rumPerformanceErrors",
+    "rumPerformanceApis",
+  ];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
 
@@ -147,7 +155,7 @@ onMounted(async () => {
     // Settimeout is temp fix, need to find a better way to do this
     setTimeout(() => {
       router.push({
-        name: "RumPerformance",
+        name: "rumPerformanceSummary",
       });
     }, 500);
   }
@@ -179,7 +187,7 @@ const checkIfRumEnabled = async () => {
 const changeTab = (tab: string) => {
   if (tab === "performance") {
     router.push({
-      name: "RumPerformance",
+      name: "rumPerformanceSummary",
     });
     return;
   }
