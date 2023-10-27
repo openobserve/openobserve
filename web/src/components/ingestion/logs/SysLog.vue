@@ -587,7 +587,6 @@ export default defineComponent({
   border-radius: 0.5rem;
   .title {
     text-transform: uppercase;
-    font-size: 0.75rem;
     line-height: 1rem;
     font-weight: 600;
   }
