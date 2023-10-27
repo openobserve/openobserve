@@ -77,33 +77,49 @@ export default defineComponent({
 import { openobserveRum } from '@openobserve/browser-rum';
 import { openobserveLogs } from '@openobserve/browser-logs';
 
-openobserveRum.init({
-  applicationId: 'web-application-id', // required, any string identifying your application
+const options = {
   clientToken: '<OPENOBSERVE_CLIENT_TOKEN>',
+  applicationId: 'web-application-id',
   site: '<OPENOBSERVE_SITE>',
+  service: 'my-web-application',
+  env: 'production',
+  version: '0.0.1',
   organizationIdentifier: '<OPENOBSERVE_ORGANIZATION_IDENTIFIER>',
-  //  service: 'my-web-application',
-  //  env: 'production',
-  //  version: '1.0.0',
-  sessionSampleRate: 100,
-  sessionReplaySampleRate: 100, // if not included, the default is 100
+  insecureHTTP: <INSECUREHTTP>,
+  apiVersion: 'v1',
+};
+
+openobserveRum.init({
+  applicationId: options.applicationId, // required, any string identifying your application
+  clientToken: options.clientToken,
+  site: options.site,
+  organizationIdentifier: options.organizationIdentifier,
+  service: options.service,
+  env: options.env,
+  version: options.version,
   trackResources: true,
   trackLongTasks: true,
   trackUserInteractions: true,
-  apiVersion: 'v1',
-  insecureHTTP: <INSECUREHTTP>,
+  apiVersion: options.apiVersion,
+  insecureHTTP: options.insecureHTTP,
 });
 
 openobserveLogs.init({
-  clientToken: '<OPENOBSERVE_CLIENT_TOKEN>',
-  site: '<OPENOBSERVE_SITE>',
+  clientToken: options.clientToken,
+  site: options.site,
   forwardErrorsToLogs: true,
-  sessionSampleRate: 100,
-  insecureHTTP: <INSECUREHTTP>,
-  apiVersion: 'v1',
+  insecureHTTP: options.insecureHTTP,
+  apiVersion: options.apiVersion,
 });
 
-openobserveRum.startSessionReplayRecording();`;
+// You can set a user context
+// openobserveRum.setUser({
+//   id: "<ID>",
+//   name: "<NAME>",
+//   email: "<EMAIL>",
+// });
+
+openobserveRum.startSessionReplayRecording();`
     const initConfiguration = ref(defaultConfig);
 
     onMounted(() => {
@@ -184,7 +200,6 @@ openobserveRum.startSessionReplayRecording();`;
     align-items: center;
     display: flex;
     .title {
-      font-size: 0.75rem;
       line-height: 1rem;
       font-weight: 600;
     }
@@ -197,7 +212,6 @@ openobserveRum.startSessionReplayRecording();`;
   pre {
     white-space: pre-wrap;
     word-wrap: break-word;
-    font-size: 0.75rem;
     margin: 0;
   }
 }

@@ -112,7 +112,6 @@ export default defineComponent({
     align-items: center;
     display: flex;
     .title {
-      font-size: 0.75rem;
       line-height: 1rem;
       font-weight: 600;
     }
@@ -125,7 +124,6 @@ export default defineComponent({
   pre {
     white-space: pre-wrap;
     word-wrap: break-word;
-    font-size: 0.75rem;
     margin-bottom: 0;
   }
 }
