@@ -107,7 +107,7 @@ export default defineComponent({
     );
     const metricRoutes = ["prometheus", "otelCollector", "telegraf"];
     const traceRoutes = ["tracesOTLP"];
-    const rumRoutes = ["rumWeb"];
+    const rumRoutes = ["frontendMonitoring"];
 
     onBeforeMount(() => {
       const ingestRoutes = [

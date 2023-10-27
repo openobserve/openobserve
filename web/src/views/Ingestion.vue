@@ -109,7 +109,6 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
-
 export default defineComponent({
   name: "PageIngestion",
   components: { ConfirmDialog },
@@ -118,7 +117,9 @@ export default defineComponent({
       apiKeysService
         .createRUMToken(this.store.state.selectedOrganization.identifier)
         .then((res) => {
-          this.store.dispatch("setRUMToken", res.data.data.keys);
+          this.store.dispatch("setRUMToken", {
+            rum_token: res.data.data.new_key,
+          });
           this.getRUMToken();
           this.q.notify({
             type: "positive",
