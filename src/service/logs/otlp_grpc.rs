@@ -24,30 +24,27 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use super::StreamMeta;
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
+    meta::{
+        alert::{Alert, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+};
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
-    ingestion::{grpc::get_val, write_file},
+    ingestion::{grpc::get_val, grpc::get_val_with_type_retained, write_file},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alert::{Alert, Trigger},
-            http::HttpResponse as MetaHttpResponse,
-            ingestion::{IngestionResponse, StreamStatus},
-            stream::StreamParams,
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    },
-    service::ingestion::grpc::get_val_with_type_retained,
 };
 
 pub async fn usage_ingest(
