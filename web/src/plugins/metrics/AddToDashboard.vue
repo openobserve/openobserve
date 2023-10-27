@@ -113,6 +113,7 @@ import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import type store from "@/test/unit/helpers/store";
 import { useRoute } from "vue-router";
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 export default defineComponent({
   name: "AddToDashboard",
@@ -192,13 +193,16 @@ export default defineComponent({
           owner: store.state.userInfo.name,
           created: new Date().toISOString(),
           panels: [],
+          version:2
         };
 
         dashboardService
           .create(store.state.selectedOrganization.identifier, baseObj)
           .then((newDashboard) => {
-            getAllDashboards(store, route.query.folder).then(() => {
-              emit("save", newDashboard.data.dashboardId);
+            // migrate the schema
+            const data = convertDashboardSchemaVersion(newDashboard.data["v" + newDashboard.data.version]);
+            getAllDashboards(store, route.query.folder ?? "default").then(() => {
+              emit("save", data.dashboardId);
             });
           })
           .catch(() =>

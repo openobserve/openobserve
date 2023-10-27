@@ -699,7 +699,8 @@ export default defineComponent({
         position: "bottom",
       });
       dashboardPanelData.data.id = getPanelId();
-      addPanel(store, dashboardId, dashboardPanelData.data)
+      // folder name will be default      
+      addPanel(store, dashboardId, dashboardPanelData.data, "default")
         .then(() => {
           showAddToDashboardDialog.value = false;
           $q.notify({
@@ -710,7 +711,7 @@ export default defineComponent({
           });
           router.push({
             name: "viewDashboard",
-            query: { dashboard: dashboardId },
+            query: { dashboard: dashboardId, folder: "default" },
           });
         })
         .catch((err) => {
