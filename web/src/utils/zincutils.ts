@@ -270,8 +270,8 @@ export const getPath = () => {
     window.location.origin == "http://localhost:8081"
       ? "/"
       : pos > -1
-        ? window.location.pathname.slice(0, pos + 5)
-        : "";
+      ? window.location.pathname.slice(0, pos + 5)
+      : "";
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };
@@ -447,4 +447,22 @@ export const histogramDateTimezone: any = (
       ) * 1000
     );
   }
+};
+
+// // Example usage:
+// const inputDatetime = "2023/10/26 17:34:00";
+// const inputTimezone = "Pacific/Pitcairn";
+export const convertToUtcTimestamp = (
+  inputDatetime: string,
+  inputTimezone: string
+) => {
+  // Create a DateTime object with the input datetime and timezone
+  const dt = DateTime.fromFormat(inputDatetime, "yyyy/MM/dd HH:mm:ss", {
+    zone: inputTimezone,
+  });
+
+  // Get the UTC timestamp in seconds (rounded to the nearest second)
+  const utcTimestamp = Math.round(dt.toUTC().toMillis());
+
+  return utcTimestamp * 1000;
 };
