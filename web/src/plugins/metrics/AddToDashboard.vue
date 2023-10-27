@@ -190,6 +190,7 @@ export default defineComponent({
 
     const updateActiveFolderId = (selectedFolder: any) =>{
       activeFolderId.value = selectedFolder.value;
+      selectedDashboard.value = null;
       // only update if old dashboard is used
       (!shouldCreateNewDashboard.value) && updateDashboardOptions();
     }
