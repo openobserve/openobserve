@@ -225,10 +225,12 @@ fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         DataType::Int32 => vec![
             DataType::Utf8,
             DataType::Int64,
+            DataType::UInt32,
+            DataType::UInt64,
             DataType::Float32,
             DataType::Float64,
         ],
-        DataType::Int64 => vec![DataType::Utf8, DataType::Float64],
+        DataType::Int64 => vec![DataType::Utf8, DataType::UInt64, DataType::Float64],
         DataType::UInt8 => vec![
             DataType::Utf8,
             DataType::UInt16,
