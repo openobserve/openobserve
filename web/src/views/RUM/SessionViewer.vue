@@ -104,9 +104,9 @@ const getSessionDetails = computed(() => {
     browser: sessionState.data.selectedSession?.browser,
     os: sessionState.data.selectedSession?.os,
     ip: sessionState.data.selectedSession?.ip,
-    user_email: sessionState.data.selectedSession?.user_email,
-    city: sessionState.data.selectedSession?.city,
-    country: sessionState.data.selectedSession?.country,
+    user_email: sessionState.data.selectedSession?.user_email || "Unknown User",
+    city: sessionState.data.selectedSession?.city || "Unknown",
+    country: sessionState.data.selectedSession?.country || "Unknown",
     id: sessionState.data.selectedSession?.session_id,
   };
 });
