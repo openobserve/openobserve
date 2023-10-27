@@ -72,18 +72,16 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import DateTimePicker from "@/components/DateTimePicker.vue";
 import { useRouter } from "vue-router";
 import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
-import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
 import AppTabs from "@/components/common/AppTabs.vue";
-import WebVitalsDashboard from "@/components/rum/performance/WebVitalsDashboard.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import usePerformance from "@/composables/rum/usePerformance";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -94,7 +92,7 @@ export default defineComponent({
   },
   setup() {
     const activePerformanceTab = ref("overview");
-
+    const { performanceState } = usePerformance();
     const tabs = [
       {
         label: "Overview",
@@ -134,7 +132,15 @@ export default defineComponent({
       },
     ];
 
+    const routeName = computed(() => router.currentRoute.value.name);
+
     onMounted(async () => {
+      console.log(
+        "onMounted ----------",
+        routeName.value,
+        activePerformanceTab.value
+      );
+
       await loadDashboard();
 
       const routeNameMapping = {
@@ -189,7 +195,7 @@ export default defineComponent({
       data: {},
     });
 
-    const updateRoute = () => {
+    const updateRoute = async () => {
       const routeNames = {
         overview: "rumPerformanceSummary",
         web_vitals: "rumPerformanceWebVitals",
@@ -199,17 +205,17 @@ export default defineComponent({
 
       if (!routeNames[activePerformanceTab.value]) return;
 
-      router.push({
-        name: routeNames[activePerformanceTab.value],
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-        },
-      });
+      setTimeout(() => {
+        router.push({
+          name: routeNames[activePerformanceTab.value],
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            refresh: generateDurationLabel(refreshInterval.value),
+            ...getQueryParamsForDuration(selectedDate.value),
+          },
+        });
+      }, 500);
     };
-
-    const routeName = computed(() => router.currentRoute.value.name);
 
     watch(
       () => routeName.value,
@@ -223,6 +229,7 @@ export default defineComponent({
         rumPerformanceErrors: "errors",
         rumPerformanceApis: "api",
       };
+
       const tab =
         routeNameMapping[
           router.currentRoute.value.name?.toString() || "placeholder"
@@ -298,7 +305,8 @@ export default defineComponent({
     const refreshInterval = ref(0);
 
     // when the date changes from the picker, update the current time object for the dashboard
-    watch(selectedDate, () => {
+    watch(selectedDate, (value) => {
+      performanceState.data.datetime = value;
       currentTimeObj.value = {
         start_time: new Date(selectedDate.value.startTime),
         end_time: new Date(selectedDate.value.endTime),
