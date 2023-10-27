@@ -345,6 +345,13 @@ pub async fn ingest(
         super::evaluate_trigger(Some(entry.clone()), &stream_alerts_map).await;
     }
 
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
+
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/org/ingest/logs/_bulk",

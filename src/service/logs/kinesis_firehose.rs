@@ -255,6 +255,13 @@ pub async fn process(
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, &stream_alerts_map).await;
 
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
+
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage
     report_request_usage_stats(

@@ -190,6 +190,13 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, &stream_alerts_map).await;
 
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
+
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
