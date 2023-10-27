@@ -61,15 +61,36 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const COLUMN_TRACE_ID: &str = "trace_id";
 
-const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
+const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "events", "json"];
-
-pub static SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA: Lazy<Vec<String>> = Lazy::new(|| {
+pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     chain(
-        SQL_FULL_TEXT_SEARCH_FIELDS.iter().map(|s| s.to_string()),
+        _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
+            .iter()
+            .map(|s| s.to_string()),
         CONFIG
             .common
             .feature_fulltext_extra_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect()
+});
+
+const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
+pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    chain(
+        _DEFAULT_DISTINCT_FIELDS.iter().map(|s| s.to_string()),
+        CONFIG
+            .common
+            .feature_distinct_extra_fields
             .split(',')
             .filter_map(|s| {
                 let s = s.trim();
@@ -257,6 +278,8 @@ pub struct Common {
     pub feature_fulltext_on_all_fields: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
+    #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
+    pub feature_distinct_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_FILELIST_DEDUP_ENABLED", default = false)]
     pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]

@@ -25,7 +25,7 @@ use std::{
 
 use crate::common::{
     infra::{
-        config::{CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA},
+        config::{CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS},
         errors::{Error, ErrorCodes},
     },
     meta::{common::FileKey, sql::Sql as MetaSql, stream::StreamParams, StreamType},
@@ -370,7 +370,7 @@ impl Sql {
         let match_all_fields = if !fts_fields.is_empty() {
             fts_fields.iter().map(|v| v.to_lowercase()).collect()
         } else {
-            SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA
+            SQL_FULL_TEXT_SEARCH_FIELDS
                 .iter()
                 .map(|v| v.to_string())
                 .collect::<String>()

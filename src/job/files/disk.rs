@@ -77,7 +77,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let columns = file_path.splitn(5, '/').collect::<Vec<&str>>();
 
         // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
-        // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingestter/7104328279989026816guOA4t.json
+        // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
         // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);

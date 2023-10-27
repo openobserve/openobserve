@@ -12,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::http::StatusCode;
-use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
 use chrono::Duration;
-use std::collections::HashMap;
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 
-use crate::common::infra::config::CONFIG;
-use crate::common::infra::{errors, metrics};
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::common::meta::usage::{RequestStats, UsageType};
-use crate::common::meta::{self, StreamType};
-use crate::common::utils::base64;
-use crate::common::utils::functions;
-use crate::common::utils::http::get_stream_type_from_request;
-use crate::common::utils::json;
-use crate::service::search as SearchService;
-use crate::service::usage::report_request_usage_stats;
+use crate::common::{
+    infra::{
+        config::{CONFIG, DISTINCT_FIELDS},
+        errors, metrics,
+    },
+    meta::{
+        self,
+        http::HttpResponse as MetaHttpResponse,
+        usage::{RequestStats, UsageType},
+        StreamType,
+    },
+    utils::{base64, functions, http::get_stream_type_from_request, json},
+};
+use crate::service::{search as SearchService, usage::report_request_usage_stats};
 
 /** SearchStreamData*/
 #[utoipa::path(
@@ -521,8 +522,6 @@ pub async fn values(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let start = std::time::Instant::now();
-    let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -530,6 +529,53 @@ pub async fn values(
         Err(e) => return Ok(meta::http::HttpResponse::bad_request(e)),
     };
 
+    let fields = match query.get("fields") {
+        Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
+        None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
+    };
+
+    let query_context = match query.get("sql") {
+        None => "".to_string(),
+        Some(v) => base64::decode(v).unwrap_or("".to_string()),
+    };
+
+    if fields.len() == 1
+        && DISTINCT_FIELDS.contains(&fields[0])
+        && !query_context.to_lowercase().contains(" where ")
+    {
+        if let Some(v) = query.get("filter") {
+            if !v.is_empty() {
+                let column = v.splitn(2, '=').collect::<Vec<_>>();
+                if DISTINCT_FIELDS.contains(&column[0].to_string()) {
+                    // has filter and the filter can be used to distinct_values
+                    return values_v2(
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                        &fields[0],
+                        Some((column[0], column[1])),
+                        &query,
+                    )
+                    .await;
+                }
+            }
+        } else {
+            // no filter
+            return values_v2(&org_id, stream_type, &stream_name, &fields[0], None, &query).await;
+        }
+    }
+    values_v1(&org_id, stream_type, &stream_name, &query).await
+}
+
+/// search in original data
+async fn values_v1(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    query: &web::Query<AHashMap<String, String>>,
+) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+    let mut uses_fn = false;
     let fields = match query.get("fields") {
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
@@ -558,7 +604,7 @@ pub async fn values(
         Some(v) => match base64::decode(v) {
             Err(_) => None,
             Ok(v) => {
-                uses_fn = functions::get_all_transform_keys(&org_id)
+                uses_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
                     .any(|fn_name| v.contains(&format!("{}(", fn_name)));
@@ -624,25 +670,25 @@ pub async fn values(
                 ),
             );
     }
-    let resp_search = match SearchService::search(&org_id, stream_type, &req).await {
+    let resp_search = match SearchService::search(org_id, stream_type, &req).await {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
-                    "/api/org/_values",
+                    "/api/org/_values/v1",
                     "500",
-                    &org_id,
-                    &stream_name,
+                    org_id,
+                    stream_name,
                     stream_type.to_string().as_str(),
                 ])
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
                 .with_label_values(&[
-                    "/api/org/_values",
+                    "/api/org/_values/v1",
                     "500",
-                    &org_id,
-                    &stream_name,
+                    org_id,
+                    stream_name,
                     stream_type.to_string().as_str(),
                 ])
                 .inc();
@@ -660,10 +706,10 @@ pub async fn values(
 
     let mut resp = meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();
-    for (key, values) in resp_search.aggs {
+    for (key, val) in resp_search.aggs {
         let mut field_value: json::Map<String, json::Value> = json::Map::new();
         field_value.insert("field".to_string(), json::Value::String(key));
-        field_value.insert("values".to_string(), json::Value::Array(values));
+        field_value.insert("values".to_string(), json::Value::Array(val));
         hit_values.push(json::Value::Object(field_value));
     }
     resp.total = fields.len();
@@ -675,19 +721,19 @@ pub async fn values(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/api/org/_values",
+            "/api/org/_values/v1",
             "200",
-            &org_id,
-            &stream_name,
+            org_id,
+            stream_name,
             stream_type.to_string().as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/api/org/_values",
+            "/api/org/_values/v1",
             "200",
-            &org_id,
-            &stream_name,
+            org_id,
+            stream_name,
             stream_type.to_string().as_str(),
         ])
         .inc();
@@ -702,8 +748,154 @@ pub async fn values(
     let num_fn = req.query.query_fn.is_some() as u16;
     report_request_usage_stats(
         req_stats,
-        &org_id,
-        &stream_name,
+        org_id,
+        stream_name,
+        StreamType::Logs,
+        UsageType::SearchTopNValues,
+        num_fn,
+    )
+    .await;
+
+    Ok(HttpResponse::Ok().json(resp))
+}
+
+/// search in distinct data
+async fn values_v2(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    field: &str,
+    filter: Option<(&str, &str)>,
+    query: &web::Query<AHashMap<String, String>>,
+) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+    let mut query_sql =  format!("SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'", stream_type,stream_name,field);
+    if let Some((key, val)) = filter {
+        query_sql = format!(
+            "{} AND filter_name ='{}' AND filter_value='{}'",
+            query_sql, key, val
+        );
+    }
+
+    let size = query
+        .get("size")
+        .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
+    let start_time = query
+        .get("start_time")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    if start_time == 0 {
+        return Ok(MetaHttpResponse::bad_request("start_time is empty"));
+    }
+    let mut end_time = query
+        .get("end_time")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    if end_time == 0 {
+        end_time = chrono::Utc::now().timestamp_micros();
+    }
+
+    let timeout = query
+        .get("timeout")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+
+    // search
+    let req = meta::search::Request {
+        query: meta::search::Query {
+            sql: format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {size}"),
+            from: 0,
+            size: 0,
+            start_time,
+            end_time,
+            sort_by: None,
+            sql_mode: "full".to_string(),
+            query_type: "".to_string(),
+            track_total_hits: false,
+            query_context: None,
+            uses_zo_fn: false,
+            query_fn: None,
+        },
+        aggs: HashMap::new(),
+        encoding: meta::search::RequestEncoding::Empty,
+        timeout,
+    };
+    let resp_search = match SearchService::search(org_id, StreamType::Metadata, &req).await {
+        Ok(res) => res,
+        Err(err) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/api/org/_values/v2",
+                    "500",
+                    org_id,
+                    stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/api/org/_values/v2",
+                    "500",
+                    org_id,
+                    stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
+            log::error!("search values error: {:?}", err);
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                    .json(meta::http::HttpResponse::error_code(code)),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
+        }
+    };
+
+    let mut resp = meta::search::Response::default();
+    let mut hit_values: Vec<json::Value> = Vec::new();
+    let mut field_value: json::Map<String, json::Value> = json::Map::new();
+    field_value.insert("field".to_string(), json::Value::String(field.to_string()));
+    field_value.insert("values".to_string(), json::Value::Array(resp_search.hits));
+    hit_values.push(json::Value::Object(field_value));
+
+    resp.total = 1;
+    resp.hits = hit_values;
+    resp.size = size;
+    resp.scan_size = resp_search.scan_size;
+    resp.took = start.elapsed().as_millis() as usize;
+
+    let time = start.elapsed().as_secs_f64();
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/api/org/_values/v2",
+            "200",
+            org_id,
+            stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/api/org/_values/v2",
+            "200",
+            org_id,
+            stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .inc();
+
+    let req_stats = RequestStats {
+        records: resp.hits.len() as i64,
+        response_time: time,
+        size: resp.scan_size as f64,
+        request_body: Some(req.query.sql),
+        ..Default::default()
+    };
+    let num_fn = req.query.query_fn.is_some() as u16;
+    report_request_usage_stats(
+        req_stats,
+        org_id,
+        stream_name,
         StreamType::Logs,
         UsageType::SearchTopNValues,
         num_fn,
