@@ -189,8 +189,9 @@ const useIngestionRoutes = () => {
 
   if (config.isCloud === "false" || !config.isCloud) {
     ingestionRoutes[0].children
-      .find((child: any) => child.name === "ingestLogs")
-      .children.push(...[sysLog, sysLogNg]);
+      .find((child: any) => child.name === "custom")
+      .children.find((child: any) => child.name === "ingestLogs")
+      ?.children.push(...[sysLog, sysLogNg]);
   }
   return ingestionRoutes;
 };

@@ -22,69 +22,69 @@
   >
     <template v-slot:before>
       <q-tabs
-            v-model="ingestTabType"
-            indicator-color="transparent"
-            inline-label
-            vertical
-          >
-            <q-route-tab
-              default
-              name="ingestFromKubernetes"
-              :to="{
-                name: 'ingestFromKubernetes',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              label="Kubernetes"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              default
-              name="ingestFromWindows"
-              :to="{
-                name: 'ingestFromWindows',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              label="Windows"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="ingestFromLinux"
-              :to="{
-                name: 'ingestFromLinux',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              label="Linux"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="ingestFromOtel"
-              :to="{
-                name: 'ingestFromOtel',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              label="OTEL"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="frontendMonitoring"
-              :to="{
-                name: 'frontendMonitoring',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              label="Frontend Monitoring"
-              content-class="tab_content"
-            />
-          </q-tabs>
+        v-model="ingestTabType"
+        indicator-color="transparent"
+        inline-label
+        vertical
+      >
+        <q-route-tab
+          default
+          name="ingestFromKubernetes"
+          :to="{
+            name: 'ingestFromKubernetes',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          label="Kubernetes"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          default
+          name="ingestFromWindows"
+          :to="{
+            name: 'ingestFromWindows',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          label="Windows"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="ingestFromLinux"
+          :to="{
+            name: 'ingestFromLinux',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          label="Linux"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="ingestFromOtel"
+          :to="{
+            name: 'ingestFromOtel',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          label="OTEL"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="frontendMonitoring"
+          :to="{
+            name: 'frontendMonitoring',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          label="Frontend Monitoring"
+          content-class="tab_content"
+        />
+      </q-tabs>
     </template>
 
     <template v-slot:after>
@@ -92,7 +92,6 @@
         :title="tabs"
         :currOrgIdentifier="currOrgIdentifier"
         :currUserEmail="currentUserEmail"
-        @copy-to-clipboard-fn="copyToClipboardFn"
       >
       </router-view>
     </template>
@@ -128,6 +127,8 @@ export default defineComponent({
       store.state.selectedOrganization.identifier
     );
 
+    const ingestTabType = ref("ingestFromKubernetes");
+
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "recommended") {
         router.push({
@@ -140,7 +141,6 @@ export default defineComponent({
       }
     });
 
-
     return {
       t,
       store,
@@ -152,6 +152,7 @@ export default defineComponent({
       getImageURL,
       verifyOrganizationStatus,
       tabs,
+      ingestTabType,
     };
   },
 });

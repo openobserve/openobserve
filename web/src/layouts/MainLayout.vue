@@ -425,7 +425,7 @@ export default defineComponent({
       {
         title: t("menu.ingestion"),
         icon: outlinedFilterAlt,
-        link: "/ingestion/",
+        link: "/ingestion/recommended/kubernetes",
       },
       {
         title: t("menu.user"),
