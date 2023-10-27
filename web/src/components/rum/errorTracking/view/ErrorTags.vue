@@ -145,19 +145,45 @@ const getTags = computed(() => {
     ip: props.error.ip,
     url: props.error.view_url,
     handled: props.error.error_handling === "handled",
-    location: props.error.geo_info_country + ", " + props.error.geo_info_city,
-    service: props.error.service,
-    source: props.error.source,
-    device:
-      props.error.user_agent_device_brand +
-      " " +
-      props.error.user_agent_device_family,
+    location: getLocation(),
+    service: props.error.service || "Unknown",
+    source: props.error.source || "Unknown",
+    device: getDevice(),
     browser: props.error.user_agent_user_agent_family,
     level: "error",
     sdk_version: props.error.sdk_version,
     user_email: props.error.usr_email,
   };
 });
+
+const getDevice = () => {
+  if (
+    !props.error.user_agent_device_brand &&
+    !props.error.user_agent_device_family
+  )
+    return "Unknown";
+
+  if (!props.error.user_agent_device_brand)
+    return props.error.user_agent_device_family;
+
+  if (!props.error.user_agent_device_family)
+    return props.error.user_agent_device_brand;
+
+  return (
+    props.error.user_agent_device_brand +
+    " " +
+    props.error.user_agent_device_family
+  );
+};
+
+const getLocation = () => {
+  if (!props.error.geo_info_country && !props.error.geo_info_city)
+    return "Unknown";
+  if (!props.error.geo_info_country) return props.error.geo_info_city;
+  if (!props.error.geo_info_city) return props.error.geo_info_country;
+
+  return props.error.geo_info_country + ", " + props.error.geo_info_city;
+};
 </script>
 
 <style lang="scss" scoped>
