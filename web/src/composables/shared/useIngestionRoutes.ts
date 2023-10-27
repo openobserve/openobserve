@@ -31,6 +31,8 @@ import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
 import IngestLogs from "@/components/ingestion/logs/Index.vue";
 import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
 import IngestTraces from "@/components/ingestion/traces/Index.vue";
+import Recommended from "@/components/ingestion/Recommended.vue";
+import Custom from "@/components/ingestion/Custom.vue";
 
 import RUMWeb from "@/components/ingestion/recommended/FrontendRumConfig.vue";
 import KubernetesConfig from "@/components/ingestion/recommended/KubernetesConfig.vue";
@@ -49,105 +51,125 @@ const useIngestionRoutes = () => {
       },
       children: [
         {
-          path: "logs",
-          name: "ingestLogs",
-          component: IngestLogs,
+          path: "custom",
+          name: "custom",
+          component: Custom,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuardPendingSubscriptions(to, from, next);
+          },
           children: [
             {
-              path: "curl",
-              name: "curl",
-              component: Curl,
+              path: "logs",
+              name: "ingestLogs",
+              component: IngestLogs,
+              children: [
+                {
+                  path: "curl",
+                  name: "curl",
+                  component: Curl,
+                },
+                {
+                  path: "fluentbit",
+                  name: "fluentbit",
+                  component: FluentBit,
+                },
+                {
+                  path: "fluentd",
+                  name: "fluentd",
+                  component: Fluentd,
+                },
+                {
+                  path: "vector",
+                  name: "vector",
+                  component: Vector,
+                },
+                {
+                  path: "kinesisfirehose",
+                  name: "kinesisfirehose",
+                  component: KinesisFirehose,
+                },
+                {
+                  path: "filebeat",
+                  name: "filebeat",
+                  component: FileBeat,
+                },
+                {
+                  path: "gcp",
+                  name: "gcpLogs",
+                  component: GcpPubSub,
+                },
+              ],
             },
             {
-              path: "fluentbit",
-              name: "fluentbit",
-              component: FluentBit,
+              path: "metrics",
+              name: "ingestMetrics",
+              component: IngestMetrics,
+              children: [
+                {
+                  path: "prometheus",
+                  name: "prometheus",
+                  component: PrometheusConfig,
+                },
+                {
+                  path: "otelcollector",
+                  name: "otelCollector",
+                  component: OtelCollector,
+                },
+                {
+                  path: "telegraf",
+                  name: "telegraf",
+                  component: TelegrafConfig,
+                },
+              ],
             },
             {
-              path: "fluentd",
-              name: "fluentd",
-              component: Fluentd,
-            },
-            {
-              path: "vector",
-              name: "vector",
-              component: Vector,
-            },
-            {
-              path: "kinesisfirehose",
-              name: "kinesisfirehose",
-              component: KinesisFirehose,
-            },
-            {
-              path: "filebeat",
-              name: "filebeat",
-              component: FileBeat,
-            },
-            {
-              path: "gcp",
-              name: "gcpLogs",
-              component: GcpPubSub,
+              path: "traces",
+              name: "ingestTraces",
+              component: IngestTraces,
+              children: [
+                {
+                  path: "opentelemetry",
+                  name: "tracesOTLP",
+                  component: OpenTelemetry,
+                },
+              ],
             },
           ],
         },
         {
-          path: "metrics",
-          name: "ingestMetrics",
-          component: IngestMetrics,
+          path: "recommended",
+          name: "recommended",
+          component: Recommended,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuardPendingSubscriptions(to, from, next);
+          },
           children: [
             {
-              path: "prometheus",
-              name: "prometheus",
-              component: PrometheusConfig,
+              path: "kubernetes",
+              name: "ingestFromKubernetes",
+              component: KubernetesConfig,
             },
             {
-              path: "otelcollector",
-              name: "otelCollector",
-              component: OtelCollector,
+              path: "windows",
+              name: "ingestFromWindows",
+              component: WindowsConfig,
             },
             {
-              path: "telegraf",
-              name: "telegraf",
-              component: TelegrafConfig,
+              path: "linux",
+              name: "ingestFromLinux",
+              component: LinuxConfig,
+            },
+            {
+              path: "otel",
+              name: "ingestFromOtel",
+              component: OtelConfig,
+            },
+            {
+              path: "frontend-monitoring",
+              name: "frontendMonitoring",
+              component: RUMWeb,
             },
           ],
-        },
-        {
-          path: "traces",
-          name: "ingestTraces",
-          component: IngestTraces,
-          children: [
-            {
-              path: "opentelemetry",
-              name: "tracesOTLP",
-              component: OpenTelemetry,
-            },
-          ],
-        },
-        {
-          path: "kubernetes",
-          name: "ingestFromKubernetes",
-          component: KubernetesConfig,
-        },
-        {
-          path: "windows",
-          name: "ingestFromWindows",
-          component: WindowsConfig,
-        },
-        {
-          path: "linux",
-          name: "ingestFromLinux",
-          component: LinuxConfig,
-        },
-        {
-          path: "otel",
-          name: "ingestFromOtel",
-          component: OtelConfig,
-        },
-        {
-          path: "frontend-monitoring",
-          name: "frontendMonitoring",
-          component: RUMWeb,
         },
       ],
     },
