@@ -194,6 +194,11 @@ export const useLocalTimezone = (val = "", isDelete = false) => {
   return timezone.value;
 };
 
+export const useLocalWrapContent = (val = "", isDelete = false) => {
+  const wrapcontent: any = useLocalStorage("wrapcontent", val, isDelete);
+  return wrapcontent.value;
+};
+
 export const deleteSessionStorageVal = (key: string) => {
   try {
     return sessionStorage.removeItem(key);
