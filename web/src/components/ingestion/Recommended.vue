@@ -129,28 +129,9 @@ export default defineComponent({
     );
 
     onBeforeMount(() => {
-      const ingestRoutes = [
-        "curl",
-        "fluentbit",
-        "fluentd",
-        "kinesisfirehose",
-        "vector",
-        "syslog",
-        "gcpLogs",
-        "syslogNg",
-      ];
-      if (ingestRoutes.includes(router.currentRoute.value.name)) {
+      if (router.currentRoute.value.name === "recommended") {
         router.push({
-          name: router.currentRoute.value.name,
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        return;
-      }
-      if (router.currentRoute.value.name === "ingestLogs") {
-        router.push({
-          name: "curl",
+          name: "ingestFromKubernetes",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },

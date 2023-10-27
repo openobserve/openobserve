@@ -155,7 +155,13 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, computed } from "vue";
+import {
+  defineComponent,
+  ref,
+  onBeforeMount,
+  computed,
+  onUpdated,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -183,18 +189,18 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
     );
+    const ingestRoutes = [
+      "curl",
+      "fluentbit",
+      "fluentd",
+      "kinesisfirehose",
+      "vector",
+      "syslog",
+      "gcpLogs",
+      "syslogNg",
+    ];
 
     onBeforeMount(() => {
-      const ingestRoutes = [
-        "curl",
-        "fluentbit",
-        "fluentd",
-        "kinesisfirehose",
-        "vector",
-        "syslog",
-        "gcpLogs",
-        "syslogNg",
-      ];
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
           name: router.currentRoute.value.name,
@@ -204,6 +210,17 @@ export default defineComponent({
         });
         return;
       }
+      if (router.currentRoute.value.name === "ingestLogs") {
+        router.push({
+          name: "curl",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+    });
+    onUpdated(() => {
       if (router.currentRoute.value.name === "ingestLogs") {
         router.push({
           name: "curl",

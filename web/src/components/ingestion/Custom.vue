@@ -99,64 +99,6 @@ export default defineComponent({
       default: "",
     },
   },
-  methods: {
-    generateRUMToken() {
-      apiKeysService
-        .createRUMToken(this.store.state.selectedOrganization.identifier)
-        .then((res) => {
-          this.store.dispatch("setRUMToken", res.data.data.keys);
-          this.getRUMToken();
-          this.q.notify({
-            type: "positive",
-            message: "RUM Token generated successfully.",
-            timeout: 5000,
-          });
-        })
-        .catch((e) => {
-          this.q.notify({
-            type: "negative",
-            message: "Error while generating RUM Token." + e.error,
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Generate RUM Token",
-        user_org: this.store.state.selectedOrganization.identifier,
-        user_id: this.store.state.userInfo.email,
-        page: "Ingestion",
-      });
-    },
-    updateRUMToken() {
-      apiKeysService
-        .updateRUMToken(
-          this.store.state.selectedOrganization.identifier,
-          this.store.state.organizationData.rumToken.id
-        )
-        .then((res) => {
-          this.getRUMToken();
-          this.q.notify({
-            type: "positive",
-            message: "RUM Token updated successfully.",
-            timeout: 5000,
-          });
-        })
-        .catch((e) => {
-          this.q.notify({
-            type: "negative",
-            message: "Error while refreshing RUM Token." + e.error,
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Update RUM Token",
-        user_org: this.store.state.selectedOrganization.identifier,
-        user_id: this.store.state.userInfo.email,
-        page: "Ingestion",
-      });
-    },
-  },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -187,6 +129,16 @@ export default defineComponent({
         "syslog",
         "gcpLogs",
       ];
+
+      if (ingestRoutes.includes(router.currentRoute.value.name)) {
+        router.push({
+          name: router.currentRoute.value.name,
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
 
       if (logRoutes.includes(router.currentRoute.value.name)) {
         tabs.value = "ingestLogs";
