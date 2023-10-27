@@ -452,7 +452,10 @@ export const histogramDateTimezone: any = (
 // // Example usage:
 // const inputDatetime = "2023/10/26 17:34:00";
 // const inputTimezone = "Pacific/Pitcairn";
-export const convertToUtcTimestamp = (inputDatetime, inputTimezone) => {
+export const convertToUtcTimestamp = (
+  inputDatetime: string,
+  inputTimezone: string
+) => {
   // Create a DateTime object with the input datetime and timezone
   const dt = DateTime.fromFormat(inputDatetime, "yyyy/MM/dd HH:mm:ss", {
     zone: inputTimezone,
