@@ -97,7 +97,7 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, onMounted } from "vue";
+import { defineComponent, ref, onBeforeMount, onMounted, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -107,9 +107,12 @@ import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+
 
 export default defineComponent({
   name: "PageIngestion",
+  components: { ConfirmDialog },
   methods: {
     generateRUMToken() {
       apiKeysService
@@ -204,6 +207,28 @@ export default defineComponent({
       ) {
         getOrganizationPasscode();
         getRUMToken();
+      }
+
+      if (router.currentRoute.value.name === "ingestion") {
+        router.push({
+          name: "recommended",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+    });
+
+    onUpdated(() => {
+      if (router.currentRoute.value.name === "ingestion") {
+        router.push({
+          name: "recommended",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
       }
     });
 

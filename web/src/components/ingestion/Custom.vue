@@ -87,12 +87,9 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import apiKeysService from "@/services/api_keys";
 
 export default defineComponent({
   name: "CustomPage",
-  components: { ConfirmDialog },
   props: {
     currOrgIdentifier: {
       type: String,
