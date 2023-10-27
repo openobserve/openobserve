@@ -259,21 +259,15 @@ async fn main() -> Result<(), anyhow::Error> {
         .event("OpenObserve - Server stopped", None, false)
         .await;
     // leave the cluster
-    let _ = cluster::leave().await;
+    _ = cluster::leave().await;
     // flush WAL cache to disk
     infra::wal::flush_all_to_disk().await;
     // flush compact offset cache to disk disk
-    if let Err(e) = db::compact::files::sync_cache_to_db().await {
-        log::error!("sync compact offset cache to db failed, error: {}", e);
-    }
+    _ = db::compact::files::sync_cache_to_db().await;
     // flush db
-    if let Err(e) = infra::db::DEFAULT.close().await {
-        log::error!("waiting for db close failed, error: {}", e);
-    }
+    _ = infra::db::DEFAULT.close().await;
     // flush distinct values
-    if let Err(e) = distinct_values::close().await {
-        log::error!("waiting for distinct_values close failed, error: {}", e);
-    }
+    _ = distinct_values::close().await;
 
     log::info!("server stopped");
 
