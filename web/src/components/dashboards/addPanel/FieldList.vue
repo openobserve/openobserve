@@ -263,8 +263,8 @@ export default defineComponent({
           ...dashboardPanelData.meta.stream.selectedStreamFields,
         ];
       }
-          );
-    // const metricTypes: any = ref([]);
+    );
+    
     // get the stream list by making an API call
     const getStreamList = async () => {
      await IndexService.nameList(

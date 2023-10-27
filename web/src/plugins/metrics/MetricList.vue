@@ -348,7 +348,6 @@ export default defineComponent({
           (v: any) => v.label.toLowerCase().indexOf(needle) > -1
         );
       });
-      console.log(" filterMetrics", streamOptions.value);
     };
     const updateMetricLabels = () => {
       selectedMetricLabels.value = searchObj.data.streamResults.list.find(
