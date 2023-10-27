@@ -19,7 +19,6 @@
   <q-page class="ingestionPage">
     <div class="q-px-md flex full-width float-right">
       <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
-
       <q-btn
         v-if="
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
@@ -57,7 +56,6 @@
         @click="showUpdateDialogFn"
       />
     </div>
-    <q-separator class="separator" />
 
     <q-tabs v-model="ingestTabType" horizontal align="left">
       <q-route-tab
