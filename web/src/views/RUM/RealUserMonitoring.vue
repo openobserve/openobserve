@@ -109,6 +109,7 @@ import useErrorTracking from "@/composables/useErrorTracking";
 import usePerformance from "@/composables/rum/usePerformance";
 
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { useI18n } from "vue-i18n";
 
 const route = useRoute();
 const router = useRouter();
@@ -126,6 +127,7 @@ const showTabs = computed(() => {
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
 
+const { t } = useI18n();
 const isLoading = ref<boolean[]>([]);
 const { sessionState } = useSession();
 const { errorTrackingState } = useErrorTracking();
@@ -134,15 +136,15 @@ const { performanceState } = usePerformance();
 const activeTab = ref<string>("performance");
 const tabs = [
   {
-    label: "Performance",
+    label: t("rum.performance"),
     value: "performance",
   },
   {
-    label: "Sessions",
+    label: t("rum.sessions"),
     value: "sessions",
   },
   {
-    label: "Error Tracking",
+    label: t("rum.errorTracking"),
     value: "error_tracking",
   },
 ];

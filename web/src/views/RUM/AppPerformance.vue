@@ -21,7 +21,7 @@
       <div class="performance_title">Performance Summary</div>
       <div class="flex items-center">
         <DateTimePickerDashboard
-          class="q-ml-sm"
+          class="q-ml-sm rum-date-time-picker"
           ref="dateTimePicker"
           v-model="selectedDate"
         />
@@ -91,11 +91,13 @@ export default defineComponent({
     DateTimePickerDashboard,
   },
   setup() {
+    const { t } = useI18n();
+
     const activePerformanceTab = ref("overview");
     const { performanceState } = usePerformance();
     const tabs = [
       {
-        label: "Overview",
+        label: t("rum.overview"),
         value: "overview",
         style: {
           width: "fit-content",
@@ -104,7 +106,7 @@ export default defineComponent({
         },
       },
       {
-        label: "Web Vitals",
+        label: t("rum.webVitals"),
         value: "web_vitals",
         style: {
           width: "fit-content",
@@ -113,7 +115,7 @@ export default defineComponent({
         },
       },
       {
-        label: "Errors",
+        label: t("rum.errors"),
         value: "errors",
         style: {
           width: "fit-content",
@@ -122,7 +124,7 @@ export default defineComponent({
         },
       },
       {
-        label: "API",
+        label: t("rum.api"),
         value: "api",
         style: {
           width: "fit-content",
@@ -187,7 +189,6 @@ export default defineComponent({
       }
     );
 
-    const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -409,6 +410,10 @@ export default defineComponent({
     border-bottom: 1px solid $border-color;
     justify-content: flex-end;
   }
+}
+
+.rum-date-time-picker {
+  height: 36px;
 }
 </style>
 

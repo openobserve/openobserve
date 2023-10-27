@@ -51,6 +51,16 @@
     "rum": "Real User Monitoring",
     "settings": "Settings"
   },
+  "rum": {
+    "title": "Real User Monitoring",
+    "performance": "Performance",
+    "sessions": "Sessions",
+    "errorTracking": "Error Tracking",
+    "overview": "Overview",
+    "webVitals": "Web Vitals",
+    "errors": "Errors",
+    "api": "API"
+  },
   "about": {
     "name": "OpenObserve",
     "introduction": "Observability simplified."
