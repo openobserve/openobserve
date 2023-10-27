@@ -16,7 +16,6 @@ use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
-use datafusion::arrow::json::reader::infer_json_schema;
 use std::{collections::BTreeMap, io::BufReader};
 use vector_enrichment::TableRegistry;
 use vrl::{
@@ -42,6 +41,7 @@ use crate::common::{
         functions::get_vrl_compiler_config,
         json::{Map, Value},
         notification::send_notification,
+        schema::infer_json_schema,
     },
 };
 use crate::service::{db, format_partition_key, stream::stream_settings, triggers};
@@ -283,7 +283,7 @@ pub async fn chk_schema_by_record(
     }
 
     let mut schema_reader = BufReader::new(record_val.as_bytes());
-    let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
+    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
     let inferred_schema = inferred_schema.with_metadata(schema.metadata().clone());
     stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
     db::schema::set(

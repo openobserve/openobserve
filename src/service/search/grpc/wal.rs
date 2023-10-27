@@ -14,7 +14,7 @@
 
 use ahash::AHashMap as HashMap;
 use datafusion::{
-    arrow::{datatypes::Schema, json::reader::infer_json_schema, record_batch::RecordBatch},
+    arrow::{datatypes::Schema, record_batch::RecordBatch},
     common::FileType,
 };
 use futures::future::try_join_all;
@@ -30,7 +30,10 @@ use crate::common::{
         wal,
     },
     meta::{self, common::FileKey, stream::ScanStats},
-    utils::file::{get_file_contents, get_file_meta, scan_files},
+    utils::{
+        file::{get_file_contents, get_file_meta, scan_files},
+        schema::infer_json_schema,
+    },
 };
 use crate::service::{
     db,
@@ -144,7 +147,7 @@ pub async fn search(
         // get schema of the file
         let file_data = tmpfs::get(&files.first().unwrap().key).unwrap();
         let mut schema_reader = BufReader::new(file_data.as_ref());
-        let mut inferred_schema = match infer_json_schema(&mut schema_reader, None) {
+        let mut inferred_schema = match infer_json_schema(&mut schema_reader, None, stream_type) {
             Ok(schema) => schema,
             Err(err) => {
                 return Err(Error::from(err));
