@@ -187,7 +187,10 @@ export default defineComponent({
                 } 
                 query += ` FROM "${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream}" `;
                 if (weight && weight.aggregationFunction) {
-                    query += `GROUP BY ${latitude.alias}, ${longitude.alias}`; 
+                    if(latitude || longitude) {
+                        const aliases = [latitude?.alias, longitude?.alias].filter(Boolean).join(', ')
+                        query += `GROUP BY ${aliases}`; 
+                    }
                 }
 
             }
