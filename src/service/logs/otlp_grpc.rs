@@ -42,7 +42,7 @@ use crate::common::{
 };
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
-    ingestion::{grpc::get_val, write_file},
+    ingestion::{grpc::get_val, grpc::get_val_with_type_retained, write_file},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
 };
@@ -295,17 +295,23 @@ pub async fn handle_grpc_request(
                 match &resource_log.resource {
                     Some(res) => {
                         for item in &res.attributes {
-                            rec[item.key.as_str()] = get_val(&item.value);
+                            rec[item.key.as_str()] = get_val_with_type_retained(&item.value);
                         }
                     }
                     None => {}
                 }
                 match &instrumentation_logs.scope {
                     Some(lib) => {
-                        rec["instrumentation_library_name"] =
-                            serde_json::Value::String(lib.name.to_owned());
-                        rec["instrumentation_library_version"] =
-                            serde_json::Value::String(lib.version.to_owned());
+                        let library_name = lib.name.to_owned();
+                        if !library_name.is_empty() {
+                            rec["instrumentation_library_name"] =
+                                serde_json::Value::String(library_name);
+                        }
+                        let lib_version = lib.version.to_owned();
+                        if !lib_version.is_empty() {
+                            rec["instrumentation_library_version"] =
+                                serde_json::Value::String(lib_version);
+                        }
                     }
                     None => {}
                 }
@@ -331,7 +337,7 @@ pub async fn handle_grpc_request(
                 //rec["name"] = log_record.name.to_owned().into();
                 rec["body"] = get_val(&log_record.body);
                 for item in &log_record.attributes {
-                    rec[item.key.as_str()] = get_val(&item.value);
+                    rec[item.key.as_str()] = get_val_with_type_retained(&item.value);
                 }
                 rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
                 match TraceId::from_bytes(
