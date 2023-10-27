@@ -1140,12 +1140,12 @@ const useLogs = () => {
     }
   };
 
-  const ftsFields = ref([]);
+  const ftsFields: any = ref([]);
   const extractFTSFields = () => {
     if (searchObj.data.stream.selectedStreamFields.length > 0) {
       ftsFields.value = searchObj.data.stream.selectedStreamFields
-        .filter((item) => item.ftsKey === true)
-        .map((item) => item.name);
+        .filter((item: any) => item.ftsKey === true)
+        .map((item: any) => item.name);
     }
 
     // if there is no FTS fields set by user then use default FTS fields
