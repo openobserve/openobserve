@@ -81,6 +81,7 @@
               name="replay_10"
               size="24px"
               class="q-mr-sm cursor-pointer"
+              @click="skipTo('backward')"
             />
             <q-icon
               :name="
@@ -96,6 +97,7 @@
               name="forward_10"
               size="24px"
               class="q-ml-sm cursor-pointer"
+              @click="skipTo('forward')"
             />
           </div>
           <div class="flex q-ml-lg items-center">
@@ -210,6 +212,7 @@ const playerState = ref({
   totalTime: 0,
   width: 0,
   height: 0,
+  actualTime: 0,
 });
 
 watch(
@@ -350,7 +353,7 @@ function formatTimeDifference(milliSeconds: number) {
 const updateProgressBar = (time: { payload: number }) => {
   playerState.value.progressWidth =
     (time.payload / playerState.value.totalTime) * playerState.value.width;
-
+  playerState.value.actualTime = time.payload;
   playerState.value.time = formatTimeDifference(time.payload);
 };
 
@@ -389,6 +392,13 @@ const toggleSkipInactive = () => {
 const goto = (timeOffset: number, play: boolean = false) => {
   playerState.value.isPlaying = play;
   player.value?.goto(timeOffset, play);
+};
+
+const skipTo = (skipTo: string) => {
+  const seconds = 10;
+  if (skipTo === "forward")
+    goto(playerState.value.actualTime + seconds * 1000, false);
+  else goto(playerState.value.actualTime - seconds * 1000, false);
 };
 
 defineExpose({
