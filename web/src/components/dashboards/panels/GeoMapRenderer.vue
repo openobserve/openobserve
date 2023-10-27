@@ -85,8 +85,9 @@ export default defineComponent({
                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }
             ).addTo(lmap);
-            lmap.setView([props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]], props.data.options?.lmap?.zoom);
-
+            if (props.data.options?.lmap?.center) {
+                lmap.setView([props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]], props.data.options?.lmap?.zoom);
+            }
             // L.geoJson(mapData).addTo(lmap);
         });
         onUnmounted(() => {
@@ -127,7 +128,9 @@ export default defineComponent({
                         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
                 }
             ).addTo(lmap);
-            lmap.setView([props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]], props.data.options?.lmap?.zoom);
+            if(props.data.options?.lmap?.center){
+                lmap.setView([props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]], props.data.options?.lmap?.zoom);
+            }
         }, { deep: true });
         return { chartRef };
     },
