@@ -107,6 +107,7 @@ openobserveRum.init({
 openobserveLogs.init({
   clientToken: options.clientToken,
   site: options.site,
+  organizationIdentifier: options.organizationIdentifier,
   forwardErrorsToLogs: true,
   insecureHTTP: options.insecureHTTP,
   apiVersion: options.apiVersion,
@@ -119,7 +120,7 @@ openobserveLogs.init({
 //   email: "<EMAIL>",
 // });
 
-openobserveRum.startSessionReplayRecording();`
+openobserveRum.startSessionReplayRecording();`;
     const initConfiguration = ref(defaultConfig);
 
     onMounted(() => {
