@@ -55,6 +55,20 @@
         :label="t(`ingestion.resetTokenBtnLabel`)"
         @click="showUpdateDialogFn"
       />
+      <ConfirmDialog
+        title="Reset Token"
+        message="Are you sure you want to update token for this organization?"
+        @update:ok="updatePasscode"
+        @update:cancel="confirmUpdate = false"
+        v-model="confirmUpdate"
+      />
+      <ConfirmDialog
+        title="Reset RUM Token"
+        message="Are you sure you want to update rum token for this organization?"
+        @update:ok="updateRUMToken"
+        @update:cancel="confirmRUMUpdate = false"
+        v-model="confirmRUMUpdate"
+      />
     </div>
 
     <q-tabs v-model="ingestTabType" horizontal align="left">
