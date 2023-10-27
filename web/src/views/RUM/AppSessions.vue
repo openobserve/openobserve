@@ -142,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineProps, onMounted } from "vue";
+import { ref, defineProps, onMounted, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import {
@@ -193,6 +193,8 @@ const dateTime = ref({
 const rumSessionStreamName = "_sessionreplay";
 
 const isMounted = ref(false);
+
+const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
 
 const columns = ref([
   {
@@ -258,9 +260,11 @@ const columns = ref([
 onMounted(async () => {
   // TODO OK : Store stream fields in composable
 
-  isMounted.value = true;
   if (router.currentRoute.value.name === "Sessions") {
+    isMounted.value = true;
     await getStreamFields();
+    await getRumDataFields();
+    getSessions();
     restoreUrlQueryParams();
   }
 });
@@ -275,10 +279,46 @@ const getStreamFields = () => {
         "logs"
       )
       .then((res) => {
-        streamFields.value = res.data.schema.map((field: any) => ({
-          ...field,
-          showValues: true,
-        }));
+        const fieldsToVerify = new Set([
+          "geo_info_city",
+          "geo_info_country",
+          "usr_email",
+          "usr_id",
+          "usr_name",
+        ]);
+        streamFields.value = res.data.schema.map((field: any) => {
+          if (fieldsToVerify.has(field.name))
+            schemaMapping.value[field.name] = field;
+          return {
+            ...field,
+            showValues: true,
+          };
+        });
+      })
+      .finally(() => {
+        resolve(true);
+        isLoading.value.pop();
+      });
+  });
+};
+
+const getRumDataFields = () => {
+  isLoading.value.push(true);
+  return new Promise((resolve) => {
+    streamService
+      .schema(store.state.selectedOrganization.identifier, "_rumdata", "logs")
+      .then((res) => {
+        const fieldsToVerify = new Set([
+          "geo_info_city",
+          "geo_info_country",
+          "usr_email",
+          "usr_id",
+          "usr_name",
+        ]);
+        res.data.schema.forEach((field: any) => {
+          if (fieldsToVerify.has(field.name))
+            schemaMapping.value[field.name] = field;
+        });
       })
       .finally(() => {
         resolve(true);
@@ -347,7 +387,23 @@ const getSessions = () => {
 };
 
 const getSessionLogs = (req: any) => {
-  req.query.sql = `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(type) as type, SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events, min(usr_email) as user_email, min(usr_id) as user_id, min(geo_info_city) as city, min(geo_info_country) as country, session_id from "_rumdata" group by session_id order by zo_sql_timestamp DESC`;
+  let geoFields = "";
+  let userFields = "";
+  if (schemaMapping.value["geo_info_country"]) {
+    geoFields += "min(geo_info_city) as city,";
+  }
+  if (schemaMapping.value["geo_info_city"]) {
+    geoFields += "min(geo_info_country) as country,";
+  }
+
+  if (schemaMapping.value["usr_email"]) {
+    geoFields += "min(usr_email) as user_email,";
+  }
+  if (schemaMapping.value["usr_id"]) {
+    geoFields += "min(usr_id) as user_id,";
+  }
+
+  req.query.sql = `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(type) as type, SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events, ${userFields} ${geoFields} session_id from "_rumdata" group by session_id order by zo_sql_timestamp DESC`;
 
   isLoading.value.push(true);
   searchService
@@ -377,7 +433,7 @@ const updateDateChange = (date: any) => {
   if (JSON.stringify(date) === JSON.stringify(dateTime.value)) return;
   dateTime.value = date;
   sessionState.data.datetime = date;
-  if (date.valueType === "relative") getSessions();
+  if (date.valueType === "relative" && isMounted.value) getSessions();
 };
 
 const splitterModel = ref(250);
