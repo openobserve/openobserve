@@ -21,7 +21,9 @@
     "showFieldLabel": "Fields",
     "showHistogramLabel": "Histogram",
     "sqlModeLabel": "SQL Mode",
-    "toggleFunctionLabel": "Function"
+    "toggleFunctionLabel": "Function",
+    "labelWrap": "Wrap Content",
+    "messageWrapContent": "Wrap Table Content"
   },
   "menu": {
     "home": "Home",
