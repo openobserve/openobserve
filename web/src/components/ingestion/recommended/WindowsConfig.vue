@@ -4,7 +4,7 @@
       You need minimum PowerShell 6 to run the install script. you can check
       your PowerShell version by running
       <code
-        class="bg-grey-3 q-px-xs q-py-xs text-subtitle2"
+        class="q-px-xs q-py-xs text-subtitle2"
         style="border-radius: 4px"
         >$PSVersionTable.PSVersion</code
       >
@@ -12,7 +12,7 @@
     </div>
     <div>You should see something like this:</div>
     <pre
-      class="notranslate bg-grey-2 q-px-md q-py-md text-body"
+      class="notranslate q-px-md q-py-md text-body"
     >PS C:\<span class="pl-k">&gt;</span> <span class="pl-c1">$PSVersionTable<span class="pl-smi">.PSVersion</span></span>
 
 Major  Minor  Patch  PreReleaseLabel BuildLabel
@@ -30,12 +30,6 @@ Major  Minor  Patch  PreReleaseLabel BuildLabel
     </div>
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">From powershell terminal:</div>
-    <ContentCopy
-      class="q-mt-sm"
-      content="Invoke-WebRequest -Uri https://raw.githubusercontent.com/openobserve/agents/main/windows/install.ps1 -OutFile install.ps1 ; .\install.ps1 -URL <URL> -AUTH_KEY <Authorization_Key>"
-    />
-
-    <div class="text-subtitle1 q-pl-xs q-mt-md">e.g.</div>
     <ContentCopy class="q-mt-sm" :content="getCommand" />
   </div>
 </template>

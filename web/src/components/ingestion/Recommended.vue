@@ -100,7 +100,7 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, computed } from "vue";
+import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -130,6 +130,18 @@ export default defineComponent({
     const ingestTabType = ref("ingestFromKubernetes");
 
     onBeforeMount(() => {
+      if (router.currentRoute.value.name === "recommended") {
+        router.push({
+          name: "ingestFromKubernetes",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+    });
+
+    onUpdated(() => {
       if (router.currentRoute.value.name === "recommended") {
         router.push({
           name: "ingestFromKubernetes",
