@@ -152,7 +152,7 @@ const getTags = computed(() => {
     browser: props.error.user_agent_user_agent_family,
     level: "error",
     sdk_version: props.error.sdk_version,
-    user_email: props.error.usr_email,
+    user_email: props.error.usr_email || "Unknown User",
   };
 });
 
