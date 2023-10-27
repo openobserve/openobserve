@@ -294,11 +294,6 @@ const setupSession = async () => {
       playerHeight;
   }
 
-  console.log(
-    playerWidth,
-    playerHeight,
-    playerContainerRef.value?.clientHeight
-  );
   if (playerRef.value) {
     playerRef.value.style.width = `${playerWidth}px`;
   }
