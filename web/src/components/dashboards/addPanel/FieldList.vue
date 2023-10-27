@@ -22,7 +22,7 @@
       <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream" :label="t('dashboard.selectIndex')"
         :options="filteredStreams" data-test="index-dropdown-stream" input-debounce="0" behavior="menu" use-input filled borderless
         dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value" 
-        option-label="name" option-value="name" emit-value>
+        option-label="name" option-value="name" emit-value :class="selectedMetricTypeIcon ? 'metric_icon_present' : ''">
         
         <template
           v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics' && selectedMetricTypeIcon"
@@ -594,6 +594,11 @@ export default defineComponent({
 
 .q-field--dense .q-field__label {
   top: 5px;
+}
+
+// if metric icon is present then move the label to the left
+:deep(.metric_icon_present .q-field__label) {
+  margin-left: -24px;
 }
 
 .q-field--dense .q-field__control,
