@@ -24,6 +24,19 @@
         dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value" 
         option-label="name" option-value="name" emit-value>
         
+        <!-- <template
+          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'"
+          v-slot:prepend
+        >
+          <q-icon
+            size="xs"
+            :name="metricsIconMapping[
+              metricTypes.value || ''
+              ]
+              "
+          />
+        </template> -->
+
         <template v-slot:option="scope"
           v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'">
             <q-item 
@@ -186,7 +199,7 @@ export default defineComponent({
     const streamDataLoading = useLoading(async () => {
       await getStreamList();
     });
-
+// console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream", dashboardPanelData.meta.stream.streamResults)
     onMounted(() => {
       streamDataLoading.execute();
     });
@@ -247,8 +260,8 @@ export default defineComponent({
           ...dashboardPanelData.meta.stream.selectedStreamFields,
         ];
       }
-    );
-
+          );
+    // const metricTypes: any = ref([]);
     // get the stream list by making an API call
     const getStreamList = async () => {
      await IndexService.nameList(
@@ -259,6 +272,13 @@ export default defineComponent({
         data.schemaList = res.data.list;
         dashboardPanelData.meta.stream.streamResults = res.data.list;
       });
+      // const streamResults = dashboardPanelData.meta.stream.streamResults.map((it: any) => {
+      //   const metricTypes = it.metrics_meta && it.metrics_meta.metric_type;
+      //   return metricTypes || "";
+      // });
+
+      // console.log("stream results", JSON.parse(JSON.stringify(streamResults)));
+      // metricTypes.value.push(...streamResults);
     };
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
@@ -337,6 +357,7 @@ export default defineComponent({
       promqlMode,
       streamDataLoading,
       metricsIconMapping,
+      // metricTypes
     };
   },
 });
