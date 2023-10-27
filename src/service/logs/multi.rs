@@ -20,7 +20,7 @@ use std::io::{BufRead, BufReader};
 
 use crate::common::{
     infra::{
-        config::{CONFIG, DISTINCT_FIELDS_EXTRA},
+        config::{CONFIG, DISTINCT_FIELDS},
         metrics,
     },
     meta::{
@@ -205,7 +205,7 @@ async fn ingest_inner(
         .await;
 
         // get distinct_value item
-        for field in DISTINCT_FIELDS_EXTRA.iter() {
+        for field in DISTINCT_FIELDS.iter() {
             if let Some(val) = local_val.get(field) {
                 if !val.is_null() {
                     distinct_values.push(distinct_values::DvItem {

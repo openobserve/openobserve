@@ -12,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::http::StatusCode;
-use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
 use chrono::Duration;
-use std::collections::HashMap;
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 
-use crate::common::infra::config::{CONFIG, DISTINCT_FIELDS_EXTRA};
-use crate::common::infra::{errors, metrics};
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::common::meta::usage::{RequestStats, UsageType};
-use crate::common::meta::{self, StreamType};
-use crate::common::utils::base64;
-use crate::common::utils::functions;
-use crate::common::utils::http::get_stream_type_from_request;
-use crate::common::utils::json;
-use crate::service::search as SearchService;
-use crate::service::usage::report_request_usage_stats;
+use crate::common::{
+    infra::{
+        config::{CONFIG, DISTINCT_FIELDS},
+        errors, metrics,
+    },
+    meta::{
+        self,
+        http::HttpResponse as MetaHttpResponse,
+        usage::{RequestStats, UsageType},
+        StreamType,
+    },
+    utils::{base64, functions, http::get_stream_type_from_request, json},
+};
+use crate::service::{search as SearchService, usage::report_request_usage_stats};
 
 /** SearchStreamData*/
 #[utoipa::path(
@@ -539,13 +540,13 @@ pub async fn values(
     };
 
     if fields.len() == 1
-        && DISTINCT_FIELDS_EXTRA.contains(&fields[0])
+        && DISTINCT_FIELDS.contains(&fields[0])
         && !query_context.to_lowercase().contains(" where ")
     {
         if let Some(v) = query.get("filter") {
             if !v.is_empty() {
                 let column = v.splitn(2, '=').collect::<Vec<_>>();
-                if DISTINCT_FIELDS_EXTRA.contains(&column[0].to_string()) {
+                if DISTINCT_FIELDS.contains(&column[0].to_string()) {
                     // has filter and the filter can be used to distinct_values
                     return values_v2(
                         &org_id,

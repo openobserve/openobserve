@@ -23,7 +23,11 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
     meta::{
         alert::{Alert, Trigger},
         http::HttpResponse as MetaHttpResponse,
@@ -36,7 +40,7 @@ use crate::common::{
 };
 use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
-    db, get_formatted_stream_name,
+    db, distinct_values, get_formatted_stream_name,
     ingestion::{grpc::get_val_for_attr, write_file},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
@@ -115,6 +119,7 @@ pub async fn logs_json_handler(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut distinct_values = Vec::with_capacity(16);
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<Trigger> = None;
 
@@ -308,6 +313,22 @@ pub async fn logs_json_handler(
 
                     if local_trigger.is_some() {
                         trigger = Some(local_trigger.unwrap());
+                    }
+
+                    // get distinct_value item
+                    for field in DISTINCT_FIELDS.iter() {
+                        if let Some(val) = local_val.get(field) {
+                            if !val.is_null() {
+                                distinct_values.push(distinct_values::DvItem {
+                                    stream_type: StreamType::Logs,
+                                    stream_name: stream_name.to_string(),
+                                    field_name: field.to_string(),
+                                    field_value: val.as_str().unwrap().to_string(),
+                                    filter_name: "".to_string(),
+                                    filter_value: "".to_string(),
+                                });
+                            }
+                        }
                     }
                 }
             }

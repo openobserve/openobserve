@@ -20,7 +20,11 @@ use std::io::{BufRead, BufReader};
 
 use super::StreamMeta;
 use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
     meta::{
         alert::{Alert, Trigger},
         functions::{StreamTransform, VRLResultResolver},
@@ -35,7 +39,8 @@ use crate::common::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
 use crate::service::{
-    db, ingestion::write_file, schema::stream_schema_exists, usage::report_request_usage_stats,
+    db, distinct_values, ingestion::write_file, schema::stream_schema_exists,
+    usage::report_request_usage_stats,
 };
 
 pub const TRANSFORM_FAILED: &str = "document_failed_transform";
@@ -76,6 +81,7 @@ pub async fn ingest(
     let mut stream_partition_keys_map: AHashMap<String, (StreamSchemaChk, PartitioningDetails)> =
         AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut distinct_values = Vec::with_capacity(16);
 
     let mut action = String::from("");
     let mut stream_name = String::from("");
@@ -259,6 +265,23 @@ pub async fn ingest(
             if local_trigger.is_some() {
                 stream_trigger_map.insert(stream_name.clone(), local_trigger.unwrap());
             }
+
+            // get distinct_value item
+            for field in DISTINCT_FIELDS.iter() {
+                if let Some(val) = local_val.get(field) {
+                    if !val.is_null() {
+                        distinct_values.push(distinct_values::DvItem {
+                            stream_type: StreamType::Logs,
+                            stream_name: stream_name.clone(),
+                            field_name: field.to_string(),
+                            field_value: val.as_str().unwrap().to_string(),
+                            filter_name: "".to_string(),
+                            filter_value: "".to_string(),
+                        });
+                    }
+                }
+            }
+
             if status.failed > 0 {
                 bulk_res.errors = true;
                 add_record_status(

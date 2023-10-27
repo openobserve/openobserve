@@ -61,12 +61,13 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const COLUMN_TRACE_ID: &str = "trace_id";
 
-const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
+const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "events", "json"];
-
-pub static SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA: Lazy<Vec<String>> = Lazy::new(|| {
+pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     chain(
-        SQL_FULL_TEXT_SEARCH_FIELDS.iter().map(|s| s.to_string()),
+        _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
+            .iter()
+            .map(|s| s.to_string()),
         CONFIG
             .common
             .feature_fulltext_extra_fields
@@ -83,10 +84,10 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA: Lazy<Vec<String>> = Lazy::new(|| {
     .collect()
 });
 
-const DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
-pub static DISTINCT_FIELDS_EXTRA: Lazy<Vec<String>> = Lazy::new(|| {
+const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
+pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     chain(
-        DISTINCT_FIELDS.iter().map(|s| s.to_string()),
+        _DEFAULT_DISTINCT_FIELDS.iter().map(|s| s.to_string()),
         CONFIG
             .common
             .feature_distinct_extra_fields

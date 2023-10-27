@@ -23,7 +23,7 @@ use std::{fs::OpenOptions, io::Error};
 use crate::common::{
     infra::{
         cluster,
-        config::{CONFIG, DISTINCT_FIELDS_EXTRA},
+        config::{CONFIG, DISTINCT_FIELDS},
         metrics,
     },
     meta::{
@@ -316,7 +316,7 @@ pub async fn traces_json(
                     );
 
                     // get distinct_value item
-                    for field in DISTINCT_FIELDS_EXTRA.iter() {
+                    for field in DISTINCT_FIELDS.iter() {
                         if let Some(val) = val_map.get(field) {
                             if !val.is_null() {
                                 let (filter_name, filter_value) = if field == "operation_name" {

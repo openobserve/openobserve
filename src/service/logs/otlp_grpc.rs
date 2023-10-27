@@ -25,7 +25,11 @@ use prost::Message;
 
 use super::StreamMeta;
 use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
     meta::{
         alert::{Alert, Trigger},
         http::HttpResponse as MetaHttpResponse,
@@ -37,7 +41,7 @@ use crate::common::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
 use crate::service::{
-    db, get_formatted_stream_name,
+    db, distinct_values, get_formatted_stream_name,
     ingestion::{grpc::get_val, write_file},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
@@ -51,6 +55,7 @@ pub async fn usage_ingest(
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut distinct_values = Vec::with_capacity(16);
     let stream_name = &get_formatted_stream_name(
         &mut StreamParams::new(org_id, in_stream_name, StreamType::Logs),
         &mut stream_schema_map,
@@ -140,6 +145,22 @@ pub async fn usage_ingest(
 
         if local_trigger.is_some() {
             trigger = Some(local_trigger.unwrap());
+        }
+
+        // get distinct_value item
+        for field in DISTINCT_FIELDS.iter() {
+            if let Some(val) = local_val.get(field) {
+                if !val.is_null() {
+                    distinct_values.push(distinct_values::DvItem {
+                        stream_type: StreamType::Logs,
+                        stream_name: stream_name.to_string(),
+                        field_name: field.to_string(),
+                        field_value: val.as_str().unwrap().to_string(),
+                        filter_name: "".to_string(),
+                        filter_value: "".to_string(),
+                    });
+                }
+            }
         }
     }
 
@@ -235,6 +256,7 @@ pub async fn handle_grpc_request(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
+    let mut distinct_values = Vec::with_capacity(16);
 
     let partition_det =
         crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
@@ -365,6 +387,22 @@ pub async fn handle_grpc_request(
 
                 if local_trigger.is_some() {
                     trigger = Some(local_trigger.unwrap());
+                }
+
+                // get distinct_value item
+                for field in DISTINCT_FIELDS.iter() {
+                    if let Some(val) = local_val.get(field) {
+                        if !val.is_null() {
+                            distinct_values.push(distinct_values::DvItem {
+                                stream_type: StreamType::Logs,
+                                stream_name: stream_name.to_string(),
+                                field_name: field.to_string(),
+                                field_value: val.as_str().unwrap().to_string(),
+                                filter_name: "".to_string(),
+                                filter_value: "".to_string(),
+                            });
+                        }
+                    }
                 }
             }
         }
