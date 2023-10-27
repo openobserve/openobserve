@@ -36,7 +36,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, type Ref } from "vue";
+import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";
 import { useStore } from "vuex";
 import { b64EncodeUnicode } from "../../../utils/zincutils";
