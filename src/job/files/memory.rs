@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use bytes::Bytes;
-use datafusion::arrow::json::{reader::infer_json_schema, ReaderBuilder};
+use datafusion::arrow::json::ReaderBuilder;
 use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
@@ -24,7 +24,11 @@ use crate::common::{
         metrics, storage, wal,
     },
     meta::{common::FileMeta, StreamType},
-    utils::{json, stream::populate_file_meta},
+    utils::{
+        json,
+        schema::{infer_json_schema, infer_json_schema_from_iterator},
+        stream::populate_file_meta,
+    },
 };
 use crate::service::{
     db, schema::schema_evolution, search::datafusion::new_parquet_writer,
@@ -163,7 +167,7 @@ async fn upload_file(
 
     let mut res_records: Vec<json::Value> = vec![];
     let mut schema_reader = BufReader::new(buf.as_ref());
-    let inferred_schema = match infer_json_schema(&mut schema_reader, None) {
+    let inferred_schema = match infer_json_schema(&mut schema_reader, None, stream_type) {
         Ok(inferred_schema) => {
             drop(schema_reader);
             inferred_schema
@@ -193,7 +197,7 @@ async fn upload_file(
                 return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
             }
             let value_iter = res_records.iter().map(Ok);
-            arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap()
+            infer_json_schema_from_iterator(value_iter, stream_type).unwrap()
         }
     };
     let arrow_schema = Arc::new(inferred_schema);

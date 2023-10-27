@@ -1116,9 +1116,6 @@ fn apply_query_fn(
                 })
                 .collect();
 
-            /*  let first_rec = json::to_string(&rows_val.first()).unwrap();
-            let mut schema_reader = std::io::BufReader::new(first_rec.as_bytes());
-            let inf_schema = arrowJson::reader::infer_json_schema(&mut schema_reader, None)?; */
             let value_iter = rows_val.iter().map(Ok);
             let inf_schema =
                 arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap();

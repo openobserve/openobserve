@@ -15,7 +15,6 @@
 use ahash::AHashMap;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::error::ArrowError;
-use datafusion::arrow::json::reader::infer_json_schema;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -28,6 +27,7 @@ use crate::common::meta::prom::METADATA_LABEL;
 use crate::common::meta::stream::SchemaEvolution;
 use crate::common::meta::{ingestion::StreamSchemaChk, StreamType};
 use crate::common::utils::json;
+use crate::common::utils::schema::infer_json_schema;
 use crate::common::utils::schema_ext::SchemaExt;
 use crate::service::db;
 use crate::service::search::server_internal_error;
@@ -225,10 +225,12 @@ fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         DataType::Int32 => vec![
             DataType::Utf8,
             DataType::Int64,
+            DataType::UInt32,
+            DataType::UInt64,
             DataType::Float32,
             DataType::Float64,
         ],
-        DataType::Int64 => vec![DataType::Utf8, DataType::Float64],
+        DataType::Int64 => vec![DataType::Utf8, DataType::UInt64, DataType::Float64],
         DataType::UInt8 => vec![
             DataType::Utf8,
             DataType::UInt16,
@@ -275,7 +277,7 @@ pub async fn check_for_schema(
     }
 
     let mut schema_reader = BufReader::new(val_str.as_bytes());
-    let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
+    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
     if schema.fields.eq(&inferred_schema.fields) {
         //return (true, None, schema.fields().to_vec());
         return SchemaEvolution {
@@ -707,7 +709,7 @@ pub async fn add_stream_schema(
     let mut local_file = file;
     local_file.seek(SeekFrom::Start(0)).unwrap();
     let mut schema_reader = BufReader::new(local_file);
-    let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
+    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
 
     let existing_schema = stream_schema_map.get(&stream_name.to_string());
     let mut metadata = match existing_schema {
