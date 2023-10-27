@@ -106,7 +106,10 @@ import { onBeforeRouteUpdate, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useSession from "@/composables/useSessionReplay";
 import useErrorTracking from "@/composables/useErrorTracking";
+import usePerformance from "@/composables/rum/usePerformance";
+
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { useI18n } from "vue-i18n";
 
 const route = useRoute();
 const router = useRouter();
@@ -124,22 +127,24 @@ const showTabs = computed(() => {
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
 
+const { t } = useI18n();
 const isLoading = ref<boolean[]>([]);
 const { sessionState } = useSession();
 const { errorTrackingState } = useErrorTracking();
+const { performanceState } = usePerformance();
 
-const activeTab = ref<string>("sessions");
+const activeTab = ref<string>("performance");
 const tabs = [
   {
-    label: "Performance",
+    label: t("rum.performance"),
     value: "performance",
   },
   {
-    label: "Sessions",
+    label: t("rum.sessions"),
     value: "sessions",
   },
   {
-    label: "Error Tracking",
+    label: t("rum.errorTracking"),
     value: "error_tracking",
   },
 ];
@@ -147,20 +152,16 @@ const tabs = [
 const isRumEnabled = ref<boolean>(false);
 const isSessionReplayEnabled = ref<boolean>(false);
 
+const routeName = computed(() => router.currentRoute.value.name);
+
 onMounted(async () => {
   isLoading.value.push(true);
-  await checkIfRumEnabled();
-  isLoading.value.pop();
-  if (!isRumEnabled.value && !isSessionReplayEnabled.value) return;
 
-  const routes = [
-    "SessionViewer",
-    "ErrorTracking",
-    "RumPerformance",
-    "ErrorViewer",
-    "Sessions",
-    "rumPerformanceSummary",
-  ];
+  await checkIfRumEnabled();
+
+  isLoading.value.pop();
+
+  if (!isRumEnabled.value && !isSessionReplayEnabled.value) return;
 
   const routeNameMapping: { [key: string]: string } = {
     SessionViewer: "sessions",
@@ -171,27 +172,20 @@ onMounted(async () => {
     rumPerformanceSummary: "performance",
   };
 
-  if (routes.includes(router.currentRoute.value.name?.toString() || "")) {
+  if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
     activeTab.value =
       routeNameMapping[
         router.currentRoute.value.name?.toString() || "placeholder"
       ];
   } else {
     activeTab.value = "performance";
-    // Settimeout is temp fix, need to find a better way to do this
-    setTimeout(() => {
-      router.push({
-        name: "rumPerformanceSummary",
-      });
-    }, 500);
   }
+  changeTab(activeTab.value);
 });
 
 onActivated(async () => {
   await checkIfRumEnabled();
 });
-
-const routeName = computed(() => router.currentRoute.value.name);
 
 watch(
   () => routeName.value,
@@ -247,7 +241,7 @@ const getQueryParams = (dateTime: any, editorValue: string) => {
     query["to"] = dateTime.endTime;
   }
 
-  query["query"] = b64EncodeUnicode(editorValue);
+  if (editorValue) query["query"] = b64EncodeUnicode(editorValue);
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   return query;
@@ -257,10 +251,7 @@ const changeTab = (tab: string) => {
   if (tab === "performance") {
     router.push({
       name: "rumPerformanceSummary",
-      query: getQueryParams(
-        sessionState.data.datetime,
-        sessionState.data.editorValue
-      ),
+      query: getQueryParams(performanceState.data.datetime, ""),
     });
     return;
   }
