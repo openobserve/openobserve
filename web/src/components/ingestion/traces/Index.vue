@@ -56,7 +56,7 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -99,6 +99,18 @@ export default defineComponent({
         });
         return;
       }
+      if (router.currentRoute.value.name === "ingestTraces") {
+        router.push({
+          name: "tracesOTLP",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+    });
+
+    onUpdated(() => {
       if (router.currentRoute.value.name === "ingestTraces") {
         router.push({
           name: "tracesOTLP",

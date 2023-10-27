@@ -30,7 +30,7 @@
         <q-route-tab
           name="rumWebTab"
           :to="{
-            name: 'rumWeb',
+            name: 'frontendMonitoring',
             query: {
               org_identifier: store.state.selectedOrganization.identifier,
             },
@@ -89,7 +89,7 @@ export default defineComponent({
     const confirmUpdate = ref<boolean>(false);
 
     onMounted(() => {
-      const ingestRoutes = ["rumWeb"];
+      const ingestRoutes = ["frontendMonitoring"];
 
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
@@ -102,7 +102,7 @@ export default defineComponent({
       }
       if (router.currentRoute.value.name === "rumMonitoring") {
         router.push({
-          name: "rumWeb",
+          name: "frontendMonitoring",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },

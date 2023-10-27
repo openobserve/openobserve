@@ -79,7 +79,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const endpoint: Ref<Endpoint> = ref({
+    const endpoint: any = ref({
       url: "",
       host: "",
       port: "",

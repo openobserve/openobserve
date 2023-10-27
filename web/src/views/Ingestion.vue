@@ -17,9 +17,8 @@
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-page class="ingestionPage">
-    <div class="head q-table__title q-pb-md q-px-md">
-      {{ t("ingestion.header") }}
-
+    <div class="q-px-md flex full-width float-right">
+      <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
       <q-btn
         v-if="
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
@@ -71,114 +70,56 @@
         v-model="confirmRUMUpdate"
       />
     </div>
+
+    <q-tabs v-model="ingestTabType" horizontal align="left">
+      <q-route-tab
+        default
+        name="recommended"
+        :to="{
+          name: 'recommended',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        label="Recommended"
+        content-class="tab_content"
+      />
+      <q-route-tab
+        name="custom"
+        :to="{
+          name: 'custom',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        label="Custom"
+        content-class="tab_content"
+      />
+    </q-tabs>
     <q-separator class="separator" />
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      style="min-height: calc(100vh - 130px)"
+    <router-view
+      :title="ingestTabType"
+      :currOrgIdentifier="currentOrgIdentifier"
+      :currUserEmail="currentUserEmail"
+      @copy-to-clipboard-fn="copyToClipboardFn"
     >
-      <template v-slot:before>
-        <q-tabs
-          v-model="ingestTabType"
-          indicator-color="transparent"
-          inline-label
-          vertical
-        >
-          <q-route-tab
-            default
-            name="ingestLogs"
-            :to="{
-              name: 'ingestLogs',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Logs"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            default
-            name="ingestMetrics"
-            :to="{
-              name: 'ingestMetrics',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Metrics"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="ingestTraces"
-            :to="{
-              name: 'ingestTraces',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Traces"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="rumMonitoring"
-            :to="{
-              name: 'rumMonitoring',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="RUM"
-            content-class="tab_content"
-          />
-        </q-tabs>
-      </template>
-
-      <template v-slot:after>
-        <q-tab-panels
-          v-model="ingestTabType"
-          animated
-          swipeable
-          vertical
-          transition-prev="jump-up"
-          transition-next="jump-up"
-        >
-          <q-tab-panel name="ingestLogs">
-            <router-view :currOrgIdentifier="currentOrgIdentifier">
-            </router-view>
-          </q-tab-panel>
-          <q-tab-panel name="ingestMetrics">
-            <router-view :currOrgIdentifier="currentOrgIdentifier">
-            </router-view>
-          </q-tab-panel>
-
-          <q-tab-panel name="ingestTraces">
-            <router-view :currOrgIdentifier="currentOrgIdentifier">
-            </router-view>
-          </q-tab-panel>
-          <q-tab-panel name="rumMonitoring">
-            <router-view :currOrgIdentifier="currentOrgIdentifier">
-            </router-view>
-          </q-tab-panel>
-        </q-tab-panels>
-      </template>
-    </q-splitter>
+    </router-view>
   </q-page>
 </template>
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, onMounted } from "vue";
+import { defineComponent, ref, onBeforeMount, onMounted, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
-import organizationsService from "../services/organizations";
-// import { config } from "../constants/config";
-import config from "../aws-exports";
-import ConfirmDialog from "../components/ConfirmDialog.vue";
-import segment from "../services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
+import { useQuasar, copyToClipboard } from "quasar";
+import organizationsService from "@/services/organizations";
+import config from "@/aws-exports";
+import segment from "@/services/segment_analytics";
+import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -188,7 +129,9 @@ export default defineComponent({
       apiKeysService
         .createRUMToken(this.store.state.selectedOrganization.identifier)
         .then((res) => {
-          this.store.dispatch("setRUMToken", res.data.data.keys);
+          this.store.dispatch("setRUMToken", {
+            rum_token: res.data.data.new_key,
+          });
           this.getRUMToken();
           this.q.notify({
             type: "positive",
@@ -252,54 +195,53 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
     );
-    const ingestTabType = ref("curl");
+    const ingestTabType = ref("recommended");
+
+    const activeTab = ref("recommended");
     const metricRoutes = ["prometheus", "otelCollector", "telegraf"];
     const traceRoutes = ["tracesOTLP"];
-    const rumRoutes = ["rumWeb"];
+    const rumRoutes = ["frontendMonitoring"];
+
+    const tabs = [
+      {
+        label: "Recommended",
+        value: "recommended",
+      },
+      {
+        label: "Custom",
+        value: "custom",
+      },
+    ];
 
     onBeforeMount(() => {
-      const ingestRoutes = [
-        "ingestLogs",
-        "ingestTraces",
-        "ingestMetrics",
-        "rumMonitoring",
-      ];
-      const logRoutes = [
-        "curl",
-        "fluentbit",
-        "fluentd",
-        "kinesisfirehose",
-        "vector",
-        "filebeat",
-        "syslog",
-        "gcpLogs",
-      ];
-
-      if (logRoutes.includes(router.currentRoute.value.name)) {
-        ingestTabType.value = "ingestLogs";
-      } else if (metricRoutes.includes(router.currentRoute.value.name)) {
-        ingestTabType.value = "ingestMetrics";
-      } else if (traceRoutes.includes(router.currentRoute.value.name)) {
-        ingestTabType.value = "ingestTraces";
-      } else if (ingestRoutes.includes(router.currentRoute.value.name)) {
-        ingestTabType.value = router.currentRoute.value.name;
-      } else if (rumRoutes.includes(router.currentRoute.value.name)) {
-        ingestTabType.value = "rumMonitoring";
-      } else if (router.currentRoute.value.name === "ingestion") {
-        ingestTabType.value = "ingestLogs";
-        router.push({
-          name: "curl",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-      }
       if (
         !store.state.organizationData.organizationPasscode &&
         router.currentRoute.value.name != "ingestion"
       ) {
         getOrganizationPasscode();
         getRUMToken();
+      }
+
+      if (router.currentRoute.value.name === "ingestion") {
+        router.push({
+          name: "recommended",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+    });
+
+    onUpdated(() => {
+      if (router.currentRoute.value.name === "ingestion") {
+        router.push({
+          name: "recommended",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
       }
     });
 
@@ -376,6 +318,32 @@ export default defineComponent({
       confirmRUMUpdate.value = true;
     };
 
+    const copyToClipboardFn = (content: any) => {
+      copyToClipboard(content.innerText)
+        .then(() => {
+          q.notify({
+            type: "positive",
+            message: "Content Copied Successfully!",
+            timeout: 5000,
+          });
+        })
+        .catch(() => {
+          q.notify({
+            type: "negative",
+            message: "Error while copy content.",
+            timeout: 5000,
+          });
+        });
+
+      segment.track("Button Click", {
+        button: "Copy to Clipboard",
+        ingestion: router.currentRoute.value.name,
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Ingestion",
+      });
+    };
+
     return {
       t,
       q,
@@ -386,6 +354,7 @@ export default defineComponent({
       splitterModel: ref(200),
       getOrganizationPasscode,
       currentOrgIdentifier,
+      currentUserEmail: store.state.userInfo.email,
       updatePasscode,
       showUpdateDialogFn,
       showRUMUpdateDialogFn,
@@ -393,8 +362,11 @@ export default defineComponent({
       confirmRUMUpdate,
       getImageURL,
       ingestTabType,
-      rumRoutes,
       getRUMToken,
+      tabs,
+      activeTab,
+      copyToClipboardFn,
+      rumRoutes,
     };
   },
 });
@@ -402,12 +374,12 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .ingestionPage {
-  padding: 1.5rem 0 0;
+  padding: 0.25rem 0 1.5rem 0;
   .head {
     padding-bottom: 1rem;
   }
   .q-tabs {
-    &--vertical {
+    &--horizontal {
       margin: 1.5rem 1rem 0 1rem;
       .q-tab {
         justify-content: flex-start;

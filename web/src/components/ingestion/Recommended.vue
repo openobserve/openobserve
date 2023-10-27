@@ -22,45 +22,66 @@
   >
     <template v-slot:before>
       <q-tabs
-        v-model="ingestiontabs"
+        v-model="ingestTabType"
         indicator-color="transparent"
         inline-label
         vertical
       >
         <q-route-tab
-          name="prometheus"
+          default
+          name="ingestFromKubernetes"
           :to="{
-            name: 'prometheus',
+            name: 'ingestFromKubernetes',
             query: {
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          :icon="'img:' + getImageURL('images/ingestion/prometheus.svg')"
-          label="Prometheus"
+          label="Kubernetes"
           content-class="tab_content"
         />
         <q-route-tab
-          name="otelCollector"
+          default
+          name="ingestFromWindows"
           :to="{
-            name: 'otelCollector',
+            name: 'ingestFromWindows',
             query: {
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          label="OTEL Collector"
+          label="Windows"
           content-class="tab_content"
         />
         <q-route-tab
-          name="telegraf"
+          name="ingestFromLinux"
           :to="{
-            name: 'telegraf',
+            name: 'ingestFromLinux',
             query: {
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          :icon="'img:' + getImageURL('images/ingestion/telegraf.png')"
-          label="Telegraf"
+          label="Linux"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="ingestFromOtel"
+          :to="{
+            name: 'ingestFromOtel',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          label="OTEL"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="frontendMonitoring"
+          :to="{
+            name: 'frontendMonitoring',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          label="Frontend Monitoring"
           content-class="tab_content"
         />
       </q-tabs>
@@ -68,10 +89,9 @@
 
     <template v-slot:after>
       <router-view
-        :title="ingestiontabs"
+        :title="tabs"
         :currOrgIdentifier="currOrgIdentifier"
         :currUserEmail="currentUserEmail"
-        @copy-to-clipboard-fn="copyToClipboardFn"
       >
       </router-view>
     </template>
@@ -80,24 +100,17 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
+import { defineComponent, ref, onBeforeMount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
-// import { config } from "../constants/config";
-import config from "../../../aws-exports";
+import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "IngestMetrics",
-  components: {},
-  data() {
-    return {
-      ingestiontabs: "",
-    };
-  },
+  name: "RecommendedPage",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -109,23 +122,17 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const rowData: any = ref({});
-    const confirmUpdate = ref<boolean>(false);
+    const tabs = ref("");
+    const currentOrgIdentifier: any = ref(
+      store.state.selectedOrganization.identifier
+    );
+
+    const ingestTabType = ref("ingestFromKubernetes");
 
     onBeforeMount(() => {
-      const ingestRoutes = ["prometheus", "otelCollector", "telegraf"];
-      if (ingestRoutes.includes(router.currentRoute.value.name)) {
+      if (router.currentRoute.value.name === "recommended") {
         router.push({
-          name: router.currentRoute.value.name,
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        return;
-      }
-      if (router.currentRoute.value.name === "ingestMetrics") {
-        router.push({
-          name: "prometheus",
+          name: "ingestFromKubernetes",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -133,62 +140,19 @@ export default defineComponent({
         return;
       }
     });
-
-    onUpdated(() => {
-      if (router.currentRoute.value.name === "ingestMetrics") {
-        router.push({
-          name: "prometheus",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        return;
-      }
-    });
-
-    const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText)
-        .then(() => {
-          q.notify({
-            type: "positive",
-            message: "Content Copied Successfully!",
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          q.notify({
-            type: "negative",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Copy to Clipboard",
-        ingestion: router.currentRoute.value.name,
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
-      });
-    };
-
-    const showUpdateDialogFn = () => {
-      confirmUpdate.value = true;
-    };
 
     return {
       t,
       store,
       router,
       config,
-      rowData,
-      splitterModel: ref(200),
+      splitterModel: ref(250),
       currentUserEmail: store.state.userInfo.email,
-      copyToClipboardFn,
-      showUpdateDialogFn,
-      confirmUpdate,
+      currentOrgIdentifier,
       getImageURL,
       verifyOrganizationStatus,
+      tabs,
+      ingestTabType,
     };
   },
 });
@@ -224,6 +188,24 @@ export default defineComponent({
         }
       }
     }
+  }
+}
+</style>
+<style lang="scss">
+.ingestionPage {
+  .q-tab-panel {
+    padding: 0 !important;
+    .tab_content {
+      .q-tab__label {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+    }
+  }
+
+  .q-icon > img {
+    height: auto !important;
   }
 }
 </style>
