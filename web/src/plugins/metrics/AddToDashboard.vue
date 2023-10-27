@@ -28,7 +28,7 @@
             <!-- select folder or create new folder and select -->
             <select-folder-dropdown @folder-selected="updateActiveFolderId"/>
             <q-input
-            v-model="newDashboardForm.name"
+            v-model.trim="newDashboardForm.name"
             label="Dashboard Name *"
             color="input-border"
             bg-color="input-bg"
@@ -42,7 +42,7 @@
             ></q-input>
             <span>&nbsp;</span>
             <q-input
-            v-model="newDashboardForm.description"
+            v-model.trim="newDashboardForm.description"
             label="Dashboard Description"
               color="input-border"
               bg-color="input-bg"
@@ -53,7 +53,7 @@
               dense
               ></q-input>
               <q-input
-                v-model="panelTitle"
+                v-model.trim="panelTitle"
                 label="Panel Title *"
                 color="input-border"
                 bg-color="input-bg"
@@ -97,7 +97,7 @@
               </template>
             </q-select>
             <q-input
-              v-model="panelTitle"
+              v-model.trim="panelTitle"
               label="Panel Title *"
               color="input-border"
               bg-color="input-bg"
