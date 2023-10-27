@@ -323,7 +323,7 @@ export default defineComponent({
 
     const refreshList = () => {
       router.push({
-        name: "functions",
+        name: "functionList",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
@@ -335,7 +335,7 @@ export default defineComponent({
     const hideForm = () => {
       showAddJSTransformDialog.value = false;
       router.replace({
-        name: "functions",
+        name: "functionList",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
