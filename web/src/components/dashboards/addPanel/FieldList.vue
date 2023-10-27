@@ -24,18 +24,19 @@
         dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value" 
         option-label="name" option-value="name" emit-value>
         
-        <!-- <template
-          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'"
+        <template
+          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics' && selectedMetricTypeIcon"
           v-slot:prepend
         >
           <q-icon
+            style="margin-top: 14px;"
             size="xs"
             :name="metricsIconMapping[
-              metricTypes.value || ''
+              selectedMetricTypeIcon || ''
               ]
               "
           />
-        </template> -->
+        </template>
 
         <template v-slot:option="scope"
           v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'">
@@ -196,10 +197,13 @@ export default defineComponent({
       Counter: "pin",
     };
 
+    const selectedMetricTypeIcon = computed(() => {
+      return dashboardPanelData.meta.stream.streamResults.find((it: any) => it.name == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream)?.metrics_meta?.metric_type
+    })
+
     const streamDataLoading = useLoading(async () => {
       await getStreamList();
     });
-// console.log("dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream", dashboardPanelData.meta.stream.streamResults)
     onMounted(() => {
       streamDataLoading.execute();
     });
@@ -245,7 +249,6 @@ export default defineComponent({
         }
       }
     })
-
     // update the current list fields if any of the lists changes
     watch(
       () => [
@@ -272,13 +275,6 @@ export default defineComponent({
         data.schemaList = res.data.list;
         dashboardPanelData.meta.stream.streamResults = res.data.list;
       });
-      // const streamResults = dashboardPanelData.meta.stream.streamResults.map((it: any) => {
-      //   const metricTypes = it.metrics_meta && it.metrics_meta.metric_type;
-      //   return metricTypes || "";
-      // });
-
-      // console.log("stream results", JSON.parse(JSON.stringify(streamResults)));
-      // metricTypes.value.push(...streamResults);
     };
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
@@ -357,7 +353,7 @@ export default defineComponent({
       promqlMode,
       streamDataLoading,
       metricsIconMapping,
-      // metricTypes
+      selectedMetricTypeIcon
     };
   },
 });
