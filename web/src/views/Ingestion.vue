@@ -123,7 +123,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog, AppTabs },
   methods: {
     generateRUMToken() {
       apiKeysService
