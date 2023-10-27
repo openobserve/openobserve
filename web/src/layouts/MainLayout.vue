@@ -208,7 +208,6 @@
         />
       </q-list>
     </q-drawer>
-
     <q-page-container
       :key="store.state.selectedOrganization?.identifier"
       v-if="isLoading"

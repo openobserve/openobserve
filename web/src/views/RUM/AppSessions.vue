@@ -257,6 +257,7 @@ const columns = ref([
 
 onMounted(async () => {
   // TODO OK : Store stream fields in composable
+
   isMounted.value = true;
   if (router.currentRoute.value.name === "Sessions") {
     await getStreamFields();
