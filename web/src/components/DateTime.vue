@@ -252,8 +252,19 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { ref, defineComponent, computed, onMounted, watch } from "vue";
-import { getImageURL, useLocalTimezone } from "../utils/zincutils";
+import {
+  ref,
+  defineComponent,
+  computed,
+  onMounted,
+  watch,
+  nextTick,
+} from "vue";
+import {
+  getImageURL,
+  useLocalTimezone,
+  convertToUtcTimestamp,
+} from "../utils/zincutils";
 import { date } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -397,9 +408,12 @@ export default defineComponent({
       if (props.autoApply) saveDate("relative-custom");
     };
 
-    const onTimezoneChange = () => {
+    const onTimezoneChange = async () => {
       useLocalTimezone(timezone.value);
       store.dispatch("setTimezone", timezone.value);
+      await nextTick();
+      if (selectedType.value == "absolute") saveDate("absolute");
+      else saveDate("relative");
       emit("on:timezone-change");
     };
 
@@ -522,6 +536,13 @@ export default defineComponent({
           relativeTimePeriod: relativeValue.value + relativePeriod.value,
         };
       } else {
+        if (typeof selectedDate.value === "string") {
+          selectedDate.value = {
+            from: selectedDate.value,
+            to: selectedDate.value,
+          };
+        }
+
         let start, end;
         if (!selectedDate.value?.from && !selectedTime.value?.startTime) {
           start = new Date();
@@ -546,14 +567,28 @@ export default defineComponent({
           start = selectedDate.value + " " + selectedTime.value.startTime;
           end = selectedDate.value + " " + selectedTime.value.endTime;
         }
-
+        const absoluteUTCTimestamp = getUTCTimeStamp();
         const rVal = {
-          startTime: new Date(start).getTime() * 1000,
-          endTime: new Date(end).getTime() * 1000,
+          startTime: absoluteUTCTimestamp.startUTC,
+          endTime: absoluteUTCTimestamp.endUTC,
           relativeTimePeriod: null,
         };
+        // console.log(rVal)
         return rVal;
       }
+    };
+
+    const getUTCTimeStamp = () => {
+      let startTime =
+        selectedDate.value.from + " " + selectedTime.value.startTime + ":00";
+      let endTime =
+        selectedDate.value.to + " " + selectedTime.value.endTime + ":00";
+      // console.log("start time", startTime);
+      // console.log("end time", endTime);
+      const startUTC = convertToUtcTimestamp(startTime, store.state.timezone);
+      const endUTC = convertToUtcTimestamp(endTime, store.state.timezone);
+      // console.log(store.state.timezone, startTime, startUTC, endTime, endUTC);
+      return { startUTC, endUTC };
     };
 
     const getDisplayValue = () => {

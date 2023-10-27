@@ -35,11 +35,20 @@
       </div>
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
+          data-test="logs-search-bar-wrap-table-content-toggle-btn"
+          v-if="searchObj.meta.flagWrapContent"
+          v-model="searchObj.meta.toggleSourceWrap"
+          icon="wrap_text"
+          :title="t('search.messageWrapContent')"
+          class="float-left"
+          size="32px"
+        />
+        <q-toggle
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.toggleFunction"
           icon="functions"
           title="Toggle Function Editor"
-          class="float-left q-mr-sm"
+          class="float-left"
           size="32px"
         />
         <q-select
@@ -163,7 +172,12 @@
               :suggestions="autoCompleteSuggestions"
               @update:query="updateQueryValue"
               @run-query="handleRunQuery"
-              :class="searchObj.data.editorValue == '' && searchObj.meta.queryEditorPlaceholderFlag ? 'empty-query' : ''"
+              :class="
+                searchObj.data.editorValue == '' &&
+                searchObj.meta.queryEditorPlaceholderFlag
+                  ? 'empty-query'
+                  : ''
+              "
             ></query-editor>
           </template>
           <template #after>
@@ -177,7 +191,8 @@
                 id="fnEditor"
                 style="height: 100%"
                 :class="
-                  searchObj.data.tempFunctionContent == '' && searchObj.meta.functionEditorPlaceholderFlag
+                  searchObj.data.tempFunctionContent == '' &&
+                  searchObj.meta.functionEditorPlaceholderFlag
                     ? 'empty-function'
                     : ''
                 "
@@ -195,8 +210,10 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn label="Cancel" color="primary" @click="cancelConfirmDialog" />
-          <q-btn label="OK" color="positive" @click="confirmDialogOK" />
+          <q-btn label="Cancel" color="primary"
+@click="cancelConfirmDialog" />
+          <q-btn label="OK" color="positive"
+@click="confirmDialogOK" />
         </q-card-actions>
       </q-card>
     </q-dialog>
