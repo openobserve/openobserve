@@ -25,6 +25,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
+use super::ingestion::grpc::get_val_with_type_retained;
 use crate::common::{
     infra::{
         cluster,
@@ -152,7 +153,7 @@ pub async fn handle_trace_request(
             } else {
                 service_att_map.insert(
                     format!("{}.{}", SERVICE, res_attr.key),
-                    get_val(&res_attr.value),
+                    get_val_with_type_retained(&res_attr.value),
                 );
             }
         }
@@ -193,7 +194,7 @@ pub async fn handle_trace_request(
                 let end_time: u64 = span.end_time_unix_nano;
                 let mut span_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 for span_att in span.attributes {
-                    span_att_map.insert(span_att.key, get_val(&span_att.value));
+                    span_att_map.insert(span_att.key, get_val_with_type_retained(&span_att.value));
                 }
 
                 let mut events = vec![];
