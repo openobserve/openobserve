@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use datafusion::arrow::json::{reader::infer_json_schema_from_seekable, ReaderBuilder};
+use datafusion::arrow::json::ReaderBuilder;
 use std::{
     fs,
     io::{BufReader, Seek, SeekFrom},
@@ -28,7 +28,12 @@ use crate::common::{
         metrics, storage, wal,
     },
     meta::{common::FileMeta, stream::StreamParams, StreamType},
-    utils::{file::scan_files, json, stream::populate_file_meta},
+    utils::{
+        file::scan_files,
+        json,
+        schema::{infer_json_schema_from_iterator, infer_json_schema_from_seekable},
+        stream::populate_file_meta,
+    },
 };
 use crate::service::{
     db, schema::schema_evolution, search::datafusion::new_parquet_writer,
@@ -205,40 +210,41 @@ async fn upload_file(
 
     let mut res_records: Vec<json::Value> = vec![];
     let mut schema_reader = BufReader::new(&file);
-    let inferred_schema = match infer_json_schema_from_seekable(&mut schema_reader, None) {
-        Ok(inferred_schema) => {
-            drop(schema_reader);
-            inferred_schema
-        }
-        Err(err) => {
-            // File has some corrupt json data....ignore such data & move rest of the records
-            log::error!(
-                "[JOB] Failed to infer schema from file: {}, error: {}",
-                path_str,
-                err.to_string()
-            );
+    let inferred_schema =
+        match infer_json_schema_from_seekable(&mut schema_reader, None, stream_type) {
+            Ok(inferred_schema) => {
+                drop(schema_reader);
+                inferred_schema
+            }
+            Err(err) => {
+                // File has some corrupt json data....ignore such data & move rest of the records
+                log::error!(
+                    "[JOB] Failed to infer schema from file: {}, error: {}",
+                    path_str,
+                    err.to_string()
+                );
 
-            drop(schema_reader);
-            file.seek(SeekFrom::Start(0)).unwrap();
-            let mut json_reader = BufReader::new(&file);
-            let value_reader = arrow::json::reader::ValueIter::new(&mut json_reader, None);
-            for value in value_reader {
-                match value {
-                    Ok(val) => {
-                        res_records.push(val);
-                    }
-                    Err(err) => {
-                        log::error!("[JOB] Failed to parse record: error: {}", err.to_string())
+                drop(schema_reader);
+                file.seek(SeekFrom::Start(0)).unwrap();
+                let mut json_reader = BufReader::new(&file);
+                let value_reader = arrow::json::reader::ValueIter::new(&mut json_reader, None);
+                for value in value_reader {
+                    match value {
+                        Ok(val) => {
+                            res_records.push(val);
+                        }
+                        Err(err) => {
+                            log::error!("[JOB] Failed to parse record: error: {}", err.to_string())
+                        }
                     }
                 }
+                if res_records.is_empty() {
+                    return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
+                }
+                let value_iter = res_records.iter().map(Ok);
+                infer_json_schema_from_iterator(value_iter, stream_type).unwrap()
             }
-            if res_records.is_empty() {
-                return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
-            }
-            let value_iter = res_records.iter().map(Ok);
-            arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap()
-        }
-    };
+        };
     let arrow_schema = Arc::new(inferred_schema);
 
     let mut batches = vec![];
