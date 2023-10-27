@@ -22,7 +22,7 @@
       <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream" :label="t('dashboard.selectIndex')"
         :options="filteredStreams" data-test="index-dropdown-stream" input-debounce="0" behavior="menu" use-input filled borderless
         dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value" 
-        option-label="name" option-value="name" emit-value :class="selectedMetricTypeIcon ? 'metric_icon_present' : ''">
+        option-label="name" option-value="name" emit-value :class="selectedMetricTypeIcon && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics' ? 'metric_icon_present' : ''">
         
         <template
           v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics' && selectedMetricTypeIcon"
