@@ -149,12 +149,20 @@ const onScroll = (e: any) => {
 };
 </script>
 
-<style>
-.thead-sticky,
-.tfoot-sticky {
-  position: sticky;
-  top: 0;
-  opacity: 1;
-  z-index: 1;
+<style lang="scss">
+.app-table-container {
+  .thead-sticky,
+  .tfoot-sticky {
+    position: sticky;
+    top: 0;
+    opacity: 1;
+    z-index: 1;
+    background: #f5f5f5;
+  }
+
+  .q-table--dark .thead-sticky,
+  .q-table--dark .tfoot-sticky {
+    background: #565656 !important;
+  }
 }
 </style>

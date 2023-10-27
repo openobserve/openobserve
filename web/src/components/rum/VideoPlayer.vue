@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div ref="playerContainerRef" class="player-container full-height q-ma-sm">
+  <div class="player-container full-height q-pa-sm">
     <div
       v-if="isLoading"
       class="q-pb-lg flex items-center justify-center text-center full-width"
@@ -32,11 +32,17 @@
       </div>
     </div>
     <div
-      ref="playerRef"
-      id="player"
-      class="player flex items-center cursor-pointer"
-      @click="togglePlay"
-    ></div>
+      ref="playerContainerRef"
+      class="flex items-center justify-center"
+      style="height: calc(100vh - 198px)"
+    >
+      <div
+        ref="playerRef"
+        id="player"
+        class="player flex items-center cursor-pointer"
+        @click="togglePlay"
+      />
+    </div>
     <div class="full-width q-pa-sm q-pt-md controls-container">
       <div
         ref="playbackBarRef"
@@ -140,6 +146,7 @@
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
+import { p } from "msw/lib/SetupApi-8ab693f7";
 import rrwebPlayer from "rrweb-player";
 import "rrweb-player/dist/style.css";
 import { nextTick, ref, watch } from "vue";
@@ -269,10 +276,23 @@ const setupSession = async () => {
   //   lastEventTime = currentTime;
   // });
 
-  const playerWidth = playerContainerRef.value?.clientWidth || 0;
-  const playerHeight =
+  let playerWidth = playerContainerRef.value?.clientWidth || 0;
+  let playerHeight =
     (session.value[0].data.height / session.value[0].data.width || 0.56) *
     playerWidth;
+
+  if (playerHeight > playerContainerRef.value?.clientHeight - 90) {
+    playerHeight = playerContainerRef.value?.clientHeight - 90 || 0;
+    playerWidth =
+      (session.value[0].data.width / session.value[0].data.height) *
+      playerHeight;
+  }
+
+  console.log(
+    playerWidth,
+    playerHeight,
+    playerContainerRef.value?.clientHeight
+  );
   if (playerRef.value) {
     playerRef.value.style.width = `${playerWidth}px`;
   }
@@ -419,7 +439,7 @@ defineExpose({
 
 <style scoped lang="scss">
 .player {
-  height: calc(100% - 153px);
+  height: 100%;
 }
 
 .playback_bar {
