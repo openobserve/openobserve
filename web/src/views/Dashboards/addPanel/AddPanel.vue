@@ -27,7 +27,7 @@
         </div>
       </div>
       <div class="flex q-gutter-sm">
-        <DateTimePickerDashboard v-model="selectedDate" />
+        <DateTimePickerDashboard v-model="selectedDate" ref="dateTimePickerRef"/>
         <q-btn class="q-ml-md text-bold" outline padding="sm lg" color="red" no-caps :label="t('panel.discard')"
           @click="goBackToDashboardList" />
         <q-btn class="q-ml-md text-bold" outline padding="sm lg"  no-caps
@@ -186,6 +186,7 @@ export default defineComponent({
       useDashboardPanelData();
     const editMode = ref(false);
     const selectedDate = ref()
+    const dateTimePickerRef: any = ref(null);
     const errorData: any = reactive({
       errors: []
     })
@@ -333,6 +334,8 @@ export default defineComponent({
       }
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // refresh the date time based on current time if relative date is selected
+      dateTimePickerRef.value && dateTimePickerRef.value.refresh();
       updateDateTime(selectedDate.value)
     };
 
@@ -705,7 +708,8 @@ export default defineComponent({
       savePanelData,
       resetAggregationFunction,
       isOutDated,
-      store
+      store,
+      dateTimePickerRef
     };
   },
   methods: {
