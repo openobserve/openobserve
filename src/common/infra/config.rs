@@ -83,6 +83,26 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA: Lazy<Vec<String>> = Lazy::new(|| {
     .collect()
 });
 
+const DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
+pub static DISTINCT_FIELDS_EXTRA: Lazy<Vec<String>> = Lazy::new(|| {
+    chain(
+        DISTINCT_FIELDS.iter().map(|s| s.to_string()),
+        CONFIG
+            .common
+            .feature_distinct_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect()
+});
+
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
@@ -257,6 +277,8 @@ pub struct Common {
     pub feature_fulltext_on_all_fields: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
+    #[env_config(name = "ZO_FEATURE_DISTINCT_FIELDS", default = "")]
+    pub feature_distinct_fields: String,
     #[env_config(name = "ZO_FEATURE_FILELIST_DEDUP_ENABLED", default = false)]
     pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]

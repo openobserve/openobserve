@@ -23,7 +23,10 @@ use vrl::compiler::runtime::Runtime;
 
 use super::StreamMeta;
 use crate::common::{
-    infra::{config::CONFIG, metrics},
+    infra::{
+        config::{CONFIG, DISTINCT_FIELDS_EXTRA},
+        metrics,
+    },
     meta::{
         alert::{Alert, Trigger},
         functions::{StreamTransform, VRLResultResolver},
@@ -39,8 +42,8 @@ use crate::common::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
 use crate::service::{
-    get_formatted_stream_name, ingestion::is_ingestion_allowed, ingestion::write_file,
-    usage::report_request_usage_stats,
+    distinct_values, get_formatted_stream_name, ingestion::is_ingestion_allowed,
+    ingestion::write_file, usage::report_request_usage_stats,
 };
 
 pub async fn ingest(
@@ -52,6 +55,7 @@ pub async fn ingest(
     let start = std::time::Instant::now();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut distinct_values = Vec::with_capacity(16);
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
 
@@ -151,6 +155,22 @@ pub async fn ingest(
                         )
                         .await;
 
+                        // get distinct_value item
+                        for field in DISTINCT_FIELDS_EXTRA.iter() {
+                            if let Some(val) = local_val.get(field) {
+                                if !val.is_null() {
+                                    distinct_values.push(distinct_values::DvItem {
+                                        stream_type: StreamType::Logs,
+                                        stream_name: stream_name.to_string(),
+                                        field_name: field.to_string(),
+                                        field_value: val.as_str().unwrap().to_string(),
+                                        filter_name: "".to_string(),
+                                        filter_value: "".to_string(),
+                                    });
+                                }
+                            }
+                        }
+
                         if local_trigger.is_some() {
                             trigger = Some(local_trigger.unwrap());
                         }
@@ -182,6 +202,13 @@ pub async fn ingest(
     }
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, &stream_alerts_map).await;
+
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME

@@ -72,7 +72,7 @@ use openobserve::{
         http::router::*,
     },
     job,
-    service::{compact, db, file_list, router, users},
+    service::{compact, db, distinct_values, file_list, router, users},
 };
 
 #[cfg(feature = "profiling")]
@@ -269,6 +269,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // flush db
     if let Err(e) = infra::db::DEFAULT.close().await {
         log::error!("waiting for db close failed, error: {}", e);
+    }
+    // flush distinct values
+    if let Err(e) = distinct_values::close().await {
+        log::error!("waiting for distinct_values close failed, error: {}", e);
     }
 
     log::info!("server stopped");
