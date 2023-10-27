@@ -27,14 +27,18 @@
         <template v-slot:option="scope"
           v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'">
             <q-item 
+              :class="store.state.theme === 'dark' &&
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream !== scope.opt.value
+                  ? 'text-white'
+                  : ''
+                "
                 v-bind="scope.itemProps"
               >
-              <q-item-section class="metric-explore-metric-icon">
+              <q-item-section avatar class="metric-explore-metric-icon">
                 <q-icon size="xs"
                   :name="metricsIconMapping[scope.opt.metrics_meta.metric_type] || ''" />            
               </q-item-section>
               <q-item-section>
-                <!-- {{ scope }} -->
               <q-item-label> {{ scope.opt.name }} </q-item-label>
               </q-item-section>
             </q-item>
@@ -46,7 +50,6 @@
           </q-item>
         </template>
       </q-select>
-      {{ dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream }}
     </div>
     <div class="column col index-table q-mt-xs">
       <q-table
@@ -179,7 +182,6 @@ export default defineComponent({
       Histogram: "bar_chart",
       Counter: "pin",
     };
-    console.log("dashboardPanelData", dashboardPanelData);
 
     const streamDataLoading = useLoading(async () => {
       await getStreamList();
@@ -216,9 +218,6 @@ export default defineComponent({
 
       data.indexOptions = dashboardPanelData.meta.stream.streamResults
         .filter((data: any) => data.stream_type == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type)
-        .map((data: any) => { return data });
-        console.log("dataaa",data)
-        console.log("data.indexOptions", data.indexOptions);
        
       // set the first stream as the selected stream when the api loads the data
       if (!props.editMode &&
@@ -264,8 +263,6 @@ export default defineComponent({
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
       if (terms != "") {
-        console.log("terms", terms);
-        
         terms = terms.toLowerCase();
         for (var i = 0; i < rows.length; i++) {
           if (rows[i]["name"].toLowerCase().includes(terms)) {
