@@ -20,27 +20,28 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS_EXTRA},
+        metrics,
+    },
+    meta::{
+        alert::{Alert, Evaluate, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        stream::{PartitionTimeLevel, StreamParams},
+        traces::{Event, Span, SpanRefType},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json},
+};
 use crate::service::{
     db, distinct_values, format_partition_key, format_stream_name,
-    ingestion::write_file,
+    ingestion::{grpc::get_val_for_attr, write_file},
     schema::{add_stream_schema, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{cluster, config::CONFIG, metrics},
-        meta::{
-            alert::{Alert, Evaluate, Trigger},
-            http::HttpResponse as MetaHttpResponse,
-            stream::{PartitionTimeLevel, StreamParams},
-            traces::{Event, Span, SpanRefType},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json},
-    },
-    service::ingestion::grpc::get_val_for_attr,
 };
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
@@ -315,19 +316,25 @@ pub async fn traces_json(
                     );
 
                     // get distinct_value item
-                    distinct_values.push(distinct_values::DvItem {
-                        stream_type: StreamType::Traces,
-                        stream_name: traces_stream_name.to_string(),
-                        field_name: "operation_name".to_string(),
-                        field_value: val_map
-                            .get("operation_name")
-                            .unwrap()
-                            .as_str()
-                            .unwrap()
-                            .to_string(),
-                        filter_name: "service_name".to_string(),
-                        filter_value: service_name.clone(),
-                    });
+                    for field in DISTINCT_FIELDS_EXTRA.iter() {
+                        if let Some(val) = val_map.get(field) {
+                            if !val.is_null() {
+                                let (filter_name, filter_value) = if field == "operation_name" {
+                                    ("service_name".to_string(), service_name.clone())
+                                } else {
+                                    ("".to_string(), "".to_string())
+                                };
+                                distinct_values.push(distinct_values::DvItem {
+                                    stream_type: StreamType::Traces,
+                                    stream_name: traces_stream_name.to_string(),
+                                    field_name: field.to_string(),
+                                    field_value: val.as_str().unwrap().to_string(),
+                                    filter_name,
+                                    filter_value,
+                                });
+                            }
+                        }
+                    }
 
                     let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
                     // get hour key

@@ -26,7 +26,11 @@ use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
 use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS_EXTRA},
+        metrics,
+    },
     meta::{
         alert::{Alert, Evaluate, Trigger},
         http::HttpResponse as MetaHttpResponse,
@@ -250,19 +254,25 @@ pub async fn handle_trace_request(
                 );
 
                 // get distinct_value item
-                distinct_values.push(distinct_values::DvItem {
-                    stream_type: StreamType::Traces,
-                    stream_name: traces_stream_name.to_string(),
-                    field_name: "operation_name".to_string(),
-                    field_value: val_map
-                        .get("operation_name")
-                        .unwrap()
-                        .as_str()
-                        .unwrap()
-                        .to_string(),
-                    filter_name: "service_name".to_string(),
-                    filter_value: service_name.clone(),
-                });
+                for field in DISTINCT_FIELDS_EXTRA.iter() {
+                    if let Some(val) = val_map.get(field) {
+                        if !val.is_null() {
+                            let (filter_name, filter_value) = if field == "operation_name" {
+                                ("service_name".to_string(), service_name.clone())
+                            } else {
+                                ("".to_string(), "".to_string())
+                            };
+                            distinct_values.push(distinct_values::DvItem {
+                                stream_type: StreamType::Traces,
+                                stream_name: traces_stream_name.to_string(),
+                                field_name: field.to_string(),
+                                field_value: val.as_str().unwrap().to_string(),
+                                filter_name,
+                                filter_value,
+                            });
+                        }
+                    }
+                }
 
                 let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
 

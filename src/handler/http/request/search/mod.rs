@@ -540,7 +540,7 @@ pub async fn values(
 
     if fields.len() == 1
         && DISTINCT_FIELDS_EXTRA.contains(&fields[0])
-        && !query_context.to_lowercase().contains(" WHERE ")
+        && !query_context.to_lowercase().contains(" where ")
     {
         if let Some(v) = query.get("filter") {
             if !v.is_empty() {
