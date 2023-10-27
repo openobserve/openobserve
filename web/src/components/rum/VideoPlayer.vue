@@ -31,7 +31,12 @@
         </div>
       </div>
     </div>
-    <div ref="playerRef" id="player" class="player flex items-center"></div>
+    <div
+      ref="playerRef"
+      id="player"
+      class="player flex items-center cursor-pointer"
+      @click="togglePlay"
+    ></div>
     <div class="full-width q-pa-sm q-pt-md controls-container">
       <div
         ref="playbackBarRef"
