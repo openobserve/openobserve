@@ -28,6 +28,8 @@ import "./styles/quasar-overrides.scss";
 import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
+import { openobserveRum } from "@openobserve/browser-rum";
+import { openobserveLogs } from "@openobserve/browser-logs";
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -70,6 +72,35 @@ const getConfig = async () => {
         tracesSampleRate: 1.0,
       });
     }
+
+    openobserveRum.init({
+      applicationId: "web-application-id", // required, any string identifying your application
+      clientToken: "rumqRPQYJv76RcPEfo0",
+      site: "test2.gke.zinclabs.dev",
+      organizationIdentifier: "default",
+      //  service: 'my-web-application',
+      //  env: 'production',
+      //  version: '1.0.0',
+      sessionSampleRate: 100,
+      sessionReplaySampleRate: 100, // if not included, the default is 100
+      trackResources: true,
+      trackLongTasks: true,
+      trackUserInteractions: true,
+      apiVersion: "v1",
+      insecureHTTP: false,
+    });
+
+    openobserveLogs.init({
+      clientToken: "rumqRPQYJv76RcPEfo0",
+      site: "test2.gke.zinclabs.dev",
+      organizationIdentifier: "default",
+      forwardErrorsToLogs: true,
+      sessionSampleRate: 100,
+      insecureHTTP: false,
+      apiVersion: "v1",
+    });
+
+    openobserveRum.startSessionReplayRecording();
   });
 };
 
