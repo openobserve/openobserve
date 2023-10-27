@@ -21,7 +21,43 @@
         class="q-mb-xs"></q-select>
       <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream" :label="t('dashboard.selectIndex')"
         :options="filteredStreams" data-test="index-dropdown-stream" input-debounce="0" behavior="menu" use-input filled borderless
-        dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value">
+        dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value" 
+        option-label="name" option-value="name" emit-value :class="selectedMetricTypeIcon && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics' ? 'metric_icon_present' : ''">
+        
+        <template
+          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics' && selectedMetricTypeIcon"
+          v-slot:prepend
+        >
+          <q-icon
+            style="margin-top: 14px;"
+            size="xs"
+            :name="metricsIconMapping[
+              selectedMetricTypeIcon || ''
+              ]
+              "
+          />
+        </template>
+
+        <template v-slot:option="scope"
+          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'">
+            <q-item 
+              :class="store.state.theme === 'dark' &&
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream !== scope.opt.value
+                  ? 'text-white'
+                  : ''
+                "
+                v-bind="scope.itemProps"
+              >
+              <q-item-section avatar class="metric-explore-metric-icon">
+                <q-icon size="xs"
+                  :name="metricsIconMapping[scope.opt.metrics_meta.metric_type] || ''" />            
+              </q-item-section>
+              <q-item-section>
+              <q-item-label> {{ scope.opt.name }} </q-item-label>
+              </q-item-section>
+            </q-item>
+        </template>
+
         <template #no-option>
           <q-item>
             <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -154,10 +190,20 @@ export default defineComponent({
     const { dashboardPanelData, addXAxisItem, addYAxisItem, addZAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, isAddZAxisNotAllowed, promqlMode, addLatitude, addLongitude, addWeight } =
       useDashboardPanelData();
       
-    const streamDataLoading = useLoading(async ()=>{
+    const metricsIconMapping: any = {
+      Summary: "description",
+      Gauge: "speed",
+      Histogram: "bar_chart",
+      Counter: "pin",
+    };
+
+    const selectedMetricTypeIcon = computed(() => {
+      return dashboardPanelData.meta.stream.streamResults.find((it: any) => it.name == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream)?.metrics_meta?.metric_type
+    })
+
+    const streamDataLoading = useLoading(async () => {
       await getStreamList();
     });
-
     onMounted(() => {
       streamDataLoading.execute();
     });
@@ -189,10 +235,7 @@ export default defineComponent({
 
       data.indexOptions = dashboardPanelData.meta.stream.streamResults
         .filter((data: any) => data.stream_type == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type)
-        .map((data: any) => {
-          return data.name;
-        });
-
+       
       // set the first stream as the selected stream when the api loads the data
       if (!props.editMode &&
         !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream &&
@@ -202,11 +245,10 @@ export default defineComponent({
         if (selectedStreamForQueries.value[currentIndex]) {
           dashboardPanelData.data.queries[currentIndex].fields.stream = selectedStreamForQueries.value[currentIndex];
         } else {
-          dashboardPanelData.data.queries[currentIndex].fields.stream = data.indexOptions[0];
+          dashboardPanelData.data.queries[currentIndex].fields.stream = data.indexOptions[0]?.name;
         }
       }
     })
-
     // update the current list fields if any of the lists changes
     watch(
       () => [
@@ -222,9 +264,9 @@ export default defineComponent({
         ];
       }
     );
-
+    
     // get the stream list by making an API call
-    const getStreamList = async() => {
+    const getStreamList = async () => {
      await IndexService.nameList(
         store.state.selectedOrganization.identifier,
         "",
@@ -234,7 +276,6 @@ export default defineComponent({
         dashboardPanelData.meta.stream.streamResults = res.data.list;
       });
     };
-
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
       if (terms != "") {
@@ -276,8 +317,9 @@ export default defineComponent({
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
         filteredStreams.value = data.indexOptions.filter(
-          (streamName: any) =>
-            streamName.toLowerCase().indexOf(val.toLowerCase()) > -1
+          (stream: any) => {
+           return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1
+          }
         );
       });
     };
@@ -309,13 +351,19 @@ export default defineComponent({
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
       promqlMode,
-      streamDataLoading
+      streamDataLoading,
+      metricsIconMapping,
+      selectedMetricTypeIcon
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
+.metric-explore-metric-icon {
+  min-width: 28px !important;
+  padding-right: 8px !important;
+}
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
@@ -546,6 +594,11 @@ export default defineComponent({
 
 .q-field--dense .q-field__label {
   top: 5px;
+}
+
+// if metric icon is present then move the label to the left
+:deep(.metric_icon_present .q-field__label) {
+  margin-left: -24px;
 }
 
 .q-field--dense .q-field__control,
