@@ -859,6 +859,9 @@ export default defineComponent({
       padding: 8px 8px;
     }
   }
+  &--standard {
+    z-index:99999;
+  }
 }
 
 .headerMenu {
