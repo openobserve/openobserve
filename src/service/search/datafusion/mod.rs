@@ -25,7 +25,7 @@ use std::{str::FromStr, sync::Arc};
 use crate::common::{
     infra::config::{
         CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE, PARQUET_PAGE_SIZE,
-        SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA,
+        SQL_FULL_TEXT_SEARCH_FIELDS,
     },
     meta::functions::ZoFunction,
 };
@@ -121,7 +121,7 @@ pub fn new_parquet_writer<'a>(
             ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
             Encoding::DELTA_BINARY_PACKED,
         );
-    for field in SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA.iter() {
+    for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
         writer_props = writer_props
             .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
     }

@@ -20,27 +20,28 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
+    meta::{
+        alert::{Alert, Evaluate, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        stream::{PartitionTimeLevel, StreamParams},
+        traces::{Event, Span, SpanRefType},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json},
+};
 use crate::service::{
-    db, format_partition_key, format_stream_name,
-    ingestion::write_file,
+    db, distinct_values, format_partition_key, format_stream_name,
+    ingestion::{grpc::get_val_for_attr, write_file},
     schema::{add_stream_schema, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{cluster, config::CONFIG, metrics},
-        meta::{
-            alert::{Alert, Evaluate, Trigger},
-            http::HttpResponse as MetaHttpResponse,
-            stream::{PartitionTimeLevel, StreamParams},
-            traces::{Event, Span, SpanRefType},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json},
-    },
-    service::ingestion::grpc::get_val_for_attr,
 };
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
@@ -94,6 +95,7 @@ pub async fn traces_json(
         AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut distinct_values = Vec::with_capacity(16);
 
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
@@ -313,6 +315,27 @@ pub async fn traces_json(
                         json::Value::Number(timestamp.into()),
                     );
 
+                    // get distinct_value item
+                    for field in DISTINCT_FIELDS.iter() {
+                        if let Some(val) = val_map.get(field) {
+                            if !val.is_null() {
+                                let (filter_name, filter_value) = if field == "operation_name" {
+                                    ("service_name".to_string(), service_name.clone())
+                                } else {
+                                    ("".to_string(), "".to_string())
+                                };
+                                distinct_values.push(distinct_values::DvItem {
+                                    stream_type: StreamType::Traces,
+                                    stream_name: traces_stream_name.to_string(),
+                                    field_name: field.to_string(),
+                                    field_value: val.as_str().unwrap().to_string(),
+                                    filter_name,
+                                    filter_value,
+                                });
+                            }
+                        }
+                    }
+
                     let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
                     // get hour key
                     let mut hour_key = crate::service::ingestion::get_wal_time_key(
@@ -385,6 +408,13 @@ pub async fn traces_json(
     .await;
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
+
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
 
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[

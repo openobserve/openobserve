@@ -4,7 +4,11 @@ use datafusion::arrow::datatypes::Schema;
 
 use super::{ingest::decode_and_decompress, StreamMeta};
 use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
     meta::{
         alert::{Alert, Trigger},
         ingestion::{GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus},
@@ -15,7 +19,8 @@ use crate::common::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
 use crate::service::{
-    db, get_formatted_stream_name, ingestion::write_file, usage::report_request_usage_stats,
+    db, distinct_values, get_formatted_stream_name, ingestion::write_file,
+    usage::report_request_usage_stats,
 };
 
 pub async fn process(
@@ -27,6 +32,7 @@ pub async fn process(
     let start = std::time::Instant::now();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut distinct_values = Vec::with_capacity(16);
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
     //stream_params.stream_name = stream_name.to_string().into();
@@ -141,6 +147,22 @@ pub async fn process(
             if local_trigger.is_some() {
                 trigger = Some(local_trigger.unwrap());
             }
+
+            // get distinct_value item
+            for field in DISTINCT_FIELDS.iter() {
+                if let Some(val) = local_val.get(field) {
+                    if !val.is_null() {
+                        distinct_values.push(distinct_values::DvItem {
+                            stream_type: StreamType::Logs,
+                            stream_name: stream_name.to_string(),
+                            field_name: field.to_string(),
+                            field_value: val.as_str().unwrap().to_string(),
+                            filter_name: "".to_string(),
+                            filter_value: "".to_string(),
+                        });
+                    }
+                }
+            }
         }
         Err(err) => {
             return Ok(GCPIngestionResponse {
@@ -165,6 +187,13 @@ pub async fn process(
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, &stream_alerts_map).await;
+
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
 
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[

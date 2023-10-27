@@ -20,8 +20,7 @@ use crate::common::{
     infra::{
         cache::stats,
         config::{
-            is_local_disk_storage, CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA,
-            STREAM_SCHEMAS,
+            is_local_disk_storage, CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, STREAM_SCHEMAS,
         },
     },
     meta::{
@@ -172,7 +171,7 @@ pub async fn save_stream_settings(
     }
 
     for key in setting.partition_keys.iter() {
-        if SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA.contains(key) {
+        if SQL_FULL_TEXT_SEARCH_FIELDS.contains(key) {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("field [{key}] can't be used for partition key"),

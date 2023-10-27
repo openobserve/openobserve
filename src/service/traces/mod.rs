@@ -26,7 +26,11 @@ use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
 use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
     meta::{
         alert::{Alert, Evaluate, Trigger},
         http::HttpResponse as MetaHttpResponse,
@@ -38,7 +42,7 @@ use crate::common::{
     utils::{flatten, json},
 };
 use crate::service::{
-    db, format_partition_key, format_stream_name,
+    db, distinct_values, format_partition_key, format_stream_name,
     ingestion::{grpc::get_val, write_file},
     schema::{add_stream_schema, stream_schema_exists},
     stream::unwrap_partition_time_level,
@@ -87,8 +91,9 @@ pub async fn handle_trace_request(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
         AHashMap::new();
-    let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut distinct_values = Vec::with_capacity(16);
 
     let stream_schema = stream_schema_exists(
         org_id,
@@ -248,6 +253,27 @@ pub async fn handle_trace_request(
                     json::Value::Number(timestamp.into()),
                 );
 
+                // get distinct_value item
+                for field in DISTINCT_FIELDS.iter() {
+                    if let Some(val) = val_map.get(field) {
+                        if !val.is_null() {
+                            let (filter_name, filter_value) = if field == "operation_name" {
+                                ("service_name".to_string(), service_name.clone())
+                            } else {
+                                ("".to_string(), "".to_string())
+                            };
+                            distinct_values.push(distinct_values::DvItem {
+                                stream_type: StreamType::Traces,
+                                stream_name: traces_stream_name.to_string(),
+                                field_name: field.to_string(),
+                                field_value: val.as_str().unwrap().to_string(),
+                                filter_name,
+                                filter_value,
+                            });
+                        }
+                    }
+                }
+
                 let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
 
                 // get hour key
@@ -322,6 +348,13 @@ pub async fn handle_trace_request(
     .await;
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
+
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
 
     let ep = if is_grpc {
         "grpc/export/traces"

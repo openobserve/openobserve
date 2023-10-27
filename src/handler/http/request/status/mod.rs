@@ -72,7 +72,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         build_date: BUILD_DATE.to_string(),
         functions_enabled: HAS_FUNCTIONS,
         telemetry_enabled: CONFIG.common.telemetry_enabled,
-        default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS_EXTRA
+        default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string())
             .collect(),
