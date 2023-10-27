@@ -194,7 +194,8 @@ export default defineComponent({
       (!shouldCreateNewDashboard.value) && updateDashboardOptions();
     }
     
-    const updateDashboardOptions = async () => {      
+    const updateDashboardOptions = async () => {
+      selectedDashboard.value = null;
       // get all dashboard list folderId
       await getAllDashboardsByFolderId(store, activeFolderId.value);
       dashboardList.value = [];
