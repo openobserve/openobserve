@@ -14,7 +14,9 @@
 -->
 
 <template>
-    <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%;"></div>
+    <div style="padding: 5px; height: 100%; width: 100%;">
+        <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%;"></div>
+    </div> 
 </template>
 
 <script lang="ts">
