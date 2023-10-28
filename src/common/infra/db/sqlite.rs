@@ -486,6 +486,9 @@ impl super::Db for SqliteDb {
     }
 
     async fn get(&self, key: &str) -> Result<Bytes> {
+        if CONFIG.common.print_key_sql {
+            log::info!("[SQLITE] get key: {}", key);
+        }
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
         let value: String = match sqlx::query_scalar(
