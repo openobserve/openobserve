@@ -278,10 +278,16 @@ const setupSession = async () => {
 
   let playerWidth = playerContainerRef.value?.clientWidth || 0;
   let playerHeight =
-    (session.value[0].data.height / session.value[0].data.width || 0.56) *
-    playerWidth;
+    (session.value[0].data.height / session.value[0].data.width) * playerWidth;
 
-  if (playerHeight > playerContainerRef.value?.clientHeight - 90) {
+  if (!session.value[0].data.height) {
+    playerHeight = playerWidth * 0.5625;
+  }
+
+  if (
+    playerContainerRef.value?.clientHeight &&
+    playerHeight > playerContainerRef.value?.clientHeight - 90
+  ) {
     playerHeight = playerContainerRef.value?.clientHeight - 90 || 0;
     playerWidth =
       (session.value[0].data.width / session.value[0].data.height) *
