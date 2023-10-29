@@ -3,7 +3,7 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo "checking out $CODEBUILD_WEBHOOK_HEAD_REF"
+      - echo "checking out $CODEBUILD_WEBHOOK_HEAD_REF against $CODEBUILD_RESOLVED_SOURCE_VERSION"
       - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/zinclabs
       - docker login --username openobserve --password $DOCKER_HUB_ACCESS_TOKEN
 
