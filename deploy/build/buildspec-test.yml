@@ -3,6 +3,7 @@ version: 0.2
 phases:
   pre_build:
     commands:
+      - echo "checking FILE_PATH is $FILE_PATH"
       - apt-get update
       - apt-get install -y bc
       - apt-get install -y zip unzip wget
