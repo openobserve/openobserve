@@ -3,7 +3,7 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo "checking FILE_PATH is $FILE_PATH"
+      - echo "checking FILE_PATH=$FILE_PATH, HEAD_REF=$HEAD_REF, BASE_REF=$BASE_REF, COMMIT_MESSAGE=$COMMIT_MESSAGE"
       - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/zinclabs
       - docker login --username openobserve --password $DOCKER_HUB_ACCESS_TOKEN
 
