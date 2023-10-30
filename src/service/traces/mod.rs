@@ -43,7 +43,7 @@ use crate::common::{
 };
 use crate::service::{
     db, distinct_values, format_partition_key, format_stream_name,
-    ingestion::{grpc::get_val, grpc::get_val, write_file},
+    ingestion::{grpc::get_val, write_file},
     schema::{add_stream_schema, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
