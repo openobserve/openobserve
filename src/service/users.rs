@@ -283,19 +283,10 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
     let user = USERS.get(&key);
     match user {
         Some(loc_user) => Some(loc_user.value().clone()),
-        None => {
-            let res = db::user::get(org_id, name).await;
-            if res.is_err() {
-                None
-            } else {
-                res.unwrap()
-                //local_user.map(|user| user)
-                /*  match local_user {
-                    Some(user) => Some(user),
-                    None => None,
-                } */
-            }
-        }
+        None => match db::user::get(org_id, name).await {
+            Ok(v) => v,
+            Err(_) => None,
+        },
     }
 }
 
@@ -309,14 +300,10 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     let user = USERS_RUM_TOKEN.get(&key);
     match user {
         Some(loc_user) => Some(loc_user.value().clone()),
-        None => {
-            let res = db::user::get_by_token(Some(org_id), token).await;
-            if res.is_err() {
-                None
-            } else {
-                res.unwrap()
-            }
-        }
+        None => match db::user::get_by_token(Some(org_id), token).await {
+            Ok(v) => v,
+            Err(_) => None,
+        },
     }
 }
 

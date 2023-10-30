@@ -136,7 +136,7 @@ pub async fn search(
     } else {
         for file in files {
             let schema_version = get_schema_version(&file.location)?;
-            let entry = files_group.entry(schema_version).or_insert_with(Vec::new);
+            let entry = files_group.entry(schema_version).or_default();
             entry.push(FileKey::from_file_name(&file.location));
         }
     }
@@ -228,7 +228,7 @@ pub async fn search(
                         .filter(|r| r.num_rows() > 0)
                         .collect::<Vec<_>>();
                     if !v.is_empty() {
-                        let group = results.entry(k).or_insert_with(Vec::new);
+                        let group = results.entry(k).or_default();
                         group.extend(v);
                     }
                 }

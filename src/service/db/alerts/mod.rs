@@ -94,8 +94,8 @@ pub async fn list(
 ) -> Result<Vec<Alert>, anyhow::Error> {
     let db = &infra_db::DEFAULT;
 
-    let loc_stream_type = if stream_type.is_some() {
-        stream_type.unwrap()
+    let loc_stream_type = if let Some(v) = stream_type {
+        v
     } else {
         StreamType::Logs
     };

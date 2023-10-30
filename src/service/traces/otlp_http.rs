@@ -155,14 +155,14 @@ pub async fn traces_json(
             None => {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    format!("Invalid json: the structure must be {{\"resourceSpans\":[]}}"),
+                    "Invalid json: the structure must be {{\"resourceSpans\":[]}}".to_string(),
                 )))
             }
         },
         None => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                format!("Invalid json: the structure must be {{\"resourceSpans\":[]}}"),
+                "Invalid json: the structure must be {{\"resourceSpans\":[]}}".to_string(),
             )))
         }
     };
@@ -201,8 +201,8 @@ pub async fn traces_json(
             }
         }
         let scope_resources = res_span.get("scopeSpans");
-        let inst_resources = if scope_resources.is_some() {
-            scope_resources.unwrap().as_array().unwrap()
+        let inst_resources = if let Some(v) = scope_resources {
+            v.as_array().unwrap()
         } else {
             res_span
                 .get("instrumentationLibrarySpans")
