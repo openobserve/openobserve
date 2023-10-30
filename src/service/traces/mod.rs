@@ -43,7 +43,7 @@ use crate::common::{
 };
 use crate::service::{
     db, distinct_values, format_partition_key, format_stream_name,
-    ingestion::{grpc::get_val, grpc::get_val_with_type_retained, write_file},
+    ingestion::{grpc::get_val, write_file},
     schema::{add_stream_schema, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
@@ -152,7 +152,7 @@ pub async fn handle_trace_request(
             } else {
                 service_att_map.insert(
                     format!("{}.{}", SERVICE, res_attr.key),
-                    get_val_with_type_retained(&res_attr.value),
+                    get_val(&res_attr.value),
                 );
             }
         }
@@ -193,7 +193,7 @@ pub async fn handle_trace_request(
                 let end_time: u64 = span.end_time_unix_nano;
                 let mut span_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 for span_att in span.attributes {
-                    span_att_map.insert(span_att.key, get_val_with_type_retained(&span_att.value));
+                    span_att_map.insert(span_att.key, get_val(&span_att.value));
                 }
 
                 let mut events = vec![];
