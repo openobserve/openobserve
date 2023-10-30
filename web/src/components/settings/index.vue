@@ -94,8 +94,8 @@ export default defineComponent({
     });
 
     onUpdated(() => {
-      settingsTab.value = "general";
       if (router.currentRoute.value.name === "settings") {
+        settingsTab.value = "general";
         router.push({
           name: "general",
           query: {
