@@ -52,6 +52,8 @@ pub enum Error {
     Unknown,
 }
 
+unsafe impl Send for Error {}
+
 #[derive(ThisError, Debug)]
 pub enum DbError {
     #[error("key {0} does not exist")]

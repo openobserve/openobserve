@@ -74,7 +74,7 @@ pub async fn get_by_token(
             let user: DBUser = json::from_slice(item).unwrap();
             user
         })
-        .filter(|user| user.organizations.iter().any(|org| normal_valid_user(org)))
+        .filter(|user| user.organizations.iter().any(normal_valid_user))
         .collect();
 
     if users.len() != 1 {

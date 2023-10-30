@@ -30,18 +30,18 @@ pub async fn quantile(
     let qtile = match param {
         Value::Float(v) => v,
         _ => {
-            return Err(DataFusionError::Plan(format!(
-                "[quantile] param must be a NumberLiteral"
-            )))
+            return Err(DataFusionError::Plan(
+                "[quantile] param must be a NumberLiteral".to_string(),
+            ))
         }
     };
     let data = match data {
         Value::Vector(v) => v,
         Value::None => return Ok(Value::None),
         _ => {
-            return Err(DataFusionError::Plan(format!(
-                "[quantile] function only accept vector values"
-            )))
+            return Err(DataFusionError::Plan(
+                "[quantile] function only accept vector values".to_string(),
+            ))
         }
     };
 

@@ -155,6 +155,14 @@ export default defineComponent({
         value: 'bytes'
       },
       {
+        label: 'Kilobytes (kb)',
+        value: 'kilobytes'
+      },
+      {
+        label: 'Megabytes (mb)',
+        value: 'megabytes'
+      },
+      {
         label: 'Bytes/Second',
         value: 'bps'
       },

@@ -21,7 +21,9 @@
     "showFieldLabel": "Fields",
     "showHistogramLabel": "Histogram",
     "sqlModeLabel": "SQL Mode",
-    "toggleFunctionLabel": "Function"
+    "toggleFunctionLabel": "Function",
+    "labelWrap": "Wrap Content",
+    "messageWrapContent": "Wrap Table Content"
   },
   "menu": {
     "home": "Home",
@@ -48,6 +50,16 @@
     "billings": "Billing",
     "rum": "Real User Monitoring",
     "settings": "Settings"
+  },
+  "rum": {
+    "title": "Real User Monitoring",
+    "performance": "Performance",
+    "sessions": "Sessions",
+    "errorTracking": "Error Tracking",
+    "overview": "Overview",
+    "webVitals": "Web Vitals",
+    "errors": "Errors",
+    "api": "API"
   },
   "about": {
     "name": "OpenObserve",

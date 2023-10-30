@@ -10,15 +10,21 @@
 export const getUnitValue = (value: any, unit: string, customUnit: string) => {
     switch (unit) {
       case "bytes": {
-        const units = ["B", "KB", "MB", "GB", "TB"];
-        for (let unit of units) {
-          if (value < 1024) {
+        const units = [
+          { unit: "B", divisor: 1 },
+          { unit: "KB", divisor: 1024 },
+          { unit: "MB", divisor: 1024 * 1024 },
+          { unit: "GB", divisor: 1024 * 1024 * 1024 },
+          { unit: "TB", divisor: 1024 * 1024 * 1024 * 1024 },
+        ];
+        for (let unitInfo of units) {
+          if (value < unitInfo.divisor) {
             return {
               value: `${parseFloat(value).toFixed(2)}`,
-              unit: `${unit}`,
+              unit: unitInfo.unit,
             };
           }
-          value /= 1024;
+          value = value ? value / unitInfo.divisor : 0;
         }
         return {
           value: `${parseFloat(value).toFixed(2)}`,
@@ -137,6 +143,51 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           unit: "%",
         };
         // ${parseFloat(value)}`;
+      }
+      case "kilobytes": {
+        const units = [
+          { unit: "B", divisor: 1 / 1024 },
+          { unit: "KB", divisor: 1 },
+          { unit: "MB", divisor: 1024 },
+          { unit: "GB", divisor: 1024 * 1024 },
+          { unit: "TB", divisor: 1024 * 1024 * 1024 },
+        ];
+        for (let unitInfo of units) {
+          const unitValue: any = value ? value / (unitInfo.divisor) : 0;
+          
+          if (unitValue < 1024) {
+            return {
+              value: `${parseFloat(unitValue).toFixed(2)}`,
+              unit: unitInfo.unit,
+            };
+          }
+        }
+        return {
+          value: `${parseFloat(value).toFixed(2)}`,
+          unit: "PB",
+        };
+      }
+      case "megabytes": {
+        const units = [
+          { unit: "B", divisor: 1 / (1024 * 1024) },
+          { unit: "KB", divisor: 1 / 1024 },
+          { unit: "MB", divisor: 1 },
+          { unit: "GB", divisor: 1024 },
+          { unit: "TB", divisor: 1024 * 1024  },
+        ];
+        for (let unitInfo of units) {
+          const unitValue: any = value ? value / (unitInfo.divisor) : 0;
+          if (unitValue < 1024) {
+            return {
+              value: `${parseFloat(unitValue).toFixed(2)}`,
+              unit: unitInfo.unit,
+            };
+          }
+        }
+        return {
+          value: `${parseFloat(value).toFixed(2)}`,
+          unit: "PB",
+        };
       }
       case "default": {
         return {

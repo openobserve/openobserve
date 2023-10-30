@@ -177,17 +177,18 @@ pub async fn set(
             metadata.insert("start_dt".to_string(), min_ts.to_string());
             metadata.insert("created_at".to_string(), min_ts.to_string());
         }
+        let values = vec![schema.to_owned().with_metadata(metadata)];
         match db
             .put(
                 &key,
-                json::to_vec(&vec![schema.clone().with_metadata(metadata)])
-                    .unwrap()
-                    .into(),
+                json::to_vec(&values).unwrap().into(),
                 infra_db::NEED_WATCH,
             )
             .await
         {
-            Ok(_) => {}
+            Ok(_) => {
+                STREAM_SCHEMAS.insert(map_key.to_owned(), values);
+            }
             Err(e) => {
                 log::error!("Error putting schema: {}", e);
                 return Err(anyhow::anyhow!("Error putting schema: {}", e));

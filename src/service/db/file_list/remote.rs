@@ -223,7 +223,7 @@ pub async fn cache_all() -> Result<(), anyhow::Error> {
     if LOADED_ALL_FILES.load(atomic::Ordering::Relaxed) {
         return Ok(());
     }
-    let prefix = format!("file_list/");
+    let prefix = "file_list/".to_string();
     let files = storage::list(&prefix).await?;
     let mut prefixes = HashSet::new();
     for file in files {

@@ -14,7 +14,7 @@
 
 use ahash::AHashMap as HashMap;
 use datafusion::{
-    arrow::{datatypes::Schema, json::reader::infer_json_schema, record_batch::RecordBatch},
+    arrow::{datatypes::Schema, record_batch::RecordBatch},
     common::FileType,
 };
 use futures::future::try_join_all;
@@ -30,7 +30,10 @@ use crate::common::{
         wal,
     },
     meta::{self, common::FileKey, stream::ScanStats},
-    utils::file::{get_file_contents, get_file_meta, scan_files},
+    utils::{
+        file::{get_file_contents, get_file_meta, scan_files},
+        schema::infer_json_schema,
+    },
 };
 use crate::service::{
     db,
@@ -58,6 +61,7 @@ pub async fn search(
     for file in files.clone().iter() {
         match get_file_contents(&file.key) {
             Err(_) => {
+                log::error!("skip wal file: {} get file content error", &file.key);
                 files.retain(|x| x != file);
             }
             Ok(file_data) => {
@@ -134,7 +138,7 @@ pub async fn search(
     } else {
         for file in files {
             let schema_version = get_schema_version(&file.location)?;
-            let entry = files_group.entry(schema_version).or_insert_with(Vec::new);
+            let entry = files_group.entry(schema_version).or_default();
             entry.push(FileKey::from_file_name(&file.location));
         }
     }
@@ -145,7 +149,7 @@ pub async fn search(
         // get schema of the file
         let file_data = tmpfs::get(&files.first().unwrap().key).unwrap();
         let mut schema_reader = BufReader::new(file_data.as_ref());
-        let mut inferred_schema = match infer_json_schema(&mut schema_reader, None) {
+        let mut inferred_schema = match infer_json_schema(&mut schema_reader, None, stream_type) {
             Ok(schema) => schema,
             Err(err) => {
                 return Err(Error::from(err));
@@ -227,7 +231,7 @@ pub async fn search(
                         .filter(|r| r.num_rows() > 0)
                         .collect::<Vec<_>>();
                     if !v.is_empty() {
-                        let group = results.entry(k).or_insert_with(Vec::new);
+                        let group = results.entry(k).or_default();
                         group.extend(v);
                     }
                 }
@@ -265,7 +269,13 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
     for file in files {
         if time_range != (0, 0) {
             // check wal file created time, we can skip files which created time > end_time
-            let file_meta = get_file_meta(&file).map_err(Error::from)?;
+            let file_meta = match get_file_meta(&file) {
+                Ok(meta) => meta,
+                Err(_) => {
+                    log::error!("skip wal file: {} get file meta error", file);
+                    continue;
+                }
+            };
             let file_modified = file_meta
                 .modified()
                 .unwrap_or(UNIX_EPOCH)

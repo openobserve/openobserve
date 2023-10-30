@@ -25,7 +25,11 @@ use prost::Message;
 
 use super::StreamMeta;
 use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
     meta::{
         alert::{Alert, Trigger},
         http::HttpResponse as MetaHttpResponse,
@@ -37,8 +41,8 @@ use crate::common::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
 use crate::service::{
-    db, get_formatted_stream_name,
-    ingestion::{grpc::get_val, write_file},
+    db, distinct_values, get_formatted_stream_name,
+    ingestion::{grpc::get_val, grpc::get_val_with_type_retained, write_file},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
 };
@@ -51,6 +55,7 @@ pub async fn usage_ingest(
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut distinct_values = Vec::with_capacity(16);
     let stream_name = &get_formatted_stream_name(
         &mut StreamParams::new(org_id, in_stream_name, StreamType::Logs),
         &mut stream_schema_map,
@@ -141,6 +146,22 @@ pub async fn usage_ingest(
         if local_trigger.is_some() {
             trigger = Some(local_trigger.unwrap());
         }
+
+        // get distinct_value item
+        for field in DISTINCT_FIELDS.iter() {
+            if let Some(val) = local_val.get(field) {
+                if !val.is_null() {
+                    distinct_values.push(distinct_values::DvItem {
+                        stream_type: StreamType::Logs,
+                        stream_name: stream_name.to_string(),
+                        field_name: field.to_string(),
+                        field_value: val.as_str().unwrap().to_string(),
+                        filter_name: "".to_string(),
+                        filter_value: "".to_string(),
+                    });
+                }
+            }
+        }
     }
 
     // write to file
@@ -163,6 +184,13 @@ pub async fn usage_ingest(
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, &stream_alerts_map).await;
+
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -235,6 +263,7 @@ pub async fn handle_grpc_request(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
+    let mut distinct_values = Vec::with_capacity(16);
 
     let partition_det =
         crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
@@ -266,17 +295,23 @@ pub async fn handle_grpc_request(
                 match &resource_log.resource {
                     Some(res) => {
                         for item in &res.attributes {
-                            rec[item.key.as_str()] = get_val(&item.value);
+                            rec[item.key.as_str()] = get_val_with_type_retained(&item.value);
                         }
                     }
                     None => {}
                 }
                 match &instrumentation_logs.scope {
                     Some(lib) => {
-                        rec["instrumentation_library_name"] =
-                            serde_json::Value::String(lib.name.to_owned());
-                        rec["instrumentation_library_version"] =
-                            serde_json::Value::String(lib.version.to_owned());
+                        let library_name = lib.name.to_owned();
+                        if !library_name.is_empty() {
+                            rec["instrumentation_library_name"] =
+                                serde_json::Value::String(library_name);
+                        }
+                        let lib_version = lib.version.to_owned();
+                        if !lib_version.is_empty() {
+                            rec["instrumentation_library_version"] =
+                                serde_json::Value::String(lib_version);
+                        }
                     }
                     None => {}
                 }
@@ -302,7 +337,7 @@ pub async fn handle_grpc_request(
                 //rec["name"] = log_record.name.to_owned().into();
                 rec["body"] = get_val(&log_record.body);
                 for item in &log_record.attributes {
-                    rec[item.key.as_str()] = get_val(&item.value);
+                    rec[item.key.as_str()] = get_val_with_type_retained(&item.value);
                 }
                 rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
                 match TraceId::from_bytes(
@@ -366,6 +401,22 @@ pub async fn handle_grpc_request(
                 if local_trigger.is_some() {
                     trigger = Some(local_trigger.unwrap());
                 }
+
+                // get distinct_value item
+                for field in DISTINCT_FIELDS.iter() {
+                    if let Some(val) = local_val.get(field) {
+                        if !val.is_null() {
+                            distinct_values.push(distinct_values::DvItem {
+                                stream_type: StreamType::Logs,
+                                stream_name: stream_name.to_string(),
+                                field_name: field.to_string(),
+                                field_value: val.as_str().unwrap().to_string(),
+                                filter_name: "".to_string(),
+                                filter_value: "".to_string(),
+                            });
+                        }
+                    }
+                }
             }
         }
     }
@@ -383,6 +434,13 @@ pub async fn handle_grpc_request(
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, &stream_alerts_map).await;
+
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
 
     let ep = if is_grpc {
         "grpc/export/logs"

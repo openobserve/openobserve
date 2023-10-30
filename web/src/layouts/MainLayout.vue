@@ -208,7 +208,6 @@
         />
       </q-list>
     </q-drawer>
-
     <q-page-container
       :key="store.state.selectedOrganization?.identifier"
       v-if="isLoading"
@@ -406,7 +405,7 @@ export default defineComponent({
       {
         title: t("menu.rum"),
         icon: "devices",
-        link: "/rum",
+        link: "/rum/performance/overview",
       },
       {
         title: t("menu.dashboard"),
@@ -426,7 +425,7 @@ export default defineComponent({
       {
         title: t("menu.ingestion"),
         icon: outlinedFilterAlt,
-        link: "/ingestion/",
+        link: "/ingestion/recommended/kubernetes",
       },
       {
         title: t("menu.user"),
@@ -859,6 +858,9 @@ export default defineComponent({
     .leftNavList {
       padding: 8px 8px;
     }
+  }
+  &--standard {
+    z-index:99999;
   }
 }
 

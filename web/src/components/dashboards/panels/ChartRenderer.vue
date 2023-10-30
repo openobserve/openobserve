@@ -54,7 +54,7 @@ export default defineComponent({
           props?.data?.extras?.setCurrentSeriesValue(params?.seriesName);
 
           // scroll legend upto current series index
-          const legendOption = chart.getOption()?.legend[0];
+          const legendOption = chart?.getOption()?.legend[0];
 
           if (legendOption) {
                 legendOption.scrollDataIndex = params?.seriesIndex || 0;
@@ -120,7 +120,9 @@ export default defineComponent({
             await nextTick();
             await nextTick();
             const theme = store.state.theme === 'dark' ? 'dark' : 'light';
-            chart = echarts.init(chartRef.value, theme);
+            if(chartRef.value) {
+              chart = echarts.init(chartRef.value, theme);
+            }
             chart?.setOption(props?.data?.options || {}, true);
             chart?.on("mouseover", mouseHoverEffectFn);
             chart?.on("globalout", () => {mouseHoverEffectFn({})});

@@ -40,13 +40,22 @@
         @update:active-tab="changeTab"
       />
       <router-view v-slot="{ Component }">
-        <keep-alive>
+        <template v-if="$route.meta.keepAlive">
+          <keep-alive>
+            <component
+              :is="Component"
+              :isRumEnabled="isRumEnabled"
+              :isSessionReplayEnabled="isSessionReplayEnabled"
+            />
+          </keep-alive>
+        </template>
+        <template v-else>
           <component
             :is="Component"
             :isRumEnabled="isRumEnabled"
             :isSessionReplayEnabled="isSessionReplayEnabled"
           />
-        </keep-alive>
+        </template>
       </router-view>
     </template>
     <template v-else>
@@ -83,31 +92,59 @@
 <script setup lang="ts">
 import AppTabs from "@/components/common/AppTabs.vue";
 import streamService from "@/services/stream";
-import { computed, nextTick, onActivated, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import {
+  computed,
+  nextTick,
+  onActivated,
+  onBeforeUnmount,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from "vue";
+import { onBeforeRouteUpdate, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import useSession from "@/composables/useSessionReplay";
+import useErrorTracking from "@/composables/useErrorTracking";
+import usePerformance from "@/composables/rum/usePerformance";
 
+import { b64EncodeUnicode } from "@/utils/zincutils";
+import { useI18n } from "vue-i18n";
+
+const route = useRoute();
 const router = useRouter();
 const store = useStore();
 const showTabs = computed(() => {
-  const routes = ["Sessions", "ErrorTracking", "RumPerformance"];
+  const routes = [
+    "Sessions",
+    "ErrorTracking",
+    "RumPerformance",
+    "rumPerformanceSummary",
+    "rumPerformanceWebVitals",
+    "rumPerformanceErrors",
+    "rumPerformanceApis",
+  ];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
 
+const { t } = useI18n();
 const isLoading = ref<boolean[]>([]);
+const { sessionState } = useSession();
+const { errorTrackingState } = useErrorTracking();
+const { performanceState } = usePerformance();
 
-const activeTab = ref<string>("sessions");
+const activeTab = ref<string>("performance");
 const tabs = [
   {
-    label: "Performance",
+    label: t("rum.performance"),
     value: "performance",
   },
   {
-    label: "Sessions",
+    label: t("rum.sessions"),
     value: "sessions",
   },
   {
-    label: "Error Tracking",
+    label: t("rum.errorTracking"),
     value: "error_tracking",
   },
 ];
@@ -115,40 +152,71 @@ const tabs = [
 const isRumEnabled = ref<boolean>(false);
 const isSessionReplayEnabled = ref<boolean>(false);
 
+const routeName = computed(() => router.currentRoute.value.name);
+
 onMounted(async () => {
   isLoading.value.push(true);
+
   await checkIfRumEnabled();
+
   isLoading.value.pop();
+
   if (!isRumEnabled.value && !isSessionReplayEnabled.value) return;
 
-  const routes = [
-    "SessionViewer",
-    "ErrorTracking",
-    "RumPerformance",
-    "ErrorViewer",
-  ];
   const routeNameMapping: { [key: string]: string } = {
     SessionViewer: "sessions",
     ErrorTracking: "error_tracking",
     RumPerformance: "performance",
     ErrorViewer: "error_tracking",
+    Sessions: "sessions",
+    rumPerformanceSummary: "performance",
   };
 
-  if (routes.includes(router.currentRoute.value.name?.toString() || "")) {
+  if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
     activeTab.value =
       routeNameMapping[
         router.currentRoute.value.name?.toString() || "placeholder"
       ];
   } else {
-    router.push({
-      name: "Sessions",
-    });
+    activeTab.value = "performance";
   }
+
+  // This is temporary fix, as we have kept sessionViewer keep-alive as false.
+  // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
+  const ignoreRoutes = ["SessionViewer"];
+
+  if (!ignoreRoutes.includes(routeName.value as string))
+    changeTab(activeTab.value);
 });
 
 onActivated(async () => {
   await checkIfRumEnabled();
 });
+
+watch(
+  () => routeName.value,
+  () => updateTabOnRouteChange()
+);
+
+const updateTabOnRouteChange = () => {
+  const routeNameMapping: { [key: string]: string } = {
+    SessionViewer: "sessions",
+    ErrorTracking: "error_tracking",
+    RumPerformance: "performance",
+    Sessions: "sessions",
+    rumPerformanceSummary: "performance",
+    rumPerformanceWebVitals: "performance",
+    rumPerformanceErrors: "performance",
+    rumPerformanceApis: "performance",
+  };
+  const tab =
+    routeNameMapping[
+      router.currentRoute.value.name?.toString() || "placeholder"
+    ];
+  if (tab !== activeTab.value && tab !== undefined) {
+    activeTab.value = tab;
+  }
+};
 
 const checkIfRumEnabled = async () => {
   await nextTick();
@@ -169,10 +237,27 @@ const checkIfRumEnabled = async () => {
   });
 };
 
+const getQueryParams = (dateTime: any, editorValue: string) => {
+  const query: any = {};
+
+  if (dateTime.valueType == "relative") {
+    query["period"] = dateTime.relativeTimePeriod;
+  } else {
+    query["from"] = dateTime.startTime;
+    query["to"] = dateTime.endTime;
+  }
+
+  if (editorValue) query["query"] = b64EncodeUnicode(editorValue);
+
+  query["org_identifier"] = store.state.selectedOrganization.identifier;
+  return query;
+};
+
 const changeTab = (tab: string) => {
   if (tab === "performance") {
     router.push({
-      name: "RumPerformance",
+      name: "rumPerformanceSummary",
+      query: getQueryParams(performanceState.data.datetime, ""),
     });
     return;
   }
@@ -180,6 +265,10 @@ const changeTab = (tab: string) => {
   if (tab === "error_tracking") {
     router.push({
       name: "ErrorTracking",
+      query: getQueryParams(
+        errorTrackingState.data.datetime,
+        errorTrackingState.data.editorValue
+      ),
     });
     return;
   }
@@ -187,6 +276,10 @@ const changeTab = (tab: string) => {
   if (tab === "sessions") {
     router.push({
       name: "Sessions",
+      query: getQueryParams(
+        sessionState.data.datetime,
+        sessionState.data.editorValue
+      ),
     });
     return;
   }

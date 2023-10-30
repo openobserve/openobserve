@@ -80,7 +80,7 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -123,6 +123,18 @@ export default defineComponent({
         });
         return;
       }
+      if (router.currentRoute.value.name === "ingestMetrics") {
+        router.push({
+          name: "prometheus",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+    });
+
+    onUpdated(() => {
       if (router.currentRoute.value.name === "ingestMetrics") {
         router.push({
           name: "prometheus",

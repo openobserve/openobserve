@@ -267,7 +267,7 @@ pub async fn set_last_stats_offset(
 
 pub async fn _set_cache_expiry(offset: i64) -> Result<(), anyhow::Error> {
     let db = &infra_db::DEFAULT;
-    let key = format!("/stats/cache_expiry");
+    let key = "/stats/cache_expiry".to_string();
     db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
         .await?;
     Ok(())

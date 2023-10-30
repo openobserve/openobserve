@@ -54,7 +54,7 @@
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
 import { cloneDeep } from "lodash-es";
-import { computed, onBeforeMount, ref } from "vue";
+import { computed, onActivated, onBeforeMount, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
@@ -104,9 +104,10 @@ const getSessionDetails = computed(() => {
     browser: sessionState.data.selectedSession?.browser,
     os: sessionState.data.selectedSession?.os,
     ip: sessionState.data.selectedSession?.ip,
-    user_email: sessionState.data.selectedSession?.user_email,
-    city: sessionState.data.selectedSession?.city,
-    country: sessionState.data.selectedSession?.country,
+    user_email: sessionState.data.selectedSession?.user_email || "Unknown User",
+    city: sessionState.data.selectedSession?.city || "Unknown",
+    country: sessionState.data.selectedSession?.country || "Unknown",
+    id: sessionState.data.selectedSession?.session_id,
   };
 });
 

@@ -23,7 +23,7 @@ use super::StreamMeta;
 use crate::common::{
     infra::{
         cluster,
-        config::{CONFIG, SYSLOG_ROUTES},
+        config::{CONFIG, DISTINCT_FIELDS, SYSLOG_ROUTES},
         metrics,
     },
     meta::{
@@ -36,7 +36,7 @@ use crate::common::{
     },
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
-use crate::service::{db, get_formatted_stream_name, ingestion::write_file};
+use crate::service::{db, distinct_values, get_formatted_stream_name, ingestion::write_file};
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow::Error> {
     let start = std::time::Instant::now();
@@ -84,6 +84,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
+    let mut distinct_values = Vec::with_capacity(16);
 
     let mut trigger: Option<Trigger> = None;
 
@@ -166,11 +167,35 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
     if local_trigger.is_some() {
         trigger = Some(local_trigger.unwrap());
     }
+
+    // get distinct_value item
+    for field in DISTINCT_FIELDS.iter() {
+        if let Some(val) = local_val.get(field) {
+            if !val.is_null() {
+                distinct_values.push(distinct_values::DvItem {
+                    stream_type: StreamType::Logs,
+                    stream_name: stream_name.to_string(),
+                    field_name: field.to_string(),
+                    field_value: val.as_str().unwrap().to_string(),
+                    filter_name: "".to_string(),
+                    filter_value: "".to_string(),
+                });
+            }
+        }
+    }
+
     let mut stream_file_name = "".to_string();
     write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, &stream_alerts_map).await;
+
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME

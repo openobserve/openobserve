@@ -116,7 +116,7 @@ pub fn linear_regression(samples: &[Sample], intercept_time: i64) -> Option<(f64
     let mut sum_y = 0.0;
     let mut sum_xy = 0.0;
     let mut sum_x2 = 0.0;
-    let initial_y = samples.get(0)?.value;
+    let initial_y = samples.first()?.value;
     let mut constant_y = true;
 
     for (i, sample) in samples.iter().enumerate() {

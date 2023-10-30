@@ -692,14 +692,17 @@ export default defineComponent({
       showAddToDashboardDialog.value = true;
     };
 
-    const addPanelToDashboard = (dashboardId) => {
+    const addPanelToDashboard = (dashboardId, folderId, panelTitle) => {
       dismiss = $q.notify({
         message: "Please wait while we add the panel to the dashboard",
         type: "ongoing",
         position: "bottom",
       });
       dashboardPanelData.data.id = getPanelId();
-      addPanel(store, dashboardId, dashboardPanelData.data)
+      // panel name will come from add to dashboard component
+      dashboardPanelData.data.title = panelTitle;
+      // to create panel dashboard id, paneldata and folderId is required
+      addPanel(store, dashboardId, dashboardPanelData.data, folderId)
         .then(() => {
           showAddToDashboardDialog.value = false;
           $q.notify({
@@ -710,7 +713,7 @@ export default defineComponent({
           });
           router.push({
             name: "viewDashboard",
-            query: { dashboard: dashboardId },
+            query: { dashboard: dashboardId, folder: folderId },
           });
         })
         .catch((err) => {

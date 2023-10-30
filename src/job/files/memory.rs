@@ -13,14 +13,18 @@
 // limitations under the License.
 
 use bytes::Bytes;
-use datafusion::arrow::json::{reader::infer_json_schema, ReaderBuilder};
+use datafusion::arrow::json::ReaderBuilder;
 use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics, storage, wal},
     meta::{common::FileMeta, StreamType},
-    utils::{json, stream::populate_file_meta},
+    utils::{
+        json,
+        schema::{infer_json_schema, infer_json_schema_from_iterator},
+        stream::populate_file_meta,
+    },
 };
 use crate::service::{
     db,
@@ -161,7 +165,7 @@ async fn upload_file(
 
     let mut res_records: Vec<json::Value> = vec![];
     let mut schema_reader = BufReader::new(buf.as_ref());
-    let inferred_schema = match infer_json_schema(&mut schema_reader, None) {
+    let inferred_schema = match infer_json_schema(&mut schema_reader, None, stream_type) {
         Ok(mut inferred_schema) => {
             drop(schema_reader);
             filter_schema_null_fields(&mut inferred_schema);
