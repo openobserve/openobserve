@@ -1,7 +1,7 @@
 FROM public.ecr.aws/docker/library/rust:bullseye
 
-RUN rustup toolchain install nightly-2023-08-01
-RUN rustup default nightly-2023-08-01
+RUN rustup toolchain install nightly-2023-10-24
+RUN rustup default nightly-2023-10-24
 RUN rustup target add aarch64-unknown-linux-gnu
 RUN rustup component add rustfmt clippy llvm-tools
 RUN cargo install sccache

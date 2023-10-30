@@ -30,15 +30,15 @@ pub async fn count_values(
     let label_name = match param {
         Value::String(v) => v,
         _ => {
-            return Err(DataFusionError::Plan(format!(
-                "[label_name] param must be a String"
-            )))
+            return Err(DataFusionError::Plan(
+                "[label_name] param must be a String".to_string(),
+            ));
         }
     };
     if !Label::is_valid_label_name(&label_name) {
-        return Err(DataFusionError::Plan(format!(
-                "[label_name] param invalid. Check https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels"
-            )));
+        return Err(DataFusionError::Plan(
+            "[label_name] param invalid. Check https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels".to_string(),
+        ));
     }
     let score_values = super::eval_count_values(modifier, data, "count_values", &label_name)?;
     if score_values.is_none() {

@@ -33,7 +33,11 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
     if CONFIG.common.local_mode || items.is_empty() {
         return Ok(());
     }
-    let nodes = if node_uuid.is_none() {
+    let nodes = if let Some(node_uuid) = node_uuid {
+        cluster::get_node_by_uuid(&node_uuid)
+            .map(|node| vec![node])
+            .unwrap_or_default()
+    } else {
         cluster::get_cached_nodes(|node| {
             node.scheduled
                 && (node.status == cluster::NodeStatus::Prepare
@@ -41,10 +45,6 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
                 && (cluster::is_querier(&node.role) || cluster::is_compactor(&node.role))
         })
         .unwrap()
-    } else {
-        cluster::get_node_by_uuid(&node_uuid.unwrap())
-            .map(|node| vec![node])
-            .unwrap_or_default()
     };
     let local_node_uuid = cluster::LOCAL_NODE_UUID.clone();
     let mut events = EVENTS.write().await;

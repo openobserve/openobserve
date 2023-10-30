@@ -132,7 +132,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .create(true)
                 .append(true)
                 .open(&CONFIG.log.file)
-                .expect(&format!("open log file [{}] error", CONFIG.log.file));
+                .unwrap_or_else(|_| panic!("open log file [{}] error", CONFIG.log.file));
             log_builder.target(env_logger::Target::Pipe(Box::new(target)));
         }
         log_builder.init();

@@ -42,7 +42,7 @@ pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> e
         .clone()
         .write()
         .await
-        .insert(format!("{}", key), setting.clone());
+        .insert(key.to_string(), setting.clone());
     Ok(())
 }
 
