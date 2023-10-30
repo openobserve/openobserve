@@ -63,7 +63,7 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, onActivated } from "vue";
+import { defineComponent, ref, onBeforeMount, onActivated, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -89,6 +89,11 @@ export default defineComponent({
 
     // render general settings component
     onActivated(() => {
+      settingsTab.value = "general";
+      router.push({ path: "/settings/general" });
+    });
+
+    onUpdated(() => {
       settingsTab.value = "general";
       router.push({ path: "/settings/general" });
     });
