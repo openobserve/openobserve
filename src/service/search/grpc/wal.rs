@@ -60,6 +60,7 @@ pub async fn search(
     for file in files.clone().iter() {
         match get_file_contents(&file.key) {
             Err(_) => {
+                log::error!("skip wal file: {} get file content error", &file.key);
                 files.retain(|x| x != file);
             }
             Ok(file_data) => {
@@ -266,7 +267,13 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
     for file in files {
         if time_range != (0, 0) {
             // check wal file created time, we can skip files which created time > end_time
-            let file_meta = get_file_meta(&file).map_err(Error::from)?;
+            let file_meta = match get_file_meta(&file) {
+                Ok(meta) => meta,
+                Err(_) => {
+                    log::error!("skip wal file: {} get file meta error", file);
+                    continue;
+                }
+            };
             let file_modified = file_meta
                 .modified()
                 .unwrap_or(UNIX_EPOCH)

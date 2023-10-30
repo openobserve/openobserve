@@ -24,7 +24,6 @@ use crate::common::utils::notification::send_notification;
 use crate::service::search as SearchService;
 use crate::service::triggers;
 
-#[cfg_attr(coverage_nightly, no_coverage)]
 pub async fn run() -> Result<(), anyhow::Error> {
     for trigger in TRIGGERS.iter() {
         if !trigger.is_ingest_time {
@@ -35,7 +34,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[cfg_attr(coverage_nightly, no_coverage)]
 pub async fn handle_triggers(trigger: Trigger) {
     match super::db::alerts::get(
         &trigger.org,
@@ -78,7 +76,6 @@ pub async fn handle_triggers(trigger: Trigger) {
     }
 }
 
-#[cfg_attr(coverage_nightly, no_coverage)]
 async fn handle_trigger(alert_key: &str, frequency: i64) {
     let mut interval = time::interval(time::Duration::from_secs((frequency * 60) as _));
 
