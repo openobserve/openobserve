@@ -550,8 +550,8 @@ const removeQuery = (index: number) => {
       .fieldValues({
         org_identifier: store.state.selectedOrganization.identifier,
         stream_name: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
-        start_time:  new Date(dashboardPanelData.meta.dateTime["start_time"].toISOString()).getTime() * 1000,
-        end_time:  new Date(dashboardPanelData.meta.dateTime["end_time"].toISOString()).getTime() * 1000,
+        start_time:  new Date(dashboardPanelData.meta.dateTime["start_time"].toISOString()).getTime() ,
+        end_time:  new Date(dashboardPanelData.meta.dateTime["end_time"].toISOString()).getTime() ,
         fields: [name],
         size: 10,
         type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type
@@ -588,8 +588,8 @@ const loadFilterItem = (name:any)=>{
       .fieldValues({
         org_identifier: store.state.selectedOrganization.identifier,
         stream_name: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
-        start_time:  new Date(dashboardPanelData.meta.dateTime["start_time"].toISOString()).getTime() * 1000,
-        end_time:  new Date(dashboardPanelData.meta.dateTime["end_time"].toISOString()).getTime() * 1000,
+        start_time:  new Date(dashboardPanelData.meta.dateTime["start_time"].toISOString()).getTime() ,
+        end_time:  new Date(dashboardPanelData.meta.dateTime["end_time"].toISOString()).getTime() ,
         fields: [name],
         size: 10,
         type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type
