@@ -174,6 +174,8 @@ use crate::handler::http::request;
             meta::organization::PasscodeResponse,
             meta::organization::OrganizationSetting,
             meta::organization::OrganizationSettingResponse,
+            meta::organization::RumIngestionResponse,
+            meta::organization::RumIngestionToken,
             request::status::HealthzResponse,
             meta::ingestion::BulkResponse,
             meta::ingestion::BulkResponseItem,
