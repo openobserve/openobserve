@@ -288,7 +288,7 @@ const changeTab = (tab: string) => {
 
 const getStarted = () => {
   router.push({
-    name: "rumPerformanceSummary",
+    name: "frontendMonitoring",
     query: { org_identifier: store.state.selectedOrganization.identifier },
   });
 };
