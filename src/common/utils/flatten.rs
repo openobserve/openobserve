@@ -272,10 +272,10 @@ mod tests {
         let null = json!(null);
         let array = json!([1, 2, 3]);
 
-        for j in [integer, string, boolean, null, array] {
-            let res = flatten(&j);
+        for j in [integer, string, boolean, null, array].iter() {
+            let res = flatten(j);
             match res {
-                Err(_) => return, // Good
+                Err(_) => {} // Good
                 Ok(_) => panic!("This should have failed"),
             }
         }

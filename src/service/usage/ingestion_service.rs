@@ -100,7 +100,7 @@ mod test {
 
     #[test]
     fn test_ingest() {
-        let mut nodes = vec![1, 2];
+        let mut nodes = [1, 2];
         let mut count_1 = 0;
         let mut count_2 = 0;
         for _ in 0..10 {
