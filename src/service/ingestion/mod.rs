@@ -18,7 +18,6 @@ use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
-use datafusion::arrow::json::reader::infer_json_schema;
 use std::{collections::BTreeMap, io::BufReader, sync::Arc};
 use vector_enrichment::TableRegistry;
 use vrl::{
