@@ -297,10 +297,20 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     let user = USERS_RUM_TOKEN.get(&key);
     match user {
         Some(loc_user) => Some(loc_user.value().clone()),
-        None => db::user::get_by_token(Some(org_id), token)
-            .await
-            .ok()
-            .flatten(),
+        None => {
+            if let Some(user) = db::user::get_by_token(Some(org_id), token)
+                .await
+                .ok()
+                .flatten()
+            {
+                USERS_RUM_TOKEN
+                    .clone()
+                    .insert(format!("{}/{}", org_id, token), user.clone());
+                Some(user)
+            } else {
+                None
+            }
+        }
     }
 }
 

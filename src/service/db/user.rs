@@ -166,6 +166,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                     USERS.insert(format!("{}/{}", user.org, item_key), user);
                 }
+                // Invalidate the entire RUM-TOKEN-CACHE
+                USERS_RUM_TOKEN.clear();
             }
             infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -175,6 +177,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         break;
                     }
                 }
+                // Invalidate the entire RUM-TOKEN-CACHE
+                USERS_RUM_TOKEN.clear();
             }
             infra_db::Event::Empty => {}
         }

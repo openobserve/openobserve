@@ -15,6 +15,7 @@
 use rand::distributions::{Alphanumeric, DistString};
 
 use super::stream::get_streams;
+use crate::common::infra::config::USERS_RUM_TOKEN;
 use crate::common::meta::organization::{
     IngestionPasscode, IngestionTokensContainer, OrgSummary, RumIngestionToken,
 };
@@ -112,15 +113,32 @@ async fn update_passcode_inner(
         // Filter out the org which needs to be updated, so that we can modify and insert it back.
         orgs.retain(|org| !org.name.eq(&local_org_id));
 
+        // Invalidate the local cache
+        let org_to_update = &existing_org[0];
+        USERS_RUM_TOKEN.clone().remove(&format!(
+            "{}/{}",
+            org_to_update.name,
+            org_to_update.rum_token.as_deref().unwrap_or_default()
+        ));
+
         let updated_org = updated_org(&existing_org[0]);
         orgs.push(updated_org);
         orgs
     } else {
         // This is a root-user, so pick up the first/default org.
         let existing_org = orgs.first().unwrap().clone();
+
+        let org_to_update = &existing_org;
+        USERS_RUM_TOKEN.clone().remove(&format!(
+            "{}/{}",
+            org_to_update.name,
+            org_to_update.rum_token.as_deref().unwrap_or_default()
+        ));
+
         let updated_org = updated_org(&existing_org);
         vec![updated_org]
     };
+
     db_user.organizations = new_orgs;
     let _ = db::user::set(db_user.clone()).await;
 
