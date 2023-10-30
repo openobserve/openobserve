@@ -26,7 +26,7 @@ function init() {
     forwardErrorsToLogs: true,
     forwardConsoleLogs: "all",
     sessionSampleRate: 100,
-    insecureHTTP: true,
+    insecureHTTP: false,
     apiVersion: "v1",
   });
 
@@ -57,7 +57,7 @@ function init() {
     trackResources: true,
     trackLongTasks: true,
     trackUserInteractions: true,
-    insecureHTTP: true,
+    insecureHTTP: false,
     apiVersion: "v1",
     allowedTracingUrls: [],
     // enableGeoInfo: true,
