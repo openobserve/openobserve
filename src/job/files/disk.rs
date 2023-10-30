@@ -210,18 +210,18 @@ async fn upload_file(
     let mut schema_reader = BufReader::new(&file);
     let inferred_schema =
         match infer_json_schema_from_seekable(&mut schema_reader, None, stream_type) {
-        Ok(mut inferred_schema) => {
-            drop(schema_reader);
-            filter_schema_null_fields(&mut inferred_schema);
-            inferred_schema
-        }
-        Err(err) => {
-            // File has some corrupt json data....ignore such data & move rest of the records
-            log::error!(
-                "[JOB] Failed to infer schema from file: {}, error: {}",
-                path_str,
-                err.to_string()
-            );
+            Ok(mut inferred_schema) => {
+                drop(schema_reader);
+                filter_schema_null_fields(&mut inferred_schema);
+                inferred_schema
+            }
+            Err(err) => {
+                // File has some corrupt json data....ignore such data & move rest of the records
+                log::error!(
+                    "[JOB] Failed to infer schema from file: {}, error: {}",
+                    path_str,
+                    err.to_string()
+                );
 
                 drop(schema_reader);
                 file.seek(SeekFrom::Start(0)).unwrap();
@@ -243,17 +243,7 @@ async fn upload_file(
                 let value_iter = res_records.iter().map(Ok);
                 infer_json_schema_from_iterator(value_iter, stream_type).unwrap()
             }
-
-            if res_records.is_empty() {
-                return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
-            }
-            let value_iter = res_records.iter().map(Ok);
-            let mut inferred_schema =
-                arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap();
-            filter_schema_null_fields(&mut inferred_schema);
-            inferred_schema
-        }
-    };
+        };
     let arrow_schema = Arc::new(inferred_schema);
 
     let mut batches = vec![];

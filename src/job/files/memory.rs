@@ -197,7 +197,7 @@ async fn upload_file(
             }
             let value_iter = res_records.iter().map(Ok);
             let mut inferred_schema =
-                arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap();
+                infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
             filter_schema_null_fields(&mut inferred_schema);
             inferred_schema
         }

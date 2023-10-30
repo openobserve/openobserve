@@ -285,7 +285,7 @@ pub async fn chk_schema_by_record(
     }
 
     let mut schema_reader = BufReader::new(record_val.as_bytes());
-    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
+    let mut inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
     filter_schema_null_fields(&mut inferred_schema);
     let inferred_schema = inferred_schema.with_metadata(schema.metadata().clone());
     stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());

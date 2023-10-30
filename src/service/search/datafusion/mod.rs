@@ -24,7 +24,6 @@ use std::{str::FromStr, sync::Arc};
 
 use crate::common::{
     infra::config::{
-
         BLOOM_FILTER_DEFAULT_COLUMNS, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
         PARQUET_PAGE_SIZE, SQL_FULL_TEXT_SEARCH_FIELDS,
     },
