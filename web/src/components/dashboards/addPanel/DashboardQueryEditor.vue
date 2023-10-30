@@ -61,7 +61,7 @@
         <div class="col">
             <query-editor data-test="dashboard-panel-query-editor" ref="queryEditorRef" class="monaco-editor" v-model:query="currentQuery"
                 v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
-                v-model:functions="dashboardPanelData.meta.stream.functions" @run-query="searchData"
+                v-model:functions="dashboardPanelData.meta.stream.functions" :keywords="autoCompletePromqlKeywords" @run-query="searchData"
                 :readOnly="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"></query-editor>
             <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
         </div>
@@ -80,6 +80,7 @@ import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import QueryEditor from "../QueryEditor.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
+import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 
 export default defineComponent({
     name: "DashboardQueryEditor",
@@ -102,6 +103,9 @@ export default defineComponent({
         const confirmQueryModeChangeDialog = ref(false)
         const parser = new Parser();
         let streamName = "";
+        const {
+            autoCompletePromqlKeywords,
+        } = usePromqlSuggestions();
         
         const addTab = () => {         
             addQuery();
@@ -308,24 +312,28 @@ export default defineComponent({
 
         // This function parses the custom query and generates the errors and custom fields
         const updateQueryValue = () => {
+            console.log("updateQueryValue", dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery);
             // store the query in the dashboard panel data
             // dashboardPanelData.meta.editorValue = value;
             // dashboardPanelData.data.query = value;
 
             if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType != "promql") {
-
+                console.log("inside custom query");
                 // empty the errors
                 dashboardPanelData.meta.errors.queryErrors = []
 
                 // Get the parsed query
                 try {
                     dashboardPanelData.meta.parsedQuery = parser.astify(dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query);
+                    console.log("inside try", dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query);
                 } catch (e) {
                     // exit as there is an invalid query
                     dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax")
+                    console.log("inside catch", dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query);
                     return null;
                 }
                 if (!dashboardPanelData.meta.parsedQuery) {
+                    console.log("inside iff", dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query);
                     return;
                 }
 
@@ -389,6 +397,7 @@ export default defineComponent({
             addTab,
             removeTab,
             currentQuery,
+            autoCompletePromqlKeywords
         };
     },
 });
