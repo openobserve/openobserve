@@ -82,7 +82,8 @@
           @click="getStarted"
         >
           Get Started
-          <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
+          <q-icon name="arrow_forward" size="20px"
+class="q-ml-xs" />
         </q-btn>
       </div>
     </template>
@@ -288,6 +289,7 @@ const changeTab = (tab: string) => {
 const getStarted = () => {
   router.push({
     name: "rumPerformanceSummary",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
   });
 };
 </script>
