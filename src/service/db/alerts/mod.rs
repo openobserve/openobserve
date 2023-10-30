@@ -94,12 +94,7 @@ pub async fn list(
 ) -> Result<Vec<Alert>, anyhow::Error> {
     let db = &infra_db::DEFAULT;
 
-    let loc_stream_type = if let Some(v) = stream_type {
-        v
-    } else {
-        StreamType::Logs
-    };
-
+    let loc_stream_type = stream_type.unwrap_or_default();
     let key = match stream_name {
         Some(stream_name) => format!("/alerts/{org_id}/{loc_stream_type}/{stream_name}"),
         None => format!("/alerts/{org_id}"),
