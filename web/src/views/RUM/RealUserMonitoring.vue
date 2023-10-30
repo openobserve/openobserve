@@ -287,7 +287,7 @@ const changeTab = (tab: string) => {
 
 const getStarted = () => {
   router.push({
-    name: "rumMonitoring",
+    name: "rumPerformanceSummary",
   });
 };
 </script>
