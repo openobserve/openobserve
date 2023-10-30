@@ -95,7 +95,15 @@ export default defineComponent({
 
     onUpdated(() => {
       settingsTab.value = "general";
-      router.push({ path: "/settings/general" });
+      if (router.currentRoute.value.name === "settings") {
+        router.push({
+          name: "general",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
     });
 
     return {
