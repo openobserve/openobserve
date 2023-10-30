@@ -309,7 +309,7 @@ const setupSession = async () => {
     target: playerRef.value as HTMLElement,
     props: {
       events: session.value,
-      UNSAFE_replayCanvas: true,
+      UNSAFE_replayCanvas: false,
       mouseTail: false,
       autoPlay: false,
       showController: false,
