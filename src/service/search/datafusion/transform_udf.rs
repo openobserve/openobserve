@@ -144,8 +144,7 @@ fn get_udf_vrl(
                         let res_map = result.as_object().unwrap();
                         res.fields.sort();
                         for col in res.fields {
-                            let field_builder =
-                                col_val_map.entry(col.to_string()).or_insert_with(Vec::new);
+                            let field_builder = col_val_map.entry(col.to_string()).or_default();
                             if res_map.contains_key(&col) {
                                 field_builder.insert(i, get_value(res_map.get(&col).unwrap()));
                             } else {

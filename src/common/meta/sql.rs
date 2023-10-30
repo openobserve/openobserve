@@ -722,7 +722,7 @@ fn parse_expr_function(
 
     let nop = SqlOperator::And;
     let next_op = SqlOperator::And;
-    let field_name = f.args.get(0).unwrap().to_string();
+    let field_name = f.args.first().unwrap().to_string();
     let field_name = field_name.trim_matches(|c: char| c == '\'' || c == '"');
     if parse_expr_check_field_name(field_name, field) {
         match f.args.get(1).unwrap() {
@@ -768,7 +768,7 @@ fn parse_expr_fun_time_range(
     }
 
     let next_op = SqlOperator::And;
-    let field_name = f.args.get(0).unwrap().to_string();
+    let field_name = f.args.first().unwrap().to_string();
     let field_name = field_name.trim_matches(|c: char| c == '\'' || c == '"');
     if parse_expr_check_field_name(field_name, field) {
         let mut vals = Vec::new();

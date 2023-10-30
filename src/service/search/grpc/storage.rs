@@ -127,7 +127,7 @@ pub async fn search(
                     schema_latest_id
                 }
             };
-            let group = files_group.entry(schema_ver_id).or_insert_with(Vec::new);
+            let group = files_group.entry(schema_ver_id).or_default();
             group.push(file.clone());
         }
     }
@@ -213,7 +213,7 @@ pub async fn search(
                         .filter(|r| r.num_rows() > 0)
                         .collect::<Vec<_>>();
                     if !v.is_empty() {
-                        let group = results.entry(k).or_insert_with(Vec::new);
+                        let group = results.entry(k).or_default();
                         group.extend(v);
                     }
                 }

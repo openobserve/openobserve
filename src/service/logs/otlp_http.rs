@@ -162,14 +162,14 @@ pub async fn logs_json_handler(
             None => {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    format!("Invalid json: the structure must be {{\"resourceLogs\":[]}}"),
+                    "Invalid json: the structure must be {{\"resourceLogs\":[]}}".to_string(),
                 )))
             }
         },
         None => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                format!("Invalid json: the structure must be {{\"resourceLogs\":[]}}"),
+                "Invalid json: the structure must be {{\"resourceLogs\":[]}}".to_string(),
             )))
         }
     };
@@ -208,8 +208,8 @@ pub async fn logs_json_handler(
             }
         }
         let scope_resources = res_log.get("scopeLogs");
-        let inst_resources = if scope_resources.is_some() {
-            scope_resources.unwrap().as_array().unwrap()
+        let inst_resources = if let Some(v) = scope_resources {
+            v.as_array().unwrap()
         } else {
             res_log
                 .get("instrumentationLibrarySpans")

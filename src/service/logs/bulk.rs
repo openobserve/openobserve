@@ -262,8 +262,8 @@ pub async fn ingest(
                 local_val,
             )
             .await;
-            if local_trigger.is_some() {
-                stream_trigger_map.insert(stream_name.clone(), local_trigger.unwrap());
+            if let Some(trigger) = local_trigger {
+                stream_trigger_map.insert(stream_name.clone(), trigger);
             }
 
             // get distinct_value item

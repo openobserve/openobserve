@@ -400,7 +400,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
 
     // total
     let total = match result.aggs.get("_count") {
-        Some(v) => v.get(0).unwrap().get("num").unwrap().as_u64().unwrap() as usize,
+        Some(v) => v.first().unwrap().get("num").unwrap().as_u64().unwrap() as usize,
         None => result.hits.len(),
     };
     result.aggs.remove("_count");

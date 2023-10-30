@@ -247,7 +247,7 @@ pub async fn eval_top(
                         continue;
                     }
                     let signature = sum_labels.signature();
-                    let value = score_values.entry(signature).or_insert(vec![]);
+                    let value = score_values.entry(signature).or_default();
                     value.push(TopItem {
                         index: i,
                         value: item.sample.value,
@@ -261,7 +261,7 @@ pub async fn eval_top(
                         continue;
                     }
                     let signature = sum_labels.signature();
-                    let value = score_values.entry(signature).or_insert(vec![]);
+                    let value = score_values.entry(signature).or_default();
                     value.push(TopItem {
                         index: i,
                         value: item.sample.value,
@@ -276,7 +276,7 @@ pub async fn eval_top(
                     continue;
                 }
                 let signature = sum_labels.signature();
-                let value = score_values.entry(signature).or_insert(vec![]);
+                let value = score_values.entry(signature).or_default();
                 value.push(TopItem {
                     index: i,
                     value: item.sample.value,

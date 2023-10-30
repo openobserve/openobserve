@@ -235,7 +235,7 @@ impl Manager {
             .first()
             .unwrap()
             .parse()
-            .expect(format!("need a thread id, but the file is: {file_name}").as_str());
+            .unwrap_or_else(|_| panic!("need a thread id, but the file is: {file_name}"));
         let key = columns[1..columns.len() - 1].join("/");
         if let Some(file) = self.get(thread_id, stream, &key).await {
             if file.name() == file_name {

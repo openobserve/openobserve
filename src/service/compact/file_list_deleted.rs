@@ -126,10 +126,7 @@ async fn query_deleted_from_s3(
     let mut files = HashMap::with_capacity(16);
     while cur_time <= time_max {
         let offset_time: DateTime<Utc> = Utc.timestamp_nanos(cur_time * 1000);
-        let file_list_prefix = format!(
-            "{org_id}/{}",
-            offset_time.format("%Y/%m/%d/%H/").to_string()
-        );
+        let file_list_prefix = format!("{org_id}/{}", offset_time.format("%Y/%m/%d/%H/"));
         let prefix_files = load_prefix_from_s3(&file_list_prefix).await?;
         for (file, records) in prefix_files {
             let entry = files.entry(file).or_insert_with(Vec::new);

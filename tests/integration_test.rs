@@ -610,7 +610,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/auth/login"))
+            .uri("/auth/login")
             .insert_header(ContentType::json())
             .set_payload(body_str)
             .to_request();
@@ -633,7 +633,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/auth/login"))
+            .uri("/auth/login")
             .insert_header(ContentType::json())
             .set_payload(body_str)
             .to_request();

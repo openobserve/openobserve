@@ -521,7 +521,7 @@ impl Engine {
     }
 
     async fn call_expr_first_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(0).expect("Missing arg 0"))
+        self.exec_expr(args.args.first().expect("Missing arg 0"))
             .await
     }
 
@@ -756,10 +756,10 @@ impl Engine {
 
                 let input = self.call_expr_first_arg(args).await?;
                 let dst_label = self.call_expr_second_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid destination label found")),
+                    DataFusionError::NotImplemented("Invalid destination label found".into()),
                 )?;
                 let separator = self.call_expr_third_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid separator label found")),
+                    DataFusionError::NotImplemented("Invalid separator label found".into()),
                 )?;
 
                 let mut source_labels = vec![];
@@ -782,18 +782,18 @@ impl Engine {
                 let input = self.call_expr_first_arg(args).await?;
 
                 let dst_label = self.call_expr_second_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid destination label found")),
+                    DataFusionError::NotImplemented("Invalid destination label found".into()),
                 )?;
                 let replacement = self.call_expr_third_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid replacement string found")),
+                    DataFusionError::NotImplemented("Invalid replacement string found".into()),
                 )?;
 
                 let src_label = self.call_expr_fourth_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid source label string found")),
+                    DataFusionError::NotImplemented("Invalid source label string found".into()),
                 )?;
 
                 let regex = self.call_expr_fifth_arg(args).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented(format!("Invalid regex string found")),
+                    DataFusionError::NotImplemented("Invalid regex string found".into()),
                 )?;
 
                 functions::label_replace(&input, &dst_label, &replacement, &src_label, &regex)?
@@ -813,9 +813,9 @@ impl Engine {
                 let input = self.call_expr_first_arg(args).await?;
 
                 let prediction_steps = self.call_expr_second_arg(args).await?.get_float().ok_or(
-                    DataFusionError::NotImplemented(format!(
-                        "Invalid prediction_steps, f64 expected",
-                    )),
+                    DataFusionError::NotImplemented(
+                        "Invalid prediction_steps, f64 expected".into(),
+                    ),
                 )?;
                 functions::predict_linear(&input, prediction_steps)?
             }
@@ -826,9 +826,9 @@ impl Engine {
                 let phi_quantile = match self.call_expr_first_arg(args).await {
                     Ok(Value::Float(v)) => v,
                     _ => {
-                        return Err(DataFusionError::Plan(format!(
-                            "[quantile] param must be a NumberLiteral"
-                        )))
+                        return Err(DataFusionError::Plan(
+                            "[quantile] param must be a NumberLiteral".into(),
+                        ))
                     }
                 };
                 let input = self.call_expr_second_arg(args).await?;
