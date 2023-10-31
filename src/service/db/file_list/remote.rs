@@ -110,7 +110,6 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
         .map(|v| v.key().to_string())
         .collect::<Vec<String>>();
     infra_file_list::batch_remove(&deleted_files).await?;
-    infra_file_list::set_initialised().await?;
 
     // cache result
     rw.insert(prefix.clone());
