@@ -19,6 +19,7 @@ use sqlparser::ast::{
     BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr, Offset as SqlOffset,
     OrderByExpr, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, Value,
 };
+use sqlparser::dialect;
 use sqlparser::parser::Parser;
 
 use crate::common::infra::config::CONFIG;
@@ -69,12 +70,15 @@ pub struct Offset<'a>(pub(crate) &'a SqlOffset);
 pub struct Limit<'a>(pub(crate) &'a SqlExpr);
 
 impl Sql {
-    pub fn new(sql: &str) -> Result<Sql, anyhow::Error> {
+    pub fn new(sql: &str, dialect_name: String) -> Result<Sql, anyhow::Error> {
         if sql.is_empty() {
             return Err(anyhow::anyhow!("SQL is empty"));
         }
-        let dialect = sqlparser::dialect::GenericDialect {};
-        let statement = Parser::parse_sql(&dialect, sql);
+
+        let temp = dialect::dialect_from_str(dialect_name).unwrap_or(Box::new(dialect::GenericDialect {}));
+        let dialect = temp.as_ref();
+
+        let statement = Parser::parse_sql(dialect, sql);
         if statement.is_err() {
             return Err(anyhow::anyhow!(statement.err().unwrap()));
         }
@@ -879,7 +883,7 @@ mod tests {
             "select a, b, c from \"{}\" where a=1 and b=1 or c=1 order by c desc limit 5 offset 10",
             table
         );
-        let local_sql: Sql = Sql::new(sql.as_str()).unwrap();
+        let local_sql: Sql = Sql::new(sql.as_str(), String::from("")).unwrap();
         assert_eq!(local_sql.source, table);
         assert_eq!(local_sql.limit, 5);
         assert_eq!(local_sql.offset, 10);
@@ -910,7 +914,7 @@ mod tests {
             ),
         ];
         for (sql, ok) in sqls {
-            let ret = Sql::new(sql);
+            let ret = Sql::new(sql, String::from(""));
             assert_eq!(ret.is_ok(), ok);
         }
     }
@@ -946,7 +950,7 @@ mod tests {
             (r#"select * from tbl where time_range("_timestamp", '2022-10-19T15:19:24.587Z','2022-10-19T15:34:24.587Z')"#,(1666192764587000,1666193664587000))].to_vec();
 
         for (sql, (expected_t1, expected_t2)) in samples {
-            let (actual_t1, actual_t2) = Sql::new(sql).unwrap().time_range.unwrap();
+            let (actual_t1, actual_t2) = Sql::new(sql, String::from("")).unwrap().time_range.unwrap();
             assert_eq!(actual_t1, expected_t1);
             if expected_t2 != 0 {
                 assert_eq!(actual_t2, expected_t2);

@@ -149,7 +149,7 @@ time = "0.3"
 tikv-jemallocator = { version = "0.5", optional = true }
 tempfile = "3"
 tokio = { version = "1", features = ["full"] }
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", features = ["net"] }
 tonic = { version = "0.8", features = ["prost", "gzip"] }
 tracing = { version = "0.1.37", features = ["attributes"] }
 tracing-opentelemetry = "0.18"
@@ -165,6 +165,10 @@ walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.12"
 sha256 = "1.4.0"
+tokio-rustls = "0.24"
+rustls-pemfile = "1.0"
+pgwire = "0.16"
+futures-util = "0.3"
 
 
 [build-dependencies]

@@ -134,6 +134,7 @@ pub static MAXMIND_DB_CLIENT: Lazy<Arc<TRwLock<Option<MaxmindClient>>>> =
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
+    pub postgres: Postgres,
     pub http: Http,
     pub grpc: Grpc,
     pub route: Route,
@@ -169,6 +170,24 @@ pub struct Auth {
     pub root_user_email: String,
     #[env_config(name = "ZO_ROOT_USER_PASSWORD")]
     pub root_user_password: String,
+}
+
+#[derive(EnvConfig)]
+pub struct Postgres {
+    #[env_config(name = "ZO_POSTGRES_USERNAME", default = "root")]
+    pub username: String,
+    #[env_config(name = "ZO_POSTGRES_PASSWORD", default = " ")]
+    pub password: String,
+    #[env_config(name = "ZO_POSTGRES_PORT", default = 5432)]
+    pub port: u16,
+    #[env_config(name = "ZO_POSTGRES_TLS", default = false)]
+    pub tls: bool,
+    #[env_config(name = "ZO_POSTGRES_ENABLED", default = true)]
+    pub enabled: bool,
+    #[env_config(name = "ZO_POSTGRES_CERT_PATH", default = "../../handler/tls/server.crt")]
+    pub cert_path: String,
+    #[env_config(name = "ZO_POSTGRES_KEY_PATH", default = "../../handler/tls/server.key")]
+    pub key_path: String
 }
 
 #[derive(EnvConfig)]

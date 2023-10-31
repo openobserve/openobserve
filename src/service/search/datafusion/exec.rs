@@ -102,7 +102,7 @@ pub async fn sql(
     );
 
     //get alias from context query for agg sql
-    let meta_sql = sql::Sql::new(&sql.query_context);
+    let meta_sql = sql::Sql::new(&sql.query_context, String::from(""));
 
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL

@@ -11,9 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-pub mod grpc;
-pub mod http;
-pub mod postgres;
-pub mod tcp_udp;
-pub mod tls;
+pub mod server;
+pub mod query_handler;
+pub mod auth_handler;
+pub mod types;

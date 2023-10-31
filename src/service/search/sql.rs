@@ -115,7 +115,7 @@ impl Sql {
             origin_sql.pop();
         }
         origin_sql = split_sql_token(&origin_sql).join("");
-        let mut meta = match MetaSql::new(&origin_sql) {
+        let mut meta = match MetaSql::new(&origin_sql, String::from("")) {
             Ok(meta) => meta,
             Err(err) => {
                 log::error!("parse sql error: {}, sql: {}", err, origin_sql);
@@ -516,7 +516,7 @@ impl Sql {
                     }
                 }
             }
-            let sql_meta = MetaSql::new(sql.clone().as_str());
+            let sql_meta = MetaSql::new(sql.clone().as_str(), String::from(""));
             if sql_meta.is_err() {
                 log::error!("parse sql error: {}, sql: {}", sql_meta.err().unwrap(), sql);
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
@@ -550,7 +550,7 @@ impl Sql {
             aggs.insert(key.clone(), (sql, sql_meta));
         }
 
-        let sql_meta = MetaSql::new(origin_sql.clone().as_str());
+        let sql_meta = MetaSql::new(origin_sql.clone().as_str(), String::from(""));
 
         match &sql_meta {
             Ok(sql_meta) => {

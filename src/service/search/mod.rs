@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
-use ahash::AHashMap as HashMap;
+use ahash::{AHashMap as HashMap};
 use once_cell::sync::Lazy;
 use std::{cmp::min, io::Cursor, sync::Arc};
 use tokio::sync::Mutex;
@@ -39,6 +39,7 @@ use crate::common::{
 };
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, file_list, format_partition_key, stream};
+use crate::service::search::sql::Sql;
 
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
@@ -117,21 +118,13 @@ async fn get_file_list(
     files
 }
 
-#[tracing::instrument(
-    name = "service:search:cluster",
-    skip(req),
-    fields(org_id = req.org_id)
-)]
-async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
-    let start = std::time::Instant::now();
+pub async fn search_by_grpc(req: &cluster_rpc::SearchRequest, sql: Arc<Sql>) -> Result<(HashMap<String, Vec<Vec<RecordBatch>>>, ScanStats), Error> {
+    let mut scan_stats = ScanStats::new();
 
-    // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
-    let meta = sql::Sql::new(&req).await?;
 
     // get a cluster search queue lock
     let locker = dist_lock::lock("search/cluster_queue", 0).await?;
-    let took_wait = start.elapsed().as_millis() as usize;
 
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
@@ -148,11 +141,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         n => n,
     };
 
-    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
+    let stream_settings = stream::stream_settings(&sql.schema).unwrap_or_default();
     let partition_time_level =
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
-    let file_list = get_file_list(&meta, stream_type, partition_time_level).await;
+    let file_list = get_file_list(&sql, stream_type, partition_time_level).await;
     let file_num = file_list.len();
     let offset = if querier_num >= file_num {
         1
@@ -161,7 +154,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     };
     log::info!(
         "search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
-        meta.meta.time_range
+        sql.meta.time_range
     );
 
     // partition request, here plus 1 second, because division is integer, maybe lose some precision
@@ -261,7 +254,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 );
                 Ok(response)
             }
-            .instrument(grpc_span),
+                .instrument(grpc_span),
         );
         tasks.push(task);
     }
@@ -283,10 +276,9 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     // search done, release lock
     dist_lock::unlock(&locker).await?;
 
-    // merge multiple instances data
-    let mut scan_stats = ScanStats::new();
     let mut batches: HashMap<String, Vec<Vec<RecordBatch>>> = HashMap::new();
-    let sql = Arc::new(meta);
+
+    // merge multiple instances data
     for resp in results {
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
         // handle hits
@@ -327,7 +319,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             &merge_sql,
             batch,
         )
-        .await
+            .await
         {
             Ok(res) => res,
             Err(err) => {
@@ -337,6 +329,29 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             }
         };
     }
+    Ok((batches, scan_stats))
+}
+
+#[tracing::instrument(
+    name = "service:search:cluster",
+    skip(req),
+    fields(org_id = req.org_id)
+)]
+async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
+    let start = std::time::Instant::now();
+
+    // handle request time range
+    let meta = sql::Sql::new(&req).await?;
+
+    let sql = Arc::new(meta);
+    let took_wait = start.elapsed().as_millis() as usize;
+
+    let grpc_result = search_by_grpc(&req, sql.clone()).await;
+    if grpc_result.is_err() {
+        return Err(grpc_result.err().unwrap());
+    }
+
+    let (batches, scan_stats) = grpc_result.unwrap();
 
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);

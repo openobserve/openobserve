@@ -79,6 +79,7 @@ use openobserve::{
 use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]
 use pyroscope_pprofrs::{pprof_backend, PprofConfig};
+use openobserve::handler::postgres::server::PostgresServer;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -167,6 +168,17 @@ async fn main() -> Result<(), anyhow::Error> {
     // gRPC server
     if !cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
         init_grpc_server()?;
+    }
+
+    // postgres server
+    let postgres_server = if CONFIG.postgres.enabled {
+        Some(init_postgres_server())
+    } else {
+        None
+    };
+
+    if postgres_server.is_some() {
+        postgres_server.as_ref().unwrap().start().await?;
     }
 
     // let node online
@@ -258,6 +270,9 @@ async fn main() -> Result<(), anyhow::Error> {
     meta::telemetry::Telemetry::new()
         .event("OpenObserve - Server stopped", None, false)
         .await;
+    if postgres_server.is_some() {
+        postgres_server.as_ref().unwrap().shutdown().await?;
+    }
     // leave the cluster
     let _ = cluster::leave().await;
     // flush WAL cache to disk
@@ -279,6 +294,10 @@ async fn main() -> Result<(), anyhow::Error> {
     agent_ready.shutdown();
 
     Ok(())
+}
+
+fn init_postgres_server() -> PostgresServer {
+    PostgresServer::new(&CONFIG.postgres)
 }
 
 fn init_grpc_server() -> Result<(), anyhow::Error> {
