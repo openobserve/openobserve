@@ -153,6 +153,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
             db::file_list::remote::cache("", false)
                 .await
                 .expect("file list remote cache failed");
+            infra_file_list::create_table_index()
+                .await
+                .expect("file list create table index failed");
+            infra_file_list::set_initialised()
+                .await
+                .expect("file list set initialised failed");
             update_stats_from_file_list()
                 .await
                 .expect("file list remote calculate stats failed");
