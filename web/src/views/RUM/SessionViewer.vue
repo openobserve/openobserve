@@ -31,21 +31,23 @@
       </div>
       <q-separator class="full-width q-mt-sm" />
     </div>
-    <div class="col-9">
-      <VideoPlayer
-        ref="videoPlayerRef"
-        :events="segmentEvents"
-        :segments="segments"
-        :is-loading="!!isLoading.length"
-      />
-    </div>
-    <div class="col-3 row">
-      <q-separator vertical class="full-height" />
-      <PlayerEventsSidebar
-        :events="segmentEvents"
-        :sessionDetails="getSessionDetails"
-        @event-emitted="handleSidebarEvent"
-      />
+    <div class="col-12 row" style="height: calc(100vh - 104px)">
+      <div class="col-9 full-height">
+        <VideoPlayer
+          ref="videoPlayerRef"
+          :events="segmentEvents"
+          :segments="segments"
+          :is-loading="!!isLoading.length"
+        />
+      </div>
+      <div class="col-3 row">
+        <q-separator vertical class="full-height" />
+        <PlayerEventsSidebar
+          :events="segmentEvents"
+          :sessionDetails="getSessionDetails"
+          @event-emitted="handleSidebarEvent"
+        />
+      </div>
     </div>
   </div>
 </template>
