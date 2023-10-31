@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use ahash::AHashMap as HashMap;
-use arrow_schema::Field;
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
@@ -55,8 +54,7 @@ use crate::common::{
     },
     utils::{flatten, json},
 };
-use crate::service::schema::filter_schema_null_fields;
-use crate::service::search::sql::Sql;
+use crate::service::{schema::filter_schema_null_fields, search::sql::Sql};
 
 use super::storage::{file_list, StorageType};
 use super::transform_udf::get_all_transform;
@@ -506,20 +504,9 @@ pub async fn merge(
             return Err(e);
         }
     };
-    let schema: Schema = df.schema().into();
     let mut batches = df.collect().await?;
     if batches.len() > 1 {
-        // try to merge recordbatch
-        let schema = Arc::new(schema);
-        let mut merged_batch = batches[0].clone();
-        for item in batches.iter().skip(1) {
-            if item.num_rows() > 0 {
-                merged_batch =
-                    arrow::compute::concat_batches(&schema.clone(), &[merged_batch, item.clone()])
-                        .unwrap();
-            }
-        }
-        batches = vec![merged_batch];
+        batches.retain(|batch| batch.num_rows() > 0);
     }
     ctx.deregister_table("tbl")?;
 
@@ -545,20 +532,20 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>,
             }
             i += 1;
             let row_schema = row.schema();
-            let filtered_fields: Vec<Field> = row_schema
-                .fields()
-                .iter()
-                .filter(|field| field.data_type() != &DataType::Null)
-                .map(|arc_field| (**arc_field).clone())
-                .collect();
-            let row_schema = Arc::new(Schema::new(filtered_fields));
-            schema = Schema::try_merge(vec![schema.clone(), row_schema.as_ref().to_owned()])?;
+            let mut row_schema = row_schema.as_ref().to_owned();
+            filter_schema_null_fields(&mut row_schema); // fix schema
+            let row_schema = row_schema.to_owned();
+            schema = Schema::try_merge(vec![schema.clone(), row_schema.clone()])?;
 
             let file_name = format!("{work_dir}{i}.parquet");
             let mut buf_parquet = Vec::new();
-            let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema.clone(), None)?;
-            writer.write(row)?;
-            writer.close().unwrap();
+            let mut writer = ArrowWriter::try_new(&mut buf_parquet, Arc::new(row_schema), None)?;
+            writer
+                .write(row)
+                .map_err(|e| DataFusionError::Execution(format!("merge write error: {e}")))?;
+            writer
+                .close()
+                .map_err(|e| DataFusionError::Execution(format!("merge close error: {e}")))?;
             tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
         }
     }
