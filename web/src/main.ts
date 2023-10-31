@@ -16,7 +16,6 @@ import { createApp } from "vue";
 import { Notify, Dialog, Quasar } from "quasar";
 import "quasar/src/css/index.sass";
 import "@quasar/extras/roboto-font/roboto-font.css";
-import "@quasar/extras/material-icons/material-icons.css";
 
 import * as Sentry from "@sentry/vue";
 
