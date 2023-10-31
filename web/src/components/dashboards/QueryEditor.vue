@@ -95,6 +95,7 @@ export default defineComponent({
         monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
       None: monaco.languages.CompletionItemInsertTextRule.None,
     };
+    console.log("props.functions", props.functions);
 
     const createDependencyProposals = (range: any) => {
       let keywords = [
@@ -286,7 +287,7 @@ export default defineComponent({
         lineNumbers: "on",
         lineNumbersMinChars: 0,
         overviewRulerLanes: 0,
-        fixedOverflowWidgets: false,
+        fixedOverflowWidgets: true,
         overviewRulerBorder: false,
         lineDecorationsWidth: 15,
         hideCursorInOverviewRuler: true,
