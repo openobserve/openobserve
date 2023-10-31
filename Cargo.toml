@@ -76,7 +76,7 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { git = "https://github.com/apache/arrow-datafusion.git", rev = "4881b5db36a978ddd4523d5a03daf7c0938a23bd", version = "32", features = [
+datafusion = { git = "https://github.com/apache/arrow-datafusion.git", rev = "656c6a93fadcec7bc43a8a881dfaf55388b0b5c6", version = "32", features = [
   "simd",
 ] }
 arrow = { version = "48", features = ["simd", "ipc_compression"] }
@@ -139,7 +139,7 @@ serde_json = "1"
 simd-json = "0.10.3"
 sled = "0.34"
 snap = "1"
-sqlparser = { version = "0.38", features = ["serde", "visitor"] }
+sqlparser = { version = "0.39", features = ["serde", "visitor"] }
 sqlx = { version = "0.7", features = [
   "runtime-tokio-rustls",
   "postgres",
@@ -178,7 +178,7 @@ prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
-datafusion-expr = { git = "https://github.com/apache/arrow-datafusion.git", rev = "4881b5db36a978ddd4523d5a03daf7c0938a23bd", version = "32" }
+datafusion-expr = { git = "https://github.com/apache/arrow-datafusion.git", rev = "656c6a93fadcec7bc43a8a881dfaf55388b0b5c6", version = "32" }
 
 expect-test = "1.4"
 float-cmp = "0.9"
