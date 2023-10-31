@@ -31,6 +31,9 @@ import configService from "./services/config";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 
+import { datadogRum } from "@datadog/browser-rum";
+import { datadogLogs } from "@datadog/browser-logs";
+
 const app = createApp(App);
 const router = createRouter(store);
 
@@ -98,6 +101,32 @@ const getConfig = async () => {
       sessionSampleRate: 100,
       insecureHTTP: false,
       apiVersion: "v1",
+    });
+
+    openobserveRum.startSessionReplayRecording();
+
+    datadogRum.init({
+      applicationId: "04d3b6de-51c1-49d5-a693-504293e3d36f", // required, any string identifying your application
+      clientToken: "pub7021787ca082769936566dbefdd0d13c",
+      site: "us5.datadoghq.com",
+      service: "openobserve",
+      // service: "my-web-application",
+      // env: "production",
+      // version: "1.0.0",
+      sessionSampleRate: 100,
+      sessionReplaySampleRate: 100, // if not included, the default is 100
+      trackResources: true,
+      trackLongTasks: true,
+      trackUserInteractions: true,
+      version: "v1",
+    });
+
+    datadogLogs.init({
+      clientToken: "pub7021787ca082769936566dbefdd0d13c",
+      site: "us5.datadoghq.com",
+      forwardErrorsToLogs: true,
+      sessionSampleRate: 100,
+      version: "v1",
     });
 
     openobserveRum.startSessionReplayRecording();
