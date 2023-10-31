@@ -93,6 +93,7 @@ export default defineConfig({
   },
   server: {
     port: 8081,
+    cors: true,
   },
   base: "./",
   plugins: [
