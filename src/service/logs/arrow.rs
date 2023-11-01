@@ -73,31 +73,22 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
         file.into_inner()
     );
     let mut rows = vec![];
-    let mut num_rows = 0;
     if let Ok(buf) = File::open(file) {
         let reader = StreamReader::try_new(&buf, None).unwrap();
 
-        let mut num_batches = 0;
-
-        let mut batches = vec![];
-
         for batch in reader {
-            num_batches += 1;
             match batch {
                 Ok(read_batch) => {
-                    let name_column = read_batch
-                        .column(1)
-                        .as_any()
-                        .downcast_ref::<StringArray>()
-                        .expect("Expected StringArray");
-                    num_rows += read_batch.num_rows();
-
-                    for i in 0..read_batch.num_rows() {
-                        let name = name_column.value(i).to_string();
-
-                        rows.push(name);
-                    }
-                    batches.push(read_batch);
+                    let json_rows =
+                        match arrow::json::writer::record_batches_to_json_rows(&[&read_batch]) {
+                            Ok(res) => res,
+                            Err(_) => {
+                                vec![]
+                            }
+                        };
+                    let mut sources: Vec<json::Value> =
+                        json_rows.into_iter().map(json::Value::Object).collect();
+                    rows.append(&mut sources);
                 }
                 Err(err) => {
                     println!("error:reading batch {}", err);
@@ -107,11 +98,10 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
         }
     } else {
     }
-    let msg = format!("got   {num_rows}    rows",);
 
     HttpResponse::Ok()
         .content_type("application/json")
-        .body(msg)
+        .json(rows)
 }
 
 pub async fn ingest(
