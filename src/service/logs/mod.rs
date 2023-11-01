@@ -30,7 +30,6 @@ use crate::common::{
         self,
         hasher::get_fields_key_xxh3,
         json::{Map, Value},
-        schema_ext::SchemaExt,
     },
 };
 use crate::service::{
@@ -593,8 +592,9 @@ async fn add_valid_record_arrow(
         local_val,
         Some(&schema_key),
     );
+
     let hour_buf = buf.entry(hour_key).or_insert(SchemaRecords {
-        schema: schema_evolution.record_schema,
+        schema: Schema::new(schema_evolution.schema_fields),
         records: vec![],
     });
 
@@ -603,7 +603,7 @@ async fn add_valid_record_arrow(
             let delta = schema_evolution.types_delta.unwrap();
             let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
             let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
-                cast_to_type(loc_value, delta)
+                cast_to_type_arrow(loc_value, delta)
             } else if schema_evolution.is_schema_changed {
                 let local_delta = delta
                     .into_iter()
@@ -613,10 +613,10 @@ async fn add_valid_record_arrow(
                 if local_delta.is_empty() {
                     (Some(value_str.clone()), None)
                 } else {
-                    cast_to_type(loc_value, local_delta)
+                    cast_to_type_arrow(loc_value, local_delta)
                 }
             } else {
-                cast_to_type(loc_value, delta)
+                cast_to_type_arrow(loc_value, delta)
             };
             if ret_val.is_some() {
                 value_str = ret_val.unwrap();
@@ -629,7 +629,6 @@ async fn add_valid_record_arrow(
         } else {
             true
         };
-
         if valid_record {
             if !stream_meta.stream_alerts_map.is_empty() {
                 // Start check for alert trigger
