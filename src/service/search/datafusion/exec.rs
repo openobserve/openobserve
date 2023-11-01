@@ -540,20 +540,6 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>,
             let row_schema = row.schema();
             schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
             let file_name = format!("{work_dir}{i}.parquet");
-            println!(
-                "{}",
-                arrow::util::pretty::pretty_format_batches_with_options(
-                    &[row.clone()],
-                    &datafusion::common::format::DEFAULT_FORMAT_OPTIONS
-                )?
-            );
-            println!(
-                "{:?}",
-                row.columns()
-                    .iter()
-                    .map(|c| c.data_type())
-                    .collect::<Vec<&DataType>>()
-            );
             let mut buf_parquet = Vec::new();
             let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema, None)?;
             writer.write(row)?;
