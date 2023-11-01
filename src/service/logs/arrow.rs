@@ -1,5 +1,4 @@
 use actix_web::{post, web, HttpResponse};
-use arrow::array::StringArray;
 use arrow::ipc::reader::StreamReader;
 use arrow::json::ReaderBuilder;
 use std::fs::File;
@@ -82,7 +81,8 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
                     let json_rows =
                         match arrow::json::writer::record_batches_to_json_rows(&[&read_batch]) {
                             Ok(res) => res,
-                            Err(_) => {
+                            Err(err) => {
+                                println!("error:reading batch {}", err);
                                 vec![]
                             }
                         };
@@ -96,7 +96,6 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
                 }
             }
         }
-    } else {
     }
 
     HttpResponse::Ok()
@@ -154,7 +153,7 @@ pub async fn ingest(
     });
     for item in reader.iter() {
         match super::ingest::apply_functions(
-            &item,
+            item,
             &local_trans,
             &stream_vrl_map,
             stream_name,

@@ -373,7 +373,7 @@ async fn handle_existing_schema(
             .await
             .unwrap();
         let (field_datatype_delta, is_schema_changed, final_fields) =
-            get_schema_changes(&schema, &inferred_schema, is_arrow);
+            get_schema_changes(&schema, inferred_schema, is_arrow);
         let is_field_delta = !field_datatype_delta.is_empty();
         let mut metadata = schema.metadata().clone();
         if !metadata.contains_key("created_at") {
@@ -430,7 +430,7 @@ async fn handle_existing_schema(
                 .await
                 .unwrap();
             let (field_datatype_delta, is_schema_changed, final_fields) =
-                get_schema_changes(&schema, &inferred_schema, is_arrow);
+                get_schema_changes(&schema, inferred_schema, is_arrow);
             let is_field_delta = !field_datatype_delta.is_empty();
             let mut metadata = schema.metadata().clone();
             if !metadata.contains_key("created_at") {
@@ -476,7 +476,7 @@ async fn handle_existing_schema(
                 .await
                 .unwrap();
             let (field_datatype_delta, _is_schema_changed, final_fields) =
-                get_schema_changes(&schema, &inferred_schema, is_arrow);
+                get_schema_changes(&schema, inferred_schema, is_arrow);
             stream_schema_map.insert(stream_name.to_string(), schema);
             log::info!("Schema exists for stream {} ", stream_name);
             drop(lock_acquired); // release lock
@@ -640,6 +640,7 @@ fn get_schema_changes(
     let mut field_datatype_delta: Vec<_> = vec![];
     let mut new_field_delta: Vec<_> = vec![];
     let mut merged_fields: AHashMap<String, Field> = AHashMap::new();
+
     let mut is_schema_changed = false;
 
     for f in schema.fields.iter() {
@@ -678,7 +679,19 @@ fn get_schema_changes(
         }
     }
 
-    let final_fields = merged_fields.drain().map(|(_key, value)| value).collect();
+    let final_fields = if !is_arrow {
+        merged_fields.drain().map(|(_key, value)| value).collect()
+    } else {
+        let mut inferred_fields: AHashMap<String, Field> = AHashMap::new();
+        for f in inferred_schema.fields.iter() {
+            inferred_fields.insert(f.name().to_owned(), (**f).clone());
+        }
+        merged_fields
+            .drain()
+            .filter(|item| inferred_fields.contains_key(&item.0))
+            .map(|(_key, value)| value)
+            .collect()
+    };
     (field_datatype_delta, is_schema_changed, final_fields)
 }
 
