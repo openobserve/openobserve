@@ -331,7 +331,6 @@ pub struct SchemaEvolution {
     pub types_delta: Option<Vec<Field>>,
     pub schema_fields: Vec<Field>,
     pub is_schema_changed: bool,
-    pub record_schema: Schema,
 }
 
 pub struct SchemaRecords {
@@ -344,7 +343,6 @@ pub struct SchemaRecords {
     pub schema: Schema,
     pub records: Vec<json::Value>,
 }
-
 
 #[derive(Clone, Copy, Default)]
 pub struct ScanStats {
