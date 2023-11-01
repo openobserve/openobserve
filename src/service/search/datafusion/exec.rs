@@ -1125,7 +1125,7 @@ fn apply_query_fn(
 
 #[cfg(test)]
 mod test {
-    use arrow::array::Int32Array;
+    use arrow::array::{Int32Array, NullArray, StringArray};
     use arrow_schema::Field;
 
     use super::*;
@@ -1140,21 +1140,34 @@ mod test {
     #[actix_web::test]
     async fn test_merge_write_recordbatch() {
         // define a schema.
-        let schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Int32, false)]));
+        let schema1 = Arc::new(Schema::new(vec![
+            Field::new("f", DataType::Int32, false),
+            Field::new("g", DataType::Utf8, false),
+        ]));
+        let schema2 = Arc::new(Schema::new(vec![
+            Field::new("f", DataType::Int32, false),
+            Field::new("g", DataType::Null, false),
+        ]));
         // define data.
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(Int32Array::from(vec![1, 10, 10, 100]))],
-        )
-        .unwrap();
-
         let batch2 = RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(Int32Array::from(vec![2, 20, 20, 200]))],
+            schema2.clone(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 10, 10, 100])),
+                Arc::new(NullArray::new(4)),
+            ],
         )
         .unwrap();
 
-        let res = merge_write_recordbatch(&[vec![batch, batch2]]).unwrap();
+        let batch1 = RecordBatch::try_new(
+            schema1.clone(),
+            vec![
+                Arc::new(Int32Array::from(vec![2, 20, 20, 200])),
+                Arc::new(StringArray::from(vec!["2", "20", "20", "200"])),
+            ],
+        )
+        .unwrap();
+
+        let res = merge_write_recordbatch(&[vec![batch1, batch2]]).unwrap();
         assert!(!res.0.fields().is_empty());
         assert!(!res.1.is_empty())
     }
