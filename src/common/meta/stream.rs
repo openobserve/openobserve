@@ -334,10 +334,12 @@ pub struct SchemaEvolution {
     pub record_schema: Schema,
 }
 
+
 pub struct SchemaRecords {
     pub schema: Schema,
     pub records: Vec<json::Value>,
 }
+
 
 #[derive(Clone, Copy, Default)]
 pub struct ScanStats {

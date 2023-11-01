@@ -1,5 +1,6 @@
 use actix_web::{post, web, HttpResponse};
-use arrow::ipc::reader::FileReader;
+use arrow::array::StringArray;
+use arrow::ipc::reader::StreamReader;
 use arrow::json::ReaderBuilder;
 use std::fs::File;
 use std::sync::Arc;
