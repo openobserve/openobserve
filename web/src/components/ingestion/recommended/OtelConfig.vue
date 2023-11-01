@@ -1,7 +1,12 @@
 <template>
   <div class="q-pa-md">
-    <div class="text-subtitle1 text-bold q-mt-md q-pl-xs">OTLP Http</div>
+    <div class="text-subtitle1 text-bold q-mt-md q-pl-xs">OTLP HTTP</div>
     <ContentCopy class="q-mt-sm" :content="getOtelHttpConfig" />
+  </div>
+  <div class="q-pa-md">
+    <div class="text-subtitle1 text-bold q-mt-md q-pl-xs">OTLP gRPC</div>
+    <div class="title" data-test="vector-title-text">(<b>Note:</b> Only available for single node. Not supported in distributed mode.)</div>
+    <ContentCopy class="q-mt-sm" :content="getOtelGrpcConfig" />
   </div>
 </template>
 

@@ -29,7 +29,7 @@
         : ''
     "
     clickable
-    :class="{ 'ql-item-mini': mini }"
+    :class="{ 'ql-item-mini': mini, 'q-router-link--active': router.currentRoute.value.path.indexOf(link) == 0 && link != '/' }"
     :target="target"
     @click="external ? openWebPage(link) : ''"
   >
@@ -49,6 +49,7 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "MenuLink",
@@ -95,12 +96,14 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const router: any = useRouter();
     const openWebPage = (url: string) => {
       window.open(url, "_blank");
     };
 
     return {
       store,
+      router,
       openWebPage,
     };
   },

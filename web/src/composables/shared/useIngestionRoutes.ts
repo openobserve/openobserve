@@ -165,6 +165,11 @@ const useIngestionRoutes = () => {
               component: OtelConfig,
             },
             {
+              path: "traces",
+              name: "ingestFromTraces",
+              component: OpenTelemetry,
+            },
+            {
               path: "frontend-monitoring",
               name: "frontendMonitoring",
               component: RUMWeb,

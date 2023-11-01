@@ -33,7 +33,7 @@ HTTP Endpoint: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/traces
 Authorization: Basic {{ accessKey }}</pre>
   </div>
 
-  <div class="title q-pl-md q-pt-md" data-test="vector-title-text"><b>OTLP GRPC</b> (Will be available in 0.7.1 - Not available in router in 0.7.0):</div>
+  <div class="title q-pl-md q-pt-md" data-test="vector-title-text"><b>OTLP GRPC</b> <br />(<b>Note:</b> Only available for single node. Not supported in distributed mode.)</div>
   <div class="tabContent q-ma-md">
     <div class="tabContent__head">
       <div class="copy_action">
@@ -48,13 +48,13 @@ Authorization: Basic {{ accessKey }}</pre>
       </div>
     </div>
     <pre ref="copyGRPCTracesContent" data-test="traces-grpc-content-text">
-endpoint: {{ endpoint.url }}
+endpoint: {{ endpoint.host }}
 headers: 
   Authorization: "Basic {{ accessKey }}"
   organization: {{ currOrgIdentifier }}
   stream-name: default
 tls:
-  insecure: true</pre>
+  insecure: {{endpoint.protocol == "https" ? false : true}}</pre>
   </div>
 </template>
 
