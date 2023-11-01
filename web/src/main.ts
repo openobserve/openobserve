@@ -80,9 +80,9 @@ const getConfig = async () => {
       clientToken: "rumqRPQYJv76RcPEfo0",
       site: "test2.gke.zinclabs.dev",
       organizationIdentifier: "default",
-      //  service: 'my-web-application',
-      //  env: 'production',
-      //  version: '1.0.0',
+      service: "alpha1-cloud",
+      env: "alpha1",
+      version: "1.0.0",
       sessionSampleRate: 100,
       sessionReplaySampleRate: 100, // if not included, the default is 100
       trackResources: true,
@@ -100,6 +100,7 @@ const getConfig = async () => {
       sessionSampleRate: 100,
       insecureHTTP: false,
       apiVersion: "v1",
+      service: "alpha1-cloud",
     });
 
     openobserveRum.startSessionReplayRecording();
