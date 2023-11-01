@@ -275,7 +275,6 @@ pub async fn check_for_schema(
             types_delta: None,
             schema_fields: schema.to_cloned_fields(),
             is_schema_changed: false,
-            record_schema: schema,
         };
     }
 
