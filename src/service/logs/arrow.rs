@@ -1,5 +1,4 @@
 use actix_web::{post, web, HttpResponse};
-use arrow::array::StringArray;
 use arrow::ipc::reader::StreamReader;
 use arrow::json::ReaderBuilder;
 use std::fs::File;
@@ -111,7 +110,6 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
                 }
             }
         }
-    } else {
     }
     HttpResponse::Ok()
         .content_type("application/json")
