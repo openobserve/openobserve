@@ -532,23 +532,23 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>,
             }
             i += 1;
             let row_schema = row.schema();
-            let mut row_schema = row_schema.as_ref().to_owned();
-            filter_schema_null_fields(&mut row_schema); // fix schema
-            let row_schema = row_schema.to_owned();
-            schema = Schema::try_merge(vec![schema.clone(), row_schema.clone()])?;
-
+            schema = Schema::try_merge(vec![schema, row_schema.as_ref().to_owned()])?;
             let file_name = format!("{work_dir}{i}.parquet");
+            println!(
+                "{}",
+                arrow::util::pretty::pretty_format_batches_with_options(
+                    &[row.clone()],
+                    &datafusion::common::format::DEFAULT_FORMAT_OPTIONS
+                )?
+            );
             let mut buf_parquet = Vec::new();
-            let mut writer = ArrowWriter::try_new(&mut buf_parquet, Arc::new(row_schema), None)?;
-            writer
-                .write(row)
-                .map_err(|e| DataFusionError::Execution(format!("merge write error: {e}")))?;
-            writer
-                .close()
-                .map_err(|e| DataFusionError::Execution(format!("merge close error: {e}")))?;
+            let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema, None)?;
+            writer.write(row)?;
+            writer.close()?;
             tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
         }
     }
+    filter_schema_null_fields(&mut schema); // fix schema
     Ok((Arc::new(schema), work_dir))
 }
 
