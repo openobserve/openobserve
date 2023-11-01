@@ -14,27 +14,47 @@
 -->
 
 <template>
+  <div class="title q-pl-md q-pt-md" data-test="vector-title-text"><b>OTLP HTTP</b></div>
   <div class="tabContent q-ma-md">
     <div class="tabContent__head">
-      <div class="title" data-test="vector-title-text">Traces / OTLP</div>
       <div class="copy_action">
         <q-btn
           data-test="traces-copy-btn"
           flat
           round
-          size="0.5rem"
-          padding="0.6rem"
           color="grey"
           icon="content_copy"
-          @click="$emit('copy-to-clipboard-fn', copyTracesContent)"
+          @click="$emit('copy-to-clipboard-fn', copyHTTPTracesContent)"
         />
       </div>
     </div>
-    <pre ref="copyTracesContent" data-test="traces-content-text">
+    <pre ref="copyHTTPTracesContent" data-test="traces-http-content-text">
 HTTP Endpoint: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/traces
-Authorization: Basic {{ accessKey }}
-  </pre
-    >
+Authorization: Basic {{ accessKey }}</pre>
+  </div>
+
+  <div class="title q-pl-md q-pt-md" data-test="vector-title-text"><b>OTLP GRPC</b> (Will be available in 0.7.1 - Not available in router in 0.7.0):</div>
+  <div class="tabContent q-ma-md">
+    <div class="tabContent__head">
+      <div class="copy_action">
+        <q-btn
+          data-test="traces-copy-btn"
+          flat
+          round
+          color="grey"
+          icon="content_copy"
+          @click="$emit('copy-to-clipboard-fn', copyGRPCTracesContent)"
+        />
+      </div>
+    </div>
+    <pre ref="copyGRPCTracesContent" data-test="traces-grpc-content-text">
+endpoint: {{ endpoint.url }}
+headers: 
+  Authorization: "Basic {{ accessKey }}"
+  organization: {{ currOrgIdentifier }}
+  stream-name: default
+tls:
+  insecure: true</pre>
   </div>
 </template>
 
@@ -77,44 +97,17 @@ export default defineComponent({
         `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
       );
     });
-    const copyTracesContent = ref(null);
+    const copyHTTPTracesContent = ref(null);
+    const copyGRPCTracesContent = ref(null);
     return {
       store,
       config,
       endpoint,
-      copyTracesContent,
+      copyHTTPTracesContent,
+      copyGRPCTracesContent,
       accessKey,
       getImageURL,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-.tabContent {
-  background-color: rgba(136, 136, 136, 0.103);
-  // tab content bg color
-  padding: 1rem 1.25rem 0.5rem;
-  border-radius: 0.5rem;
-  &__head {
-    justify-content: space-between;
-    text-transform: uppercase;
-    align-items: center;
-    display: flex;
-    .title {
-      line-height: 1rem;
-      font-weight: 600;
-    }
-    .copy_action {
-      .q-btn {
-        // background-color: white;
-      }
-    }
-  }
-  pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    margin-bottom: 0;
-  }
-}
-</style>
