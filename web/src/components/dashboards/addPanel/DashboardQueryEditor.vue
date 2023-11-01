@@ -60,16 +60,17 @@
 
         <div class="col">
             <query-editor 
-            ref="queryEditorRef" 
-            class="monaco-editor" 
-            v-model:query="currentQuery"
-            data-test="dashboard-panel-query-editor" 
-            v-model:functions="dashboardPanelData.meta.stream.functions" 
-            v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields" 
-                :keywords="autoCompletePromqlKeywords" 
+                ref="queryEditorRef" 
+                class="monaco-editor" 
+                v-model:query="currentQuery"
+                data-test="dashboard-panel-query-editor" 
+                v-model:functions="dashboardPanelData.meta.stream.functions" 
+                v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields" 
+                :keywords="dashboardPanelData.data.queryType === 'promql' ? autoCompletePromqlKeywords : []" 
+                @update-query="updateQuery"
                 @run-query="searchData" 
-                @update-query="updatePromQLQuery"
                 :readOnly="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"
+                :language="dashboardPanelData.data.queryType"
             ></query-editor>
             <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
         </div>
@@ -124,6 +125,11 @@ export default defineComponent({
             addQuery();
             dashboardPanelData.layout.currentQueryIndex = dashboardPanelData.data.queries.length - 1;
         };
+        const updateQuery = (query, fields) => {
+            if(dashboardPanelData.data.queryType === 'promql'){
+                updatePromQLQuery(query, fields);
+            }
+        }
 
         const removeTab = async (index) => {
             if (dashboardPanelData.layout.currentQueryIndex >= dashboardPanelData.data.queries.length-1) dashboardPanelData.layout.currentQueryIndex -=1;
@@ -308,10 +314,10 @@ export default defineComponent({
             query += xAxisAlias.length ? " ORDER BY " + xAxisAlias.join(", ") : ''
             return query
         }
-
+        
         watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery, dashboardPanelData.meta.stream.selectedStreamFields], () => {
             console.log("dashboardPanelData.meta.stream.functions", dashboardPanelData.meta.stream);
-
+            
             // Only continue if the current mode is "show custom query"
             if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType == "sql") {
                 // Call the updateQueryValue function
@@ -439,7 +445,8 @@ export default defineComponent({
             autoCompleteData,
             autoCompletePromqlKeywords,
             getSuggestions,
-            queryEditorRef
+            queryEditorRef,
+            updateQuery
         };
     },
 });

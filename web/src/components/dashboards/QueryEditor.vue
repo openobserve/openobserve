@@ -69,6 +69,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    language: {
+      type: String,
+      default: "sql",
+    }
   },
   emits: ["update-query", "run-query", "update:query"],
   setup(props, { emit }) {
@@ -98,121 +102,154 @@ export default defineComponent({
     console.log("props.functions", props.functions);
 
     const createDependencyProposals = (range: any) => {
-      let keywords = [
-        // {
-        //   label: "and",
-        //   kind: monaco.languages.CompletionItemKind.Keyword,
-        //   insertText: "and ",
-        //   range: range,
-        // },
-        // {
-        //   label: "or",
-        //   kind: monaco.languages.CompletionItemKind.Keyword,
-        //   insertText: "or ",
-        //   range: range,
-        // },
-        // {
-        //   label: "like",
-        //   kind: monaco.languages.CompletionItemKind.Keyword,
-        //   insertText: "like '%${1:params}%' ",
-        //   range: range,
-        // },
-        // {
-        //   label: "in",
-        //   kind: monaco.languages.CompletionItemKind.Keyword,
-        //   insertText: "in ('${1:params}') ",
-        //   range: range,
-        //   insertTextRules:
-        //     monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        // },
-        // {
-        //   label: "not in",
-        //   kind: monaco.languages.CompletionItemKind.Keyword,
-        //   insertText: "not in ('${1:params}') ",
-        //   range: range,
-        //   insertTextRules:
-        //     monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        // },
-        // {
-        //   label: "between",
-        //   kind: monaco.languages.CompletionItemKind.Keyword,
-        //   insertText: "between('${1:params}','${1:params}') ",
-        //   range: range,
-        //   insertTextRules:
-        //     monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        // },
-        // {
-        //   label: "not between",
-        //   kind: monaco.languages.CompletionItemKind.Keyword,
-        //   insertText: "not between('${1:params}','${1:params}') ",
-        //   range: range,
-        //   insertTextRules:
-        //     monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        // },
-        // {
-        //   label: "is null",
-        //   kind: monaco.languages.CompletionItemKind.Keyword,
-        //   insertText: "is null ",
-        //   range: range,
-        // },
-        // {
-        //   label: "is not null",
-        //   kind: monaco.languages.CompletionItemKind.Keyword,
-        //   insertText: "is not null ",
-        //   range: range,
-        // },
-        // {
-        //   label: ">",
-        //   kind: monaco.languages.CompletionItemKind.Operator,
-        //   insertText: "> ",
-        //   range: range,
-        // },
-        // {
-        //   label: "<",
-        //   kind: monaco.languages.CompletionItemKind.Operator,
-        //   insertText: "< ",
-        //   range: range,
-        // },
-        // {
-        //   label: ">=",
-        //   kind: monaco.languages.CompletionItemKind.Operator,
-        //   insertText: ">= ",
-        //   range: range,
-        // },
-        // {
-        //   label: "<=",
-        //   kind: monaco.languages.CompletionItemKind.Operator,
-        //   insertText: "<= ",
-        //   range: range,
-        // },
-        // {
-        //   label: "<>",
-        //   kind: monaco.languages.CompletionItemKind.Operator,
-        //   insertText: "<> ",
-        //   range: range,
-        // },
-        // {
-        //   label: "=",
-        //   kind: monaco.languages.CompletionItemKind.Operator,
-        //   insertText: "= ",
-        //   range: range,
-        // },
-        // {
-        //   label: "!=",
-        //   kind: monaco.languages.CompletionItemKind.Operator,
-        //   insertText: "!= ",
-        //   range: range,
-        // },
-        // {
-        //   label: "()",
-        //   kind: monaco.languages.CompletionItemKind.Keyword,
-        //   insertText: "(${1:condition}) ",
-        //   range: range,
-        //   insertTextRules:
-        //     monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        // },
-      ];
+      let keywords: any[] = []
+      if(props.language === "sql"){
+        keywords = [
+          {
+            label: "and",
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: "and ",
+            range: range,
+          },
+          {
+            label: "or",
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: "or ",
+            range: range,
+          },
+          {
+            label: "like",
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: "like '%${1:params}%' ",
+            range: range,
+          },
+          {
+            label: "in",
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: "in ('${1:params}') ",
+            range: range,
+            insertTextRules:
+              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          },
+          {
+            label: "not in",
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: "not in ('${1:params}') ",
+            range: range,
+            insertTextRules:
+              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          },
+          {
+            label: "between",
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: "between('${1:params}','${1:params}') ",
+            range: range,
+            insertTextRules:
+              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          },
+          {
+            label: "not between",
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: "not between('${1:params}','${1:params}') ",
+            range: range,
+            insertTextRules:
+              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          },
+          {
+            label: "is null",
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: "is null ",
+            range: range,
+          },
+          {
+            label: "is not null",
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: "is not null ",
+            range: range,
+          },
+          {
+            label: ">",
+            kind: monaco.languages.CompletionItemKind.Operator,
+            insertText: "> ",
+            range: range,
+          },
+          {
+            label: "<",
+            kind: monaco.languages.CompletionItemKind.Operator,
+            insertText: "< ",
+            range: range,
+          },
+          {
+            label: ">=",
+            kind: monaco.languages.CompletionItemKind.Operator,
+            insertText: ">= ",
+            range: range,
+          },
+          {
+            label: "<=",
+            kind: monaco.languages.CompletionItemKind.Operator,
+            insertText: "<= ",
+            range: range,
+          },
+          {
+            label: "<>",
+            kind: monaco.languages.CompletionItemKind.Operator,
+            insertText: "<> ",
+            range: range,
+          },
+          {
+            label: "=",
+            kind: monaco.languages.CompletionItemKind.Operator,
+            insertText: "= ",
+            range: range,
+          },
+          {
+            label: "!=",
+            kind: monaco.languages.CompletionItemKind.Operator,
+            insertText: "!= ",
+            range: range,
+          },
+          {
+            label: "()",
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: "(${1:condition}) ",
+            range: range,
+            insertTextRules:
+              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          },
+        ];
+        
+        props.fields.forEach((field: any) => {
+          if (field.name == store.state.zoConfig.timestamp_column) {
+            return;
+          }
+          let itemObj = {
+            label: field.name,
+            kind: monaco.languages.CompletionItemKind.Text,
+            insertText: field.name,
+            range: range,
+            insertTextRules:
+              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          };
+          keywords.push(itemObj);
+        });
 
+        props.functions.forEach((field: any) => {
+          let itemObj = {
+            label: field.name,
+            kind: monaco.languages.CompletionItemKind.Text,
+            insertText: field.name + field.args,
+            range: range,
+            insertTextRules:
+              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          };
+          keywords.push(itemObj);
+        });
+      }
+      else{
+        console.log("inside promql else");
+        
+      // let keywords: any[] = [];
       props.keywords.forEach((keyword: any) => {
         const itemObj: any = {
           ...keyword,
@@ -227,33 +264,8 @@ export default defineComponent({
         }
         keywords.push(itemObj);
       });
+    }
 
-      props.fields.forEach((field: any) => {
-        if (field.name == store.state.zoConfig.timestamp_column) {
-          return;
-        }
-        let itemObj = {
-          label: field.name,
-          kind: monaco.languages.CompletionItemKind.Text,
-          insertText: field.name,
-          range: range,
-          insertTextRules:
-            monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        };
-        keywords.push(itemObj);
-      });
-
-      props.functions.forEach((field: any) => {
-        let itemObj = {
-          label: field.name,
-          kind: monaco.languages.CompletionItemKind.Text,
-          insertText: field.name + field.args,
-          range: range,
-          insertTextRules:
-            monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        };
-        keywords.push(itemObj);
-      });
       console.log("keywords", keywords);
       return keywords;
     };
@@ -368,12 +380,30 @@ export default defineComponent({
           let filteredSuggestions = [];
 
           filteredSuggestions = createDependencyProposals(range);
-          filteredSuggestions = filteredSuggestions.filter((item) => {
+          filteredSuggestions = filteredSuggestions.filter((item: any) => {
             return item.label.toLowerCase().includes(word.word.toLowerCase());
           });
 
           // if (filteredSuggestions.length == 0) {
           const lastElement = arr.pop();
+          
+          if(props.language == "sql"){
+            filteredSuggestions.push({
+              label: `match_all('${lastElement}')`,
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: `match_all('${lastElement}')`,
+              range: range,
+            });
+            filteredSuggestions.push({
+              label: `match_all_ignore_case('${lastElement}')`,
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: `match_all_ignore_case('${lastElement}')`,
+              range: range,
+            });
+          }
+          else{
+        console.log("inside promql else");
+
 console.log("props.suggestions", props.suggestions);
           props.suggestions.forEach((suggestion: any) => {
             console.log("lastElement", suggestion);
@@ -388,6 +418,7 @@ console.log("props.suggestions", props.suggestions);
             });
 
           });
+        }
           console.log("filteredSuggestions", filteredSuggestions);
           
           return {
