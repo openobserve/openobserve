@@ -100,7 +100,7 @@
               class="q-px-none q-py-none"
             >
               <q-item class="list-head">
-                <q-item-section class="text-bold col-3">
+                <q-item-section class="text-bold col-3 ">
                   {{ t("search.sourceName") }}
                 </q-item-section>
                 <q-item-section class="text-bold col-9">
@@ -115,7 +115,7 @@
               >
                 <q-item-section
                   :data-test="`log-detail-${value}-key`"
-                  class="col-3 text-weight-regular"
+                  class="col-3 text-weight-regular text-red-10"
                   >{{ value }}</q-item-section
                 >
                 <q-item-section

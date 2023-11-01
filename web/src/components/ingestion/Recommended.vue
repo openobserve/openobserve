@@ -74,6 +74,17 @@
           content-class="tab_content"
         />
         <q-route-tab
+          name="ingestFromTraces"
+          :to="{
+            name: 'ingestFromTraces',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          label="Traces (OpenTelelmetry)"
+          content-class="tab_content"
+        />
+        <q-route-tab
           name="frontendMonitoring"
           :to="{
             name: 'frontendMonitoring',
