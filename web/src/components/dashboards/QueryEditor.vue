@@ -99,7 +99,6 @@ export default defineComponent({
         monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
       None: monaco.languages.CompletionItemInsertTextRule.None,
     };
-    console.log("props.functions", props.functions);
 
     const createDependencyProposals = (range: any) => {
       let keywords: any[] = []
@@ -247,9 +246,6 @@ export default defineComponent({
         });
       }
       else{
-        console.log("inside promql else");
-        
-      // let keywords: any[] = [];
       props.keywords.forEach((keyword: any) => {
         const itemObj: any = {
           ...keyword,
@@ -266,12 +262,10 @@ export default defineComponent({
       });
     }
 
-      console.log("keywords", keywords);
       return keywords;
     };
 
     onMounted(async () => {
-      console.log("onMounted");
       //   editorRef.value.addEventListener("keyup", onKeyUp);
 
       monaco.editor.defineTheme("myCustomTheme", {
@@ -402,12 +396,7 @@ export default defineComponent({
             });
           }
           else{
-        console.log("inside promql else");
-
-console.log("props.suggestions", props.suggestions);
           props.suggestions.forEach((suggestion: any) => {
-            console.log("lastElement", suggestion);
-
             filteredSuggestions.push({
               label: suggestion.label(lastElement),
               kind: monaco.languages.CompletionItemKind[
@@ -416,10 +405,8 @@ console.log("props.suggestions", props.suggestions);
               insertText: suggestion.insertText(lastElement),
               range: range,
             });
-
           });
         }
-          console.log("filteredSuggestions", filteredSuggestions);
           
           return {
             suggestions: filteredSuggestions,
@@ -455,16 +442,13 @@ console.log("props.suggestions", props.suggestions);
     };
 
      const triggerAutoComplete = async (value: string) => {
-      console.log('trigger auto complete started');
       
       disableSuggestionPopup();
       await nextTick();
-      console.log('trigger suggest');
       editorObj.trigger(value, "editor.action.triggerSuggest", {});
     };
 
     const disableSuggestionPopup = () => {
-      console.log('disable suggestion popup');
       const escEvent = new KeyboardEvent("keydown", {
         keyCode: 27,
         code: "Escape",

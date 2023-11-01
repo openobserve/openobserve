@@ -116,8 +116,6 @@ export default defineComponent({
             autoCompleteData,
             autoCompletePromqlKeywords,
             getSuggestions,
-            updateMetricKeywords,
-            parsePromQlQuery,
         } = usePromqlSuggestions();
         const queryEditorRef = ref(null);
 
@@ -316,7 +314,6 @@ export default defineComponent({
         }
         
         watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery, dashboardPanelData.meta.stream.selectedStreamFields], () => {
-            console.log("dashboardPanelData.meta.stream.functions", dashboardPanelData.meta.stream);
             
             // Only continue if the current mode is "show custom query"
             if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType == "sql") {
@@ -335,30 +332,24 @@ export default defineComponent({
 
         // This function parses the custom query and generates the errors and custom fields
         const updateQueryValue = () => {
-            console.log("dashboardPanelData.data.queryType", dashboardPanelData.data.queryType);
             
-            console.log("updateQueryValue", dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery);
             // store the query in the dashboard panel data
             // dashboardPanelData.meta.editorValue = value;
             // dashboardPanelData.data.query = value;
 
             if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType != "promql") {
-                console.log("inside custom query");
                 // empty the errors
                 dashboardPanelData.meta.errors.queryErrors = []
 
                 // Get the parsed query
                 try {
                     dashboardPanelData.meta.parsedQuery = parser.astify(dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query);
-                    console.log("inside try", dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query);
                 } catch (e) {
                     // exit as there is an invalid query
                     dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax")
-                    console.log("inside catch", dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query);
                     return null;
                 }
                 if (!dashboardPanelData.meta.parsedQuery) {
-                    console.log("inside iff", dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query);
                     return;
                 }
 
@@ -406,10 +397,6 @@ export default defineComponent({
         };
 
         const updatePromQLQuery = async (event, value) => {
-            console.log("updatePromQLQuery", value);
-            console.log("up events", event);
-            console.log("autoCompleteData", autoCompleteData.value);
-            console.log("inside promql, ", dashboardPanelData.meta.dateTime);
             autoCompleteData.value.query = value;
             autoCompleteData.value.text = event.changes[0].text;
             autoCompleteData.value.dateTime = {
