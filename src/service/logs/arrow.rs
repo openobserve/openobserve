@@ -111,6 +111,7 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
                 }
             }
         }
+    } else {
     }
     HttpResponse::Ok()
         .content_type("application/json")
