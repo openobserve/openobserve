@@ -11,6 +11,7 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
+use crate::common::infra::config::DISTINCT_FIELDS;
 use crate::common::infra::{config::CONFIG, metrics};
 use crate::common::meta::stream::SchemaRecords;
 use crate::common::meta::{
@@ -20,9 +21,11 @@ use crate::common::meta::{
     usage::UsageType,
     StreamType,
 };
-use crate::common::utils::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::common::utils::json;
 use crate::service::ingestion::{is_ingestion_allowed, write_file_arrow};
-use crate::service::{get_formatted_stream_name, usage::report_request_usage_stats};
+use crate::service::{
+    distinct_values, get_formatted_stream_name, usage::report_request_usage_stats,
+};
 
 #[post("/arrow")]
 async fn json_to_arrow(body: web::Bytes) -> HttpResponse {
@@ -69,41 +72,42 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
         "./data/openobserve/wal/files/{org_id}/logs/{in_stream_name}/{}",
         file.into_inner()
     );
-
-    let buf = File::open(file).unwrap();
-    let reader = StreamReader::try_new(&buf, None).unwrap();
-
-    let mut num_rows = 0;
-    let mut num_batches = 0;
-
-    let mut batches = vec![];
     let mut rows = vec![];
-    for batch in reader {
-        num_batches += 1;
-        match batch {
-            Ok(read_batch) => {
-                let name_column = read_batch
-                    .column(1)
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .expect("Expected StringArray");
-                num_rows += read_batch.num_rows();
+    let mut num_rows = 0;
+    if let Ok(buf) = File::open(file) {
+        let reader = StreamReader::try_new(&buf, None).unwrap();
 
-                for i in 0..read_batch.num_rows() {
-                    let name = name_column.value(i).to_string();
+        let mut num_batches = 0;
 
-                    rows.push(name);
+        let mut batches = vec![];
+
+        for batch in reader {
+            num_batches += 1;
+            match batch {
+                Ok(read_batch) => {
+                    let name_column = read_batch
+                        .column(1)
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .expect("Expected StringArray");
+                    num_rows += read_batch.num_rows();
+
+                    for i in 0..read_batch.num_rows() {
+                        let name = name_column.value(i).to_string();
+
+                        rows.push(name);
+                    }
+                    batches.push(read_batch);
                 }
-                batches.push(read_batch);
-            }
-            Err(err) => {
-                println!("error:reading batch {}", err);
-                continue;
+                Err(err) => {
+                    println!("error:reading batch {}", err);
+                    continue;
+                }
             }
         }
+    } else {
     }
-    println!("rows are {:?}", rows);
-    let msg = format!("got {} rows", num_rows);
+    let msg = format!("got   {num_rows}    rows",);
 
     HttpResponse::Ok()
         .content_type("application/json")
@@ -120,6 +124,7 @@ pub async fn ingest(
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
+    let mut distinct_values = Vec::with_capacity(16);
 
     if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
         return Err(value);
@@ -158,73 +163,65 @@ pub async fn ingest(
         vec![val]
     });
     for item in reader.iter() {
-        //JSON Flattening
-        let mut value = flatten::flatten(item)?;
+        match super::ingest::apply_functions(
+            &item,
+            &local_trans,
+            &stream_vrl_map,
+            stream_name,
+            &mut runtime,
+        ) {
+            Ok(mut res) => {
+                let local_val = res.as_object_mut().unwrap();
 
-        if !local_trans.is_empty() {
-            value = crate::service::ingestion::apply_stream_transform(
-                &local_trans,
-                &value,
-                &stream_vrl_map,
-                stream_name,
-                &mut runtime,
-            )?;
-        }
-
-        if value.is_null() || !value.is_object() {
-            stream_status.status.failed += 1; // transform failed or dropped
-            continue;
-        }
-        // End row based transform
-
-        // get json object
-        let local_val = value.as_object_mut().unwrap();
-
-        // handle timestamp
-        let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
-            Some(v) => match parse_timestamp_micro_from_value(v) {
-                Ok(t) => t,
-                Err(e) => {
-                    stream_status.status.failed += 1;
-                    stream_status.status.error = e.to_string();
-                    continue;
+                match super::ingest::handle_ts(local_val, min_ts) {
+                    Ok(t) => min_ts = t,
+                    Err(e) => {
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = e.to_string();
+                        continue;
+                    }
                 }
-            },
-            None => Utc::now().timestamp_micros(),
+                let local_trigger = super::add_valid_record_arrow(
+                    &StreamMeta {
+                        org_id: org_id.to_string(),
+                        stream_name: stream_name.to_string(),
+                        partition_keys: &partition_keys,
+                        partition_time_level: &partition_time_level,
+                        stream_alerts_map: &stream_alerts_map,
+                    },
+                    &mut stream_schema_map,
+                    &mut stream_status.status,
+                    &mut buf,
+                    local_val,
+                )
+                .await;
+
+                // get distinct_value item
+                for field in DISTINCT_FIELDS.iter() {
+                    if let Some(val) = local_val.get(field) {
+                        if !val.is_null() {
+                            distinct_values.push(distinct_values::DvItem {
+                                stream_type: StreamType::Logs,
+                                stream_name: stream_name.to_string(),
+                                field_name: field.to_string(),
+                                field_value: val.as_str().unwrap().to_string(),
+                                filter_name: "".to_string(),
+                                filter_value: "".to_string(),
+                            });
+                        }
+                    }
+                }
+
+                if local_trigger.is_some() {
+                    trigger = Some(local_trigger.unwrap());
+                }
+            }
+            Err(e) => {
+                stream_status.status.failed += 1;
+                stream_status.status.error = e.to_string();
+                continue;
+            }
         };
-        // check ingestion time
-        let earliest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
-        if timestamp < earliest_time.timestamp_micros() {
-            stream_status.status.failed += 1; // to old data, just discard
-            stream_status.status.error = super::get_upto_discard_error();
-            continue;
-        }
-        if timestamp < min_ts {
-            min_ts = timestamp;
-        }
-        local_val.insert(
-            CONFIG.common.column_timestamp.clone(),
-            json::Value::Number(timestamp.into()),
-        );
-
-        let local_trigger = super::add_valid_record_arrow(
-            &StreamMeta {
-                org_id: org_id.to_string(),
-                stream_name: stream_name.to_string(),
-                partition_keys: &partition_keys,
-                partition_time_level: &partition_time_level,
-                stream_alerts_map: &stream_alerts_map,
-            },
-            &mut stream_schema_map,
-            &mut stream_status.status,
-            &mut buf,
-            local_val,
-        )
-        .await;
-
-        if local_trigger.is_some() {
-            trigger = Some(local_trigger.unwrap());
-        }
     }
 
     // write to file

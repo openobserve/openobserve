@@ -265,7 +265,7 @@ pub async fn ingest(
     ))
 }
 
-fn apply_functions<'a>(
+pub fn apply_functions<'a>(
     item: &'a json::Value,
     local_trans: &Vec<StreamTransform>,
     stream_vrl_map: &'a AHashMap<String, VRLResultResolver>,
@@ -291,7 +291,7 @@ fn apply_functions<'a>(
     }
 }
 
-fn handle_ts(
+pub fn handle_ts(
     local_val: &mut json::Map<String, json::Value>,
     mut min_ts: i64,
 ) -> Result<i64, anyhow::Error> {
