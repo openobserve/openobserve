@@ -306,11 +306,17 @@ async fn exec_query(
                         .fields()
                         .iter()
                         .filter(|field| !tmp_fields.contains(field.name()))
-                        .map(|field| field.name().as_str())
-                        .collect::<Vec<&str>>();
+                        .collect::<Vec<_>>();
                     if !need_add_columns.is_empty() {
                         for column in need_add_columns {
-                            tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
+                            if column.data_type() == &DataType::Utf8 {
+                                tmp_df = tmp_df.with_column(
+                                    &column.name().to_string(),
+                                    lit(ScalarValue::Utf8(None)),
+                                )?;
+                            } else if let Ok(v) = ScalarValue::new_zero(column.data_type()) {
+                                tmp_df = tmp_df.with_column(&column.name().to_string(), lit(v))?;
+                            }
                         }
                         q_ctx.deregister_table("tbl")?;
                         q_ctx.register_table("tbl", tmp_df.clone().into_view())?;
@@ -532,7 +538,7 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>,
             }
             i += 1;
             let row_schema = row.schema();
-            schema = Schema::try_merge(vec![schema, row_schema.as_ref().to_owned()])?;
+            schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
             let file_name = format!("{work_dir}{i}.parquet");
             println!(
                 "{}",
