@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use ahash::AHashMap as HashMap;
-use arrow_schema::Field;
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
@@ -307,11 +306,17 @@ async fn exec_query(
                         .fields()
                         .iter()
                         .filter(|field| !tmp_fields.contains(field.name()))
-                        .map(|field| field.name().as_str())
-                        .collect::<Vec<&str>>();
+                        .collect::<Vec<_>>();
                     if !need_add_columns.is_empty() {
                         for column in need_add_columns {
-                            tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
+                            if column.data_type() == &DataType::Utf8 {
+                                tmp_df = tmp_df.with_column(
+                                    &column.name().to_string(),
+                                    lit(ScalarValue::Utf8(None)),
+                                )?;
+                            } else if let Ok(v) = ScalarValue::new_zero(column.data_type()) {
+                                tmp_df = tmp_df.with_column(&column.name().to_string(), lit(v))?;
+                            }
                         }
                         q_ctx.deregister_table("tbl")?;
                         q_ctx.register_table("tbl", tmp_df.clone().into_view())?;
@@ -544,15 +549,7 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>,
             }
             i += 1;
             let row_schema = row.schema();
-            let filtered_fields: Vec<Field> = row_schema
-                .fields()
-                .iter()
-                .filter(|field| field.data_type() != &DataType::Null)
-                .map(|arc_field| (**arc_field).clone())
-                .collect();
-            let row_schema = Arc::new(Schema::new(filtered_fields));
-            schema = Schema::try_merge(vec![schema.clone(), row_schema.as_ref().to_owned()])?;
-
+            schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
             let file_name = format!("{work_dir}{i}.parquet");
             let mut buf_parquet = Vec::new();
             let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema.clone(), None)?;
