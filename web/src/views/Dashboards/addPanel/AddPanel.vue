@@ -49,11 +49,11 @@
             <div class="col scroll " style="height: calc(100vh - 115px); overflow-y: auto;">
               <div class="column" style="height: 100%">
                 <div class="col-auto q-pa-sm">
-                <span class="text-weight-bold">{{ t('panel.fields') }}</span>
+                  <span class="text-weight-bold">{{ t('panel.fields') }}</span>
                 </div>
                 <div class="col" style="width: 100%">
-                <!-- <GetFields :editMode="editMode" /> -->
-                <FieldList :editMode="editMode"/>
+                  <!-- <GetFields :editMode="editMode" /> -->
+                  <FieldList :editMode="editMode"/>
                 </div>
               </div>
             </div>
@@ -66,33 +66,27 @@
           <template #after>
             <div class="row" style="height: calc(100vh - 115px); overflow-y: auto; ">
               <div class="col" style="height: 100%">
-                  <q-splitter 
-                    v-model="dashboardPanelData.layout.querySplitter" 
-                    horizontal 
-                    @update:model-value="querySplitterUpdated" 
-                    reverse 
-                    unit="px" 
-                    :limits="!dashboardPanelData.layout.showQueryBar ? [41, 400] : [140, 400]"
-                    :disable="!dashboardPanelData.layout.showQueryBar"
-                    style="height: 100%;" 
-                  >
-                   <template #before>
+                <q-splitter class="query-editor-splitter" v-model="dashboardPanelData.layout.querySplitter" horizontal
+                  @update:model-value="querySplitterUpdated" reverse unit="px"
+                  :limits="!dashboardPanelData.layout.showQueryBar ? [41, 400] : [140, 400]"
+                  :disable="!dashboardPanelData.layout.showQueryBar" style="height: 100%;">
+                  <template #before>
                     <div class="layout-panel-container col" style="height:100%;">
 
-                    <DashboardQueryBuilder />
-                    <q-separator />
-                    <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables"
-                      :selectedTimeDate="dashboardPanelData.meta.dateTime" @variablesData="variablesDataUpdated" />
+                      <DashboardQueryBuilder />
+                      <q-separator />
+                      <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables"
+                        :selectedTimeDate="dashboardPanelData.meta.dateTime" @variablesData="variablesDataUpdated" />
 
-                    <div v-if="isOutDated" :style="{ borderColor: '#c3920d', borderWidth: '1px', borderStyle: 'solid', backgroundColor: store.state.theme == 'dark' ? '#2a1f03' : '#faf2da', padding: '1%', margin: '1%', borderRadius: '5px' }">
-                      <div style="font-weight: 700;">Your chart is not up to date</div>
-                      <div>Chart configuration has been updated, but the chart was not updated automatically. Click on the "Apply" button to run the query again</div>
-                    </div>
+                      <div v-if="isOutDated" :style="{ borderColor: '#c3920d', borderWidth: '1px', borderStyle: 'solid', backgroundColor: store.state.theme == 'dark' ? '#2a1f03' : '#faf2da', padding: '1%', margin: '1%', borderRadius: '5px' }">
+                        <div style="font-weight: 700;">Your chart is not up to date</div>
+                        <div>Chart configuration has been updated, but the chart was not updated automatically. Click on the "Apply" button to run the query again</div>
+                      </div>
 
-                    <div style="flex:1;">
-                      <PanelSchemaRenderer :key="dashboardPanelData.data.type" :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
-                    </div>
-                    <DashboardErrorsComponent :errors="errorData" />
+                      <div style="flex:1;">
+                        <PanelSchemaRenderer :key="dashboardPanelData.data.type" :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
+                      </div>
+                      <DashboardErrorsComponent :errors="errorData" />
                     </div>
                   </template>
                   <template #separator>
@@ -130,8 +124,8 @@ import {
   watch,
   reactive,
   onDeactivated,
-onUnmounted,
-onMounted,
+  onUnmounted,
+  onMounted,
 } from "vue";
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
 import ConfigPanel from "../../../components/dashboards/addPanel/ConfigPanel.vue";
@@ -197,7 +191,7 @@ export default defineComponent({
     const currentDashboardData : any = reactive({
       data: {},
     });
-    
+
     // this is used to activate the watcher only after on mounted
     let isPanelConfigWatcherActivated = false
     const isPanelConfigChanged = ref(false);
@@ -278,8 +272,8 @@ export default defineComponent({
 
     const isInitailDashboardPanelData = ()=>{
       return dashboardPanelData.data.description==""&&(!dashboardPanelData.data.config.unit)&&(!dashboardPanelData.data.config.unit_custom)&&dashboardPanelData.data.queries[0].fields.x.length==0&&
-      dashboardPanelData.data.queries[0].fields.y.length==0&&dashboardPanelData.data.queries[0].fields.z.length==0&&dashboardPanelData.data.queries[0].fields.filter.length==0&&
-      dashboardPanelData.data.queries.length==1;
+        dashboardPanelData.data.queries[0].fields.y.length==0&&dashboardPanelData.data.queries[0].fields.z.length==0&&dashboardPanelData.data.queries[0].fields.filter.length==0&&
+        dashboardPanelData.data.queries.length==1;
     }
 
 
@@ -316,7 +310,7 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     })
 
-    
+
     // resize the chart when config panel is opened and closed
     watch(() => dashboardPanelData.layout.showQueryBar, (newValue) => {
       if (!newValue) {
@@ -370,21 +364,21 @@ export default defineComponent({
       return ;
     };
 
-  onBeforeRouteLeave((to, from, next) => {
-  if (from.path === '/dashboards/add_panel' && isPanelConfigChanged.value) {
-    const confirmMessage = 'You have unsaved changes. Are you sure you want to leave?';
-    if (window.confirm(confirmMessage)) {
-      // User confirmed, allow navigation
-      next();
-    } else {
-      // User canceled, prevent navigation
-      next(false);
-    }
-  } else {
-    // No unsaved changes or not leaving the edit route, allow navigation
-    next();
-  }
-});
+    onBeforeRouteLeave((to, from, next) => {
+      if (from.path === '/dashboards/add_panel' && isPanelConfigChanged.value) {
+        const confirmMessage = 'You have unsaved changes. Are you sure you want to leave?';
+        if (window.confirm(confirmMessage)) {
+          // User confirmed, allow navigation
+          next();
+        } else {
+          // User canceled, prevent navigation
+          next(false);
+        }
+      } else {
+        // No unsaved changes or not leaving the edit route, allow navigation
+        next();
+      }
+    });
 
 
     //validate the data
@@ -492,7 +486,7 @@ export default defineComponent({
             break;
           }
           case 'heatmap': {
-             if (dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.y.length == 0) {
+            if (dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.y.length == 0) {
               errors.push("Add at least one field for the Y-Axis")
             }
 
@@ -634,9 +628,9 @@ export default defineComponent({
           dashboardPanelData.data,
           route.query.folder ?? "default"
         );
-        if (errorMessageOnSave instanceof Error) { 
-          errorData.errors.push("Error saving panel configuration : " + errorMessageOnSave.message); 
-          return; 
+        if (errorMessageOnSave instanceof Error) {
+          errorData.errors.push("Error saving panel configuration : " + errorMessageOnSave.message);
+          return;
         }
       } else {
         const panelId =
@@ -644,7 +638,7 @@ export default defineComponent({
 
         dashboardPanelData.data.id = panelId;
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        
+
         const errorMessageOnSave = await addPanel(
           store,
           dashId,
@@ -742,5 +736,9 @@ export default defineComponent({
 
 .splitter-enabled:hover {
   background-color: orange;
+}
+
+:deep(.query-editor-splitter .q-splitter__separator) {
+  background-color: transparent !important;
 }
 </style>
