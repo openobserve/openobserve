@@ -30,7 +30,6 @@ use crate::common::{
         self,
         hasher::get_fields_key_xxh3,
         json::{Map, Value},
-        schema_ext::SchemaExt,
     },
 };
 use crate::service::{
