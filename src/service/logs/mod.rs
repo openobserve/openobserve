@@ -30,7 +30,6 @@ use crate::common::{
         self,
         hasher::get_fields_key_xxh3,
         json::{Map, Value},
-        schema_ext::SchemaExt,
     },
 };
 use crate::service::{
@@ -206,15 +205,148 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Opt
     }
 }
 
-async fn add_valid_record<'a>(
-    stream_meta: &'a StreamMeta<'_>,
-    stream_schema_map: &'a mut AHashMap<String, Schema>,
-    status: &'a mut RecordStatus,
-    buf: &'a mut AHashMap<String, Vec<String>>,
-    local_val: &'a mut Map<String, Value>,
-    need_trigger: bool,
-) -> TriggerAlertData {
-    let mut trigger: Vec<(Alert, Vec<Map<String, Value>>)> = Vec::new();
+pub fn cast_to_type_arrow(mut value: Value, delta: Vec<Field>) -> (Option<String>, Option<String>) {
+    let local_map = value.as_object_mut().unwrap();
+    //let mut error_msg = String::new();
+    let mut parse_error = String::new();
+    for field in delta {
+        let field_map = local_map.get(field.name());
+        if let Some(val) = field_map {
+            if val.is_null() {
+                local_map.insert(field.name().clone(), val.clone());
+                continue;
+            }
+            let local_val = get_value(val);
+            match field.data_type() {
+                DataType::Boolean => {
+                    match local_val.parse::<bool>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::Int8 => {
+                    match local_val.parse::<i8>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::Int16 => {
+                    match local_val.parse::<i16>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::Int32 => {
+                    match local_val.parse::<i32>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::Int64 => {
+                    match local_val.parse::<i64>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::UInt8 => {
+                    match local_val.parse::<u8>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::UInt16 => {
+                    match local_val.parse::<u16>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::UInt32 => {
+                    match local_val.parse::<u32>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::UInt64 => {
+                    match local_val.parse::<u64>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::Float16 => {
+                    match local_val.parse::<f32>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::Float32 => {
+                    match local_val.parse::<f32>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::Float64 => {
+                    match local_val.parse::<f64>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                DataType::Utf8 => {
+                    match local_val.parse::<String>() {
+                        Ok(val) => {
+                            local_map.insert(field.name().clone(), val.into());
+                        }
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
+                    };
+                }
+                _ => println!("{local_val:?}"),
+            };
+        }
+    }
+    if parse_error.is_empty() {
+        // Convert the Map to a Vec of (String, Value) pairs
+        let mut entries: Vec<_> = local_map.clone().into_iter().collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+
+        // If you want to convert it back to a Map
+        let sorted_map: Map<String, Value> = entries.into_iter().collect();
+        (Some(utils::json::to_string(&sorted_map).unwrap()), None)
+    } else {
+        (None, Some(parse_error))
+    }
+}
+
+async fn add_valid_record(
+    stream_meta: &StreamMeta<'_>,
+    stream_schema_map: &mut AHashMap<String, Schema>,
+    status: &mut RecordStatus,
+    buf: &mut AHashMap<String, Vec<String>>,
+    local_val: &mut Map<String, Value>,
+) -> Option<Trigger> {
+    let mut trigger: Option<Trigger> = None;
     let timestamp: i64 = local_val
         .get(&CONFIG.common.column_timestamp)
         .unwrap()
@@ -344,8 +476,9 @@ async fn add_valid_record_arrow(
         local_val,
         Some(&schema_key),
     );
+
     let hour_buf = buf.entry(hour_key).or_insert(SchemaRecords {
-        schema: schema_evolution.record_schema,
+        schema: Schema::new(schema_evolution.schema_fields),
         records: vec![],
     });
 
@@ -354,7 +487,7 @@ async fn add_valid_record_arrow(
             let delta = schema_evolution.types_delta.unwrap();
             let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
             let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
-                cast_to_type(loc_value, delta)
+                cast_to_type_arrow(loc_value, delta)
             } else if schema_evolution.is_schema_changed {
                 let local_delta = delta
                     .into_iter()
@@ -364,10 +497,10 @@ async fn add_valid_record_arrow(
                 if local_delta.is_empty() {
                     (Some(value_str.clone()), None)
                 } else {
-                    cast_to_type(loc_value, local_delta)
+                    cast_to_type_arrow(loc_value, local_delta)
                 }
             } else {
-                cast_to_type(loc_value, delta)
+                cast_to_type_arrow(loc_value, delta)
             };
             if ret_val.is_some() {
                 value_str = ret_val.unwrap();
@@ -380,7 +513,6 @@ async fn add_valid_record_arrow(
         } else {
             true
         };
-
         if valid_record {
             if !stream_meta.stream_alerts_map.is_empty() {
                 // Start check for alert trigger

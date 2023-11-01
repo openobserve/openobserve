@@ -275,7 +275,6 @@ pub async fn check_for_schema(
             types_delta: None,
             schema_fields: schema.to_cloned_fields(),
             is_schema_changed: false,
-            record_schema: schema,
         };
     }
 
@@ -290,7 +289,6 @@ pub async fn check_for_schema(
             types_delta: None,
             schema_fields: schema.to_cloned_fields(),
             is_schema_changed: false,
-            record_schema: inferred_schema,
         };
     }
 
@@ -301,7 +299,6 @@ pub async fn check_for_schema(
             types_delta: None,
             schema_fields: inferred_schema.to_cloned_fields(),
             is_schema_changed: false,
-            record_schema: inferred_schema,
         };
     }
 
@@ -343,7 +340,6 @@ pub async fn check_for_schema(
                 types_delta: Some(field_datatype_delta),
                 schema_fields: schema.to_cloned_fields(),
                 is_schema_changed: false,
-                record_schema: inferred_schema,
             }
         }
     } else {
@@ -352,7 +348,6 @@ pub async fn check_for_schema(
             types_delta: Some(field_datatype_delta),
             schema_fields: final_fields,
             is_schema_changed,
-            record_schema: inferred_schema,
         }
     }
 }
@@ -410,7 +405,6 @@ async fn handle_existing_schema(
             types_delta: Some(field_datatype_delta),
             schema_fields: final_fields,
             is_schema_changed,
-            record_schema: inferred_schema.clone(),
         })
     } else {
         let key = format!(
@@ -468,7 +462,6 @@ async fn handle_existing_schema(
                 types_delta: Some(field_datatype_delta),
                 schema_fields: final_fields,
                 is_schema_changed,
-                record_schema: inferred_schema.clone(),
             })
         } else {
             // Some other request has already acquired the lock.
@@ -485,7 +478,6 @@ async fn handle_existing_schema(
                 types_delta: Some(field_datatype_delta),
                 schema_fields: final_fields,
                 is_schema_changed: false,
-                record_schema: inferred_schema.clone(),
             })
         }
     }
@@ -550,7 +542,6 @@ async fn handle_new_schema(
                     types_delta: None,
                     schema_fields: final_schema.to_cloned_fields(),
                     is_schema_changed: true,
-                    record_schema: inferred_schema.clone(),
                 });
             } else {
                 stream_schema_map.insert(stream_name.to_string(), chk_schema.clone());
@@ -605,7 +596,6 @@ async fn handle_new_schema(
                         types_delta: None,
                         schema_fields: final_schema.to_cloned_fields(),
                         is_schema_changed: true,
-                        record_schema: inferred_schema.clone(),
                     });
                 } else {
                     // No schema change
@@ -679,7 +669,7 @@ fn get_schema_changes(
         }
     }
 
-    let final_fields = if !is_arrow {
+    let mut final_fields: Vec<Field> = if !is_arrow {
         merged_fields.drain().map(|(_key, value)| value).collect()
     } else {
         let mut inferred_fields: AHashMap<String, Field> = AHashMap::new();
@@ -692,6 +682,9 @@ fn get_schema_changes(
             .map(|(_key, value)| value)
             .collect()
     };
+
+    final_fields.sort_by(|a, b| a.name().cmp(b.name()));
+
     (field_datatype_delta, is_schema_changed, final_fields)
 }
 
