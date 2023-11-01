@@ -105,6 +105,9 @@ openobserveLogs.init({
   forwardErrorsToLogs: true,
   insecureHTTP: options.insecureHTTP,
   apiVersion: options.apiVersion,
+  service: options.service,
+  env: options.env,
+  version: options.version,
 });
 
 // You can set a user context
