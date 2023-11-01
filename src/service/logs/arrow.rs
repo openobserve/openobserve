@@ -113,6 +113,7 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
                 }
             }
         }
+    } else {
     }
     println!("got rows {}", rows.len());
     HttpResponse::Ok()
