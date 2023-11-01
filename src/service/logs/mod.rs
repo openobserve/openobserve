@@ -585,7 +585,7 @@ async fn add_valid_record_arrow(
     .await;
 
     // get hour key
-    let schema_key = get_fields_key_xxh3(&schema_evolution.record_schema.to_cloned_fields());
+    let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
     let hour_key = get_wal_time_key(
         timestamp,
         stream_meta.partition_keys,
