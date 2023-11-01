@@ -15,7 +15,6 @@
 
 <template>
   <div class="tabContent q-ma-md">
-    <div class="title" data-test="syslog-title-text">Syslog</div>
     <div v-if="isLoading" class="flex column items-center justify-center">
       <q-spinner color="primary" size="lg" />
       <div>Loading Syslog</div>
@@ -578,20 +577,6 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.tabContent {
-  background-color: rgba(136, 136, 136, 0.103);
- // tab content bg color
-  padding: 1rem;
-  border-radius: 0.5rem;
-  .title {
-    text-transform: uppercase;
-    line-height: 1rem;
-    font-weight: 600;
-  }
-}
-</style>
 
 <style lang="scss">
 .syslog-inputs {

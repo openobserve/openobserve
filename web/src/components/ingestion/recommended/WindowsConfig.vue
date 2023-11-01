@@ -1,26 +1,25 @@
 <template>
   <div class="q-pa-md">
-    <div class="text-subtitle2 q-pb-sm">
+    <div class="text-subtitle1 q-pb-sm">
       You need minimum PowerShell 6 to run the install script. you can check
       your PowerShell version by running
       <code
-        class="q-px-xs q-py-xs text-subtitle2"
+        class="q-px-xs q-py-xs text-subtitle1"
         style="border-radius: 4px"
         >$PSVersionTable.PSVersion</code
       >
       in your terminal.
     </div>
-    <div>You should see something like this:</div>
+    <div class="text-subtitle1">You should see something like this:</div>
     <pre
       class="notranslate q-px-md q-py-md text-body"
     >PS C:\<span class="pl-k">&gt;</span> <span class="pl-c1">$PSVersionTable<span class="pl-smi">.PSVersion</span></span>
 
 Major  Minor  Patch  PreReleaseLabel BuildLabel
 <span class="pl-k">-----</span>  <span class="pl-k">-----</span>  <span class="pl-k">-----</span>  <span class="pl-k">---------------</span> <span class="pl-k">----------</span>
-<span class="pl-c1">7</span>      <span class="pl-c1">3</span>      <span class="pl-c1">7</span>
-</pre>
-    <div class="text-subtitle2">Major should be at least 6.</div>
-    <div class="text-subtitle2 q-pt-sm">
+<span class="pl-c1">7</span>      <span class="pl-c1">3</span>      <span class="pl-c1">7</span></pre>
+    <div class="text-subtitle1">Major should be at least 6.</div>
+    <div class="text-subtitle1 q-pt-sm">
       You can download and install the latest version of powershell from
       <a
         target="_blank"

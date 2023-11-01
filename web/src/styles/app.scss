@@ -74,3 +74,43 @@
 .q-position-engine {
   z-index: 99998;
 }
+
+.tabContent {
+  background-color: rgba(136, 136, 136, 0.103);
+  // tab content bg color
+  padding: 0px 10px;
+  border-radius: 0.5rem;
+  &__head {
+    justify-content: end;
+    display: flex;
+    .title {
+      line-height: 1rem;
+      font-weight: bold;
+      font-size: 16px;
+      padding-top: 10px;
+    }
+    .copy_action {
+      .q-btn {
+        justify-content: end;
+        font-size: 8px;
+        padding: 10px 0px 0px 0px;
+        min-width: 0px;
+        min-height: 0px;
+        line-height: 0px;
+        float: inline-end;
+        position: absolute;
+        right: 30px;
+      }
+    }
+  }
+  pre {
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+    line-height: 20px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    max-width: 96%;
+  }
+}
