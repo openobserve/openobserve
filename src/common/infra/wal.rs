@@ -350,42 +350,14 @@ impl MemoryFiles {
 }
 
 impl RwFile {
-    pub async fn write_for_schema(
-        &self,
-        data: RecordBatch,
-        thread_id: usize,
-        stream: StreamParams,
-        partition_time_level: Option<PartitionTimeLevel>,
-        key: &str,
-        use_cache: bool,
-        schema: Option<Schema>,
-    ) {
-        if self.arrow_file.as_ref().is_some() {
-            self.arrow_file
-                .as_ref()
-                .unwrap()
-                .write()
-                .await
-                .write(&data)
-                .unwrap()
-        } else {
-            crate::common::infra::wal::get_or_create_arrow(
-                0,
-                StreamParams::new("default", "in_stream_name", StreamType::Logs),
-                None,
-                "aa",
-                false,
-                Some(schema.as_ref().unwrap().clone()),
-            )
-            .await;
-            self.arrow_file
-                .as_ref()
-                .unwrap()
-                .write()
-                .await
-                .write(&data)
-                .unwrap()
-        }
+    pub async fn write_arrow(&self, data: RecordBatch) {
+        self.arrow_file
+            .as_ref()
+            .unwrap()
+            .write()
+            .await
+            .write(&data)
+            .unwrap()
     }
 
     async fn new(
@@ -543,11 +515,7 @@ impl RwFile {
                         .freeze(),
                 )
                 .await;
-        } else if self.use_arrow {
-            let mut writer = self.arrow_file.as_ref();
-            writer.unwrap().write().await.finish().unwrap();
-            writer = None;
-        } else {
+        } else if !self.use_arrow {
             self.file
                 .as_ref()
                 .unwrap()

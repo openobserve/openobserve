@@ -36,7 +36,7 @@ use crate::common::{
     meta::{
         alerts::Alert,
         functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-        stream::{PartitionTimeLevel, PartitioningDetails, StreamParams},
+        stream::{PartitionTimeLevel, PartitioningDetails, SchemaRecords, StreamParams},
         usage::RequestStats,
         StreamType,
     },
@@ -365,7 +365,7 @@ pub async fn write_file(
 }
 
 pub async fn write_file_arrow(
-    buf: &AHashMap<String, Vec<json::Value>>,
+    buf: &AHashMap<String, SchemaRecords>,
     thread_id: usize,
     stream: &StreamParams,
     stream_file_name: &mut String,
@@ -373,20 +373,17 @@ pub async fn write_file_arrow(
 ) -> RequestStats {
     let mut req_stats = RequestStats::default();
     for (key, entry) in buf {
-        if entry.is_empty() {
+        if entry.records.is_empty() {
             continue;
         }
-        let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(entry.len());
+        let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(entry.records.len());
 
-        let inferred_schema =
-            arrow::json::reader::infer_json_schema_from_iterator(entry.iter().map(Ok)).unwrap();
-
-        let mut decoder = ReaderBuilder::new(Arc::new(inferred_schema.clone()))
+        let mut decoder = ReaderBuilder::new(Arc::new(entry.schema.clone()))
             .with_batch_size(batch_size)
             .build_decoder()
             .unwrap();
 
-        let _ = decoder.serialize(entry);
+        let _ = decoder.serialize(&entry.records);
         let batch = decoder.flush().unwrap().unwrap();
         let rw_file = get_or_create_arrow(
             thread_id,
@@ -394,25 +391,15 @@ pub async fn write_file_arrow(
             partition_time_level,
             key,
             CONFIG.common.wal_memory_mode_enabled,
-            Some(inferred_schema.clone()),
+            Some(entry.schema.clone()),
         )
         .await;
         if stream_file_name.is_empty() {
             *stream_file_name = rw_file.full_name();
         }
-        rw_file
-            .write_for_schema(
-                batch,
-                thread_id,
-                stream.clone(),
-                partition_time_level,
-                key,
-                CONFIG.common.wal_memory_mode_enabled,
-                Some(inferred_schema),
-            )
-            .await;
-        req_stats.size += entry.len() as f64 / SIZE_IN_MB;
-        req_stats.records += entry.len() as i64;
+        rw_file.write_arrow(batch).await;
+        req_stats.size += entry.records.len() as f64 / SIZE_IN_MB;
+        req_stats.records += entry.records.len() as i64;
     }
     req_stats
 }
@@ -452,17 +439,7 @@ pub async fn write_file_arrow_new(
         if stream_file_name.is_empty() {
             *stream_file_name = rw_file.full_name();
         }
-        rw_file
-            .write_for_schema(
-                batch,
-                thread_id,
-                stream.clone(),
-                partition_time_level,
-                key,
-                CONFIG.common.wal_memory_mode_enabled,
-                Some(inferred_schema),
-            )
-            .await;
+        rw_file.write_arrow(batch).await;
         req_stats.size += entry.len() as f64 / SIZE_IN_MB;
         req_stats.records += entry.len() as i64;
     }

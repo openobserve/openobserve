@@ -1,4 +1,5 @@
 use actix_web::{post, web, HttpResponse};
+use arrow::array::StringArray;
 use arrow::ipc::reader::StreamReader;
 use arrow::json::ReaderBuilder;
 use std::fs::File;
@@ -11,6 +12,7 @@ use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
 use crate::common::infra::{config::CONFIG, metrics};
+use crate::common::meta::stream::SchemaRecords;
 use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{IngestionResponse, StreamStatus},
@@ -53,17 +55,7 @@ async fn json_to_arrow(body: web::Bytes) -> HttpResponse {
         Some(inferred_schema.clone()),
     )
     .await;
-    rw_file
-        .write_for_schema(
-            batch,
-            0,
-            StreamParams::new("default", "in_stream_name", StreamType::Logs),
-            None,
-            "aa",
-            false,
-            Some(inferred_schema),
-        )
-        .await;
+    rw_file.write_arrow(batch).await;
 
     HttpResponse::Ok()
         .content_type("application/octet-stream")
@@ -78,20 +70,39 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
         file.into_inner()
     );
 
-    println!("{}", file);
-
     let buf = File::open(file).unwrap();
     let reader = StreamReader::try_new(&buf, None).unwrap();
 
     let mut num_rows = 0;
+    let mut num_batches = 0;
 
     let mut batches = vec![];
+    let mut rows = vec![];
     for batch in reader {
-        let read_batch = batch.unwrap();
-        num_rows += read_batch.num_rows();
-        batches.push(read_batch);
+        num_batches += 1;
+        match batch {
+            Ok(read_batch) => {
+                let name_column = read_batch
+                    .column(1)
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .expect("Expected StringArray");
+                num_rows += read_batch.num_rows();
+
+                for i in 0..read_batch.num_rows() {
+                    let name = name_column.value(i).to_string();
+
+                    rows.push(name);
+                }
+                batches.push(read_batch);
+            }
+            Err(err) => {
+                println!("error:reading batch {}", err);
+                continue;
+            }
+        }
     }
-    println!("{:?}", batches);
+    println!("rows are {:?}", rows);
     let msg = format!("got {} rows", num_rows);
 
     HttpResponse::Ok()
@@ -141,7 +152,7 @@ pub async fn ingest(
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
 
-    let mut buf: AHashMap<String, Vec<json::Value>> = AHashMap::new();
+    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
     let reader: Vec<json::Value> = json::from_slice(&body).unwrap_or({
         let val: json::Value = json::from_slice(&body)?;
         vec![val]

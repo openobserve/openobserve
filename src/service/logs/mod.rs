@@ -20,10 +20,17 @@ use datafusion::arrow::datatypes::Schema;
 use crate::common::{
     infra::config::CONFIG,
     meta::{alerts::Alert, ingestion::RecordStatus, stream::PartitionTimeLevel, StreamType},
+    meta::{
+        alert::{Alert, Evaluate, Trigger},
+        ingestion::RecordStatus,
+        stream::{PartitionTimeLevel, SchemaRecords},
+        StreamType,
+    },
     utils::{
         self,
         hasher::get_fields_key_xxh3,
         json::{Map, Value},
+        schema_ext::SchemaExt,
     },
 };
 use crate::service::{
@@ -223,6 +230,7 @@ async fn add_valid_record<'a>(
         &value_str,
         stream_schema_map,
         timestamp,
+        false,
     )
     .await;
 
@@ -304,7 +312,7 @@ async fn add_valid_record_arrow(
     stream_meta: &StreamMeta<'_>,
     stream_schema_map: &mut AHashMap<String, Schema>,
     status: &mut RecordStatus,
-    buf: &mut AHashMap<String, Vec<utils::json::Value>>,
+    buf: &mut AHashMap<String, SchemaRecords>,
     local_val: &mut Map<String, Value>,
 ) -> Option<Trigger> {
     let mut trigger: Option<Trigger> = None;
@@ -323,11 +331,12 @@ async fn add_valid_record_arrow(
         &value_str,
         stream_schema_map,
         timestamp,
+        true,
     )
     .await;
 
     // get hour key
-    let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
+    let schema_key = get_fields_key_xxh3(&schema_evolution.record_schema.to_cloned_fields());
     let hour_key = get_wal_time_key(
         timestamp,
         stream_meta.partition_keys,
@@ -335,7 +344,10 @@ async fn add_valid_record_arrow(
         local_val,
         Some(&schema_key),
     );
-    let hour_buf = buf.entry(hour_key).or_default();
+    let hour_buf = buf.entry(hour_key).or_insert(SchemaRecords {
+        schema: schema_evolution.record_schema,
+        records: vec![],
+    });
 
     if schema_evolution.schema_compatible {
         let valid_record = if schema_evolution.types_delta.is_some() {
@@ -402,7 +414,7 @@ async fn add_valid_record_arrow(
                 // End check for alert trigger
             }
             let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
-            hour_buf.push(loc_value);
+            hour_buf.records.push(loc_value);
             status.successful += 1;
         };
     } else {
