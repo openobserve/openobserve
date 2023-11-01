@@ -33,7 +33,7 @@ HTTP Endpoint: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/traces
 Authorization: Basic {{ accessKey }}</pre>
   </div>
 
-  <div class="title q-pl-md q-pt-md" data-test="vector-title-text"><b>OTLP GRPC</b> <br />(<b>Note:</b> Only available for single node. Not supported in distributed mode.)</div>
+  <div class="title q-pl-md q-pt-md" data-test="vector-title-text"><b>OTLP gRPC</b> <br />(<b>Note:</b> Only available for single node. Not supported in distributed mode.)</div>
   <div class="tabContent q-ma-md">
     <div class="tabContent__head">
       <div class="copy_action">
