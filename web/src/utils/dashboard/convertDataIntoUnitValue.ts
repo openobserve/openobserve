@@ -27,8 +27,9 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
             };
           }
         }
+        const val: any = value ? value / units[units.length - 1].divisor : 0
         return {
-          value: `${parseFloat(value ? value / units[units.length - 1].divisor : 0).toFixed(2)}`,
+          value: `${parseFloat(val).toFixed(2)}`,
           unit: "PB",
         };
       }
@@ -173,8 +174,9 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
             };
           }
         }
+        const val: any = value ? value / units[units.length - 1].divisor : 0
         return {
-          value: `${parseFloat(value ? value / units[units.length - 1].divisor : 0).toFixed(2)}`,
+          value: `${parseFloat(val).toFixed(2)}`,
           unit: "PB",
         };
       }
@@ -196,8 +198,9 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
             };
           }
         }
+        const val: any = value ? value / units[units.length - 1].divisor : 0
         return {
-          value: `${parseFloat(value ? value / units[units.length - 1].divisor : 0).toFixed(2)}`,
+          value: `${parseFloat(val).toFixed(2)}`,
           unit: "PB",
         };
       }
