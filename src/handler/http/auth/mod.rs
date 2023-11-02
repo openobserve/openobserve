@@ -177,7 +177,10 @@ pub async fn validator_aws(
     match req.headers().get("X-Amz-Firehose-Access-Key") {
         Some(val) => match val.to_str() {
             Ok(val) => {
-                let amz_creds = base64::decode(val).unwrap();
+                let amz_creds = match base64::decode(val) {
+                    Ok(val) => val,
+                    Err(_) => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
+                };
                 let creds = amz_creds
                     .split(':')
                     .map(|s| s.to_string())
