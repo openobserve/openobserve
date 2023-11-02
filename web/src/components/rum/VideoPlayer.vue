@@ -158,7 +158,7 @@ import {
   onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
-import { useLocalToken } from "@/utils/zincutils";
+import { useLocalToken, getPath } from "@/utils/zincutils";
 
 const props = defineProps({
   events: {
@@ -486,7 +486,7 @@ const skipTo = (skipTo: string) => {
 const initializeWorker = () => {
   if (window.Worker) {
     // Creating the Web Worker
-    worker.value = new Worker("/rumCssWorker.js");
+    worker.value = new Worker(`${getPath()}rumCssWorker.js`);
     console.log("Worker created successfully.");
   } else {
     console.error("Web Workers are not supported in this browser.");
