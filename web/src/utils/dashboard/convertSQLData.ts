@@ -960,7 +960,10 @@ export const convertSQLData = (
     panelSchema.type != "metric" &&
     panelSchema.type != "pie" &&
     panelSchema.type != "donut" &&
-    panelSchema?.queries[0]?.customQuery == false
+    panelSchema?.queries[0]?.customQuery == false &&
+    Array.isArray(options.xAxis) &&
+    options.xAxis.length > 0 &&
+    options.xAxis[0].data.length > 0
   ) {
     // auto SQL: if x axis has time series(aggregation function is histogram)
     const field = panelSchema.queries[0].fields?.x.find(
@@ -979,12 +982,12 @@ export const convertSQLData = (
         seriesObj.data = seriesObj.data.map((it: any, index: any) => [
           store.state.timezone != "UTC"
             ? utcToZonedTime(
-                Number.isInteger(options.xAxis[0].data[index])
-                  ? options.xAxis[0].data[index]
-                  : new Date(options.xAxis[0].data[index]).getTime(),
+                Number.isInteger(options?.xAxis[0]?.data[index])
+                  ? options?.xAxis[0]?.data[index]
+                  : new Date(options?.xAxis[0]?.data[index]).getTime(),
                 store.state.timezone
               )
-            : new Date(options.xAxis[0].data[index]).toISOString().slice(0, -1),
+            : new Date(options?.xAxis[0]?.data[index]).toISOString().slice(0, -1),
           it,
         ]);
       });
@@ -1062,6 +1065,7 @@ export const convertSQLData = (
     panelSchema.type != "pie" &&
     panelSchema.type != "donut" &&
     panelSchema?.queries[0]?.customQuery == true &&
+    Array.isArray(options.xAxis) &&
     options.xAxis.length > 0 &&
     options.xAxis[0].data.length > 0
   ) {
