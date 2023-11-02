@@ -177,7 +177,7 @@ export const convertSQLData = (
       enterable: true,
       backgroundColor:
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-      extraCssText: "max-height: 200px; overflow: auto;",
+      extraCssText: "max-height: 200px; overflow: auto; max-width: 400px",
       axisPointer: {
         type: "cross",
         label: {
