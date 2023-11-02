@@ -113,7 +113,7 @@ export const convertPromQLData = (
       },
       enterable: true,
       backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-      extraCssText: "max-height: 200px; overflow: auto;",
+      extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       formatter: function (name: any) {
         if (name.length == 0) return "";
 
@@ -123,14 +123,14 @@ export const convertPromQLData = (
         const currentSeriesIndex = name.findIndex(
           (it: any) => it.seriesName == currentSeriesName
         )
-        
+
         // swap current hovered series index to top in tooltip
         const temp = name[0];
         name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-        let hoverText = name.map((it: any) => { 
-          
+        let hoverText = name.map((it: any) => {
+
           // check if the series is the current series being hovered
           // if have than bold it
           if(it?.seriesName == currentSeriesName)
@@ -141,15 +141,15 @@ export const convertPromQLData = (
                 panelSchema.config?.unit_custom
               )
             )} </strong>`;
-            // else normal text
-            else
-              return `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                getUnitValue(
-                  it.data[1],
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom
-                )
-              )}`;
+          // else normal text
+          else
+            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
+              getUnitValue(
+                it.data[1],
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom
+              )
+            )}`;
         });
 
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
