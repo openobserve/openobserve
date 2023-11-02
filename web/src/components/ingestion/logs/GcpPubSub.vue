@@ -16,9 +16,6 @@
 <template>
   <div class="tabContent q-ma-md">
     <div class="tabContent__head">
-      <div class="title" data-test="vector-title-text">
-        GCP Logs via (Pub/Sub)
-      </div>
       <div class="copy_action">
         <q-btn
           data-test="gcpLogs-copy-btn"
@@ -35,8 +32,7 @@
     <pre ref="gcpContent" data-test="vector-content-text">
 URL: {{ endpoint.url }}/gcp/{{ currOrgIdentifier }}/default/_sub?API-Key={{
         accessKey
-      }}
-  </pre
+      }}</pre
     >
   </div>
 </template>
@@ -92,32 +88,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.tabContent {
-  background-color: rgba(136, 136, 136, 0.103);
-  // tab content bg color
-  padding: 1rem 1.25rem 0.5rem;
-  border-radius: 0.5rem;
-  &__head {
-    justify-content: space-between;
-    text-transform: uppercase;
-    align-items: center;
-    display: flex;
-    .title {
-      line-height: 1rem;
-      font-weight: 600;
-    }
-    .copy_action {
-      .q-btn {
-        // background-color: white;
-      }
-    }
-  }
-  pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    margin-bottom: 0;
-  }
-}
-</style>

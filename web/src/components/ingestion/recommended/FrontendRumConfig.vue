@@ -15,28 +15,22 @@
 
 <template>
   <div class="q-ma-md" :key="rumToken">
-    <div class="title" data-test="vector-title-text">RUM</div>
     <div v-if="rumToken">
-      <copy-content
-        :displayContent="`Client Token: ` + rumToken"
-        :content="rumToken"
-      ></copy-content>
-
-      <div class="text-h6 q-mt-md" data-test="rumweb-title-text">
+      <div class="text-h6 q-mt-xs" data-test="rumweb-title-text">
         {{ t("ingestion.npmStepTitle") }}
       </div>
       <q-separator class="q-my-sm"></q-separator>
 
-      <div class="text-subtitle1 q-mt-md" v-html="npmStep1"></div>
+      <div class="text-subtitle1 q-mt-xs" v-html="npmStep1"></div>
       <copy-content
         content="npm i @openobserve/browser-rum @openobserve/browser-logs"
       ></copy-content>
 
       <br />
-      <div class="text-subtitle1 q-mt-md" v-html="npmStep2"></div>
+      <div class="text-subtitle1 q-mt-xs" v-html="npmStep2"></div>
       <copy-content :content="initConfiguration"></copy-content>
     </div>
-    <div v-else class="q-mt-md">
+    <div v-else class="q-mt-xs">
       {{ t("ingestion.generateRUMTokenMessage") }}
     </div>
   </div>
@@ -108,6 +102,9 @@ openobserveLogs.init({
   clientToken: options.clientToken,
   site: options.site,
   organizationIdentifier: options.organizationIdentifier,
+  service: options.service,
+  env: options.env,
+  version: options.version,
   forwardErrorsToLogs: true,
   insecureHTTP: options.insecureHTTP,
   apiVersion: options.apiVersion,
@@ -188,32 +185,3 @@ openobserveRum.startSessionReplayRecording();`;
   },
 });
 </script>
-
-<style scoped lang="scss">
-.tabContent {
-  background-color: rgba(136, 136, 136, 0.103);
-  // tab content bg color
-  padding: 10px 20px;
-  border-radius: 0.5rem;
-  &__head {
-    justify-content: space-between;
-    text-transform: uppercase;
-    align-items: center;
-    display: flex;
-    .title {
-      line-height: 1rem;
-      font-weight: 600;
-    }
-    .copy_action {
-      .q-btn {
-        // background-color: white;
-      }
-    }
-  }
-  pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    margin: 0;
-  }
-}
-</style>

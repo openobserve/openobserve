@@ -16,7 +16,6 @@
 <template>
   <div class="tabContent">
     <div class="tabContent__head">
-      <pre data-test="rum-content-text">{{ displayContent || content }}</pre>
       <div>
         <div class="copy_action">
           <q-btn
@@ -32,6 +31,7 @@
         </div>
       </div>
     </div>
+    <pre data-test="rum-content-text">{{ displayContent || content }}</pre>
   </div>
 </template>
 
@@ -82,23 +82,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.tabContent {
-  background-color: rgba(136, 136, 136, 0.103);
-  // tab content bg color
-  padding: 10px 20px;
-  border-radius: 0.5rem;
-  &__head {
-    justify-content: space-between;
-    display: flex;
-  }
-  pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    font-size: 14px;
-    margin: 0;
-    line-height: 30px;
-  }
-}
-</style>

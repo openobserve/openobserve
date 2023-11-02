@@ -59,10 +59,19 @@
         <div class="row">
 
         <div class="col">
-            <query-editor data-test="dashboard-panel-query-editor" ref="queryEditorRef" class="monaco-editor" v-model:query="currentQuery"
-                v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
-                v-model:functions="dashboardPanelData.meta.stream.functions" @run-query="searchData"
-                :readOnly="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"></query-editor>
+            <query-editor 
+                ref="queryEditorRef" 
+                class="monaco-editor" 
+                v-model:query="currentQuery"
+                data-test="dashboard-panel-query-editor" 
+                v-model:functions="dashboardPanelData.meta.stream.functions" 
+                v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields" 
+                :keywords="dashboardPanelData.data.queryType === 'promql' ? autoCompletePromqlKeywords : []" 
+                @update-query="updateQuery"
+                @run-query="searchData" 
+                :readOnly="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"
+                :language="dashboardPanelData.data.queryType"
+            ></query-editor>
             <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
         </div>
         </div>
@@ -80,6 +89,7 @@ import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import QueryEditor from "../QueryEditor.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
+import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 
 export default defineComponent({
     name: "DashboardQueryEditor",
@@ -102,11 +112,22 @@ export default defineComponent({
         const confirmQueryModeChangeDialog = ref(false)
         const parser = new Parser();
         let streamName = "";
-        
+        const {
+            autoCompleteData,
+            autoCompletePromqlKeywords,
+            getSuggestions,
+        } = usePromqlSuggestions();
+        const queryEditorRef = ref(null);
+
         const addTab = () => {         
             addQuery();
             dashboardPanelData.layout.currentQueryIndex = dashboardPanelData.data.queries.length - 1;
         };
+        const updateQuery = (query, fields) => {
+            if(dashboardPanelData.data.queryType === 'promql'){
+                updatePromQLQuery(query, fields);
+            }
+        }
 
         const removeTab = async (index) => {
             if (dashboardPanelData.layout.currentQueryIndex >= dashboardPanelData.data.queries.length-1) dashboardPanelData.layout.currentQueryIndex -=1;
@@ -291,9 +312,9 @@ export default defineComponent({
             query += xAxisAlias.length ? " ORDER BY " + xAxisAlias.join(", ") : ''
             return query
         }
-
+        
         watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery, dashboardPanelData.meta.stream.selectedStreamFields], () => {
-
+            
             // Only continue if the current mode is "show custom query"
             if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType == "sql") {
                 // Call the updateQueryValue function
@@ -303,17 +324,20 @@ export default defineComponent({
                 // remove the custom fields from the list
                 dashboardPanelData.meta.stream.customQueryFields = []
             }
+            // if (dashboardPanelData.data.queryType == "promql") {
+            //     updatePromQLQuery()
+            // }
         }, { deep: true })
 
 
         // This function parses the custom query and generates the errors and custom fields
         const updateQueryValue = () => {
+            
             // store the query in the dashboard panel data
             // dashboardPanelData.meta.editorValue = value;
             // dashboardPanelData.data.query = value;
 
             if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType != "promql") {
-
                 // empty the errors
                 dashboardPanelData.meta.errors.queryErrors = []
 
@@ -370,8 +394,23 @@ export default defineComponent({
                     dashboardPanelData.meta.errors.queryErrors.push("Stream name required")
                 }
             }
-
         };
+
+        const updatePromQLQuery = async (event, value) => {
+            autoCompleteData.value.query = value;
+            autoCompleteData.value.text = event.changes[0].text;
+            autoCompleteData.value.dateTime = {
+                startTime: dashboardPanelData.meta.dateTime.start_time?.getTime(),
+                endTime: dashboardPanelData.meta.dateTime.end_time?.getTime()
+            }
+            autoCompleteData.value.position.cursorIndex =
+                queryEditorRef.value.getCursorIndex();
+            autoCompleteData.value.popup.open =
+                queryEditorRef.value.triggerAutoComplete;
+            autoCompleteData.value.popup.close =
+                queryEditorRef.value.disableSuggestionPopup;
+            getSuggestions();
+        }
 
         const onUpdateToggle = (value) => {
             dashboardPanelData.meta.errors.queryErrors = []
@@ -381,6 +420,7 @@ export default defineComponent({
             t,
             router,
             updateQueryValue,
+            updatePromQLQuery,
             onDropDownClick,
             promqlMode,
             dashboardPanelData,
@@ -389,6 +429,11 @@ export default defineComponent({
             addTab,
             removeTab,
             currentQuery,
+            autoCompleteData,
+            autoCompletePromqlKeywords,
+            getSuggestions,
+            queryEditorRef,
+            updateQuery
         };
     },
 });
@@ -397,7 +442,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .sql-bar {
     height: 40px !important;
-    overflow: hidden;
+    // overflow: hidden;
     cursor: pointer;
 }
 .q-ml-sm:hover{

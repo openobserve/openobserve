@@ -405,7 +405,7 @@ export default defineComponent({
       {
         title: t("menu.rum"),
         icon: "devices",
-        link: "/rum/performance/overview",
+        link: "/rum",
       },
       {
         title: t("menu.dashboard"),
@@ -425,7 +425,7 @@ export default defineComponent({
       {
         title: t("menu.ingestion"),
         icon: outlinedFilterAlt,
-        link: "/ingestion/recommended/kubernetes",
+        link: "/ingestion",
       },
       {
         title: t("menu.user"),
