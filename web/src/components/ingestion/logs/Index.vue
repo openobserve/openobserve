@@ -89,6 +89,7 @@
           content-class="tab_content"
         />
         <q-route-tab
+          v-if="showCloudIngestionOptions"
           name="kinesisfirehose"
           :to="{
             name: 'kinesisfirehose',
@@ -101,6 +102,7 @@
           content-class="tab_content"
         />
         <q-route-tab
+          v-if="showCloudIngestionOptions"
           name="gcpLogs"
           :to="{
             name: 'gcpLogs',
@@ -260,6 +262,10 @@ export default defineComponent({
       return config.isCloud !== "true";
     });
 
+    const showCloudIngestionOptions = computed(() => {
+      return config.isCloud === "true";
+    });
+
     return {
       t,
       store,
@@ -276,6 +282,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       ingestiontabs,
       showSyslog,
+      showCloudIngestionOptions,
     };
   },
 });
