@@ -476,7 +476,13 @@ const useLogs = () => {
             .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
             .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
 
-          const parsedSQL = whereClause.split(" ");
+          //remove everything after -- in where clause
+          const parsedSQL = whereClause
+            .split("\n")
+            .map((line) => line.split("--")[0].trim())
+            .filter((line) => line !== "")
+            .join("\n")
+            .split(" ");
           searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
             parsedSQL.forEach((node: any, index: any) => {
               if (node == field.name) {
