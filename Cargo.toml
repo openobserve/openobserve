@@ -3,7 +3,7 @@ description = "OpenObserve is an observability platform that allows you to captu
 edition = "2021"
 homepage = "https://openobserve.ai/"
 keywords = [
-  "search",
+  "openobserve",
   "log",
   "metrics",
   "traces",
