@@ -58,7 +58,7 @@ const getOtelGrpcConfig = computed(() => {
       endpoint: ${endpoint.value.host}:5081
       headers:
         Authorization: "Basic ${accessKey.value}"
-        organization: default
+        organization: ${props.currOrgIdentifier}
         stream-name: default
       tls:
         insecure: true
@@ -66,7 +66,7 @@ const getOtelGrpcConfig = computed(() => {
       endpoint: ${endpoint.value.host}:5081
       headers:
         Authorization: "Basic ${accessKey.value}"
-        organization: default
+        organization: ${props.currOrgIdentifier}
         stream-name: default
       tls:
         insecure: true`;
