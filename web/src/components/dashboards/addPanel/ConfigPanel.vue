@@ -273,6 +273,8 @@ name="info" />
       </template>
     </q-input>
 
+    <OverridesList/>
+
   </div>
 </template>
 
@@ -280,8 +282,13 @@ name="info" />
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import OverridesList from "@/components/dashboards/addPanel/OverridesList.vue"
 
 export default defineComponent({
+  components:{
+    OverridesList
+  },
+  name: 'ConfigPanel',
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
