@@ -297,10 +297,15 @@ const setupSession = async () => {
                       __child.attributes.href.endsWith(".css")
                     ) {
                       workerProcessId.value++;
+                      console.log(
+                        "Processing css for worker id:",
+                        workerProcessId.value
+                      );
                       processCss(
                         __child.attributes._cssText,
                         workerProcessId.value
                       ).then((res: any) => {
+                        console.log("Processed css for worker id:", res.id);
                         __child.attributes._cssText = res.updatedCssString;
                       });
                     }
@@ -511,6 +516,7 @@ const processCss = (cssString: string, id: string | number) => {
         id,
         token: token.replace("Basic ", ""),
       });
+      console.log("Message posted to worker");
     } else {
       reject("Worker not initialized");
     }
