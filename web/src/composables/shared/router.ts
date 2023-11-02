@@ -104,7 +104,7 @@ const useRoutes = () => {
     },
     {
       name: "streamExplorer",
-      path: "logstreams/stream-explore",
+      path: "streams/stream-explore",
       component: StreamExplorer,
       props: true,
     },
