@@ -84,19 +84,9 @@ const useIngestionRoutes = () => {
                   component: Vector,
                 },
                 {
-                  path: "kinesisfirehose",
-                  name: "kinesisfirehose",
-                  component: KinesisFirehose,
-                },
-                {
                   path: "filebeat",
                   name: "filebeat",
                   component: FileBeat,
-                },
-                {
-                  path: "gcp",
-                  name: "gcpLogs",
-                  component: GcpPubSub,
                 },
               ],
             },
@@ -192,11 +182,28 @@ const useIngestionRoutes = () => {
     component: SyslogNg,
   };
 
+  const kinesisFirehose = {
+    path: "kinesisfirehose",
+    name: "kinesisfirehose",
+    component: KinesisFirehose,
+  };
+
+  const gcpPubSub = {
+    path: "gcp",
+    name: "gcpLogs",
+    component: GcpPubSub,
+  };
+
   if (config.isCloud === "false" || !config.isCloud) {
     ingestionRoutes[0].children
       .find((child: any) => child.name === "custom")
       .children.find((child: any) => child.name === "ingestLogs")
       ?.children.push(...[sysLog, sysLogNg]);
+  } else {
+    ingestionRoutes[0].children
+      .find((child: any) => child.name === "custom")
+      .children.find((child: any) => child.name === "ingestLogs")
+      ?.children.push(...[kinesisFirehose, gcpPubSub]);
   }
   return ingestionRoutes;
 };
