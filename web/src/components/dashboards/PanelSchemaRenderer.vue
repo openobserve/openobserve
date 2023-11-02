@@ -96,7 +96,36 @@ export default defineComponent({
         }
       }
     },{ deep: true });
-
+    
+    const handleNoData = (panelType: any) => {
+      const xAlias = panelSchema.value.queries[0].fields.x.map((it: any) => it.alias)
+      const yAlias = panelSchema.value.queries[0].fields.y.map((it: any) => it.alias)
+      const zAlias = panelSchema.value.queries[0].fields.z.map((it: any) => it.alias)      
+      
+      switch (panelType) {
+        case "area":
+        case "area-stacked":
+        case "bar":
+        case "h-bar":
+        case "stacked":
+        case "h-stacked":
+        case "line":
+        case "scatter":
+        case "metric":
+        case "table":
+          {
+            // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
+            return data.value[0].length > 1 || xAlias.every((x: any) => data.value[0][0][x]) && yAlias.every((y: any) => data.value[0][0][y]);
+          }
+        case "heatmap":
+          {
+            return data.value[0].length > 1 || xAlias.every((x: any) => data.value[0][0][x]) && yAlias.every((y: any) => data.value[0][0][y]) && zAlias.every((z: any) => data.value[0][0][z]);
+          }
+        default:
+          break;
+      }
+    } 
+    
     // Compute the value of the 'noData' variable
     const noData = computed(() => {
       // Check if the queryType is 'promql'
@@ -108,7 +137,7 @@ export default defineComponent({
           : "No Data"; // Return "No Data" if there is no data
       } else {
         // The queryType is not 'promql'        
-        return data.value.length && data.value[0]?.length ? "" : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
+        return data.value.length && data.value[0]?.length && handleNoData(panelSchema.value.type) ? "" : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
       }
     });
 
