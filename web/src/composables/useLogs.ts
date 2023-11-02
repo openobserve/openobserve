@@ -433,8 +433,8 @@ const useLogs = () => {
       if (searchObj.meta.sqlMode == true) {
         const filteredQuery = searchObj.data.query
           .split("\n")
-          .map((line) => line.split("--")[0].trim())
-          .filter((line) => line !== "")
+          .map((line: string) => line.split("--")[0].trim())
+          .filter((line: string) => line !== "")
           .join("\n");
         const parsedSQL: any = parser.astify(filteredQuery);
         if (parsedSQL.limit != null) {
@@ -484,8 +484,8 @@ const useLogs = () => {
           //remove everything after -- in where clause
           const parsedSQL = whereClause
             .split("\n")
-            .map((line) => line.split("--")[0].trim())
-            .filter((line) => line !== "")
+            .map((line: string) => line.split("--")[0].trim())
+            .filter((line: string) => line !== "")
             .join("\n")
             .split(" ");
           searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
