@@ -217,7 +217,7 @@ export const convertPromQLData = (
       case "area":
       case "scatter":
       case "area-stacked": {
-        switch (it.resultType) {
+        switch (it?.resultType) {
           case "matrix": {
             const seriesObj = it?.result?.map((metric: any) => {
               const values = metric.values.sort(
@@ -254,7 +254,7 @@ export const convertPromQLData = (
         }
       }
       case "metric": {
-        switch (it.resultType) {
+        switch (it?.resultType) {
           case "matrix": {
             const traces = it?.result?.map((metric: any) => {
               const values = metric.values.sort(
