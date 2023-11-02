@@ -10,7 +10,7 @@
 export const getUnitValue = (value: any, unit: string, customUnit: string) => {
     switch (unit) {
       case "bytes": {
-        const units = [
+        const units: any = [
           { unit: "B", divisor: 1 },
           { unit: "KB", divisor: 1024 },
           { unit: "MB", divisor: 1024 * 1024 },
@@ -19,7 +19,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 * 1024 },
         ];
         for (let unitInfo of units) {
-          const unitValue = value ? value / unitInfo.divisor : 0;
+          const unitValue: any = value ? value / unitInfo.divisor : 0;
           if (unitValue < 1024) {
             return {
               value: `${parseFloat(unitValue).toFixed(2)}`,
@@ -155,7 +155,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
         // ${parseFloat(value)}`;
       }
       case "kilobytes": {
-        const units = [
+        const units: any = [
           { unit: "B", divisor: 1 / 1024 },
           { unit: "KB", divisor: 1 },
           { unit: "MB", divisor: 1024 },
@@ -179,7 +179,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
         };
       }
       case "megabytes": {
-        const units = [
+        const units: any = [
           { unit: "B", divisor: 1 / (1024 * 1024) },
           { unit: "KB", divisor: 1 / 1024 },
           { unit: "MB", divisor: 1 },
