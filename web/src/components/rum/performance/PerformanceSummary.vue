@@ -89,9 +89,11 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       await nextTick();
-
-      // emit window resize event to trigger the layout
       performanceChartsRef.value.layoutUpdate();
+
+      setTimeout(() => {
+        performanceChartsRef.value.layoutUpdate();
+      }, 500);
     };
 
     const loadDashboard = async () => {
