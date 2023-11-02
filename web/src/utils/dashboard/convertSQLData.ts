@@ -517,7 +517,7 @@ export const convertSQLData = (
             opacity: 0.8,
             ...getPropsByChartTypeForSeries(panelSchema.type),
             data: getAxisDataFromKey(key).map((it: any, i: number) => {
-              return [options.xAxis[0].data[i], it];
+              return [options?.xAxis[0]?.data[i], it];
             }),
           };
           return seriesObj;
@@ -599,7 +599,7 @@ export const convertSQLData = (
         const seriesObj = {
           ...getPropsByChartTypeForSeries(panelSchema.type),
           data: getAxisDataFromKey(key).map((it: any, i: number) => {
-            return { value: it, name: options.xAxis[0].data[i] };
+            return { value: it, name: options?.xAxis[0]?.data[i] };
           }),
           label: {
             show: true,
@@ -641,7 +641,7 @@ export const convertSQLData = (
         const seriesObj = {
           ...getPropsByChartTypeForSeries(panelSchema.type),
           data: getAxisDataFromKey(key).map((it: any, i: number) => {
-            return { value: it, name: options.xAxis[0].data[i] };
+            return { value: it, name: options?.xAxis[0]?.data[i] };
           }),
           label: {
             show: true,
