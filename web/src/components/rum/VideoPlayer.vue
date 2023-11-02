@@ -491,7 +491,7 @@ const skipTo = (skipTo: string) => {
 const initializeWorker = () => {
   if (window.Worker) {
     // Creating the Web Worker
-    worker.value = new Worker(`${getPath()}rumCssWorker.js`);
+    worker.value = new Worker(`${getPath()}rumcssworker.js`);
     console.log("Worker created successfully.");
   } else {
     console.error("Web Workers are not supported in this browser.");
