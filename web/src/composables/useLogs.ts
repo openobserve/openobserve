@@ -431,7 +431,12 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
-        const parsedSQL: any = parser.astify(searchObj.data.query);
+        const filteredQuery = searchObj.data.query
+          .split("\n")
+          .map((line) => line.split("--")[0].trim())
+          .filter((line) => line !== "")
+          .join("\n");
+        const parsedSQL: any = parser.astify(filteredQuery);
         if (parsedSQL.limit != null) {
           req.query.size = parsedSQL.limit.value[0].value;
 
