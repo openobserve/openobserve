@@ -107,27 +107,6 @@ pub async fn multi(
     )
 }
 
-#[post("/{org_id}/{stream_name}/v1/_multi")]
-pub async fn multi_v1(
-    path: web::Path<(String, String)>,
-    body: web::Bytes,
-    thread_id: web::Data<usize>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
-    Ok(
-        match logs::multi::ingest(&org_id, &stream_name, body, **thread_id).await {
-            Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => {
-                log::error!("Error processing request: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        },
-    )
-}
-
 /** _json ingestion API */
 #[utoipa::path(
     context_path = "/api",
@@ -162,27 +141,6 @@ pub async fn json(
         )
         .await
         {
-            Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => {
-                log::error!("Error processing request: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        },
-    )
-}
-
-#[post("/{org_id}/{stream_name}/v1/_json")]
-pub async fn json_v1(
-    path: web::Path<(String, String)>,
-    body: web::Bytes,
-    thread_id: web::Data<usize>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
-    Ok(
-        match logs::json::ingest(&org_id, &stream_name, body, **thread_id).await {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
@@ -245,71 +203,6 @@ pub async fn handle_kinesis_request(
                     timestamp: request_time,
                     error_message: e.to_string().into(),
                 })
-            }
-        },
-    )
-}
-
-#[post("/{org_id}/{stream_name}/v1/_kinesis_firehose")]
-pub async fn handle_kinesis_request_v1(
-    path: web::Path<(String, String)>,
-    thread_id: web::Data<usize>,
-    post_data: web::Json<KinesisFHRequest>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
-    Ok(
-        match logs::kinesis_firehose::process(
-            &org_id,
-            &stream_name,
-            post_data.into_inner(),
-            **thread_id,
-        )
-        .await
-        {
-            Ok(v) => {
-                if v.error_message.is_some() {
-                    log::error!("Error processing kinesis request: {:?}", v);
-                    HttpResponse::BadRequest().json(v)
-                } else {
-                    MetaHttpResponse::json(v)
-                }
-            }
-            Err(e) => {
-                log::error!("Error processing request: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        },
-    )
-}
-
-#[post("/{org_id}/{stream_name}/v1/_sub")]
-pub async fn handle_gcp_request_v1(
-    path: web::Path<(String, String)>,
-    thread_id: web::Data<usize>,
-    post_data: web::Json<GCPIngestionRequest>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
-    Ok(
-        match logs::gcs_pub_sub::process(&org_id, &stream_name, post_data.into_inner(), **thread_id)
-            .await
-        {
-            Ok(v) => {
-                if v.error_message.is_some() {
-                    log::error!("Error processing request: {:?}", v);
-                    HttpResponse::BadRequest().json(v)
-                } else {
-                    MetaHttpResponse::json(v)
-                }
-            }
-            Err(e) => {
-                log::error!("Error processing request: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
             }
         },
     )
