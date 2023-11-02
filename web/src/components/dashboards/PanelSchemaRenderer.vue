@@ -103,7 +103,7 @@ export default defineComponent({
       if (panelSchema.value?.queryType == "promql") {
         // Check if the 'data' array has elements and every item has a non-empty 'result' array
         return data.value.length &&
-          data.value.every((item: any) => item.result?.length)
+          data.value.every((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
       } else {
