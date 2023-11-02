@@ -17,7 +17,7 @@ use std::io::Error;
 
 use crate::common::infra::config::CONFIG;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::common::meta::ingestion::IngestionRequest;
+use crate::common::meta::ingestion::{IngestionRequest, KinesisFHIngestionResponse};
 use crate::handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
 use crate::service::logs::otlp_http::{logs_json_handler, logs_proto_handler};
 use crate::{
@@ -220,6 +220,10 @@ pub async fn handle_kinesis_request(
     post_data: web::Json<KinesisFHRequest>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
+    let request_id = post_data.request_id.clone();
+    let request_time = post_data
+        .timestamp
+        .unwrap_or(chrono::Utc::now().timestamp_millis());
     Ok(
         match logs::ingest::ingest(
             &org_id,
@@ -229,20 +233,18 @@ pub async fn handle_kinesis_request(
         )
         .await
         {
-            Ok(v) => {
-                /* if v.error_message.is_some() {
-                    log::error!("Error processing request: {:?}", v);
-                    HttpResponse::BadRequest().json(v)
-                } else { */
-                MetaHttpResponse::json(v)
-                //}
-            }
+            Ok(_) => MetaHttpResponse::json(KinesisFHIngestionResponse {
+                request_id,
+                timestamp: request_time,
+                error_message: None,
+            }),
             Err(e) => {
-                log::error!("Error processing request: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
+                log::error!("Error processing kinesis request: {:?}", e);
+                HttpResponse::BadRequest().json(KinesisFHIngestionResponse {
+                    request_id,
+                    timestamp: request_time,
+                    error_message: e.to_string().into(),
+                })
             }
         },
     )
@@ -266,7 +268,7 @@ pub async fn handle_kinesis_request_v1(
         {
             Ok(v) => {
                 if v.error_message.is_some() {
-                    log::error!("Error processing request: {:?}", v);
+                    log::error!("Error processing kinesis request: {:?}", v);
                     HttpResponse::BadRequest().json(v)
                 } else {
                     MetaHttpResponse::json(v)
