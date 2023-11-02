@@ -4147,9 +4147,9 @@ export const segments = [
                                                   "class": "q-item q-item-type row no-wrap q-item--clickable q-link cursor-pointer q-focusable q-hoverable ql-item-mini",
                                                   "role": "listitem",
                                                   "tabindex": "0",
-                                                  "href": "/logstreams?org_identifier=bhargav_organization_74",
+                                                  "href": "/streams?org_identifier=bhargav_organization_74",
                                                   "target": "_self",
-                                                  "data-test": "menu-link-/logstreams-item",
+                                                  "data-test": "menu-link-/streams-item",
                                                   "data-v-88dacebc": ""
                                                 },
                                                 "childNodes": [
@@ -5552,7 +5552,7 @@ export const segments = [
                                             "type": 2,
                                             "tagName": "a",
                                             "attributes": {
-                                              "href": "/logstreams",
+                                              "href": "/streams",
                                               "class": "absolute full-width full-height",
                                               "exact": "",
                                               "data-v-b4e148ca": ""

@@ -133,7 +133,7 @@
                           bg-secondary
                           class="no-border bg-secondary text-white"
                           :to="
-                            '/logstreams?dialog=' +
+                            '/streams?dialog=' +
                             searchObj.data.stream.selectedStream.label
                           "
                           >Click here</q-btn

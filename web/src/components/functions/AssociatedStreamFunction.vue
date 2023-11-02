@@ -728,7 +728,7 @@ export default defineComponent({
       this.orgData = newVal;
       if (
         (newVal != oldVal || this.logStream.values == undefined) &&
-        this.router.currentRoute.value.name == "logstreams"
+        this.router.currentRoute.value.name == "streams"
       ) {
         this.logStream = [];
         this.resultTotal = 0;

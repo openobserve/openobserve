@@ -3607,9 +3607,9 @@ export const dd_events = [
                                     "q-item q-item-type row no-wrap q-item--clickable q-link cursor-pointer q-focusable q-hoverable ql-item-mini",
                                   role: "listitem",
                                   tabindex: "0",
-                                  href: "/logstreams?org_identifier=default",
+                                  href: "/streams?org_identifier=default",
                                   target: "_self",
-                                  "data-test": "menu-link-/logstreams-item",
+                                  "data-test": "menu-link-/streams-item",
                                   "data-v-88dacebc": "",
                                 },
                                 childNodes: [
