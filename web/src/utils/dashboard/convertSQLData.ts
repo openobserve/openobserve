@@ -64,14 +64,15 @@ export const convertSQLData = (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    const data = searchQueryData[0].filter((item: any) => {
+    const data = searchQueryData[0]?.filter((item: any) => {
       return (
         xAxisKeys.every((key: any) => item[key] != null) &&
         yAxisKeys.every((key: any) => item[key] != null)
       );
-    });
+    }) || [];
 
-    const keys = Object.keys(data[0] || {}); // Assuming there's at least one object
+    // if data is not there use {} as a default value
+    const keys = Object.keys((data.length && data[0]) || {}); // Assuming there's at least one object
 
     const keyArrays: any = {};
 
