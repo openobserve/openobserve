@@ -109,7 +109,7 @@ const useRoutes = () => {
       props: true,
     },
     {
-      path: "logstreams",
+      path: "streams",
       name: "logstreams",
       component: LogStream,
       beforeEnter(to: any, from: any, next: any) {
