@@ -212,11 +212,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(update_folder)
             .service(get_folder)
             .service(delete_folder)
-            .service(move_dashboard)
-            .service(logs::ingest::multi_v1)
-            .service(logs::ingest::json_v1)
-            .service(logs::ingest::handle_kinesis_request_v1)
-            .service(logs::ingest::handle_gcp_request_v1),
+            .service(move_dashboard),
     );
 }
 
