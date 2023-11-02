@@ -188,7 +188,7 @@ export default defineComponent({
         // Fetch dashboard data
         const data = JSON.parse(JSON.stringify(await getDashboard(store, route.query.dashboard, route.query.folder)))?.variables?.list
         // Find the variable to edit
-        const edit = data.find((it: any) => it.name === props.variableName);
+        const edit = (data || []).find((it: any) => it.name === props.variableName);
         // Assign edit data to variableData
         Object.assign(variableData, edit)
 
