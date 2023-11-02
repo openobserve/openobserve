@@ -978,8 +978,8 @@ export const convertSQLData = (
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
-      options.series.map((seriesObj: any) => {
-        seriesObj.data = seriesObj.data.map((it: any, index: any) => [
+      options?.series?.map((seriesObj: any) => {
+        seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
           store.state.timezone != "UTC"
             ? utcToZonedTime(
                 Number.isInteger(options?.xAxis[0]?.data[index])
@@ -1075,7 +1075,7 @@ export const convertSQLData = (
     );
 
     if (isTimeSeries(sample)) {
-      options.series.map((seriesObj: any) => {
+      options?.series?.map((seriesObj: any) => {
         seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
           store.state.timezone != "UTC"
             ? utcToZonedTime(
