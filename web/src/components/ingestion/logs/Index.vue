@@ -89,6 +89,32 @@
           content-class="tab_content"
         />
         <q-route-tab
+          v-if="showCloudIngestionOptions"
+          name="kinesisfirehose"
+          :to="{
+            name: 'kinesisfirehose',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')"
+          label="Kinesis Firehose"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          v-if="showCloudIngestionOptions"
+          name="gcpLogs"
+          :to="{
+            name: 'gcpLogs',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/gcp.svg')"
+          label="GCP Logs via (Pub/Sub)"
+          content-class="tab_content"
+        />
+        <q-route-tab
           v-if="showSyslog"
           name="syslogNg"
           :to="{
@@ -236,6 +262,10 @@ export default defineComponent({
       return config.isCloud !== "true";
     });
 
+    const showCloudIngestionOptions = computed(() => {
+      return config.isCloud === "true";
+    });
+
     return {
       t,
       store,
@@ -252,6 +282,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       ingestiontabs,
       showSyslog,
+      showCloudIngestionOptions,
     };
   },
 });
