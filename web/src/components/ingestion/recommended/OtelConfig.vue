@@ -5,7 +5,7 @@
   </div>
   <div class="q-pa-md">
     <div class="text-subtitle1 text-bold q-mt-md q-pl-xs">OTLP gRPC</div>
-    <div class="title" data-test="vector-title-text">(<b>Note:</b> Only available for single node. Not supported in distributed mode.)</div>
+    <div class="title" data-test="vector-title-text"><b>Note:</b> Not supported in clustered installation of OpenObserve yet.</div>
     <ContentCopy class="q-mt-sm" :content="getOtelGrpcConfig" />
   </div>
 </template>
@@ -55,18 +55,18 @@ const accessKey = computed(() => {
 const getOtelGrpcConfig = computed(() => {
   return `exporters:
   otlp/openobserve:
-      endpoint: localhost:5081
+      endpoint: ${endpoint.value.host}:5081
       headers:
         Authorization: "Basic ${accessKey.value}"
-        organization: default
+        organization: ${props.currOrgIdentifier}
         stream-name: default
       tls:
         insecure: true
   otlp/openobserve_k8s_events:
-      endpoint: localhost:5081
+      endpoint: ${endpoint.value.host}:5081
       headers:
         Authorization: "Basic ${accessKey.value}"
-        organization: default
+        organization: ${props.currOrgIdentifier}
         stream-name: default
       tls:
         insecure: true`;

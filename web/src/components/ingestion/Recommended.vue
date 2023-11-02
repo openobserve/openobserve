@@ -70,7 +70,7 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          label="OTEL"
+          label="OTEL Collector"
           content-class="tab_content"
         />
         <q-route-tab
