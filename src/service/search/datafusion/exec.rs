@@ -133,9 +133,11 @@ pub async fn sql(
             let fields = df.schema().fields();
             let mut exprs = Vec::with_capacity(fields.len());
             for field in fields {
-                if field.qualifier().is_none() {
-                    exprs.push(col(field.name()));
-                    continue;
+                if let Some(v) = field.qualifier() {
+                    if v.to_string() != "tbl" {
+                        exprs.push(col(field.name()));
+                        continue;
+                    }
                 }
                 exprs.push(match rules.get(field.name()) {
                     Some(rule) => Expr::Alias(Alias::new(
@@ -248,9 +250,11 @@ async fn exec_query(
         let fields = df.schema().fields();
         let mut exprs = Vec::with_capacity(fields.len());
         for field in fields {
-            if field.qualifier().is_none() {
-                exprs.push(col(field.name()));
-                continue;
+            if let Some(v) = field.qualifier() {
+                if v.to_string() != "tbl" {
+                    exprs.push(col(field.name()));
+                    continue;
+                }
             }
             exprs.push(match rules.get(field.name()) {
                 Some(rule) => Expr::Alias(Alias::new(
@@ -831,9 +835,11 @@ pub async fn convert_parquet_file(
         let fields = df.schema().fields();
         let mut exprs = Vec::with_capacity(fields.len());
         for field in fields {
-            if field.qualifier().is_none() {
-                exprs.push(col(field.name()));
-                continue;
+            if let Some(v) = field.qualifier() {
+                if v.to_string() != "tbl" {
+                    exprs.push(col(field.name()));
+                    continue;
+                }
             }
             exprs.push(match rules.get(field.name()) {
                 Some(rule) => Expr::Alias(Alias::new(
