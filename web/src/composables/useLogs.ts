@@ -431,11 +431,11 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
-        const filteredQuery = searchObj.data.query
+        query = searchObj.data.query
           .split("\n")
           .filter((line: string) => !line.trim().startsWith("--"))
           .join("\n");
-        const parsedSQL: any = parser.astify(filteredQuery);
+        const parsedSQL: any = parser.astify(query);
         if (parsedSQL.limit != null) {
           req.query.size = parsedSQL.limit.value[0].value;
 
@@ -468,6 +468,10 @@ const useLogs = () => {
           whereClause = parseQuery[0].trim();
         }
 
+        whereClause = whereClause
+            .split("\n")
+            .filter((line: string) => !line.trim().startsWith("--"))
+            .join("\n");
         if (whereClause.trim() != "") {
           whereClause = whereClause
             .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
@@ -481,11 +485,7 @@ const useLogs = () => {
             .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
 
           //remove everything after -- in where clause
-          const parsedSQL = whereClause
-            .split("\n")
-            .filter((line: string) => !line.trim().startsWith("--"))
-            .join("\n")
-            .split(" ");
+          const parsedSQL = whereClause.split(" ");
           searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
             parsedSQL.forEach((node: any, index: any) => {
               if (node == field.name) {
