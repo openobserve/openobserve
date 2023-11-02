@@ -84,19 +84,9 @@ const useIngestionRoutes = () => {
                   component: Vector,
                 },
                 {
-                  path: "kinesisfirehose",
-                  name: "kinesisfirehose",
-                  component: KinesisFirehose,
-                },
-                {
                   path: "filebeat",
                   name: "filebeat",
                   component: FileBeat,
-                },
-                {
-                  path: "gcp",
-                  name: "gcpLogs",
-                  component: GcpPubSub,
                 },
               ],
             },
