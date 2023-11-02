@@ -16,18 +16,19 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           { unit: "MB", divisor: 1024 * 1024 },
           { unit: "GB", divisor: 1024 * 1024 * 1024 },
           { unit: "TB", divisor: 1024 * 1024 * 1024 * 1024 },
+          { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 * 1024 },
         ];
         for (let unitInfo of units) {
-          if (value < unitInfo.divisor) {
+          const unitValue = value ? value / unitInfo.divisor : 0;
+          if (unitValue < 1024) {
             return {
-              value: `${parseFloat(value).toFixed(2)}`,
+              value: `${parseFloat(unitValue).toFixed(2)}`,
               unit: unitInfo.unit,
             };
           }
-          value = value ? value / unitInfo.divisor : 0;
         }
         return {
-          value: `${parseFloat(value).toFixed(2)}`,
+          value: `${parseFloat(value ? value / units[units.length - 1].divisor : 0).toFixed(2)}`,
           unit: "PB",
         };
       }
@@ -151,6 +152,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           { unit: "MB", divisor: 1024 },
           { unit: "GB", divisor: 1024 * 1024 },
           { unit: "TB", divisor: 1024 * 1024 * 1024 },
+          { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 },
         ];
         for (let unitInfo of units) {
           const unitValue: any = value ? value / (unitInfo.divisor) : 0;
@@ -163,7 +165,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           }
         }
         return {
-          value: `${parseFloat(value).toFixed(2)}`,
+          value: `${parseFloat(value ? value / units[units.length - 1].divisor : 0).toFixed(2)}`,
           unit: "PB",
         };
       }
@@ -174,6 +176,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           { unit: "MB", divisor: 1 },
           { unit: "GB", divisor: 1024 },
           { unit: "TB", divisor: 1024 * 1024  },
+          { unit: "PB", divisor: 1024 * 1024 * 1024 },
         ];
         for (let unitInfo of units) {
           const unitValue: any = value ? value / (unitInfo.divisor) : 0;
@@ -185,7 +188,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           }
         }
         return {
-          value: `${parseFloat(value).toFixed(2)}`,
+          value: `${parseFloat(value ? value / units[units.length - 1].divisor : 0).toFixed(2)}`,
           unit: "PB",
         };
       }
