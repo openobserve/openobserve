@@ -146,10 +146,19 @@
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import { p } from "msw/lib/SetupApi-8ab693f7";
 import rrwebPlayer from "rrweb-player";
 import "rrweb-player/dist/style.css";
-import { nextTick, ref, watch } from "vue";
+import {
+  nextTick,
+  ref,
+  watch,
+  type Ref,
+  onBeforeUnmount,
+  onMounted,
+  onBeforeMount,
+} from "vue";
+import { useStore } from "vuex";
+import { useLocalToken } from "@/utils/zincutils";
 
 const props = defineProps({
   events: {
@@ -166,6 +175,8 @@ const props = defineProps({
   },
 });
 
+const store = useStore();
+
 const player = ref<rrwebPlayer>();
 
 const playerRef = ref<HTMLElement | null>(null);
@@ -175,6 +186,10 @@ const playbackBarRef = ref<HTMLElement | null>(null);
 const session = ref<any>([]);
 
 const playerContainerRef = ref<HTMLElement | null>(null);
+
+const worker: Ref<Worker | null> = ref(null);
+
+const workerProcessId = ref(0);
 
 const speedOptions = [
   {
@@ -235,6 +250,16 @@ watch(
   { deep: true, immediate: true }
 );
 
+onBeforeMount(() => {
+  initializeWorker();
+});
+
+onBeforeUnmount(() => {
+  if (worker.value) {
+    worker.value.terminate();
+  }
+});
+
 const setupSession = async () => {
   session.value = [];
   if (!props.segments.length) return;
@@ -256,6 +281,37 @@ const setupSession = async () => {
           type: 5,
         };
         segCopy = seg;
+      }
+      try {
+        if (segCopy.type === 2 && segCopy.data.node.type === 0) {
+          segCopy.data.node.childNodes.forEach((child: any) => {
+            if (child.type === 2 && child.tagName === "html") {
+              child.childNodes.forEach((_child: any) => {
+                if (_child.type === 2 && _child.tagName === "head") {
+                  _child.childNodes.forEach((__child: any) => {
+                    if (
+                      __child.type === 2 &&
+                      __child.tagName === "link" &&
+                      __child.attributes.rel === "stylesheet" &&
+                      typeof __child.attributes.href === "string" &&
+                      __child.attributes.href.endsWith(".css")
+                    ) {
+                      workerProcessId.value++;
+                      processCss(
+                        __child.attributes._cssText,
+                        workerProcessId.value
+                      ).then((res: any) => {
+                        __child.attributes._cssText = res.updatedCssString;
+                      });
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.log(e);
       }
       session.value.push(segCopy);
     });
@@ -425,6 +481,40 @@ const skipTo = (skipTo: string) => {
   if (skipTo === "forward")
     goto(playerState.value.actualTime + seconds * 1000, false);
   else goto(playerState.value.actualTime - seconds * 1000, false);
+};
+
+const initializeWorker = () => {
+  if (window.Worker) {
+    // Creating the Web Worker
+    worker.value = new Worker("/rumCssWorker.js");
+    console.log("Worker created successfully.");
+  } else {
+    console.error("Web Workers are not supported in this browser.");
+  }
+};
+
+const processCss = (cssString: string, id: string | number) => {
+  return new Promise((resolve, reject) => {
+    if (worker.value) {
+      const handleWorkerMessage = (event: any) => {
+        if (event.data.id === id) {
+          if (worker.value)
+            worker.value.removeEventListener("message", handleWorkerMessage);
+          resolve(event.data);
+        }
+      };
+      worker.value.addEventListener("message", handleWorkerMessage);
+      const token = useLocalToken()?.value as string;
+      worker.value.postMessage({
+        cssString: cssString,
+        proxyUrl: `${store.state.API_ENDPOINT}/proxy/${store.state.selectedOrganization.identifier}`,
+        id,
+        token: token.replace("Basic ", ""),
+      });
+    } else {
+      reject("Worker not initialized");
+    }
+  });
 };
 
 defineExpose({
