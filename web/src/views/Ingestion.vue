@@ -215,13 +215,14 @@ export default defineComponent({
 
     onBeforeMount(() => {
       if (
-        !store.state.organizationData.organizationPasscode &&
-        router.currentRoute.value.name != "ingestion"
+        !store.state.organizationData.organizationPasscode
       ) {
         getOrganizationPasscode();
         getRUMToken();
       }
+    });
 
+    onMounted(() => {
       if (router.currentRoute.value.name === "ingestion") {
         router.push({
           name: "recommended",
