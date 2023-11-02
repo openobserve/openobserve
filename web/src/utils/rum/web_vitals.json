@@ -39,7 +39,7 @@
             ],
             "y": [
               {
-                "label": "Largest Contentful Paint ( LCP )nds",
+                "label": "",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -89,7 +89,7 @@
             ],
             "y": [
               {
-                "label": "Milliseconds",
+                "label": "",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,
@@ -138,7 +138,7 @@
             ],
             "y": [
               {
-                "label": "View Cumulative Layout Shift",
+                "label": "",
                 "alias": "y_axis_1",
                 "column": "view_cumulative_layout_shift",
                 "color": "#5960b2",

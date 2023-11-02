@@ -28,7 +28,7 @@
             "stream_type": "logs",
             "x": [
               {
-                "label": "x_axis_1",
+                "label": "Timestamp",
                 "alias": "x_axis_1",
                 "column": "x_axis_1",
                 "color": null
@@ -36,7 +36,7 @@
             ],
             "y": [
               {
-                "label": "y_axis_1",
+                "label": "",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": "#5960b2",
