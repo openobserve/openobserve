@@ -217,7 +217,8 @@ async fn main() -> Result<(), anyhow::Error> {
                     .service(router::aws)
                     .service(router::gcp)
                     .service(router::rum)
-                    .configure(get_basic_routes),
+                    .configure(get_basic_routes)
+                    .configure(get_proxy_routes),
             )
         } else {
             app = app.service(
@@ -225,7 +226,8 @@ async fn main() -> Result<(), anyhow::Error> {
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
-                    .configure(get_basic_routes),
+                    .configure(get_basic_routes)
+                    .configure(get_proxy_routes),
             )
         }
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))

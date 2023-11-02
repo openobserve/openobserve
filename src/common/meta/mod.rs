@@ -26,6 +26,7 @@ pub mod meta_store;
 pub mod middleware_data;
 pub mod organization;
 pub mod prom;
+pub mod proxy;
 pub mod search;
 pub mod service;
 pub mod sql;
