@@ -218,7 +218,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-#logsQueryEditor,
+#logsStreamQueryEditor,
 #fnEditor {
   height: calc(100% - 20px) !important;
 }
