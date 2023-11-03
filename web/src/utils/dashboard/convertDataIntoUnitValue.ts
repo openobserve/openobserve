@@ -10,24 +10,26 @@
 export const getUnitValue = (value: any, unit: string, customUnit: string) => {
     switch (unit) {
       case "bytes": {
-        const units = [
+        const units: any = [
           { unit: "B", divisor: 1 },
           { unit: "KB", divisor: 1024 },
           { unit: "MB", divisor: 1024 * 1024 },
           { unit: "GB", divisor: 1024 * 1024 * 1024 },
           { unit: "TB", divisor: 1024 * 1024 * 1024 * 1024 },
+          { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 * 1024 },
         ];
         for (let unitInfo of units) {
-          if (value < unitInfo.divisor) {
+          const unitValue: any = value ? value / unitInfo.divisor : 0;
+          if (unitValue < 1024) {
             return {
-              value: `${parseFloat(value).toFixed(2)}`,
+              value: `${parseFloat(unitValue).toFixed(2)}`,
               unit: unitInfo.unit,
             };
           }
-          value = value ? value / unitInfo.divisor : 0;
         }
+        const val: any = value ? value / units[units.length - 1].divisor : 0
         return {
-          value: `${parseFloat(value).toFixed(2)}`,
+          value: `${parseFloat(val).toFixed(2)}`,
           unit: "PB",
         };
       }
@@ -48,22 +50,24 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           { unit: "M", divisor: 2592000 }, // Assuming 30 days in a month
           { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
         ];
-        for (const unitInfo of units) {
-          const unitValue = value ? value / unitInfo.divisor : 0;
-          if (unitValue >= 1 && unitValue < 1000) {
+        for (let i = units.length - 1; i >= 0; i--) {
+          const unitInfo = units[i];
+          const unitValue = value / unitInfo.divisor;
+          if (unitValue >= 1) {
             return {
-              value: unitValue.toFixed(2),
+              value: parseFloat(unitValue.toFixed(2)),
               unit: unitInfo.unit,
             };
           }
         }
-  
-        // If the value is too large to fit in any unit, return the original seconds
+
+        // If the value is too small to fit in any unit, return in microseconds
         return {
-          value: value,
-          unit: "s",
+          value: parseFloat((value / units[0].divisor).toFixed(2)),
+          unit: units[0].unit,
         };
       }
+
       case "microseconds": {
         const units = [
           { unit: "μs", divisor: 1 },
@@ -75,20 +79,24 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           { unit: "M", divisor: 2592000000000 }, // Assuming 30 days in a month
           { unit: "Y", divisor: 31536000000000 }, // Assuming 365 days in a year
         ];
-        for (let unitInfo of units) {
-          const unitValue = value ? value / unitInfo.divisor : 0;
-          if (unitValue < 1000) {
+        for (let i = units.length - 1; i >= 0; i--) {
+          const unitInfo = units[i];
+          const unitValue = value / unitInfo.divisor;
+          if (unitValue >= 1) {
             return {
-              value: unitValue.toFixed(2),
+              value: parseFloat(unitValue.toFixed(2)),
               unit: unitInfo.unit,
             };
           }
         }
+
+        // If the value is too small to fit in any unit, return in microseconds
         return {
-          value: value,
-          unit: "s",
+          value: parseFloat((value / units[0].divisor).toFixed(2)),
+          unit: units[0].unit,
         };
       }
+      
       case "milliseconds": {
         const units = [
           { unit: "μs", divisor: 0.001 },
@@ -100,18 +108,21 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           { unit: "M", divisor: 2592000000 }, // Assuming 30 days in a month
           { unit: "Y", divisor: 31536000000 }, // Assuming 365 days in a year
         ];
-        for (let unitInfo of units) {
-          const unitValue = value ? value / unitInfo.divisor : 0;
-          if (unitValue < 1000) {
+        for (let i = units.length - 1; i >= 0; i--) {
+          const unitInfo = units[i];
+          const unitValue = value / unitInfo.divisor;
+          if (unitValue >= 1) {
             return {
-              value: unitValue.toFixed(2),
+              value: parseFloat(unitValue.toFixed(2)),
               unit: unitInfo.unit,
             };
           }
         }
+
+        // If the value is too small to fit in any unit, return in microseconds
         return {
-          value: value,
-          unit: "s",
+          value: parseFloat((value / units[0].divisor).toFixed(2)),
+          unit: units[0].unit,
         };
       }
       case "bps": {
@@ -145,12 +156,13 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
         // ${parseFloat(value)}`;
       }
       case "kilobytes": {
-        const units = [
+        const units: any = [
           { unit: "B", divisor: 1 / 1024 },
           { unit: "KB", divisor: 1 },
           { unit: "MB", divisor: 1024 },
           { unit: "GB", divisor: 1024 * 1024 },
           { unit: "TB", divisor: 1024 * 1024 * 1024 },
+          { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 },
         ];
         for (let unitInfo of units) {
           const unitValue: any = value ? value / (unitInfo.divisor) : 0;
@@ -162,18 +174,20 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
             };
           }
         }
+        const val: any = value ? value / units[units.length - 1].divisor : 0
         return {
-          value: `${parseFloat(value).toFixed(2)}`,
+          value: `${parseFloat(val).toFixed(2)}`,
           unit: "PB",
         };
       }
       case "megabytes": {
-        const units = [
+        const units: any = [
           { unit: "B", divisor: 1 / (1024 * 1024) },
           { unit: "KB", divisor: 1 / 1024 },
           { unit: "MB", divisor: 1 },
           { unit: "GB", divisor: 1024 },
           { unit: "TB", divisor: 1024 * 1024  },
+          { unit: "PB", divisor: 1024 * 1024 * 1024 },
         ];
         for (let unitInfo of units) {
           const unitValue: any = value ? value / (unitInfo.divisor) : 0;
@@ -184,8 +198,9 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
             };
           }
         }
+        const val: any = value ? value / units[units.length - 1].divisor : 0
         return {
-          value: `${parseFloat(value).toFixed(2)}`,
+          value: `${parseFloat(val).toFixed(2)}`,
           unit: "PB",
         };
       }

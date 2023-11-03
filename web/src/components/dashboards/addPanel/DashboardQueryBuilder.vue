@@ -340,7 +340,7 @@
                             data-test="dashboard-filter-condition-input"
                             label="Value"
                             style="width: 100%; margin-top: 5px"
-                            :rules="[ val => val.length > 0 || 'Required' ]"
+                            :rules="[ val => val?.length > 0 || 'Required' ]"
                           />
                         </div>
                       </q-tab-panel>

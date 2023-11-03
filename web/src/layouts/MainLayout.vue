@@ -415,7 +415,7 @@ export default defineComponent({
       {
         title: t("menu.index"),
         icon: outlinedWindow,
-        link: "/logstreams",
+        link: "/streams",
       },
       {
         title: t("menu.alerts"),

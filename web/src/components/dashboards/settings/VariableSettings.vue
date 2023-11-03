@@ -149,7 +149,7 @@ export default defineComponent({
    
     const getDashboardData = async () => {
       const data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard, route.query.folder ?? "default")))?.variables?.list
-      dashboardVariableData.data = data.map((it:any, index:number) => {
+      dashboardVariableData.data = (data || []).map((it:any, index:number) => {
         
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,

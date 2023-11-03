@@ -17,7 +17,7 @@ use actix_web::{
     body::MessageBody,
     dev::{Service, ServiceResponse},
     http::header,
-    web, HttpResponse,
+    web, HttpRequest, HttpResponse,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
 use futures::FutureExt;
@@ -25,12 +25,15 @@ use std::rc::Rc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use super::auth::{validator, validator_aws, validator_gcp, validator_rum};
+use super::auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum};
 use super::request::{
     alerts::*, dashboards::folders::*, dashboards::*, enrichment_table, functions, kv, logs,
     metrics, organization, prom, rum, search, status, stream, syslog, traces, users,
 };
-use crate::common::{infra::config::CONFIG, meta::middleware_data::RumExtraData};
+use crate::common::{
+    infra::config::CONFIG,
+    meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
+};
 use actix_web_lab::middleware::from_fn;
 pub mod openapi;
 pub mod ui;
@@ -47,6 +50,45 @@ fn get_cors() -> Rc<Cors> {
         .allow_any_origin()
         .max_age(3600);
     Rc::new(cors)
+}
+
+/// This is a very trivial proxy to overcome the cors errors while
+/// session-replay in rrweb.
+pub fn get_proxy_routes(cfg: &mut web::ServiceConfig) {
+    let auth = HttpAuthentication::with_fn(validator_proxy_url);
+    let cors = Cors::default()
+        .allow_any_origin()
+        .allow_any_method()
+        .allow_any_header();
+
+    cfg.service(
+        web::resource("/proxy/{org_id}/{target_url:.*}")
+            .wrap(auth)
+            .wrap(cors)
+            .route(web::get().to(proxy)),
+    );
+}
+
+async fn proxy(
+    path: web::Path<PathParamProxyURL>,
+    req: HttpRequest,
+) -> actix_web::Result<HttpResponse> {
+    let client = reqwest::Client::new();
+    let method = req.method().clone();
+    let forwarded_resp = client
+        .request(method, &path.target_url)
+        .send()
+        .await
+        .map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!("Request failed: {}", e))
+        })?;
+
+    let status = forwarded_resp.status().as_u16();
+    let body = forwarded_resp.bytes().await.map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {}", e))
+    })?;
+
+    Ok(HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap()).body(body))
 }
 
 pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
@@ -212,11 +254,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(update_folder)
             .service(get_folder)
             .service(delete_folder)
-            .service(move_dashboard)
-            .service(logs::ingest::multi_v1)
-            .service(logs::ingest::json_v1)
-            .service(logs::ingest::handle_kinesis_request_v1)
-            .service(logs::ingest::handle_gcp_request_v1),
+            .service(move_dashboard),
     );
 }
 

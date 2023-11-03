@@ -18,6 +18,25 @@
 <template>
   <q-page>
     <div class="q-mx-sm performance-dashboard">
+      <div
+        class="text-bold q-ml-sm q-px-sm rounded q-mt-md q-py-xs learn-web-vitals-link flex items-center"
+        :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
+      >
+        <q-icon
+          name="info"
+          size="16px"
+          class="material-symbols-outlined q-mr-xs"
+        ></q-icon>
+        To Learn More About Web Vitals
+        <a
+          href="https://web.dev/articles/vitals"
+          title="https://web.dev/articles/vitals"
+          class="q-ml-xs"
+          target="_blank"
+          :class="store.state.theme === 'dark' ? 'text-white' : 'text-dark'"
+          >Click Here</a
+        >
+      </div>
       <RenderDashboardCharts
         ref="webVitalsChartsRef"
         :viewOnly="true"
@@ -212,6 +231,11 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.learn-web-vitals-link {
+  font-size: 14px;
+  width: fit-content;
+  border-radius: 4px;
+}
 .performance_title {
   font-size: 24px;
 }

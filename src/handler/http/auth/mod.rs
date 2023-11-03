@@ -14,6 +14,7 @@
 
 use crate::common::infra::config::CONFIG;
 use crate::common::meta::ingestion::INGESTION_EP;
+use crate::common::meta::proxy::QueryParamProxyURL;
 use crate::common::meta::user::UserRole;
 use crate::common::utils::{
     auth::{get_hash, is_root_user},
@@ -27,6 +28,7 @@ use actix_web::{
     http::Method,
     web, Error,
 };
+
 use actix_web_httpauth::extractors::basic::BasicAuth;
 
 pub async fn validator(
@@ -177,7 +179,10 @@ pub async fn validator_aws(
     match req.headers().get("X-Amz-Firehose-Access-Key") {
         Some(val) => match val.to_str() {
             Ok(val) => {
-                let amz_creds = base64::decode(val).unwrap();
+                let amz_creds = match base64::decode(val) {
+                    Ok(val) => val,
+                    Err(_) => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
+                };
                 let creds = amz_creds
                     .split(':')
                     .map(|s| s.to_string())
@@ -233,6 +238,33 @@ pub async fn validator_gcp(
             }
         }
         None => Err((ErrorUnauthorized("Unauthorized Access"), req)),
+    }
+}
+
+pub async fn validator_proxy_url(
+    req: ServiceRequest,
+    query: web::Query<QueryParamProxyURL>,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let creds = base64::decode(&query.proxy_token).expect("Invalid base-encoded token");
+    let creds = creds
+        .split(':')
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+    let path = req
+        .request()
+        .path()
+        .strip_prefix(format!("{}/proxy/", CONFIG.common.base_uri).as_str())
+        .unwrap_or(req.request().path());
+
+    match validate_credentials(&creds[0], &creds[1], path).await {
+        Ok(res) => {
+            if res {
+                Ok(req)
+            } else {
+                Err((ErrorUnauthorized("Unauthorized Access"), req))
+            }
+        }
+        Err(err) => Err((err, req)),
     }
 }
 

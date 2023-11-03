@@ -64,14 +64,15 @@ export const convertSQLData = (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    const data = searchQueryData[0].filter((item: any) => {
+    const data = searchQueryData[0]?.filter((item: any) => {
       return (
         xAxisKeys.every((key: any) => item[key] != null) &&
         yAxisKeys.every((key: any) => item[key] != null)
       );
-    });
+    }) || [];
 
-    const keys = Object.keys(data[0] || {}); // Assuming there's at least one object
+    // if data is not there use {} as a default value
+    const keys = Object.keys((data.length && data[0]) || {}); // Assuming there's at least one object
 
     const keyArrays: any = {};
 
@@ -177,7 +178,7 @@ export const convertSQLData = (
       enterable: true,
       backgroundColor:
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-      extraCssText: "max-height: 200px; overflow: auto;",
+      extraCssText: "max-height: 200px; overflow: auto; max-width: 400px",
       axisPointer: {
         type: "cross",
         label: {
@@ -517,7 +518,7 @@ export const convertSQLData = (
             opacity: 0.8,
             ...getPropsByChartTypeForSeries(panelSchema.type),
             data: getAxisDataFromKey(key).map((it: any, i: number) => {
-              return [options.xAxis[0].data[i], it];
+              return [options?.xAxis[0]?.data[i], it];
             }),
           };
           return seriesObj;
@@ -599,7 +600,7 @@ export const convertSQLData = (
         const seriesObj = {
           ...getPropsByChartTypeForSeries(panelSchema.type),
           data: getAxisDataFromKey(key).map((it: any, i: number) => {
-            return { value: it, name: options.xAxis[0].data[i] };
+            return { value: it, name: options?.xAxis[0]?.data[i] };
           }),
           label: {
             show: true,
@@ -641,7 +642,7 @@ export const convertSQLData = (
         const seriesObj = {
           ...getPropsByChartTypeForSeries(panelSchema.type),
           data: getAxisDataFromKey(key).map((it: any, i: number) => {
-            return { value: it, name: options.xAxis[0].data[i] };
+            return { value: it, name: options?.xAxis[0]?.data[i] };
           }),
           label: {
             show: true,
@@ -960,7 +961,10 @@ export const convertSQLData = (
     panelSchema.type != "metric" &&
     panelSchema.type != "pie" &&
     panelSchema.type != "donut" &&
-    panelSchema?.queries[0]?.customQuery == false
+    panelSchema?.queries[0]?.customQuery == false &&
+    Array.isArray(options.xAxis) &&
+    options.xAxis.length > 0 &&
+    options.xAxis[0].data.length > 0
   ) {
     // auto SQL: if x axis has time series(aggregation function is histogram)
     const field = panelSchema.queries[0].fields?.x.find(
@@ -975,16 +979,16 @@ export const convertSQLData = (
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
-      options.series.map((seriesObj: any) => {
-        seriesObj.data = seriesObj.data.map((it: any, index: any) => [
+      options?.series?.map((seriesObj: any) => {
+        seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
           store.state.timezone != "UTC"
             ? utcToZonedTime(
-                Number.isInteger(options.xAxis[0].data[index])
-                  ? options.xAxis[0].data[index]
-                  : new Date(options.xAxis[0].data[index]).getTime(),
+                Number.isInteger(options?.xAxis[0]?.data[index])
+                  ? options?.xAxis[0]?.data[index]
+                  : new Date(options?.xAxis[0]?.data[index]).getTime(),
                 store.state.timezone
               )
-            : new Date(options.xAxis[0].data[index]).toISOString().slice(0, -1),
+            : new Date(options?.xAxis[0]?.data[index]).toISOString().slice(0, -1),
           it,
         ]);
       });
@@ -1062,6 +1066,7 @@ export const convertSQLData = (
     panelSchema.type != "pie" &&
     panelSchema.type != "donut" &&
     panelSchema?.queries[0]?.customQuery == true &&
+    Array.isArray(options.xAxis) &&
     options.xAxis.length > 0 &&
     options.xAxis[0].data.length > 0
   ) {
@@ -1071,7 +1076,7 @@ export const convertSQLData = (
     );
 
     if (isTimeSeries(sample)) {
-      options.series.map((seriesObj: any) => {
+      options?.series?.map((seriesObj: any) => {
         seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
           store.state.timezone != "UTC"
             ? utcToZonedTime(
