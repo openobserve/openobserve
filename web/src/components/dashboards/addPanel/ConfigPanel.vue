@@ -273,6 +273,7 @@ name="info" />
       </template>
     </q-input>
 
+    <!-- add overrides -->
     <OverridesList/>
 
   </div>

@@ -205,18 +205,18 @@ pub struct MapView {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Override {
-    matcher: Matcher,
-    properties: Vec<Property>,
+    matcher: Option<Matcher>,
+    properties: Option<Vec<Property>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Matcher {
-    id: String,
-    options: String,
+    id: Option<String>,
+    options: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Property {
-    id: String,
-    value: String,
+    id: Option<String>,
+    value: Option<String>,
 }
