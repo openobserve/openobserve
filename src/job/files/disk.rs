@@ -238,7 +238,10 @@ async fn upload_file(
                     }
                 }
                 if res_records.is_empty() {
-                    return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
+                    return Err(anyhow::anyhow!(
+                        "[JOB] File has corrupt json data: {}",
+                        path_str
+                    ));
                 }
                 let value_iter = res_records.iter().map(Ok);
                 infer_json_schema_from_iterator(value_iter, stream_type).unwrap()
@@ -257,8 +260,9 @@ async fn upload_file(
             match batch {
                 Ok(batch) => batches.push(batch),
                 Err(err) => {
+                    tokio::fs::remove_file(path_str).await?;
                     return Err(anyhow::anyhow!(
-                        "file has corrupt data: {}, err: {}",
+                        "[JOB] File has corrupt data: {}, err: {}",
                         path_str,
                         err
                     ));

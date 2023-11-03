@@ -123,6 +123,10 @@ export default defineComponent({
       await nextTick();
       // emit window resize event to trigger the layout
       webVitalsChartsRef.value.layoutUpdate();
+
+      setTimeout(() => {
+        webVitalsChartsRef.value.layoutUpdate();
+      }, 500);
     };
 
     const loadDashboard = async () => {

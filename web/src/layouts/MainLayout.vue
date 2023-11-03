@@ -405,7 +405,7 @@ export default defineComponent({
       {
         title: t("menu.rum"),
         icon: "devices",
-        link: "/rum",
+        link: "/rum/performance/overview",
       },
       {
         title: t("menu.dashboard"),
@@ -860,7 +860,7 @@ export default defineComponent({
     }
   }
   &--standard {
-    z-index:99999;
+    z-index: 99999;
   }
 }
 

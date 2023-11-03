@@ -82,7 +82,11 @@
             bottom: '-5px',
             height: '15px',
           }"
-          title="This is event"
+          :title="
+            event.name.length > 100
+              ? event.name.slice(0, 100) + '...'
+              : event.name
+          "
         />
       </div>
       <div class="controls flex justify-between items-center">
@@ -146,8 +150,8 @@
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import rrwebPlayer from "rrweb-player";
-import "rrweb-player/dist/style.css";
+import rrwebPlayer from "@openobserve/rrweb-player";
+import "@openobserve/rrweb-player/dist/style.css";
 import {
   nextTick,
   ref,
@@ -442,7 +446,7 @@ const updateProgressBar = (time: { payload: number }) => {
 const handlePlaybackBarClick = (event: any) => {
   let time =
     (event.offsetX / playerState.value.width) * playerState.value.totalTime;
-  goto(time, false);
+  goto(time, playerState.value.isPlaying);
 };
 
 // -------------- Player control methods ----------------

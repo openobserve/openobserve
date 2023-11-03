@@ -21,7 +21,7 @@
       </div>
       <div class="row q-mt-xs items-center">
         <div class="text-grey-8">
-          {{ column.city }}
+          {{ column.city || "Unknown" }}
         </div>
         <q-icon name="circle" size="4px" class="q-mx-md text-grey-6" />
         <div class="text-grey-8">{{ column.browser }}</div>

@@ -123,6 +123,7 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
                     srv.call(req).map(move |res| {
                         if path.starts_with("src/")
                             || path.starts_with("assets/")
+                            || path.starts_with("monacoeditorwork/")
                             || path.eq("favicon.ico")
                         {
                             res
