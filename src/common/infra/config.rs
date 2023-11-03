@@ -250,6 +250,8 @@ pub struct Common {
     pub cluster_name: String,
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
     pub instance_name: String,
+    #[env_config(name = "ZO_INGESTER_SIDE_QUERIER", default = false)]
+    pub ingester_side_querier: bool,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
     pub data_dir: String,
     #[env_config(name = "ZO_DATA_WAL_DIR", default = "")] // ./data/openobserve/wal/

@@ -13,7 +13,11 @@
 // limitations under the License.
 
 use crate::common::{
-    infra::{cluster, config::FILE_EXT_PARQUET, ider},
+    infra::{
+        cluster,
+        config::{CONFIG, FILE_EXT_PARQUET},
+        ider,
+    },
     meta::StreamType,
 };
 
@@ -22,7 +26,7 @@ pub mod disk;
 pub mod memory;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) || CONFIG.common.ingester_side_querier {
         return Ok(()); // not an ingester, no need to init job
     }
 

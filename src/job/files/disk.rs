@@ -255,8 +255,10 @@ async fn upload_file(
             .build(json_reader)
             .unwrap();
         for batch in json {
-            let batch_write = batch.unwrap();
-            batches.push(batch_write);
+            match batch {
+                Ok(batch) => batches.push(batch),
+                Err(err) => log::error!("[JOB] Failed to parse record: error: {}", err),
+            }
         }
     } else {
         let mut json = vec![];
