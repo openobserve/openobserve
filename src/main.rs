@@ -182,10 +182,16 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // HTTP server
     let thread_id = Arc::new(AtomicU16::new(0));
+    let http_port =
+        if CONFIG.common.ingester_sidecar_enabled && CONFIG.common.ingester_sidecar_querier {
+            50800 // a fake port
+        } else {
+            CONFIG.http.port
+        };
     let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
-        format!("[::]:{}", CONFIG.http.port).parse()?
+        format!("[::]:{}", http_port).parse()?
     } else {
-        format!("0.0.0.0:{}", CONFIG.http.port).parse()?
+        format!("0.0.0.0:{}", http_port).parse()?
     };
     meta::telemetry::Telemetry::new()
         .event("OpenObserve - Starting server", None, false)
@@ -282,7 +288,12 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 
 fn init_grpc_server() -> Result<(), anyhow::Error> {
-    let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
+    let gaddr: SocketAddr =
+        if CONFIG.common.ingester_sidecar_enabled && !CONFIG.common.ingester_sidecar_querier {
+            "0.0.0.0:50810".parse()? // a fake port
+        } else {
+            format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?
+        };
     let event_svc = EventServer::new(Eventer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);

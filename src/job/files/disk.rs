@@ -256,9 +256,7 @@ async fn upload_file(
         for batch in json {
             match batch {
                 Ok(batch) => batches.push(batch),
-                Err(err) => {
-                    log::error!("[JOB] Failed to parse record: error: {}", err.to_string())
-                }
+                Err(err) => log::error!("[JOB] Failed to parse record: error: {}", err),
             }
         }
     } else {

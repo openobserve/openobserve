@@ -34,7 +34,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) || CONFIG.common.ingester_sidecar_querier {
         return Ok(()); // not an ingester, no need to init job
     }
 
