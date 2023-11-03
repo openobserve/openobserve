@@ -97,10 +97,6 @@ export default defineComponent({
       }
     })
 
-    watch(dashboardPanelData, () => {
-      console.log(dashboardPanelData, "dashboardPanelData");
-    }, {deep: true})
-
     return {
       isDropdownVisible,
       selectedOption,

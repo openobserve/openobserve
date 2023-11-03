@@ -38,7 +38,7 @@ export const convertPromQLTableData = (
       // iterate over each properties
       override?.properties?.forEach((property: any) => {
         // if property id is display name
-        if(property?.id === "displayName"){
+        if(property?.id === "displayName" && property?.value){
           // set the display name
           filedNameObj[override?.matcher?.options] = property?.value;
         }
