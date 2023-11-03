@@ -47,7 +47,7 @@
         </div>
       </div>
       <query-editor
-        editorId="session-replay-query-editor"
+        editor-id="session-replay-query-editor"
         class="monaco-editor"
         v-model:query="sessionState.data.editorValue"
         :debounce-time="300"
