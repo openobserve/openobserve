@@ -24,7 +24,7 @@
     v-else-if="panelSchema.type == 'table'"
     :data="panelData.chartType == 'table'? panelData: {options: {}}"
     />
-    <ChartRenderer v-else :data="panelSchema.queryType === 'promql' || (data.length && data[0].length  && panelData.chartType != 'geomap' && panelData.chartType != 'table') ? panelData : {options:{}}" />
+    <ChartRenderer v-else :data="panelSchema.queryType === 'promql' || (data.length && data[0]?.length  && panelData.chartType != 'geomap' && panelData.chartType != 'table') ? panelData : {options:{}}" />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div v-if="errorDetail" class="errorMessage">
@@ -115,11 +115,11 @@ export default defineComponent({
         case "table":
           {
             // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
-            return data.value[0].length > 1 || xAlias.every((x: any) => data.value[0][0][x]) && yAlias.every((y: any) => data.value[0][0][y]);
+            return data.value[0]?.length > 1 || xAlias.every((x: any) => data.value[0][0][x]) && yAlias.every((y: any) => data.value[0][0][y]);
           }
         case "heatmap":
           {
-            return data.value[0].length > 1 || xAlias.every((x: any) => data.value[0][0][x]) && yAlias.every((y: any) => data.value[0][0][y]) && zAlias.every((z: any) => data.value[0][0][z]);
+            return data.value[0]?.length > 1 || xAlias.every((x: any) => data.value[0][0][x]) && yAlias.every((y: any) => data.value[0][0][y]) && zAlias.every((z: any) => data.value[0][0][z]);
           }
         default:
           break;
