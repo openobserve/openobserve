@@ -331,6 +331,8 @@ const getRumDataFields = () => {
 };
 
 const getSessions = () => {
+  sessionState.data.sessions = {};
+
   const interval = getTimeInterval(
     dateTime.value.startTime,
     dateTime.value.endTime
