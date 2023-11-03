@@ -22,6 +22,7 @@ const defaultObject = {
       relativeTimePeriod: "15m",
       valueType: "relative",
     },
+    streams: {} as any,
   },
 };
 
