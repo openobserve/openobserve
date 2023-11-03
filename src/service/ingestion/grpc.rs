@@ -20,34 +20,31 @@ use opentelemetry_proto::tonic::{
 
 use super::get_value;
 
-pub fn get_val(attr_val: &Option<AnyValue>) -> json::Value {
+pub fn get_val(attr_val: &Option<&AnyValue>) -> json::Value {
     match attr_val {
         Some(local_val) => match &local_val.value {
             Some(val) => match val {
-                Value::StringValue(inner_val) => json::json!(inner_val.as_str()),
-                Value::BoolValue(inner_val) => {
-                    json::json!(inner_val.to_string())
-                }
-                Value::IntValue(inner_val) => {
-                    json::json!(inner_val.to_string())
-                }
-                Value::DoubleValue(inner_val) => json::json!(inner_val.to_string()),
+                Value::StringValue(inner_val) => json::Value::String(inner_val.to_owned()),
+                Value::BoolValue(inner_val) => json::Value::String(inner_val.to_string()),
+                Value::IntValue(inner_val) => json::Value::String(inner_val.to_string()),
+                Value::DoubleValue(inner_val) => json::Value::String(inner_val.to_string()),
                 Value::ArrayValue(inner_val) => {
                     let mut vals = vec![];
-                    for item in inner_val.values.iter().cloned() {
+                    for item in inner_val.values.iter() {
                         vals.push(get_val(&Some(item)))
                     }
-                    json::json!(vals)
+                    json::Value::Array(vals)
                 }
                 Value::KvlistValue(inner_val) => {
                     let mut vals = json::Map::new();
-                    for item in inner_val.values.iter().cloned() {
-                        vals.insert(item.key, get_val(&item.value));
+                    for item in inner_val.values.iter() {
+                        vals.insert(item.key.clone(), get_val(&item.value.as_ref()));
                     }
-                    json::json!(vals)
+                    json::Value::from(vals)
                 }
                 Value::BytesValue(inner_val) => {
-                    json::json!(inner_val)
+                    let s = String::from_utf8(inner_val.to_owned()).unwrap_or_default();
+                    json::Value::String(s)
                 }
             },
             None => json::Value::Null,
@@ -116,7 +113,7 @@ pub fn get_val_for_attr(attr_val: json::Value) -> json::Value {
     ().into()
 }
 
-pub fn get_val_with_type_retained(attr_val: &Option<AnyValue>) -> json::Value {
+pub fn get_val_with_type_retained(attr_val: &Option<&AnyValue>) -> json::Value {
     match attr_val {
         Some(local_val) => match &local_val.value {
             Some(val) => match val {
@@ -134,7 +131,7 @@ pub fn get_val_with_type_retained(attr_val: &Option<AnyValue>) -> json::Value {
                 }
                 Value::ArrayValue(val) => {
                     let mut vals = vec![];
-                    for item in val.values.iter().cloned() {
+                    for item in val.values.iter() {
                         vals.push(get_val(&Some(item)))
                     }
                     json::json!(vals)
@@ -142,7 +139,7 @@ pub fn get_val_with_type_retained(attr_val: &Option<AnyValue>) -> json::Value {
                 Value::KvlistValue(val) => {
                     let mut vals = json::Map::new();
                     for item in val.values.iter().cloned() {
-                        vals.insert(item.key, get_val(&item.value));
+                        vals.insert(item.key, get_val(&item.value.as_ref()));
                     }
                     json::json!(vals)
                 }
@@ -168,28 +165,28 @@ mod tests {
         let str_val = AnyValue {
             value: Some(Value::StringValue(in_str.clone())),
         };
-        let resp = get_val(&Some(str_val));
+        let resp = get_val(&Some(&str_val));
         assert_eq!(resp.as_str().unwrap(), in_str);
 
         let in_bool = false;
         let bool_val = AnyValue {
             value: Some(Value::BoolValue(in_bool)),
         };
-        let resp = get_val(&Some(bool_val));
+        let resp = get_val(&Some(&bool_val));
         assert_eq!(resp.as_str().unwrap(), in_bool.to_string());
 
         let in_int = 20;
         let int_val = AnyValue {
             value: Some(Value::IntValue(in_int)),
         };
-        let resp = get_val(&Some(int_val.clone()));
+        let resp = get_val(&Some(&int_val));
         assert_eq!(resp.as_str().unwrap(), in_int.to_string());
 
         let in_double = 20.00;
         let double_val = AnyValue {
             value: Some(Value::DoubleValue(in_double)),
         };
-        let resp = get_val(&Some(double_val));
+        let resp = get_val(&Some(&double_val));
         assert_eq!(resp.as_str().unwrap(), in_double.to_string());
 
         let in_arr = vec![int_val.clone()];
@@ -198,7 +195,7 @@ mod tests {
                 opentelemetry_proto::tonic::common::v1::ArrayValue { values: in_arr },
             )),
         };
-        let resp = get_val(&Some(arr_val));
+        let resp = get_val(&Some(&arr_val));
         assert!(!resp.as_array().unwrap().is_empty());
 
         let kv_val = AnyValue {
@@ -211,7 +208,7 @@ mod tests {
                 },
             )),
         };
-        let resp = get_val(&Some(kv_val));
+        let resp = get_val(&Some(&kv_val));
         assert!(resp.as_object().unwrap().contains_key(&in_str));
 
         let in_byte = Value::BytesValue(vec![8u8]);
@@ -219,7 +216,7 @@ mod tests {
         let byte_val = AnyValue {
             value: Some(in_byte),
         };
-        let resp = get_val(&Some(byte_val));
+        let resp = get_val(&Some(&byte_val));
         assert!(!resp.as_array().unwrap().is_empty());
     }
 }
