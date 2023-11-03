@@ -27,14 +27,14 @@
           size="16px"
           class="material-symbols-outlined q-mr-xs"
         ></q-icon>
-        To Learn More About Web Vitals
+        {{t("rum.learnWebVitalsLabel")}}
         <a
           href="https://web.dev/articles/vitals"
           title="https://web.dev/articles/vitals"
           class="q-ml-xs"
           target="_blank"
           :class="store.state.theme === 'dark' ? 'text-white' : 'text-dark'"
-          >Click Here</a
+          >{{t("rum.clickHereLabel")}}</a
         >
       </div>
       <RenderDashboardCharts

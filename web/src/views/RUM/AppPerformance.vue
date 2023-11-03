@@ -18,7 +18,7 @@
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
     <div class="flex justify-between items-center q-py-sm q-px-md">
-      <div class="performance_title">Performance Summary</div>
+      <div class="performance_title">{{t('rum.performanceSummaryLabel')}}</div>
       <div class="flex items-center">
         <DateTimePickerDashboard
           class="q-ml-sm rum-date-time-picker"

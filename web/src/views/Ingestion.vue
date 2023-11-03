@@ -204,11 +204,11 @@ export default defineComponent({
 
     const tabs = [
       {
-        label: "Recommended",
+        label: t('ingestion.recommendedLabel'),
         value: "recommended",
       },
       {
-        label: "Custom",
+        label: t('ingestion.customLabel'),
         value: "custom",
       },
     ];

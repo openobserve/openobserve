@@ -93,6 +93,7 @@ flat icon="close" />
                 round
                 class="q-mr-sm data-retention-input"
                 :rules="[(val: any) => (!!val && val > 0) || 'Retention period must be at least 1 day']"
+                @change="formDirtyFlag = true"
               ></q-input>
               <div>
                 <span class="text-bold">Note:</span> Global data retention
