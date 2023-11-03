@@ -67,6 +67,7 @@
       <div class="col">
         <query-editor
           ref="queryEditorRef"
+          editor-id="traces-query-editor"
           class="monaco-editor"
           v-model:query="searchObj.data.editorValue"
           :keywords="autoCompleteKeywords"
