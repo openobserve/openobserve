@@ -51,7 +51,7 @@ export default defineComponent({
       value: "byName"
     }]
     const { dashboardPanelData } = useDashboardPanelData();
-    const overridesArray: any = ref(dashboardPanelData.data.overrides);
+    const overridesArray: any = ref(dashboardPanelData.data.config.overrides);
 
     const showDropdown = () => {
       selectedOption.value = null;

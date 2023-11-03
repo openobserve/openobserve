@@ -1,7 +1,7 @@
 <template>
   <div style="padding-left: 8px;">
     <q-select
-    v-model="override.matcher.value"
+    v-model="override.matcher.options"
     label="Field with name"
     :options="overrideFieldOptions"
     class="q-my-sm"
