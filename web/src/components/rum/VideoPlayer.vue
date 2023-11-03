@@ -297,15 +297,10 @@ const setupSession = async () => {
                       __child.attributes.href.endsWith(".css")
                     ) {
                       workerProcessId.value++;
-                      console.log(
-                        "Processing css for worker id:",
-                        workerProcessId.value
-                      );
                       processCss(
                         __child.attributes._cssText,
                         workerProcessId.value
                       ).then((res: any) => {
-                        console.log("Processed css for worker id:", res.id);
                         __child.attributes._cssText = res.updatedCssString;
                       });
                     }
@@ -491,7 +486,6 @@ const skipTo = (skipTo: string) => {
 const initializeWorker = () => {
   if (window.Worker) {
     // Creating the Web Worker
-    console.log(new URL("../../workers/rumcssworker.js", import.meta.url));
     worker.value = new Worker(
       new URL("../../workers/rumcssworker.js", import.meta.url),
       { type: "module" }
