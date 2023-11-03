@@ -137,12 +137,6 @@ export default defineComponent({
     const routeName = computed(() => router.currentRoute.value.name);
 
     onMounted(async () => {
-      console.log(
-        "onMounted ----------",
-        routeName.value,
-        activePerformanceTab.value
-      );
-
       await loadDashboard();
 
       const routeNameMapping = {

@@ -23,6 +23,7 @@
         :viewOnly="true"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
+        @variablesData="variablesDataUpdated"
       />
     </div>
     <div class="row q-px-md">
