@@ -144,7 +144,7 @@ pub async fn handle_trace_request(
 
         for res_attr in resource.attributes {
             if res_attr.key.eq(SERVICE_NAME) {
-                let loc_service_name = get_val(&res_attr.value);
+                let loc_service_name = get_val(&res_attr.value.as_ref());
                 if !loc_service_name.eq(&json::Value::Null) {
                     service_name = loc_service_name.as_str().unwrap().to_string();
                     service_att_map.insert(res_attr.key, loc_service_name);
@@ -152,7 +152,7 @@ pub async fn handle_trace_request(
             } else {
                 service_att_map.insert(
                     format!("{}.{}", SERVICE, res_attr.key),
-                    get_val(&res_attr.value),
+                    get_val(&res_attr.value.as_ref()),
                 );
             }
         }
@@ -193,14 +193,14 @@ pub async fn handle_trace_request(
                 let end_time: u64 = span.end_time_unix_nano;
                 let mut span_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 for span_att in span.attributes {
-                    span_att_map.insert(span_att.key, get_val(&span_att.value));
+                    span_att_map.insert(span_att.key, get_val(&span_att.value.as_ref()));
                 }
 
                 let mut events = vec![];
                 let mut event_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 for event in span.events {
                     for event_att in event.attributes {
-                        event_att_map.insert(event_att.key, get_val(&event_att.value));
+                        event_att_map.insert(event_att.key, get_val(&event_att.value.as_ref()));
                     }
                     events.push(Event {
                         name: event.name,

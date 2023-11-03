@@ -126,7 +126,8 @@ pub async fn handle_grpc_request(
                 match &resource_metric.resource {
                     Some(res) => {
                         for item in &res.attributes {
-                            rec[format_label_name(item.key.as_str())] = get_val(&item.value);
+                            rec[format_label_name(item.key.as_str())] =
+                                get_val(&item.value.as_ref());
                         }
                     }
                     None => {}
@@ -513,7 +514,7 @@ fn process_summary(
 
 fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) {
     for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value);
+        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
     rec[VALUE_LABEL] = get_metric_val(&data_point.value);
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
@@ -534,7 +535,7 @@ fn process_hist_data_point(
     let mut bucket_recs = vec![];
 
     for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value);
+        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
@@ -582,7 +583,7 @@ fn process_exp_hist_data_point(
     let mut bucket_recs = vec![];
 
     for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value);
+        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
@@ -643,7 +644,7 @@ fn process_summary_data_point(
     let mut bucket_recs = vec![];
 
     for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value);
+        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
@@ -680,7 +681,7 @@ fn process_exemplars(rec: &mut json::Value, exemplars: &Vec<Exemplar>) {
     for exemplar in exemplars {
         let mut exemplar_rec = json::json!({});
         for attr in &exemplar.filtered_attributes {
-            exemplar_rec[attr.key.as_str()] = get_val(&attr.value);
+            exemplar_rec[attr.key.as_str()] = get_val(&attr.value.as_ref());
         }
         exemplar_rec[VALUE_LABEL] = get_exemplar_val(&exemplar.value);
         exemplar_rec[&CONFIG.common.column_timestamp] = (exemplar.time_unix_nano / 1000).into();
