@@ -144,7 +144,7 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     max: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    overrides: Vec<Override>
+    overrides: Option<Vec<Override>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

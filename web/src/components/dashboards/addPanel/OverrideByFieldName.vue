@@ -44,8 +44,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from 'vue';
+import { computed, defineComponent, ref, watch } from 'vue';
 import DisplayName from "@/components/dashboards/addPanel/overrideProperties/DisplayName.vue"
+import useDashboardPanelData from '@/composables/useDashboardPanel';
 
 export default defineComponent({
   name: "OverrideByFieldName",
@@ -65,15 +66,16 @@ export default defineComponent({
       label: "Display Name",
       value: "displayName"
     }]
-    const overrideFieldOptions = [{
-        label: "Query 1",
-        value: "query 1"
-      },
-      {
-        label: "Query 2",
-        value: "query 2"
+    const overrideFieldOptions = computed(() => {
+      const queryLength = useDashboardPanelData().dashboardPanelData.data.query.length;
+      const optionsArr = [];
+      for(let i = 0; i < queryLength; i++) {
+        optionsArr.push({
+          label: `Query ${i + 1}`,
+          value: `query ${i + 1}`
+        })
       }
-    ]
+    })
 
     const showDropdown = () => {
       selectedPropertyOption.value = null;
