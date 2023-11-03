@@ -142,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineProps, onMounted, type Ref } from "vue";
+import { ref, defineProps, onMounted, type Ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import {
@@ -257,6 +257,10 @@ const columns = ref([
   },
 ]);
 
+onBeforeMount(() => {
+  restoreUrlQueryParams();
+});
+
 onMounted(async () => {
   // TODO OK : Store stream fields in composable
 
@@ -265,7 +269,6 @@ onMounted(async () => {
     await getStreamFields();
     await getRumDataFields();
     getSessions();
-    restoreUrlQueryParams();
   }
 });
 

@@ -14,10 +14,12 @@
 -->
 
 <template>
-  <div class="tag-block row items-center wrap q-mr-sm q-mt-sm">
+  <div class="tag-block row items-center no-wrap q-mr-sm q-mt-sm">
     <div class="q-px-md">{{ tag.key }}</div>
     <q-separator vertical />
-    <div class="q-px-md tag-bg">{{ tag.value }}</div>
+    <div class="q-px-md tag-bg" style="word-break: break-all">
+      {{ tag.value }}
+    </div>
   </div>
 </template>
 

@@ -26,6 +26,19 @@
         },
         "value": "",
         "options": []
+      },
+      {
+        "type": "query_values",
+        "name": "version",
+        "label": "Version",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "_rumdata",
+          "field": "version",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
       }
     ]
   }

@@ -23,6 +23,7 @@
         :viewOnly="true"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
+        @variablesData="variablesDataUpdated"
       />
     </div>
     <div class="row q-px-md">
@@ -205,7 +206,8 @@ export default defineComponent({
         if (JSON.stringify(newVal) !== JSON.stringify(oldValue)) {
           getResourceErrors();
         }
-      }
+      },
+      { immediate: true }
     );
 
     return {
