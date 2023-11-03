@@ -21,7 +21,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(*) as \"y_axis_1\"  FROM \"_rumdata\" where type='error' and service='$service' and env='$env' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(*) as \"y_axis_1\"  FROM \"_rumdata\" where type='error' and service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -79,6 +79,19 @@
           "stream_type": "logs",
           "stream": "_rumdata",
           "field": "env",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      },
+      {
+        "type": "query_values",
+        "name": "version",
+        "label": "Version",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "_rumdata",
+          "field": "version",
           "max_record_size": null
         },
         "value": "",

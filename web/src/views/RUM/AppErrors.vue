@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onActivated, onMounted, ref, type Ref } from "vue";
+import { nextTick, onBeforeMount, onMounted, ref, type Ref } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -170,10 +170,14 @@ const columns = ref([
 
 const router = useRouter();
 
+onBeforeMount(() => {
+  restoreUrlQueryParams();
+});
+
 onMounted(async () => {
   isMounted.value = true;
   await getStreamFields();
-  restoreUrlQueryParams();
+  updateUrlQueryParams();
 });
 
 const handleSidebarEvent = (event: string, value: any) => {
