@@ -62,14 +62,10 @@
       <div class="q-pa-lg enable-rum">
         <div class="q-pb-lg">
           <div class="text-left text-h6 text-bold q-pb-md">
-            Discover Real User Monitoring to Enhance Your User Experience
+            {{t("rum.aboutRUMTitle")}}
           </div>
           <div class="text-subtitle1">
-            Real User Monitoring allows you to track and analyze the performance
-            of your website or application from the perspective of real users.
-            This means understanding how actual users experience your site,
-            where they face slowdowns, which pages they frequently use, and
-            more.
+            {{t("rum.aboutRUMMessage")}}
           </div>
           <div>
             <div></div>
@@ -78,10 +74,10 @@
         <q-btn
           class="bg-secondary rounded text-white"
           no-caps
-          title="Get started with Real User Monitoring"
+          :title="t('rum.getStartedTitle')"
           @click="getStarted"
         >
-          Get Started
+          {{t("rum.getStartedLabel")}}
           <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
         </q-btn>
       </div>

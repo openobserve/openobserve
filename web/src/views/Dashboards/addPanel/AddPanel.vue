@@ -101,7 +101,7 @@
               </div>
               <q-separator vertical />
               <div class="col-auto">
-                <PanelSidebar title="Config" v-model="dashboardPanelData.layout.isConfigPanelOpen">
+                <PanelSidebar :title="t('dashboard.configLabel')" v-model="dashboardPanelData.layout.isConfigPanelOpen">
                   <ConfigPanel />
                 </PanelSidebar>
               </div>
@@ -357,7 +357,7 @@ export default defineComponent({
       //check is data updated or not
       if(isPanelConfigChanged.value){
         // Display a confirmation message
-        const confirmMessage = 'You have unsaved changes. Are you sure you want to leave?';        // Some browsers require a return statement to display the message
+        const confirmMessage = t("dashboard.unsavedMessage");        // Some browsers require a return statement to display the message
         e.returnValue = confirmMessage;
         return confirmMessage;
       }
@@ -366,7 +366,7 @@ export default defineComponent({
 
     onBeforeRouteLeave((to, from, next) => {
       if (from.path === '/dashboards/add_panel' && isPanelConfigChanged.value) {
-        const confirmMessage = 'You have unsaved changes. Are you sure you want to leave?';
+        const confirmMessage = t("dashboard.unsavedMessage");
         if (window.confirm(confirmMessage)) {
           // User confirmed, allow navigation
           next();

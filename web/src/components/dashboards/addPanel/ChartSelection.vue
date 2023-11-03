@@ -69,6 +69,7 @@ import { defineComponent, ref } from "vue";
 import { getImageURL } from "../../../utils/zincutils";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "ChartSelection",
@@ -77,83 +78,85 @@ export default defineComponent({
 
   setup() {
     const store = useStore();
+    const { t } = useI18n();
     // array of charts
     const chartsArray = ref([
       {
         image: "img:" + getImageURL("images/dashboard/charts/area.png"),
-        title: "Area",
+        title: t('dashboard.areaLabel'),
         id: "area",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/area-graph.png"),
-        title: "Area Stacked",
+        title: t('dashboard.areaStackedLabel'),
         id: "area-stacked",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
-        title: "Line",
+        title: t('dashboard.lineLabel'),
         id: "line",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/bar-chart.png"),
-        title: "Bar",
+        title: t('dashboard.barLabel'),
         id: "bar",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/bar-graph.png"),
-        title: "Horizontal",
+        title: t('dashboard.horizontalLabel'),
         id: "h-bar",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/stacked.png"),
-        title: "Stacked",
+        title: t('dashboard.stackedLabel'),
         id: "stacked",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
-        title: "Heatmap",
+        title: t('dashboard.heatmapLabel'),
         id: "heatmap",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/geomap.png"),
-        title: "GeoMap",
+        title: t('dashboard.geomapLabel'),
         id: "geomap",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
-        title: "H-Stacked",
+        title: t('dashboard.hstackedLabel'),
         id: "h-stacked",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/pie-chart.png"),
-        title: "Pie",
+        title: t('dashboard.pieLabel'),
         id: "pie",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
-        title: "Donut",
+        title: t('dashboard.donutLabel'),
         id: "donut",
       },
       {
         image:
           "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
-        title: "Scatter",
+        title: t('dashboard.scatterLabel'),
         id: "scatter",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/table.png"),
-        title: "Table",
+        title: t('dashboard.tableLabel'),
         id: "table",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/123.png"),
-        title: "Metric Text",
+        title: t('dashboard.metricTextLabel'),
         id: "metric",
       },
     ]);
 
     const { promqlMode, dashboardPanelData } = useDashboardPanelData();
     return {
+      t,
       ChartsArray: chartsArray,
       promqlMode,
       dashboardPanelData,

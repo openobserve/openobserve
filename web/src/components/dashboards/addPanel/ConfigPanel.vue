@@ -16,31 +16,31 @@
 <template>
   <div>
     <q-toggle v-if="dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'heatmap'" v-model="dashboardPanelData.data.config.show_legends"
-      label="Show Legends" />
+      :label="t('dashboard.showLegendsLabel')" />
 
     <div class="space"></div>
 
     <q-select v-if="dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'heatmap'" outlined
       v-model="dashboardPanelData.data.config.legends_position" :options="legendsPositionOptions" dense
-      label="Legends Positions" class="showLabelOnTop" stack-label emit-value
+      :label="t('dashboard.legendsPositionLabel')" class="showLabelOnTop" stack-label emit-value
       :display-value="`${dashboardPanelData.data.config.legends_position ?? 'Auto'}`">
     </q-select>
 
     <div class="space"></div>
 
-    <q-select outlined v-model="dashboardPanelData.data.config.unit" :options="unitOptions" dense label="Unit"
+    <q-select outlined v-model="dashboardPanelData.data.config.unit" :options="unitOptions" dense :label="t('dashboard.unitLabel')"
       class="showLabelOnTop selectedLabel" stack-label emit-value
       :display-value="`${dashboardPanelData.data.config.unit ? unitOptions.find(it => it.value == dashboardPanelData.data.config.unit)?.label : 'Default'}`">
     </q-select>
     <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
-    <q-input v-if="dashboardPanelData.data.config.unit == 'custom'" v-model="dashboardPanelData.data.config.unit_custom" label="Custom unit" color="input-border"
+    <q-input v-if="dashboardPanelData.data.config.unit == 'custom'" v-model="dashboardPanelData.data.config.unit_custom" :label="t('dashboard.customunitLabel')" color="input-border"
     bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label filled dense label-slot/>
 
     <div class="space"></div>
 
     <q-select v-if="dashboardPanelData.data.type == 'geomap'" outlined
         v-model="dashboardPanelData.data.config.base_map.type" :options="basemapTypeOptions" dense
-        label="Base Map" class="showLabelOnTop" stack-label emit-value
+        :label="t('dashboard.basemapLabel')" class="showLabelOnTop" stack-label emit-value
         :display-value="'OpenStreetMap'">
       </q-select>
 
@@ -48,14 +48,14 @@
       <div v-if="dashboardPanelData.data.type == 'geomap'">
         <span>Initial View:</span>
         <div class="row">
-          <q-input  v-model.number="dashboardPanelData.data.config.map_view.lat" label="Latitude" color="input-border"
+          <q-input  v-model.number="dashboardPanelData.data.config.map_view.lat" :label="t('dashboard.lattitudeLabel')" color="input-border"
             bg-color="input-bg" class="col-6 q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
           </q-input>
-          <q-input v-model.number="dashboardPanelData.data.config.map_view.lng" label="Longitude" color="input-border"
+          <q-input v-model.number="dashboardPanelData.data.config.map_view.lng" :label="t('dashboard.longitudeLabel')" color="input-border"
             bg-color="input-bg" class="col-6 q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
           </q-input>
         </div>
-        <q-input v-model.number="dashboardPanelData.data.config.map_view.zoom" label="Zoom" color="input-border"
+        <q-input v-model.number="dashboardPanelData.data.config.map_view.zoom" :label="t('dashboard.zoomLabel')" color="input-border"
             bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
           </q-input>
       </div>
@@ -78,11 +78,11 @@
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot>
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
-          Legend
+          {{t('dashboard.legendLabel')}}
           <div>
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-              Series name overrides. For example, {endpoint} with be replaced with the label value for endpoint.
+              {{t('dashboard.overrideMessage')}}
             </q-tooltip>
           </div>
         </div>
@@ -108,10 +108,12 @@
 <script lang="ts">
 import useDashboardPanelData from '@/composables/useDashboardPanel';
 import { computed, defineComponent, watch } from 'vue';
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData()
+    const { t } = useI18n();
 
     const basemapTypeOptions = [
       {
@@ -196,6 +198,7 @@ export default defineComponent({
       return !!layoutFields?.weight;
     });
     return {
+      t,
       dashboardPanelData,
       promqlMode,
       basemapTypeOptions,

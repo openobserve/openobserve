@@ -23,7 +23,13 @@
     "sqlModeLabel": "SQL Mode",
     "toggleFunctionLabel": "Function",
     "labelWrap": "Wrap Content",
-    "messageWrapContent": "Wrap Table Content"
+    "messageWrapContent": "Wrap Table Content",
+    "functionPlaceholder": "Select or create a function",
+    "functionMessage": "Press Tab/Enter button to apply new function name.",
+    "saveFunctionLabel": "Save Function",
+    "exportLogs": "Export logs",
+    "runQuery": "Run query",
+    "syntaxGuideLabel": "Syntax Guide"
   },
   "menu": {
     "home": "Home",
@@ -59,7 +65,17 @@
     "overview": "Overview",
     "webVitals": "Web Vitals",
     "errors": "Errors",
-    "api": "API"
+    "api": "API",
+    "aboutRUMTitle": "Discover Real User Monitoring to Enhance Your User Experience",
+    "aboutRUMMessage": "Real User Monitoring allows you to track and analyze the performance of your website or application from the perspective of real users. This means understanding how actual users experience your site, where they face slowdowns, which pages they frequently use, and more.",
+    "getStartedTitle": "Get Started with Real User Monitoring",
+    "getStartedLabel": "Get Started",
+    "performanceSummaryLabel": "Performance Summary",
+    "webVitalsLabel": "Web Vitals",
+    "errorLabel": "Errors",
+    "sessionLabel": "Sessions",
+    "learnWebVitalsLabel": "Learn more about Web Vitals",
+    "clickHereLabel": "Click here"
   },
   "about": {
     "name": "OpenObserve",
@@ -213,7 +229,11 @@
     "explore": "Explore",
     "timezone": "Timezone",
     "deleteActionLabel": "Delete",
-    "deleteActionMessage": "Are you sure you want to delete selected field's. This action cannot be undone."
+    "deleteActionMessage": "Are you sure you want to delete selected field's. This action cannot be undone.",
+    "labelAll": "All",
+    "labelLogs": "Logs",
+    "labelMetrics": "Metrics",
+    "labelTraces": "Traces"
   },
   "function": {
     "header": "Functions",
@@ -257,7 +277,30 @@
     "resetRUMTokenLabel": "Reset RUM Token",
     "generateRUMTokenLabel": "Generate RUM Token",
     "generateRUMTokenMessage": "Generate RUM Token to enable RUM for your organization.",
-    "npmStepTitle": "NPM Installation Method"
+    "npmStepTitle": "NPM Installation Method",
+    "recommendedLabel": "Recommended",
+    "customLabel": "Custom",
+    "kubernetesLabel": "Kubernetes",
+    "windowsLabel": "Windows",
+    "linuxLabel": "Linux",
+    "otelCollectorLabel": "OTEL Collector",
+    "tracesLabel": "Traces (OpenTelelmetry)",
+    "rumLabel": "Frontend Monitoring",
+    "logsLabel": "Logs",
+    "metricsLabel": "Metrics",
+    "tracesLabel": "Traces",
+    "curlLabel": "Curl",
+    "filebeatLabel": "Filebeat",
+    "fluentBitLabel": "FluentBit (Recommended)",
+    "fluentdLabel": "Fluentd",
+    "vectorLabel": "Vector",
+    "kinesisFirehoseLabel": "Kinesis Firehose",
+    "gcpPubSubLabel": "GCP Logs via (Pub/Sub)",
+    "syslogngLabel": "Syslog-ng",
+    "syslogLabel": "Syslog",
+    "prometheusLabel": "Prometheus",
+    "telegrafLabel": "Telegraf",
+    "opentelemetryLabel": "OpenTelemetry"
   },
   "syslog": {
     "stream": "Stream",
@@ -315,7 +358,44 @@
     "DefaultValue": "Default value (optional)",
     "typeOfVariable": "Type of variable",
     "DefaultSize": "Default max record size(optional)",
-    "maxRecordSize": "Default max record size is 10. You can update this value as required"
+    "maxRecordSize": "Default max record size is 10. You can update this value as required",
+    "newFolderBtnLabel": "New Folder",
+    "folderLabel": "Folders",
+    "areaLabel": "Area",
+    "areaStackedLabel": "Area Stacked",
+    "lineLabel": "Line",
+    "barLabel": "Bar",
+    "horizontalLabel": "Horizontal",
+    "stackedLabel": "Stacked",
+    "heatmapLabel": "Heatmap",
+    "geomapLabel": "GeoMap",
+    "hstackedLabel": "H-Stacked",
+    "pieLabel": "Pie",
+    "donutLabel": "Donut",
+    "scatterLabel": "Scatter",
+    "tableLabel": "Table",
+    "metricTextLabel": "Metric Text",
+    "oneFieldMessage": "Add 1 field here",
+    "maxtwofieldMessage": "Add maximum 2 fields here",
+    "twoFieldsMessage": "Add 2 fields here",
+    "oneOrMoreFieldsMessage": "Add one or more fields here",
+    "xaxisFieldNAMessage": "X-Axis field is not allowed",
+    "oneLabelFieldMessage": "Add 1 label field here",
+    "oneValueFieldMessage": "Add 1 values field here",
+    "oneFieldConfigMessage": "Add 1 field or Configure it from the Config",
+    "configLabel": "Config",
+    "showLegendsLabel": "Show Legends",
+    "legendsPositionLabel": "Legends Positions",
+    "unitLabel": "Unit",
+    "basemapLabel": "Base Map",
+    "customunitLabel": "Custom Unit",
+    "lattitudeLabel": "Lattitude",
+    "longitudeLabel": "Longitude",
+    "zoomLabel": "Zoom",
+    "legendLabel": "Legend",
+    "overrideMessage": "Series name overrides. For example, {endpoint} with be replaced with the label value for endpoint.",
+    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
+    "addFieldMessage": "Please add a field from the list"
   },
   "panel": {
     "header": "Panel",
@@ -422,7 +502,10 @@
     "messageDataNotFound": "Data not found",
     "invoiceStartDate": "Invoice Start Date",
     "invoiceEndDate": "Invoice End Date",
-    "downloadInvoice": "Download Invoice"
+    "downloadInvoice": "Download Invoice",
+    "usageLabel": "Usage",
+    "plansLabel": "Plans",
+    "invoiceHistoryLabel": "Invoice History"
   },
   "message": {
     "ServerInternalError": "Error: Something went wrong. Internal server error.",
@@ -481,7 +564,12 @@
     "searchMetric": "Search for a Metric",
     "searchLabel": "Search metric label",
     "add": "Add",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "promqlLabel": "PromQL",
+    "runQuery": "Run Query",
+    "holdMessage": "Hold on tight, fetching metrics.",
+    "noStreamSelected": "No metrics selected.",
+    "addToDashboard": "Add to dashboard"
   },
   "settings": {
     "header": "Settings",
@@ -495,6 +583,10 @@
     "apiNamePlaceHolder": "Key Name",
     "updateuserKey": "Update User Key",
     "id": "Id",
-    "update": "Update"
+    "update": "Update",
+    "generalLabel": "General",
+    "apikeyLabel": "API Keys",
+    "generalPageTitle": "General Settings",
+    "scrapintervalLabel": "Scrape Interval (In Seconds) *"
   }
 }

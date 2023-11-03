@@ -242,10 +242,10 @@ export default defineComponent({
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("all");
     const streamFilterValues = [
-      { label: "All", value: "all" },
-      { label: "Logs", value: "logs" },
-      { label: "Metrics", value: "metrics" },
-      { label: "Traces", value: "traces" },
+      { label: t("logStream.labelAll"), value: "all" },
+      { label: t("logStream.labelLogs"), value: "logs" },
+      { label: t("logStream.labelMetrics"), value: "metrics" },
+      { label: t("logStream.labelTraces"), value: "traces" },
     ];
     const columns = ref<QTableProps["columns"]>([
       {
