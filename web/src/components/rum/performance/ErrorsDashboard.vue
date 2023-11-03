@@ -205,7 +205,8 @@ export default defineComponent({
         if (JSON.stringify(newVal) !== JSON.stringify(oldValue)) {
           getResourceErrors();
         }
-      }
+      },
+      { immediate: true }
     );
 
     return {

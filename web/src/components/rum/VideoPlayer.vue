@@ -82,7 +82,11 @@
             bottom: '-5px',
             height: '15px',
           }"
-          title="This is event"
+          :title="
+            event.name.length > 100
+              ? event.name.slice(0, 100) + '...'
+              : event.name
+          "
         />
       </div>
       <div class="controls flex justify-between items-center">
@@ -442,7 +446,7 @@ const updateProgressBar = (time: { payload: number }) => {
 const handlePlaybackBarClick = (event: any) => {
   let time =
     (event.offsetX / playerState.value.width) * playerState.value.totalTime;
-  goto(time, false);
+  goto(time, playerState.value.isPlaying);
 };
 
 // -------------- Player control methods ----------------
