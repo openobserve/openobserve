@@ -62,6 +62,8 @@ import { useStore } from "vuex";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
+import usePerformance from "@/composables/rum/usePerformance";
+
 import { date } from "quasar";
 
 const defaultEvent = {
@@ -87,6 +89,7 @@ const segmentEvents = ref<any[]>([]);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const errorCount = ref(10);
+const { performanceState } = usePerformance();
 
 const session_start_time = 1692884313968;
 const session_end_time = 1692884769270;
@@ -115,9 +118,19 @@ const getSessionDetails = computed(() => {
 
 const getSession = () => {
   return new Promise((resolve) => {
+    let geoFields = "";
+
+    if (performanceState.data.streams["_sessionreplay"]["geo_info_country"]) {
+      geoFields += "min(geo_info_city) as city,";
+    }
+
+    if (performanceState.data.streams["_sessionreplay"]["geo_info_city"]) {
+      geoFields += "min(geo_info_country) as country,";
+    }
+
     const req = {
       query: {
-        sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, min(geo_info_city) as city, min(geo_info_country) as country, min(session_id) as session_id from "_sessionreplay" where session_id='${getSessionId.value}' order by zo_sql_timestamp`,
+        sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where session_id='${getSessionId.value}' order by zo_sql_timestamp`,
         start_time:
           Number(router.currentRoute.value.query.start_time) - 900000000,
         end_time: Number(router.currentRoute.value.query.end_time) + 900000000,

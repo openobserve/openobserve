@@ -62,7 +62,7 @@
       <div class="col" style="border-top: 1px solid #dbdbdb; height: 100px">
         <b>Query Editor:</b>
         <query-editor
-          editorId="logsQueryEditor"
+          editor-id="logsStreamQueryEditor"
           ref="queryEditorRef"
           class="monaco-editor"
           v-model:query="query"
@@ -218,7 +218,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-#logsQueryEditor,
+#logsStreamQueryEditor,
 #fnEditor {
   height: calc(100% - 20px) !important;
 }
