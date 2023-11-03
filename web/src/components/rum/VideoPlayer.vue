@@ -486,7 +486,11 @@ const skipTo = (skipTo: string) => {
 const initializeWorker = () => {
   if (window.Worker) {
     // Creating the Web Worker
-    worker.value = new Worker(`${getPath()}rumCssWorker.js`);
+    worker.value = new Worker(
+      new URL("../../workers/rumcssworker.js", import.meta.url),
+      { type: "module" }
+    );
+
     console.log("Worker created successfully.");
   } else {
     console.error("Web Workers are not supported in this browser.");
@@ -511,6 +515,7 @@ const processCss = (cssString: string, id: string | number) => {
         id,
         token: token.replace("Basic ", ""),
       });
+      console.log("Message posted to worker");
     } else {
       reject("Worker not initialized");
     }
