@@ -295,7 +295,8 @@ pub async fn handle_grpc_request(
                 match &resource_log.resource {
                     Some(res) => {
                         for item in &res.attributes {
-                            rec[item.key.as_str()] = get_val_with_type_retained(&item.value);
+                            rec[item.key.as_str()] =
+                                get_val_with_type_retained(&item.value.as_ref());
                         }
                     }
                     None => {}
@@ -335,9 +336,9 @@ pub async fn handle_grpc_request(
                 rec[CONFIG.common.column_timestamp.clone()] = ts.into();
                 rec["severity"] = log_record.severity_text.to_owned().into();
                 //rec["name"] = log_record.name.to_owned().into();
-                rec["body"] = get_val(&log_record.body);
+                rec["body"] = get_val(&log_record.body.as_ref());
                 for item in &log_record.attributes {
-                    rec[item.key.as_str()] = get_val_with_type_retained(&item.value);
+                    rec[item.key.as_str()] = get_val_with_type_retained(&item.value.as_ref());
                 }
                 rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
                 match TraceId::from_bytes(
