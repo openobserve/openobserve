@@ -26,7 +26,7 @@ pub mod disk;
 pub mod memory;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) || CONFIG.common.ingester_side_querier {
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) || CONFIG.common.ingester_sidecar_querier {
         return Ok(()); // not an ingester, no need to init job
     }
 
