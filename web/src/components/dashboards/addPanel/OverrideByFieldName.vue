@@ -67,7 +67,7 @@ export default defineComponent({
       value: "displayName"
     }]
     const overrideFieldOptions = computed(() => {
-      const queryLength = useDashboardPanelData().dashboardPanelData.data.query.length;
+      const queryLength = useDashboardPanelData().dashboardPanelData?.data?.queries?.length ?? 1;
       const optionsArr = [];
       for(let i = 0; i < queryLength; i++) {
         optionsArr.push({
@@ -75,6 +75,7 @@ export default defineComponent({
           value: `query ${i + 1}`
         })
       }
+      return optionsArr;
     })
 
     const showDropdown = () => {
