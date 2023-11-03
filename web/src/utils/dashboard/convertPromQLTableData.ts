@@ -27,20 +27,20 @@ export const convertPromQLTableData = (
   // display name object for each column
   const filedNameObj: any = {};
   // in table, we will have single column for each query.
-  for(let i=0;i<panelSchema.queries.length;i++){
+  for(let i=0;i<panelSchema?.queries?.length;i++){
     filedNameObj["query "+(i+1)] = "Query " + (i+1);
   }  
 
   // need to use display name override
   panelSchema?.config?.overrides?.forEach((override: any) => {
     // if matcher is byName
-    if (override.matcher.id === "byName") {
+    if (override?.matcher?.id === "byName") {
       // iterate over each properties
-      override.properties.forEach((property: any) => {
+      override?.properties?.forEach((property: any) => {
         // if property id is display name
-        if(property.id === "displayName"){
+        if(property?.id === "displayName"){
           // set the display name
-          filedNameObj[override.matcher.options] = property.value;
+          filedNameObj[override?.matcher?.options] = property?.value;
         }
       })
     }
