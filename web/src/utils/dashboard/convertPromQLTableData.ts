@@ -47,17 +47,18 @@ export const convertPromQLTableData = (
   });  
   
   // for each columns/querys values, we will find average
-  const data = searchQueryData.map((it: any) => {
+  const data = searchQueryData?.map((it: any) => {
     return it?.result?.map((res:any)=>{
-      res.values = ((res?.values?.reduce((acc: any, cur: any) => acc + (+cur[1]||0),0) || 1)/(res?.values?.length||1))?.toFixed(2);
+      // if array then need to find average else simply return value by converting into number
+      res.values = Array.isArray(res?.values) ? ((res?.values?.reduce((acc: any, cur: any) => acc + (+cur[1]||0),0) || 1)/(res?.values?.length||1))?.toFixed(2) : +(res?.values) ?? 0;
       return JSON.parse(JSON.stringify(res));
     })
   })
 
   const tableObject:any = {};
 
-  data.forEach((sublist:any,columnIndex:any) => {
-    sublist.forEach((item:any) => {
+  data?.forEach((sublist:any,columnIndex:any) => {
+    sublist?.forEach((item:any) => {
         const metric = JSON.stringify(item.metric);
         const value = item.values;
         
@@ -67,7 +68,7 @@ export const convertPromQLTableData = (
             };
         }
         
-        tableObject[metric][`query ${columnIndex + 1}`] = value;
+        tableObject[metric][filedNameObj["query " + (columnIndex+1)]] = value;
     });
 });
 
