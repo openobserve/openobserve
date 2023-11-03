@@ -143,6 +143,8 @@ pub struct PanelConfig {
     min: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    overrides: Vec<Override>
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -199,4 +201,22 @@ pub struct MapView {
     pub zoom: f64,
     pub lat: f64,
     pub lng: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct Override {
+    matcher: Matcher,
+    properties: Vec<Property>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct Matcher {
+    id: String,
+    options: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct Property {
+    id: String,
+    value: String,
 }
