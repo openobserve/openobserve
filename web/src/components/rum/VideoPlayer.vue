@@ -146,8 +146,8 @@
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import rrwebPlayer from "rrweb-player";
-import "rrweb-player/dist/style.css";
+import rrwebPlayer from "@openobserve/rrweb-player";
+import "@openobserve/rrweb-player/dist/style.css";
 import {
   nextTick,
   ref,
