@@ -23,7 +23,13 @@
     "sqlModeLabel": "SQL モード",
     "toggleFunctionLabel": "ファンクション",
     "labelWrap": "ラップコンテンツ",
-    "messageWrapContent": "ラップテーブルコンテンツ"
+    "messageWrapContent": "ラップテーブルコンテンツ",
+    "functionPlaceholder": "関数を選択または作成する",
+    "functionMessage": "Tab/Enter ボタンを押して新しい関数名を適用します。",
+    "saveFunctionLabel": "保存機能",
+    "exportLogs": "ログをエクスポートする",
+    "runQuery": "クエリーを実行",
+    "syntaxGuideLabel": "シンタックスガイド"
   },
   "menu": {
     "home": "ホーム",
@@ -59,7 +65,17 @@
     "overview": "[概要]",
     "webVitals": "ウェブバイタル",
     "errors": "エラー",
-    "api": "API"
+    "api": "API",
+    "aboutRUMTitle": "ユーザー体験を向上させるリアルユーザーモニタリングをご覧ください",
+    "aboutRUMMessage": "Real User Monitoringを使用すると、実際のユーザーの視点からWebサイトまたはアプリケーションのパフォーマンスを追跡および分析できます。つまり、実際のユーザーがサイトをどのように体験しているか、どこで速度低下に直面しているか、どのページを頻繁に使用しているかなどを把握する必要があります。",
+    "getStartedTitle": "リアルユーザーモニタリングを始める",
+    "getStartedLabel": "今すぐ始める",
+    "performanceSummaryLabel": "パフォーマンスサマリー",
+    "webVitalsLabel": "ウェブバイタル",
+    "errorLabel": "エラー",
+    "sessionLabel": "セッション",
+    "learnWebVitalsLabel": "ウェブバイタルについてもっと知る",
+    "clickHereLabel": "ここをクリック"
   },
   "about": {
     "name": "オープンオブザーブ",
@@ -213,7 +229,11 @@
     "explore": "探索",
     "timezone": "タイムゾーン",
     "deleteActionLabel": "[削除]",
-    "deleteActionMessage": "選択したフィールドを削除してもよろしいですか?このアクションは元に戻せません。"
+    "deleteActionMessage": "選択したフィールドを削除してもよろしいですか?このアクションは元に戻せません。",
+    "labelAll": "[すべて]",
+    "labelLogs": "[ログ]",
+    "labelMetrics": "メトリックス",
+    "labelTraces": "トレース"
   },
   "function": {
     "header": "ファンクション",
@@ -257,7 +277,29 @@
     "resetRUMTokenLabel": "RUM トークンをリセット",
     "generateRUMTokenLabel": "RUM トークンを生成",
     "generateRUMTokenMessage": "RUM トークンを生成して、組織の RUM を有効にします。",
-    "npmStepTitle": "NPM インストール方法"
+    "npmStepTitle": "NPM インストール方法",
+    "recommendedLabel": "おすすめ",
+    "customLabel": "カスタム",
+    "kubernetesLabel": "キューベルネテス",
+    "windowsLabel": "Windows",
+    "linuxLabel": "リナックス",
+    "otelCollectorLabel": "ホテルコレクター",
+    "tracesLabel": "トレース",
+    "rumLabel": "フロントエンドモニタリング",
+    "logsLabel": "[ログ]",
+    "metricsLabel": "メトリックス",
+    "curlLabel": "カール",
+    "filebeatLabel": "ファイルビート",
+    "fluentBitLabel": "フルーエントビット (推奨)",
+    "fluentdLabel": "流暢に話せる",
+    "vectorLabel": "[ベクター]",
+    "kinesisFirehoseLabel": "キネシスファイヤーホース",
+    "gcpPubSubLabel": "(パブ/サブ) 経由の GCP ログ",
+    "syslogngLabel": "シスログ-NG",
+    "syslogLabel": "シスログ",
+    "prometheusLabel": "プロメテウス",
+    "telegrafLabel": "テレグラフ",
+    "opentelemetryLabel": "オープンテレメトリ"
   },
   "syslog": {
     "stream": "ストリーム",
@@ -315,7 +357,44 @@
     "DefaultValue": "デフォルト値 (オプション)",
     "typeOfVariable": "変数のタイプ",
     "DefaultSize": "デフォルトの最大レコードサイズ (オプション)",
-    "maxRecordSize": "デフォルトの最大レコードサイズは 10 です。この値は必要に応じて更新できます。"
+    "maxRecordSize": "デフォルトの最大レコードサイズは 10 です。この値は必要に応じて更新できます。",
+    "newFolderBtnLabel": "新規フォルダー",
+    "folderLabel": "フォルダー",
+    "areaLabel": "エリア",
+    "areaStackedLabel": "エリアスタック",
+    "lineLabel": "ライン",
+    "barLabel": "バー",
+    "horizontalLabel": "水平",
+    "stackedLabel": "積み重ね",
+    "heatmapLabel": "ヒートマップ",
+    "geomapLabel": "ジオマップ",
+    "hstackedLabel": "Hスタック",
+    "pieLabel": "パイ",
+    "donutLabel": "ドーナツ",
+    "scatterLabel": "スキャッター",
+    "tableLabel": "テーブル",
+    "metricTextLabel": "メトリックテキスト",
+    "oneFieldMessage": "ここにフィールドを 1 つ追加",
+    "maxtwofieldMessage": "ここに最大 2 つのフィールドを追加",
+    "twoFieldsMessage": "ここに2つのフィールドを追加",
+    "oneOrMoreFieldsMessage": "1 つまたは複数のフィールドをここに追加してください",
+    "xaxisFieldNAMessage": "X 軸フィールドは使用できません",
+    "oneLabelFieldMessage": "ここにラベルフィールドを 1 つ追加",
+    "oneValueFieldMessage": "ここに1つの値フィールドを追加",
+    "oneFieldConfigMessage": "フィールドを 1 つ追加するか、設定から設定します",
+    "configLabel": "コンフィグ",
+    "showLegendsLabel": "レジェンドを表示",
+    "legendsPositionLabel": "レジェンドポジション",
+    "unitLabel": "単位",
+    "basemapLabel": "ベースマップ",
+    "customunitLabel": "カスタムユニット",
+    "lattitudeLabel": "緯度",
+    "longitudeLabel": "経度",
+    "zoomLabel": "ズーム",
+    "legendLabel": "レジェンド",
+    "overrideMessage": "シリーズ名のオーバーライド。たとえば、{endpoint} はエンドポイントのラベル値に置き換える必要があります。",
+    "unsavedMessage": "保存されていない変更があります。本当に辞めたいの？",
+    "addFieldMessage": "リストからフィールドを追加してください"
   },
   "panel": {
     "header": "パネル",
@@ -422,7 +501,10 @@
     "messageDataNotFound": "データが見つかりません",
     "invoiceStartDate": "請求開始日",
     "invoiceEndDate": "請求書終了日",
-    "downloadInvoice": "請求書をダウンロード"
+    "downloadInvoice": "請求書をダウンロード",
+    "usageLabel": "使用法",
+    "plansLabel": "計画",
+    "invoiceHistoryLabel": "請求書履歴"
   },
   "message": {
     "ServerInternalError": "エラー:問題が発生しました。内部サーバーエラー。",
@@ -481,7 +563,12 @@
     "searchMetric": "メトリクスを検索する",
     "searchLabel": "検索指標ラベル",
     "add": "追加",
-    "cancel": "[キャンセル]"
+    "cancel": "[キャンセル]",
+    "promqlLabel": "PromQL",
+    "runQuery": "クエリーを実行",
+    "holdMessage": "魅力的な指標をしっかりと保持してください。",
+    "noStreamSelected": "メトリクスが選択されていません。",
+    "addToDashboard": "ダッシュボードに追加"
   },
   "settings": {
     "header": "[設定]",
@@ -495,6 +582,10 @@
     "apiNamePlaceHolder": "キー名",
     "updateuserKey": "ユーザーキーを更新",
     "id": "ID",
-    "update": "[更新]"
+    "update": "[更新]",
+    "generalLabel": "将軍",
+    "apikeyLabel": "API キー",
+    "generalPageTitle": "[一般設定]",
+    "scrapintervalLabel": "スクレイプ間隔 (秒単位) *"
   }
 }

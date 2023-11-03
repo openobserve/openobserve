@@ -25,7 +25,7 @@
             !queryData.queryResults.hits.length
           "
           icon="download"
-          title="Export logs"
+          :title="t('search.exportLogs')"
           @click="downloadLogs"
         ></q-btn>
         <div
@@ -50,10 +50,10 @@
             data-cy="search-bar-refresh-button"
             dense
             flat
-            title="Run query"
+            :title="t('search.runQuery')"
             class="q-pa-none search-button"
             @click="searchData"
-            >Run query</q-btn
+            >{{t('search.runQuery')}}</q-btn
           >
         </div>
       </div>

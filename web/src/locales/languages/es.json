@@ -23,7 +23,13 @@
     "sqlModeLabel": "Modo SQL",
     "toggleFunctionLabel": "Función",
     "labelWrap": "Envolver contenido",
-    "messageWrapContent": "Envolver el contenido de la tabla"
+    "messageWrapContent": "Envolver el contenido de la tabla",
+    "functionPlaceholder": "Seleccione o cree una función",
+    "functionMessage": "Pulse el botón Tab/Enter para aplicar el nuevo nombre de la función.",
+    "saveFunctionLabel": "Función Guardar",
+    "exportLogs": "Registros de exportación",
+    "runQuery": "Ejecutar consulta",
+    "syntaxGuideLabel": "Guía de sintaxis"
   },
   "menu": {
     "home": "Inicio",
@@ -59,7 +65,17 @@
     "overview": "Descripción general",
     "webVitals": "Signos vitales web",
     "errors": "Errores",
-    "api": "API"
+    "api": "API",
+    "aboutRUMTitle": "Descubra la supervisión de usuarios reales para mejorar su experiencia de usuario",
+    "aboutRUMMessage": "El monitoreo de usuarios reales le permite rastrear y analizar el rendimiento de su sitio web o aplicación desde la perspectiva de los usuarios reales. Esto significa comprender cómo los usuarios reales experimentan tu sitio, dónde se enfrentan a ralentizaciones, qué páginas utilizan con frecuencia y más.",
+    "getStartedTitle": "Comience con la supervisión de usuarios reales",
+    "getStartedLabel": "Empezar",
+    "performanceSummaryLabel": "Resumen de rendimiento",
+    "webVitalsLabel": "Signos vitales web",
+    "errorLabel": "Errores",
+    "sessionLabel": "Sesiones",
+    "learnWebVitalsLabel": "Más información sobre Web Vitals",
+    "clickHereLabel": "Haga clic aquí"
   },
   "about": {
     "name": "Abrir Observe",
@@ -213,7 +229,11 @@
     "explore": "Explora",
     "timezone": "Zona horaria",
     "deleteActionLabel": "Eliminar",
-    "deleteActionMessage": "¿Está seguro de que desea eliminar los campos seleccionados? Esta acción no se puede deshacer."
+    "deleteActionMessage": "¿Está seguro de que desea eliminar los campos seleccionados? Esta acción no se puede deshacer.",
+    "labelAll": "Todos",
+    "labelLogs": "Registros",
+    "labelMetrics": "Métricas",
+    "labelTraces": "Huellas"
   },
   "function": {
     "header": "Funciones",
@@ -257,7 +277,29 @@
     "resetRUMTokenLabel": "Restablecer el token RUM",
     "generateRUMTokenLabel": "Generar token RUM",
     "generateRUMTokenMessage": "Genere un token de RUM para habilitar el RUM en su organización.",
-    "npmStepTitle": "Método de instalación de NPM"
+    "npmStepTitle": "Método de instalación de NPM",
+    "recommendedLabel": "Recomendado",
+    "customLabel": "Personalizado",
+    "kubernetesLabel": "Kubernetes",
+    "windowsLabel": "escaparates",
+    "linuxLabel": "Linux",
+    "otelCollectorLabel": "OTEL Collector",
+    "tracesLabel": "Huellas",
+    "rumLabel": "Monitorización de frontend",
+    "logsLabel": "Registros",
+    "metricsLabel": "Métricas",
+    "curlLabel": "Curl",
+    "filebeatLabel": "Filebeat",
+    "fluentBitLabel": "FluentBit (recomendado)",
+    "fluentdLabel": "Fluido",
+    "vectorLabel": "Vector",
+    "kinesisFirehoseLabel": "Manguera Kinesis Firehose",
+    "gcpPubSubLabel": "Registros de GCP mediante (Pub/Sub)",
+    "syslogngLabel": "Syslog-ng",
+    "syslogLabel": "Syslog",
+    "prometheusLabel": "Prometeo",
+    "telegrafLabel": "Telégrafo",
+    "opentelemetryLabel": "Telemetría abierta"
   },
   "syslog": {
     "stream": "Transmitir",
@@ -315,7 +357,44 @@
     "DefaultValue": "Valor predeterminado (opcional)",
     "typeOfVariable": "Tipo de variable",
     "DefaultSize": "Tamaño máximo de registro predeterminado (opcional)",
-    "maxRecordSize": "El tamaño máximo de registro predeterminado es 10. Puede actualizar este valor según sea necesario"
+    "maxRecordSize": "El tamaño máximo de registro predeterminado es 10. Puede actualizar este valor según sea necesario",
+    "newFolderBtnLabel": "Carpeta nueva",
+    "folderLabel": "Carpetas",
+    "areaLabel": "Zona",
+    "areaStackedLabel": "Área apilada",
+    "lineLabel": "Línea",
+    "barLabel": "bar",
+    "horizontalLabel": "Horizontal",
+    "stackedLabel": "Apilados",
+    "heatmapLabel": "Mapa de calor",
+    "geomapLabel": "Geomapa",
+    "hstackedLabel": "Apilado en H",
+    "pieLabel": "Pastel",
+    "donutLabel": "Donut",
+    "scatterLabel": "Dispersión",
+    "tableLabel": "Tabla",
+    "metricTextLabel": "Texto métrico",
+    "oneFieldMessage": "Añada 1 campo aquí",
+    "maxtwofieldMessage": "Añada un máximo de 2 campos aquí",
+    "twoFieldsMessage": "Añada 2 campos aquí",
+    "oneOrMoreFieldsMessage": "Añada uno o más campos aquí",
+    "xaxisFieldNAMessage": "El campo del eje X no está permitido",
+    "oneLabelFieldMessage": "Añada aquí 1 campo de etiqueta",
+    "oneValueFieldMessage": "Agregue 1 campo de valores aquí",
+    "oneFieldConfigMessage": "Agregue 1 campo o configúrelo desde la configuración",
+    "configLabel": "Configuración",
+    "showLegendsLabel": "Mostrar leyendas",
+    "legendsPositionLabel": "Posiciones de leyendas",
+    "unitLabel": "Unidad",
+    "basemapLabel": "Mapa base",
+    "customunitLabel": "Unidad personalizada",
+    "lattitudeLabel": "Latitud",
+    "longitudeLabel": "Longitud",
+    "zoomLabel": "Zoom",
+    "legendLabel": "Leyenda",
+    "overrideMessage": "El nombre de la serie se anula. Por ejemplo, {endpoint} se sustituirá por el valor de etiqueta para el punto final.",
+    "unsavedMessage": "Tienes cambios sin guardar. ¿Estás seguro de que quieres marcharte?",
+    "addFieldMessage": "Agregue un campo de la lista"
   },
   "panel": {
     "header": "Panel",
@@ -422,7 +501,10 @@
     "messageDataNotFound": "No se han encontrado datos",
     "invoiceStartDate": "Fecha de inicio de la factura",
     "invoiceEndDate": "Fecha de finalización de la factura",
-    "downloadInvoice": "Descargar factura"
+    "downloadInvoice": "Descargar factura",
+    "usageLabel": "Uso",
+    "plansLabel": "Planes",
+    "invoiceHistoryLabel": "Historial de facturas"
   },
   "message": {
     "ServerInternalError": "Error: algo salió mal. Error interno del servidor.",
@@ -481,7 +563,12 @@
     "searchMetric": "Buscar una métrica",
     "searchLabel": "Etiqueta métrica de búsqueda",
     "add": "Añadir",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "promqlLabel": "ProMQL",
+    "runQuery": "Ejecutar consulta",
+    "holdMessage": "Agárrate fuerte y busca métricas.",
+    "noStreamSelected": "No se seleccionó ninguna métrica.",
+    "addToDashboard": "Añadir al panel"
   },
   "settings": {
     "header": "Ajustes",
@@ -495,6 +582,10 @@
     "apiNamePlaceHolder": "Nombre clave",
     "updateuserKey": "Actualizar clave de usuario",
     "id": "ID",
-    "update": "Actualización"
+    "update": "Actualización",
+    "generalLabel": "General",
+    "apikeyLabel": "Claves de API",
+    "generalPageTitle": "Ajustes generales",
+    "scrapintervalLabel": "Intervalo de raspado (en segundos) *"
   }
 }

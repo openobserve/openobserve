@@ -23,7 +23,13 @@
     "sqlModeLabel": "SQL-Modus",
     "toggleFunctionLabel": "Funktion",
     "labelWrap": "Inhalt einwickeln",
-    "messageWrapContent": "Tabelleninhalt umbrechen"
+    "messageWrapContent": "Tabelleninhalt umbrechen",
+    "functionPlaceholder": "Wählen oder erstellen Sie eine Funktion",
+    "functionMessage": "Drücken Sie die Tabulator-/Enter-Taste, um einen neuen Funktionsnamen anzuwenden.",
+    "saveFunctionLabel": "Funktion speichern",
+    "exportLogs": "Logs exportieren",
+    "runQuery": "Abfrage ausführen",
+    "syntaxGuideLabel": "Leitfaden zur Syntax"
   },
   "menu": {
     "home": "Zuhause",
@@ -59,7 +65,17 @@
     "overview": "Überblick",
     "webVitals": "Web Vitals",
     "errors": "Fehler",
-    "api": "API"
+    "api": "API",
+    "aboutRUMTitle": "Entdecken Sie Real User Monitoring, um Ihr Benutzererlebnis zu verbessern",
+    "aboutRUMMessage": "Real User Monitoring ermöglicht es Ihnen, die Leistung Ihrer Website oder Anwendung aus der Sicht echter Benutzer zu verfolgen und zu analysieren. Das bedeutet, zu verstehen, wie tatsächliche Nutzer Ihre Website erleben, wo sie mit Verlangsamungen konfrontiert sind, welche Seiten sie häufig verwenden und vieles mehr.",
+    "getStartedTitle": "Erste Schritte mit Real User Monitoring",
+    "getStartedLabel": "Fangen Sie an",
+    "performanceSummaryLabel": "Zusammenfassung der Leistung",
+    "webVitalsLabel": "Web Vitals",
+    "errorLabel": "Fehler",
+    "sessionLabel": "Sessions",
+    "learnWebVitalsLabel": "Erfahre mehr über Web Vitals",
+    "clickHereLabel": "Klicken Sie hier"
   },
   "about": {
     "name": "Observe öffnen",
@@ -213,7 +229,11 @@
     "explore": "Erkunden",
     "timezone": "Zeitzone",
     "deleteActionLabel": "Löschen",
-    "deleteActionMessage": "Sind Sie sicher, dass Sie die ausgewählten Felder löschen möchten. Diese Aktion kann nicht rückgängig gemacht werden."
+    "deleteActionMessage": "Sind Sie sicher, dass Sie die ausgewählten Felder löschen möchten. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "labelAll": "Alle",
+    "labelLogs": "Logs",
+    "labelMetrics": "Metriken",
+    "labelTraces": "Spuren"
   },
   "function": {
     "header": "Funktionen",
@@ -257,7 +277,29 @@
     "resetRUMTokenLabel": "RUM-Token zurücksetzen",
     "generateRUMTokenLabel": "RUM-Token generieren",
     "generateRUMTokenMessage": "Generieren Sie ein RUM-Token, um RUM für Ihre Organisation zu aktivieren.",
-    "npmStepTitle": "NPM-Installationsmethode"
+    "npmStepTitle": "NPM-Installationsmethode",
+    "recommendedLabel": "Empfehlenswert",
+    "customLabel": "Benutzerdefiniert",
+    "kubernetesLabel": "Kubernetes",
+    "windowsLabel": "Fenster",
+    "linuxLabel": "Linux",
+    "otelCollectorLabel": "OTEL Collector",
+    "tracesLabel": "Spuren",
+    "rumLabel": "Frontend-Überwachung",
+    "logsLabel": "Logs",
+    "metricsLabel": "Metriken",
+    "curlLabel": "Locke",
+    "filebeatLabel": "Filebeat",
+    "fluentBitLabel": "FluentBit (empfohlen)",
+    "fluentdLabel": "Fließend",
+    "vectorLabel": "Vektor",
+    "kinesisFirehoseLabel": "Kinesis Feuerwehrschlauch",
+    "gcpPubSubLabel": "GCP-Protokolle über (Pub/Sub)",
+    "syslogngLabel": "Syslog-NG",
+    "syslogLabel": "Syslog",
+    "prometheusLabel": "Prometheus",
+    "telegrafLabel": "Telegraf",
+    "opentelemetryLabel": "Offene Telemetrie"
   },
   "syslog": {
     "stream": "Streamen",
@@ -315,7 +357,44 @@
     "DefaultValue": "Standardwert (optional)",
     "typeOfVariable": "Art der Variablen",
     "DefaultSize": "Standardmäßige maximale Datensatzgröße (optional)",
-    "maxRecordSize": "Die standardmäßige maximale Datensatzgröße ist 10. Sie können diesen Wert nach Bedarf aktualisieren"
+    "maxRecordSize": "Die standardmäßige maximale Datensatzgröße ist 10. Sie können diesen Wert nach Bedarf aktualisieren",
+    "newFolderBtnLabel": "Neuer Ordner",
+    "folderLabel": "Ordner",
+    "areaLabel": "Bereich",
+    "areaStackedLabel": "Gestapelte Fläche",
+    "lineLabel": "Linie",
+    "barLabel": "Bar",
+    "horizontalLabel": "Horizontal",
+    "stackedLabel": "Gestapelt",
+    "heatmapLabel": "Heatmap",
+    "geomapLabel": "GeoMap",
+    "hstackedLabel": "H-gestapelt",
+    "pieLabel": "Torte",
+    "donutLabel": "Krapfen",
+    "scatterLabel": "Streuen",
+    "tableLabel": "Tabelle",
+    "metricTextLabel": "Metrischer Text",
+    "oneFieldMessage": "Füge hier 1 Feld hinzu",
+    "maxtwofieldMessage": "Fügen Sie hier maximal 2 Felder hinzu",
+    "twoFieldsMessage": "Füge hier 2 Felder hinzu",
+    "oneOrMoreFieldsMessage": "Fügen Sie hier ein oder mehrere Felder hinzu",
+    "xaxisFieldNAMessage": "X-Achsen-Feld ist nicht zulässig",
+    "oneLabelFieldMessage": "Fügen Sie hier ein Labelfeld hinzu",
+    "oneValueFieldMessage": "Fügen Sie hier ein Wertefeld hinzu",
+    "oneFieldConfigMessage": "Fügen Sie ein Feld hinzu oder konfigurieren Sie es aus der Konfiguration",
+    "configLabel": "Konfig",
+    "showLegendsLabel": "Legenden anzeigen",
+    "legendsPositionLabel": "Positionen der Legenden",
+    "unitLabel": "Einheit",
+    "basemapLabel": "Basiskarte",
+    "customunitLabel": "Benutzerdefinierte Einheit",
+    "lattitudeLabel": "Breitengrad",
+    "longitudeLabel": "Längengrad",
+    "zoomLabel": "Zoomen",
+    "legendLabel": "Legende",
+    "overrideMessage": "Überschreibungen des Seriennamens. Beispielsweise muss {endpoint} durch den Labelwert für Endpunkt ersetzt werden.",
+    "unsavedMessage": "Sie haben ungespeicherte Änderungen. Bist du sicher, dass du gehen willst?",
+    "addFieldMessage": "Bitte fügen Sie ein Feld aus der Liste hinzu"
   },
   "panel": {
     "header": "Paneel",
@@ -422,7 +501,10 @@
     "messageDataNotFound": "Daten wurden nicht gefunden",
     "invoiceStartDate": "Startdatum der Rechnung",
     "invoiceEndDate": "Enddatum der Rechnung",
-    "downloadInvoice": "Rechnung herunterladen"
+    "downloadInvoice": "Rechnung herunterladen",
+    "usageLabel": "Verwendung",
+    "plansLabel": "Pläne",
+    "invoiceHistoryLabel": "Rechnungshistorie"
   },
   "message": {
     "ServerInternalError": "Fehler: Etwas ist schief gelaufen. Interner Serverfehler.",
@@ -481,7 +563,12 @@
     "searchMetric": "Suchen Sie nach einer Metrik",
     "searchLabel": "Metriklabel suchen",
     "add": "Hinzufügen",
-    "cancel": "Stornieren"
+    "cancel": "Stornieren",
+    "promqlLabel": "für MQL",
+    "runQuery": "Abfrage ausführen",
+    "holdMessage": "Halten Sie sich fest und holen Sie sich Metriken.",
+    "noStreamSelected": "Keine Metriken ausgewählt.",
+    "addToDashboard": "Zum Dashboard hinzufügen"
   },
   "settings": {
     "header": "Einstellungen",
@@ -495,6 +582,10 @@
     "apiNamePlaceHolder": "Name des Schlüssels",
     "updateuserKey": "Benutzerschlüssel aktualisieren",
     "id": "Id",
-    "update": "Aktualisieren"
+    "update": "Aktualisieren",
+    "generalLabel": "Allgemeines",
+    "apikeyLabel": "API-Schlüssel",
+    "generalPageTitle": "Allgemeine Einstellungen",
+    "scrapintervalLabel": "Kratzintervall (in Sekunden) *"
   }
 }

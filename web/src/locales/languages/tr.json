@@ -23,7 +23,13 @@
     "sqlModeLabel": "SQL Modu",
     "toggleFunctionLabel": "Fonksiyon",
     "labelWrap": "İçeriği Sarın",
-    "messageWrapContent": "Tablo İçeriğini Sarın"
+    "messageWrapContent": "Tablo İçeriğini Sarın",
+    "functionPlaceholder": "Bir işlev seçme veya oluşturma",
+    "functionMessage": "Yeni işlev adı uygulamak için Sekme/Enter düğmesine basın.",
+    "saveFunctionLabel": "Kaydet Fonksiyonu",
+    "exportLogs": "Günlükleri dışa aktarma",
+    "runQuery": "Sorgu çalıştır",
+    "syntaxGuideLabel": "Sözdizimi Kılavuzu"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -59,7 +65,17 @@
     "overview": "Genel Bakış",
     "webVitals": "Web Hayati Değerler",
     "errors": "Hatalar",
-    "api": "API"
+    "api": "API",
+    "aboutRUMTitle": "Kullanıcı Deneyiminizi Geliştirmek için Gerçek Kullanıcı İzlemesini Keşfedin",
+    "aboutRUMMessage": "Gerçek Kullanıcı İzleme, web sitenizin veya uygulamanızın performansını gerçek kullanıcılar açısından izlemenize ve analiz etmenize olanak tanır. Bu, gerçek kullanıcıların sitenizi nasıl deneyimlediklerini, nerede yavaşlamalarla karşılaştıklarını, hangi sayfaları sıklıkla kullandıklarını ve daha fazlasını anlamak anlamına gelir.",
+    "getStartedTitle": "Gerçek Kullanıcı İzlemeye Başlayın",
+    "getStartedLabel": "Başlayın",
+    "performanceSummaryLabel": "Performans Özeti",
+    "webVitalsLabel": "Web Hayati Değerler",
+    "errorLabel": "Hatalar",
+    "sessionLabel": "Oturumlar",
+    "learnWebVitalsLabel": "Web Vitals hakkında daha fazla bilgi edinin",
+    "clickHereLabel": "Buraya tıklayınız"
   },
   "about": {
     "name": "Açık Gözlem",
@@ -213,7 +229,11 @@
     "explore": "Keşfedin",
     "timezone": "Saat dilimi",
     "deleteActionLabel": "Sil",
-    "deleteActionMessage": "Seçili alanları silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+    "deleteActionMessage": "Seçili alanları silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+    "labelAll": "Hepsi",
+    "labelLogs": "Günlükler",
+    "labelMetrics": "Metrikler",
+    "labelTraces": "İzleri"
   },
   "function": {
     "header": "Fonksiyonlar",
@@ -257,7 +277,29 @@
     "resetRUMTokenLabel": "RUM Jetonunu Sıfırla",
     "generateRUMTokenLabel": "RUM Token Oluştur",
     "generateRUMTokenMessage": "Kuruluşunuz için RUM'u etkinleştirmek için RUM Token oluşturun.",
-    "npmStepTitle": "NPM Kurulum Yöntemi"
+    "npmStepTitle": "NPM Kurulum Yöntemi",
+    "recommendedLabel": "Önerilen",
+    "customLabel": "Özel",
+    "kubernetesLabel": "Kubernetes",
+    "windowsLabel": "Windows",
+    "linuxLabel": "Linux",
+    "otelCollectorLabel": "OTEL Kollektörü",
+    "tracesLabel": "İzleri",
+    "rumLabel": "Ön uç İzleme",
+    "logsLabel": "Günlükler",
+    "metricsLabel": "Metrikler",
+    "curlLabel": "Kıvrılma",
+    "filebeatLabel": "Filebeat",
+    "fluentBitLabel": "FluentBit (Önerilen)",
+    "fluentdLabel": "Fluentd",
+    "vectorLabel": "Vektör",
+    "kinesisFirehoseLabel": "Kinesis Yangın Hortumu",
+    "gcpPubSubLabel": "(Pub/Sub) üzerinden GCP Günlükleri",
+    "syslogngLabel": "Syslog-ng",
+    "syslogLabel": "Syslog",
+    "prometheusLabel": "Prometheus",
+    "telegrafLabel": "Telgraf",
+    "opentelemetryLabel": "OpenTelemetry"
   },
   "syslog": {
     "stream": "Akış",
@@ -315,7 +357,44 @@
     "DefaultValue": "Varsayılan değer (isteğe bağlı)",
     "typeOfVariable": "Değişken türü",
     "DefaultSize": "Varsayılan maksimum kayıt boyutu (isteğe bağlı)",
-    "maxRecordSize": "Varsayılan maksimum kayıt boyutu 10'dur. Bu değeri gerektiği gibi güncelleyebilirsiniz"
+    "maxRecordSize": "Varsayılan maksimum kayıt boyutu 10'dur. Bu değeri gerektiği gibi güncelleyebilirsiniz",
+    "newFolderBtnLabel": "Yeni Klasör",
+    "folderLabel": "Klasörler",
+    "areaLabel": "Alanı",
+    "areaStackedLabel": "Yığılmış Alan",
+    "lineLabel": "Çizgi",
+    "barLabel": "Bar",
+    "horizontalLabel": "Yatay",
+    "stackedLabel": "Yığılmış",
+    "heatmapLabel": "Isı haritası",
+    "geomapLabel": "GeoMap",
+    "hstackedLabel": "H-Yığılmış",
+    "pieLabel": "Turta",
+    "donutLabel": "Tatlı çörek",
+    "scatterLabel": "Dağılım",
+    "tableLabel": "Tablo",
+    "metricTextLabel": "Metrik Metin",
+    "oneFieldMessage": "Buraya 1 alan ekleyin",
+    "maxtwofieldMessage": "Buraya en fazla 2 alan ekleyin",
+    "twoFieldsMessage": "Buraya 2 alan ekleyin",
+    "oneOrMoreFieldsMessage": "Buraya bir veya daha fazla alan ekleyin",
+    "xaxisFieldNAMessage": "X Ekseni alanına izin verilmiyor",
+    "oneLabelFieldMessage": "Buraya 1 etiket alanı ekleyin",
+    "oneValueFieldMessage": "Buraya 1 değer alanı ekleyin",
+    "oneFieldConfigMessage": "1 alan ekleyin veya Yapılandırmadan Yapılandırın",
+    "configLabel": "Yapılandırma",
+    "showLegendsLabel": "Efsaneleri Göster",
+    "legendsPositionLabel": "Efsaneler Pozisyonları",
+    "unitLabel": "Birim",
+    "basemapLabel": "Temel Harita",
+    "customunitLabel": "Özel Birim",
+    "lattitudeLabel": "Uzunluk",
+    "longitudeLabel": "Boylam",
+    "zoomLabel": "Yakınlaştır",
+    "legendLabel": "Efsane",
+    "overrideMessage": "Seri adı geçersiz kılıyor. Örneğin, {endpoint} with, uç nokta için etiket değeri ile değiştirilir.",
+    "unsavedMessage": "Kaydedilmemiş değişiklikleriniz var. Gitmek istediğinden emin misin?",
+    "addFieldMessage": "Lütfen listeden bir alan ekleyin"
   },
   "panel": {
     "header": "Panel",
@@ -422,7 +501,10 @@
     "messageDataNotFound": "Veri bulunamadı",
     "invoiceStartDate": "Fatura Başlangıç Tarihi",
     "invoiceEndDate": "Fatura Bitiş Tarihi",
-    "downloadInvoice": "Faturayı İndir"
+    "downloadInvoice": "Faturayı İndir",
+    "usageLabel": "Kullanımı",
+    "plansLabel": "Planlar",
+    "invoiceHistoryLabel": "Fatura Geçmişi"
   },
   "message": {
     "ServerInternalError": "Hata: Bir şeyler ters gitti. Dahili sunucu hatası.",
@@ -481,7 +563,12 @@
     "searchMetric": "Bir Metrik Ara",
     "searchLabel": "Metrik etiketi ara",
     "add": "Ekle",
-    "cancel": "İptal"
+    "cancel": "İptal",
+    "promqlLabel": "PromQL",
+    "runQuery": "Sorguyu Çalıştırma",
+    "holdMessage": "Sıkı tutun, metrikleri getir.",
+    "noStreamSelected": "Metrik seçilmedi.",
+    "addToDashboard": "Gösterge tablosuna ekle"
   },
   "settings": {
     "header": "Ayarlar",
@@ -495,6 +582,10 @@
     "apiNamePlaceHolder": "Anahtar Adı",
     "updateuserKey": "Kullanıcı Anahtarını Güncelle",
     "id": "Kimlik",
-    "update": "Güncelleme"
+    "update": "Güncelleme",
+    "generalLabel": "General",
+    "apikeyLabel": "API Anahtarları",
+    "generalPageTitle": "Genel Ayarlar",
+    "scrapintervalLabel": "Kazıma Aralığı (Saniye cinsinden) *"
   }
 }

@@ -38,7 +38,7 @@
             name="usage"
             :to="'/billings/usage'"
             :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
-            label="Usage"
+            :label="t('billing.usageLabel')"
             content-class="tab_content"
           />
           <q-route-tab
@@ -46,7 +46,7 @@
             name="plans"
             :to="'/billings/plans'"
             :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
-            label="Plans"
+            :label="t('billing.plansLabel')"
             content-class="tab_content"
           />
           <q-route-tab
@@ -54,7 +54,7 @@
             name="invoice_history"
             :to="'/billings/invoice_history'"
             :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
-            label="Invoice History"
+            :label="t('billing.invoiceHistoryLabel')"
             content-class="tab_content"
           />
         </q-tabs>

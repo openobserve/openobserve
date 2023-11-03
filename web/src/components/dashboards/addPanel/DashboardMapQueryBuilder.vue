@@ -230,18 +230,18 @@ export default defineComponent({
     const Hint = computed((e: any) => {
       switch (dashboardPanelData.data.type) {
         case 'geomap':
-          return "Add 1 field here"
+          return t("dashboard.oneFieldMessage")
         default:
-          return "Add maximum 2 fields here";
+          return t("dashboard.maxtwofieldMessage");
       }
     })
 
     const WeightHint = computed((e: any) => {
       switch (dashboardPanelData.data.type) {
         case 'geomap':
-          return "Add 1 field or Configure it from the Config"
+          return t("dashboard.oneFieldConfigMessage")
         default:
-          return "Add maximum 2 fields here";
+          return t("dashboard.maxtwofieldMessage");
       }
     })
 

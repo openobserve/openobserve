@@ -23,7 +23,13 @@
     "sqlModeLabel": "SQL 모드",
     "toggleFunctionLabel": "기능",
     "labelWrap": "랩 콘텐츠",
-    "messageWrapContent": "랩 테이블 콘텐츠"
+    "messageWrapContent": "랩 테이블 콘텐츠",
+    "functionPlaceholder": "함수 선택 또는 생성",
+    "functionMessage": "Tab/Enter 버튼을 눌러 새 함수 이름을 적용합니다.",
+    "saveFunctionLabel": "저장 함수",
+    "exportLogs": "로그 내보내기",
+    "runQuery": "쿼리 실행",
+    "syntaxGuideLabel": "구문 가이드"
   },
   "menu": {
     "home": "홈",
@@ -59,7 +65,17 @@
     "overview": "개요",
     "webVitals": "웹 바이탈",
     "errors": "오류",
-    "api": "API"
+    "api": "API",
+    "aboutRUMTitle": "사용자 경험을 개선하기 위한 실제 사용자 모니터링 알아보기",
+    "aboutRUMMessage": "Real User Monitoring을 사용하면 실제 사용자의 관점에서 웹 사이트 또는 애플리케이션의 성능을 추적하고 분석할 수 있습니다.즉, 실제 사용자가 사이트를 어떻게 경험하는지, 어디서 속도가 느려지는지, 어떤 페이지를 자주 사용하는지 등을 이해해야 합니다.",
+    "getStartedTitle": "실제 사용자 모니터링 시작하기",
+    "getStartedLabel": "시작하기",
+    "performanceSummaryLabel": "퍼포먼스 요약",
+    "webVitalsLabel": "웹 바이탈",
+    "errorLabel": "오류",
+    "sessionLabel": "세션",
+    "learnWebVitalsLabel": "웹 바이탈에 대해 자세히 알아보기",
+    "clickHereLabel": "여기를 클릭하세요"
   },
   "about": {
     "name": "오픈 옵저브",
@@ -213,7 +229,11 @@
     "explore": "둘러보기",
     "timezone": "시간대",
     "deleteActionLabel": "삭제",
-    "deleteActionMessage": "선택한 필드를 삭제하시겠습니까?이 작업은 취소할 수 없습니다."
+    "deleteActionMessage": "선택한 필드를 삭제하시겠습니까?이 작업은 취소할 수 없습니다.",
+    "labelAll": "모두",
+    "labelLogs": "로그",
+    "labelMetrics": "측정항목",
+    "labelTraces": "트레이스"
   },
   "function": {
     "header": "함수",
@@ -257,7 +277,29 @@
     "resetRUMTokenLabel": "RUM 토큰 초기화",
     "generateRUMTokenLabel": "RUM 토큰 생성",
     "generateRUMTokenMessage": "RUM 토큰을 생성하여 조직에 RUM을 활성화하십시오.",
-    "npmStepTitle": "NPM 설치 방법"
+    "npmStepTitle": "NPM 설치 방법",
+    "recommendedLabel": "추천합니다",
+    "customLabel": "커스텀",
+    "kubernetesLabel": "쿠버네티스",
+    "windowsLabel": "윈도우",
+    "linuxLabel": "리눅스",
+    "otelCollectorLabel": "오텔 컬렉터",
+    "tracesLabel": "트레이스",
+    "rumLabel": "프런트엔드 모니터링",
+    "logsLabel": "로그",
+    "metricsLabel": "측정항목",
+    "curlLabel": "컬",
+    "filebeatLabel": "파일비트",
+    "fluentBitLabel": "플루언트비트 (권장)",
+    "fluentdLabel": "유창한",
+    "vectorLabel": "벡터",
+    "kinesisFirehoseLabel": "키네시스 파이어호스",
+    "gcpPubSubLabel": "(게시/구독) 를 통한 GCP 로그",
+    "syslogngLabel": "Syslog-NG",
+    "syslogLabel": "시스템 로그",
+    "prometheusLabel": "프로메테우스",
+    "telegrafLabel": "텔레그라프",
+    "opentelemetryLabel": "오픈 텔레메트리"
   },
   "syslog": {
     "stream": "스트림",
@@ -315,7 +357,44 @@
     "DefaultValue": "기본값 (선택 사항)",
     "typeOfVariable": "변수 유형",
     "DefaultSize": "기본 최대 레코드 크기 (선택 사항)",
-    "maxRecordSize": "기본 최대 레코드 크기는 10입니다.필요에 따라 이 값을 업데이트할 수 있습니다."
+    "maxRecordSize": "기본 최대 레코드 크기는 10입니다.필요에 따라 이 값을 업데이트할 수 있습니다.",
+    "newFolderBtnLabel": "새 폴더",
+    "folderLabel": "폴더",
+    "areaLabel": "지역",
+    "areaStackedLabel": "영역 스택",
+    "lineLabel": "라인",
+    "barLabel": "바",
+    "horizontalLabel": "수평형",
+    "stackedLabel": "적층형",
+    "heatmapLabel": "히트맵",
+    "geomapLabel": "지오맵",
+    "hstackedLabel": "H-스택",
+    "pieLabel": "파이",
+    "donutLabel": "도넛",
+    "scatterLabel": "스캐터",
+    "tableLabel": "테이블",
+    "metricTextLabel": "지표 텍스트",
+    "oneFieldMessage": "여기에 필드 1개 추가",
+    "maxtwofieldMessage": "여기에 최대 2개의 필드를 추가합니다.",
+    "twoFieldsMessage": "여기에 필드 2개 추가",
+    "oneOrMoreFieldsMessage": "여기에 하나 이상의 필드를 추가합니다.",
+    "xaxisFieldNAMessage": "X축 필드는 허용되지 않습니다.",
+    "oneLabelFieldMessage": "여기에 라벨 필드 1개 추가",
+    "oneValueFieldMessage": "여기에 값 필드 1개 추가",
+    "oneFieldConfigMessage": "필드 1개 추가 또는 구성에서 구성",
+    "configLabel": "구성",
+    "showLegendsLabel": "쇼 레전드",
+    "legendsPositionLabel": "레전드 포지션",
+    "unitLabel": "유닛",
+    "basemapLabel": "기본 맵",
+    "customunitLabel": "커스텀 유닛",
+    "lattitudeLabel": "래티튜드",
+    "longitudeLabel": "경도",
+    "zoomLabel": "줌",
+    "legendLabel": "레전드",
+    "overrideMessage": "시리즈 이름 재정의.예를 들어, {endpoint} 는 엔드포인트의 레이블 값으로 대체되어야 합니다.",
+    "unsavedMessage": "변경 내용을 저장하지 않았습니다.정말 떠나고 싶니?",
+    "addFieldMessage": "목록에서 필드를 추가하세요."
   },
   "panel": {
     "header": "패널",
@@ -422,7 +501,10 @@
     "messageDataNotFound": "데이터를 찾을 수 없음",
     "invoiceStartDate": "인보이스 시작 날짜",
     "invoiceEndDate": "인보이스 종료 날짜",
-    "downloadInvoice": "인보이스 다운로드"
+    "downloadInvoice": "인보이스 다운로드",
+    "usageLabel": "용법",
+    "plansLabel": "플랜",
+    "invoiceHistoryLabel": "인보이스 내역"
   },
   "message": {
     "ServerInternalError": "오류: 문제가 발생했습니다.내부 서버 오류입니다.",
@@ -481,7 +563,12 @@
     "searchMetric": "지표 검색",
     "searchLabel": "지표 레이블 검색",
     "add": "추가",
-    "cancel": "취소"
+    "cancel": "취소",
+    "promqlLabel": "PromQL",
+    "runQuery": "쿼리 실행",
+    "holdMessage": "빡빡하고 불러오는 메트릭을 유지하세요.",
+    "noStreamSelected": "선택한 지표가 없습니다.",
+    "addToDashboard": "대시보드에 추가"
   },
   "settings": {
     "header": "설정",
@@ -495,6 +582,10 @@
     "apiNamePlaceHolder": "키 이름",
     "updateuserKey": "사용자 키 업데이트",
     "id": "신분증",
-    "update": "업데이트"
+    "update": "업데이트",
+    "generalLabel": "일반",
+    "apikeyLabel": "API 키",
+    "generalPageTitle": "일반 설정",
+    "scrapintervalLabel": "스크래핑 간격 (초) *"
   }
 }

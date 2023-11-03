@@ -23,7 +23,13 @@
     "sqlModeLabel": "SQL-modus",
     "toggleFunctionLabel": "Functie",
     "labelWrap": "Inhoud inpakken",
-    "messageWrapContent": "Inhoud van de tabel inpakken"
+    "messageWrapContent": "Inhoud van de tabel inpakken",
+    "functionPlaceholder": "Selecteer of maak een functie",
+    "functionMessage": "Druk op de Tab/Enter-knop om een nieuwe functienaam toe te passen.",
+    "saveFunctionLabel": "Functie opslaan",
+    "exportLogs": "Logboeken exporteren",
+    "runQuery": "Query uitvoeren",
+    "syntaxGuideLabel": "Handleiding voor syntaxis"
   },
   "menu": {
     "home": "Home",
@@ -59,7 +65,17 @@
     "overview": "Overzicht",
     "webVitals": "Vitalen voor het web",
     "errors": "Fouten",
-    "api": "API"
+    "api": "API",
+    "aboutRUMTitle": "Ontdek Real User Monitoring om uw gebruikerservaring te verbeteren",
+    "aboutRUMMessage": "Met Real User Monitoring kunt u de prestaties van uw website of applicatie volgen en analyseren vanuit het perspectief van echte gebruikers. Dit betekent dat u moet begrijpen hoe echte gebruikers uw site ervaren, waar ze te maken krijgen met vertragingen, welke pagina's ze vaak gebruiken en meer.",
+    "getStartedTitle": "Ga aan de slag met Real User Monitoring",
+    "getStartedLabel": "Ga aan de slag",
+    "performanceSummaryLabel": "Samenvatting van de prestaties",
+    "webVitalsLabel": "Vitalen voor het web",
+    "errorLabel": "Fouten",
+    "sessionLabel": "Sessies",
+    "learnWebVitalsLabel": "Meer informatie over Web Vitals",
+    "clickHereLabel": "Klik hier"
   },
   "about": {
     "name": "OpenObserve",
@@ -213,7 +229,11 @@
     "explore": "Ontdek",
     "timezone": "Tijdzone",
     "deleteActionLabel": "Verwijderen",
-    "deleteActionMessage": "Weet je zeker dat je de geselecteerde velden wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt."
+    "deleteActionMessage": "Weet je zeker dat je de geselecteerde velden wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+    "labelAll": "Alles",
+    "labelLogs": "Logboeken",
+    "labelMetrics": "Metrieken",
+    "labelTraces": "Sporen"
   },
   "function": {
     "header": "Functies",
@@ -257,7 +277,29 @@
     "resetRUMTokenLabel": "RUM-token opnieuw instellen",
     "generateRUMTokenLabel": "Genereer een RUM-token",
     "generateRUMTokenMessage": "Genereer een RUM-token om RUM voor uw organisatie mogelijk te maken.",
-    "npmStepTitle": "NPM-installatiemethode"
+    "npmStepTitle": "NPM-installatiemethode",
+    "recommendedLabel": "Aanbevolen",
+    "customLabel": "Op maat",
+    "kubernetesLabel": "Kubernetes",
+    "windowsLabel": "Ramen",
+    "linuxLabel": "Linux",
+    "otelCollectorLabel": "OTEL verzamelaar",
+    "tracesLabel": "Sporen",
+    "rumLabel": "Frontend-bewaking",
+    "logsLabel": "Logboeken",
+    "metricsLabel": "Metrieken",
+    "curlLabel": "Krul",
+    "filebeatLabel": "Filebeat",
+    "fluentBitLabel": "FluentBit (aanbevolen)",
+    "fluentdLabel": "Vloeiend",
+    "vectorLabel": "Vector",
+    "kinesisFirehoseLabel": "Kinesis brandslang",
+    "gcpPubSubLabel": "GCP-logboeken via (Pub/Sub)",
+    "syslogngLabel": "Syslog-NG",
+    "syslogLabel": "Syslog",
+    "prometheusLabel": "Prometheus",
+    "telegrafLabel": "Telegraf",
+    "opentelemetryLabel": "OpenTelemetrie"
   },
   "syslog": {
     "stream": "Streamen",
@@ -315,7 +357,44 @@
     "DefaultValue": "Standaardwaarde (optioneel)",
     "typeOfVariable": "Soort variabele",
     "DefaultSize": "Standaard maximale recordgrootte (optioneel)",
-    "maxRecordSize": "De standaard maximale recordgrootte is 10. U kunt deze waarde naar wens bijwerken."
+    "maxRecordSize": "De standaard maximale recordgrootte is 10. U kunt deze waarde naar wens bijwerken.",
+    "newFolderBtnLabel": "Nieuwe map",
+    "folderLabel": "Mappen",
+    "areaLabel": "Gebied",
+    "areaStackedLabel": "Gestapeld gebied",
+    "lineLabel": "Lijn",
+    "barLabel": "Bar",
+    "horizontalLabel": "Horizontaal",
+    "stackedLabel": "Gestapeld",
+    "heatmapLabel": "Heatmap",
+    "geomapLabel": "GeoMap",
+    "hstackedLabel": "H-gestapeld",
+    "pieLabel": "Taart",
+    "donutLabel": "Donut",
+    "scatterLabel": "Verstrooien",
+    "tableLabel": "Tafel",
+    "metricTextLabel": "Metrische tekst",
+    "oneFieldMessage": "Voeg hier 1 veld toe",
+    "maxtwofieldMessage": "Voeg hier maximaal 2 velden toe",
+    "twoFieldsMessage": "Voeg hier 2 velden toe",
+    "oneOrMoreFieldsMessage": "Voeg hier een of meer velden toe",
+    "xaxisFieldNAMessage": "Het X-asveld is niet toegestaan",
+    "oneLabelFieldMessage": "Voeg hier 1 labelveld toe",
+    "oneValueFieldMessage": "Voeg hier 1 waardenveld toe",
+    "oneFieldConfigMessage": "Voeg 1 veld toe of configureer het vanuit de Config",
+    "configLabel": "Config",
+    "showLegendsLabel": "Legendes tonen",
+    "legendsPositionLabel": "Legends-posities",
+    "unitLabel": "Eenheid",
+    "basemapLabel": "Basiskaart",
+    "customunitLabel": "Eenheid op maat",
+    "lattitudeLabel": "Breedtegraad",
+    "longitudeLabel": "Lengtegraad",
+    "zoomLabel": "inzoomen",
+    "legendLabel": "Legenda",
+    "overrideMessage": "Overschrijvingen van de serienaam. {endpoint} moet bijvoorbeeld worden vervangen door de labelwaarde voor het eindpunt.",
+    "unsavedMessage": "Je hebt de wijzigingen niet opgeslagen. Weet je zeker dat je weg wilt?",
+    "addFieldMessage": "Voeg een veld uit de lijst toe"
   },
   "panel": {
     "header": "Paneel",
@@ -422,7 +501,10 @@
     "messageDataNotFound": "Gegevens niet gevonden",
     "invoiceStartDate": "Startdatum van de factuur",
     "invoiceEndDate": "Einddatum van de factuur",
-    "downloadInvoice": "Factuur downloaden"
+    "downloadInvoice": "Factuur downloaden",
+    "usageLabel": "Gebruik",
+    "plansLabel": "Plannen",
+    "invoiceHistoryLabel": "Factuurgeschiedenis"
   },
   "message": {
     "ServerInternalError": "Fout: er is iets misgegaan. Interne serverfout.",
@@ -481,7 +563,12 @@
     "searchMetric": "Zoek naar een statistiek",
     "searchLabel": "Zoek een metrisch label",
     "add": "Toevoegen",
-    "cancel": "Annuleer"
+    "cancel": "Annuleer",
+    "promqlLabel": "ProMQL",
+    "runQuery": "Query uitvoeren",
+    "holdMessage": "Houd je aan strakke, aantrekkelijke statistieken.",
+    "noStreamSelected": "Er zijn geen statistieken geselecteerd.",
+    "addToDashboard": "Aan dashboard toevoegen"
   },
   "settings": {
     "header": "Instellingen",
@@ -495,6 +582,10 @@
     "apiNamePlaceHolder": "Sleutelnaam",
     "updateuserKey": "Gebruikerssleutel bijwerken",
     "id": "Id",
-    "update": "Bijwerken"
+    "update": "Bijwerken",
+    "generalLabel": "Generaal",
+    "apikeyLabel": "API-sleutels",
+    "generalPageTitle": "Algemene instellingen",
+    "scrapintervalLabel": "Schraapinterval (in seconden) *"
   }
 }

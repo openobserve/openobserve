@@ -26,9 +26,9 @@
       >
         <template v-slot:before_panels>
           <div class="flex items-center q-pb q-pt-md text-subtitle1 text-bold">
-            <div class="col text-center">Web Vitals</div>
-            <div class="col text-center">Errors</div>
-            <div class="col text-center">Sessions</div>
+            <div class="col text-center">{{t('rum.webVitalsLabel')}}</div>
+            <div class="col text-center">{{t('rum.errorLabel')}}</div>
+            <div class="col text-center">{{t('rum.sessionLabel')}}</div>
           </div>
         </template>
       </RenderDashboardCharts>

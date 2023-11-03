@@ -36,7 +36,8 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          label="Kubernetes"
+          :icon="'img:' + getImageURL('images/common/kubernetes.svg')"
+          :label="t('ingestion.kubernetesLabel')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -48,7 +49,8 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          label="Windows"
+          :icon="'img:' + getImageURL('images/common/windows.svg')"
+          :label="t('ingestion.windowsLabel')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -59,7 +61,8 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          label="Linux"
+          :icon="'img:' + getImageURL('images/common/linux.svg')"
+          :label="t('ingestion.linuxLabel')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -70,7 +73,8 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          label="OTEL Collector"
+          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+          :label="t('ingestion.otelCollectorLabel')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -81,7 +85,8 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          label="Traces (OpenTelelmetry)"
+          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+          :label="t('ingestion.tracesLabel')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -92,7 +97,8 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          label="Frontend Monitoring"
+          :icon="'img:' + getImageURL('images/common/monitoring.svg')"
+          :label="t('ingestion.rumLabel')"
           content-class="tab_content"
         />
       </q-tabs>

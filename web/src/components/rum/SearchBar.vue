@@ -29,7 +29,7 @@
           size="sm"
           :disable="!searchObj.data.queryResults.hits.length"
           icon="download"
-          title="Export logs"
+          :title="t('search.exportLogs')"
           @click="downloadLogs"
         ></q-btn>
         <div class="float-left">
@@ -51,13 +51,13 @@
             data-cy="search-bar-refresh-button"
             dense
             flat
-            title="Run query"
+            :title="t('search.runQuery')"
             class="q-pa-none search-button bg-secondary"
             @click="searchData"
             :disable="
               searchObj.loading || searchObj.data.streamResults.length == 0
             "
-            >Run query</q-btn
+            >{{t('search.runQuery')}}</q-btn
           >
         </div>
       </div>

@@ -23,7 +23,13 @@
     "sqlModeLabel": "SQL 模式",
     "toggleFunctionLabel": "函数",
     "labelWrap": "包装内容",
-    "messageWrapContent": "包装表格内容"
+    "messageWrapContent": "包装表格内容",
+    "functionPlaceholder": "选择或创建函数",
+    "functionMessage": "按 Tab/Enter 按钮应用新的函数名称。",
+    "saveFunctionLabel": "保存功能",
+    "exportLogs": "导出日志",
+    "runQuery": "运行查询",
+    "syntaxGuideLabel": "语法指南"
   },
   "menu": {
     "home": "主页",
@@ -59,7 +65,17 @@
     "overview": "概述",
     "webVitals": "Web Vitals",
     "errors": "错误",
-    "api": "API"
+    "api": "API",
+    "aboutRUMTitle": "探索真实的用户监控以增强您的用户体验",
+    "aboutRUMMessage": "真实用户监控允许您从真实用户的角度跟踪和分析网站或应用程序的性能。这意味着要了解实际用户如何体验您的网站、他们面临的速度变慢、他们经常使用哪些页面等等。",
+    "getStartedTitle": "开始使用真实用户监控",
+    "getStartedLabel": "开始吧",
+    "performanceSummaryLabel": "性能摘要",
+    "webVitalsLabel": "Web Vitals",
+    "errorLabel": "错误",
+    "sessionLabel": "会议",
+    "learnWebVitalsLabel": "了解有关 Web Vitals 的更多信息",
+    "clickHereLabel": "点击这里"
   },
   "about": {
     "name": "打开观察",
@@ -213,7 +229,11 @@
     "explore": "探索",
     "timezone": "时区",
     "deleteActionLabel": "删除",
-    "deleteActionMessage": "是否确定要删除选定字段。此操作无法撤消。"
+    "deleteActionMessage": "是否确定要删除选定字段。此操作无法撤消。",
+    "labelAll": "全部",
+    "labelLogs": "日志",
+    "labelMetrics": "指标",
+    "labelTraces": "痕迹"
   },
   "function": {
     "header": "函数",
@@ -257,7 +277,29 @@
     "resetRUMTokenLabel": "重置 RUM 代币",
     "generateRUMTokenLabel": "生成 RUM 代币",
     "generateRUMTokenMessage": "生成 RUM 令牌以为您的组织启用 RUM。",
-    "npmStepTitle": "NPM 安装方法"
+    "npmStepTitle": "NPM 安装方法",
+    "recommendedLabel": "推荐",
+    "customLabel": "自定义",
+    "kubernetesLabel": "Kubernetes",
+    "windowsLabel": "Windows",
+    "linuxLabel": "Linux的",
+    "otelCollectorLabel": "OTEL 收藏家",
+    "tracesLabel": "痕迹",
+    "rumLabel": "前端监控",
+    "logsLabel": "日志",
+    "metricsLabel": "指标",
+    "curlLabel": "卷曲",
+    "filebeatLabel": "文件节拍",
+    "fluentBitLabel": "FluentBit（推荐）",
+    "fluentdLabel": "Fluentd",
+    "vectorLabel": "向量",
+    "kinesisFirehoseLabel": "Kinesis 消防水带",
+    "gcpPubSubLabel": "通过（发布/订阅）获取的 GCP 日志",
+    "syslogngLabel": "syslog-ng",
+    "syslogLabel": "Syslog",
+    "prometheusLabel": "普罗米修斯",
+    "telegrafLabel": "Telegraf",
+    "opentelemetryLabel": "打开遥测"
   },
   "syslog": {
     "stream": "直播",
@@ -315,7 +357,44 @@
     "DefaultValue": "默认值（可选）",
     "typeOfVariable": "变量的类型",
     "DefaultSize": "默认的最大记录大小（可选）",
-    "maxRecordSize": "默认的最大记录大小为 10。您可以根据需要更新此值"
+    "maxRecordSize": "默认的最大记录大小为 10。您可以根据需要更新此值",
+    "newFolderBtnLabel": "新建文件夹",
+    "folderLabel": "文件夹",
+    "areaLabel": "区域",
+    "areaStackedLabel": "堆叠区域",
+    "lineLabel": "Line",
+    "barLabel": "酒吧",
+    "horizontalLabel": "水平",
+    "stackedLabel": "堆叠",
+    "heatmapLabel": "热图",
+    "geomapLabel": "GeoMap",
+    "hstackedLabel": "H 型堆叠",
+    "pieLabel": "馅饼",
+    "donutLabel": "甜甜圈",
+    "scatterLabel": "分散",
+    "tableLabel": "桌子",
+    "metricTextLabel": "指标文本",
+    "oneFieldMessage": "在此处添加 1 个字段",
+    "maxtwofieldMessage": "此处最多添加 2 个字段",
+    "twoFieldsMessage": "在此处添加 2 个字段",
+    "oneOrMoreFieldsMessage": "在此处添加一个或多个字段",
+    "xaxisFieldNAMessage": "不允许 X 轴字段",
+    "oneLabelFieldMessage": "在此处添加 1 个标签字段",
+    "oneValueFieldMessage": "在此处添加 1 个值字段",
+    "oneFieldConfigMessage": "添加 1 个字段或从配置中对其进行配置",
+    "configLabel": "配置",
+    "showLegendsLabel": "显示传奇",
+    "legendsPositionLabel": "传奇位置",
+    "unitLabel": "单位",
+    "basemapLabel": "基地地图",
+    "customunitLabel": "自定义单位",
+    "lattitudeLabel": "纬度",
+    "longitudeLabel": "经度",
+    "zoomLabel": "缩放",
+    "legendLabel": "传奇",
+    "overrideMessage": "系列名称替代。例如，{endpoint} 替换为端点的标签值。",
+    "unsavedMessage": "您有未保存的更改。你确定要离开吗？",
+    "addFieldMessage": "请从列表中添加一个字段"
   },
   "panel": {
     "header": "小组",
@@ -422,7 +501,10 @@
     "messageDataNotFound": "未找到数据",
     "invoiceStartDate": "发票起始日期",
     "invoiceEndDate": "发票结束日期",
-    "downloadInvoice": "下载发票"
+    "downloadInvoice": "下载发票",
+    "usageLabel": "用法",
+    "plansLabel": "计划",
+    "invoiceHistoryLabel": "发票历史记录"
   },
   "message": {
     "ServerInternalError": "错误：出了点问题。内部服务器错误。",
@@ -481,7 +563,12 @@
     "searchMetric": "搜索指标",
     "searchLabel": "搜索指标标签",
     "add": "添加",
-    "cancel": "取消"
+    "cancel": "取消",
+    "promqlLabel": "PromQL",
+    "runQuery": "运行查询",
+    "holdMessage": "紧紧抓住，获取指标。",
+    "noStreamSelected": "未选择任何指标。",
+    "addToDashboard": "添加到控制面板"
   },
   "settings": {
     "header": "设置",
@@ -495,6 +582,10 @@
     "apiNamePlaceHolder": "密钥名称",
     "updateuserKey": "更新用户密钥",
     "id": "身份证",
-    "update": "更新"
+    "update": "更新",
+    "generalLabel": "普通的",
+    "apikeyLabel": "API 密钥",
+    "generalPageTitle": "常规设置",
+    "scrapintervalLabel": "抓取间隔（以秒为单位）*"
   }
 }

@@ -56,7 +56,7 @@
           :options="functionOptions"
           option-label="name"
           option-value="function"
-          placeholder="Select or create a function"
+          :placeholder="t('search.functionPlaceholder')"
           data-cy="index-dropdown"
           input-debounce="10"
           use-input
@@ -83,8 +83,7 @@
           <template #no-option>
             <q-item>
               <q-item-section class="text-xs"
-                >Press Tab/Enter button to apply new function
-                name.</q-item-section
+                >{{t('search.functionMessage')}}</q-item-section
               >
             </q-item>
           </template>
@@ -95,7 +94,7 @@
             !searchObj.data.tempFunctionContent ||
             functionModel.function == searchObj.data.tempFunctionContent
           "
-          title="Save Function"
+          :title="t('search.saveFunctionLabel')"
           icon="save"
           icon-right="functions"
           size="sm"
@@ -110,7 +109,7 @@
             !searchObj.data.queryResults.hits.length
           "
           icon="download"
-          title="Export logs"
+          :title="t('search.exportLogs')"
           @click="downloadLogs"
         ></q-btn>
         <div class="float-left">
@@ -141,13 +140,13 @@
               data-cy="search-bar-refresh-button"
               dense
               flat
-              title="Run query"
+              :title="t('search.runQuery')"
               class="q-pa-none search-button"
               @click="handleRunQuery"
               :disable="
                 searchObj.loading || searchObj.data.streamResults.length == 0
               "
-              >Run query</q-btn
+              >{{t('search.runQuery')}}</q-btn
             >
           </div>
         </div>
@@ -210,9 +209,9 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn label="Cancel" color="primary"
+          <q-btn :label="t('confirmDialog.cancel')" color="primary"
 @click="cancelConfirmDialog" />
-          <q-btn label="OK" color="positive"
+          <q-btn :label="t('confirmDialog.ok')" color="positive"
 @click="confirmDialogOK" />
         </q-card-actions>
       </q-card>

@@ -18,7 +18,7 @@
   <div>
     <div class="q-px-md q-py-md">
       <div class="text-body1 text-bold">
-        General Settings
+        {{t('settings.generalPageTitle')}}
       </div>
     </div>
     <q-separator />
@@ -28,7 +28,7 @@
           v-model.number="scrapeIntereval"
           type="number"
           min="0"
-          label="Scrape Interval (In Seconds) *"
+          :label="t('settings.scrapintervalLabel')"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -41,12 +41,12 @@
         />
         <span>&nbsp;</span>
 
-        <div class="flex justify-center q-mt-lg">
+        <div class="flex justify-start q-mt-lg">
           <q-btn
             data-test="dashboard-add-submit"
             :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
+            class="q-mb-md text-bold no-border"
             color="secondary"
             padding="sm xl"
             type="submit"

@@ -1044,4 +1044,10 @@ export default defineComponent({
 .dark-mode {
   background-color: $dark-page;
 }
+
+.languagelist {
+  .q-item{
+    padding: 4px 8px;
+  }
+}
 </style>

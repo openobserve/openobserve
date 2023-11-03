@@ -23,7 +23,13 @@
     "sqlModeLabel": "Mode SQL",
     "toggleFunctionLabel": "Fonction",
     "labelWrap": "Contenu de l'emballage",
-    "messageWrapContent": "Emballage du contenu de la table"
+    "messageWrapContent": "Emballage du contenu de la table",
+    "functionPlaceholder": "Sélectionnez ou créez une fonction",
+    "functionMessage": "Appuyez sur le bouton Tab/Enter pour appliquer le nouveau nom de fonction.",
+    "saveFunctionLabel": "Fonction de sauvegarde",
+    "exportLogs": "Exporter des journaux",
+    "runQuery": "Exécuter une requête",
+    "syntaxGuideLabel": "Guide de syntaxe"
   },
   "menu": {
     "home": "Accueil",
@@ -59,7 +65,17 @@
     "overview": "Vue d'ensemble",
     "webVitals": "Vitals Web",
     "errors": "Erreurs",
-    "api": "API"
+    "api": "API",
+    "aboutRUMTitle": "Découvrez la véritable surveillance des utilisateurs pour améliorer votre expérience utilisateur",
+    "aboutRUMMessage": "La surveillance des utilisateurs réels vous permet de suivre et d'analyser les performances de votre site Web ou de votre application du point de vue des utilisateurs réels. Cela implique de comprendre comment les utilisateurs perçoivent réellement votre site, où ils sont confrontés à des ralentissements, quelles pages ils utilisent fréquemment, etc.",
+    "getStartedTitle": "Commencez avec Real User Monitoring",
+    "getStartedLabel": "Commencez",
+    "performanceSummaryLabel": "Résumé des performances",
+    "webVitalsLabel": "Vitals Web",
+    "errorLabel": "Erreurs",
+    "sessionLabel": "Séances",
+    "learnWebVitalsLabel": "En savoir plus sur Web Vitals",
+    "clickHereLabel": "Cliquez ici"
   },
   "about": {
     "name": "Ouvrez Observe",
@@ -213,7 +229,11 @@
     "explore": "Explorez",
     "timezone": "Fuseau horaire",
     "deleteActionLabel": "Supprimer",
-    "deleteActionMessage": "Voulez-vous vraiment supprimer les champs sélectionnés ? Cette action ne peut pas être annulée."
+    "deleteActionMessage": "Voulez-vous vraiment supprimer les champs sélectionnés ? Cette action ne peut pas être annulée.",
+    "labelAll": "Tous",
+    "labelLogs": "Logs",
+    "labelMetrics": "Métriques",
+    "labelTraces": "Des traces"
   },
   "function": {
     "header": "Fonctions",
@@ -257,7 +277,29 @@
     "resetRUMTokenLabel": "Réinitialiser le jeton RUM",
     "generateRUMTokenLabel": "Générer un jeton RUM",
     "generateRUMTokenMessage": "Générez un jeton RUM pour activer RUM pour votre organisation.",
-    "npmStepTitle": "Méthode d'installation NPM"
+    "npmStepTitle": "Méthode d'installation NPM",
+    "recommendedLabel": "Recommandé",
+    "customLabel": "Personnalisé",
+    "kubernetesLabel": "Kubernetes",
+    "windowsLabel": "Fenêtres",
+    "linuxLabel": "Linux",
+    "otelCollectorLabel": "Collecteur OTEL",
+    "tracesLabel": "Des traces",
+    "rumLabel": "Surveillance du frontend",
+    "logsLabel": "Logs",
+    "metricsLabel": "Métriques",
+    "curlLabel": "Boucler",
+    "filebeatLabel": "Filebeat",
+    "fluentBitLabel": "FluentBit (recommandé)",
+    "fluentdLabel": "Courant",
+    "vectorLabel": "Vecteur",
+    "kinesisFirehoseLabel": "Kinesis Firehose",
+    "gcpPubSubLabel": "Journaux GCP via (Pub/Sub)",
+    "syslogngLabel": "Syslog-NG",
+    "syslogLabel": "Syslog",
+    "prometheusLabel": "Prométhée",
+    "telegrafLabel": "Télégraphe",
+    "opentelemetryLabel": "Télémétrie ouverte"
   },
   "syslog": {
     "stream": "Stream",
@@ -315,7 +357,44 @@
     "DefaultValue": "Valeur par défaut (facultatif)",
     "typeOfVariable": "Type de variable",
     "DefaultSize": "Taille maximale d'enregistrement par défaut (facultatif)",
-    "maxRecordSize": "La taille d'enregistrement maximale par défaut est de 10. Vous pouvez mettre à jour cette valeur si nécessaire"
+    "maxRecordSize": "La taille d'enregistrement maximale par défaut est de 10. Vous pouvez mettre à jour cette valeur si nécessaire",
+    "newFolderBtnLabel": "Nouveau dossier",
+    "folderLabel": "Dossiers",
+    "areaLabel": "Région",
+    "areaStackedLabel": "Zone empilée",
+    "lineLabel": "Ligne",
+    "barLabel": "Bar",
+    "horizontalLabel": "horizontale",
+    "stackedLabel": "Empilés",
+    "heatmapLabel": "Carte thermique",
+    "geomapLabel": "Carte géographique",
+    "hstackedLabel": "Empilé en H",
+    "pieLabel": "Tarte",
+    "donutLabel": "Donut",
+    "scatterLabel": "Dispersion",
+    "tableLabel": "Tableau",
+    "metricTextLabel": "Texte métrique",
+    "oneFieldMessage": "Ajoutez 1 champ ici",
+    "maxtwofieldMessage": "Ajoutez un maximum de 2 champs ici",
+    "twoFieldsMessage": "Ajoutez 2 champs ici",
+    "oneOrMoreFieldsMessage": "Ajoutez un ou plusieurs champs ici",
+    "xaxisFieldNAMessage": "Le champ de l'axe X n'est pas autorisé",
+    "oneLabelFieldMessage": "Ajoutez 1 champ d'étiquette ici",
+    "oneValueFieldMessage": "Ajoutez 1 champ de valeurs ici",
+    "oneFieldConfigMessage": "Ajoutez 1 champ ou configurez-le depuis la configuration",
+    "configLabel": "Configuration",
+    "showLegendsLabel": "Afficher les légendes",
+    "legendsPositionLabel": "Positions des légendes",
+    "unitLabel": "Unité",
+    "basemapLabel": "Carte de base",
+    "customunitLabel": "Unité personnalisée",
+    "lattitudeLabel": "Latitude",
+    "longitudeLabel": "Longitude",
+    "zoomLabel": "Zoom",
+    "legendLabel": "Légende",
+    "overrideMessage": "Le nom de la série prévaut. Par exemple, {endpoint} doit être remplacé par la valeur d'étiquette pour endpoint.",
+    "unsavedMessage": "Vous avez des modifications non enregistrées. Tu es sûre de vouloir partir ?",
+    "addFieldMessage": "Veuillez ajouter un champ dans la liste"
   },
   "panel": {
     "header": "Panneau",
@@ -422,7 +501,10 @@
     "messageDataNotFound": "Données non trouvées",
     "invoiceStartDate": "Date de début de la facture",
     "invoiceEndDate": "Date de fin de facture",
-    "downloadInvoice": "Télécharger la facture"
+    "downloadInvoice": "Télécharger la facture",
+    "usageLabel": "Utilisation",
+    "plansLabel": "Plans",
+    "invoiceHistoryLabel": "Historique des factures"
   },
   "message": {
     "ServerInternalError": "Erreur : une erreur s'est produite. Erreur interne au serveur.",
@@ -481,7 +563,12 @@
     "searchMetric": "Rechercher une métrique",
     "searchLabel": "Étiquette de mesure de recherche",
     "add": "Ajouter",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "promqlLabel": "ProMQL",
+    "runQuery": "Exécuter une requête",
+    "holdMessage": "Tenez-vous bien et récupérez des indicateurs.",
+    "noStreamSelected": "Aucune métrique n'a été sélectionnée.",
+    "addToDashboard": "Ajouter au tableau de bord"
   },
   "settings": {
     "header": "Réglages",
@@ -495,6 +582,10 @@
     "apiNamePlaceHolder": "Nom de la clé",
     "updateuserKey": "Mettre à jour la clé utilisateur",
     "id": "Id",
-    "update": "Mise à jour"
+    "update": "Mise à jour",
+    "generalLabel": "Général",
+    "apikeyLabel": "Clés API",
+    "generalPageTitle": "Réglages généraux",
+    "scrapintervalLabel": "Intervalle de grattage (en secondes) *"
   }
 }

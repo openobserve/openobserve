@@ -58,7 +58,7 @@
     >
       <template v-slot:before>
         <div class="text-bold q-px-md q-pt-sm">
-          Folders
+          {{t('dashboard.folderLabel')}}
         </div>
         <div class="dashboards-tabs">
           <q-tabs
@@ -100,7 +100,7 @@
               padding="sm lg"
               color="secondary"
               no-caps
-              label="New Folder"
+              :label="t('dashboard.newFolderBtnLabel')"
               @click.stop="addFolder"
               />
           </div>
