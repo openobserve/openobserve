@@ -24,6 +24,28 @@ export const convertPromQLTableData = (
   searchQueryData: any
 ) => {
   
+  // display name object for each column
+  const filedNameObj: any = {};
+  // in table, we will have single column for each query.
+  for(let i=0;i<panelSchema.queries.length;i++){
+    filedNameObj["query "+(i+1)] = "Query " + (i+1);
+  }  
+
+  // need to use display name override
+  panelSchema?.config?.overrides?.forEach((override: any) => {
+    // if matcher is byName
+    if (override.matcher.id === "byName") {
+      // iterate over each properties
+      override.properties.forEach((property: any) => {
+        // if property id is display name
+        if(property.id === "displayName"){
+          // set the display name
+          filedNameObj[override.matcher.options] = property.value;
+        }
+      })
+    }
+  });  
+  
   // for each columns/querys values, we will find average
   const data = searchQueryData.map((it: any) => {
     return it?.result?.map((res:any)=>{
@@ -45,9 +67,10 @@ export const convertPromQLTableData = (
             };
         }
         
-        tableObject[metric][`Column ${columnIndex + 1}`] = value;
+        tableObject[metric][`query ${columnIndex + 1}`] = value;
     });
 });
+
 const columns=[{
   name:"name",
   field:"name",
@@ -57,9 +80,9 @@ const columns=[{
 }];
 for(let i=1;i<=searchQueryData.length;i++){
     let obj: any = {};
-    obj["name"] = "Column " + i;
-    obj["field"] = "Column " + i;
-    obj["label"] = "Column " + i;
+    obj["name"] = filedNameObj["query " + i];
+    obj["field"] = filedNameObj["query " + i];
+    obj["label"] = filedNameObj["query " + i];
     obj["sortable"] = true;
     obj["align"] = "right";
     columns.push(obj);
