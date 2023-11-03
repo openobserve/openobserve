@@ -256,7 +256,13 @@ async fn upload_file(
         for batch in json {
             match batch {
                 Ok(batch) => batches.push(batch),
-                Err(err) => log::error!("[JOB] Failed to parse record: error: {}", err),
+                Err(err) => {
+                    return Err(anyhow::anyhow!(
+                        "file has corrupt data: {}, err: {}",
+                        path_str,
+                        err
+                    ));
+                }
             }
         }
     } else {
