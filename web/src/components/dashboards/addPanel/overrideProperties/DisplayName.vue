@@ -1,9 +1,8 @@
 <template>
   <div>
-    display name
     <q-input
       v-model="override.value"
-      label="Display Name *"
+      label="Display Name"
       color="input-border"
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"

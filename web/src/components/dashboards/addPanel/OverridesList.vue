@@ -1,7 +1,10 @@
 <template>
   <div>
     <div v-for="(override, index) in overridesArray" :key="index">
-      Override {{ index + 1 }}
+      <div class="flex justify-between">
+        <div style="font-weight: 700; align-self: center;">Override {{ index + 1 }}</div>
+        <q-btn @click="() => overridesArray.splice(index, 1)" icon="delete" style="padding: 1px;"/>
+      </div>
       <OverrideByFieldName v-if="override.matcher.id == 'byName'" :override="override"/>
     </div>
     <q-btn 
@@ -33,6 +36,7 @@
 <script lang="ts">
 import { defineComponent, ref, watch } from 'vue';
 import OverrideByFieldName from './OverrideByFieldName.vue';
+import useDashboardPanelData from '@/composables/useDashboardPanel';
 
 export default defineComponent({
   name: "OverridesList",
@@ -46,7 +50,8 @@ export default defineComponent({
       label: "By filed name",
       value: "byName"
     }]
-    const overridesArray: any = ref([])
+    const { dashboardPanelData } = useDashboardPanelData();
+    const overridesArray: any = ref(dashboardPanelData.data.overrides);
 
     const showDropdown = () => {
       selectedOption.value = null;

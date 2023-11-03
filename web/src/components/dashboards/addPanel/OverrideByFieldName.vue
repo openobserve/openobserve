@@ -1,17 +1,20 @@
 <template>
-  <div>
+  <div style="padding-left: 8px;">
     <q-select
-      v-model="override.matcher.value"
-      label="Field with name"
-      :options="overrideFieldOptions"
-      class="q-my-md"
-      behavior="menu"
-      filled
-      emit-value
+    v-model="override.matcher.value"
+    label="Field with name"
+    :options="overrideFieldOptions"
+    class="q-my-sm"
+    behavior="menu"
+    filled
+    emit-value
     />
-
-    <div v-for="properties in override.properties" :key="properties.id">
-      <DisplayName v-if="properties.id === 'displayName'" :override="properties"/>
+    
+    <div v-for="(properties, index) in override.properties" :key="index">
+      <div class="flex justify-between">
+        <DisplayName v-if="properties.id === 'displayName'" :override="properties"/>
+        <q-btn @click="() => override.properties.splice(index, 1)" icon="close" style="padding: 1px; align-self: center;"/>
+      </div>
     </div>
     
     <q-btn 

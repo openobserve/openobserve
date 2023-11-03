@@ -55,6 +55,8 @@ const getDefaultDashboardPanelData: any = () => ({
       // gauge min and max values
       min: 0,
       max: 100,
+      // overrides array
+      overrides:[]
     },
     queryType: "sql",
     queries: [
