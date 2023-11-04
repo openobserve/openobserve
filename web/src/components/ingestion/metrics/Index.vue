@@ -36,7 +36,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/prometheus.svg')"
-          :label="t('ingestion.prometheusLabel')"
+          label="Prometheus"
           content-class="tab_content"
         />
         <q-route-tab
@@ -48,7 +48,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          :label="t('ingestion.otelCollectorLabel')"
+          label="OTEL Collector"
           content-class="tab_content"
         />
         <q-route-tab
@@ -60,7 +60,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/telegraf.png')"
-          :label="t('ingestion.opentelemetryLabel')"
+          label="Telegraf"
           content-class="tab_content"
         />
       </q-tabs>
