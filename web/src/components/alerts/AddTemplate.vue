@@ -98,11 +98,11 @@
           </div>
           <q-separator style="width: 100%" />
           <div class="q-py-md q-px-xs">
-            <div>{{ t("alert_templates.stream_name_variable") }}</div>
-            <div>{{ t("alert_templates.org_name_variable") }}</div>
-            <div>{{ t("alert_templates.alert_name_variable") }}</div>
-            <div>{{ t("alert_templates.alert_type_variable") }}</div>
-            <div>{{ t("alert_templates.timestamp_variable") }}</div>
+            <div>stream_name</div>
+            <div>org_name</div>
+            <div>alert_name</div>
+            <div>alert_type</div>
+            <div>timestamp</div>
           </div>
           <div class="q-pb-md q-px-xs">
             <div class="text-bold text-body-1 q-pb-sm">
