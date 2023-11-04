@@ -52,13 +52,13 @@
             data-cy="search-bar-refresh-button"
             dense
             flat
-            title="Run query"
+            :title="t('search.runQuery')"
             class="q-pa-none search-button bg-secondary"
             @click="searchData"
             :disable="
               searchObj.loading || searchObj.data.streamResults.length == 0
             "
-            >Run query</q-btn
+            >{{t('search.runQuery')}}</q-btn
           >
         </div>
       </div>
@@ -67,6 +67,7 @@
       <div class="col">
         <query-editor
           ref="queryEditorRef"
+          editor-id="traces-query-editor"
           class="monaco-editor"
           v-model:query="searchObj.data.editorValue"
           :keywords="autoCompleteKeywords"

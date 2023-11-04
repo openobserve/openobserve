@@ -62,14 +62,10 @@
       <div class="q-pa-lg enable-rum">
         <div class="q-pb-lg">
           <div class="text-left text-h6 text-bold q-pb-md">
-            Discover Real User Monitoring to Enhance Your User Experience
+            {{t("rum.aboutRUMTitle")}}
           </div>
           <div class="text-subtitle1">
-            Real User Monitoring allows you to track and analyze the performance
-            of your website or application from the perspective of real users.
-            This means understanding how actual users experience your site,
-            where they face slowdowns, which pages they frequently use, and
-            more.
+            {{t("rum.aboutRUMMessage")}}
           </div>
           <div>
             <div></div>
@@ -78,12 +74,11 @@
         <q-btn
           class="bg-secondary rounded text-white"
           no-caps
-          title="Get started with Real User Monitoring"
+          :title="t('rum.getStartedTitle')"
           @click="getStarted"
         >
-          Get Started
-          <q-icon name="arrow_forward" size="20px"
-class="q-ml-xs" />
+          {{t("rum.getStartedLabel")}}
+          <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
         </q-btn>
       </div>
     </template>
@@ -164,6 +159,8 @@ onMounted(async () => {
 
   if (!isRumEnabled.value && !isSessionReplayEnabled.value) return;
 
+  await getSchema();
+
   const routeNameMapping: { [key: string]: string } = {
     SessionViewer: "sessions",
     ErrorTracking: "error_tracking",
@@ -184,7 +181,7 @@ onMounted(async () => {
 
   // This is temporary fix, as we have kept sessionViewer keep-alive as false.
   // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-  const ignoreRoutes = ["SessionViewer"];
+  const ignoreRoutes = ["SessionViewer", "ErrorViewer"];
 
   if (!ignoreRoutes.includes(routeName.value as string))
     changeTab(activeTab.value);
@@ -290,6 +287,65 @@ const getStarted = () => {
   router.push({
     name: "frontendMonitoring",
     query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
+};
+
+const getSchema = async () => {
+  return new Promise((resolve) => {
+    getSessionReplayFields().finally(() => {
+      getRumDataFields().finally(() => {
+        resolve(true);
+      });
+    });
+  });
+};
+
+const getSessionReplayFields = () => {
+  isLoading.value.push(true);
+  return new Promise((resolve) => {
+    streamService
+      .schema(
+        store.state.selectedOrganization.identifier,
+        "_sessionreplay",
+        "logs"
+      )
+      .then((res) => {
+        performanceState.data.streams["_sessionreplay"] = {
+          schema: {},
+          name: "_sessionreplay",
+        };
+        res.data.schema.forEach((field: any) => {
+          performanceState.data.streams["_sessionreplay"]["schema"][
+            field.name
+          ] = field;
+        });
+      })
+      .finally(() => {
+        resolve(true);
+        isLoading.value.pop();
+      });
+  });
+};
+
+const getRumDataFields = () => {
+  isLoading.value.push(true);
+  return new Promise((resolve) => {
+    streamService
+      .schema(store.state.selectedOrganization.identifier, "_rumdata", "logs")
+      .then((res) => {
+        performanceState.data.streams["_rumdata"] = {
+          schema: {},
+          name: "_rumdata",
+        };
+        res.data.schema.forEach((field: any) => {
+          performanceState.data.streams["_rumdata"]["schema"][field.name] =
+            field;
+        });
+      })
+      .finally(() => {
+        resolve(true);
+        isLoading.value.pop();
+      });
   });
 };
 </script>

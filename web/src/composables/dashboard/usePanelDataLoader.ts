@@ -188,6 +188,12 @@ export const usePanelDataLoader = (
 
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
 
+      // If we can not run the query, remove the data so that, if the query doesn't run, then the previous data is removed
+      // and charts are updated to show no data
+      // TODO: need to improve this as it will cause some flickering when you change the date
+      if(!canRunQueryBasedOnVariables()) {
+        state.data = [];
+      }
       return;
     }
 

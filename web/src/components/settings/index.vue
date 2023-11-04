@@ -38,7 +38,7 @@
             name="general"
             :to="'/settings/general'"
             :icon="outlinedSettings"
-            label="general"
+            :label="t('settings.generalLabel')"
             content-class="tab_content"
           />
           <q-route-tab
@@ -48,7 +48,7 @@
             name="api_keys"
             :to="'/settings/apikeys'"
             icon="key"
-            label="API Keys"
+            :label="t('settings.apikeyLabel')"
             content-class="tab_content"
           />
         </q-tabs>

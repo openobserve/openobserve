@@ -25,7 +25,7 @@
             !queryData.queryResults.hits.length
           "
           icon="download"
-          title="Export logs"
+          :title="t('search.exportLogs')"
           @click="downloadLogs"
         ></q-btn>
         <div
@@ -50,10 +50,10 @@
             data-cy="search-bar-refresh-button"
             dense
             flat
-            title="Run query"
+            :title="t('search.runQuery')"
             class="q-pa-none search-button"
             @click="searchData"
-            >Run query</q-btn
+            >{{t('search.runQuery')}}</q-btn
           >
         </div>
       </div>
@@ -62,7 +62,7 @@
       <div class="col" style="border-top: 1px solid #dbdbdb; height: 100px">
         <b>Query Editor:</b>
         <query-editor
-          editorId="logsQueryEditor"
+          editor-id="logsStreamQueryEditor"
           ref="queryEditorRef"
           class="monaco-editor"
           v-model:query="query"
@@ -218,7 +218,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-#logsQueryEditor,
+#logsStreamQueryEditor,
 #fnEditor {
   height: calc(100% - 20px) !important;
 }

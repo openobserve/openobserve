@@ -37,7 +37,7 @@
                 org_identifier: store.state.selectedOrganization.identifier,
               },
             }"
-            label="Logs"
+            :label="t('ingestion.logsLabel')"
             content-class="tab_content"
           />
           <q-route-tab
@@ -48,6 +48,7 @@
                 org_identifier: store.state.selectedOrganization.identifier,
               },
             }"
+            :label="t('ingestion.metricsLabel')"
             label="Metrics"
             content-class="tab_content"
           />
@@ -59,6 +60,7 @@
                 org_identifier: store.state.selectedOrganization.identifier,
               },
             }"
+            :label="t('ingestion.tracesLabel')"
             label="Traces"
             content-class="tab_content"
           />

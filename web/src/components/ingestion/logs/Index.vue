@@ -61,7 +61,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
-          label="FluentBit (Recommended)"
+          label="FluentBit"
           content-class="tab_content"
         />
         <q-route-tab
@@ -85,7 +85,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/vector.png')"
-          label="Vector"
+          label="Vector (Recommended)"
           content-class="tab_content"
         />
         <q-route-tab
@@ -124,7 +124,7 @@
             },
           }"
           icon="plagiarism"
-          label="syslog-ng"
+          label="Syslog-ng"
           content-class="tab_content"
         />
         <q-route-tab

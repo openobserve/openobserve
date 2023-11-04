@@ -21,13 +21,13 @@
     flat
     class="q-ml-sm q-pa-xs syntax-guide-button"
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-    label="Syntax Guide"
+    :label="t('search.syntaxGuideLabel')"
     icon="help"
   >
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <q-card flat v-if="!sqlmode">
         <q-card-section class="syntax-guide-title">
-          <div class="label">Syntax Guide</div>
+          <div class="label">{{t('search.syntaxGuideLabel')}}</div>
         </q-card-section>
         <q-separator />
         <q-card-section class="q-pt-none answers">

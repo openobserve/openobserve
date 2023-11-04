@@ -46,7 +46,7 @@
       </div>
     </div>
     <query-editor
-      editorId="session-replay-query-editor"
+      editor-id="rum-errors-query-editor"
       class="monaco-editor"
       v-model:query="errorTrackingState.data.editorValue"
       :debounce-time="300"

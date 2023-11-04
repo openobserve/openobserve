@@ -68,14 +68,14 @@
               data-cy="metrics-explorer-run-query-button"
               dense
               flat
-              title="Run query"
+              :title="t('metrics.runQuery')"
               class="q-pa-none bg-secondary search-button"
               @click="searchData"
               :disable="
                 searchObj.loading || searchObj.data.streamResults.length == 0
               "
             >
-              Run query
+            {{t('metrics.runQuery')}}
             </q-btn>
           </div>
           <div>
@@ -84,7 +84,7 @@
                 class="col q-pa-sm"
                 style="border-top: 1px solid #dbdbdb; height: 100%"
               >
-                <div class="q-pb-xs text-bold">PromQL:</div>
+                <div class="q-pb-xs text-bold">{{t('metrics.promqlLabel')}}:</div>
                 <div
                   v-if="searchObj.data.metrics.selectedMetric?.help?.length"
                   class="q-pb-sm"
@@ -144,7 +144,7 @@
                 style="margin: 0 auto; display: block"
               />
               <span class="text-center">
-                Hold on tight, fetching metrics.
+                {{t('metrics.holdMessage')}}
               </span>
             </div>
           </div>
@@ -169,7 +169,7 @@
               data-test="logs-search-no-stream-selected-text"
               class="text-center"
             >
-              No metrics selected.
+              {{t('metrics.noStreamSelected')}}
             </h5>
           </div>
           <div
@@ -190,7 +190,8 @@
                 dense
                 color="primary"
                 @click="addToDashboard"
-                >Add to dashboard</q-btn
+                :title="t('metrics.addToDashboard')"
+                >{{t('metrics.addToDashboard')}}</q-btn
               >
             </div>
             <div style="height: 500px">
@@ -826,6 +827,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       router,
       parser,

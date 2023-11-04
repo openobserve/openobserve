@@ -14,7 +14,6 @@ categories:
     labels:
       - '📒 Documentation'
   - title: '🧹 Updates:'
-    collapse-after: 25
     labels:
       - '🧹 Updates'
       - '🤖 Dependencies'
@@ -41,16 +40,23 @@ template: |
     $CHANGES
 
     ## 🐳 Docker Images
-    - `public.ecr.aws/zinclabs/$REPOSITORY:latest`
-    - `public.ecr.aws/zinclabs/$REPOSITORY:latest-simd`
-    - `public.ecr.aws/zinclabs/$REPOSITORY:$RESOLVED_VERSION`
-    - `public.ecr.aws/zinclabs/$REPOSITORY:$RESOLVED_VERSION-simd`
+
+    Available at:
+    - https://gallery.ecr.aws/zinclabs/openobserve
+    - https://hub.docker.com/r/openobserve/openobserve/tags
+
+    Version tags:
+    - `public.ecr.aws/zinclabs/$REPOSITORY:v$RESOLVED_VERSION`
+    - `public.ecr.aws/zinclabs/$REPOSITORY:v$RESOLVED_VERSION-simd`
+    - `openobserve/$REPOSITORY:v$RESOLVED_VERSION`
+    - `openobserve/$REPOSITORY:v$RESOLVED_VERSION-simd`
 
     **📒 Documentation**: https://openobserve.ai/docs/
 
-    **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$RESOLVED_VERSION
+    **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
 
     Thanks to $CONTRIBUTORS for making this release possible.
+
 autolabeler:
 - label: '📒 Documentation'
   files:

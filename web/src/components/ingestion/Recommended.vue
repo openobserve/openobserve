@@ -36,6 +36,7 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
+          :icon="'img:' + getImageURL('images/common/kubernetes.svg')"
           label="Kubernetes"
           content-class="tab_content"
         />
@@ -48,6 +49,7 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
+          :icon="'img:' + getImageURL('images/common/windows.svg')"
           label="Windows"
           content-class="tab_content"
         />
@@ -59,6 +61,7 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
+          :icon="'img:' + getImageURL('images/common/linux.svg')"
           label="Linux"
           content-class="tab_content"
         />
@@ -70,6 +73,7 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
+          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
           label="OTEL Collector"
           content-class="tab_content"
         />
@@ -81,6 +85,7 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
+          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
           label="Traces (OpenTelelmetry)"
           content-class="tab_content"
         />
@@ -92,6 +97,7 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
+          :icon="'img:' + getImageURL('images/common/monitoring.svg')"
           label="Frontend Monitoring"
           content-class="tab_content"
         />

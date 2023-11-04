@@ -429,7 +429,7 @@
           class="text-caption text-weight-bold text-center q-mt-xs"
           v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter < 1"
         >
-          Please add a field from the list
+          {{t("dashboard.addFieldMessage")}}
         </div>
       </div>
       <div></div>
@@ -547,19 +547,19 @@ export default defineComponent({
       switch (dashboardPanelData.data.type) {
         case 'pie':
         case 'donut':
-          return "Add 1 label field here"
+          return t("dashboard.oneLabelFieldMessage");
         case 'metric':
-          return "X-Axis field is not allowed"
+          return t("dashboard.xaxisFieldNAMessage");
         case 'table':
-          return "Add one or more fields here"
+          return t("dashboard.oneOrMoreFieldsMessage");
         case 'area-stacked':
         case 'stacked':
         case 'h-stacked':
-          return "Add 2 fields here"
+          return t("dashboard.twoFieldsMessage");
         case 'heatmap':
-          return "Add 1 field here"
+          return t("dashboard.oneFieldMessage");
         default:
-          return "Add maximum 2 fields here";
+          return t("dashboard.maxtwofieldMessage");
       }
     })
 
@@ -568,15 +568,15 @@ export default defineComponent({
 
         case 'pie':
         case 'donut':
-          return "Add 1 values field here"
+          return t("dashboard.oneValueFieldMessage");
         case 'metric':
-          return "Add 1 values field here"
+          return t("dashboard.oneValueFieldMessage");
         case 'stacked':
         case 'heatmap':
         case 'h-stacked':
-          return "Add 1 field here"
+          return t("dashboard.oneFieldMessage");
         default:
-          return "Add one or more fields here";
+          return t("dashboard.oneOrMoreFieldsMessage");
       }
     })
 
