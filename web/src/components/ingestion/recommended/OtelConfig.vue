@@ -67,7 +67,7 @@ const getOtelGrpcConfig = computed(() => {
       headers:
         Authorization: "Basic ${accessKey.value}"
         organization: ${props.currOrgIdentifier}
-        stream-name: default
+        stream-name: k8s_events
       tls:
         insecure: true`;
 });
