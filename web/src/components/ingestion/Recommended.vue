@@ -37,7 +37,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/common/kubernetes.svg')"
-          :label="t('ingestion.kubernetesLabel')"
+          label="Kubernetes"
           content-class="tab_content"
         />
         <q-route-tab
@@ -50,7 +50,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/common/windows.svg')"
-          :label="t('ingestion.windowsLabel')"
+          label="Windows"
           content-class="tab_content"
         />
         <q-route-tab
@@ -62,7 +62,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/common/linux.svg')"
-          :label="t('ingestion.linuxLabel')"
+          label="Linux"
           content-class="tab_content"
         />
         <q-route-tab
@@ -74,7 +74,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          :label="t('ingestion.otelCollectorLabel')"
+          label="OTEL Collector"
           content-class="tab_content"
         />
         <q-route-tab
@@ -86,7 +86,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          :label="t('ingestion.tracesLabel')"
+          label="Traces (OpenTelelmetry)"
           content-class="tab_content"
         />
         <q-route-tab
@@ -98,7 +98,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/common/monitoring.svg')"
-          :label="t('ingestion.rumLabel')"
+          label="Frontend Monitoring"
           content-class="tab_content"
         />
       </q-tabs>
