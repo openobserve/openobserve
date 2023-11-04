@@ -46,14 +46,14 @@ template: |
     - https://hub.docker.com/r/openobserve/openobserve/tags
 
     Version tags:
-    - `public.ecr.aws/zinclabs/$REPOSITORY:$RESOLVED_VERSION`
-    - `public.ecr.aws/zinclabs/$REPOSITORY:$RESOLVED_VERSION-simd`
-    - `openobserve/$REPOSITORY:$RESOLVED_VERSION`
-    - `openobserve/$REPOSITORY:$RESOLVED_VERSION-simd`
+    - `public.ecr.aws/zinclabs/$REPOSITORY:v$RESOLVED_VERSION`
+    - `public.ecr.aws/zinclabs/$REPOSITORY:v$RESOLVED_VERSION-simd`
+    - `openobserve/$REPOSITORY:v$RESOLVED_VERSION`
+    - `openobserve/$REPOSITORY:v$RESOLVED_VERSION-simd`
 
     **📒 Documentation**: https://openobserve.ai/docs/
 
-    **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$RESOLVED_VERSION
+    **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
 
     Thanks to $CONTRIBUTORS for making this release possible.
 
