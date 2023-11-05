@@ -15,68 +15,65 @@
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      style="min-height: calc(100vh - 130px)"
-    >
-      <template v-slot:before>
-        <q-tabs
-          v-model="tabs"
-          indicator-color="transparent"
+  <q-splitter
+    v-model="splitterModel"
+    unit="px"
+    style="min-height: calc(100vh - 130px)"
+  >
+    <template v-slot:before>
+      <q-tabs
+        v-model="tabs"
+        indicator-color="transparent"
         inline-label
         vertical
-        >
-          <q-route-tab
-            default
-            name="ingestLogs"
-            :to="{
-              name: 'ingestLogs',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.logsLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="ingestMetrics"
-            :to="{
-              name: 'ingestMetrics',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.metricsLabel')"
-            label="Metrics"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="ingestTraces"
-            :to="{
-              name: 'ingestTraces',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.tracesLabel')"
-            label="Traces"
-            content-class="tab_content"
-          />
-        </q-tabs>
-      </template>
+      >
+        <q-route-tab
+          default
+          name="ingestLogs"
+          :to="{
+            name: 'ingestLogs',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :label="t('ingestion.logsLabel')"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="ingestMetrics"
+          :to="{
+            name: 'ingestMetrics',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :label="t('ingestion.metricsLabel')"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="ingestTraces"
+          :to="{
+            name: 'ingestTraces',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :label="t('ingestion.tracesLabel')"
+          content-class="tab_content"
+        />
+      </q-tabs>
+    </template>
 
-      <template v-slot:after>
-        <router-view
-          :title="tabs"
-          :currOrgIdentifier="currOrgIdentifier"
-          :currUserEmail="currentUserEmail"
-          @copy-to-clipboard-fn="copyToClipboardFn"
-        >
-        </router-view>
-      </template>
-    </q-splitter>
+    <template v-slot:after>
+      <router-view
+        :title="tabs"
+        :currOrgIdentifier="currOrgIdentifier"
+        :currUserEmail="currentUserEmail"
+        @copy-to-clipboard-fn="copyToClipboardFn"
+      >
+      </router-view>
+    </template>
+  </q-splitter>
 </template>
 
 <script lang="ts">
