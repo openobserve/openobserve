@@ -15,7 +15,10 @@
       content="kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml"
     />
 
-    <div class="text-subtitle1 q-pl-xs q-mt-md">Wait for 2 minutes</div>
+    <div class="text-subtitle1 q-pl-xs q-mt-md">
+      Wait for 2 minutes after installing cert-manger for the webhook to be
+      ready before installing OpenTelemetry operator.
+    </div>
     <div class="text-subtitle1 q-pl-xs q-mt-md">Update helm repo</div>
     <ContentCopy
       class="q-mt-sm"
