@@ -14,39 +14,42 @@
 -->
 
 <template>
-  <div class="tabContent q-ma-md">
-    <div class="tabContent__head">
-      <div class="copy_action">
-        <q-btn
-          data-test="traces-copy-btn"
-          flat
-          round
-          size="0.5rem"
-          padding="0.6rem"
-          color="grey"
-          icon="content_copy"
-          @click="$emit('copy-to-clipboard-fn', copyTracesContent)"
-        />
+  <div>
+    <div class="tabContent q-ma-md">
+      <div class="tabContent__head">
+        <div class="copy_action">
+          <q-btn
+            data-test="traces-copy-btn"
+            flat
+            round
+            size="0.5rem"
+            padding="0.6rem"
+            color="grey"
+            icon="content_copy"
+            @click="$emit('copy-to-clipboard-fn', copyTracesContent)"
+          />
+        </div>
       </div>
-    </div>
-    <pre ref="copyTracesContent" data-test="traces-content-text">
+      <pre ref="copyTracesContent" data-test="traces-content-text">
 remote_write:
   - url: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/api/v1/write
     basic_auth:
       username: {{ currUserEmail }}
-      password: {{ store.state.organizationData.organizationPasscode }}</pre>
-  </div>
-  <div>
-    <a
-      href="https://openobserve.ai/blog/send-metrics-using-kube-prometheus-stack-to-openobserve"
-      class="q-ml-lg text-bold"
-      style="padding-right: 2px"
-      target="_blank"
-      title="Send Kubernetes Metrics Using Prometheus to OpenObserve"
-    >
-      Click here</a
-    >
-    to learn how to ingest metrics using Prometheus
+      password: {{ store.state.organizationData.organizationPasscode }}</pre
+      >
+    </div>
+    <div>
+      <a
+        href="https://openobserve.ai/blog/send-metrics-using-kube-prometheus-stack-to-openobserve"
+        class="q-ml-lg text-bold"
+        style="padding-right: 2px"
+        target="_blank"
+        title="Send Kubernetes Metrics Using Prometheus to OpenObserve"
+      >
+        Click here</a
+      >
+      to learn how to ingest metrics using Prometheus
+    </div>
   </div>
 </template>
 
