@@ -14,47 +14,56 @@
 -->
 
 <template>
-  <div class="title q-pl-md q-pt-md" data-test="vector-title-text"><b>OTLP HTTP</b></div>
-  <div class="tabContent q-ma-md">
-    <div class="tabContent__head">
-      <div class="copy_action">
-        <q-btn
-          data-test="traces-copy-btn"
-          flat
-          round
-          color="grey"
-          icon="content_copy"
-          @click="$emit('copy-to-clipboard-fn', copyHTTPTracesContent)"
-        />
-      </div>
+  <div>
+    <div class="title q-pl-md q-pt-md" data-test="vector-title-text">
+      <b>OTLP HTTP</b>
     </div>
-    <pre ref="copyHTTPTracesContent" data-test="traces-http-content-text">
+    <div class="tabContent q-ma-md">
+      <div class="tabContent__head">
+        <div class="copy_action">
+          <q-btn
+            data-test="traces-copy-btn"
+            flat
+            round
+            color="grey"
+            icon="content_copy"
+            @click="$emit('copy-to-clipboard-fn', copyHTTPTracesContent)"
+          />
+        </div>
+      </div>
+      <pre ref="copyHTTPTracesContent" data-test="traces-http-content-text">
 HTTP Endpoint: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/traces
-Authorization: Basic {{ accessKey }}</pre>
-  </div>
-
-  <div class="title q-pl-md q-pt-md" data-test="vector-title-text"><b>OTLP gRPC</b> <br />(<b>Note:</b> Only available for single node. Not supported in distributed mode.)</div>
-  <div class="tabContent q-ma-md">
-    <div class="tabContent__head">
-      <div class="copy_action">
-        <q-btn
-          data-test="traces-copy-btn"
-          flat
-          round
-          color="grey"
-          icon="content_copy"
-          @click="$emit('copy-to-clipboard-fn', copyGRPCTracesContent)"
-        />
-      </div>
+Authorization: Basic {{ accessKey }}</pre
+      >
     </div>
-    <pre ref="copyGRPCTracesContent" data-test="traces-grpc-content-text">
+
+    <div class="title q-pl-md q-pt-md" data-test="vector-title-text">
+      <b>OTLP gRPC</b> <br /><b>Note:</b> Not supported in clustered
+      installation of OpenObserve yet.
+    </div>
+    <div class="tabContent q-ma-md">
+      <div class="tabContent__head">
+        <div class="copy_action">
+          <q-btn
+            data-test="traces-copy-btn"
+            flat
+            round
+            color="grey"
+            icon="content_copy"
+            @click="$emit('copy-to-clipboard-fn', copyGRPCTracesContent)"
+          />
+        </div>
+      </div>
+      <pre ref="copyGRPCTracesContent" data-test="traces-grpc-content-text">
 endpoint: {{ endpoint.host }}
 headers: 
   Authorization: "Basic {{ accessKey }}"
   organization: {{ currOrgIdentifier }}
   stream-name: default
 tls:
-  insecure: {{endpoint.protocol == "https" ? false : true}}</pre>
+  insecure: {{ endpoint.protocol == "https" ? false : true }}</pre
+      >
+    </div>
   </div>
 </template>
 
