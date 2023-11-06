@@ -182,7 +182,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         _ = clean_empty_dirs(&CONFIG.common.data_wal_dir);
     }
 
-    //tokio::task::spawn(async move { files::run().await });
+    tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { file_list::run().await });
     tokio::task::spawn(async move { stats::run().await });
     tokio::task::spawn(async move { compact::run().await });
