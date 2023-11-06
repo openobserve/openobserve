@@ -85,7 +85,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/vector.png')"
-          label="Vector (Recommended)"
+          label="Vector"
           content-class="tab_content"
         />
         <q-route-tab
