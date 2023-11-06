@@ -181,6 +181,11 @@ async fn main() -> Result<(), anyhow::Error> {
         .expect("EnrichmentTables cache failed");
 
     tokio::task::spawn(async move { zo_logger::send_logs().await });
+    tokio::task::spawn(async move {
+        meta::telemetry::Telemetry::new()
+            .event("OpenObserve - Starting server", None, false)
+            .await;
+    });
 
     // init http server
     init_http_server().await?;
@@ -272,21 +277,20 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     // metrics
     let prometheus = infra::metrics::create_prometheus_handler();
 
+    // ua parser
+    let ua_parser = web::Data::new(
+        UserAgentParser::builder()
+            .build_from_bytes(USER_AGENT_REGEX_FILE)
+            .expect("User Agent Parser creation failed"),
+    );
+
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
         format!("[::]:{}", CONFIG.http.port).parse()?
     } else {
         format!("0.0.0.0:{}", CONFIG.http.port).parse()?
     };
-    meta::telemetry::Telemetry::new()
-        .event("OpenObserve - Starting server", None, false)
-        .await;
 
-    let ua_parser = web::Data::new(
-        UserAgentParser::builder()
-            .build_from_bytes(USER_AGENT_REGEX_FILE)
-            .expect("User Agent Parser creation failed"),
-    );
     let server = HttpServer::new(move || {
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
         if CONFIG.common.feature_per_thread_lock {
