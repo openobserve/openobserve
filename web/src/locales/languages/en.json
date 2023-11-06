@@ -1,4 +1,22 @@
 {
+  "common": {
+    "close":"Close",
+    "startTime": "Start time",
+    "endTime": "End time",
+    "datetimeMessage": "* You can choose multiple date",
+    "datetimeRelative": "RELATIVE",
+    "datetimeAbsolute": "ABSOLUTE",
+    "move": "Move",
+    "legend": "Legend",
+    "weight": "Weight",
+    "label": "Label",
+    "aggregation": "Aggregation",
+    "list": "List",
+    "condition": "Condition",
+    "operator": "Operator",
+    "value": "Value",
+    "selectFilter": "Select Filter"
+  },
   "search": {
     "selectIndex": "Select Stream First",
     "typeSearch": "Type your search query here",
@@ -264,7 +282,9 @@
     "enrichmentTables": "Enrichment Tables",
     "addEnrichmentTable": "Add Enrichment Table",
     "updateEnrichmentTable": "Update Enrichment Table",
-    "searchEnrichmentTable": "Search Enrichment Table"
+    "searchEnrichmentTable": "Search Enrichment Table",
+    "uploadCSVFile": "Upload CSV File",
+    "selectFunction": "Select Function"
   },
   "confirmDialog": {
     "cancel": "Cancel",
@@ -282,7 +302,13 @@
     "customLabel": "Custom",
     "logsLabel": "Logs",
     "metricsLabel": "Metrics",
-    "tracesLabel": "Traces"
+    "tracesLabel": "Traces",
+    "kubernetes": "kubernetes",
+    "windows": "Windows",
+    "linux": "Linux",
+    "otelCollector": "OTEL Collector",
+    "traces": "Traces (OpenTelelmetry)",
+    "frontend": "Frontend Monitoring"
   },
   "syslog": {
     "stream": "Stream",
@@ -377,7 +403,10 @@
     "legendLabel": "Legend",
     "overrideMessage": "Series name overrides. For example, {endpoint} with be replaced with the label value for endpoint.",
     "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
-    "addFieldMessage": "Please add a field from the list"
+    "addFieldMessage": "Please add a field from the list",
+    "currentFolderLabel": "Current Folder",
+    "selectFolderLabel": "Select Folder",
+    "layerType": "Layer Type"
   },
   "panel": {
     "header": "Panel",

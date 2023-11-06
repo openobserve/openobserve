@@ -130,7 +130,7 @@
                         v-model="selectedFunction"
                         option-value="name"
                         option-label="name"
-                        label="Select function..."
+                        :label="t('function.selectFunction')"
                         :options="filterFunctions"
                         :loading="addFunctionInProgressLoading"
                         :disable="addFunctionInProgressLoading"

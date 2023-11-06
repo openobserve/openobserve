@@ -35,7 +35,7 @@
             class="q-pl-sm" :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column}`">
             <q-menu class="q-pa-md" :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column}-menu`">
               <div>
-                <q-input dense filled data-test="dashboard-x-item-input" label="Label" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.label"
+                <q-input dense filled data-test="dashboard-x-item-input" :label="t('common.label')" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.label"
                    :rules="[val => val > 0 || 'Required']" />
               </div>
             </q-menu>
@@ -113,7 +113,7 @@
                         .aggregationFunction
                         "
                         :options="triggerOperators"
-                        dense filled emit-value map-options label="Aggregation" data-test="dashboard-y-item-dropdown">
+                        dense filled emit-value map-options :label="t('common.aggregation')" data-test="dashboard-y-item-dropdown">
                         <template v-slot:append>
                             <q-icon name="close" size="small"
                               @click.stop.prevent="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.aggregationFunction = null"
@@ -122,7 +122,7 @@
                       </q-select>
                     </div>
                   </div>
-                  <q-input dense filled label="Label" data-test="dashboard-y-item-input" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.label" 
+                  <q-input dense filled :label="t('common.label')" data-test="dashboard-y-item-input" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.label" 
                       :rules="[val => val > 0 || 'Required']" />
                 </div>
               </q-menu>
