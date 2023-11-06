@@ -81,7 +81,7 @@
             org_identifier: store.state.selectedOrganization.identifier,
           },
         }"
-        label="Recommended"
+        :label="t('ingestion.recommendedLabel')"
         content-class="tab_content"
       />
       <q-route-tab
@@ -92,7 +92,7 @@
             org_identifier: store.state.selectedOrganization.identifier,
           },
         }"
-        label="Custom"
+        :label="t('ingestion.customLabel')"
         content-class="tab_content"
       />
     </q-tabs>
