@@ -23,15 +23,6 @@
         ></syntax-guide>
       </div>
       <div class="float-right col-auto">
-        <q-btn
-          v-if="searchObj.data.queryResults.hits"
-          class="q-mr-sm float-left download-logs-btn"
-          size="sm"
-          :disable="!searchObj.data.queryResults.hits.length"
-          icon="download"
-          title="Export logs"
-          @click="downloadLogs"
-        ></q-btn>
         <div class="float-left">
           <date-time
             auto-apply
@@ -58,12 +49,25 @@
             :disable="
               searchObj.loading || searchObj.data.streamResults.length == 0
             "
-            >{{t('search.runQuery')}}</q-btn
+            >{{ t("search.runQuery") }}</q-btn
           >
         </div>
+        <q-btn
+          v-if="searchObj.data.queryResults.hits"
+          class="q-mr-sm float-left download-logs-btn q-pa-sm"
+          size="sm"
+          :disable="!searchObj.data.queryResults.hits.length"
+          icon="download"
+          title="Export logs"
+          @click="downloadLogs"
+        ></q-btn>
       </div>
     </div>
-    <div class="row" v-if="searchObj.meta.showQuery">
+    <div
+      class="row"
+      v-if="searchObj.meta.showQuery"
+      style="border-top: 1px solid #dbdbdb"
+    >
       <div class="col">
         <query-editor
           ref="queryEditorRef"

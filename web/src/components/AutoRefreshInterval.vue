@@ -15,9 +15,14 @@
 
 <template>
   <div class="q-pl-sm float-left">
-    <q-btn-dropdown v-model="btnRefreshInterval" border no-caps class="q-pa-xs">
+    <q-btn-dropdown
+      v-model="btnRefreshInterval"
+      border
+      no-caps
+      class="q-pa-xs refresh-interval-dropdown"
+    >
       <template v-slot:label>
-        <div class="row items-center no-wrap" style="min-width: 36px">
+        <div class="row items-center no-wrap">
           <q-icon left name="update" />
           <div class="text-center">{{ selectedLabel }}</div>
         </div>
@@ -41,7 +46,8 @@
         </div>
       </div>
       <q-separator />
-      <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+      <div v-for="(items, i) in refreshTimes"
+:key="'row_' + i" class="row">
         <div
           v-for="(item, j) in items"
           :key="'col_' + i + '_' + j"
@@ -189,4 +195,12 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.refresh-interval-dropdown {
+  min-width: 36px;
+  height: 30px;
+  min-height: 30px;
+  line-height: 30px;
+  padding: 0px 5px;
+}
+</style>

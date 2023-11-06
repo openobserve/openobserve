@@ -41,10 +41,15 @@
           />
         </template>
         <template #after>
+          <div class="row">
           <div
-            class="text-right q-px-lg q-py-sm flex align-center justify-end metrics-date-time"
+            class="text-left col auto q-px-sm q-py-sm flex justify-start metrics-date-time"
           >
             <syntax-guide-metrics class="q-mr-sm" />
+          </div>
+          <div
+            class="text-right col q-px-sm q-py-sm flex justify-end metrics-date-time"
+          >
             <date-time
               auto-apply
               :default-type="searchObj.data.datetime.type"
@@ -71,12 +76,14 @@
               :title="t('metrics.runQuery')"
               class="q-pa-none bg-secondary search-button"
               @click="searchData"
+              size="sm"
               :disable="
                 searchObj.loading || searchObj.data.streamResults.length == 0
               "
             >
             {{t('metrics.runQuery')}}
             </q-btn>
+          </div>
           </div>
           <div>
             <div class="row metrics-query-editor-container">
@@ -938,6 +945,8 @@ export default defineComponent({
   }
 
   .refresh-button {
+    height: 30px;
+    line-height: 29px;
     .q-icon {
       font-size: 18px;
       padding-right: 2px;
@@ -945,14 +954,16 @@ export default defineComponent({
   }
 
   .metrics-date-time {
+    height: 45px;
     .date-time-button {
-      height: 100%;
+      height: 30px;
       padding: 0 8px;
     }
   }
 
   .search-button {
     width: 96px;
+    height: 30px;
     line-height: 29px;
     font-weight: bold;
     text-transform: initial;
