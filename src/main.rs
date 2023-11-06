@@ -35,6 +35,7 @@ use std::{
     },
     time::Duration,
 };
+use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
 use uaparser::UserAgentParser;
@@ -165,8 +166,10 @@ async fn main() -> Result<(), anyhow::Error> {
     job::init().await.expect("job init failed");
 
     // gRPC server
+    let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
+    let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
     if !cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
-        init_grpc_server()?;
+        init_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     }
 
     // let node online
@@ -177,10 +180,98 @@ async fn main() -> Result<(), anyhow::Error> {
         .await
         .expect("EnrichmentTables cache failed");
 
+    tokio::task::spawn(async move { zo_logger::send_logs().await });
+
+    // init http server
+    init_http_server().await?;
+    log::info!("HTTP server stopped");
+    grpc_shutudown_tx.send(()).ok();
+    grpc_stopped_rx.await.ok();
+    log::info!("gRPC server stopped");
+
+    // stop telemetry
+    meta::telemetry::Telemetry::new()
+        .event("OpenObserve - Server stopped", None, false)
+        .await;
+    // leave the cluster
+    _ = cluster::leave().await;
+    // flush WAL cache to disk
+    infra::wal::flush_all_to_disk().await;
+    // flush compact offset cache to disk disk
+    _ = db::compact::files::sync_cache_to_db().await;
+    // flush db
+    _ = infra::db::DEFAULT.close().await;
+    // flush distinct values
+    _ = distinct_values::close().await;
+
+    log::info!("server stopped");
+
+    #[cfg(feature = "profiling")]
+    let agent_ready = agent_running.stop().unwrap();
+    #[cfg(feature = "profiling")]
+    agent_ready.shutdown();
+
+    Ok(())
+}
+
+fn init_grpc_server(
+    shutdown_rx: oneshot::Receiver<()>,
+    stopped_tx: oneshot::Sender<()>,
+) -> Result<(), anyhow::Error> {
+    let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
+    let event_svc = EventServer::new(Eventer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let search_svc = SearchServer::new(Searcher)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let filelist_svc = FilelistServer::new(Filelister)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let metrics_svc = MetricsServer::new(Querier)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let metrics_ingest_svc = MetricsServiceServer::new(Ingester)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let usage_svc = UsageServer::new(UsageServerImpl)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let logs_svc = LogsServiceServer::new(LogsServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let tracer = TraceServer::default();
+    let trace_svc = TraceServiceServer::new(tracer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+
+    tokio::task::spawn(async move {
+        log::info!("starting gRPC server at {}", gaddr);
+        tonic::transport::Server::builder()
+            .layer(tonic::service::interceptor(check_auth))
+            .add_service(event_svc)
+            .add_service(search_svc)
+            .add_service(filelist_svc)
+            .add_service(metrics_svc)
+            .add_service(metrics_ingest_svc)
+            .add_service(trace_svc)
+            .add_service(usage_svc)
+            .add_service(logs_svc)
+            .serve_with_shutdown(gaddr, async {
+                shutdown_rx.await.ok();
+                log::info!("gRPC server starts shutting down");
+            })
+            .await
+            .expect("gRPC server init failed");
+        stopped_tx.send(()).ok();
+    });
+    Ok(())
+}
+
+async fn init_http_server() -> Result<(), anyhow::Error> {
     // metrics
     let prometheus = infra::metrics::create_prometheus_handler();
 
-    // HTTP server
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
         format!("[::]:{}", CONFIG.http.port).parse()?
@@ -246,8 +337,6 @@ async fn main() -> Result<(), anyhow::Error> {
     .client_request_timeout(Duration::from_secs(CONFIG.limit.request_timeout))
     .bind(haddr)?;
 
-    tokio::task::spawn(async move { zo_logger::send_logs().await });
-
     server
         .workers(CONFIG.limit.http_worker_num)
         .worker_max_blocking_threads(
@@ -255,76 +344,6 @@ async fn main() -> Result<(), anyhow::Error> {
         )
         .run()
         .await?;
-
-    // stop telemetry
-    meta::telemetry::Telemetry::new()
-        .event("OpenObserve - Server stopped", None, false)
-        .await;
-    // leave the cluster
-    _ = cluster::leave().await;
-    // flush WAL cache to disk
-    infra::wal::flush_all_to_disk().await;
-    // flush compact offset cache to disk disk
-    _ = db::compact::files::sync_cache_to_db().await;
-    // flush db
-    _ = infra::db::DEFAULT.close().await;
-    // flush distinct values
-    _ = distinct_values::close().await;
-
-    log::info!("server stopped");
-
-    #[cfg(feature = "profiling")]
-    let agent_ready = agent_running.stop().unwrap();
-    #[cfg(feature = "profiling")]
-    agent_ready.shutdown();
-
-    Ok(())
-}
-
-fn init_grpc_server() -> Result<(), anyhow::Error> {
-    let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
-    let event_svc = EventServer::new(Eventer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
-    let search_svc = SearchServer::new(Searcher)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
-    let filelist_svc = FilelistServer::new(Filelister)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
-    let metrics_svc = MetricsServer::new(Querier)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
-    let metrics_ingest_svc = MetricsServiceServer::new(Ingester)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
-    let usage_svc = UsageServer::new(UsageServerImpl)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
-    let logs_svc = LogsServiceServer::new(LogsServer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
-    let tracer = TraceServer::default();
-    let trace_svc = TraceServiceServer::new(tracer)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
-
-    tokio::task::spawn(async move {
-        log::info!("starting gRPC server at {}", gaddr);
-        tonic::transport::Server::builder()
-            .layer(tonic::service::interceptor(check_auth))
-            .add_service(event_svc)
-            .add_service(search_svc)
-            .add_service(filelist_svc)
-            .add_service(metrics_svc)
-            .add_service(metrics_ingest_svc)
-            .add_service(trace_svc)
-            .add_service(usage_svc)
-            .add_service(logs_svc)
-            .serve(gaddr)
-            .await
-            .expect("gRPC server init failed");
-    });
     Ok(())
 }
 
