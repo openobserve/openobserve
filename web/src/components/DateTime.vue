@@ -33,6 +33,7 @@
         class="date-time-dialog"
         anchor="bottom left"
         self="top left"
+        no-route-dismiss
         @before-show="onBeforeShow"
       >
         <div class="flex justify-evenly q-py-sm">
