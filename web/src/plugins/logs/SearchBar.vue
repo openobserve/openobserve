@@ -130,7 +130,6 @@
           <div class="flex">
             <auto-refresh-interval
               class="q-mr-sm q-px-none logs-auto-refresh-interval"
-              style="padding-left: 0 !important"
               v-model="searchObj.meta.refreshInterval"
               @update:model-value="onRefreshIntervalUpdate"
             />

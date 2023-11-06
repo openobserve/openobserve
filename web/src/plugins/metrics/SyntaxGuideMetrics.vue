@@ -19,7 +19,7 @@
     size="sm"
     dense
     flat
-    class="q-ml-sm q-pa-xs syntax-guide-button"
+    class="syntax-guide-button"
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
     :label="t('search.syntaxGuideLabel')"
     icon="help"
@@ -166,6 +166,7 @@ export default defineComponent({
   cursor: pointer;
   text-transform: capitalize;
   padding: 5px 5px;
+  height: 30px;
   font-weight: bold;
   border: 1px solid rgba(89, 96, 178, 0.3);
 }
