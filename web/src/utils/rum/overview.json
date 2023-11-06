@@ -267,6 +267,11 @@
         "base_map": { "type": "osm" },
         "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
       },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
       "queryType": "sql",
       "queries": [
         {

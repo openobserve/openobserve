@@ -27,9 +27,17 @@
     <ChartRenderer v-else :data="panelSchema.queryType === 'promql' || (data.length && data[0]?.length  && panelData.chartType != 'geomap' && panelData.chartType != 'table') ? panelData : {options:{}}" />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
-    <div v-if="errorDetail" class="errorMessage">
+    <div v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling" class="errorMessage">
       <q-icon size="md" name="warning" />
       <div style="height: 80%; width: 100%">{{ errorDetail }}</div>
+    </div>
+    <div v-if="errorDetail 
+        && panelSchema?.error_config?.custom_error_handeling 
+        && !panelSchema?.error_config?.default_data_on_error 
+        && panelSchema?.error_config?.custom_error_message" 
+      class="customErrorMessage"
+    >
+      {{ panelSchema?.error_config?.custom_error_message }}
     </div>
     <div
       v-if="loading"
@@ -93,6 +101,14 @@ export default defineComponent({
           errorDetail.value = "";
         } catch (error: any) {
           errorDetail.value = error.message;
+        }
+      } else {
+        // if no data is available, then show the default data
+        // if there is an error config in the panel schema, then show the default data on error
+        // if no default data on error is set, then show the custom error message
+        if(panelSchema.value?.error_config?.custom_error_handeling && panelSchema.value?.error_config?.default_data_on_error){
+          data.value = JSON.parse(panelSchema.value?.error_config?.default_data_on_error)
+          errorDetail.value = ""
         }
       }
     },{ deep: true });
@@ -172,6 +188,16 @@ export default defineComponent({
   overflow: hidden;
   text-align: center;
   color: rgba(255, 0, 0, 0.8);
+  text-overflow: ellipsis;
+}
+
+.customErrorMessage {
+  position: absolute;
+  top: 20%;
+  width: 100%;
+  height: 80%;
+  overflow: hidden;
+  text-align: center;
   text-overflow: ellipsis;
 }
 
