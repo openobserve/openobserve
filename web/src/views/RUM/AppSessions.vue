@@ -179,7 +179,6 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
 const streamFields = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
