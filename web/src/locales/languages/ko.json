@@ -506,7 +506,9 @@
     "histogram": "히스토그램",
     "queryValues": "쿼리 값",
     "constant": "상수",
-    "textbox": "텍스트 박스"
+    "textbox": "텍스트 박스",
+    "newFolder": "새 폴더",
+    "updateFolder": "폴더 업데이트"
   },
   "panel": {
     "header": "패널",
