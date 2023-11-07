@@ -488,7 +488,9 @@
     "histogram": "Histogramm",
     "queryValues": "Werte abfragen",
     "constant": "Konstante",
-    "textbox": "Textfeld"
+    "textbox": "Textfeld",
+    "newFolder": "Neuer Ordner",
+    "updateFolder": "Ordner aktualisieren"
   },
   "panel": {
     "header": "Paneel",

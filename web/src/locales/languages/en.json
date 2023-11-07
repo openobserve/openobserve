@@ -488,7 +488,9 @@
     "histogram": "Histogram",
     "queryValues": "Query Values",
     "constant": "Constant",
-    "textbox": "Textbox"
+    "textbox": "Textbox",
+    "newFolder": "New Folder",
+    "updateFolder": "Update Folder"
   },
   "panel": {
     "header": "Panel",

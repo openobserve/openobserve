@@ -488,7 +488,9 @@
     "histogram": "Istogramma",
     "queryValues": "Valori di interrogazione",
     "constant": "Costante",
-    "textbox": "Casella di testo"
+    "textbox": "Casella di testo",
+    "newFolder": "Nuova cartella",
+    "updateFolder": "Aggiorna cartella"
   },
   "panel": {
     "header": "Pannello",

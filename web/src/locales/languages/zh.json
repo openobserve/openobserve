@@ -488,7 +488,9 @@
     "histogram": "直方图",
     "queryValues": "查询值",
     "constant": "常量",
-    "textbox": "文本框"
+    "textbox": "文本框",
+    "newFolder": "新建資料夾",
+    "updateFolder": "更新資料夾"
   },
   "panel": {
     "header": "面板",
