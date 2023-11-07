@@ -506,7 +506,9 @@
     "histogram": "हिस्टोग्राम",
     "queryValues": "क्वैरी वैल्यू",
     "constant": "स्थिरांक",
-    "textbox": "टेक्स्टबॉक्स"
+    "textbox": "टेक्स्टबॉक्स",
+    "newFolder": "नया फ़ोल्डर",
+    "updateFolder": "फ़ोल्डर अद्यतन करें"
   },
   "panel": {
     "header": "पैनल",

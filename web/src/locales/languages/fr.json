@@ -506,7 +506,9 @@
     "histogram": "Histogramme",
     "queryValues": "Valeurs de requête",
     "constant": "Constante",
-    "textbox": "Zone de texte"
+    "textbox": "Zone de texte",
+    "newFolder": "Nouveau dossier",
+    "updateFolder": "Mettre à jour le dossier"
   },
   "panel": {
     "header": "Panneau",

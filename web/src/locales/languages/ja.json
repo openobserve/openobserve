@@ -506,7 +506,9 @@
     "histogram": "ヒストグラム",
     "queryValues": "クエリ値",
     "constant": "コンスタント",
-    "textbox": "テキストボックス"
+    "textbox": "テキストボックス",
+    "newFolder": "新しいフォルダー",
+    "updateFolder": "アップデートフォルダー"
   },
   "panel": {
     "header": "パネル",
