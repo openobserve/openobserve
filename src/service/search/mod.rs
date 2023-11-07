@@ -358,8 +358,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 )))
             }
         };
-        let mut sources: Vec<json::Value> =
-            json_rows.into_iter().map(json::Value::Object).collect();
+        let mut sources: Vec<json::Value> = json_rows
+            .into_iter()
+            .filter(|v| !v.is_empty())
+            .map(json::Value::Object)
+            .collect();
 
         // handle metrics response
         if query_type == "metrics" {
