@@ -8,8 +8,16 @@
     />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Wait for 2 minutes after installing cert-manger for the webhook to be ready before installing OpenTelemetry operator.
+      Wait for 2 minutes after installing cert-manger for the webhook to be
+      ready.
     </div>
+
+    <div class="text-subtitle1 q-pl-xs q-mt-md">Update helm repo</div>
+    <ContentCopy
+      class="q-mt-sm"
+      content="helm repo add openobserve https://charts.openobserve.ai"
+    />
+    <ContentCopy class="q-mt-sm" content="helm repo update" />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">
       Install OpenTelemetry operator
@@ -19,13 +27,6 @@
       content="kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml"
     />
 
-    <div class="text-subtitle1 q-pl-xs q-mt-md">Update helm repo</div>
-    <ContentCopy
-      class="q-mt-sm"
-      content="helm repo add openobserve https://charts.openobserve.ai"
-    />
-    <ContentCopy class="q-mt-sm" content="helm repo update" />
-
     <div class="text-subtitle1 q-pl-xs q-mt-md">Create namespace</div>
     <ContentCopy
       class="q-mt-sm"
@@ -33,7 +34,7 @@
     />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Install openobserve collector
+      Install OpenObserve collector
     </div>
     <ContentCopy class="q-mt-sm" :content="collectorCmd" />
   </div>
