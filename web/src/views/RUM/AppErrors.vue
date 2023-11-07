@@ -19,15 +19,14 @@
       <syntax-guide class="q-mr-sm" />
       <div class="flex align-center justify-end metrics-date-time q-mr-md">
         <date-time
+          ref="errorsDateTimeRef"
           auto-apply
-          :default-type="errorTrackingState.data.datetime?.valueType"
+          :default-type="rumState.data.datetime?.valueType"
           :default-absolute-time="{
-            startTime: errorTrackingState.data.datetime.startTime,
-            endTime: errorTrackingState.data.datetime.endTime,
+            startTime: rumState.data.datetime.startTime,
+            endTime: rumState.data.datetime.endTime,
           }"
-          :default-relative-time="
-            errorTrackingState.data.datetime.relativeTimePeriod
-          "
+          :default-relative-time="rumState.data.datetime.relativeTimePeriod"
           data-test="logs-search-bar-date-time-dropdown"
           class="q-mr-md"
           @on:date-change="updateDateChange"
@@ -112,7 +111,14 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeMount, onMounted, ref, type Ref } from "vue";
+import {
+  nextTick,
+  onBeforeMount,
+  onMounted,
+  onActivated,
+  ref,
+  type Ref,
+} from "vue";
 import AppTable from "@/components/AppTable.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -128,16 +134,19 @@ import { cloneDeep } from "lodash-es";
 import streamService from "@/services/stream";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
+import useRum from "@/composables/rum/useRum";
 
 const { t } = useI18n();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
+  relativeTimePeriod: "",
 });
 const streamFields = ref([]);
 const splitterModel = ref(250);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { errorTrackingState } = useErrorTracking();
+const { rumState } = useRum();
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
@@ -172,6 +181,8 @@ const columns = ref([
 
 const router = useRouter();
 
+const errorsDateTimeRef = ref<any>(null);
+
 onBeforeMount(() => {
   restoreUrlQueryParams();
 });
@@ -180,6 +191,23 @@ onMounted(async () => {
   isMounted.value = true;
   await getStreamFields();
   updateUrlQueryParams();
+});
+
+onActivated(() => {
+  if (
+    rumState.data.datetime.valueType === "relative" &&
+    rumState.data.datetime.relativeTimePeriod ===
+      dateTime.value.relativeTimePeriod
+  )
+    return;
+
+  if (
+    rumState.data.datetime.valueType === "absolute" &&
+    rumState.data.datetime.startTime === dateTime.value.startTime &&
+    rumState.data.datetime.endTime === dateTime.value.endTime
+  )
+    return;
+  errorsDateTimeRef.value.setDefault();
 });
 
 const handleSidebarEvent = (event: string, value: any) => {
@@ -265,8 +293,9 @@ const getErrorLogs = () => {
 };
 
 const updateDateChange = (date: any) => {
+  if (JSON.stringify(date) === JSON.stringify(dateTime.value)) return;
   dateTime.value = date;
-  errorTrackingState.data.datetime = date;
+  rumState.data.datetime = date;
   if (!isLoading.value.length && date.valueType === "relative") runQuery();
 };
 
@@ -309,7 +338,7 @@ function restoreUrlQueryParams() {
   };
 
   if (date && ((date.startTime && date.endTime) || date.relativeTimePeriod)) {
-    errorTrackingState.data.datetime = date;
+    rumState.data.datetime = date;
   }
 
   if (queryParams.query) {
@@ -321,7 +350,7 @@ function restoreUrlQueryParams() {
 function updateUrlQueryParams() {
   if (!isMounted.value) return;
 
-  const date = errorTrackingState.data.datetime;
+  const date = rumState.data.datetime;
   const query: any = {};
 
   if (date.valueType == "relative") {

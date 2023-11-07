@@ -23,12 +23,13 @@
         :viewOnly="true"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
+        @variablesData="variablesDataUpdated"
       >
         <template v-slot:before_panels>
           <div class="flex items-center q-pb q-pt-md text-subtitle1 text-bold">
-            <div class="col text-center">{{t('rum.webVitalsLabel')}}</div>
-            <div class="col text-center">{{t('rum.errorLabel')}}</div>
-            <div class="col text-center">{{t('rum.sessionLabel')}}</div>
+            <div class="col text-center">{{ t("rum.webVitalsLabel") }}</div>
+            <div class="col text-center">{{ t("rum.errorLabel") }}</div>
+            <div class="col text-center">{{ t("rum.sessionLabel") }}</div>
           </div>
         </template>
       </RenderDashboardCharts>
@@ -57,6 +58,7 @@ import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
 import { cloneDeep } from "lodash-es";
+import useRum from "@/composables/rum/useRum";
 
 export default defineComponent({
   name: "PerformanceSummary",
@@ -75,6 +77,8 @@ export default defineComponent({
     // });
 
     const performanceChartsRef = ref(null);
+
+    const { rumState } = useRum();
 
     onMounted(async () => {
       await loadDashboard();
@@ -100,6 +104,8 @@ export default defineComponent({
       currentDashboardData.value.data = overviewDashboard;
 
       // if variables data is null, set it to empty list
+      // currentDashboardData.value.data.variables = rumState.data.variables;
+
       if (
         !(
           currentDashboardData.value.data?.variables &&
@@ -129,16 +135,6 @@ export default defineComponent({
       const variableObj = {};
       data.values.forEach((v) => {
         variableObj[`var-${v.name}`] = v.value;
-      });
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          ...variableObj,
-        },
       });
     };
 
@@ -185,12 +181,12 @@ export default defineComponent({
     const refreshInterval = ref(0);
 
     // when the date changes from the picker, update the current time object for the dashboard
-    watch(selectedDate, () => {
-      currentTimeObj.value = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
-      };
-    });
+    // watch(selectedDate, () => {
+    //   currentTimeObj.value = {
+    //     start_time: new Date(selectedDate.value.startTime),
+    //     end_time: new Date(selectedDate.value.endTime),
+    //   };
+    // });
 
     const getQueryParamsForDuration = (data: any) => {
       if (data.relativeTimePeriod) {
@@ -206,28 +202,6 @@ export default defineComponent({
     };
 
     // [END] date picker related variables
-
-    // back button to render dashboard List page
-    const goBackToDashboardList = () => {
-      return router.push({
-        path: "/dashboards",
-        query: {
-          dashboard: route.query.dashboard,
-          folder: route.query.folder ?? "default",
-        },
-      });
-    };
-
-    //add panel
-    const addPanelData = () => {
-      return router.push({
-        path: "/dashboards/add_panel",
-        query: {
-          dashboard: route.query.dashboard,
-          folder: route.query.folder ?? "default",
-        },
-      });
-    };
 
     const refreshData = () => {
       dateTimePicker.value.refresh();
@@ -253,33 +227,20 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     });
 
-    // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, selectedDate], () => {
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-        },
-      });
-    });
-
-    const onDeletePanel = async (panelId: any) => {
-      await deletePanel(
-        store,
-        route.query.dashboard,
-        panelId,
-        route.query.folder ?? "default"
-      );
-      await loadDashboard();
-    };
-
+    // // whenever the refreshInterval is changed, update the query params
+    // watch([refreshInterval, selectedDate], () => {
+    //   router.replace({
+    //     query: {
+    //       org_identifier: store.state.selectedOrganization.identifier,
+    //       dashboard: route.query.dashboard,
+    //       folder: route.query.folder,
+    //       refresh: generateDurationLabel(refreshInterval.value),
+    //       ...getQueryParamsForDuration(selectedDate.value),
+    //     },
+    //   });
+    // });
     return {
       currentDashboardData,
-      goBackToDashboardList,
-      addPanelData,
       t,
       getDashboard,
       store,
@@ -289,7 +250,6 @@ export default defineComponent({
       currentTimeObj,
       refreshInterval,
       refreshData,
-      onDeletePanel,
       variablesData,
       variablesDataUpdated,
       showDashboardSettingsDialog,
