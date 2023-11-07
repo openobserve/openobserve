@@ -27,14 +27,14 @@
           size="16px"
           class="material-symbols-outlined q-mr-xs"
         ></q-icon>
-        {{t("rum.learnWebVitalsLabel")}}
+        {{ t("rum.learnWebVitalsLabel") }}
         <a
           href="https://web.dev/articles/vitals"
           title="https://web.dev/articles/vitals"
           class="q-ml-xs"
           target="_blank"
           :class="store.state.theme === 'dark' ? 'text-white' : 'text-dark'"
-          >{{t("rum.clickHereLabel")}}</a
+          >{{ t("rum.clickHereLabel") }}</a
         >
       </div>
       <RenderDashboardCharts
@@ -133,6 +133,7 @@ export default defineComponent({
       currentDashboardData.data = overviewDashboard;
 
       // if variables data is null, set it to empty list
+
       if (
         !(
           currentDashboardData.data?.variables &&

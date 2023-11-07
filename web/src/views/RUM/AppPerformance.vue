@@ -18,12 +18,20 @@
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
     <div class="flex justify-between items-center q-py-sm q-px-md">
-      <div class="performance_title">{{t('rum.performanceSummaryLabel')}}</div>
+      <div class="performance_title">
+        {{ t("rum.performanceSummaryLabel") }}
+      </div>
       <div class="flex items-center">
-        <DateTimePickerDashboard
-          class="q-ml-sm rum-date-time-picker"
-          ref="dateTimePicker"
-          v-model="selectedDate"
+        <date-time
+          ref="performanceDateTimeRef"
+          auto-apply
+          :default-type="rumState.data.datetime?.valueType"
+          :default-absolute-time="{
+            startTime: rumState.data.datetime.startTime,
+            endTime: rumState.data.datetime.endTime,
+          }"
+          :default-relative-time="rumState.data.datetime.relativeTimePeriod"
+          @on:date-change="updateDateChange"
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
@@ -69,6 +77,7 @@ import {
   nextTick,
   computed,
   onActivated,
+  onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -80,21 +89,21 @@ import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
 import AppTabs from "@/components/common/AppTabs.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import usePerformance from "@/composables/rum/usePerformance";
+import DateTime from "@/components/DateTime.vue";
+import useRum from "@/composables/rum/useRum";
 
 export default defineComponent({
   name: "AppPerformance",
   components: {
     AutoRefreshInterval,
     AppTabs,
-    DateTimePickerDashboard,
+    DateTime,
   },
   setup() {
     const { t } = useI18n();
 
     const activePerformanceTab = ref("overview");
-    const { performanceState } = usePerformance();
+    const { rumState } = useRum();
     const tabs = [
       {
         label: t("rum.overview"),
@@ -135,6 +144,9 @@ export default defineComponent({
     ];
 
     const routeName = computed(() => router.currentRoute.value.name);
+    const performanceDateTimeRef = ref(null);
+
+    onBeforeMount(() => restoreUrlQueryParams());
 
     onMounted(async () => {
       await loadDashboard();
@@ -158,7 +170,21 @@ export default defineComponent({
     });
 
     onActivated(async () => {
-      await loadDashboard();
+      if (
+        rumState.data.datetime.valueType === "relative" &&
+        rumState.data.datetime.relativeTimePeriod ===
+          selectedDate.value.relativeTimePeriod
+      )
+        return;
+
+      if (
+        rumState.data.datetime.valueType === "absolute" &&
+        rumState.data.datetime.startTime === selectedDate.value.startTime &&
+        rumState.data.datetime.endTime === selectedDate.value.endTime
+      )
+        return;
+
+      performanceDateTimeRef.value.setDefault();
     });
 
     const loadDashboard = async () => {
@@ -199,7 +225,6 @@ export default defineComponent({
       };
 
       if (!routeNames[activePerformanceTab.value]) return;
-
       setTimeout(() => {
         router.push({
           name: routeNames[activePerformanceTab.value],
@@ -245,16 +270,16 @@ export default defineComponent({
       data.values.forEach((v) => {
         variableObj[`var-${v.name}`] = v.value;
       });
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          ...variableObj,
-        },
-      });
+      // router.replace({
+      //   query: {
+      //     org_identifier: store.state.selectedOrganization.identifier,
+      //     dashboard: route.query.dashboard,
+      //     folder: route.query.folder,
+      //     refresh: generateDurationLabel(refreshInterval.value),
+      //     ...getQueryParamsForDuration(selectedDate.value),
+      //     ...variableObj,
+      //   },
+      // });
     };
 
     // ======= [START] default variable values
@@ -299,15 +324,6 @@ export default defineComponent({
     // refresh interval v-model
     const refreshInterval = ref(0);
 
-    // when the date changes from the picker, update the current time object for the dashboard
-    watch(selectedDate, (value) => {
-      performanceState.data.datetime = value;
-      currentTimeObj.value = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
-      };
-    });
-
     const getQueryParamsForDuration = (data: any) => {
       if (data.relativeTimePeriod) {
         return {
@@ -322,7 +338,7 @@ export default defineComponent({
     };
 
     const refreshData = () => {
-      dateTimePicker.value.refresh();
+      performanceDateTimeRef.value.refresh();
     };
 
     // ------- work with query params ----------
@@ -346,7 +362,8 @@ export default defineComponent({
     });
 
     // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, selectedDate], () => {
+    watch([refreshInterval, selectedDate], async () => {
+      await nextTick();
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -367,6 +384,35 @@ export default defineComponent({
       );
       await loadDashboard();
     };
+
+    const updateDateChange = (date: any) => {
+      if (JSON.stringify(date) === JSON.stringify(selectedDate.value)) return;
+      selectedDate.value = date;
+      rumState.data.datetime = date;
+      currentTimeObj.value = {
+        start_time: new Date(selectedDate.value.startTime),
+        end_time: new Date(selectedDate.value.endTime),
+      };
+    };
+
+    function restoreUrlQueryParams() {
+      const queryParams = router.currentRoute.value.query;
+
+      const date = {
+        startTime: Number(queryParams.from) as number,
+        endTime: Number(queryParams.to) as number,
+        relativeTimePeriod: (queryParams.period as string) || "",
+        valueType: queryParams.period ? "relative" : "absolute",
+      };
+
+      if (
+        date &&
+        ((date.startTime && date.endTime) || date.relativeTimePeriod)
+      ) {
+        selectedDate.value = date;
+        rumState.data.datetime = date;
+      }
+    }
 
     return {
       currentDashboardData,
@@ -390,6 +436,9 @@ export default defineComponent({
       getQueryParamsForDuration,
       tabs,
       activePerformanceTab,
+      performanceDateTimeRef,
+      rumState,
+      updateDateChange,
     };
   },
 });
