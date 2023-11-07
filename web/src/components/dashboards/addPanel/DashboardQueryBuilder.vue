@@ -65,7 +65,6 @@
             class="q-pl-sm"
             :data-test="`dashboard-x-item-${itemX.column}`"
           >
-            >
             <q-menu
               class="q-pa-md"
               :data-test="`dashboard-x-item-${itemX.column}-menu`"
