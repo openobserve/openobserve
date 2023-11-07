@@ -104,7 +104,6 @@ export default defineComponent({
       currentDashboardData.value.data = overviewDashboard;
 
       // if variables data is null, set it to empty list
-      // currentDashboardData.value.data.variables = rumState.data.variables;
 
       if (
         !(

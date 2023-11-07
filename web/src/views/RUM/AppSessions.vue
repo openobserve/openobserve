@@ -186,7 +186,7 @@ const props = defineProps({
   },
 });
 
-const streamFields = ref([]);
+const streamFields: Ref<any[]> = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
 const { sessionState } = useSession();
@@ -207,6 +207,34 @@ const sessionsDateTimeRef = ref<any>(null);
 const isMounted = ref(false);
 
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
+
+const userDataSet = new Set([
+  "user_agent_device_family",
+  "user_agent_user_agent_major",
+  "user_agent_user_agent_minor",
+  "user_agent_user_agent_family",
+  "user_agent_os_major",
+  "user_agent_os_minor",
+  "user_agent_os_patch",
+  "user_agent_user_agent_patch",
+  "user_agent_os_family",
+  "user_agent_device_brand",
+  "ip",
+  "geo_info_location_timezone",
+  "geo_info_location_metro_code",
+  "geo_info_country",
+  "geo_info_city",
+  "geo_info_location_accuracy_radius",
+  "sdk_version",
+  "application_id",
+  "env",
+  "service",
+  "oosource",
+  "oo_evp_origin",
+  "oo_evp_origin_version",
+  "source",
+  "api",
+]);
 
 const columns = ref([
   {
@@ -319,13 +347,17 @@ const getStreamFields = () => {
           "usr_id",
           "usr_name",
         ]);
-        streamFields.value = res.data.schema.map((field: any) => {
+        streamFields.value = [];
+        res.data.schema.forEach((field: any) => {
           if (fieldsToVerify.has(field.name))
             schemaMapping.value[field.name] = field;
-          return {
-            ...field,
-            showValues: true,
-          };
+
+          if (userDataSet.has(field.name)) {
+            streamFields.value.push({
+              ...field,
+              showValues: true,
+            });
+          }
         });
       })
       .finally(() => {

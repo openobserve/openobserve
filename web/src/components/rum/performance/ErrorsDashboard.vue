@@ -184,8 +184,6 @@ export default defineComponent({
     const loadDashboard = async () => {
       currentDashboardData.data = errorDashboard;
 
-      currentDashboardData.value.data.variables = rumState.data.variables;
-
       // if variables data is null, set it to empty list
       if (
         !(
