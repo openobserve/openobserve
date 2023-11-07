@@ -126,7 +126,8 @@ export default defineComponent({
 
       setTimeout(() => {
         webVitalsChartsRef.value.layoutUpdate();
-      }, 500);
+        window.dispatchEvent(new Event("resize"));
+      }, 800);
     };
 
     const loadDashboard = async () => {
