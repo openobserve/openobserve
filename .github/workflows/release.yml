@@ -26,6 +26,11 @@ jobs:
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64-musl
             file_ext: .tar.gz
+          - arch: aarch64-unknown-linux-musl
+            os: ubuntu-2004-8-cores
+            features: "--features mimalloc"
+            file_name: openobserve-${{ github.ref_name }}-linux-arm64-musl
+            file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
             features: "--features mimalloc"
@@ -110,7 +115,13 @@ jobs:
           brew install protobuf
 
       - name: Install dependencies for linux
-        if: contains(matrix.arch, 'linux')
+        if: contains(matrix.arch, 'linux-gnu')
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
+      
+      - name: Install dependencies for linux
+        if: contains(matrix.arch, 'linux-musl')
         run: |
           sudo apt-get -y update
           sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
