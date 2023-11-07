@@ -506,7 +506,9 @@
     "histogram": "Histogram",
     "queryValues": "Sorgu Değerleri",
     "constant": "Sabit",
-    "textbox": "Metin Kutusu"
+    "textbox": "Metin Kutusu",
+    "newFolder": "Yeni dosya",
+    "updateFolder": "Klasörü Güncelle"
   },
   "panel": {
     "header": "Panel",

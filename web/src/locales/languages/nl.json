@@ -506,7 +506,9 @@
     "histogram": "Histogram",
     "queryValues": "Querywaarden",
     "constant": "Constant",
-    "textbox": "Tekstvak"
+    "textbox": "Tekstvak",
+    "newFolder": "Nieuwe map",
+    "updateFolder": "Map bijwerken"
   },
   "panel": {
     "header": "Paneel",
