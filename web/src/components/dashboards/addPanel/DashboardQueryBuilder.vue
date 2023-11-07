@@ -700,15 +700,15 @@ export default defineComponent({
       promqlMode,
     } = useDashboardPanelData();
     const triggerOperators = [
-      { label: "Count", value: "count" },
-      { label: "Count (Distinct)", value: "count-distinct" },
-      { label: "Sum", value: "sum" },
-      { label: "Avg", value: "avg" },
-      { label: "Min", value: "min" },
-      { label: "Max", value: "max" },
+      { label: t("dashboard.count"), value: "count" },
+      { label: t("dashboard.countDistinct"), value: "count-distinct" },
+      { label: t("dashboard.sum"), value: "sum" },
+      { label: t("dashboard.avg"), value: "avg" },
+      { label: t("dashboard.min"), value: "min" },
+      { label: t("dashboard.max"), value: "max" },
     ];
     const triggerOperatorsWithHistogram: any = [
-      { label: "Histogram", value: "histogram" },
+      { label: t("dashboard.histogram"), value: "histogram" },
     ];
 
     watch(

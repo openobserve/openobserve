@@ -40,7 +40,7 @@
           <label class="text-bold">{{ key.api_name }}</label>
           <pre data-test="curl-content-text">
           {{ key.api_key }}<br />
-          Allowed Organization: {{ key.org_identifier }}
+          {{t("user.allowedOrg")}}: {{ key.org_identifier }}
         </pre>
 
           <q-btn
@@ -77,7 +77,7 @@
       </div>
     </div>
     <div v-else>
-      <label class="text-bold">User API Key Not Found.</label>
+      <label class="text-bold">{{t('user.apiKeyNotFound')}}</label>
     </div>
 
     <q-dialog
@@ -102,18 +102,18 @@
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          Are you sure you want to delete this User API Key? This action cannot
-          be undone. Click OK to confirm.
+          {{ t("user.deleteAPIKeyMessage") }}
         </q-card-section>
 
         <q-card-actions align="right" class="bg-white text-teal">
           <q-btn
             flat
-            label="OK"
+            :label="t('common.ok')"
             @click="deleteUserKey(deleteID)"
             v-close-popup="true"
           />
-          <q-btn flat label="CANCLE" v-close-popup="true" />
+          <q-btn flat
+:label="t('common.cancel')" v-close-popup="true" />
         </q-card-actions>
       </q-card>
     </q-dialog>

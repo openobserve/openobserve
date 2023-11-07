@@ -37,8 +37,8 @@
       align="justify"
       narrow-indicator
     >
-      <q-tab name="table" label="Table" />
-      <q-tab name="json" label="JSON" />
+      <q-tab name="table" :label="t('common.table')" />
+      <q-tab name="json" :label="t('common.json')" />
     </q-tabs>
 
     <q-separator />

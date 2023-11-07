@@ -36,7 +36,7 @@
             },
           }"
           icon="data_object"
-          label="Curl"
+          :label="t('ingestion.curl')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -48,7 +48,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/filebeat.png')"
-          label="Filebeat"
+          :label="t('ingestion.fileBeat')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -61,7 +61,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
-          label="FluentBit"
+          :label="t('ingestion.fluentBit')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -73,7 +73,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
-          label="Fluentd"
+          :label="t('ingestion.fluentd')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -85,7 +85,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/vector.png')"
-          label="Vector"
+          :label="t('ingestion.vector')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -98,7 +98,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')"
-          label="Kinesis Firehose"
+          :label="t('ingestion.kinesisFirehose')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -111,7 +111,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/gcp.svg')"
-          label="GCP Logs via (Pub/Sub)"
+          :label="t('ingestion.gcpLogs')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -124,7 +124,7 @@
             },
           }"
           icon="plagiarism"
-          label="Syslog-ng"
+          :label="t('ingestion.sysLogNG')"
           content-class="tab_content"
         />
         <q-route-tab
@@ -137,7 +137,7 @@
             },
           }"
           icon="plagiarism"
-          label="Syslog"
+          :label="t('ingestion.syslog')"
           content-class="tab_content"
         />
       </q-tabs>

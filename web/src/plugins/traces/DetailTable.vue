@@ -26,16 +26,27 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" />
+          <q-btn v-close-popup="true"
+round flat
+icon="cancel" />
         </div>
       </div>
     </q-card-section>
     <q-separator />
     <div class="row justify-between">
       <div class="col-10">
-        <q-tabs v-model="tab" shrink align="left">
-          <q-tab data-test="log-detail-table-tab" name="table" label="Table" />
-          <q-tab data-test="log-detail-json-tab" name="json" label="JSON" />
+        <q-tabs v-model="tab" shrink
+align="left">
+          <q-tab
+            data-test="log-detail-table-tab"
+            name="table"
+            :label="t('common.table')"
+          />
+          <q-tab
+            data-test="log-detail-json-tab"
+            name="json"
+            :label="t('common.json')"
+          />
         </q-tabs>
       </div>
       <div
@@ -45,7 +56,7 @@
         <q-toggle
           data-test="log-detail-wrap-values-toggle-btn"
           v-model="shouldWrapValues"
-          label="Wrap"
+          :label="t('common.wrap')"
           color="primary"
           size="xs"
           @update:model-value="toggleWrapLogDetails"
@@ -55,7 +66,8 @@
 
     <q-separator />
 
-    <q-tab-panels data-test="log-detail-tab-container" v-model="tab" animated>
+    <q-tab-panels data-test="log-detail-tab-container" v-model="tab"
+animated>
       <q-tab-panel name="table">
         <q-card-section
           class="q-pa-none q-mb-lg"
@@ -127,7 +139,7 @@
                               dense
                               class="q-mr-sm pointer"
                             ></q-icon
-                            >Include Search Term</q-item-label
+                            >{{ t("common.includeSearchTerm") }}</q-item-label
                           >
                         </q-item-section>
                       </q-item>
@@ -151,7 +163,7 @@
                               dense
                               class="q-mr-sm pointer"
                             ></q-icon
-                            >Exclude Search Term</q-item-label
+                            >{{ t("common.excludeSearchTerm") }}</q-item-label
                           >
                         </q-item-section>
                       </q-item>
@@ -197,11 +209,11 @@
             outline
             @click="$emit('showPrevDetail', false, true)"
             icon="navigate_before"
-            label="Previous"
+            :label="t('common.previous')"
           />
         </div>
         <div class="col-8 row justify-center align-center q-gutter-sm">
-          <div style="line-height: 40px; font-weight: bold">No of Records:</div>
+          <div style="line-height: 40px; font-weight: bold">{{t("common.noOfRecords")}}</div>
           <div class="" style="minwidth: 150px">
             <q-select
               v-model="selectedRelativeValue"
@@ -218,7 +230,7 @@
               no-caps
               :disabled="currentIndex >= totalLength - 1"
               outline
-              label="Search Around"
+              :label="t('common.searchAround')"
               @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
               padding="sm md"
             />
@@ -234,7 +246,7 @@
             outline
             @click="$emit('showNextDetail', true, false)"
             icon-right="navigate_next"
-            label="Next"
+            :label="t('common.next')"
           />
         </div>
       </div>

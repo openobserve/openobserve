@@ -44,7 +44,7 @@
             dense
             flat
             :title="t('search.runQuery')"
-            class="q-pa-none search-button bg-secondary"
+            class="search-button bg-secondary"
             @click="searchData"
             :disable="
               searchObj.loading || searchObj.data.streamResults.length == 0
@@ -446,16 +446,18 @@ export default defineComponent({
   }
 
   .search-button {
-    width: 96px;
+    min-width: 96px;
     line-height: 29px;
     font-weight: bold;
     text-transform: initial;
     font-size: 11px;
     color: white;
+    padding: 0px 5px;
 
     .q-btn__content {
       background: $secondary;
       border-radius: 3px 3px 3px 3px;
+      padding: 0px 5px;
 
       .q-icon {
         font-size: 15px;

@@ -269,79 +269,79 @@ export default defineComponent({
 
     const basemapTypeOptions = [
       {
-        label: "OpenStreetMap",
+        label: t("dashboard.openStreetMap"),
         value: "osm",
       },
     ];
 
     const layerTypeOptions = [
       {
-        label: "Scatter",
+        label: t("dashboard.scatter"),
         value: "scatter",
       },
       {
-        label: "Heatmap",
+        label: t("dashboard.heatmap"),
         value: "heatmap",
       },
     ];
     // options for legends position
     const legendsPositionOptions = [
       {
-        label: "Auto",
+        label: t("dashboard.auto"),
         value: null,
       },
       {
-        label: "Right",
+        label: t("dashboard.right"),
         value: "right",
       },
       {
-        label: "Bottom",
+        label: t("dashboard.bottom"),
         value: "bottom",
       },
     ];
     const unitOptions = [
       {
-        label: "Default",
+        label: t("dashboard.default"),
         value: null,
       },
       {
-        label: "Bytes",
+        label: t("dashboard.bytes"),
         value: "bytes",
       },
       {
-        label: "Kilobytes (kb)",
+        label: t("dashboard.kilobytes"),
         value: "kilobytes",
       },
       {
-        label: "Megabytes (mb)",
+        label: t("dashboard.megabytes"),
         value: "megabytes",
       },
       {
-        label: "Bytes/Second",
+        label: t("dashboard.bytesPerSecond"),
         value: "bps",
       },
       {
-        label: "Seconds (s)",
+        label: t("dashboard.seconds"),
         value: "seconds",
       },
       {
-        label: "Microseconds (μs)",
+        label: t("dashboard.microseconds"),
         value: "microseconds",
       },
       {
-        label: "Milliseconds (ms)",
+        label: t("dashboard.milliseconds"),
         value: "milliseconds",
       },
       {
-        label: "Percent (0.0-1.0)",
+        label: t("dashboard.percent1"),
         value: "percent-1",
       },
       {
-        label: "Percent (0-100)",
+        label: t("dashboard.percent"),
         value: "percent",
       },
       {
-        label: "Custom",
+        label: t("dashboard.custom"),
         value: "custom",
       },
     ];

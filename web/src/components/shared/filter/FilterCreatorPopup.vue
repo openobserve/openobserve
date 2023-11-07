@@ -44,8 +44,8 @@
         </div>
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn flat label="Cancel" color="primary" v-close-popup="true" />
-        <q-btn flat label="Apply" color="primary" @click="applyFilter" />
+        <q-btn flat :label="t('common.cancel')" color="primary" v-close-popup="true" />
+        <q-btn flat :label="t('common.apply')" color="primary" @click="applyFilter" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -84,10 +84,10 @@ export default defineComponent({
       } as Filter);
     };
     return {
+      t,
       selectedValues,
       selectedOperator,
       applyFilter,
-      t,
     };
   },
 });

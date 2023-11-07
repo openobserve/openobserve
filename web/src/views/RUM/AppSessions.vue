@@ -179,6 +179,7 @@ const props = defineProps({
   },
 });
 
+const { t } = useI18n();
 const streamFields = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
@@ -208,21 +209,21 @@ const columns = ref([
   {
     name: "timestamp",
     field: (row: any) => getFormattedDate(row["timestamp"] / 1000),
-    label: "Timestamp",
+    label: t("rum.timestamp"),
     align: "left",
     sortable: true,
   },
   {
     name: "user_email",
     field: (row: any) => row["user_email"] || "Unknown",
-    label: "User Email",
+    label: t("login.userEmail"),
     align: "left",
     sortable: true,
   },
   {
     name: "time_spent",
     field: (row: any) => formatDuration(row["time_spent"]),
-    label: "Time Spent",
+    label: t("rum.timeSpent"),
     align: "left",
     sortable: true,
     sort: (a: any, b: any, rowA: Session, rowB: Session) => {
@@ -236,14 +237,14 @@ const columns = ref([
     name: "error_count",
     field: (row: any) => row["error_count"],
     prop: (row: any) => row["error_count"],
-    label: "Error Count",
+    label: t("rum.errorCount"),
     align: "left",
     sortable: true,
   },
   {
     name: "location",
     field: (row: any) => formatDuration(row["time_spent"]),
-    label: "Location",
+    label: t("rum.location"),
     align: "left",
     slot: true,
     slotName: "session_location_column",

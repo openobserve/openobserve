@@ -15,44 +15,9 @@
 
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'geomap'">
-    <div style="display:flex; flex-direction: row;" class="q-pl-md">
-      <div class="layout-name">{{ t('panel.latitude') }}
-        <q-icon name="info_outline" class="q-ml-xs">
-          <q-tooltip>
-          {{ Hint }}
-          </q-tooltip>
-        </q-icon>
-      </div>
-      <span class="layout-separator">:</span>
-      <div class="axis-container droppable scroll q-py-xs" :class="{
-        'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
-        'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'latitude'
-      }" @dragenter="onDragEnter($event, 'latitude')" @dragleave="onDragLeave($event, 'latitude')"
-        @dragover="onDragOver($event, 'latitude')" @drop="onDrop($event, 'latitude')" v-mutation="handler2"
-        data-test="dashboard-x-layout">
-        <q-btn-group class="q-mr-sm" v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude">
-          <q-btn icon-right="arrow_drop_down" no-caps color="primary" dense rounded size="sm" :label="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column"
-            class="q-pl-sm" :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column}`">
-            <q-menu class="q-pa-md" :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column}-menu`">
-              <div>
-                <q-input dense filled data-test="dashboard-x-item-input" :label="t('common.label')" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.label"
-                   :rules="[val => val > 0 || 'Required']" />
-              </div>
-            </q-menu>
-          </q-btn>
-          <q-btn size="xs" round flat dense :data-test="`dashboard-x-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude?.column}-remove`"
-            @click="removeLatitude()" icon="close" />
-        </q-btn-group>
-        <div class="text-caption text-weight-bold text-center q-mt-xs"
-          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude == null">
-          {{ Hint }}
-        </div>
-      </div>
-
-    </div>
-    <q-separator />
-    <div style="display:flex; flex-direction: row;" class="q-pl-md">
-      <div class="layout-name">{{ t('panel.longitude') }}
+    <div style="display: flex; flex-direction: row" class="q-pl-md">
+      <div class="layout-name">
+        {{ t("panel.latitude") }}
         <q-icon name="info_outline" class="q-ml-xs">
           <q-tooltip>
             {{ Hint }}
@@ -60,82 +25,339 @@
         </q-icon>
       </div>
       <span class="layout-separator">:</span>
-      <div class="axis-container droppable scroll q-py-xs" :class="{
-        'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
-        'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'longitude'
-      }" @dragenter="onDragEnter($event, 'longitude')" @dragleave="onDragLeave($event, 'longitude')"
-        @dragover="onDragOver($event, 'longitude')" @drop="onDrop($event, 'longitude')" v-mutation="handler2"
-        data-test="dashboard-y-layout">
-        <q-btn-group class="q-mr-sm" v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude">
-          <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude?.column"
-            :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude?.column}`" class="q-pl-sm">
-            <q-menu class="q-pa-md" :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude?.column}-menu`">
+      <div
+        class="axis-container droppable scroll q-py-xs"
+        :class="{
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-entered':
+            dashboardPanelData.meta.dragAndDrop.dragging &&
+            currentDragArea == 'latitude',
+        }"
+        @dragenter="onDragEnter($event, 'latitude')"
+        @dragleave="onDragLeave($event, 'latitude')"
+        @dragover="onDragOver($event, 'latitude')"
+        @drop="onDrop($event, 'latitude')"
+        v-mutation="handler2"
+        data-test="dashboard-x-layout"
+      >
+        <q-btn-group
+          class="q-mr-sm"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.latitude
+          "
+        >
+          <q-btn
+            icon-right="arrow_drop_down"
+            no-caps
+            color="primary"
+            dense
+            rounded
+            size="sm"
+            :label="
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.latitude?.column
+            "
+            class="q-pl-sm"
+            :data-test="`dashboard-x-item-${
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.latitude?.column
+            }`"
+          >
+            <q-menu
+              class="q-pa-md"
+              :data-test="`dashboard-x-item-${
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields?.latitude?.column
+              }-menu`"
+            >
               <div>
-                <q-input dense filled label="Label" data-test="dashboard-y-item-input" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.label"
-                   :rules="[val => val > 0 || 'Required']" />
+                <q-input
+                  dense
+                  filled
+                  data-test="dashboard-x-item-input"
+                  :label="t('common.label')"
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.latitude.label
+                  "
+                  :rules="[(val) => val > 0 || 'Required']"
+                />
               </div>
             </q-menu>
           </q-btn>
-          <q-btn size="xs" round flat dense :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude?.column}-remove`"
-            @click="removeLongitude()" icon="close" />
+          <q-btn
+            size="xs"
+            round
+            flat
+            dense
+            :data-test="`dashboard-x-item-${
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.latitude?.column
+            }-remove`"
+            @click="removeLatitude()"
+            icon="close"
+          />
         </q-btn-group>
-        <div class="text-caption text-weight-bold text-center q-mt-xs"
-          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude == null">
+        <div
+          class="text-caption text-weight-bold text-center q-mt-xs"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.latitude == null
+          "
+        >
           {{ Hint }}
         </div>
       </div>
     </div>
     <q-separator />
-    <div style="display:flex; flex-direction: row;" class="q-pl-md">
-        <div class="layout-name">{{ t('panel.weight') }}
-          <q-icon name="info_outline" class="q-ml-xs">
-            <q-tooltip>
-              {{ WeightHint }}
-            </q-tooltip>
-          </q-icon>
-        </div>
-        <span class="layout-separator">:</span>
-        <div class="axis-container droppable scroll q-py-xs" :class="{
+    <div style="display: flex; flex-direction: row" class="q-pl-md">
+      <div class="layout-name">
+        {{ t("panel.longitude") }}
+        <q-icon name="info_outline" class="q-ml-xs">
+          <q-tooltip>
+            {{ Hint }}
+          </q-tooltip>
+        </q-icon>
+      </div>
+      <span class="layout-separator">:</span>
+      <div
+        class="axis-container droppable scroll q-py-xs"
+        :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
-          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'weight'
-        }" @dragenter="onDragEnter($event, 'weight')" @dragleave="onDragLeave($event, 'weight')"
-          @dragover="onDragOver($event, 'weight')" @drop="onDrop($event, 'weight')" v-mutation="handler2"
-          data-test="dashboard-y-layout">
-          <q-btn-group class="q-mr-sm" v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight">
-            <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="weightLabel"
-              :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight?.column}`" class="q-pl-sm">
-              <q-menu class="q-pa-md" :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight?.column}-menu`">
-                <div>
-                  <div class="row q-mb-sm" style="align-items: center;">
-                    <div v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery"
-                      class="q-mr-xs" style="width: 160px">
-                      <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight
-                        .aggregationFunction
-                        "
-                        :options="triggerOperators"
-                        dense filled emit-value map-options :label="t('common.aggregation')" data-test="dashboard-y-item-dropdown">
-                        <template v-slot:append>
-                            <q-icon name="close" size="small"
-                              @click.stop.prevent="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.aggregationFunction = null"
-                              class="cursor-pointer" />
-                        </template>
-                      </q-select>
-                    </div>
-                  </div>
-                  <q-input dense filled :label="t('common.label')" data-test="dashboard-y-item-input" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.label" 
-                      :rules="[val => val > 0 || 'Required']" />
-                </div>
-              </q-menu>
-            </q-btn>
-            <q-btn size="xs" round flat dense :data-test="`dashboard-y-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight?.column}-remove`"
-              @click="removeWeight()" icon="close" />
-          </q-btn-group>
-          <div class="text-caption text-weight-bold text-center q-mt-xs"
-            v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight == null">
-            {{ WeightHint }}
-          </div>
+          'drop-entered':
+            dashboardPanelData.meta.dragAndDrop.dragging &&
+            currentDragArea == 'longitude',
+        }"
+        @dragenter="onDragEnter($event, 'longitude')"
+        @dragleave="onDragLeave($event, 'longitude')"
+        @dragover="onDragOver($event, 'longitude')"
+        @drop="onDrop($event, 'longitude')"
+        v-mutation="handler2"
+        data-test="dashboard-y-layout"
+      >
+        <q-btn-group
+          class="q-mr-sm"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.longitude
+          "
+        >
+          <q-btn
+            icon-right="arrow_drop_down"
+            no-caps
+            dense
+            color="primary"
+            rounded
+            size="sm"
+            :label="
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.longitude?.column
+            "
+            :data-test="`dashboard-y-item-${
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.longitude?.column
+            }`"
+            class="q-pl-sm"
+          >
+            <q-menu
+              class="q-pa-md"
+              :data-test="`dashboard-y-item-${
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields?.longitude?.column
+              }-menu`"
+            >
+              <div>
+                <q-input
+                  dense
+                  filled
+                  label="Label"
+                  data-test="dashboard-y-item-input"
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.longitude.label
+                  "
+                  :rules="[(val) => val > 0 || 'Required']"
+                />
+              </div>
+            </q-menu>
+          </q-btn>
+          <q-btn
+            size="xs"
+            round
+            flat
+            dense
+            :data-test="`dashboard-y-item-${
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.longitude?.column
+            }-remove`"
+            @click="removeLongitude()"
+            icon="close"
+          />
+        </q-btn-group>
+        <div
+          class="text-caption text-weight-bold text-center q-mt-xs"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.longitude == null
+          "
+        >
+          {{ Hint }}
         </div>
       </div>
+    </div>
+    <q-separator />
+    <div style="display: flex; flex-direction: row" class="q-pl-md">
+      <div class="layout-name">
+        {{ t("panel.weight") }}
+        <q-icon name="info_outline" class="q-ml-xs">
+          <q-tooltip>
+            {{ WeightHint }}
+          </q-tooltip>
+        </q-icon>
+      </div>
+      <span class="layout-separator">:</span>
+      <div
+        class="axis-container droppable scroll q-py-xs"
+        :class="{
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-entered':
+            dashboardPanelData.meta.dragAndDrop.dragging &&
+            currentDragArea == 'weight',
+        }"
+        @dragenter="onDragEnter($event, 'weight')"
+        @dragleave="onDragLeave($event, 'weight')"
+        @dragover="onDragOver($event, 'weight')"
+        @drop="onDrop($event, 'weight')"
+        v-mutation="handler2"
+        data-test="dashboard-y-layout"
+      >
+        <q-btn-group
+          class="q-mr-sm"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.weight
+          "
+        >
+          <q-btn
+            icon-right="arrow_drop_down"
+            no-caps
+            dense
+            color="primary"
+            rounded
+            size="sm"
+            :label="weightLabel"
+            :data-test="`dashboard-y-item-${
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.weight?.column
+            }`"
+            class="q-pl-sm"
+          >
+            <q-menu
+              class="q-pa-md"
+              :data-test="`dashboard-y-item-${
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields?.weight?.column
+              }-menu`"
+            >
+              <div>
+                <div class="row q-mb-sm" style="align-items: center">
+                  <div
+                    v-if="
+                      !dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
+                    "
+                    class="q-mr-xs"
+                    style="width: 160px"
+                  >
+                    <q-select
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.weight.aggregationFunction
+                      "
+                      :options="triggerOperators"
+                      dense
+                      filled
+                      emit-value
+                      map-options
+                      :label="t('common.aggregation')"
+                      data-test="dashboard-y-item-dropdown"
+                    >
+                      <template v-slot:append>
+                        <q-icon
+                          name="close"
+                          size="small"
+                          @click.stop.prevent="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.weight.aggregationFunction = null
+                          "
+                          class="cursor-pointer"
+                        />
+                      </template>
+                    </q-select>
+                  </div>
+                </div>
+                <q-input
+                  dense
+                  filled
+                  :label="t('common.label')"
+                  data-test="dashboard-y-item-input"
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.weight.label
+                  "
+                  :rules="[(val) => val > 0 || 'Required']"
+                />
+              </div>
+            </q-menu>
+          </q-btn>
+          <q-btn
+            size="xs"
+            round
+            flat
+            dense
+            :data-test="`dashboard-y-item-${
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.weight?.column
+            }-remove`"
+            @click="removeWeight()"
+            icon="close"
+          />
+        </q-btn-group>
+        <div
+          class="text-caption text-weight-bold text-center q-mt-xs"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.weight == null
+          "
+        >
+          {{ WeightHint }}
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -154,7 +376,7 @@ export default defineComponent({
       latitude: true,
       longitude: true,
       weight: true,
-    })
+    });
 
     const {
       dashboardPanelData,
@@ -166,88 +388,90 @@ export default defineComponent({
       removeWeight,
       addFilteredItem,
       loadFilterItem,
-      promqlMode, 
+      promqlMode,
     } = useDashboardPanelData();
     const triggerOperators = [
-      { label: "Count", value: "count" },
-      { label: "Count (Distinct)", value: "count-distinct" },
-      { label: "Sum", value: "sum" },
-      { label: "Avg", value: "avg" },
-      { label: "Min", value: "min" },
-      { label: "Max", value: "max" },
-    ]
+      { label: t("dashboard.count"), value: "count" },
+      { label: t("dashboard.countDistinct"), value: "count-distinct" },
+      { label: t("dashboard.sum"), value: "sum" },
+      { label: t("dashboard.avg"), value: "avg" },
+      { label: t("dashboard.min"), value: "min" },
+      { label: t("dashboard.max"), value: "max" },
+    ];
 
-    watch(() => dashboardPanelData.meta.dragAndDrop.dragging, (newVal: boolean, oldVal: boolean) => {
-      if (oldVal == false && newVal == true) {
-        expansionItems.latitude = true
-        expansionItems.longitude = true
-        expansionItems.weight = true
+    watch(
+      () => dashboardPanelData.meta.dragAndDrop.dragging,
+      (newVal: boolean, oldVal: boolean) => {
+        if (oldVal == false && newVal == true) {
+          expansionItems.latitude = true;
+          expansionItems.longitude = true;
+          expansionItems.weight = true;
+        }
       }
-    })
+    );
 
-    const currentDragArea = ref('')
+    const currentDragArea = ref("");
 
     const onDrop = (e: any, area: string) => {
+      const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-      const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement
+      dashboardPanelData.meta.dragAndDrop.dragging = false;
+      dashboardPanelData.meta.dragAndDrop.dragElement = null;
 
-      dashboardPanelData.meta.dragAndDrop.dragging = false
-      dashboardPanelData.meta.dragAndDrop.dragElement = null
-
-      if (dragItem && area == 'latitude') {
-        addLatitude(dragItem)
-      } else if (dragItem && area == 'longitude') {
-        addLongitude(dragItem)
-      } else if (dragItem && area == 'weight') {
-        addWeight(dragItem)
-      } else {
-
+      if (dragItem && area == "latitude") {
+        addLatitude(dragItem);
+      } else if (dragItem && area == "longitude") {
+        addLongitude(dragItem);
+      } else if (dragItem && area == "weight") {
+        addWeight(dragItem);
       }
-      currentDragArea.value = ''
-    }
+      currentDragArea.value = "";
+    };
 
-
-    const onDragEnter = (e: any, area: string) => {
-    }
+    const onDragEnter = (e: any, area: string) => {};
 
     const onDragStart = (e: any, item: any) => {
-      e.preventDefault()
-    }
+      e.preventDefault();
+    };
 
     const onDragLeave = (e: any, area: string) => {
-      currentDragArea.value = ''
+      currentDragArea.value = "";
 
-      e.preventDefault()
-    }
+      e.preventDefault();
+    };
 
     const onDragOver = (e: any, area: string) => {
-      currentDragArea.value = area
-      e.preventDefault()
-    }
+      currentDragArea.value = area;
+      e.preventDefault();
+    };
 
-    const handler2 = () => { }
+    const handler2 = () => {};
 
     const Hint = computed((e: any) => {
       switch (dashboardPanelData.data.type) {
-        case 'geomap':
-          return t("dashboard.oneFieldMessage")
+        case "geomap":
+          return t("dashboard.oneFieldMessage");
         default:
           return t("dashboard.maxtwofieldMessage");
       }
-    })
+    });
 
     const WeightHint = computed((e: any) => {
       switch (dashboardPanelData.data.type) {
-        case 'geomap':
-          return t("dashboard.oneFieldConfigMessage")
+        case "geomap":
+          return t("dashboard.oneFieldConfigMessage");
         default:
           return t("dashboard.maxtwofieldMessage");
       }
-    })
+    });
 
     const commonBtnLabel = (field: any) => {
-      if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
-        return field.column
+      if (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+      ) {
+        return field.column;
       }
       if (field.aggregationFunction) {
         const aggregation = field.aggregationFunction.toUpperCase();
@@ -258,7 +482,10 @@ export default defineComponent({
     };
 
     const weightLabel = computed(() => {
-      const weightField = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight;
+      const weightField =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.weight;
       return commonBtnLabel(weightField);
     });
 
@@ -517,17 +744,17 @@ export default defineComponent({
     font-size: 0.75rem;
   }
 
-  &.q-manual-focusable--focused>.q-focus-helper {
+  &.q-manual-focusable--focused > .q-focus-helper {
     background: none !important;
     opacity: 0.3 !important;
   }
 
-  &.q-manual-focusable--focused>.q-focus-helper,
+  &.q-manual-focusable--focused > .q-focus-helper,
   &--active {
     background-color: $selected-list-bg !important;
   }
 
-  &.q-manual-focusable--focused>.q-focus-helper,
+  &.q-manual-focusable--focused > .q-focus-helper,
   &:hover,
   &--active {
     color: $primary;
