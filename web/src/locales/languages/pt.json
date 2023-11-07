@@ -506,7 +506,9 @@
     "histogram": "Histograma",
     "queryValues": "Valores de consulta",
     "constant": "Constante",
-    "textbox": "Caixa de texto"
+    "textbox": "Caixa de texto",
+    "newFolder": "Nova pasta",
+    "updateFolder": "Atualizar pasta"
   },
   "panel": {
     "header": "Painel",
