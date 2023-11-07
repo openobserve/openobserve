@@ -81,7 +81,8 @@
             {{ t("billing.manageCards") }}
           </div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup="true" />
+          <q-btn icon="close" flat round dense
+v-close-popup="true" />
         </q-card-section>
         <q-card-section>
           <iframe
@@ -106,7 +107,8 @@
             {{ t("billing.subscriptionCheckout") }}
           </div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup="true" />
+          <q-btn icon="close" flat round dense
+v-close-popup="true" />
         </q-card-section>
 
         <q-card-section>
@@ -134,15 +136,18 @@
               color="primary"
               text-color="white"
               class="q-mr-sm"
-            />You are downgrading the subscription plan. Are you sure you want
-            to proceed with this action?</span
+            />{{ t("billing.downgradeMessage") }}</span
           >
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn label="Cancel" color="secondary" v-close-popup="true" />
           <q-btn
-            label="Confirm"
+            :label="t('common.cancel')"
+            color="secondary"
+            v-close-popup="true"
+          />
+          <q-btn
+            :label="t('common.confirm')"
             color="primary"
             v-close-popup="true"
             @click="onUnsubscribe"

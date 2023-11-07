@@ -33,6 +33,7 @@ import { ref } from "vue";
 import ErrorEventDescription from "@/components/rum/errorTracking/view/ErrorEventDescription.vue";
 import { date } from "quasar";
 import ErrorTypeIcons from "./ErrorTypeIcons.vue";
+import { useI18n } from "vue-i18n";
 
 defineProps({
   error: {
@@ -41,10 +42,12 @@ defineProps({
   },
 });
 
+const { t } = useI18n();
+
 const columns = ref([
   {
     name: "type",
-    label: "Type",
+    label: t("rum.type"),
     align: "left",
     sortable: true,
     style: (row: any) =>
@@ -57,7 +60,7 @@ const columns = ref([
     name: "category",
     field: (row: any) => getErrorCategory(row),
     prop: (row: any) => getErrorCategory(row),
-    label: "Category",
+    label: t("rum.category"),
     align: "left",
     sortable: true,
     style: (row: any) =>
@@ -65,7 +68,7 @@ const columns = ref([
   },
   {
     name: "description",
-    label: "Description",
+    label: t("rum.description"),
     align: "left",
     sortable: true,
     style: (row: any) =>
@@ -78,7 +81,7 @@ const columns = ref([
     name: "level",
     field: (row: any) => (row["type"] === "error" ? "error" : "info"),
     prop: (row: any) => (row["type"] === "error" ? "error" : "info"),
-    label: "Level",
+    label: t("rum.level"),
     align: "left",
     style: (row: any) =>
       row["type"] === "error" ? "color: red; border-bottom: 1px solid red" : "",
@@ -88,7 +91,7 @@ const columns = ref([
     name: "timestamp",
     field: (row: any) => getFormattedDate(row["_timestamp"] / 1000),
     prop: (row: any) => getFormattedDate(row["_timestamp"] / 1000),
-    label: "timestamp",
+    label: t("rum.timestamp"),
     align: "left",
     style: (row: any) =>
       row["type"] === "error" ? "border-bottom: 1px solid red" : "",

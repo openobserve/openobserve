@@ -363,8 +363,8 @@ export default defineComponent({
     const parser = new Parser();
 
     const streamTypes = [
-      { label: "Logs", value: "logs" },
-      { label: "Enrichment Tables", value: "enrichment_tables" },
+      { label: t("search.logs"), value: "logs" },
+      { label: t("search.enrichmentTables"), value: "enrichment_tables" },
     ];
 
     const filterStreamFn = (val: string, update: any) => {

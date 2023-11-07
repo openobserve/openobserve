@@ -24,7 +24,7 @@
           <q-card>
             <q-card-section class="bg-white">
               <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
-                <q-input v-model="name" data-cy="login-user-id" label="Email *">
+                <q-input v-model="name" data-cy="login-user-id" :label="t('login.email') + ' *'">
                   <template #prepend>
                     <q-icon name="email" />
                   </template>

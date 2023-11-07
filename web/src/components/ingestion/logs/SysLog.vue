@@ -96,7 +96,7 @@
                   <template v-else-if="col.name === 'subnets'">
                     <q-input
                       v-model="editingRoute.subnets"
-                      label="Enter multiple subnets separated by commas"
+                      :label="t('ingestion.subnetMessage')"
                       data-test="add-alert-name-input"
                       placeholder="192.168.1.0/24, 10.0.0.0/16"
                       color="input-border"

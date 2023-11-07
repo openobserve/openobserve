@@ -17,7 +17,7 @@
     <div class="flex justify-center items-baseline">
       <!-- select new folder -->
       <q-select v-model="selectedFolder"
-        label="Select Folder"
+        :label="t('dashboard.selectFolderLabel')"
         :options="store.state.organizationData.folders.map((item: any)=> {return {label: item.name, value: item.folderId}})" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
         class="q-mb-xs showLabelOnTop" style="width: 88%">
       </q-select>
