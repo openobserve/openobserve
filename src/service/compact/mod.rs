@@ -48,6 +48,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             StreamType::Metrics,
             StreamType::Traces,
             StreamType::EnrichmentTables,
+            StreamType::Metadata,
         ];
         for org_id in orgs {
             // get the working node for the organization
@@ -170,6 +171,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         StreamType::Metrics,
         StreamType::Traces,
         StreamType::EnrichmentTables,
+        StreamType::Metadata,
     ];
     for org_id in orgs {
         // get the working node for the organization
