@@ -25,6 +25,7 @@
             width: 22px;
             height: 22px;
           "
+          title="Go Back"
           @click="router.back()"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
