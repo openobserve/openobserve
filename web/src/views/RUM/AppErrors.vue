@@ -127,7 +127,9 @@ import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import streamService from "@/services/stream";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
+import { useI18n } from "vue-i18n";
 
+const { t } = useI18n();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
@@ -144,7 +146,7 @@ const columns = ref([
     name: "error",
     field: (row: any) => row["error"],
     prop: (row: any) => row["error"],
-    label: "Error",
+    label: t("rum.error"),
     align: "left",
     sortable: true,
     slot: true,
@@ -154,7 +156,7 @@ const columns = ref([
     name: "events",
     field: (row: any) => row["events"],
     prop: (row: any) => row["events"],
-    label: "Events",
+    label: t("rum.events"),
     align: "left",
     sortable: true,
   },
@@ -162,7 +164,7 @@ const columns = ref([
     name: "initial_view_name",
     field: (row: any) => row["view_url"],
     prop: (row: any) => row["view_url"],
-    label: "View Url",
+    label: t("rum.viewURL"),
     align: "left",
     sortable: true,
   },

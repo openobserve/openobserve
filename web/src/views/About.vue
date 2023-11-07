@@ -21,16 +21,16 @@
         class="logo"
         width="177"
       />
-      <div class="para">Observability simplified.</div>
+      <div class="para">{{t("about.logoMsg")}}</div>
     </div>
 
     <q-separator class="separator" />
 
     <div class="about_data">
       <div class="row head">
-        <div class="col-1">Version</div>
-        <div class="col-6 col-md-5 col-lg-4">Commit Hash</div>
-        <div class="col-3 col-md-3 col-lg-2">Build Date</div>
+        <div class="col-1">{{t("about.version")}}</div>
+        <div class="col-6 col-md-5 col-lg-4">{{t("about.commitHash")}}</div>
+        <div class="col-3 col-md-3 col-lg-2">{{t("about.buildDate")}}</div>
       </div>
       <div class="row body">
         <div class="col-1">{{ store.state.zoConfig.version }}</div>
@@ -49,14 +49,17 @@
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "../utils/zincutils";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "PageAbout",
   setup() {
     const store = useStore();
     const pageData = ref("Page Data");
+    const { t } = useI18n();
 
     return {
+      t,
       store,
       pageData,
       getImageURL,

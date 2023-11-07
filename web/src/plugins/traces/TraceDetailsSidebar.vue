@@ -49,8 +49,8 @@
     inline-label
     class="text-bold q-mx-sm span_details_tabs"
   >
-    <q-tab name="tags" label="Attributes" style="text-transform: capitalize" />
-    <q-tab name="events" label="Events" style="text-transform: capitalize" />
+    <q-tab name="tags" :label="t('common.attributes')" style="text-transform: capitalize" />
+    <q-tab name="events" :label="t('common.events')" style="text-transform: capitalize" />
   </q-tabs>
   <q-separator style="width: 100%" />
   <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
@@ -140,6 +140,7 @@ import { cloneDeep } from "lodash-es";
 import { date, type QTableProps } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -151,6 +152,7 @@ export default defineComponent({
   },
   emits: ["close"],
   setup(props, { emit }) {
+    const { t } = useI18n();
     const activeTab = ref("tags");
     const closeSidebar = () => {
       emit("close");
@@ -248,6 +250,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       activeTab,
       closeSidebar,
       eventColumns,

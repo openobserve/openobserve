@@ -32,7 +32,7 @@
       <q-form ref="moveFolderForm" @submit.stop="onSubmit.execute()">
         <q-input
           v-model="store.state.organizationData.folders.find((item: any) => item.folderId === activeFolderId).name"
-          label="Current Folder"
+          :label="t('dashboard.currentFolderLabel')"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -60,7 +60,7 @@
             data-test="dashboard-add-submit"
             :disable="activeFolderId === selectedFolder.value"
             :loading="onSubmit.isLoading.value"
-            label="Move"
+            :label="t('common.move')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
             padding="sm xl"

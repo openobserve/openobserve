@@ -1,7 +1,7 @@
 <template>
   <div class="q-py-xs flex justify-start q-px-md copy-log-btn">
     <q-btn
-      label="Copy to clipboard"
+      :label="t('common.copyToClipboard')"
       dense
       size="sm"
       no-caps
@@ -43,7 +43,7 @@
                   <q-icon color="currentColor">
                     <EqualIcon></EqualIcon>
                   </q-icon> </q-btn
-                >Include Search Term</q-item-label
+                >{{ t("common.includeSearchTerm") }}</q-item-label
               >
             </q-item-section>
           </q-item>
@@ -63,7 +63,7 @@
                   <q-icon color="currentColor">
                     <NotEqualIcon></NotEqualIcon>
                   </q-icon> </q-btn
-                >Exclude Search Term</q-item-label
+                >{{ t("common.excludeSearchTerm") }}</q-item-label
               >
             </q-item-section>
           </q-item>
@@ -80,7 +80,7 @@
                   round
                   class="q-mr-sm pointer"
                 ></q-btn
-                >Add field to table</q-item-label
+                >{{ t("common.addFieldToTable") }}</q-item-label
               >
             </q-item-section>
           </q-item>
@@ -110,6 +110,7 @@ import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import { useI18n } from "vue-i18n";
 
 export default {
   name: "JsonPreview",
@@ -127,6 +128,7 @@ export default {
   components: { NotEqualIcon, EqualIcon },
   emits: ["copy", "addSearchTerm", "addFieldToTable"],
   setup(props: any, { emit }: any) {
+    const { t } = useI18n();
     const store = useStore();
     const copyLogToClipboard = () => {
       emit("copy", props.value);
@@ -138,6 +140,7 @@ export default {
       emit("addFieldToTable", value);
     };
     return {
+      t,
       copyLogToClipboard,
       getImageURL,
       addSearchTerm,

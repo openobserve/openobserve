@@ -40,7 +40,7 @@
           :flat="data.selectedDate.tab !== 'relative'"
           @click="data.selectedDate.tab = 'relative'"
         >
-          RELATIVE
+          {{ t("common.datetimeRelative") }}
         </q-btn>
         <q-separator vertical inset />
         <q-btn
@@ -49,7 +49,7 @@
           :flat="data.selectedDate.tab !== 'absolute'"
           @click="data.selectedDate.tab = 'absolute'"
         >
-          ABSOLUTE
+          {{ t("common.datetimeAbsolute") }}
         </q-btn>
       </div>
       <q-separator />
@@ -125,13 +125,13 @@
                 }"
               />
             </div>
-            <div class="notePara">* You can choose multiple date</div>
+            <div class="notePara">{{ t("common.datetimeMessage") }}</div>
             <q-separator class="q-my-sm" />
 
             <table class="q-px-md startEndTime">
               <tr>
-                <td class="label">Start time</td>
-                <td class="label">End time</td>
+                <td class="label">{{ t("common.startTime") }}</td>
+                <td class="label">{{ t("common.endTime") }}</td>
               </tr>
               <tr>
                 <td>
@@ -154,7 +154,7 @@
                             <div class="row items-center justify-end">
                               <q-btn
                                 v-close-popup="true"
-                                label="Close"
+                                :label="t('common.close')"
                                 color="primary"
                                 flat
                               />
@@ -183,7 +183,7 @@
                             <div class="row items-center justify-end">
                               <q-btn
                                 v-close-popup="true"
-                                label="Close"
+                                :label="t('common.close')"
                                 color="primary"
                                 flat
                               />
@@ -207,6 +207,7 @@
 import { ref, defineComponent, reactive, watch, computed } from "vue";
 import { getImageURL } from "../utils/zincutils";
 import { isEqual } from "lodash-es";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "DateTimePicker",
@@ -234,6 +235,7 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const datetimeBtn = ref();
+    const { t } = useI18n();
 
     // v-model computed value which is used for the getvalue and setvalue for the props
     const selectedDateEmitValue = computed({
@@ -376,6 +378,7 @@ export default defineComponent({
     updateEmitValue();
 
     return {
+      t,
       relativePeriods,
       relativeDates,
       data,

@@ -167,13 +167,13 @@ export default defineComponent({
     const columns = [
       {
         name: "url",
-        label: "View URL",
+        label: t("rum.viewURL"),
         field: (row) => row["url"],
         align: "left",
       },
       {
         name: "error_count",
-        label: "Error Count",
+        label: t("rum.errorCount"),
         field: (row: any) => row["error_count"],
         align: "left",
         sortable: true,

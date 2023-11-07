@@ -106,7 +106,7 @@
           v-slot:spinner="scope"
           ref="fileUploader"
           counter
-          label="Attachments"
+          :label="t('common.attachments')"
           multiple
           max-files="3"
           color="white"

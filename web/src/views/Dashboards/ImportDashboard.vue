@@ -14,95 +14,159 @@
     <div class="row items-center no-wrap">
       <div class="col">
         <div class="flex">
-          <q-btn no-caps @click="goBack()" padding="xs" outline icon="arrow_back_ios_new" />
+          <q-btn
+            no-caps
+            @click="goBack()"
+            padding="xs"
+            outline
+            icon="arrow_back_ios_new"
+          />
           <div class="text-h6 q-ml-md">
-            Import Dashboard
+            {{ t("dashboard.importDashboard") }}
           </div>
         </div>
       </div>
     </div>
     <q-separator class="q-my-sm" />
-    <div style="width: 400px;">
+    <div style="width: 400px">
       <q-form @submit="onSubmit">
-        <div class="q-my-md">
-          Import Dashboard from exported JSON file
-        </div>
-        <div style="width: 400px;">
-          <q-file filled bottom-slots v-model="jsonFiles" label="Drop your file here" accept=".json" multiple
-            :disable="!!isLoading">
+        <div class="q-my-md">Import Dashboard from exported JSON file</div>
+        <div style="width: 400px">
+          <q-file
+            filled
+            bottom-slots
+            v-model="jsonFiles"
+            :label="t('dashboard.dropFileMsg')"
+            accept=".json"
+            multiple
+            :disable="!!isLoading"
+          >
             <template v-slot:prepend>
               <q-icon name="cloud_upload" @click.stop.prevent />
             </template>
             <template v-slot:append>
-              <q-icon name="close" @click.stop.prevent="jsonFiles = null" class="cursor-pointer" />
+              <q-icon
+                name="close"
+                @click.stop.prevent="jsonFiles = null"
+                class="cursor-pointer"
+              />
             </template>
-            <template v-slot:hint>
-              .json files only
-            </template>
+            <template v-slot:hint> .json files only </template>
           </q-file>
 
-        <!-- select folder or create new folder and select -->
-        <select-folder-dropdown @folder-selected="selectedFolderAtJson = $event"/>
+          <!-- select folder or create new folder and select -->
+          <select-folder-dropdown
+            @folder-selected="selectedFolderAtJson = $event"
+          />
 
           <div>
             <div v-if="filesImportResults.length" class="q-py-sm">
               <div v-for="importResult in filesImportResults">
                 <span v-if="importResult.status == 'rejected'" class="text-red">
-                  <code style="background-color: #f2f1f1; padding: 3px;">{{ importResult?.reason?.file }}</code> : {{ importResult?.reason?.error }}
+                  <code style="background-color: #f2f1f1; padding: 3px">{{
+                    importResult?.reason?.file
+                  }}</code>
+                  : {{ importResult?.reason?.error }}
                 </span>
               </div>
             </div>
-            <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.FILES" :label="t('dashboard.import')"
-              class="q-my-md text-bold no-border" color="secondary" padding="sm xl" type="submit" no-caps
-              @click="importFiles()" />
+            <q-btn
+              :disable="!!isLoading"
+              :loading="isLoading == ImportType.FILES"
+              :label="t('dashboard.import')"
+              class="q-my-md text-bold no-border"
+              color="secondary"
+              padding="sm xl"
+              type="submit"
+              no-caps
+              @click="importFiles()"
+            />
           </div>
         </div>
       </q-form>
       <q-separator class="q-my-sm" />
 
       <q-form @submit="onSubmit">
-        <div class="q-my-md">
-          Import Dashboard from URL
-        </div>
-        <div style="width: 400px;">
-          <q-input v-model="url" label="Add your url" color="input-border" bg-color="input-bg"
-            stack-label filled dense label-slot :disable="!!isLoading" />
+        <div class="q-my-md">{{t("dashboard.importURL")}}</div>
+        <div style="width: 400px">
+          <q-input
+            v-model="url"
+            :label="t('dashboard.addURL')"
+            color="input-border"
+            bg-color="input-bg"
+            stack-label
+            filled
+            dense
+            label-slot
+            :disable="!!isLoading"
+          />
 
-        <!-- select folder or create new folder and select -->
-        <select-folder-dropdown @folder-selected="selectedFolderAtUrl = $event"/>
-          
+          <!-- select folder or create new folder and select -->
+          <select-folder-dropdown
+            @folder-selected="selectedFolderAtUrl = $event"
+          />
+
           <div class="q-my-md">
-            <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.URL" class="text-bold no-border"
-              :label="t('dashboard.import')" color="secondary" type="submit" no-caps @click="importFromUrl()"
-              padding="sm xl" />
+            <q-btn
+              :disable="!!isLoading"
+              :loading="isLoading == ImportType.URL"
+              class="text-bold no-border"
+              :label="t('dashboard.import')"
+              color="secondary"
+              type="submit"
+              no-caps
+              @click="importFromUrl()"
+              padding="sm xl"
+            />
           </div>
         </div>
       </q-form>
       <q-separator class="q-my-sm" />
       <q-form @submit="onSubmit">
-        <div class="q-my-md">
-          Import Dashboard from JSON
+        <div class="q-my-md">{{t("dashboard.importJson")}}</div>
+        <div style="width: 400px" class="flex">
+          <q-input
+            :disable="!!isLoading"
+            v-model="jsonStr"
+            style="width: 400px"
+            :label="t('dashboard.jsonObject')"
+            color="input-border"
+            dense
+            filled
+            type="textarea"
+          />
         </div>
-        <div style="width: 400px;" class="flex">
-          <q-input :disable="!!isLoading" v-model="jsonStr" style="width: 400px;" label="JSON Object" color="input-border"
-            dense filled type="textarea" />
-        </div>
-        
+
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown @folder-selected="selectedFolderAtJsonObj = $event"/>
+        <select-folder-dropdown
+          @folder-selected="selectedFolderAtJsonObj = $event"
+        />
 
         <div class="q-my-md">
-          <q-btn :disable="!!isLoading" :loading="isLoading == ImportType.JSON_STRING" class="text-bold no-border q-mr-md"
-            :label="t('dashboard.import')" color="secondary" type="submit" padding="sm xl" no-caps
-            @click="importFromJsonStr()" />
-          <q-btn v-close-popup class="text-bold" :label="t('function.cancel')" text-color="light-text" padding="sm xl"
-            no-caps @click="goBack()" />
+          <q-btn
+            :disable="!!isLoading"
+            :loading="isLoading == ImportType.JSON_STRING"
+            class="text-bold no-border q-mr-md"
+            :label="t('dashboard.import')"
+            color="secondary"
+            type="submit"
+            padding="sm xl"
+            no-caps
+            @click="importFromJsonStr()"
+          />
+          <q-btn
+            v-close-popup
+            class="text-bold"
+            :label="t('function.cancel')"
+            text-color="light-text"
+            padding="sm xl"
+            no-caps
+            @click="goBack()"
+          />
         </div>
       </q-form>
     </div>
-    <div>
-
-    </div>
+    <div></div>
   </div>
 </template>
 <script lang="ts">
@@ -114,7 +178,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import dashboardService from "../../services/dashboards";
-import axios from 'axios';
+import axios from "axios";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 
@@ -123,266 +187,300 @@ export default defineComponent({
   props: ["dashboardId"],
   setup() {
     const { t } = useI18n();
-    const store = useStore()
-    const router = useRouter()
+    const store = useStore();
+    const router = useRouter();
     const route = useRoute();
     const $q = useQuasar();
 
     const selectedFolderAtJson = ref({
-      label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
-      value: route.query.folder
+      label:
+        store.state.organizationData.folders.find(
+          (item: any) => item.folderId === route.query.folder ?? "default"
+        )?.name ?? "default",
+      value: route.query.folder,
     });
     const selectedFolderAtUrl = ref({
-      label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
-      value: route.query.folder
+      label:
+        store.state.organizationData.folders.find(
+          (item: any) => item.folderId === route.query.folder ?? "default"
+        )?.name ?? "default",
+      value: route.query.folder,
     });
     const selectedFolderAtJsonObj = ref({
-      label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
-      value: route.query.folder
+      label:
+        store.state.organizationData.folders.find(
+          (item: any) => item.folderId === route.query.folder ?? "default"
+        )?.name ?? "default",
+      value: route.query.folder,
     });
 
     // hold the values of 3 supported import types
-    const jsonFiles = ref<any>()
-    const url = ref('')
-    const jsonStr = ref('')
+    const jsonFiles = ref<any>();
+    const url = ref("");
+    const jsonStr = ref("");
 
     // holds the value of the loading for any of the import type
-    const isLoading = ref(false)
+    const isLoading = ref(false);
 
     // import type values
     const ImportType = {
-      FILES: 'files',
-      URL: 'url',
-      JSON_STRING: 'json_string',
-    }
+      FILES: "files",
+      URL: "url",
+      JSON_STRING: "json_string",
+    };
 
     // store the results of the import (for files)
-    const filesImportResults = ref([])
+    const filesImportResults = ref([]);
 
-    onMounted(async() => {
-      filesImportResults.value = [];   
+    onMounted(async () => {
+      filesImportResults.value = [];
       await getFoldersList(store);
       selectedFolderAtJson.value = {
-        label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
-        value: route.query.folder
+        label:
+          store.state.organizationData.folders.find(
+            (item: any) => item.folderId === route.query.folder ?? "default"
+          )?.name ?? "default",
+        value: route.query.folder,
       };
       selectedFolderAtUrl.value = {
-        label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
-        value: route.query.folder
+        label:
+          store.state.organizationData.folders.find(
+            (item: any) => item.folderId === route.query.folder ?? "default"
+          )?.name ?? "default",
+        value: route.query.folder,
       };
       selectedFolderAtJsonObj.value = {
-        label: store.state.organizationData.folders.find((item: any) => item.folderId === route.query.folder ?? 'default')?.name ?? 'default',
-        value: route.query.folder
-      };       
+        label:
+          store.state.organizationData.folders.find(
+            (item: any) => item.folderId === route.query.folder ?? "default"
+          )?.name ?? "default",
+        value: route.query.folder,
+      };
     });
 
     //import dashboard from the json
-    const importDashboardFromJSON = async (jsonObj: any, selectedFolder: any) => {
-      const data = typeof jsonObj == 'string' ? JSON.parse(jsonObj) : typeof jsonObj == 'object' ? jsonObj : jsonObj
+    const importDashboardFromJSON = async (
+      jsonObj: any,
+      selectedFolder: any
+    ) => {
+      const data =
+        typeof jsonObj == "string"
+          ? JSON.parse(jsonObj)
+          : typeof jsonObj == "object"
+          ? jsonObj
+          : jsonObj;
 
       //set owner name and creator name to import dashboard
-      data.owner = store.state.userInfo.name
-      data.created = new Date().toISOString()
+      data.owner = store.state.userInfo.name;
+      data.created = new Date().toISOString();
 
       //create new dashboard
       const newDashboard = await dashboardService.create(
         store.state.selectedOrganization.identifier,
         data,
         selectedFolder.value
-      )
+      );
 
       //update store
       await getAllDashboards(store, selectedFolder.value);
 
       //return new dashboard
       return newDashboard;
-    }
+    };
 
     // import multiple files
     const importFiles = async () => {
       if (!jsonFiles.value || !jsonFiles.value.length) {
         $q.notify({
           type: "negative",
-          message: 'No JSON file(s) selected for import',
+          message: "No JSON file(s) selected for import",
         });
         isLoading.value = false;
         return;
       }
-      isLoading.value = ImportType.FILES
+      isLoading.value = ImportType.FILES;
 
       const data = jsonFiles?.value?.map((it: any, index: number) => {
         return new Promise((resolve, reject) => {
           let reader = new FileReader();
           reader.onload = function (readerResult) {
             try {
-
               const oldImportedSchema = JSON.parse(readerResult.target.result);
-              const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
+              const convertedSchema =
+                convertDashboardSchemaVersion(oldImportedSchema);
 
-              importDashboardFromJSON(convertedSchema, selectedFolderAtJson.value)
+              importDashboardFromJSON(
+                convertedSchema,
+                selectedFolderAtJson.value
+              )
                 .then((res) => {
-                  resolve({ file: it.name, result: res })
-                }).catch((e) => {
-                  reject({ file: it.name, error: e })
+                  resolve({ file: it.name, result: res });
                 })
+                .catch((e) => {
+                  reject({ file: it.name, error: e });
+                });
             } catch (e) {
-              reject({ file: it.name, error: 'Error reading file' })
-
+              reject({ file: it.name, error: "Error reading file" });
             }
           };
-          reader.readAsText(it)
-        })
-      })
-
-      Promise.allSettled(data ?? [])
-        .then(async (results) => {
-          filesImportResults.value = results
-
-          const allFulfilledValues = results
-            .filter(r => r.status === 'fulfilled')?.length
-
-          if (results.length == allFulfilledValues) {
-            await resetAndRefresh(ImportType.FILES, selectedFolderAtJson.value);
-          }
-
-          if(allFulfilledValues){
-            
-            $q.notify({
-              type: "positive",
-              message: `${allFulfilledValues} Dashboard(s) Imported Successfully.`,
-            });
-          }
-
-          if(results.length-allFulfilledValues){
-            
-            $q.notify({
-              type: "negative",
-              message: `${results.length-allFulfilledValues} Dashboard(s) Failed to Import.`,
-            });
-          }
-          
-
-          isLoading.value = false
+          reader.readAsText(it);
         });
+      });
 
-    }
+      Promise.allSettled(data ?? []).then(async (results) => {
+        filesImportResults.value = results;
 
-    // reset and refresh the value based on selected type 
+        const allFulfilledValues = results.filter(
+          (r) => r.status === "fulfilled"
+        )?.length;
+
+        if (results.length == allFulfilledValues) {
+          await resetAndRefresh(ImportType.FILES, selectedFolderAtJson.value);
+        }
+
+        if (allFulfilledValues) {
+          $q.notify({
+            type: "positive",
+            message: `${allFulfilledValues} Dashboard(s) Imported Successfully.`,
+          });
+        }
+
+        if (results.length - allFulfilledValues) {
+          $q.notify({
+            type: "negative",
+            message: `${
+              results.length - allFulfilledValues
+            } Dashboard(s) Failed to Import.`,
+          });
+        }
+
+        isLoading.value = false;
+      });
+    };
+
+    // reset and refresh the value based on selected type
     const resetAndRefresh = async (type, selectedFolder) => {
       switch (type) {
         case ImportType.FILES:
-          jsonFiles.value = null
-          isLoading.value = false
-          break
+          jsonFiles.value = null;
+          isLoading.value = false;
+          break;
         case ImportType.URL:
-          url.value = ''
-          isLoading.value = false
-          break
+          url.value = "";
+          isLoading.value = false;
+          break;
         case ImportType.JSON_STRING:
-          jsonStr.value = ''
-          isLoading.value = false
-          break
+          jsonStr.value = "";
+          isLoading.value = false;
+          break;
         default:
-          break
+          break;
       }
 
       return router.push({
-        path: '/dashboards',
+        path: "/dashboards",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           folder: selectedFolder.value,
-        }
-      })
-    }
+        },
+      });
+    };
 
     //import dashboard from url
     const importFromUrl = async () => {
-      isLoading.value = ImportType.URL
+      isLoading.value = ImportType.URL;
       try {
         // get the dashboard
-        const urlData = url.value.trim() ? url.value.trim() : ''
+        const urlData = url.value.trim() ? url.value.trim() : "";
 
-        if(!urlData){
+        if (!urlData) {
           $q.notify({
-              type: "negative",
-              message: `Please Enter a URL for import`,
-            });
-            return ;
+            type: "negative",
+            message: `Please Enter a URL for import`,
+          });
+          return;
         }
 
         const res = await axios.get(urlData);
 
-        const oldImportedSchema = (res.data);
-        const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
+        const oldImportedSchema = res.data;
+        const convertedSchema =
+          convertDashboardSchemaVersion(oldImportedSchema);
 
-        await importDashboardFromJSON(convertedSchema, selectedFolderAtUrl.value)
-          .then((res) => {
-            resetAndRefresh(ImportType.URL, selectedFolderAtUrl.value);
-            filesImportResults.value = []
-            $q.notify({
-              type: "positive",
-              message: `Dashboard Imported Successfully`,
-            });
-          })
+        await importDashboardFromJSON(
+          convertedSchema,
+          selectedFolderAtUrl.value
+        ).then((res) => {
+          resetAndRefresh(ImportType.URL, selectedFolderAtUrl.value);
+          filesImportResults.value = [];
+          $q.notify({
+            type: "positive",
+            message: `Dashboard Imported Successfully`,
+          });
+        });
       } catch (error) {
         $q.notify({
           type: "negative",
-          message: 'Please Enter a URL for import',
+          message: "Please Enter a URL for import",
         });
-        
       } finally {
-        isLoading.value = false
+        isLoading.value = false;
       }
-    }
+    };
 
     // import dashboard from json string
     const importFromJsonStr = async () => {
-      isLoading.value = ImportType.JSON_STRING
+      isLoading.value = ImportType.JSON_STRING;
       try {
         // get the dashboard
-        
-        const oldImportedSchema = JSON.parse(jsonStr.value);
-        const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
 
-        await importDashboardFromJSON(convertedSchema, selectedFolderAtJsonObj.value)
-          .then((res) => {
-            resetAndRefresh(ImportType.JSON_STRING, selectedFolderAtJsonObj.value);
-            filesImportResults.value = []
-            $q.notify({
-                type: "positive",
-                message: `Dashboard Imported Successfully`,
-            });
-          })
+        const oldImportedSchema = JSON.parse(jsonStr.value);
+        const convertedSchema =
+          convertDashboardSchemaVersion(oldImportedSchema);
+
+        await importDashboardFromJSON(
+          convertedSchema,
+          selectedFolderAtJsonObj.value
+        ).then((res) => {
+          resetAndRefresh(
+            ImportType.JSON_STRING,
+            selectedFolderAtJsonObj.value
+          );
+          filesImportResults.value = [];
+          $q.notify({
+            type: "positive",
+            message: `Dashboard Imported Successfully`,
+          });
+        });
       } catch (error) {
         $q.notify({
           type: "negative",
-          message: 'Please Enter a JSON object for import',
+          message: "Please Enter a JSON object for import",
         });
-       
       } finally {
-        isLoading.value = false
+        isLoading.value = false;
       }
-    }
+    };
 
     // back button to render dashboard List page
     const goBack = () => {
-      jsonFiles.value = []
-      url.value = ''
-      jsonStr.value = ''
-      filesImportResults.value = []
+      jsonFiles.value = [];
+      url.value = "";
+      jsonStr.value = "";
+      filesImportResults.value = [];
       return router.push({
-          path: "/dashboards",
-          query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-              folder: route?.query?.folder || "default",
-          }
+        path: "/dashboards",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: route?.query?.folder || "default",
+        },
       });
-  };
+    };
     const onSubmit = () => {
       // do nothing here
     };
 
-  return {
+    return {
       t,
       goBack,
       onSubmit,
@@ -398,9 +496,9 @@ export default defineComponent({
       route,
       selectedFolderAtJson,
       selectedFolderAtUrl,
-      selectedFolderAtJsonObj
-  };
+      selectedFolderAtJsonObj,
+    };
   },
-components: { SelectFolderDropdown }
-})
+  components: { SelectFolderDropdown },
+});
 </script>

@@ -36,7 +36,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          label="OpenTelemetry"
+          :label="t('ingestion.openTelelmetry')"
           content-class="tab_content"
         />
       </q-tabs>

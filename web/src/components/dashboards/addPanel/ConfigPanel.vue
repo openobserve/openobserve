@@ -15,74 +15,194 @@
 
 <template>
   <div>
-    <q-toggle v-if="dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'heatmap'" v-model="dashboardPanelData.data.config.show_legends"
-      :label="t('dashboard.showLegendsLabel')" />
+    <q-toggle
+      v-if="
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'heatmap'
+      "
+      v-model="dashboardPanelData.data.config.show_legends"
+      :label="t('dashboard.showLegendsLabel')"
+    />
 
     <div class="space"></div>
 
-    <q-select v-if="dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'heatmap'" outlined
-      v-model="dashboardPanelData.data.config.legends_position" :options="legendsPositionOptions" dense
-      :label="t('dashboard.legendsPositionLabel')" class="showLabelOnTop" stack-label emit-value
-      :display-value="`${dashboardPanelData.data.config.legends_position ?? 'Auto'}`">
+    <q-select
+      v-if="
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'heatmap'
+      "
+      outlined
+      v-model="dashboardPanelData.data.config.legends_position"
+      :options="legendsPositionOptions"
+      dense
+      :label="t('dashboard.legendsPositionLabel')"
+      class="showLabelOnTop"
+      stack-label
+      emit-value
+      :display-value="`${
+        dashboardPanelData.data.config.legends_position ?? 'Auto'
+      }`"
+    >
     </q-select>
 
     <div class="space"></div>
 
-    <q-select outlined v-model="dashboardPanelData.data.config.unit" :options="unitOptions" dense :label="t('dashboard.unitLabel')"
-      class="showLabelOnTop selectedLabel" stack-label emit-value
-      :display-value="`${dashboardPanelData.data.config.unit ? unitOptions.find(it => it.value == dashboardPanelData.data.config.unit)?.label : 'Default'}`">
+    <q-select
+      outlined
+      v-model="dashboardPanelData.data.config.unit"
+      :options="unitOptions"
+      dense
+      :label="t('dashboard.unitLabel')"
+      class="showLabelOnTop selectedLabel"
+      stack-label
+      emit-value
+      :display-value="`${
+        dashboardPanelData.data.config.unit
+          ? unitOptions.find(
+              (it) => it.value == dashboardPanelData.data.config.unit
+            )?.label
+          : 'Default'
+      }`"
+    >
     </q-select>
     <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
-    <q-input v-if="dashboardPanelData.data.config.unit == 'custom'" v-model="dashboardPanelData.data.config.unit_custom" :label="t('dashboard.customunitLabel')" color="input-border"
-    bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label filled dense label-slot/>
+    <q-input
+      v-if="dashboardPanelData.data.config.unit == 'custom'"
+      v-model="dashboardPanelData.data.config.unit_custom"
+      :label="t('dashboard.customunitLabel')"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      filled
+      dense
+      label-slot
+    />
 
     <div class="space"></div>
 
-    <q-select v-if="dashboardPanelData.data.type == 'geomap'" outlined
-        v-model="dashboardPanelData.data.config.base_map.type" :options="basemapTypeOptions" dense
-        :label="t('dashboard.basemapLabel')" class="showLabelOnTop" stack-label emit-value
-        :display-value="'OpenStreetMap'">
-      </q-select>
+    <q-select
+      v-if="dashboardPanelData.data.type == 'geomap'"
+      outlined
+      v-model="dashboardPanelData.data.config.base_map.type"
+      :options="basemapTypeOptions"
+      dense
+      :label="t('dashboard.basemapLabel')"
+      class="showLabelOnTop"
+      stack-label
+      emit-value
+      :display-value="'OpenStreetMap'"
+    >
+    </q-select>
 
-      <div class="space"></div>
-      <div v-if="dashboardPanelData.data.type == 'geomap'">
-        <span>Initial View:</span>
-        <div class="row">
-          <q-input  v-model.number="dashboardPanelData.data.config.map_view.lat" :label="t('dashboard.lattitudeLabel')" color="input-border"
-            bg-color="input-bg" class="col-6 q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
-          </q-input>
-          <q-input v-model.number="dashboardPanelData.data.config.map_view.lng" :label="t('dashboard.longitudeLabel')" color="input-border"
-            bg-color="input-bg" class="col-6 q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
-          </q-input>
-        </div>
-        <q-input v-model.number="dashboardPanelData.data.config.map_view.zoom" :label="t('dashboard.zoomLabel')" color="input-border"
-            bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
-          </q-input>
+    <div class="space"></div>
+    <div v-if="dashboardPanelData.data.type == 'geomap'">
+      <span>Initial View:</span>
+      <div class="row">
+        <q-input
+          v-model.number="dashboardPanelData.data.config.map_view.lat"
+          :label="t('dashboard.lattitudeLabel')"
+          color="input-border"
+          bg-color="input-bg"
+          class="col-6 q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+        >
+        </q-input>
+        <q-input
+          v-model.number="dashboardPanelData.data.config.map_view.lng"
+          :label="t('dashboard.longitudeLabel')"
+          color="input-border"
+          bg-color="input-bg"
+          class="col-6 q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+        >
+        </q-input>
       </div>
-          
+      <q-input
+        v-model.number="dashboardPanelData.data.config.map_view.zoom"
+        :label="t('dashboard.zoomLabel')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        :type="'number'"
+      >
+      </q-input>
+    </div>
+
     <div class="space"></div>
 
     <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
-      <div v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"  class="q-py-md showLabelOnTop">Query
-    <q-tabs v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows mobile-arrows>
-      <q-tab no-caps v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
-        :label="'Query ' + (index + 1)">
-      </q-tab>
-    </q-tabs>
-  </div>
+    <div
+      v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+      class="q-py-md showLabelOnTop"
+    >
+      Query
+      <q-tabs
+        v-model="dashboardPanelData.layout.currentQueryIndex"
+        narrow-indicator
+        dense
+        inline-label
+        outside-arrows
+        mobile-arrows
+      >
+        <q-tab
+          no-caps
+          v-for="(tab, index) in dashboardPanelData.data.queries"
+          :key="index"
+          :name="index"
+          :label="'Query ' + (index + 1)"
+        >
+        </q-tab>
+      </q-tabs>
+    </div>
     <!-- </q-input> -->
-   <div class="space"></div>
+    <div class="space"></div>
 
-    <q-input v-if="promqlMode" v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.promql_legend" label="Legend" color="input-border"
-      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot>
+    <q-input
+      v-if="promqlMode"
+      v-model="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.promql_legend
+      "
+      :label="t('common.legend')"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+    >
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
-          {{t('dashboard.legendLabel')}}
+          {{ t("dashboard.legendLabel") }}
           <div>
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-              {{t('dashboard.overrideMessage')}}
+            <q-icon class="q-ml-xs" size="20px"
+name="info" />
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+            >
+              {{ t("dashboard.overrideMessage") }}
             </q-tooltip>
           </div>
         </div>
@@ -91,110 +211,145 @@
 
     <div class="space"></div>
 
-    <q-select v-if="dashboardPanelData.data.type == 'geomap'" outlined
-      v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.layer_type" :options="layerTypeOptions" dense
-      label="Layer Type" class="showLabelOnTop" stack-label emit-value
-      :display-value="`${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.layer_type}`">
+    <q-select
+      v-if="dashboardPanelData.data.type == 'geomap'"
+      outlined
+      v-model="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.layer_type
+      "
+      :options="layerTypeOptions"
+      dense
+      :label="t('dashboard.layerType')"
+      class="showLabelOnTop"
+      stack-label
+      emit-value
+      :display-value="`${
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.layer_type
+      }`"
+    >
     </q-select>
 
     <div class="space"></div>
 
-   <q-input v-if="dashboardPanelData.data.type == 'geomap' && !isWeightFieldPresent" v-model.number="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.weight_fixed" label="Weight" color="input-border"
-      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot :type="'number'">
+    <q-input
+      v-if="dashboardPanelData.data.type == 'geomap' && !isWeightFieldPresent"
+      v-model.number="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.weight_fixed
+      "
+      :label="t('common.weight')"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      :type="'number'"
+    >
     </q-input>
   </div>
 </template>
 
 <script lang="ts">
-import useDashboardPanelData from '@/composables/useDashboardPanel';
-import { computed, defineComponent, watch } from 'vue';
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import { computed, defineComponent, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   setup() {
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData()
+    const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
 
     const basemapTypeOptions = [
       {
-        label: 'OpenStreetMap',
-        value: 'osm'
-      }
-    ]
+        label: t("dashboard.openStreetMap"),
+        value: "osm",
+      },
+    ];
 
     const layerTypeOptions = [
       {
-        label: 'Scatter',
-        value: 'scatter'
+        label: t("dashboard.scatter"),
+        value: "scatter",
       },
       {
-        label: 'Heatmap',
-        value: 'heatmap'
-      }
-    ]
+        label: t("dashboard.heatmap"),
+        value: "heatmap",
+      },
+    ];
     // options for legends position
     const legendsPositionOptions = [
       {
-        label: 'Auto',
-        value: null
+        label: t("dashboard.auto"),
+        value: null,
       },
       {
-        label: 'Right',
-        value: 'right'
+        label: t("dashboard.right"),
+        value: "right",
       },
       {
-        label: 'Bottom',
-        value: 'bottom'
+        label: t("dashboard.bottom"),
+        value: "bottom",
       },
-    ]
+    ];
     const unitOptions = [
       {
-        label: 'Default',
-        value: null
+        label: t("dashboard.default"),
+        value: null,
       },
       {
-        label: 'Bytes',
-        value: 'bytes'
+        label: t("dashboard.bytes"),
+        value: "bytes",
       },
       {
-        label: 'Kilobytes (kb)',
-        value: 'kilobytes'
+        label: t("dashboard.kilobytes"),
+        value: "kilobytes",
       },
       {
-        label: 'Megabytes (mb)',
-        value: 'megabytes'
+        label: t("dashboard.megabytes"),
+        value: "megabytes",
       },
       {
-        label: 'Bytes/Second',
-        value: 'bps'
+        label: t("dashboard.bytesPerSecond"),
+        value: "bps",
       },
       {
-        label: 'Seconds (s)',
-        value: 'seconds'
+        label: t("dashboard.seconds"),
+        value: "seconds",
       },
       {
-        label: 'Microseconds (μs)',
-        value: 'microseconds'
+        label: t("dashboard.microseconds"),
+        value: "microseconds",
       },
       {
-        label: 'Milliseconds (ms)',
-        value: 'milliseconds'
+        label: t("dashboard.milliseconds"),
+        value: "milliseconds",
       },
       {
-        label: 'Percent (0.0-1.0)',
-        value: 'percent-1'
+        label: t("dashboard.percent1"),
+        value: "percent-1",
       },
       {
-        label: 'Percent (0-100)',
-        value: 'percent'
+        label: t("dashboard.percent"),
+        value: "percent",
       },
       {
-        label: 'Custom',
-        value: 'custom'
+        label: t("dashboard.custom"),
+        value: "custom",
       },
-    ]
+    ];
     const isWeightFieldPresent = computed(() => {
-      const layoutFields = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields; 
+      const layoutFields =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields;
       return !!layoutFields?.weight;
     });
     return {
@@ -205,9 +360,9 @@ export default defineComponent({
       layerTypeOptions,
       legendsPositionOptions,
       unitOptions,
-      isWeightFieldPresent
+      isWeightFieldPresent,
     };
-  }
+  },
 });
 </script>
 

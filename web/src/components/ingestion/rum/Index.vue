@@ -36,7 +36,7 @@
             },
           }"
           icon="web"
-          label="Browser"
+          :label="t('common.browser')"
           content-class="tab_content"
         />
       </q-tabs>

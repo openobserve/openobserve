@@ -125,7 +125,7 @@
           <q-toggle
             class="q-mr-md"
             v-model="playerState.skipInactivity"
-            label="Skip Inactivity"
+            :label="t('rum.skipInactivity')"
             size="xs"
             @update:model-value="toggleSkipInactive"
           />
@@ -163,6 +163,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useLocalToken, getPath } from "@/utils/zincutils";
+import { useI18n } from "vue-i18n";
 
 const props = defineProps({
   events: {
@@ -178,6 +179,8 @@ const props = defineProps({
     required: true,
   },
 });
+
+const { t } = useI18n();
 
 const store = useStore();
 
