@@ -115,7 +115,13 @@ jobs:
           brew install protobuf
 
       - name: Install dependencies for linux
-        if: contains(matrix.arch, 'linux')
+        if: contains(matrix.arch, 'linux-gnu')
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
+      
+      - name: Install dependencies for linux
+        if: contains(matrix.arch, 'linux-musl')
         run: |
           sudo apt-get -y update
           sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
