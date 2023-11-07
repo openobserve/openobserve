@@ -8,17 +8,17 @@
     />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Install opentelemetry operator
+      Wait for 2 minutes after installing cert-manger for the webhook to be ready before installing OpenTelemetry operator.
+    </div>
+
+    <div class="text-subtitle1 q-pl-xs q-mt-md">
+      Install OpenTelemetry operator
     </div>
     <ContentCopy
       class="q-mt-sm"
       content="kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml"
     />
 
-    <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Wait for 2 minutes after installing cert-manger for the webhook to be
-      ready before installing OpenTelemetry operator.
-    </div>
     <div class="text-subtitle1 q-pl-xs q-mt-md">Update helm repo</div>
     <ContentCopy
       class="q-mt-sm"
@@ -82,11 +82,11 @@ const accessKey = computed(() => {
 });
 
 const collectorCmd = computed(() => {
-  return `helm --namespace openobserve-collector -f values.yaml \ 
-  install o1c openobserve/openobserve-collector \         
-  --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \    
-  --set exporters."otlphttp/openobserve".headers.Authorization="Basic ${accessKey.value}"  \  
-  --set exporters."otlphttp/openobserve_k8s_events".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \  
+  return `helm --namespace openobserve-collector \\
+  install o1c openobserve/openobserve-collector \\
+  --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\    
+  --set exporters."otlphttp/openobserve".headers.Authorization="Basic ${accessKey.value}"  \\
+  --set exporters."otlphttp/openobserve_k8s_events".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\
   --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic ${accessKey.value}"`;
 });
 </script>
