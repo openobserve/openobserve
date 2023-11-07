@@ -191,10 +191,11 @@ export const usePanelDataLoader = (
       // If we can not run the query, remove the data so that, if the query doesn't run, then the previous data is removed
       // and charts are updated to show no data
       // TODO: need to improve this as it will cause some flickering when you change the date
-      if(!canRunQueryBasedOnVariables()) {
-        state.data = [];
-      }
       return;
+    }
+    // need to set data as [] if variable data not found
+    if(isVariableDataNotFound()) {
+      state.data = [];
     }
 
     const queryData = panelSchema.value.queries[0].query;
@@ -352,6 +353,25 @@ export const usePanelDataLoader = (
     }
   };
 
+  const isVariableDataNotFound = () => {
+    const dependentVariables = variablesData.value?.values?.filter((it: any) =>
+      panelSchema?.value?.queries
+        ?.map((q: any) => {
+          const includes = q?.query?.includes(`$${it.name}`);
+          return includes;
+        })
+        ?.includes(true)
+    )    
+    if (dependentVariables?.length > 0) {
+      const flag = dependentVariables.some(
+        (it: any) => !it.isLoading && it.value == ""
+      );
+      return 
+    }else{
+      return false;
+    }
+  }
+
   /**
    * Replaces the query with the corresponding variable values.
    *
@@ -499,7 +519,7 @@ export const usePanelDataLoader = (
         const oldValue = currentDependentVariablesData.find(
           (it2: any) => it2.name == it.name
         );
-        return it.value == oldValue?.value;
+        return it.value == oldValue?.value && oldValue?.value != "";
       });
 
       if (!isAllValuesSame) {
