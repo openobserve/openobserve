@@ -186,16 +186,9 @@ export const usePanelDataLoader = (
     const controller = new AbortController();
     // state.loading = true;
 
+    // if variable is loading then do not call api simply return
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
-
-      // If we can not run the query, remove the data so that, if the query doesn't run, then the previous data is removed
-      // and charts are updated to show no data
-      // TODO: need to improve this as it will cause some flickering when you change the date
       return;
-    }
-    // need to set data as [] if variable data not found
-    if(isVariableDataNotFound()) {
-      state.data = [];
     }
 
     const queryData = panelSchema.value.queries[0].query;
@@ -352,25 +345,6 @@ export const usePanelDataLoader = (
       return true;
     }
   };
-
-  const isVariableDataNotFound = () => {
-    const dependentVariables = variablesData.value?.values?.filter((it: any) =>
-      panelSchema?.value?.queries
-        ?.map((q: any) => {
-          const includes = q?.query?.includes(`$${it.name}`);
-          return includes;
-        })
-        ?.includes(true)
-    )    
-    if (dependentVariables?.length > 0) {
-      const flag = dependentVariables.some(
-        (it: any) => !it.isLoading && it.value == ""
-      );
-      return 
-    }else{
-      return false;
-    }
-  }
 
   /**
    * Replaces the query with the corresponding variable values.
