@@ -186,14 +186,8 @@ export const usePanelDataLoader = (
     const controller = new AbortController();
     // state.loading = true;
 
+    // if variable is loading then do not call api simply return
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
-
-      // If we can not run the query, remove the data so that, if the query doesn't run, then the previous data is removed
-      // and charts are updated to show no data
-      // TODO: need to improve this as it will cause some flickering when you change the date
-      if(!canRunQueryBasedOnVariables()) {
-        state.data = [];
-      }
       return;
     }
 
@@ -499,7 +493,7 @@ export const usePanelDataLoader = (
         const oldValue = currentDependentVariablesData.find(
           (it2: any) => it2.name == it.name
         );
-        return it.value == oldValue?.value;
+        return it.value == oldValue?.value && oldValue?.value != "";
       });
 
       if (!isAllValuesSame) {
