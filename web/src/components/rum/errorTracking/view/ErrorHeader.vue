@@ -16,8 +16,27 @@
 <template>
   <div>
     <div>
+      <div class="q-pt-sm q-pb-xs flex justify-start">
+        <div
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          @click="router.back()"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+        <span class="text-bold">Event ID:</span>
+        <span :title="eventId" class="q-pl-xs cursor-pointer"
+          >{{ error.error_id }} <q-icon size="12px" name="content_copy"
+        /></span>
+        <span class="q-ml-lg">{{ error.timestamp }}</span>
+      </div>
       <div class="row items-center no-wrap q-my-xs">
-        <div class="error_type text-bold ">{{ error.type }}</div>
+        <div class="error_type text-bold">{{ error.type }}</div>
       </div>
       <div class="error_message q-pt-xs row items-center">
         <div
@@ -32,20 +51,15 @@
         </div>
         {{ error.error_message }}
       </div>
-      <div class="q-pt-sm q-pb-xs">
-        <span class="text-bold">Event ID:</span>
-        <span :title="eventId" class="q-pl-xs cursor-pointer"
-          >{{ error.error_id }} <q-icon size="12px" name="content_copy"
-        /></span>
-        <span class="q-ml-lg">{{ error.timestamp }}</span>
-      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { computed, defineProps } from "vue";
+import { useRouter } from "vue-router";
 
+const router = useRouter();
 const props = defineProps({
   error: {
     type: Object,

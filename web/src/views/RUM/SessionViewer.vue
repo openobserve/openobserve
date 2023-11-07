@@ -18,6 +18,18 @@
     <div class="col-12 q-px-sm q-pt-md row items-end">
       <div class="col-9 row">
         <div
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          @click="router.back()"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+        <div
           class="text-caption ellipsis row items-center q-mr-md"
           style="font-size: 20px"
         >
