@@ -275,6 +275,7 @@ pub async fn check_for_schema(
             types_delta: None,
             schema_fields: schema.to_cloned_fields(),
             is_schema_changed: false,
+            record_schema: schema,
         };
     }
 
@@ -289,6 +290,7 @@ pub async fn check_for_schema(
             types_delta: None,
             schema_fields: schema.to_cloned_fields(),
             is_schema_changed: false,
+            record_schema: schema,
         };
     }
 
@@ -299,6 +301,7 @@ pub async fn check_for_schema(
             types_delta: None,
             schema_fields: inferred_schema.to_cloned_fields(),
             is_schema_changed: false,
+            record_schema: schema,
         };
     }
 
@@ -318,7 +321,7 @@ pub async fn check_for_schema(
         }
     };
 
-    let (field_datatype_delta, is_schema_changed, final_fields) =
+    let (field_datatype_delta, is_schema_changed, final_fields, record_schema) =
         get_schema_changes(&schema, &inferred_schema, is_arrow);
 
     if is_schema_changed {
@@ -340,6 +343,7 @@ pub async fn check_for_schema(
                 types_delta: Some(field_datatype_delta),
                 schema_fields: schema.to_cloned_fields(),
                 is_schema_changed: false,
+                record_schema,
             }
         }
     } else {
@@ -348,6 +352,7 @@ pub async fn check_for_schema(
             types_delta: Some(field_datatype_delta),
             schema_fields: final_fields,
             is_schema_changed,
+            record_schema,
         }
     }
 }
@@ -367,7 +372,7 @@ async fn handle_existing_schema(
         let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
             .await
             .unwrap();
-        let (field_datatype_delta, is_schema_changed, final_fields) =
+        let (field_datatype_delta, is_schema_changed, final_fields, _) =
             get_schema_changes(&schema, inferred_schema, is_arrow);
         let is_field_delta = !field_datatype_delta.is_empty();
         let mut metadata = schema.metadata().clone();
@@ -405,6 +410,7 @@ async fn handle_existing_schema(
             types_delta: Some(field_datatype_delta),
             schema_fields: final_fields,
             is_schema_changed,
+            record_schema: final_schema,
         })
     } else {
         let key = format!(
@@ -423,7 +429,7 @@ async fn handle_existing_schema(
             let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            let (field_datatype_delta, is_schema_changed, final_fields) =
+            let (field_datatype_delta, is_schema_changed, final_fields, _) =
                 get_schema_changes(&schema, inferred_schema, is_arrow);
             let is_field_delta = !field_datatype_delta.is_empty();
             let mut metadata = schema.metadata().clone();
@@ -450,7 +456,7 @@ async fn handle_existing_schema(
                 )
                 .await
                 .unwrap();
-                stream_schema_map.insert(stream_name.to_string(), final_schema);
+                stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
             } else {
                 //No Change in schema.
                 stream_schema_map.insert(stream_name.to_string(), schema);
@@ -462,15 +468,16 @@ async fn handle_existing_schema(
                 types_delta: Some(field_datatype_delta),
                 schema_fields: final_fields,
                 is_schema_changed,
+                record_schema: final_schema,
             })
         } else {
             // Some other request has already acquired the lock.
             let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            let (field_datatype_delta, _is_schema_changed, final_fields) =
+            let (field_datatype_delta, _is_schema_changed, final_fields, _) =
                 get_schema_changes(&schema, inferred_schema, is_arrow);
-            stream_schema_map.insert(stream_name.to_string(), schema);
+            stream_schema_map.insert(stream_name.to_string(), schema.clone());
             log::info!("Schema exists for stream {} ", stream_name);
             drop(lock_acquired); // release lock
             Some(SchemaEvolution {
@@ -478,6 +485,7 @@ async fn handle_existing_schema(
                 types_delta: Some(field_datatype_delta),
                 schema_fields: final_fields,
                 is_schema_changed: false,
+                record_schema: schema,
             })
         }
     }
@@ -542,6 +550,7 @@ async fn handle_new_schema(
                     types_delta: None,
                     schema_fields: final_schema.to_cloned_fields(),
                     is_schema_changed: true,
+                    record_schema: final_schema,
                 });
             } else {
                 stream_schema_map.insert(stream_name.to_string(), chk_schema.clone());
@@ -596,6 +605,7 @@ async fn handle_new_schema(
                         types_delta: None,
                         schema_fields: final_schema.to_cloned_fields(),
                         is_schema_changed: true,
+                        record_schema: final_schema,
                     });
                 } else {
                     // No schema change
@@ -626,7 +636,7 @@ fn get_schema_changes(
     schema: &Schema,
     inferred_schema: &Schema,
     is_arrow: bool,
-) -> (Vec<Field>, bool, Vec<Field>) {
+) -> (Vec<Field>, bool, Vec<Field>, Schema) {
     let mut field_datatype_delta: Vec<_> = vec![];
     let mut new_field_delta: Vec<_> = vec![];
     let mut merged_fields: AHashMap<String, Field> = AHashMap::new();
@@ -668,24 +678,36 @@ fn get_schema_changes(
             }
         }
     }
+    let mut rec_schema = Schema::empty();
+    if !field_datatype_delta.is_empty() {
+        //update data type
+        match try_merge(vec![
+            schema.clone(),
+            Arc::into_inner(inferred_schema.clone().into()).unwrap(),
+        ]) {
+            Err(e) => {
+                log::error!("get_schema_changes: schema merge failed err: {:?}", e);
+            }
+            Ok(merged) => {
+                rec_schema = merged;
+            }
+        }
+    }
 
     let mut final_fields: Vec<Field> = if !is_arrow {
         merged_fields.drain().map(|(_key, value)| value).collect()
     } else {
-        let mut inferred_fields: AHashMap<String, Field> = AHashMap::new();
-        for f in inferred_schema.fields.iter() {
-            inferred_fields.insert(f.name().to_owned(), (**f).clone());
-        }
-        merged_fields
-            .drain()
-            .filter(|item| inferred_fields.contains_key(&item.0))
-            .map(|(_key, value)| value)
-            .collect()
+        rec_schema.all_fields().iter().map(|&x| x.clone()).collect()
     };
 
     final_fields.sort_by(|a, b| a.name().cmp(b.name()));
 
-    (field_datatype_delta, is_schema_changed, final_fields)
+    (
+        field_datatype_delta,
+        is_schema_changed,
+        final_fields,
+        rec_schema,
+    )
 }
 
 pub async fn stream_schema_exists(
