@@ -593,7 +593,7 @@ async fn add_valid_record_arrow(
         Some(&schema_key),
     );
 
-    let mut rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
+    let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
 
     if schema_evolution.schema_compatible {
         let valid_record = if schema_evolution.types_delta.is_some() {
