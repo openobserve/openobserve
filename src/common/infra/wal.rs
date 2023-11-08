@@ -92,7 +92,6 @@ pub async fn get_or_create(
             partition_time_level,
             key,
             use_cache,
-            false,
             None,
         )
         .await
@@ -113,7 +112,6 @@ pub async fn get_or_create_arrow(
             partition_time_level,
             key,
             use_cache,
-            true,
             schema,
         )
         .await
@@ -232,7 +230,6 @@ impl Manager {
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
-        use_arrow: bool,
         schema: Option<Schema>,
     ) -> Arc<RwFile> {
         let stream_type = stream.stream_type;
@@ -244,7 +241,7 @@ impl Manager {
         if let Some(f) = data.get(&full_key) {
             return f.clone();
         }
-
+        let use_arrow = schema.is_some();
         let file = Arc::new(
             RwFile::new(
                 thread_id,
@@ -270,7 +267,6 @@ impl Manager {
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
-        use_arrow: bool,
         schema: Option<Schema>,
     ) -> Arc<RwFile> {
         if let Some(file) = self.get(thread_id, stream.clone(), key).await {
@@ -282,7 +278,6 @@ impl Manager {
                 partition_time_level,
                 key,
                 use_cache,
-                use_arrow,
                 schema,
             )
             .await
