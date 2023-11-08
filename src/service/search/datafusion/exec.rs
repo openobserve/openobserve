@@ -20,7 +20,6 @@ use datafusion::{
         record_batch::RecordBatch,
     },
     common::{FileType, GetExt},
-    config::ConfigOptions,
     datasource::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
@@ -870,7 +869,7 @@ pub async fn merge_parquet_files(
     let start = std::time::Instant::now();
     // query data
     let runtime_env = create_runtime_env()?;
-    let session_config = create_session_config();
+    let session_config = create_session_config()?;
     let ctx = SessionContext::new_with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
@@ -934,19 +933,23 @@ pub async fn merge_parquet_files(
     Ok(file_meta)
 }
 
-pub fn create_session_config() -> SessionConfig {
+pub fn create_session_config() -> Result<SessionConfig> {
     // Enable parquet predicate pushdown optimization
-    let mut options = ConfigOptions::new();
-    options.execution.parquet.pushdown_filters = true;
-    options.execution.parquet.reorder_filters = true;
-    options.optimizer.repartition_sorts = true;
-    if CONFIG.common.bloom_filter_enabled {
-        options.execution.parquet.bloom_filter_enabled = true;
-    }
+    // let mut options = ConfigOptions::new();
+    // options.execution.parquet.pushdown_filters = true;
+    // options.execution.parquet.reorder_filters = true;
+    // options.optimizer.repartition_sorts = true;
+    // if CONFIG.common.traces_bloom_filter_enabled {
+    //     options.execution.parquet.bloom_filter_enabled = true;
+    // }
 
-    SessionConfig::from(options)
+    let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
-        .with_information_schema(true)
+        .with_information_schema(true);
+    if CONFIG.common.bloom_filter_enabled {
+        config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", true);
+    }
+    Ok(config)
 }
 
 pub fn create_runtime_env() -> Result<RuntimeEnv> {
@@ -984,7 +987,7 @@ pub fn create_runtime_env() -> Result<RuntimeEnv> {
 
 pub fn prepare_datafusion_context() -> Result<SessionContext, DataFusionError> {
     let runtime_env = create_runtime_env()?;
-    let session_config = create_session_config();
+    let session_config = create_session_config()?;
     Ok(SessionContext::new_with_config_rt(
         session_config,
         Arc::new(runtime_env),
