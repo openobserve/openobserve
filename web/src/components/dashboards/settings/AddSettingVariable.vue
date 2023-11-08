@@ -337,6 +337,10 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+:deep(.no-case .q-field__native > :first-child) {
+  text-transform: none !important;
+}
+
 .textbox {
   margin-top: 5px;
   margin-bottom: 5px;
