@@ -331,7 +331,7 @@ pub struct SchemaEvolution {
     pub types_delta: Option<Vec<Field>>,
     pub schema_fields: Vec<Field>,
     pub is_schema_changed: bool,
-    pub record_schema: Schema
+    pub record_schema: Schema,
 }
 
 pub struct SchemaRecords {
