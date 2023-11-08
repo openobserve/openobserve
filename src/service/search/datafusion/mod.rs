@@ -16,7 +16,7 @@ use datafusion::arrow::datatypes::Schema;
 use parquet::{
     arrow::ArrowWriter,
     basic::{Compression, Encoding},
-    file::properties::WriterProperties,
+    file::{metadata::KeyValue, properties::WriterProperties},
     format::SortingColumn,
     schema::types::ColumnPath,
 };
@@ -27,7 +27,7 @@ use crate::common::{
         CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE, PARQUET_PAGE_SIZE,
         SQL_FULL_TEXT_SEARCH_FIELDS,
     },
-    meta::functions::ZoFunction,
+    meta::{common::FileMeta, functions::ZoFunction},
 };
 
 mod date_format_udf;
@@ -97,7 +97,7 @@ pub const DEFAULT_FUNCTIONS: [ZoFunction; 6] = [
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
-    num_rows: u64,
+    metadata: &'a FileMeta,
     bf_fields: Option<Vec<&str>>,
 ) -> ArrowWriter<&'a mut Vec<u8>> {
     let sort_column_id = schema
@@ -120,7 +120,16 @@ pub fn new_parquet_writer<'a>(
         .set_column_encoding(
             ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
             Encoding::DELTA_BINARY_PACKED,
-        );
+        )
+        .set_key_value_metadata(Some(vec![
+            KeyValue::new("min_ts".to_string(), metadata.min_ts.to_string()),
+            KeyValue::new("max_ts".to_string(), metadata.max_ts.to_string()),
+            KeyValue::new("records".to_string(), metadata.records.to_string()),
+            KeyValue::new(
+                "original_size".to_string(),
+                metadata.original_size.to_string(),
+            ),
+        ]));
     for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
         writer_props = writer_props
             .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
@@ -129,10 +138,10 @@ pub fn new_parquet_writer<'a>(
         for field in fields {
             writer_props = writer_props
                 .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
-            if num_rows > 0 {
+            if metadata.records > 0 {
                 writer_props = writer_props.set_column_bloom_filter_ndv(
                     ColumnPath::from(vec![field.to_string()]),
-                    num_rows,
+                    metadata.records as u64,
                 );
             }
         }

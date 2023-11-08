@@ -257,12 +257,7 @@ async fn upload_file(
         } else {
             None
         };
-    let mut writer = new_parquet_writer(
-        &mut buf_parquet,
-        &arrow_schema,
-        file_meta.records as u64,
-        bf_fields,
-    );
+    let mut writer = new_parquet_writer(&mut buf_parquet, &arrow_schema, &file_meta, bf_fields);
     for batch in batches {
         writer.write(&batch)?;
     }
