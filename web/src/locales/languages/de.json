@@ -1,4 +1,42 @@
 {
+  "common": {
+    "close": "Schliessen",
+    "cancel": "Stornieren",
+    "ok": "In Ordnung",
+    "apply": "Bewerben",
+    "startTime": "Startzeit",
+    "endTime": "Endzeit",
+    "datetimeMessage": "* Sie können mehrere Daten wählen",
+    "datetimeRelative": "RELATIV",
+    "datetimeAbsolute": "ABSOLUT",
+    "move": "Beweg",
+    "legend": "Legende",
+    "weight": "Gewicht",
+    "label": "Etikett",
+    "aggregation": "Aggregation",
+    "list": "Liste",
+    "condition": "Zustand",
+    "operator": "Betreiber",
+    "value": "Wert",
+    "selectFilter": "Wählen Sie Filter",
+    "browser": "Browser",
+    "attachments": "Anlagen",
+    "confirm": "Bestätigen",
+    "json": "JSON",
+    "table": "Tabelle",
+    "wrap": "Wickeln",
+    "previous": "Bisherige",
+    "next": "Weiter",
+    "searchAround": "Suchen Sie in der Umgebung",
+    "copyToClipboard": "In die Zwischenablage kopieren",
+    "includeSearchTerm": "Suchbegriff einbeziehen",
+    "addFieldToTable": "Feld zur Tabelle hinzufügen",
+    "excludeSearchTerm": "Suchbegriff ausschließen",
+    "noOfRecords": "Anzahl der Aufzeichnungen:",
+    "attributes": "Eigenschaften",
+    "events": "Ereignisse",
+    "goHome": "Geh nach Hause"
+  },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
     "typeSearch": "Geben Sie hier Ihre Suchanfrage ein",
@@ -29,7 +67,9 @@
     "saveFunctionLabel": "Funktion speichern",
     "exportLogs": "Logs exportieren",
     "runQuery": "Abfrage ausführen",
-    "syntaxGuideLabel": "Leitfaden zur Syntax"
+    "syntaxGuideLabel": "Leitfaden zur Syntax",
+    "logs": "Logs",
+    "enrichmentTables": "Anreicherungstabellen"
   },
   "menu": {
     "home": "Zuhause",
@@ -48,7 +88,8 @@
     "function": "Funktionen",
     "ingestion": "Verschlucken",
     "metrics": "Metriken",
-    "slack": "Hilfe",
+    "slack": "Flache",
+    "help": "Hilfe",
     "dashboard": "Dashboards",
     "alerts": "Warnmeldungen",
     "openapi": "API öffnen",
@@ -75,11 +116,32 @@
     "errorLabel": "Fehler",
     "sessionLabel": "Sessions",
     "learnWebVitalsLabel": "Erfahre mehr über Web Vitals",
-    "clickHereLabel": "Klicken Sie hier"
+    "clickHereLabel": "Klicken Sie hier",
+    "skipInactivity": "Inaktivität überspringen",
+    "error": "Fehler",
+    "sessionType": "Sitzungstyp",
+    "timeSpent": "Verbrachte Zeit",
+    "errorCount": "Anzahl der Fehler",
+    "initialViewName": "Name der ersten Ansicht",
+    "timestamp": "Zeitstempel",
+    "type": "Typ",
+    "category": "Kategorie",
+    "level": "Stufe",
+    "description": "Beschreibung",
+    "resourceURL": "Ressourcen-URL",
+    "durationms": "Dauer (ms)",
+    "sizekb": "Größe (kb)",
+    "viewURL": "URL anzeigen",
+    "events": "Ereignisse",
+    "location": "Standort"
   },
   "about": {
     "name": "Observe öffnen",
-    "introduction": "Beobachtbarkeit vereinfacht."
+    "introduction": "Beobachtbarkeit vereinfacht.",
+    "version": "Ausführung",
+    "commitHash": "Hash übertragen",
+    "buildDate": "Datum der Erstellung",
+    "logoMsg": "Beobachtbarkeit vereinfacht."
   },
   "login": {
     "userid": "Benutzer-ID",
@@ -88,7 +150,8 @@
     "signUp": "Melde dich an",
     "password": "Passwort",
     "cnfpassword": "Passwort bestätigen",
-    "singnInWithGoogle": "Weiter mit Google"
+    "singnInWithGoogle": "Weiter mit Google",
+    "email": "E-Mail"
   },
   "user": {
     "header": "Mitglied der Organisation",
@@ -135,7 +198,10 @@
     "newPassword": "Neues Passwort",
     "organization": "Organisation",
     "otherOrganization": "Andere Organisation",
-    "isExistingUser": "Existierender Benutzer?"
+    "isExistingUser": "Existierender Benutzer?",
+    "deleteAPIKeyMessage": "Möchten Sie diesen Benutzer-API-Schlüssel wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Klicken Sie zur Bestätigung auf OK.",
+    "apiKeyNotFound": "Benutzer-API-Schlüssel wurde nicht gefunden.",
+    "allowedOrg": "Zulässige Organisation"
   },
   "ticket": {
     "header": "Tickets für den Support",
@@ -264,7 +330,9 @@
     "enrichmentTables": "Anreicherungstabellen",
     "addEnrichmentTable": "Anreicherungstabelle hinzufügen",
     "updateEnrichmentTable": "Anreicherungstabelle aktualisieren",
-    "searchEnrichmentTable": "Tabelle „Suchanreicherung“"
+    "searchEnrichmentTable": "Tabelle „Suchanreicherung“",
+    "uploadCSVFile": "CSV-Datei hochladen",
+    "selectFunction": "Funktion wählen"
   },
   "confirmDialog": {
     "cancel": "Stornieren",
@@ -282,7 +350,8 @@
     "customLabel": "Benutzerdefiniert",
     "logsLabel": "Logs",
     "metricsLabel": "Metriken",
-    "tracesLabel": "Spuren"
+    "tracesLabel": "Spuren",
+    "subnetMessage": "Geben Sie mehrere durch Kommas getrennte Subnetze ein"
   },
   "syslog": {
     "stream": "Streamen",
@@ -377,7 +446,51 @@
     "legendLabel": "Legende",
     "overrideMessage": "Überschreibungen des Seriennamens. Beispielsweise muss {endpoint} durch den Labelwert für Endpunkt ersetzt werden.",
     "unsavedMessage": "Sie haben ungespeicherte Änderungen. Bist du sicher, dass du gehen willst?",
-    "addFieldMessage": "Bitte fügen Sie ein Feld aus der Liste hinzu"
+    "addFieldMessage": "Bitte fügen Sie ein Feld aus der Liste hinzu",
+    "currentFolderLabel": "Aktueller Ordner",
+    "selectFolderLabel": "Ordner wählen",
+    "layerType": "Schicht-Typ",
+    "newDashboard": "Neues Dashboard erstellen",
+    "addDashboard": "Zum Dashboard hinzufügen",
+    "dashboardName": "Name des Dashboards",
+    "dashboardDesc": "Beschreibung des Dashboards",
+    "panelTitle": "Titel des Panels",
+    "selectDashboard": "Wählen Sie Dashboard",
+    "importDashboard": "Dashboard importieren",
+    "dropFileMsg": "Legen Sie Ihre Datei hier ab",
+    "importURL": "Dashboard aus URL importieren",
+    "addURL": "Füge deine URL hinzu",
+    "importJson": "Dashboard aus JSON importieren",
+    "jsonObject": "JSON-Objekt",
+    "openStreetMap": "OpenStreetMap",
+    "scatter": "Streuen",
+    "heatmap": "Heatmap",
+    "auto": "Automatisch",
+    "right": "Richtig",
+    "bottom": "Unterseite",
+    "default": "Standard",
+    "bytes": "Byte",
+    "kilobytes": "Kilobyte (kb)",
+    "megabytes": "Megabyte (MB)",
+    "bytesPerSecond": "Bytes/Sekunde",
+    "seconds": "Sekunde (n)",
+    "microseconds": "Mikrosekunden (μs)",
+    "milliseconds": "Millisekunden (ms)",
+    "percent1": "Prozent (0,0-1,0)",
+    "percent": "Prozent (0-100)",
+    "custom": "Benutzerdefiniert",
+    "count": "Graf",
+    "countDistinct": "Anzahl (deutlich)",
+    "sum": "Summe",
+    "avg": "Durchschn.",
+    "min": "Min.",
+    "max": "Max",
+    "histogram": "Histogramm",
+    "queryValues": "Werte abfragen",
+    "constant": "Konstante",
+    "textbox": "Textfeld",
+    "newFolder": "Neuer Ordner",
+    "updateFolder": "Ordner aktualisieren"
   },
   "panel": {
     "header": "Paneel",
@@ -487,7 +600,8 @@
     "downloadInvoice": "Rechnung herunterladen",
     "usageLabel": "Verwendung",
     "plansLabel": "Pläne",
-    "invoiceHistoryLabel": "Rechnungshistorie"
+    "invoiceHistoryLabel": "Rechnungshistorie",
+    "downgradeMessage": "Sie stufen das Abonnement herab. Sind Sie sicher, dass Sie mit dieser Aktion fortfahren möchten?"
   },
   "message": {
     "ServerInternalError": "Fehler: Etwas ist schief gelaufen. Interner Serverfehler.",

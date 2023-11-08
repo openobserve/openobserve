@@ -8,23 +8,24 @@
     />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Install opentelemetry operator
-    </div>
-    <ContentCopy
-      class="q-mt-sm"
-      content="kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml"
-    />
-
-    <div class="text-subtitle1 q-pl-xs q-mt-md">
       Wait for 2 minutes after installing cert-manger for the webhook to be
-      ready before installing OpenTelemetry operator.
+      ready.
     </div>
+
     <div class="text-subtitle1 q-pl-xs q-mt-md">Update helm repo</div>
     <ContentCopy
       class="q-mt-sm"
       content="helm repo add openobserve https://charts.openobserve.ai"
     />
     <ContentCopy class="q-mt-sm" content="helm repo update" />
+
+    <div class="text-subtitle1 q-pl-xs q-mt-md">
+      Install OpenTelemetry operator
+    </div>
+    <ContentCopy
+      class="q-mt-sm"
+      content="kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml"
+    />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">Create namespace</div>
     <ContentCopy
@@ -33,7 +34,7 @@
     />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Install openobserve collector
+      Install OpenObserve collector
     </div>
     <ContentCopy class="q-mt-sm" :content="collectorCmd" />
   </div>
@@ -82,11 +83,11 @@ const accessKey = computed(() => {
 });
 
 const collectorCmd = computed(() => {
-  return `helm --namespace openobserve-collector -f values.yaml \ 
-  install o1c openobserve/openobserve-collector \         
-  --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \    
-  --set exporters."otlphttp/openobserve".headers.Authorization="Basic ${accessKey.value}"  \  
-  --set exporters."otlphttp/openobserve_k8s_events".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \  
+  return `helm --namespace openobserve-collector \\
+  install o1c openobserve/openobserve-collector \\
+  --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\    
+  --set exporters."otlphttp/openobserve".headers.Authorization="Basic ${accessKey.value}"  \\
+  --set exporters."otlphttp/openobserve_k8s_events".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\
   --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic ${accessKey.value}"`;
 });
 </script>

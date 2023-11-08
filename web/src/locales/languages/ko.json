@@ -1,4 +1,42 @@
 {
+  "common": {
+    "close": "닫기",
+    "cancel": "취소",
+    "ok": "확인",
+    "apply": "적용하기",
+    "startTime": "시작 시간",
+    "endTime": "종료 시간",
+    "datetimeMessage": "* 여러 날짜를 선택할 수 있습니다.",
+    "datetimeRelative": "상대",
+    "datetimeAbsolute": "앱솔루트",
+    "move": "이동",
+    "legend": "레전드",
+    "weight": "무게",
+    "label": "레이블",
+    "aggregation": "어그리게이션",
+    "list": "리스트",
+    "condition": "조건",
+    "operator": "운영자",
+    "value": "가치",
+    "selectFilter": "필터 선택",
+    "browser": "브라우저",
+    "attachments": "첨부 파일",
+    "confirm": "확인하기",
+    "json": "JSON",
+    "table": "테이블",
+    "wrap": "랩",
+    "previous": "이전",
+    "next": "다음",
+    "searchAround": "주변 검색",
+    "copyToClipboard": "클립보드로 복사",
+    "includeSearchTerm": "검색어 포함",
+    "addFieldToTable": "테이블에 필드 추가",
+    "excludeSearchTerm": "검색어 제외",
+    "noOfRecords": "레코드 수:",
+    "attributes": "특성",
+    "events": "이벤트",
+    "goHome": "홈으로 이동"
+  },
   "search": {
     "selectIndex": "스트림 우선 선택",
     "typeSearch": "여기에 검색어를 입력하세요",
@@ -29,7 +67,9 @@
     "saveFunctionLabel": "저장 함수",
     "exportLogs": "로그 내보내기",
     "runQuery": "쿼리 실행",
-    "syntaxGuideLabel": "구문 가이드"
+    "syntaxGuideLabel": "구문 가이드",
+    "logs": "로그",
+    "enrichmentTables": "인리치먼트 테이블"
   },
   "menu": {
     "home": "홈",
@@ -48,7 +88,8 @@
     "function": "함수",
     "ingestion": "섭취",
     "metrics": "측정항목",
-    "slack": "도움말",
+    "slack": "슬랙",
+    "help": "도움말",
     "dashboard": "대시보드",
     "alerts": "알림",
     "openapi": "오픈 API",
@@ -75,11 +116,32 @@
     "errorLabel": "오류",
     "sessionLabel": "세션",
     "learnWebVitalsLabel": "웹 바이탈에 대해 자세히 알아보기",
-    "clickHereLabel": "여기를 클릭하세요"
+    "clickHereLabel": "여기를 클릭하세요",
+    "skipInactivity": "비활성 건너뛰기",
+    "error": "오류",
+    "sessionType": "세션 유형",
+    "timeSpent": "체류 시간",
+    "errorCount": "오류 개수",
+    "initialViewName": "초기 뷰 이름",
+    "timestamp": "타임스탬프",
+    "type": "타입",
+    "category": "카테고리",
+    "level": "레벨",
+    "description": "제품 설명",
+    "resourceURL": "리소스 URL",
+    "durationms": "기간 (밀리초)",
+    "sizekb": "크기 (킬로바이트)",
+    "viewURL": "URL 보기",
+    "events": "이벤트",
+    "location": "위치"
   },
   "about": {
     "name": "오픈 옵저브",
-    "introduction": "옵저버빌리티가 단순화되었습니다."
+    "introduction": "옵저버빌리티가 단순화되었습니다.",
+    "version": "버전",
+    "commitHash": "커밋 해시",
+    "buildDate": "빌드 날짜",
+    "logoMsg": "옵저버빌리티가 단순화되었습니다."
   },
   "login": {
     "userid": "사용자 ID",
@@ -88,7 +150,8 @@
     "signUp": "가입하기",
     "password": "비밀번호",
     "cnfpassword": "비밀번호 확인",
-    "singnInWithGoogle": "구글로 계속하기"
+    "singnInWithGoogle": "구글로 계속하기",
+    "email": "이메일"
   },
   "user": {
     "header": "조직 멤버",
@@ -135,7 +198,10 @@
     "newPassword": "새 비밀번호",
     "organization": "조직",
     "otherOrganization": "기타 조직",
-    "isExistingUser": "기존 사용자?"
+    "isExistingUser": "기존 사용자?",
+    "deleteAPIKeyMessage": "이 사용자 API 키를 정말로 삭제하시겠습니까?이 작업은 취소할 수 없습니다.확인을 클릭하여 확인합니다.",
+    "apiKeyNotFound": "사용자 API 키를 찾을 수 없습니다.",
+    "allowedOrg": "허용된 조직"
   },
   "ticket": {
     "header": "지원 티켓",
@@ -264,7 +330,9 @@
     "enrichmentTables": "인리치먼트 테이블",
     "addEnrichmentTable": "강화 테이블 추가",
     "updateEnrichmentTable": "인리치먼트 테이블 업데이트",
-    "searchEnrichmentTable": "검색 강화 테이블"
+    "searchEnrichmentTable": "검색 강화 테이블",
+    "uploadCSVFile": "CSV 파일 업로드",
+    "selectFunction": "기능 선택"
   },
   "confirmDialog": {
     "cancel": "취소",
@@ -282,7 +350,8 @@
     "customLabel": "커스텀",
     "logsLabel": "로그",
     "metricsLabel": "측정항목",
-    "tracesLabel": "트레이스"
+    "tracesLabel": "트레이스",
+    "subnetMessage": "여러 서브넷을 쉼표로 구분하여 입력합니다."
   },
   "syslog": {
     "stream": "스트림",
@@ -377,7 +446,51 @@
     "legendLabel": "레전드",
     "overrideMessage": "시리즈 이름 재정의.예를 들어, {endpoint} 는 엔드포인트의 레이블 값으로 대체되어야 합니다.",
     "unsavedMessage": "변경 내용을 저장하지 않았습니다.정말 떠나고 싶니?",
-    "addFieldMessage": "목록에서 필드를 추가하세요."
+    "addFieldMessage": "목록에서 필드를 추가하세요.",
+    "currentFolderLabel": "현재 폴더",
+    "selectFolderLabel": "폴더 선택",
+    "layerType": "레이어 유형",
+    "newDashboard": "새 대시보드 만들기",
+    "addDashboard": "대시보드에 추가",
+    "dashboardName": "대시보드 이름",
+    "dashboardDesc": "대시보드 설명",
+    "panelTitle": "패널 제목",
+    "selectDashboard": "대시보드 선택",
+    "importDashboard": "대시보드 가져오기",
+    "dropFileMsg": "여기에 파일을 올려주세요",
+    "importURL": "URL에서 대시보드 가져오기",
+    "addURL": "URL을 추가하세요",
+    "importJson": "JSON에서 대시보드 가져오기",
+    "jsonObject": "JSON 오브젝트",
+    "openStreetMap": "오픈스트리트맵",
+    "scatter": "스캐터",
+    "heatmap": "히트맵",
+    "auto": "자동",
+    "right": "오른쪽",
+    "bottom": "하단",
+    "default": "디폴트",
+    "bytes": "바이트",
+    "kilobytes": "킬로바이트 (kb)",
+    "megabytes": "메가바이트 (mb)",
+    "bytesPerSecond": "바이트/초",
+    "seconds": "초 (초)",
+    "microseconds": "마이크로초 (μs)",
+    "milliseconds": "밀리초 (밀리초)",
+    "percent1": "퍼센트 (0.0-1.0)",
+    "percent": "퍼센트 (0-100)",
+    "custom": "커스텀",
+    "count": "개수",
+    "countDistinct": "개수 (고유)",
+    "sum": "합계",
+    "avg": "평균",
+    "min": "최소",
+    "max": "맥스",
+    "histogram": "히스토그램",
+    "queryValues": "쿼리 값",
+    "constant": "상수",
+    "textbox": "텍스트 박스",
+    "newFolder": "새 폴더",
+    "updateFolder": "폴더 업데이트"
   },
   "panel": {
     "header": "패널",
@@ -487,7 +600,8 @@
     "downloadInvoice": "인보이스 다운로드",
     "usageLabel": "용법",
     "plansLabel": "플랜",
-    "invoiceHistoryLabel": "인보이스 내역"
+    "invoiceHistoryLabel": "인보이스 내역",
+    "downgradeMessage": "구독 플랜을 다운그레이드하고 있습니다.정말 이 작업을 계속하시겠습니까?"
   },
   "message": {
     "ServerInternalError": "오류: 문제가 발생했습니다.내부 서버 오류입니다.",

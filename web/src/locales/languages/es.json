@@ -1,4 +1,42 @@
 {
+  "common": {
+    "close": "Cerrar",
+    "cancel": "Cancelar",
+    "ok": "Ok",
+    "apply": "Aplica",
+    "startTime": "Hora de inicio",
+    "endTime": "Hora de finalización",
+    "datetimeMessage": "* Puedes elegir varias fechas",
+    "datetimeRelative": "PARIENTE",
+    "datetimeAbsolute": "ABSOLUTO",
+    "move": "Muévete",
+    "legend": "Leyenda",
+    "weight": "Peso",
+    "label": "Etiqueta",
+    "aggregation": "Agregación",
+    "list": "Lista",
+    "condition": "Condición",
+    "operator": "Operador",
+    "value": "Valor",
+    "selectFilter": "Seleccione un filtro",
+    "browser": "Navegador",
+    "attachments": "Adjuntos",
+    "confirm": "Confirmar",
+    "json": "JSON",
+    "table": "Tabla",
+    "wrap": "Envolver",
+    "previous": "Anterior",
+    "next": "Próxima",
+    "searchAround": "Busca alrededor",
+    "copyToClipboard": "Copiar al portapapeles",
+    "includeSearchTerm": "Incluir término de búsqueda",
+    "addFieldToTable": "Agregar campo a la tabla",
+    "excludeSearchTerm": "Excluir término de búsqueda",
+    "noOfRecords": "Número de registros:",
+    "attributes": "Atributos",
+    "events": "Eventos",
+    "goHome": "Ve a casa"
+  },
   "search": {
     "selectIndex": "Selecciona Transmitir primero",
     "typeSearch": "Escriba aquí su consulta de búsqueda",
@@ -29,7 +67,9 @@
     "saveFunctionLabel": "Función Guardar",
     "exportLogs": "Registros de exportación",
     "runQuery": "Ejecutar consulta",
-    "syntaxGuideLabel": "Guía de sintaxis"
+    "syntaxGuideLabel": "Guía de sintaxis",
+    "logs": "Registros",
+    "enrichmentTables": "Tablas de enriquecimiento"
   },
   "menu": {
     "home": "Inicio",
@@ -48,7 +88,8 @@
     "function": "Funciones",
     "ingestion": "Ingestión",
     "metrics": "Métricas",
-    "slack": "Ayuda",
+    "slack": "Slack",
+    "help": "Ayuda",
     "dashboard": "Cuadros de mando",
     "alerts": "Alertas",
     "openapi": "API abierta",
@@ -75,11 +116,32 @@
     "errorLabel": "Errores",
     "sessionLabel": "Sesiones",
     "learnWebVitalsLabel": "Más información sobre Web Vitals",
-    "clickHereLabel": "Haga clic aquí"
+    "clickHereLabel": "Haga clic aquí",
+    "skipInactivity": "Omitir inactividad",
+    "error": "Error",
+    "sessionType": "Tipo de sesión",
+    "timeSpent": "Tiempo empleado",
+    "errorCount": "Recuento de errores",
+    "initialViewName": "Nombre de vista inicial",
+    "timestamp": "Marca de tiempo",
+    "type": "Tipo",
+    "category": "Categoría",
+    "level": "Nivel",
+    "description": "Descripción",
+    "resourceURL": "URL del recurso",
+    "durationms": "Duración (ms)",
+    "sizekb": "Tamaño (kb)",
+    "viewURL": "Ver URL",
+    "events": "Eventos",
+    "location": "Ubicación"
   },
   "about": {
     "name": "Abrir Observe",
-    "introduction": "Observabilidad simplificada."
+    "introduction": "Observabilidad simplificada.",
+    "version": "Versión",
+    "commitHash": "Comprometer hash",
+    "buildDate": "Fecha de construcción",
+    "logoMsg": "Observabilidad simplificada."
   },
   "login": {
     "userid": "ID de usuario",
@@ -88,7 +150,8 @@
     "signUp": "Regístrate",
     "password": "Contraseña",
     "cnfpassword": "Confirme la contraseña",
-    "singnInWithGoogle": "Continuar con Google"
+    "singnInWithGoogle": "Continuar con Google",
+    "email": "Correo electrónico"
   },
   "user": {
     "header": "Miembro de la organización",
@@ -135,7 +198,10 @@
     "newPassword": "Contraseña nueva",
     "organization": "Organización",
     "otherOrganization": "Otra organización",
-    "isExistingUser": "¿Usuario existente?"
+    "isExistingUser": "¿Usuario existente?",
+    "deleteAPIKeyMessage": "¿Está seguro de que desea eliminar esta clave de API de usuario? Esta acción no se puede deshacer. Haga clic en Aceptar para confirmar.",
+    "apiKeyNotFound": "No se encontró la clave de API de usuario.",
+    "allowedOrg": "Organización permitida"
   },
   "ticket": {
     "header": "Tickets de soporte",
@@ -264,7 +330,9 @@
     "enrichmentTables": "Tablas de enriquecimiento",
     "addEnrichmentTable": "Agregar tabla de enriquecimiento",
     "updateEnrichmentTable": "Actualizar tabla de enriquecimiento",
-    "searchEnrichmentTable": "Tabla de enriquecimiento de búsquedas"
+    "searchEnrichmentTable": "Tabla de enriquecimiento de búsquedas",
+    "uploadCSVFile": "Cargar archivo CSV",
+    "selectFunction": "Seleccione la función"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
@@ -282,7 +350,8 @@
     "customLabel": "Personalizado",
     "logsLabel": "Registros",
     "metricsLabel": "Métricas",
-    "tracesLabel": "Huellas"
+    "tracesLabel": "Huellas",
+    "subnetMessage": "Introduzca varias subredes separadas por comas"
   },
   "syslog": {
     "stream": "Transmitir",
@@ -377,7 +446,51 @@
     "legendLabel": "Leyenda",
     "overrideMessage": "El nombre de la serie se anula. Por ejemplo, {endpoint} se sustituirá por el valor de etiqueta para el punto final.",
     "unsavedMessage": "Tienes cambios sin guardar. ¿Estás seguro de que quieres marcharte?",
-    "addFieldMessage": "Agregue un campo de la lista"
+    "addFieldMessage": "Agregue un campo de la lista",
+    "currentFolderLabel": "Carpeta actual",
+    "selectFolderLabel": "Seleccione la carpeta",
+    "layerType": "Tipo de capa",
+    "newDashboard": "Crear un panel de control nuevo",
+    "addDashboard": "Agregar al panel",
+    "dashboardName": "Nombre del panel",
+    "dashboardDesc": "Descripción del panel",
+    "panelTitle": "Título del panel",
+    "selectDashboard": "Seleccione Panel de control",
+    "importDashboard": "Panel de importación",
+    "dropFileMsg": "Deja tu archivo aquí",
+    "importURL": "Importar panel desde URL",
+    "addURL": "Añade tu URL",
+    "importJson": "Importar panel desde JSON",
+    "jsonObject": "Objeto JSON",
+    "openStreetMap": "OpenStreetMap",
+    "scatter": "Dispersión",
+    "heatmap": "Mapa de calor",
+    "auto": "Auto",
+    "right": "Correcto",
+    "bottom": "Parte inferior",
+    "default": "Predeterminado",
+    "bytes": "Bytes",
+    "kilobytes": "Kilobytes (kb)",
+    "megabytes": "Megabytes (mb)",
+    "bytesPerSecond": "Bytes/segundo",
+    "seconds": "Segundo (s)",
+    "microseconds": "Microsegundos (μs)",
+    "milliseconds": "Milisegundos (ms)",
+    "percent1": "Porcentaje (0.0-1.0)",
+    "percent": "Porcentaje (0-100)",
+    "custom": "Personalizado",
+    "count": "Contar",
+    "countDistinct": "Contar (distinto)",
+    "sum": "Suma",
+    "avg": "Promedio",
+    "min": "Mínimo",
+    "max": "Máx",
+    "histogram": "Histograma",
+    "queryValues": "Valores de consulta",
+    "constant": "Constante",
+    "textbox": "Cuadro de texto",
+    "newFolder": "Nueva carpeta",
+    "updateFolder": "Actualizar carpeta"
   },
   "panel": {
     "header": "Panel",
@@ -487,7 +600,8 @@
     "downloadInvoice": "Descargar factura",
     "usageLabel": "Uso",
     "plansLabel": "Planes",
-    "invoiceHistoryLabel": "Historial de facturas"
+    "invoiceHistoryLabel": "Historial de facturas",
+    "downgradeMessage": "Estás bajando de categoría el plan de suscripción. ¿Está seguro de que desea continuar con esta acción?"
   },
   "message": {
     "ServerInternalError": "Error: algo salió mal. Error interno del servidor.",

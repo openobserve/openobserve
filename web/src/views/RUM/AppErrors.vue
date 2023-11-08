@@ -19,15 +19,14 @@
       <syntax-guide class="q-mr-sm" />
       <div class="flex align-center justify-end metrics-date-time q-mr-md">
         <date-time
+          ref="errorsDateTimeRef"
           auto-apply
-          :default-type="errorTrackingState.data.datetime?.valueType"
+          :default-type="rumState.data.datetime?.valueType"
           :default-absolute-time="{
-            startTime: errorTrackingState.data.datetime.startTime,
-            endTime: errorTrackingState.data.datetime.endTime,
+            startTime: rumState.data.datetime.startTime,
+            endTime: rumState.data.datetime.endTime,
           }"
-          :default-relative-time="
-            errorTrackingState.data.datetime.relativeTimePeriod
-          "
+          :default-relative-time="rumState.data.datetime.relativeTimePeriod"
           data-test="logs-search-bar-date-time-dropdown"
           class="q-mr-md"
           @on:date-change="updateDateChange"
@@ -112,7 +111,14 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeMount, onMounted, ref, type Ref } from "vue";
+import {
+  nextTick,
+  onBeforeMount,
+  onMounted,
+  onActivated,
+  ref,
+  type Ref,
+} from "vue";
 import AppTable from "@/components/AppTable.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -127,15 +133,20 @@ import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import streamService from "@/services/stream";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
+import { useI18n } from "vue-i18n";
+import useRum from "@/composables/rum/useRum";
 
+const { t } = useI18n();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
+  relativeTimePeriod: "",
 });
-const streamFields = ref([]);
+const streamFields: Ref<any[]> = ref([]);
 const splitterModel = ref(250);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { errorTrackingState } = useErrorTracking();
+const { rumState } = useRum();
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
@@ -144,7 +155,7 @@ const columns = ref([
     name: "error",
     field: (row: any) => row["error"],
     prop: (row: any) => row["error"],
-    label: "Error",
+    label: t("rum.error"),
     align: "left",
     sortable: true,
     slot: true,
@@ -154,7 +165,7 @@ const columns = ref([
     name: "events",
     field: (row: any) => row["events"],
     prop: (row: any) => row["events"],
-    label: "Events",
+    label: t("rum.events"),
     align: "left",
     sortable: true,
   },
@@ -162,13 +173,63 @@ const columns = ref([
     name: "initial_view_name",
     field: (row: any) => row["view_url"],
     prop: (row: any) => row["view_url"],
-    label: "View Url",
+    label: t("rum.viewURL"),
     align: "left",
     sortable: true,
   },
 ]);
 
+const userDataSet = new Set([
+  "user_agent_device_brand",
+  "geo_info_city",
+  "resource_method",
+  "geo_info_location_metro_code",
+  "resource_status_code",
+  "resource_duration",
+  "resource_url",
+  "error_source",
+  "geo_info_location_timezone",
+  "error_source_type",
+  "application_id",
+  "display_viewport_width",
+  "error_type",
+  "action_type",
+  "user_agent_user_agent_minor",
+  "type",
+  "service",
+  "api",
+  "privacy_replay_level",
+  "view_url",
+  "usr_id",
+  "user_agent_user_agent_family",
+  "user_agent_user_agent_patch",
+  "user_agent_os_minor",
+  "geo_info_location_accuracy_radius",
+  "source",
+  "oo_evp_origin",
+  "session_has_replay",
+  "version",
+  "env",
+  "sdk_version",
+  "user_agent_os_major",
+  "user_agent_os_patch",
+  "view_referrer",
+  "usr_email",
+  "usr_name",
+  "user_agent_os_family",
+  "oo_evp_origin_version",
+  "ip",
+  "oosource",
+  "user_agent_user_agent_major",
+  "geo_info_country",
+  "error_stack",
+  "error_handling",
+  "user_agent_device_family",
+]);
+
 const router = useRouter();
+
+const errorsDateTimeRef = ref<any>(null);
 
 onBeforeMount(() => {
   restoreUrlQueryParams();
@@ -178,6 +239,23 @@ onMounted(async () => {
   isMounted.value = true;
   await getStreamFields();
   updateUrlQueryParams();
+});
+
+onActivated(() => {
+  if (
+    rumState.data.datetime.valueType === "relative" &&
+    rumState.data.datetime.relativeTimePeriod ===
+      dateTime.value.relativeTimePeriod
+  )
+    return;
+
+  if (
+    rumState.data.datetime.valueType === "absolute" &&
+    rumState.data.datetime.startTime === dateTime.value.startTime &&
+    rumState.data.datetime.endTime === dateTime.value.endTime
+  )
+    return;
+  errorsDateTimeRef.value.setDefault();
 });
 
 const handleSidebarEvent = (event: string, value: any) => {
@@ -200,10 +278,15 @@ const getStreamFields = () => {
         "logs"
       )
       .then((res) => {
-        streamFields.value = res.data.schema.map((field: any) => ({
-          ...field,
-          showValues: true,
-        }));
+        streamFields.value = [];
+        res.data.schema.forEach((field: any) => {
+          if (userDataSet.has(field.name)) {
+            streamFields.value.push({
+              ...field,
+              showValues: true,
+            });
+          }
+        });
       })
       .finally(() => {
         resolve(true);
@@ -263,8 +346,9 @@ const getErrorLogs = () => {
 };
 
 const updateDateChange = (date: any) => {
+  if (JSON.stringify(date) === JSON.stringify(dateTime.value)) return;
   dateTime.value = date;
-  errorTrackingState.data.datetime = date;
+  rumState.data.datetime = date;
   if (!isLoading.value.length && date.valueType === "relative") runQuery();
 };
 
@@ -307,7 +391,7 @@ function restoreUrlQueryParams() {
   };
 
   if (date && ((date.startTime && date.endTime) || date.relativeTimePeriod)) {
-    errorTrackingState.data.datetime = date;
+    rumState.data.datetime = date;
   }
 
   if (queryParams.query) {
@@ -319,7 +403,7 @@ function restoreUrlQueryParams() {
 function updateUrlQueryParams() {
   if (!isMounted.value) return;
 
-  const date = errorTrackingState.data.datetime;
+  const date = rumState.data.datetime;
   const query: any = {};
 
   if (date.valueType == "relative") {

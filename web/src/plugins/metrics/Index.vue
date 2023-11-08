@@ -962,7 +962,7 @@ export default defineComponent({
   }
 
   .search-button {
-    width: 96px;
+    min-width: 96px;
     height: 30px;
     line-height: 29px;
     font-weight: bold;
@@ -973,6 +973,7 @@ export default defineComponent({
     .q-btn__content {
       background: $secondary;
       border-radius: 3px 3px 3px 3px;
+      padding: 0px 5px;
 
       .q-icon {
         font-size: 15px;

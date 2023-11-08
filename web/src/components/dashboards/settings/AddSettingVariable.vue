@@ -146,19 +146,19 @@ export default defineComponent({
     // const filteredStreams = ref([]);
     const variableTypes = ref([
       {
-        label: 'Query Values',
+        label: t("dashboard.queryValues"),
         value: 'query_values'
       },
       {
-        label: 'Constant',
+        label: t("dashboard.constant"),
         value: 'constant'
       },
       {
-        label: 'Textbox',
+        label: t("dashboard.textbox"),
         value: 'textbox'
       },
       {
-        label: 'Custom',
+        label: t("dashboard.custom"),
         value: 'custom'
       }
     ])

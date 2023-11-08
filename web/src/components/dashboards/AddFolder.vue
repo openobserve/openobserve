@@ -18,8 +18,8 @@
     <q-card-section class="q-px-md q-py-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div v-if="editMode" class="text-body1 text-bold">Update Folder</div>
-          <div v-else class="text-body1 text-bold">New Folder</div>
+          <div v-if="editMode" class="text-body1 text-bold">{{t("dashboard.updateFolder")}}</div>
+          <div v-else class="text-body1 text-bold">{{t("dashboard.newFolder")}}</div>
         </div>
         <div class="col-auto">
           <q-btn v-close-popup="true" round flat icon="cancel" />
@@ -31,7 +31,7 @@
       <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
         <q-input
           v-model="folderData.name"
-          label="Name *"
+          :label="t('dashboard.nameOfVariable') + '*'"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"

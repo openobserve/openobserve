@@ -81,17 +81,40 @@ impl Metrics for Querier {
         let end_time = req.get_ref().end_time;
         let org_id = &req.get_ref().org_id;
         let stream_name = &req.get_ref().stream_name;
-        let pattern = format!(
-            "{}files/{org_id}/metrics/{stream_name}/",
-            &CONFIG.common.data_wal_dir
-        );
-
         let mut resp = MetricsWalFileResponse::default();
+
+        let wal_dir = match std::path::Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
+            Ok(path) => path.to_str().unwrap().to_string(),
+            Err(_) => {
+                return Ok(Response::new(resp));
+            }
+        };
+
+        let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/",);
         let files = scan_files(&pattern);
-        for file in files {
+        if files.is_empty() {
+            return Ok(Response::new(resp));
+        }
+
+        // lock theses files
+        let files = files
+            .iter()
+            .map(|f| {
+                f.strip_prefix(&wal_dir)
+                    .unwrap()
+                    .to_string()
+                    .replace('\\', "/")
+                    .trim_start_matches('/')
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        wal::lock_files(&files).await;
+
+        for file in files.iter() {
+            let source_file = wal_dir.to_string() + "/" + file;
             if start_time > 0 || end_time > 0 {
                 // check wal file created time, we can skip files which created time > end_time
-                let file_meta = match get_file_meta(&file) {
+                let file_meta = match get_file_meta(&source_file) {
                     Ok(meta) => meta,
                     Err(err) => {
                         log::error!("failed to get file meta: {}, {}", file, err);
@@ -127,9 +150,8 @@ impl Metrics for Querier {
                     continue;
                 }
             }
-            if let Ok(body) = get_file_contents(&file) {
-                let name = file.replace('\\', "/");
-                let name = name.split('/').last().unwrap_or_default();
+            if let Ok(body) = get_file_contents(&source_file) {
+                let name = file.split('/').last().unwrap_or_default();
                 resp.files.push(MetricsWalFile {
                     name: name.to_string(),
                     body,
@@ -147,6 +169,9 @@ impl Metrics for Querier {
                 resp.files.push(MetricsWalFile { name, body });
             }
         }
+
+        // release all files
+        wal::release_files(&files).await;
 
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME

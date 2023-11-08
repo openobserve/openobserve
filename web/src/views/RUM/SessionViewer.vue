@@ -18,6 +18,19 @@
     <div class="col-12 q-px-sm q-pt-md row items-end">
       <div class="col-9 row">
         <div
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="router.back()"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+        <div
           class="text-caption ellipsis row items-center q-mr-md"
           style="font-size: 20px"
         >
@@ -62,7 +75,7 @@ import { useStore } from "vuex";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
-import usePerformance from "@/composables/rum/usePerformance";
+import useRum from "@/composables/rum/useRum";
 
 import { date } from "quasar";
 
@@ -89,7 +102,7 @@ const segmentEvents = ref<any[]>([]);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const errorCount = ref(10);
-const { performanceState } = usePerformance();
+const { rumState } = useRum();
 
 const session_start_time = 1692884313968;
 const session_end_time = 1692884769270;
@@ -120,11 +133,11 @@ const getSession = () => {
   return new Promise((resolve) => {
     let geoFields = "";
 
-    if (performanceState.data.streams["_sessionreplay"]["geo_info_country"]) {
+    if (rumState.data.streams["_sessionreplay"]["geo_info_country"]) {
       geoFields += "min(geo_info_city) as city,";
     }
 
-    if (performanceState.data.streams["_sessionreplay"]["geo_info_city"]) {
+    if (rumState.data.streams["_sessionreplay"]["geo_info_city"]) {
       geoFields += "min(geo_info_country) as country,";
     }
 

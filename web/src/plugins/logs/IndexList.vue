@@ -363,8 +363,8 @@ export default defineComponent({
     const parser = new Parser();
 
     const streamTypes = [
-      { label: "Logs", value: "logs" },
-      { label: "Enrichment Tables", value: "enrichment_tables" },
+      { label: t("search.logs"), value: "logs" },
+      { label: t("search.enrichmentTables"), value: "enrichment_tables" },
     ];
 
     const filterStreamFn = (val: string, update: any) => {
@@ -465,24 +465,6 @@ export default defineComponent({
         if (searchObj.meta.sqlMode == true) {
           const parsedSQL: any = parser.astify(query);
           //hack add time stamp column to parsedSQL if not already added
-          if (
-            !(parsedSQL.columns === "*") &&
-            parsedSQL.columns.filter(
-              (e: { expr: { column: string } }) =>
-                e.expr.column === store.state.zoConfig.timestamp_column
-            ).length === 0
-          ) {
-            const ts_col = {
-              expr: {
-                type: "column_ref",
-                table: null,
-                column: store.state.zoConfig.timestamp_column,
-              },
-              as: null,
-            };
-            parsedSQL.columns.push(ts_col);
-          }
-
           query_context =
             b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')) || "";
         } else {

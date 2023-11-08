@@ -20,15 +20,14 @@
         <syntax-guide class="q-mr-sm" />
         <div class="flex align-center justify-end metrics-date-time q-mr-md">
           <date-time
+            ref="sessionsDateTimeRef"
             auto-apply
-            :default-type="sessionState.data.datetime.valueType"
+            :default-type="rumState.data.datetime.valueType"
             :default-absolute-time="{
-              startTime: sessionState.data.datetime.startTime,
-              endTime: sessionState.data.datetime.endTime,
+              startTime: rumState.data.datetime.startTime,
+              endTime: rumState.data.datetime.endTime,
             }"
-            :default-relative-time="
-              sessionState.data.datetime.relativeTimePeriod
-            "
+            :default-relative-time="rumState.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
             class="q-mr-md"
             @on:date-change="updateDateChange"
@@ -142,7 +141,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineProps, onMounted, type Ref, onBeforeMount } from "vue";
+import {
+  ref,
+  defineProps,
+  onMounted,
+  type Ref,
+  onBeforeMount,
+  onActivated,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import {
@@ -162,6 +168,7 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
+import useRum from "@/composables/rum/useRum";
 
 interface Session {
   timestamp: string;
@@ -179,22 +186,55 @@ const props = defineProps({
   },
 });
 
-const streamFields = ref([]);
+const streamFields: Ref<any[]> = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
 const { sessionState } = useSession();
+const { rumState } = useRum();
+
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
 const { t } = useI18n();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
+  relativeTimePeriod: "",
 });
 const rumSessionStreamName = "_sessionreplay";
+
+const sessionsDateTimeRef = ref<any>(null);
 
 const isMounted = ref(false);
 
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
+
+const userDataSet = new Set([
+  "user_agent_device_family",
+  "user_agent_user_agent_major",
+  "user_agent_user_agent_minor",
+  "user_agent_user_agent_family",
+  "user_agent_os_major",
+  "user_agent_os_minor",
+  "user_agent_os_patch",
+  "user_agent_user_agent_patch",
+  "user_agent_os_family",
+  "user_agent_device_brand",
+  "ip",
+  "geo_info_location_timezone",
+  "geo_info_location_metro_code",
+  "geo_info_country",
+  "geo_info_city",
+  "geo_info_location_accuracy_radius",
+  "sdk_version",
+  "application_id",
+  "env",
+  "service",
+  "oosource",
+  "oo_evp_origin",
+  "oo_evp_origin_version",
+  "source",
+  "api",
+]);
 
 const columns = ref([
   {
@@ -208,21 +248,21 @@ const columns = ref([
   {
     name: "timestamp",
     field: (row: any) => getFormattedDate(row["timestamp"] / 1000),
-    label: "Timestamp",
+    label: t("rum.timestamp"),
     align: "left",
     sortable: true,
   },
   {
     name: "user_email",
     field: (row: any) => row["user_email"] || "Unknown",
-    label: "User Email",
+    label: t("login.userEmail"),
     align: "left",
     sortable: true,
   },
   {
     name: "time_spent",
     field: (row: any) => formatDuration(row["time_spent"]),
-    label: "Time Spent",
+    label: t("rum.timeSpent"),
     align: "left",
     sortable: true,
     sort: (a: any, b: any, rowA: Session, rowB: Session) => {
@@ -236,14 +276,14 @@ const columns = ref([
     name: "error_count",
     field: (row: any) => row["error_count"],
     prop: (row: any) => row["error_count"],
-    label: "Error Count",
+    label: t("rum.errorCount"),
     align: "left",
     sortable: true,
   },
   {
     name: "location",
     field: (row: any) => formatDuration(row["time_spent"]),
-    label: "Location",
+    label: t("rum.location"),
     align: "left",
     slot: true,
     slotName: "session_location_column",
@@ -263,6 +303,7 @@ onBeforeMount(() => {
 
 onMounted(async () => {
   // TODO OK : Store stream fields in composable
+  console.log("rumState", rumState.data.datetime);
 
   if (router.currentRoute.value.name === "Sessions") {
     isMounted.value = true;
@@ -270,6 +311,23 @@ onMounted(async () => {
     await getRumDataFields();
     getSessions();
   }
+});
+
+onActivated(() => {
+  if (
+    rumState.data.datetime.valueType === "relative" &&
+    rumState.data.datetime.relativeTimePeriod ===
+      dateTime.value.relativeTimePeriod
+  )
+    return;
+
+  if (
+    rumState.data.datetime.valueType === "absolute" &&
+    rumState.data.datetime.startTime === dateTime.value.startTime &&
+    rumState.data.datetime.endTime === dateTime.value.endTime
+  )
+    return;
+  sessionsDateTimeRef.value.setDefault();
 });
 
 const getStreamFields = () => {
@@ -289,13 +347,17 @@ const getStreamFields = () => {
           "usr_id",
           "usr_name",
         ]);
-        streamFields.value = res.data.schema.map((field: any) => {
+        streamFields.value = [];
+        res.data.schema.forEach((field: any) => {
           if (fieldsToVerify.has(field.name))
             schemaMapping.value[field.name] = field;
-          return {
-            ...field,
-            showValues: true,
-          };
+
+          if (userDataSet.has(field.name)) {
+            streamFields.value.push({
+              ...field,
+              showValues: true,
+            });
+          }
         });
       })
       .finally(() => {
@@ -435,9 +497,10 @@ const getSessionLogs = (req: any) => {
 };
 
 const updateDateChange = (date: any) => {
+  console.log("date", date);
   if (JSON.stringify(date) === JSON.stringify(dateTime.value)) return;
   dateTime.value = date;
-  sessionState.data.datetime = date;
+  rumState.data.datetime = date;
   if (date.valueType === "relative" && isMounted.value) getSessions();
 };
 
@@ -508,7 +571,7 @@ function restoreUrlQueryParams() {
   };
 
   if (date && ((date.startTime && date.endTime) || date.relativeTimePeriod)) {
-    sessionState.data.datetime = date;
+    rumState.data.datetime = date;
   }
 
   if (queryParams.query) {
@@ -520,7 +583,7 @@ function restoreUrlQueryParams() {
 function updateUrlQueryParams() {
   if (!isMounted.value) return;
 
-  const date = sessionState.data.datetime;
+  const date = rumState.data.datetime;
   const query: any = {};
 
   if (date.valueType == "relative") {
