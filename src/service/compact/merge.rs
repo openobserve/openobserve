@@ -380,7 +380,8 @@ async fn merge_files(
 
     let mut buf = Vec::new();
     let mut new_file_meta =
-        datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema, new_file_size).await?;
+        datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema, new_file_size)
+            .await?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.records == 0 {
