@@ -22,20 +22,19 @@ const defaultObject = {
       relativeTimePeriod: "15m",
       valueType: "relative",
     },
-    variables: {},
     streams: {} as any,
   },
 };
 
-let rumState = reactive(Object.assign({}, defaultObject));
+let performanceState = reactive(Object.assign({}, defaultObject));
 
-const useRum = () => {
-  const resetRumState = () => {
+const usePerformance = () => {
+  const resetSessionState = () => {
     // delete searchObj.data;
-    rumState = reactive(Object.assign({}, defaultObject));
+    performanceState = reactive(Object.assign({}, defaultObject));
   };
 
-  return { rumState, resetRumState };
+  return { performanceState, resetSessionState };
 };
 
-export default useRum;
+export default usePerformance;

@@ -75,7 +75,7 @@ import { useStore } from "vuex";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
-import useRum from "@/composables/rum/useRum";
+import usePerformance from "@/composables/rum/usePerformance";
 
 import { date } from "quasar";
 
@@ -102,7 +102,7 @@ const segmentEvents = ref<any[]>([]);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const errorCount = ref(10);
-const { rumState } = useRum();
+const { performanceState } = usePerformance();
 
 const session_start_time = 1692884313968;
 const session_end_time = 1692884769270;
@@ -133,11 +133,11 @@ const getSession = () => {
   return new Promise((resolve) => {
     let geoFields = "";
 
-    if (rumState.data.streams["_sessionreplay"]["geo_info_country"]) {
+    if (performanceState.data.streams["_sessionreplay"]["geo_info_country"]) {
       geoFields += "min(geo_info_city) as city,";
     }
 
-    if (rumState.data.streams["_sessionreplay"]["geo_info_city"]) {
+    if (performanceState.data.streams["_sessionreplay"]["geo_info_city"]) {
       geoFields += "min(geo_info_country) as country,";
     }
 
