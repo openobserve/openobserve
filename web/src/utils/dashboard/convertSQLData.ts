@@ -30,7 +30,8 @@ import {
 export const convertSQLData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any
+  store: any,
+  chartPanelRef: any
 ) => {
   // if no data than return it
   if (
@@ -365,7 +366,7 @@ export const convertSQLData = (
     },
     toolbox: {
       orient: "vertical",
-      show: !["pie", "donut", "metric"].includes(panelSchema.type),
+      show: !["pie", "donut", "metric","gauge"].includes(panelSchema.type),
       feature: {
         dataZoom: {
           yAxisIndex: "none",
@@ -567,7 +568,7 @@ export const convertSQLData = (
       options.yAxis = temp;
 
       options.yAxis.map((it: any) => {
-        it.nameGap = calculateWidthText(largestLabel(it.data)) + 14;
+        it.nameGap = calculateWidthText(xAxisKeys.reduce((str:any,it: any) => str+largestLabel(getAxisDataFromKey(it)),""));
       });
       (options.xAxis.name =
         panelSchema.queries[0]?.fields?.y?.length >= 1
@@ -906,7 +907,7 @@ export const convertSQLData = (
       options.xAxis = options.yAxis;
       options.yAxis = temp;
       options.yAxis.map((it: any) => {
-        it.nameGap = calculateWidthText(largestLabel(it.data)) + 8;
+        it.nameGap = calculateWidthText(largestLabel(it.data)) + 20;
       });
       options.xAxis.nameGap = 20;
       break;
@@ -954,6 +955,91 @@ export const convertSQLData = (
       ];
       break;
     }
+    case "gauge" :{
+      const key1 = yAxisKeys[0];
+      const yAxisValue = getAxisDataFromKey(key1);
+      // used for gague name
+      const xAxisValue = getAxisDataFromKey(xAxisKeys[0]);
+
+      // create grid array based on chart panel width, height and total no. of gauge
+      const gridDataForGauge = calculateGridPositions(
+        chartPanelRef.value.offsetWidth,
+        chartPanelRef.value.offsetHeight,
+        yAxisValue.length
+      );
+
+      options.dataset = { source: [[]] };
+      options.tooltip = {
+        show: true,
+        trigger: "item",
+      };
+      options.angleAxis = {
+        show: false,
+      };
+      options.radiusAxis = {
+        show: false,
+      };
+      options.polar = {};
+      options.xAxis = [];
+      options.yAxis = [];
+      // for each gague we have seperate grid
+      options.grid = gridDataForGauge.gridArray;
+
+      options.series = yAxisValue.map((it: any, index: any) => {
+        const unitValue = getUnitValue(
+          it,
+          panelSchema.config?.unit,
+          panelSchema.config?.unit_custom
+        );
+        return {
+          ...getPropsByChartTypeForSeries(panelSchema.type),
+          min: panelSchema?.config?.min || 0,
+          max: panelSchema?.config?.max || 100,
+
+          //which grid will be used
+          gridIndex: index,
+          // radius, progress and axisline width will be calculated based on grid width and height
+          radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
+          progress: {
+            show: true,
+            width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
+          },
+          axisLine: {
+            lineStyle: {
+              width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
+            }
+          },
+          title:{
+            fontSize: 10,
+            offsetCenter: [0, "70%"],
+            // width: upto chart width
+            width: `${gridDataForGauge.gridWidth}`,
+            overflow: "truncate"
+          },
+
+          // center of gauge
+          // x: left + width / 2,
+          // y: top + height / 2,
+          center:[`${parseFloat(options.grid[index].left) + parseFloat(options.grid[index].width) / 2}%`, `${parseFloat(options.grid[index].top) + parseFloat(options.grid[index].height) / 2}%`],
+
+          data: [{
+              name: JSON.stringify(xAxisValue[index] || ""),
+              value:(unitValue.value),
+              detail: {
+                formatter: function (value:any) {
+                return value + unitValue.unit;
+                },
+              }
+            }],
+          detail: {
+            valueAnimation: true,
+            offsetCenter: [0, 0],
+            fontSize:12
+          }
+        }
+      });
+      break;
+    };
     default: {
       break;
     }
@@ -1212,6 +1298,66 @@ export const convertSQLData = (
   };
 };
 
+// it is used to create grid array for gauge chart
+function calculateGridPositions(width: any, height: any, numGrids: any) {
+  const gridArray: any = [];
+
+  // if no grid then return empty array
+  if (numGrids <= 0) {
+    return gridArray;
+  }
+
+  // if only one grid then return single grid array, width, height, gridNoOfRow, gridNoOfCol
+  if(numGrids == 1){
+    return {
+      gridArray: [{
+      left: "0%",
+      top: "0%",
+      width: "100%",
+      height: "100%",
+    }],
+    gridWidth : width,
+    gridHeight : height,
+    gridNoOfRow: 1,
+    gridNoOfCol: 1
+  }
+  }
+
+  // total area of chart element
+  const totalArea = width * height;
+  // per gauge area
+  const perChartArea = Math.sqrt(totalArea / numGrids);  
+  // number of row and column for gauge rendering
+  let numRows = Math.ceil(height / perChartArea);
+  let numCols = Math.ceil(width / perChartArea);
+
+  // width and height for single gauge
+  const cellWidth = 100 / numCols;
+  const cellHeight = 100 / numRows;
+
+  // will create 2D grid array
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numCols; col++) {
+      const grid = {
+        left: `${col * cellWidth}%`,
+        top: `${row * cellHeight}%`,
+        width: `${cellWidth}%`,
+        height: `${cellHeight}%`,
+      };
+      gridArray.push(grid);
+    }
+  }
+
+  // return grid array, width, height, gridNoOfRow, gridNoOfCol
+  return {
+    gridArray: gridArray,
+    gridWidth : (cellWidth * width) / 100,
+    gridHeight : (cellHeight * height) / 100,
+    gridNoOfRow: numRows,
+    gridNoOfCol: numCols
+  }
+}
+
 /**
  * Returns the position format for the legend.
  *
@@ -1407,6 +1553,37 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: {
           focus: "series",
         },
+      };
+    case "gauge":
+      return {
+        type: 'gauge',
+        startAngle: 205,
+        endAngle: -25,
+        // splitNumber: 12,
+        // itemStyle: {
+          // color: '#FFAB91'
+        // },
+        progress: {
+          show: true,
+          width: 10
+        },
+        pointer: {
+          show: false
+        },
+        axisLine: {
+          lineStyle: {
+            width: 10,
+          }
+        },
+        axisTick: {
+          show:false
+        },
+        splitLine: {
+          show:false
+        },
+        axisLabel: {
+          show:false
+        }
       };
     default:
       return {

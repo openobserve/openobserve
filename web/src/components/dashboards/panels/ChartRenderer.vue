@@ -221,6 +221,7 @@ export default defineComponent({
           key: "dataZoomSelect",
           dataZoomSelectActive: true,
         });
+            windowResizeEventCallback();
       },
       { deep: true }
     );

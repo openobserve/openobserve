@@ -120,10 +120,12 @@ export default defineComponent({
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value) {
           try {
+            // passing chartpanelref to get width and height of DOM element
             panelData.value = convertPanelData(
               panelSchema.value,
               data.value,
-              store
+              store,
+              chartPanelRef
             );
             errorDetail.value = "";
           } catch (error: any) {

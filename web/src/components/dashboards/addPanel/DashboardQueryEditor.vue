@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             inline-label
             outside-arrows
-            mobile-arrows
+            mobile-arrows @click.stop
           >
             <q-tab
               no-caps
