@@ -89,14 +89,15 @@
 import AppTabs from "@/components/common/AppTabs.vue";
 import streamService from "@/services/stream";
 import { computed, nextTick, onActivated, onMounted, ref, watch } from "vue";
-import { onBeforeRouteUpdate, useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useSession from "@/composables/useSessionReplay";
 import useErrorTracking from "@/composables/useErrorTracking";
-import useRum from "@/composables/rum/useRum";
+import usePerformance from "@/composables/rum/usePerformance";
 
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
+import useRum from "@/composables/rum/useRum";
 
 const route = useRoute();
 const router = useRouter();
@@ -118,6 +119,7 @@ const { t } = useI18n();
 const isLoading = ref<boolean[]>([]);
 const { sessionState } = useSession();
 const { errorTrackingState } = useErrorTracking();
+const { performanceState } = usePerformance();
 const { rumState } = useRum();
 
 const activeTab = ref<string>("performance");
@@ -246,7 +248,7 @@ const changeTab = (tab: string) => {
   if (tab === "performance") {
     router.push({
       name: "rumPerformanceSummary",
-      query: getQueryParams(rumState.data.datetime, ""),
+      query: getQueryParams(performanceState.data.datetime, ""),
     });
     return;
   }
@@ -255,7 +257,7 @@ const changeTab = (tab: string) => {
     router.push({
       name: "ErrorTracking",
       query: getQueryParams(
-        rumState.data.datetime,
+        performanceState.data.datetime,
         errorTrackingState.data.editorValue
       ),
     });
@@ -266,7 +268,7 @@ const changeTab = (tab: string) => {
     router.push({
       name: "Sessions",
       query: getQueryParams(
-        rumState.data.datetime,
+        performanceState.data.datetime,
         sessionState.data.editorValue
       ),
     });
@@ -301,12 +303,14 @@ const getSessionReplayFields = () => {
         "logs"
       )
       .then((res) => {
-        rumState.data.streams["_sessionreplay"] = {
+        performanceState.data.streams["_sessionreplay"] = {
           schema: {},
           name: "_sessionreplay",
         };
         res.data.schema.forEach((field: any) => {
-          rumState.data.streams["_sessionreplay"]["schema"][field.name] = field;
+          performanceState.data.streams["_sessionreplay"]["schema"][
+            field.name
+          ] = field;
         });
       })
       .finally(() => {
@@ -322,12 +326,13 @@ const getRumDataFields = () => {
     streamService
       .schema(store.state.selectedOrganization.identifier, "_rumdata", "logs")
       .then((res) => {
-        rumState.data.streams["_rumdata"] = {
+        performanceState.data.streams["_rumdata"] = {
           schema: {},
           name: "_rumdata",
         };
         res.data.schema.forEach((field: any) => {
-          rumState.data.streams["_rumdata"]["schema"][field.name] = field;
+          performanceState.data.streams["_rumdata"]["schema"][field.name] =
+            field;
         });
       })
       .finally(() => {

@@ -16,14 +16,16 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page>
-    <div class="q-mx-sm performance-dashboard">
+  <q-page class="relative-position">
+    <div
+      class="q-mx-sm performance-dashboard"
+      :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
+    >
       <RenderDashboardCharts
         ref="performanceChartsRef"
         :viewOnly="true"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
-        @variablesData="variablesDataUpdated"
       >
         <template v-slot:before_panels>
           <div class="flex items-center q-pb q-pt-md text-subtitle1 text-bold">
@@ -33,6 +35,20 @@
           </div>
         </template>
       </RenderDashboardCharts>
+    </div>
+    <div
+      v-show="isLoading.length"
+      class="q-pb-lg flex items-center justify-center text-center absolute full-width"
+      style="height: calc(100vh - 250px); top: 0"
+    >
+      <div>
+        <q-spinner-hourglass
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; display: block"
+        />
+        <div class="text-center full-width">Loading Dashboard</div>
+      </div>
     </div>
   </q-page>
 </template>
@@ -47,6 +63,7 @@ import {
   nextTick,
   onActivated,
   onDeactivated,
+  type Ref,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -58,7 +75,6 @@ import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
 import { cloneDeep } from "lodash-es";
-import useRum from "@/composables/rum/useRum";
 
 export default defineComponent({
   name: "PerformanceSummary",
@@ -77,8 +93,7 @@ export default defineComponent({
     // });
 
     const performanceChartsRef = ref(null);
-
-    const { rumState } = useRum();
+    const isLoading: Ref<boolean[]> = ref([]);
 
     onMounted(async () => {
       await loadDashboard();
@@ -89,16 +104,21 @@ export default defineComponent({
     });
 
     const updateLayout = async () => {
+      isLoading.value.push(true);
       await nextTick();
       await nextTick();
       await nextTick();
       await nextTick();
       performanceChartsRef.value.layoutUpdate();
 
+      // Dashboards gets overlapped as we have used keep alive
+      // Its an internal bug of vue-grid-layout
+      // So adding settimeout of 1 sec to fix the issue
       setTimeout(() => {
         performanceChartsRef.value.layoutUpdate();
         window.dispatchEvent(new Event("resize"));
-      }, 800);
+        isLoading.value.pop();
+      }, 1000);
     };
 
     const loadDashboard = async () => {
@@ -135,6 +155,16 @@ export default defineComponent({
       const variableObj = {};
       data.values.forEach((v) => {
         variableObj[`var-${v.name}`] = v.value;
+      });
+      router.replace({
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: route.query.dashboard,
+          folder: route.query.folder,
+          refresh: generateDurationLabel(refreshInterval.value),
+          ...getQueryParamsForDuration(selectedDate.value),
+          ...variableObj,
+        },
       });
     };
 
@@ -181,12 +211,12 @@ export default defineComponent({
     const refreshInterval = ref(0);
 
     // when the date changes from the picker, update the current time object for the dashboard
-    // watch(selectedDate, () => {
-    //   currentTimeObj.value = {
-    //     start_time: new Date(selectedDate.value.startTime),
-    //     end_time: new Date(selectedDate.value.endTime),
-    //   };
-    // });
+    watch(selectedDate, () => {
+      currentTimeObj.value = {
+        start_time: new Date(selectedDate.value.startTime),
+        end_time: new Date(selectedDate.value.endTime),
+      };
+    });
 
     const getQueryParamsForDuration = (data: any) => {
       if (data.relativeTimePeriod) {
@@ -202,6 +232,28 @@ export default defineComponent({
     };
 
     // [END] date picker related variables
+
+    // back button to render dashboard List page
+    const goBackToDashboardList = () => {
+      return router.push({
+        path: "/dashboards",
+        query: {
+          dashboard: route.query.dashboard,
+          folder: route.query.folder ?? "default",
+        },
+      });
+    };
+
+    //add panel
+    const addPanelData = () => {
+      return router.push({
+        path: "/dashboards/add_panel",
+        query: {
+          dashboard: route.query.dashboard,
+          folder: route.query.folder ?? "default",
+        },
+      });
+    };
 
     const refreshData = () => {
       dateTimePicker.value.refresh();
@@ -227,20 +279,33 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     });
 
-    // // whenever the refreshInterval is changed, update the query params
-    // watch([refreshInterval, selectedDate], () => {
-    //   router.replace({
-    //     query: {
-    //       org_identifier: store.state.selectedOrganization.identifier,
-    //       dashboard: route.query.dashboard,
-    //       folder: route.query.folder,
-    //       refresh: generateDurationLabel(refreshInterval.value),
-    //       ...getQueryParamsForDuration(selectedDate.value),
-    //     },
-    //   });
-    // });
+    // whenever the refreshInterval is changed, update the query params
+    watch([refreshInterval, selectedDate], () => {
+      router.replace({
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: route.query.dashboard,
+          folder: route.query.folder,
+          refresh: generateDurationLabel(refreshInterval.value),
+          ...getQueryParamsForDuration(selectedDate.value),
+        },
+      });
+    });
+
+    const onDeletePanel = async (panelId: any) => {
+      await deletePanel(
+        store,
+        route.query.dashboard,
+        panelId,
+        route.query.folder ?? "default"
+      );
+      await loadDashboard();
+    };
+
     return {
       currentDashboardData,
+      goBackToDashboardList,
+      addPanelData,
       t,
       getDashboard,
       store,
@@ -250,6 +315,7 @@ export default defineComponent({
       currentTimeObj,
       refreshInterval,
       refreshData,
+      onDeletePanel,
       variablesData,
       variablesDataUpdated,
       showDashboardSettingsDialog,
@@ -257,6 +323,7 @@ export default defineComponent({
       loadDashboard,
       getQueryParamsForDuration,
       performanceChartsRef,
+      isLoading,
     };
   },
 });

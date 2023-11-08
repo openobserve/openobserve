@@ -26,15 +26,15 @@ const defaultObject = {
   },
 };
 
-let rumState = reactive(Object.assign({}, defaultObject));
+let performanceState = reactive(Object.assign({}, defaultObject));
 
-const useRum = () => {
+const usePerformance = () => {
   const resetSessionState = () => {
     // delete searchObj.data;
-    rumState = reactive(Object.assign({}, defaultObject));
+    performanceState = reactive(Object.assign({}, defaultObject));
   };
 
-  return { rumState, resetSessionState };
+  return { performanceState, resetSessionState };
 };
 
-export default useRum;
+export default usePerformance;

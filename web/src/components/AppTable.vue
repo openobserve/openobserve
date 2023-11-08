@@ -41,8 +41,6 @@
         :virtual-scroll-item-size="48"
         :rows-per-page-options="[0]"
         @virtual-scroll="onScroll"
-        no-data-label="I didn't find anything for you"
-        no-results-label="The filter didn't uncover any results"
         class="full-height"
         hide-bottom
       >
