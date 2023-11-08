@@ -385,9 +385,10 @@ pub async fn write_file_arrow(
         //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
         //let inferred_schema = entry.schema.clone();
 
-        let mut schema_reader = BufReader::new(first_record.as_bytes());
-        let inferred_schema =
-            infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
+        // let mut schema_reader = BufReader::new(first_record.as_bytes());
+        // let inferred_schema =
+        //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
+        let inferred_schema = &entry.schema;
 
         let mut decoder = ReaderBuilder::new(Arc::new(inferred_schema.clone()))
             .with_batch_size(batch_size)
