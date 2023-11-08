@@ -413,7 +413,7 @@ pub async fn write_file_arrow(
             partition_time_level,
             key,
             CONFIG.common.wal_memory_mode_enabled,
-            Some(inferred_schema.clone()),
+            Some(entry.schema.clone()),
         )
         .await;
         if stream_file_name.is_empty() {
