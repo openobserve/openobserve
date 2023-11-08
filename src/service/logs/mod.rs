@@ -593,10 +593,7 @@ async fn add_valid_record_arrow(
         Some(&schema_key),
     );
 
-    let hour_buf = buf.entry(hour_key).or_insert(SchemaRecords {
-        schema: Schema::new(schema_evolution.schema_fields),
-        records: vec![],
-    });
+    let mut rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
 
     if schema_evolution.schema_compatible {
         let valid_record = if schema_evolution.types_delta.is_some() {
@@ -662,6 +659,10 @@ async fn add_valid_record_arrow(
                 // End check for alert trigger
             }
             let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
+            let hour_buf = buf.entry(hour_key).or_insert(SchemaRecords {
+                schema: rec_schema.clone(),
+                records: vec![],
+            });
             hour_buf.records.push(loc_value);
             status.successful += 1;
         };
