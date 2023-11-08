@@ -47,7 +47,7 @@ const accessKey = computed(() => {
 });
 
 const getCommand = computed(() => {
-  return `wget https://raw.githubusercontent.com/openobserve/agents/main/linux/install.sh \      
+  return `wget https://raw.githubusercontent.com/openobserve/agents/main/linux/install.sh \\      
     && chmod +x install.sh && sudo ./install.sh ${endpoint.value.url}/api/${props.currOrgIdentifier}/ ${accessKey.value}`;
 });
 </script>
