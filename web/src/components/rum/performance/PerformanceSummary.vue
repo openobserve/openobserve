@@ -16,8 +16,11 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page>
-    <div class="q-mx-sm performance-dashboard">
+  <q-page class="relative-position">
+    <div
+      class="q-mx-sm performance-dashboard"
+      :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
+    >
       <RenderDashboardCharts
         ref="performanceChartsRef"
         :viewOnly="true"
@@ -33,6 +36,20 @@
         </template>
       </RenderDashboardCharts>
     </div>
+    <div
+      v-show="isLoading.length"
+      class="q-pb-lg flex items-center justify-center text-center absolute full-width"
+      style="height: calc(100vh - 250px); top: 0"
+    >
+      <div>
+        <q-spinner-hourglass
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; display: block"
+        />
+        <div class="text-center full-width">Loading Dashboard</div>
+      </div>
+    </div>
   </q-page>
 </template>
 
@@ -46,6 +63,7 @@ import {
   nextTick,
   onActivated,
   onDeactivated,
+  type Ref,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -75,6 +93,7 @@ export default defineComponent({
     // });
 
     const performanceChartsRef = ref(null);
+    const isLoading: Ref<boolean[]> = ref([]);
 
     onMounted(async () => {
       await loadDashboard();
@@ -85,16 +104,21 @@ export default defineComponent({
     });
 
     const updateLayout = async () => {
+      isLoading.value.push(true);
       await nextTick();
       await nextTick();
       await nextTick();
       await nextTick();
       performanceChartsRef.value.layoutUpdate();
 
+      // Dashboards gets overlapped as we have used keep alive
+      // Its an internal bug of vue-grid-layout
+      // So adding settimeout of 1 sec to fix the issue
       setTimeout(() => {
         performanceChartsRef.value.layoutUpdate();
         window.dispatchEvent(new Event("resize"));
-      }, 800);
+        isLoading.value.pop();
+      }, 1000);
     };
 
     const loadDashboard = async () => {
@@ -299,6 +323,7 @@ export default defineComponent({
       loadDashboard,
       getQueryParamsForDuration,
       performanceChartsRef,
+      isLoading,
     };
   },
 });

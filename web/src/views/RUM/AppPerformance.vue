@@ -18,7 +18,9 @@
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
     <div class="flex justify-between items-center q-py-sm q-px-md">
-      <div class="performance_title">{{t('rum.performanceSummaryLabel')}}</div>
+      <div class="performance_title">
+        {{ t("rum.performanceSummaryLabel") }}
+      </div>
       <div class="flex items-center">
         <DateTimePickerDashboard
           class="q-ml-sm rum-date-time-picker"
@@ -82,6 +84,7 @@ import overviewDashboard from "@/utils/rum/overview.json";
 import AppTabs from "@/components/common/AppTabs.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import usePerformance from "@/composables/rum/usePerformance";
+import useRum from "@/composables/rum/useRum";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -95,6 +98,8 @@ export default defineComponent({
 
     const activePerformanceTab = ref("overview");
     const { performanceState } = usePerformance();
+    const { rumState } = useRum();
+
     const tabs = [
       {
         label: t("rum.overview"),
@@ -200,16 +205,14 @@ export default defineComponent({
 
       if (!routeNames[activePerformanceTab.value]) return;
 
-      setTimeout(() => {
-        router.push({
-          name: routeNames[activePerformanceTab.value],
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            refresh: generateDurationLabel(refreshInterval.value),
-            ...getQueryParamsForDuration(selectedDate.value),
-          },
-        });
-      }, 500);
+      router.push({
+        name: routeNames[activePerformanceTab.value],
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          refresh: generateDurationLabel(refreshInterval.value),
+          ...getQueryParamsForDuration(selectedDate.value),
+        },
+      });
     };
 
     watch(
@@ -407,7 +410,7 @@ export default defineComponent({
 }
 
 .rum-date-time-picker {
-  height: 36px;
+  height: 30px;
 }
 </style>
 

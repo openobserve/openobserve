@@ -62,10 +62,10 @@
       <div class="q-pa-lg enable-rum">
         <div class="q-pb-lg">
           <div class="text-left text-h6 text-bold q-pb-md">
-            {{t("rum.aboutRUMTitle")}}
+            {{ t("rum.aboutRUMTitle") }}
           </div>
           <div class="text-subtitle1">
-            {{t("rum.aboutRUMMessage")}}
+            {{ t("rum.aboutRUMMessage") }}
           </div>
           <div>
             <div></div>
@@ -77,7 +77,7 @@
           :title="t('rum.getStartedTitle')"
           @click="getStarted"
         >
-          {{t("rum.getStartedLabel")}}
+          {{ t("rum.getStartedLabel") }}
           <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
         </q-btn>
       </div>
@@ -88,17 +88,8 @@
 <script setup lang="ts">
 import AppTabs from "@/components/common/AppTabs.vue";
 import streamService from "@/services/stream";
-import {
-  computed,
-  nextTick,
-  onActivated,
-  onBeforeUnmount,
-  onMounted,
-  onUnmounted,
-  ref,
-  watch,
-} from "vue";
-import { onBeforeRouteUpdate, useRoute, useRouter } from "vue-router";
+import { computed, nextTick, onActivated, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useSession from "@/composables/useSessionReplay";
 import useErrorTracking from "@/composables/useErrorTracking";
@@ -106,6 +97,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
+import useRum from "@/composables/rum/useRum";
 
 const route = useRoute();
 const router = useRouter();
@@ -128,6 +120,7 @@ const isLoading = ref<boolean[]>([]);
 const { sessionState } = useSession();
 const { errorTrackingState } = useErrorTracking();
 const { performanceState } = usePerformance();
+const { rumState } = useRum();
 
 const activeTab = ref<string>("performance");
 const tabs = [
@@ -264,7 +257,7 @@ const changeTab = (tab: string) => {
     router.push({
       name: "ErrorTracking",
       query: getQueryParams(
-        errorTrackingState.data.datetime,
+        performanceState.data.datetime,
         errorTrackingState.data.editorValue
       ),
     });
@@ -275,7 +268,7 @@ const changeTab = (tab: string) => {
     router.push({
       name: "Sessions",
       query: getQueryParams(
-        sessionState.data.datetime,
+        performanceState.data.datetime,
         sessionState.data.editorValue
       ),
     });

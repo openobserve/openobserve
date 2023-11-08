@@ -189,6 +189,8 @@ const { t } = useI18n();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
+  relativeTimePeriod: "",
+  valueType: "relative",
 });
 const rumSessionStreamName = "_sessionreplay";
 
@@ -468,8 +470,15 @@ const getSessionLogs = (req: any) => {
 
 const updateDateChange = (date: any) => {
   if (JSON.stringify(date) === JSON.stringify(dateTime.value)) return;
-  dateTime.value = date;
-  sessionState.data.datetime = date;
+  dateTime.value = {
+    startTime: date.startTime,
+    endTime: date.endTime,
+    relativeTimePeriod: date.relativeTimePeriod
+      ? date.relativeTimePeriod
+      : sessionState.data.datetime.relativeTimePeriod,
+    valueType: date.relativeTimePeriod ? "relative" : "absolute",
+  };
+  sessionState.data.datetime = dateTime.value;
   if (date.valueType === "relative" && isMounted.value) getSessions();
 };
 

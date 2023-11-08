@@ -16,8 +16,11 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page>
-    <div class="q-mx-sm performance-dashboard">
+  <q-page class="relative-position">
+    <div
+      class="q-mx-sm performance-dashboard"
+      :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
+    >
       <div
         class="text-bold q-ml-sm q-px-sm rounded q-mt-md q-py-xs learn-web-vitals-link flex items-center"
         :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
@@ -26,8 +29,7 @@
           name="info"
           size="16px"
           class="material-symbols-outlined q-mr-xs"
-        ></q-icon>
-        {{ t("rum.learnWebVitalsLabel") }}
+        />
         {{ t("rum.learnWebVitalsLabel") }}
         <a
           href="https://web.dev/articles/vitals"
@@ -45,6 +47,20 @@
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
       />
+    </div>
+    <div
+      v-show="isLoading.length"
+      class="q-pb-lg flex items-center justify-center text-center absolute full-width"
+      style="height: calc(100vh - 250px); top: 0"
+    >
+      <div>
+        <q-spinner-hourglass
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; display: block"
+        />
+        <div class="text-center full-width">Loading Dashboard</div>
+      </div>
     </div>
   </q-page>
 </template>
@@ -102,6 +118,7 @@ export default defineComponent({
     const refreshInterval = ref(0);
     const selectedDate = ref();
     const webVitalsChartsRef = ref(null);
+    const isLoading: Ref<boolean[]> = ref([]);
 
     // variables data
     const variablesData = reactive({});
@@ -119,6 +136,7 @@ export default defineComponent({
     });
 
     const updateLayout = async () => {
+      isLoading.value.push(true);
       await nextTick();
       await nextTick();
       await nextTick();
@@ -126,10 +144,15 @@ export default defineComponent({
       // emit window resize event to trigger the layout
       webVitalsChartsRef.value.layoutUpdate();
 
+      // Dashboards gets overlapped as we have used keep alive
+      // Its an internal bug of vue-grid-layout
+      // So adding settimeout of 1 sec to fix the issue
+
       setTimeout(() => {
         webVitalsChartsRef.value.layoutUpdate();
         window.dispatchEvent(new Event("resize"));
-      }, 800);
+        isLoading.value.pop();
+      }, 1000);
     };
 
     const loadDashboard = async () => {
@@ -233,6 +256,7 @@ export default defineComponent({
       showDashboardSettingsDialog,
       loadDashboard,
       webVitalsChartsRef,
+      isLoading,
     };
   },
 });

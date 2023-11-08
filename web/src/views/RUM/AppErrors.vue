@@ -133,6 +133,8 @@ const { t } = useI18n();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
+  relativeTimePeriod: "",
+  valueType: "relative",
 });
 const streamFields: Ref<any[]> = ref([]);
 const splitterModel = ref(250);
@@ -227,7 +229,7 @@ onBeforeMount(() => {
 onMounted(async () => {
   isMounted.value = true;
   await getStreamFields();
-  updateUrlQueryParams();
+  runQuery();
 });
 
 const handleSidebarEvent = (event: string, value: any) => {
@@ -318,8 +320,16 @@ const getErrorLogs = () => {
 };
 
 const updateDateChange = (date: any) => {
-  dateTime.value = date;
-  errorTrackingState.data.datetime = date;
+  if (JSON.stringify(date) === JSON.stringify(dateTime.value)) return;
+  dateTime.value = {
+    startTime: date.startTime,
+    endTime: date.endTime,
+    relativeTimePeriod: date.relativeTimePeriod
+      ? date.relativeTimePeriod
+      : errorTrackingState.data.datetime.relativeTimePeriod,
+    valueType: date.relativeTimePeriod ? "relative" : "absolute",
+  };
+  errorTrackingState.data.datetime = dateTime.value;
   if (!isLoading.value.length && date.valueType === "relative") runQuery();
 };
 
