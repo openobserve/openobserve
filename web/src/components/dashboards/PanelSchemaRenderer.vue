@@ -140,6 +140,11 @@ export default defineComponent({
           {
             return data.value[0]?.length > 1 || xAlias.every((x: any) => data.value[0][0][x]) && yAlias.every((y: any) => data.value[0][0][y]) && zAlias.every((z: any) => data.value[0][0][z]);
           }
+        case "pie":
+        case "donut":
+          {
+            return data.value[0]?.length > 1 || yAlias.every((y: any) => data.value[0][0][y]);
+          }
         default:
           break;
       }
