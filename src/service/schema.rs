@@ -635,7 +635,7 @@ async fn handle_new_schema(
 fn get_schema_changes(
     schema: &Schema,
     inferred_schema: &Schema,
-    is_arrow: bool,
+    _is_arrow: bool,
 ) -> (Vec<Field>, bool, Vec<Field>, Schema) {
     let mut field_datatype_delta: Vec<_> = vec![];
     let mut new_field_delta: Vec<_> = vec![];
@@ -678,8 +678,8 @@ fn get_schema_changes(
             }
         }
     }
-    let mut rec_schema = Schema::empty();
-    if !field_datatype_delta.is_empty() {
+    /*let mut rec_schema = Schema::empty();
+      if !field_datatype_delta.is_empty() {
         //update data type
         match try_merge(vec![
             schema.clone(),
@@ -692,21 +692,14 @@ fn get_schema_changes(
                 rec_schema = merged;
             }
         }
-    }
+    } */
 
-    let mut final_fields: Vec<Field> = if !is_arrow {
-        merged_fields.drain().map(|(_key, value)| value).collect()
-    } else {
-        rec_schema.all_fields().iter().map(|&x| x.clone()).collect()
-    };
-
-    final_fields.sort_by(|a, b| a.name().cmp(b.name()));
-
+    let final_fields: Vec<Field> = merged_fields.drain().map(|(_key, value)| value).collect();
     (
         field_datatype_delta,
         is_schema_changed,
         final_fields,
-        rec_schema,
+        Schema::empty(),
     )
 }
 

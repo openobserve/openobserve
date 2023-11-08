@@ -377,15 +377,15 @@ pub async fn write_file_arrow(
             continue;
         }
         let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(entry.records.len());
-        let value = &entry.records.first().unwrap();
-        let first_record = json::to_string(value).unwrap();
+        //let value = &entry.records.first().unwrap();
+        //let first_record = json::to_string(value).unwrap();
 
         // let mut schema_reader = BufReader::new(first_record.as_bytes());
         // let inferred_schema =
         //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
-        let inferred_schema = &entry.schema;
+        //let inferred_schema = entry.schema.clone();
 
-        let mut decoder = ReaderBuilder::new(Arc::new(inferred_schema.clone()))
+        let mut decoder = ReaderBuilder::new(Arc::new(entry.schema.clone()))
             .with_batch_size(batch_size)
             .build_decoder()
             .unwrap();
@@ -398,7 +398,7 @@ pub async fn write_file_arrow(
             partition_time_level,
             key,
             CONFIG.common.wal_memory_mode_enabled,
-            Some(inferred_schema.clone()),
+            Some(entry.schema.clone()),
         )
         .await;
         if stream_file_name.is_empty() {

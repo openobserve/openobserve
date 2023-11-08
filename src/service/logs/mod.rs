@@ -331,7 +331,7 @@ pub fn cast_to_type_arrow(mut value: Value, delta: Vec<Field>) -> (Option<String
         let mut entries: Vec<_> = local_map.clone().into_iter().collect();
         entries.sort_by(|a, b| a.0.cmp(&b.0));
 
-        // If you want to convert it back to a Map
+        // Convert it back to a Map
         let sorted_map: Map<String, Value> = entries.into_iter().collect();
         (Some(utils::json::to_string(&sorted_map).unwrap()), None)
     } else {
@@ -477,7 +477,7 @@ async fn add_valid_record_arrow(
         Some(&schema_key),
     );
 
-    let mut rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
+    let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
 
     if schema_evolution.schema_compatible {
         let valid_record = if schema_evolution.types_delta.is_some() {

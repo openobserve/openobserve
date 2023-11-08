@@ -67,37 +67,53 @@ async fn json_to_arrow(body: web::Bytes) -> HttpResponse {
 #[post("/data/{org_id}/{stream_name}")]
 async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> HttpResponse {
     let (org_id, in_stream_name) = path.into_inner();
-    let file = format!(
+
+    /* let path = format!(
+        "./data/openobserve/wal/files/{}/logs/{}/",
+        org_id, in_stream_name
+    ); */
+
+    let path = format!(
         "./data/openobserve/wal/files/{org_id}/logs/{in_stream_name}/{}",
         file.into_inner()
     );
     let mut rows = vec![];
-    if let Ok(buf) = File::open(file) {
-        let reader = StreamReader::try_new(&buf, None).unwrap();
+    for entry in std::fs::read_dir(path).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
 
-        for batch in reader {
-            match batch {
-                Ok(read_batch) => {
-                    let json_rows =
-                        match arrow::json::writer::record_batches_to_json_rows(&[&read_batch]) {
-                            Ok(res) => res,
-                            Err(err) => {
-                                println!("error:reading batch {}", err);
-                                vec![]
-                            }
-                        };
-                    let mut sources: Vec<json::Value> =
-                        json_rows.into_iter().map(json::Value::Object).collect();
-                    rows.append(&mut sources);
-                }
-                Err(err) => {
-                    println!("error:reading batch {}", err);
-                    continue;
+        // If the directory entry is a file, read it
+        if path.is_file() {
+            if let Ok(buf) = File::open(path) {
+                let reader = StreamReader::try_new(&buf, None).unwrap();
+
+                for batch in reader {
+                    match batch {
+                        Ok(read_batch) => {
+                            let json_rows =
+                                match arrow::json::writer::record_batches_to_json_rows(&[
+                                    &read_batch,
+                                ]) {
+                                    Ok(res) => res,
+                                    Err(err) => {
+                                        println!("error:reading batch {}", err);
+                                        vec![]
+                                    }
+                                };
+                            let mut sources: Vec<json::Value> =
+                                json_rows.into_iter().map(json::Value::Object).collect();
+                            rows.append(&mut sources);
+                        }
+                        Err(err) => {
+                            println!("error:reading batch {}", err);
+                            continue;
+                        }
+                    }
                 }
             }
         }
     }
-
+    println!("got rows {}", rows.len());
     HttpResponse::Ok()
         .content_type("application/json")
         .json(rows)
