@@ -21,6 +21,76 @@ import {
 } from "./convertDataIntoUnitValue";
 import { utcToZonedTime } from "date-fns-tz";
 
+// function autoFontSize() {
+//   let width = document?.getElementById('chart1')?.offsetWidth || 400;
+//   let newFontSize = Math.round(width / 30);
+//   console.log(`Current width : ${width}, Updating Fontsize to ${newFontSize}`);
+//   return newFontSize;
+// };
+
+// it is used to create grid array for gauge chart
+function calculateGridPositions(width: any, height: any, numGrids: any) {
+  const gridArray: any = [];
+
+  // if no grid then return empty array
+  if (numGrids <= 0) {
+    return gridArray;
+  }
+
+  // if only one grid then return single grid array, width, height, gridNoOfRow, gridNoOfCol
+  if (numGrids == 1) {
+    return {
+      gridArray: [
+        {
+          left: "0%",
+          top: "0%",
+          width: "100%",
+          height: "100%",
+        },
+      ],
+      gridWidth: width,
+      gridHeight: height,
+      gridNoOfRow: 1,
+      gridNoOfCol: 1,
+    };
+  }
+
+  // total area of chart element
+  const totalArea = width * height;
+  // per gauge area
+  // chart will be square, so width and height are same, that's why used sqrt
+  const perChartArea = Math.sqrt(totalArea / numGrids);
+  // number of row and column for gauge rendering
+  let numRows = Math.ceil(height / perChartArea);
+  let numCols = Math.ceil(width / perChartArea);
+
+  // width and height for single gauge
+  const cellWidth = 100 / numCols;
+  const cellHeight = 100 / numRows;
+
+  // will create 2D grid array
+  for (let row = 0; row < numRows; row++) {
+    for (let col = 0; col < numCols; col++) {
+      const grid = {
+        left: `${col * cellWidth}%`,
+        top: `${row * cellHeight}%`,
+        width: `${cellWidth}%`,
+        height: `${cellHeight}%`,
+      };
+      gridArray.push(grid);
+    }
+  }
+
+  // return grid array, width, height, gridNoOfRow, gridNoOfCol
+  return {
+    gridArray: gridArray,
+    gridWidth: (cellWidth * width) / 100,
+    gridHeight: (cellHeight * height) / 100,
+    gridNoOfRow: numRows,
+    gridNoOfCol: numCols,
+  };
+}
+
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
  *
@@ -32,7 +102,8 @@ import { utcToZonedTime } from "date-fns-tz";
 export const convertPromQLData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any
+  store: any,
+  chartPanelRef: any
 ) => {
   // if no data than return it
   if (
@@ -203,7 +274,7 @@ export const convertPromQLData = (
     },
     toolbox: {
       orient: "vertical",
-      show: !["pie", "donut", "metric"].includes(panelSchema.type),
+      show: !["pie", "donut", "metric", "gauge"].includes(panelSchema.type),
       feature: {
         dataZoom: {
           filterMode: "none",
@@ -213,6 +284,32 @@ export const convertPromQLData = (
     },
     series: [],
   };
+  // to pass grid index in gauge chart
+  let gaugeIndex = 0;
+
+  // for gauge chart we need total no. of gauge to calculate grid positions
+  let totalLength = 0;
+  // for gauge chart, it contains grid array, single chart height and width, no. of charts per row and no. of columns
+  let gridDataForGauge: any = {};
+
+  if (panelSchema.type === "gauge") {
+    // calculate total length of all metrics
+    searchQueryData.forEach((metric: any) => {
+      if (metric.result && Array.isArray(metric.result)) {
+        totalLength += metric.result.length;
+      }
+    });
+
+    // create grid array based on chart panel width, height and total no. of gauge
+    gridDataForGauge = calculateGridPositions(
+      chartPanelRef.value.offsetWidth,
+      chartPanelRef.value.offsetHeight,
+      totalLength
+    );
+
+    //assign grid array to gauge chart options
+    options.grid = gridDataForGauge.gridArray;
+  }
 
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
@@ -262,10 +359,109 @@ export const convertPromQLData = (
           }
         }
       }
+      case "gauge": {
+        const series = it?.result?.map((metric: any) => {
+          const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+          const unitValue = getUnitValue(
+            values[values.length - 1][1],
+            panelSchema.config?.unit,
+            panelSchema.config?.unit_custom
+          );
+          gaugeIndex++;
+          return {
+            ...getPropsByChartTypeForSeries(panelSchema.type),
+            min: panelSchema?.config?.min || 0,
+            max: panelSchema?.config?.max || 100,
+
+            //which grid will be used
+            gridIndex: gaugeIndex - 1,
+            // radius, progress and axisline width will be calculated based on grid width and height
+            radius: `${
+              Math.min(
+                gridDataForGauge.gridWidth,
+                gridDataForGauge.gridHeight
+              ) /
+                2 -
+              5
+            }px`,
+            progress: {
+              show: true,
+              width: `${
+                Math.min(
+                  gridDataForGauge.gridWidth,
+                  gridDataForGauge.gridHeight
+                ) / 6
+              }`,
+            },
+            axisLine: {
+              lineStyle: {
+                width: `${
+                  Math.min(
+                    gridDataForGauge.gridWidth,
+                    gridDataForGauge.gridHeight
+                  ) / 6
+                }`,
+              },
+            },
+            title: {
+              fontSize: 10,
+              offsetCenter: [0, "70%"],
+              // width: upto chart width
+              width: `${gridDataForGauge.gridWidth}`,
+              overflow: "truncate",
+            },
+
+            // center of gauge
+            // x: left + width / 2,
+            // y: top + height / 2,
+            center: [
+              `${
+                parseFloat(options.grid[gaugeIndex - 1].left) +
+                parseFloat(options.grid[gaugeIndex - 1].width) / 2
+              }%`,
+              `${
+                parseFloat(options.grid[gaugeIndex - 1].top) +
+                parseFloat(options.grid[gaugeIndex - 1].height) / 2
+              }%`,
+            ],
+            data: [
+              {
+                name: JSON.stringify(metric.metric),
+                value: parseFloat(unitValue.value).toFixed(2),
+                detail: {
+                  formatter: function (value: any) {
+                    return value + unitValue.unit;
+                  },
+                },
+              },
+            ],
+            detail: {
+              valueAnimation: true,
+              offsetCenter: [0, 0],
+              fontSize: 12,
+            },
+          };
+        });
+        options.dataset = { source: [[]] };
+        options.tooltip = {
+          show: true,
+          trigger: "item",
+        };
+        options.angleAxis = {
+          show: false,
+        };
+        options.radiusAxis = {
+          show: false,
+        };
+        options.polar = {};
+        options.xAxis = [];
+        options.yAxis = [];
+        return series;
+      }
       case "metric": {
         switch (it?.resultType) {
           case "matrix": {
-            const traces = it?.result?.map((metric: any) => {
+            const series = it?.result?.map((metric: any) => {
               const values = metric.values.sort(
                 (a: any, b: any) => a[0] - b[0]
               );
@@ -307,7 +503,7 @@ export const convertPromQLData = (
             options.polar = {};
             options.xAxis = [];
             options.yAxis = [];
-            return traces;
+            return series;
           }
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
@@ -448,6 +644,24 @@ const getPropsByChartTypeForSeries = (type: string) => {
         showSymbol: false,
         emphasis: {
           focus: "series",
+        },
+      };
+    case "gauge":
+      return {
+        type: "gauge",
+        startAngle: 205,
+        endAngle: -25,
+        pointer: {
+          show: false,
+        },
+        axisTick: {
+          show: false,
+        },
+        splitLine: {
+          show: false,
+        },
+        axisLabel: {
+          show: false,
         },
       };
     case "metric":
