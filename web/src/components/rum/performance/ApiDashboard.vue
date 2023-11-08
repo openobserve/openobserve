@@ -17,34 +17,68 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page
+    class="relative-position"
     :key="store.state.selectedOrganization.identifier"
-    class="api-performance-dashboards"
   >
-    <div class="q-px-md">
-      <VariablesValueSelector
-        :variablesConfig="apiDashboard?.variables"
-        :selectedTimeDate="dateTime"
-        @variablesData="variablesDataUpdated"
-      />
+    <div
+      class="api-performance-dashboards"
+      :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
+    >
+      <div class="q-px-md">
+        <VariablesValueSelector
+          :variablesConfig="apiDashboard?.variables"
+          :selectedTimeDate="dateTime"
+          @variablesData="variablesDataUpdated"
+        />
+      </div>
+      <div class="row q-px-md">
+        <div class="col-6 q-px-xs q-py-xs">
+          <div class="view-error-table q-pa-sm">
+            <div class="q-pb-sm text-bold q-pl-xs">Top Slowest Resources</div>
+            <AppTable
+              :columns="slowResourceColumn"
+              :rows="topSlowResources"
+              :virtualScroll="false"
+              height="200px"
+            />
+          </div>
+        </div>
+        <div class="col-6 q-px-xs q-py-xs">
+          <div class="view-error-table q-pa-sm">
+            <div class="q-pb-sm text-bold q-pl-xs">Top Heaviest Resources</div>
+            <AppTable
+              :columns="heavyResourceColumn"
+              :rows="topHeavyResources"
+              :virtualScroll="false"
+              height="200px"
+            />
+          </div>
+        </div>
+        <div class="col-6 q-px-xs q-py-xs">
+          <div class="view-error-table q-pa-sm">
+            <div class="q-pb-sm text-bold q-pl-xs">Top Error Resources</div>
+            <AppTable
+              :columns="errorResourceColumns"
+              :rows="topErrorResources"
+              :virtualScroll="false"
+              height="200px"
+            />
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="row q-px-md">
-      <div class="col-6 q-px-xs q-py-xs">
-        <div class="view-error-table q-pa-sm">
-          <div class="q-pb-sm text-bold q-pl-xs">Top Slowest Resources</div>
-          <AppTable :columns="slowResourceColumn" :rows="topSlowResources" />
-        </div>
-      </div>
-      <div class="col-6 q-px-xs q-py-xs">
-        <div class="view-error-table q-pa-sm">
-          <div class="q-pb-sm text-bold q-pl-xs">Top Heaviest Resources</div>
-          <AppTable :columns="heavyResourceColumn" :rows="topHeavyResources" />
-        </div>
-      </div>
-      <div class="col-6 q-px-xs q-py-xs">
-        <div class="view-error-table q-pa-sm">
-          <div class="q-pb-sm text-bold q-pl-xs">Top Error Resources</div>
-          <AppTable :columns="errorResourceColumns" :rows="topErrorResources" />
-        </div>
+    <div
+      v-show="isLoading.length"
+      class="q-pb-lg flex items-center justify-center text-center absolute full-width"
+      style="height: calc(100vh - 250px); top: 0"
+    >
+      <div>
+        <q-spinner-hourglass
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; display: block"
+        />
+        <div class="text-center full-width">Loading Dashboard</div>
       </div>
     </div>
   </q-page>
@@ -52,7 +86,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted } from "vue";
+import { defineComponent, ref, watch, onMounted, onActivated } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -98,6 +132,7 @@ export default defineComponent({
     const refDateTime: any = ref(null);
     const refreshInterval = ref(0);
     const topCount = 10;
+    const isLoading: Ref<boolean[]> = ref([]);
 
     // variables data
     const variablesDataUpdated = (data: any) => {
@@ -169,7 +204,22 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
+      updateLayout();
     });
+
+    onActivated(() => {
+      updateLayout();
+    });
+
+    const updateLayout = async () => {
+      isLoading.value.push(true);
+
+      // Settimeout is used to make consitent loading experience across all tabs
+      // As due to vue-grid-layout issue in summary and webvitals
+      setTimeout(() => {
+        isLoading.value.pop();
+      }, 1000);
+    };
 
     const getTopSlowResources = () => {
       topSlowResources.value = [];
@@ -340,6 +390,7 @@ export default defineComponent({
       errorResourceColumns,
       topErrorResources,
       apiDashboard,
+      isLoading,
     };
   },
 });
