@@ -147,6 +147,19 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 return Ok(());
             }
 
+            // check if allowed to delete the file
+            loop {
+                if wal::lock_files_exists(&file_path).await {
+                    log::info!(
+                        "[JOB] the file is still in use, waiting for a few ms: {}",
+                        file_path
+                    );
+                    time::sleep(time::Duration::from_millis(100)).await;
+                } else {
+                    break;
+                }
+            }
+
             let ret = tokio::fs::remove_file(&local_file).await;
             if let Err(e) = ret {
                 log::error!(
@@ -302,12 +315,7 @@ async fn upload_file(
         } else {
             None
         };
-    let mut writer = new_parquet_writer(
-        &mut buf_parquet,
-        &arrow_schema,
-        file_meta.records as u64,
-        bf_fields,
-    );
+    let mut writer = new_parquet_writer(&mut buf_parquet, &arrow_schema, &file_meta, bf_fields);
     for batch in batches {
         writer.write(&batch)?;
     }
