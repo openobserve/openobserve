@@ -54,11 +54,13 @@ pub async fn search(
     // get file list
     let mut files = get_file_list(&sql, stream_type).await?;
     let mut scan_stats = ScanStats::new();
+    let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
     // cache files
     let work_dir = session_id.to_string();
     for file in files.clone().iter() {
-        match get_file_contents(&file.key) {
+        let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
+        match get_file_contents(&source_file) {
             Err(_) => {
                 log::error!("skip wal file: {} get file content error", &file.key);
                 files.retain(|x| x != file);
@@ -77,8 +79,7 @@ pub async fn search(
                     }
                 }
                 scan_stats.original_size += file_data.len() as i64;
-                let file_key = file.key.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
-                let file_name = format!("/{work_dir}/{file_key}");
+                let file_name = format!("/{work_dir}/{}", file.key);
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             }
         }
@@ -112,6 +113,9 @@ pub async fn search(
         Ok(schema) => schema,
         Err(err) => {
             log::error!("get schema error: {}", err);
+            // release all files
+            wal::release_files(&lock_files).await;
+            tmpfs::delete(session_id, true).unwrap();
             return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
                 sql.stream_name.clone(),
             )));
@@ -151,6 +155,9 @@ pub async fn search(
         let mut inferred_schema = match infer_json_schema(&mut schema_reader, None, stream_type) {
             Ok(schema) => schema,
             Err(err) => {
+                // release all files
+                wal::release_files(&lock_files).await;
+                tmpfs::delete(session_id, true).unwrap();
                 return Err(Error::from(err));
             }
         };
@@ -236,11 +243,16 @@ pub async fn search(
             }
             Err(err) => {
                 log::error!("datafusion execute error: {}", err);
+                // release all files
+                wal::release_files(&lock_files).await;
+                tmpfs::delete(session_id, true).unwrap();
                 return Err(super::handle_datafusion_error(err));
             }
         };
     }
 
+    // release all files
+    wal::release_files(&lock_files).await;
     // clear tmpfs
     tmpfs::delete(session_id, true).unwrap();
 
@@ -250,24 +262,44 @@ pub async fn search(
 /// get file list from local wal, no need match_source, each file will be searched
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<FileKey>, Error> {
-    let pattern = format!(
-        "{}files/{}/{stream_type}/{}/",
-        &CONFIG.common.data_wal_dir, &sql.org_id, &sql.stream_name
-    );
-    let files = scan_files(&pattern);
-
-    let mut result = Vec::with_capacity(files.len());
     let wal_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
-        Ok(path) => path,
+        Ok(path) => path.to_str().unwrap().to_string(),
         Err(_) => {
-            return Ok(result);
+            return Ok(vec![]);
         }
     };
+
+    // get all files
+    let pattern = format!(
+        "{}/files/{}/{stream_type}/{}/",
+        wal_dir, &sql.org_id, &sql.stream_name
+    );
+    let files = scan_files(&pattern);
+    if files.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // lock theses files
+    let files = files
+        .iter()
+        .map(|f| {
+            f.strip_prefix(&wal_dir)
+                .unwrap()
+                .to_string()
+                .replace('\\', "/")
+                .trim_start_matches('/')
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+    wal::lock_files(&files).await;
+
+    let mut result = Vec::with_capacity(files.len());
     let time_range = sql.meta.time_range.unwrap_or((0, 0));
     for file in files {
         if time_range != (0, 0) {
             // check wal file created time, we can skip files which created time > end_time
-            let file_meta = match get_file_meta(&file) {
+            let source_file = wal_dir.to_string() + "/" + file.as_str();
+            let file_meta = match get_file_meta(&source_file) {
                 Ok(meta) => meta,
                 Err(_) => {
                     log::error!("skip wal file: {} get file meta error", file);
@@ -303,16 +335,8 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
                 continue;
             }
         }
-        let file = Path::new(&file).canonicalize().unwrap();
-        let file = file.strip_prefix(&wal_dir).unwrap();
-        let local_file = file.to_str().unwrap();
-        let file_path = file.parent().unwrap().to_str().unwrap().replace('\\', "/");
-        let file_name = file.file_name().unwrap().to_str().unwrap();
-        let source_file = format!("{file_path}/{file_name}");
-        let mut file_key = FileKey::from_file_name(&source_file);
+        let file_key = FileKey::from_file_name(&file);
         if sql.match_source(&file_key, false, true, stream_type).await {
-            file_key.key =
-                format!("{}{local_file}", &CONFIG.common.data_wal_dir).replace('\\', "/");
             result.push(file_key);
         }
     }

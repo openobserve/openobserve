@@ -25,7 +25,7 @@ use tokio::{
 
 use crate::common::{
     infra::{
-        config::{CONFIG, FILE_EXT_JSON},
+        config::{RwAHashSet, CONFIG, FILE_EXT_JSON},
         ider, metrics,
     },
     meta::{
@@ -34,6 +34,9 @@ use crate::common::{
     },
     utils::asynchronism::file::get_file_contents,
 };
+
+// SEARCHING_FILES for searching files, in use, should not move to s3
+static SEARCHING_FILES: Lazy<RwAHashSet<String>> = Lazy::new(|| RwLock::new(Default::default()));
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
@@ -66,6 +69,7 @@ pub struct RwFile {
 pub async fn init() -> Result<(), anyhow::Error> {
     _ = MANAGER.data.len();
     _ = MEMORY_FILES.list("").await.len();
+    _ = SEARCHING_FILES.read().await.len();
     Ok(())
 }
 
@@ -477,6 +481,27 @@ impl RwFile {
     pub fn expired(&self) -> i64 {
         self.expired
     }
+}
+
+pub async fn lock_files(files: &[String]) {
+    let mut locker = SEARCHING_FILES.write().await;
+    for file in files.iter() {
+        // log::info!("lock acquire file: {}", file);
+        locker.insert(file.clone());
+    }
+}
+
+pub async fn release_files(files: &[String]) {
+    let mut locker = SEARCHING_FILES.write().await;
+    for file in files.iter() {
+        // log::info!("lock released file: {}", file);
+        locker.remove(file);
+    }
+    locker.shrink_to_fit();
+}
+
+pub async fn lock_files_exists(file: &str) -> bool {
+    SEARCHING_FILES.read().await.get(file).is_some()
 }
 
 #[cfg(test)]
