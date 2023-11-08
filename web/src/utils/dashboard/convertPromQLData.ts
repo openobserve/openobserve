@@ -426,7 +426,10 @@ export const convertPromQLData = (
             ],
             data: [
               {
-                name: JSON.stringify(metric.metric),
+                name: getPromqlLegendName(
+                  metric.metric,
+                  panelSchema.queries[index].config.promql_legend
+                ),
                 value: parseFloat(unitValue.value).toFixed(2),
                 detail: {
                   formatter: function (value: any) {

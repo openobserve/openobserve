@@ -177,6 +177,7 @@ export default defineComponent({
               yAlias.every((y: any) => data.value[0][0][y]) != null)
           );
         }
+        case "gauge":
         case "metric": {
           return (
             data.value[0]?.length > 1 ||
