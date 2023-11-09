@@ -175,27 +175,6 @@ pub async fn json_arrow(
     )
 }
 
-#[post("/{org_id}/{stream_name}/v1/_json")]
-pub async fn json_v1(
-    path: web::Path<(String, String)>,
-    body: web::Bytes,
-    thread_id: web::Data<usize>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
-    Ok(
-        match logs::json::ingest(&org_id, &stream_name, body, **thread_id).await {
-            Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => {
-                log::error!("Error processing request: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        },
-    )
-}
-
 /** _kinesis_firehose ingestion API*/
 #[utoipa::path(
     context_path = "/api",
