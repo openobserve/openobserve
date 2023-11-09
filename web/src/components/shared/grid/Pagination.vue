@@ -19,7 +19,7 @@
     :class="position === 'bottom' ? 'q-py-sm' : 'q-pt-sm'"
     class="q-table__control full-width row justify-between"
   >
-    <div v-if="position === 'bottom' && maxRecords" class="max-result">
+    <div v-if="position === 'bottom' && maxRecords" class="max-result" style="justify-content: start;">
       <span class="q-table__bottom-item">{{ t("search.maxRecords") }}</span>
       <q-input
         v-model="maxRecords"
@@ -247,6 +247,7 @@ export default defineComponent({
         font-weight: 600;
         // color: $dark;
         padding: 0;
+        width: fit-content;
       }
     }
   }
