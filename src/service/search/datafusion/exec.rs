@@ -48,8 +48,8 @@ use crate::common::{
     meta::{
         common::{FileKey, FileMeta},
         functions::VRLResultResolver,
-        search::Session as SearchSession,
-        sql,
+        search::{SearchType, Session as SearchSession},
+        sql, StreamType,
     },
     utils::{flatten, json},
 };
@@ -390,6 +390,7 @@ async fn get_fast_mode_ctx(
     let fast_session = SearchSession {
         id: format!("{}-fast", session.id),
         storage_type: session.storage_type.clone(),
+        search_type: session.search_type.clone(),
     };
     let mut ctx =
         register_table(&fast_session, schema.clone(), "tbl", &new_files, file_type).await?;
@@ -469,7 +470,7 @@ pub async fn merge(
     // );
 
     // query data
-    let mut ctx = prepare_datafusion_context()?;
+    let mut ctx = prepare_datafusion_context(&SearchType::Normal)?;
     // Configure listing options
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -765,7 +766,7 @@ pub async fn convert_parquet_file(
 ) -> Result<()> {
     let start = std::time::Instant::now();
     // query data
-    let ctx = prepare_datafusion_context()?;
+    let ctx = prepare_datafusion_context(&SearchType::Normal)?;
 
     // Configure listing options
     let listing_options = match file_type {
@@ -869,7 +870,7 @@ pub async fn merge_parquet_files(
     let start = std::time::Instant::now();
     // query data
     let runtime_env = create_runtime_env()?;
-    let session_config = create_session_config()?;
+    let session_config = create_session_config(&SearchType::Normal)?;
     let ctx = SessionContext::new_with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
@@ -933,19 +934,14 @@ pub async fn merge_parquet_files(
     Ok(file_meta)
 }
 
-pub fn create_session_config() -> Result<SessionConfig> {
-    // Enable parquet predicate pushdown optimization
-    // let mut options = ConfigOptions::new();
-    // options.execution.parquet.pushdown_filters = true;
-    // options.execution.parquet.reorder_filters = true;
-    // options.optimizer.repartition_sorts = true;
-    // if CONFIG.common.traces_bloom_filter_enabled {
-    //     options.execution.parquet.bloom_filter_enabled = true;
-    // }
-
+pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {
     let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
         .with_information_schema(true);
+    if search_type == &SearchType::Normal {
+        config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
+        config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
+    }
     if CONFIG.common.bloom_filter_enabled {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", true);
     }
@@ -985,9 +981,11 @@ pub fn create_runtime_env() -> Result<RuntimeEnv> {
     RuntimeEnv::new(rn_config)
 }
 
-pub fn prepare_datafusion_context() -> Result<SessionContext, DataFusionError> {
+pub fn prepare_datafusion_context(
+    search_type: &SearchType,
+) -> Result<SessionContext, DataFusionError> {
+    let session_config = create_session_config(search_type)?;
     let runtime_env = create_runtime_env()?;
-    let session_config = create_session_config()?;
     Ok(SessionContext::new_with_config_rt(
         session_config,
         Arc::new(runtime_env),
@@ -1017,7 +1015,7 @@ pub async fn register_table(
     files: &[FileKey],
     file_type: FileType,
 ) -> Result<SessionContext> {
-    let ctx = prepare_datafusion_context()?;
+    let ctx = prepare_datafusion_context(&session.search_type)?;
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {

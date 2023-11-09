@@ -23,6 +23,13 @@ use crate::service::search::datafusion::storage::StorageType;
 pub struct Session {
     pub id: String,
     pub storage_type: StorageType,
+    pub search_type: SearchType,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SearchType {
+    Normal,
+    Aggregation,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

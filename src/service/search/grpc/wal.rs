@@ -29,7 +29,7 @@ use crate::common::{
         errors::{Error, ErrorCodes},
         wal,
     },
-    meta::{self, common::FileKey, stream::ScanStats},
+    meta::{self, common::FileKey, search::SearchType, stream::ScanStats},
     utils::{
         file::{get_file_contents, get_file_meta, scan_files},
         schema::infer_json_schema,
@@ -190,6 +190,11 @@ pub async fn search(
             meta::search::Session {
                 id: session_id.to_string(),
                 storage_type: StorageType::Tmpfs,
+                search_type: if !sql.meta.group_by.is_empty() {
+                    SearchType::Aggregation
+                } else {
+                    SearchType::Normal
+                },
             }
         } else {
             let id = format!("{session_id}-{ver}");
@@ -206,6 +211,11 @@ pub async fn search(
             meta::search::Session {
                 id,
                 storage_type: StorageType::Tmpfs,
+                search_type: if !sql.meta.group_by.is_empty() {
+                    SearchType::Aggregation
+                } else {
+                    SearchType::Normal
+                },
             }
         };
         let datafusion_span = info_span!(

@@ -28,7 +28,7 @@ use crate::common::{
     },
     meta::{
         common::FileKey,
-        search::Session as SearchSession,
+        search::{SearchType, Session as SearchSession},
         stream::{PartitionTimeLevel, ScanStats, StreamParams},
         StreamType,
     },
@@ -130,6 +130,7 @@ pub(crate) async fn create_context(
     let session = SearchSession {
         id: session_id.to_string(),
         storage_type: StorageType::Memory,
+        search_type: SearchType::Normal,
     };
 
     let ctx = register_table(
