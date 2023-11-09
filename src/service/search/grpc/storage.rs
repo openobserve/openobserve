@@ -28,6 +28,7 @@ use crate::common::{
     meta::{
         self,
         common::FileKey,
+        search::SearchType,
         stream::{PartitionTimeLevel, ScanStats},
     },
 };
@@ -168,6 +169,11 @@ pub async fn search(
         let session = meta::search::Session {
             id: format!("{session_id}-{ver}"),
             storage_type: StorageType::Memory,
+            search_type: if !sql.meta.group_by.is_empty() {
+                SearchType::Aggregation
+            } else {
+                SearchType::Normal
+            },
         };
         // cacluate the diff between latest schema and group schema
         let mut diff_fields = HashMap::new();
