@@ -660,7 +660,9 @@ async fn add_valid_record_arrow(
             }
             let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
             let hour_buf = buf.entry(hour_key).or_insert(SchemaRecords {
-                schema: rec_schema.clone(),
+                schema: rec_schema
+                    .clone()
+                    .with_metadata(std::collections::HashMap::new()),
                 records: vec![],
             });
             hour_buf.records.push(loc_value);
