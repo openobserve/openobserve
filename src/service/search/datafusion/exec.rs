@@ -106,8 +106,6 @@ pub async fn sql(
         }
         let schema = if let Some(first_batch) = record_batches.first() {
             let schema = first_batch.schema();
-            println!("record batch meta is {:?}", schema.metadata());
-
             schema
         } else {
             return Err(datafusion::error::DataFusionError::Plan(
