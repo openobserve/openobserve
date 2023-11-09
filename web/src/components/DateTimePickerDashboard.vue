@@ -53,7 +53,13 @@ export default defineComponent({
   setup(props, { emit }) {
     const dateTimePicker: any = ref(null);
 
+    watch(() => props.modelValue, () => {
+      console.log('DateTimePickerDashboard: modelValue updated', props.modelValue);
+    })
+
     const updateDateTime = (date: any) => {
+      console.log('DateTimePickerDashboard: date updated', date);
+      
       const newValue = {
         startTime: date.startTime,
         endTime: date.endTime,

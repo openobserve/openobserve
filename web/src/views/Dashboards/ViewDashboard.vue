@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardData="currentDashboardData.data"
       :currentTimeObj="currentTimeObj"
       @onDeletePanel="onDeletePanel"
+      @updated:data-zoom="onDataZoom"
     />
 
     <q-dialog
@@ -230,11 +231,20 @@ export default defineComponent({
 
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
+      console.log("selected date time updated: ", convertDateToReadableFormat(selectedDate.value));
       currentTimeObj.value = {
         start_time: new Date(selectedDate.value.startTime),
         end_time: new Date(selectedDate.value.endTime),
       };
     });
+
+    const convertDateToReadableFormat = (date) => {
+      const convertTimestamp = (timestampInMicro: number) => {
+        return new Date(timestampInMicro / 1000).toLocaleString("en-US");
+      }
+
+      return (convertTimestamp(date.startTime) + " - " + convertTimestamp(date.endTime));
+    };
 
     const getQueryParamsForDuration = (data: any) => {
       if (data.relativeTimePeriod) {
@@ -276,6 +286,25 @@ export default defineComponent({
     const refreshData = () => {
       dateTimePicker.value.refresh();
     };
+
+    const onDataZoom = (event: any) => {
+      console.log("onDataZoom", event);
+      const startTime = new Date(event.start)
+      const endTime = new Date(event.end)
+
+      startTime.setSeconds(0)
+      endTime.setSeconds(0)
+      startTime.setMilliseconds(0)
+      endTime.setMilliseconds(0)
+      const timeRange = {
+        startTime: startTime.getTime() * 1000,
+        endTime: endTime.getTime() * 1000,
+        valueType: "absolute",
+        relativeTimePeriod: null,
+      };
+      selectedDate.value = timeRange
+      // dateTimePicker?.value?.updateDateTime(timeRange);
+    }
 
     // ------- work with query params ----------
     onActivated(async () => {
@@ -342,6 +371,7 @@ export default defineComponent({
       loadDashboard,
       initialVariableValues,
       getQueryParamsForDuration,
+      onDataZoom
     };
   },
 });
