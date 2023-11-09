@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :width="props.width"
       :height="props.height"
       :variablesData="props.variablesData"
+      @updated:data-zoom="$emit('updated:data-zoom', $event)"
     ></PanelSchemaRenderer>
   </div>
 </template>
@@ -95,7 +96,7 @@ import { ref } from "vue";
 
 export default defineComponent({
   name: "PanelContainer",
-  emits: ["onDeletePanel", "onViewPanel"],
+  emits: ["onDeletePanel", "onViewPanel", "updated:data-zoom"],
   props: [
     "data",
     "selectedTimeDate",

@@ -65,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :variablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
+              @updated:data-zoom="$emit('updated:data-zoom', $event)"
             >
             </PanelContainer>
           </div>
@@ -109,7 +110,7 @@ import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
-  emits: ["onDeletePanel", "onViewPanel", "variablesData"],
+  emits: ["onDeletePanel", "onViewPanel", "variablesData", "updated:data-zoom"],
   props: [
     "viewOnly",
     "dashboardData",

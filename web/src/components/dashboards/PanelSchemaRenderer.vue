@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? panelData
             : { options: {} }
         "
-      />
+      @updated:data-zoom="$emit('updated:data-zoom', $event)" />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div
@@ -96,6 +96,7 @@ export default defineComponent({
       type: Object,
     },
   },
+  emits: ["updated:data-zoom"],
   setup(props, { emit }) {
     const store = useStore();
 
