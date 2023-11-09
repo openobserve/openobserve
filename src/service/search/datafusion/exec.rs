@@ -49,7 +49,7 @@ use crate::common::{
         common::{FileKey, FileMeta},
         functions::VRLResultResolver,
         search::{SearchType, Session as SearchSession},
-        sql, StreamType,
+        sql,
     },
     utils::{flatten, json},
 };
