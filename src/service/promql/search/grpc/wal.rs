@@ -24,12 +24,18 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Chan
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::infra::{
-    cache::tmpfs,
-    cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
-    config::CONFIG,
+use crate::common::{
+    infra::{
+        cache::tmpfs,
+        cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
+        config::CONFIG,
+    },
+    meta::{
+        search::{SearchType, Session as SearchSession},
+        stream::ScanStats,
+        StreamType,
+    },
 };
-use crate::common::meta::{search::Session as SearchSession, stream::ScanStats, StreamType};
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{
     db,
@@ -88,6 +94,7 @@ pub(crate) async fn create_context(
     let session = SearchSession {
         id: session_id.to_string(),
         storage_type: StorageType::Tmpfs,
+        search_type: SearchType::Normal,
     };
 
     let ctx = register_table(&session, schema.clone(), stream_name, &[], FileType::JSON).await?;
