@@ -1,4 +1,3 @@
-import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { Parser } from "node-sql-parser/build/mysql";
 
 export const addLabelToSQlQuery = (

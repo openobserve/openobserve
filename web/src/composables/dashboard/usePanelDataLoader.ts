@@ -16,8 +16,8 @@
 import { ref, watch, reactive, toRefs, onMounted, onUnmounted } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
-import { addLabelToPromQlQuery } from "@/utils/dashboard/convertPromQLVariableQuery";
-import { addLabelToSQlQuery } from "@/utils/dashboard/convertSQLVariableQuery";
+import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
+import { addLabelToSQlQuery } from "@/utils/query/sqlUtils";
 
 const formatInterval = (interval: any) => {
   switch (true) {
