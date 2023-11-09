@@ -73,7 +73,11 @@ pub async fn search(
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search(&session_id1, sql1, stream_type, timeout).await
+                if CONFIG.common.use_arrow_for_wal {
+                    wal::search_arrow(&session_id1, sql1, stream_type, timeout).await
+                } else {
+                    wal::search(&session_id1, sql1, stream_type, timeout).await
+                }
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
             }

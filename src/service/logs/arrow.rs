@@ -1,5 +1,5 @@
 use actix_web::{post, web, HttpResponse};
-use arrow::ipc::reader::StreamReader;
+use arrow::ipc::reader::FileReader;
 use arrow::json::ReaderBuilder;
 use std::fs::File;
 use std::sync::Arc;
@@ -85,7 +85,7 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
         // If the directory entry is a file, read it
         if path.is_file() {
             if let Ok(buf) = File::open(path) {
-                let reader = StreamReader::try_new(&buf, None).unwrap();
+                let reader = FileReader::try_new(&buf, None).unwrap();
 
                 for batch in reader {
                     match batch {

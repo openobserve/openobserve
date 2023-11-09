@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ahash::AHashMap as HashMap;
+use arrow::ipc::reader::StreamReader;
 use datafusion::{
     arrow::{datatypes::Schema, record_batch::RecordBatch},
     common::FileType,
@@ -399,4 +400,233 @@ fn get_schema_version(file: &str) -> Result<String, Error> {
         return Err(Error::Message(format!("invalid wal file name: {}", file)));
     }
     Ok(column[11].to_string())
+}
+
+/// search in local WAL, which haven't been sync to object storage
+#[tracing::instrument(name = "service:search_arrow:wal:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+pub async fn search_arrow(
+    session_id: &str,
+    sql: Arc<Sql>,
+    stream_type: meta::StreamType,
+    timeout: u64,
+) -> super::SearchResult {
+    // get file list
+    let mut files = get_file_list(&sql, stream_type).await?;
+    let mut scan_stats = ScanStats::new();
+    let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
+
+    // cache files
+    let work_dir = session_id.to_string();
+    for file in files.clone().iter() {
+        let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
+        match get_file_contents(&source_file) {
+            Err(_) => {
+                log::error!("skip wal file: {} get file content error", &file.key);
+                files.retain(|x| x != file);
+            }
+            Ok(file_data) => {
+                let mut file_data = file_data;
+                // check json file is complete
+                if !file_data.ends_with(b"\n") {
+                    if let Ok(s) = String::from_utf8(file_data.clone()) {
+                        if let Some(last_line) = s.lines().last() {
+                            if serde_json::from_str::<serde_json::Value>(last_line).is_err() {
+                                // remove last line
+                                file_data = file_data[..file_data.len() - last_line.len()].to_vec();
+                            }
+                        }
+                    }
+                }
+                scan_stats.original_size += file_data.len() as i64;
+                let file_name = format!("/{work_dir}/{}", file.key);
+                tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
+            }
+        }
+    }
+
+    // check wal memory mode
+    if CONFIG.common.wal_memory_mode_enabled {
+        let mem_files = wal::get_search_in_memory_files(&sql.org_id, &sql.stream_name, stream_type)
+            .await
+            .unwrap_or_default();
+        for (file_key, file_data) in mem_files {
+            scan_stats.original_size += file_data.len() as i64;
+            let file_name = format!("/{work_dir}/{file_key}");
+            tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
+            files.push(FileKey::from_file_name(&file_name));
+        }
+    }
+
+    scan_stats.files = files.len() as i64;
+    if scan_stats.files == 0 {
+        return Ok((HashMap::new(), scan_stats));
+    }
+    log::info!(
+        "wal->search: load files {}, scan_size {}",
+        scan_stats.files,
+        scan_stats.original_size
+    );
+
+    // fetch all schema versions, get latest schema
+    let schema_latest = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(err) => {
+            log::error!("get schema error: {}", err);
+            // release all files
+            wal::release_files(&lock_files).await;
+            tmpfs::delete(session_id, true).unwrap();
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                sql.stream_name.clone(),
+            )));
+        }
+    };
+    let schema_latest = Arc::new(
+        schema_latest
+            .to_owned()
+            .with_metadata(std::collections::HashMap::new()),
+    );
+
+    // check schema version
+    let files = tmpfs::list(&work_dir).unwrap_or_default();
+    let mut files_group: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(2);
+    if !CONFIG.common.widening_schema_evolution {
+        files_group.insert(
+            "latest".to_string(),
+            files
+                .iter()
+                .map(|f| FileKey::from_file_name(&f.location))
+                .collect(),
+        );
+    } else {
+        for file in files {
+            let schema_version = get_schema_version(&file.location)?;
+            let entry = files_group.entry(schema_version).or_default();
+            entry.push(FileKey::from_file_name(&file.location));
+        }
+    }
+
+    let mut tasks = Vec::new();
+    let single_group = files_group.len() == 1;
+    for (ver, files) in files_group {
+        // get schema of the file
+        let file_data = tmpfs::get(&files.first().unwrap().key).unwrap();
+        let buf_reader = Cursor::new(file_data);
+
+        let schema_reader = StreamReader::try_new(buf_reader, None)?;
+        let meta = std::collections::HashMap::new();
+        let mut inferred_schema: Schema =
+            schema_reader.schema().as_ref().clone().with_metadata(meta);
+        // calulate schema diff
+        let mut diff_fields = HashMap::new();
+        let group_fields = inferred_schema.fields();
+        for field in group_fields {
+            if let Ok(v) = schema_latest.field_with_name(field.name()) {
+                if v.data_type() != field.data_type() {
+                    diff_fields.insert(v.name().clone(), v.data_type().clone());
+                }
+            }
+        }
+        // add not exists field for wal infered schema
+        let mut new_fields = Vec::new();
+        for field in schema_latest.fields() {
+            if inferred_schema.field_with_name(field.name()).is_err() {
+                new_fields.push(field.clone());
+            }
+        }
+        if !new_fields.is_empty() {
+            let new_schema = Schema::new(new_fields);
+            inferred_schema = Schema::try_merge(vec![inferred_schema, new_schema])?;
+        }
+        let schema = Arc::new(inferred_schema);
+        let sql = sql.clone();
+        let session = if single_group {
+            meta::search::Session {
+                id: session_id.to_string(),
+                storage_type: StorageType::Tmpfs,
+                search_type: if !sql.meta.group_by.is_empty() {
+                    SearchType::Aggregation
+                } else {
+                    SearchType::Normal
+                },
+            }
+        } else {
+            let id = format!("{session_id}-{ver}");
+            // move data to group tmpfs
+            for file in files.iter() {
+                let file_data = tmpfs::get(&file.key).unwrap();
+                let file_name = format!(
+                    "/{}/{}",
+                    id,
+                    file.key.strip_prefix(&format!("/{}/", work_dir)).unwrap()
+                );
+                tmpfs::set(&file_name, file_data).expect("tmpfs set success");
+            }
+            meta::search::Session {
+                id,
+                storage_type: StorageType::Tmpfs,
+                search_type: if !sql.meta.group_by.is_empty() {
+                    SearchType::Aggregation
+                } else {
+                    SearchType::Normal
+                },
+            }
+        };
+        let datafusion_span = info_span!(
+            "service:search:grpc:wal:datafusion",
+            org_id = sql.org_id,
+            stream_name = sql.stream_name,
+            stream_type = ?stream_type
+        );
+        let task = tokio::time::timeout(
+            Duration::from_secs(timeout),
+            async move {
+                exec::sql(
+                    &session,
+                    schema,
+                    &diff_fields,
+                    &sql,
+                    &files,
+                    FileType::ARROW,
+                )
+                .await
+            }
+            .instrument(datafusion_span),
+        );
+        tasks.push(task);
+    }
+
+    let mut results: HashMap<String, Vec<RecordBatch>> = HashMap::new();
+    let task_results = try_join_all(tasks)
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    for ret in task_results {
+        match ret {
+            Ok(ret) => {
+                for (k, v) in ret {
+                    let v = v
+                        .into_iter()
+                        .filter(|r| r.num_rows() > 0)
+                        .collect::<Vec<_>>();
+                    if !v.is_empty() {
+                        let group = results.entry(k).or_default();
+                        group.extend(v);
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!("datafusion execute error: {}", err);
+                // release all files
+                wal::release_files(&lock_files).await;
+                tmpfs::delete(session_id, true).unwrap();
+                return Err(super::handle_datafusion_error(err));
+            }
+        };
+    }
+
+    // release all files
+    wal::release_files(&lock_files).await;
+    // clear tmpfs
+    tmpfs::delete(session_id, true).unwrap();
+
+    Ok((results, scan_stats))
 }
