@@ -21,6 +21,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { utcToZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
+import usehoveredSeriesState from "../../composables/dashboard/currentSeriesName";
 
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
@@ -36,6 +37,10 @@ export const convertPromQLData = (
   store: any,
   chartPanelRef: any
 ) => {
+  // hovered series state
+  // used to show tooltip axis for all charts
+  const { hoveredSeriesState } = usehoveredSeriesState();
+
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -45,14 +50,6 @@ export const convertPromQLData = (
   ) {
     return { options: null };
   }
-
-  // It is used to keep track of the current series name in tooltip to bold the series name
-  let currentSeriesName = "";
-
-  // set the current series name (will be set at chartrenderer on mouseover)
-  const setCurrentSeriesValue = (newValue: any) => {
-    currentSeriesName = newValue ?? "";
-  };
 
   const legendPosition = getLegendPosition(
     panelSchema?.config?.legends_position
@@ -83,7 +80,7 @@ export const convertPromQLData = (
       },
     },
     formatter: (name: any) => {
-      return name == currentSeriesName
+      return name == hoveredSeriesState.hoveredSeriesName
         ? "{a|" + name + "}"
         : "{b|" + name + "}";
     },
@@ -130,7 +127,7 @@ export const convertPromQLData = (
 
         // get the current series index from name
         const currentSeriesIndex = name.findIndex(
-          (it: any) => it.seriesName == currentSeriesName
+          (it: any) => it.seriesName == hoveredSeriesState.hoveredSeriesName
         );
 
         // swap current hovered series index to top in tooltip
@@ -141,7 +138,7 @@ export const convertPromQLData = (
         let hoverText = name.map((it: any) => {
           // check if the series is the current series being hovered
           // if have than bold it
-          if (it?.seriesName == currentSeriesName)
+          if (it?.seriesName == hoveredSeriesState.hoveredSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -472,9 +469,7 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  // extras will be used to return other data to chart renderer
-  // e.g. setCurrentSeriesValue to set the current series index which is hovered
-  return { options, extras: { setCurrentSeriesValue } };
+  return { options };
 };
 
 /**

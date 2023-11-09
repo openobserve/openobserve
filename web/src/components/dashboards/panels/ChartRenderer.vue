@@ -35,6 +35,7 @@ import {
 } from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
+import usehoveredSeriesState from "../../../composables/dashboard/currentSeriesName";
 
 export default defineComponent({
   name: "ChartRenderer",
@@ -56,6 +57,10 @@ export default defineComponent({
       chart?.resize();
     };
 
+    // currently hovered series state
+    const { hoveredSeriesState, setHoveredSeriesName } =
+      usehoveredSeriesState();
+
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
       // seriesName and seriesIndex will used in the same function
@@ -64,7 +69,8 @@ export default defineComponent({
         params.seriesIndex = params?.dataIndex;
       }
 
-      props?.data?.extras?.setCurrentSeriesValue(params?.seriesName);
+      // set current hovered series name in state
+      setHoveredSeriesName(params?.seriesName);
 
       // scroll legend upto current series index
       const legendOption = chart?.getOption()?.legend[0];
@@ -102,6 +108,16 @@ export default defineComponent({
         chart?.setOption({ legend: [legendOption] });
       }
     };
+
+    // dispatch tooltip action for all charts
+    watch(
+      () => hoveredSeriesState.hoveredSeriesName,
+      (newcurrentSeriesName) => {
+        console.log(newcurrentSeriesName, "newcurrentSeriesName");
+
+        chart?.dispatchAction({ type: "showTip", x: 100, y: 100 });
+      }
+    );
 
     watch(
       () => store.state.theme,
