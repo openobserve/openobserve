@@ -301,7 +301,8 @@ const setupSession = async () => {
                       __child.tagName === "link" &&
                       __child.attributes.rel === "stylesheet" &&
                       typeof __child.attributes.href === "string" &&
-                      __child.attributes.href.endsWith(".css")
+                      __child.attributes.href.endsWith(".css") &&
+                      __child.attributes._cssText
                     ) {
                       workerProcessId.value++;
                       processCss(
@@ -360,6 +361,7 @@ const setupSession = async () => {
   if (playerRef.value) {
     playerRef.value.style.width = `${playerWidth}px`;
   }
+
   await nextTick();
   if (!playerRef.value) return;
   if (player.value) return;
@@ -522,7 +524,6 @@ const processCss = (cssString: string, id: string | number) => {
         id,
         token: token.replace("Basic ", ""),
       });
-      console.log("Message posted to worker");
     } else {
       reject("Worker not initialized");
     }

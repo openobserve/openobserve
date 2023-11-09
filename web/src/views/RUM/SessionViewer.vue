@@ -75,7 +75,7 @@ import { useStore } from "vuex";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
-import useRum from "@/composables/rum/useRum";
+import usePerformance from "@/composables/rum/usePerformance";
 
 import { date } from "quasar";
 
@@ -102,7 +102,7 @@ const segmentEvents = ref<any[]>([]);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const errorCount = ref(10);
-const { rumState } = useRum();
+const { performanceState } = usePerformance();
 
 const session_start_time = 1692884313968;
 const session_end_time = 1692884769270;
@@ -133,11 +133,11 @@ const getSession = () => {
   return new Promise((resolve) => {
     let geoFields = "";
 
-    if (rumState.data.streams["_sessionreplay"]["geo_info_country"]) {
+    if (performanceState.data.streams["_sessionreplay"]["geo_info_country"]) {
       geoFields += "min(geo_info_city) as city,";
     }
 
-    if (rumState.data.streams["_sessionreplay"]["geo_info_city"]) {
+    if (performanceState.data.streams["_sessionreplay"]["geo_info_city"]) {
       geoFields += "min(geo_info_country) as country,";
     }
 
@@ -145,8 +145,9 @@ const getSession = () => {
       query: {
         sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where session_id='${getSessionId.value}' order by zo_sql_timestamp`,
         start_time:
-          Number(router.currentRoute.value.query.start_time) - 900000000,
-        end_time: Number(router.currentRoute.value.query.end_time) + 900000000,
+          Number(router.currentRoute.value.query.start_time) - 86400000000,
+        end_time:
+          Number(router.currentRoute.value.query.end_time) + 86400000000,
         from: 0,
         size: 10,
         sql_mode: "full",
@@ -261,12 +262,55 @@ const getSessionEvents = () => {
       segmentEvents.value = res.data.hits.filter((hit: any) => {
         return (
           !!events.includes(hit.type) &&
-          hit.date >= Number(router.currentRoute.value.query.start_time) / 1000
+          hit.date >= Number(sessionState.data.selectedSession.start_time)
         );
       });
       segmentEvents.value = segmentEvents.value.map((hit: any) => {
         return formatEvent(hit);
       });
+      getSessionErrorLogs();
+    })
+    .finally(() => isLoading.value.pop());
+};
+
+const getSessionErrorLogs = () => {
+  const queryPayload: any = {
+    from: 0,
+    size: 150,
+    timestamp_column: store.state.zoConfig.timestamp_column,
+    timestamps: {
+      startTime:
+        Number(sessionState.data.selectedSession?.start_time) * 1000 - 1,
+      endTime: Number(sessionState.data.selectedSession?.end_time) * 1000 + 1,
+    },
+    sqlMode: false,
+    currentPage: 0,
+    parsedQuery: null,
+  };
+
+  const req = buildQueryPayload(queryPayload);
+  req.query.sql = `select * from "_rumlog" where session_id='${sessionId.value}' and status='error' order by date asc`;
+  delete req.aggs;
+  isLoading.value.push(true);
+  searchService
+    .search({
+      org_identifier: store.state.selectedOrganization.identifier,
+      query: req,
+      page_type: "logs",
+    })
+    .then((res) => {
+      const events = res.data.hits.filter((hit: any) => {
+        return hit.date >= Number(sessionState.data.selectedSession.start_time);
+      });
+
+      events.forEach((hit: any, index: number) => {
+        hit.type = "error";
+        hit.error_id = index;
+        hit.error_message = hit.message;
+        segmentEvents.value.push(formatEvent(hit));
+      });
+
+      segmentEvents.value.sort((a, b) => a.timestamp - b.timestamp);
     })
     .finally(() => isLoading.value.pop());
 };
@@ -279,7 +323,7 @@ const getDefaultEvent = (event: any) => {
   _event.timestamp = event.date;
   const relativeTime = formatTimeDifference(
     _event.timestamp,
-    Number(router.currentRoute.value.query.start_time) / 1000
+    Number(sessionState.data.selectedSession.start_time)
   );
   _event.relativeTime = relativeTime[0] as number;
   _event.displayTime = relativeTime[1] as string;

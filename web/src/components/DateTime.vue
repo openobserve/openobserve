@@ -345,22 +345,18 @@ export default defineComponent({
       // updateDisplayValue();
       try {
         resetTime("", "");
-        setDefault();
+        selectedType.value = props.defaultType;
+        setAbsoluteTime(
+          props.defaultAbsoluteTime?.startTime,
+          props.defaultAbsoluteTime?.endTime
+        );
+        setRelativeTime(props.defaultRelativeTime);
+        displayValue.value = getDisplayValue();
+        if (props.autoApply) saveDate(props.defaultType);
       } catch (e) {
         console.log(e);
       }
     });
-
-    const setDefault = () => {
-      selectedType.value = props.defaultType;
-      setAbsoluteTime(
-        props.defaultAbsoluteTime?.startTime,
-        props.defaultAbsoluteTime?.endTime
-      );
-      setRelativeTime(props.defaultRelativeTime);
-      displayValue.value = getDisplayValue();
-      if (props.autoApply) saveDate(props.defaultType);
-    };
 
     watch(
       () => selectedType.value,
@@ -660,7 +656,6 @@ export default defineComponent({
       timezone,
       filteredTimezone,
       timezoneFilterFn,
-      setDefault,
     };
   },
 });

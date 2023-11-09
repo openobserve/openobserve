@@ -16,24 +16,45 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="performance-error-dashboard">
-    <div class="q-px-sm performance-dashboard">
-      <RenderDashboardCharts
-        ref="errorRenderDashboardChartsRef"
-        :viewOnly="true"
-        :dashboardData="currentDashboardData.data"
-        :currentTimeObj="dateTime"
-        @variablesData="variablesDataUpdated"
-      />
-    </div>
-    <div class="row q-px-md">
-      <div class="col-6 view-error-table q-pa-sm">
-        <div class="q-pb-sm text-bold q-pl-xs">Top Error Views</div>
-        <AppTable
-          :columns="columns"
-          :rows="errorsByView"
-          style="height: auto"
+  <q-page class="relative-position">
+    <div
+      class="performance-error-dashboard"
+      :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
+    >
+      <div class="q-px-sm performance-dashboard">
+        <RenderDashboardCharts
+          ref="errorRenderDashboardChartsRef"
+          :viewOnly="true"
+          :dashboardData="currentDashboardData.data"
+          :currentTimeObj="dateTime"
+          @variablesData="variablesDataUpdated"
         />
+      </div>
+      <div class="row q-px-md">
+        <div class="col-6 view-error-table q-pa-sm">
+          <div class="q-pb-sm text-bold q-pl-xs">Top Error Views</div>
+          <AppTable
+            :columns="columns"
+            :rows="errorsByView"
+            style="height: auto"
+            :virtualScroll="false"
+            height="200px"
+          />
+        </div>
+      </div>
+    </div>
+    <div
+      v-show="isLoading.length"
+      class="q-pb-lg flex items-center justify-center text-center absolute full-width"
+      style="height: calc(100vh - 250px); top: 0"
+    >
+      <div>
+        <q-spinner-hourglass
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; display: block"
+        />
+        <div class="text-center full-width">Loading Dashboard</div>
       </div>
     </div>
   </q-page>
@@ -95,6 +116,7 @@ export default defineComponent({
 
     const refDateTime: any = ref(null);
     const refreshInterval = ref(0);
+    const isLoading: Ref<boolean[]> = ref([]);
 
     onMounted(async () => {
       await loadDashboard();
@@ -106,17 +128,24 @@ export default defineComponent({
     });
 
     const updateLayout = async () => {
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
+      // await nextTick();
+      // await nextTick();
+      // await nextTick();
+      // await nextTick();
+      // // emit window resize event to trigger the layout
+      // errorRenderDashboardChartsRef.value.layoutUpdate();
+      isLoading.value.push(true);
 
-      // emit window resize event to trigger the layout
-      errorRenderDashboardChartsRef.value.layoutUpdate();
+      // Settimeout is used to make consitent loading experience across all tabs
+      // As due to vue-grid-layout issue in summary and webvitals
+
+      setTimeout(() => {
+        errorRenderDashboardChartsRef.value.layoutUpdate();
+        isLoading.value.pop();
+      }, 1000);
     };
 
     const getResourceErrors = () => {
-      updateLayout();
       errorsByView.value = [];
 
       let whereClause = `WHERE type='error'`;
@@ -225,6 +254,7 @@ export default defineComponent({
       columns,
       errorsByView,
       errorRenderDashboardChartsRef,
+      isLoading,
     };
   },
 });
