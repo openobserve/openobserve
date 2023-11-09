@@ -339,12 +339,6 @@ pub struct SchemaRecords {
     pub records: Vec<json::Value>,
 }
 
-
-pub struct SchemaRecords {
-    pub schema: Schema,
-    pub records: Vec<json::Value>,
-}
-
 #[derive(Clone, Copy, Default)]
 pub struct ScanStats {
     pub files: i64,
