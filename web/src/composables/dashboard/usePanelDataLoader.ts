@@ -17,6 +17,7 @@ import { ref, watch, reactive, toRefs, onMounted, onUnmounted } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 import { addLabelToPromQlQuery } from "@/utils/dashboard/convertPromQLVariableQuery";
+import { addLabelToSQlQuery } from "@/utils/dashboard/convertSQLVariableQuery";
 
 const formatInterval = (interval: any) => {
   switch (true) {
@@ -456,6 +457,27 @@ export const usePanelDataLoader = (
         console.log("query", query);
       }
 
+      if (queryType === "sql") {
+        console.log("inside sql");
+
+        const adHocSQLVariables = [
+          {
+            name: "kubernetes_namespace_name",
+            value: "ziox-alpha1",
+            operator: "=",
+          },
+        ];
+
+        adHocSQLVariables.forEach((variable: any) => {
+          query = addLabelToSQlQuery(
+            query,
+            variable.name,
+            variable.value,
+            variable.operator
+          );
+        });
+        console.log("querySQL", query);
+      }
       return query;
     } else {
       return query;
