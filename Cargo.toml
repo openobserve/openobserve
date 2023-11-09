@@ -26,8 +26,8 @@ jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 
 [profile.release]
-debug = true
-strip = false
+debug = false
+strip = true
 
 [profile.release-prod]
 inherits = "release"
