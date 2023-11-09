@@ -895,13 +895,13 @@ export default defineComponent({
             timestampToTimezoneDate(
               row["start_time"] / 1000000,
               store.state.timezone,
-              "MMM dd, YYYY HH:mm:ss.SSS Z"
+              "MMM dd, yyyy HH:mm:ss.SSS Z"
             ),
           prop: (row: any) =>
             timestampToTimezoneDate(
               row["start_time"] / 1000000,
               store.state.timezone,
-              "MMM dd, YYYY HH:mm:ss.SSS Z"
+              "MMM dd, yyyy HH:mm:ss.SSS Z"
             ),
           label: "Start Time",
           align: "left",
