@@ -105,8 +105,7 @@ pub async fn sql(
             }
         }
         let schema = if let Some(first_batch) = record_batches.first() {
-            let schema = first_batch.schema();
-            schema
+            first_batch.schema()
         } else {
             return Err(datafusion::error::DataFusionError::Plan(
                 "No record batches found".to_string(),
