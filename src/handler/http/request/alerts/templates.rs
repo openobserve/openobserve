@@ -102,6 +102,7 @@ async fn get_template(path: web::Path<(String, String)>) -> impl Responder {
     responses(
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
         (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description="Error", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[delete("/{org_id}/alerts/templates/{template_name}")]

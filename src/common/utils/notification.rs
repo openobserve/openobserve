@@ -27,72 +27,71 @@ pub async fn send_notification(
         false => "Scheduled",
     };
     let curr_ts = chrono::Utc::now().timestamp_micros();
-    match db::alerts::destinations::get(&trigger.org, &alert.destination).await {
-        Ok(dest) => match dest {
-            Some(local_dest) => {
-                let body = local_dest.template.unwrap().body;
-                let resp_str = json::to_string(&body).unwrap();
+    let local_dest = match db::alerts::destinations::get(&trigger.org, &alert.destination).await {
+        Ok(v) => v,
+        Err(_) => {
+            log::error!("Destination Not found: {}", &alert.destination);
+            return Ok(());
+        }
+    };
 
-                let mut resp = resp_str
-                    .replace("{stream_name}", &trigger.stream)
-                    .replace("{org_name}", &trigger.org)
-                    .replace("{alert_name}", &trigger.alert_name)
-                    .replace("{alert_type}", alert_type)
-                    .replace("{timestamp}", &curr_ts.to_string());
+    let body = local_dest.template.unwrap().body;
+    let resp_str = json::to_string(&body).unwrap();
 
-                // Replace contextual information with values if any from alert
-                if alert.context_attributes.is_some() {
-                    for (key, value) in alert.context_attributes.as_ref().unwrap() {
-                        resp = resp.replace(&format!("{{{key}}}"), value)
-                    }
-                }
+    let mut resp = resp_str
+        .replace("{stream_name}", &trigger.stream)
+        .replace("{org_name}", &trigger.org)
+        .replace("{alert_name}", &trigger.alert_name)
+        .replace("{alert_type}", alert_type)
+        .replace("{timestamp}", &curr_ts.to_string());
 
-                let msg: Value = json::from_str(&resp).unwrap();
-                let msg: Value = match &msg {
-                    Value::String(obj) => match json::from_str(obj) {
-                        Ok(obj) => obj,
-                        Err(_) => msg,
-                    },
-                    _ => msg,
-                };
-                let client = if local_dest.skip_tls_verify {
-                    reqwest::Client::builder()
-                        .danger_accept_invalid_certs(true)
-                        .build()?
-                } else {
-                    reqwest::Client::new()
-                };
-                let url = url::Url::parse(&local_dest.url);
-                let mut req = match local_dest.method {
-                    alert::AlertHTTPType::POST => client.post(url.unwrap()),
-                    alert::AlertHTTPType::PUT => client.put(url.unwrap()),
-                    alert::AlertHTTPType::GET => client.get(url.unwrap()),
-                }
-                .header("Content-type", "application/json");
+    // Replace contextual information with values if any from alert
+    if alert.context_attributes.is_some() {
+        for (key, value) in alert.context_attributes.as_ref().unwrap() {
+            resp = resp.replace(&format!("{{{key}}}"), value)
+        }
+    }
 
-                // Add additional headers if any from destination description
-                if local_dest.headers.is_some() {
-                    for (key, value) in local_dest.headers.unwrap() {
-                        if !key.is_empty() && !value.is_empty() {
-                            req = req.header(key, value);
-                        }
-                    }
-                };
-
-                let resp = req.json(&msg).send().await;
-                match resp {
-                    Ok(resp) => {
-                        if !resp.status().is_success() {
-                            log::error!("Notification sent error: {:?}", resp.bytes().await);
-                        }
-                    }
-                    Err(err) => log::error!("Notification sending error {:?}", err),
-                }
-            }
-
-            None => log::error!("Destination Not found"),
+    let msg: Value = json::from_str(&resp).unwrap();
+    let msg: Value = match &msg {
+        Value::String(obj) => match json::from_str(obj) {
+            Ok(obj) => obj,
+            Err(_) => msg,
         },
-        Err(err) => log::error!("Error sending notification {:?}", err),
+        _ => msg,
+    };
+    let client = if local_dest.skip_tls_verify {
+        reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()?
+    } else {
+        reqwest::Client::new()
+    };
+    let url = url::Url::parse(&local_dest.url);
+    let mut req = match local_dest.method {
+        alert::AlertHTTPType::POST => client.post(url.unwrap()),
+        alert::AlertHTTPType::PUT => client.put(url.unwrap()),
+        alert::AlertHTTPType::GET => client.get(url.unwrap()),
+    }
+    .header("Content-type", "application/json");
+
+    // Add additional headers if any from destination description
+    if local_dest.headers.is_some() {
+        for (key, value) in local_dest.headers.unwrap() {
+            if !key.is_empty() && !value.is_empty() {
+                req = req.header(key, value);
+            }
+        }
+    };
+
+    let resp = req.json(&msg).send().await;
+    match resp {
+        Ok(resp) => {
+            if !resp.status().is_success() {
+                log::error!("Notification sent error: {:?}", resp.bytes().await);
+            }
+        }
+        Err(err) => log::error!("Notification sending error {:?}", err),
     }
 
     Ok(())

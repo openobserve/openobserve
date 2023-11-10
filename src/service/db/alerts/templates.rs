@@ -20,31 +20,23 @@ use crate::common::{
     utils::json,
 };
 
-pub async fn get(org_id: &str, name: &str) -> Result<Option<DestinationTemplate>, anyhow::Error> {
+pub async fn get(org_id: &str, name: &str) -> Result<DestinationTemplate, anyhow::Error> {
     let map_key = format!("{org_id}/{name}");
+    if let Some(v) = ALERTS_TEMPLATES.get(&map_key) {
+        return Ok(v.value().clone());
+    }
     let default_org_key = format!("{DEFAULT_ORG}/{name}");
-    let value: Option<DestinationTemplate> = if ALERTS_TEMPLATES.contains_key(&map_key)
-        || ALERTS_TEMPLATES.contains_key(&default_org_key)
-    {
-        match ALERTS_TEMPLATES.get(&map_key) {
-            Some(template) => Some(template.clone()),
-            None => Some(ALERTS_TEMPLATES.get(&default_org_key).unwrap().clone()),
-        }
-    } else {
-        let db = &infra_db::DEFAULT;
-        let key = format!("/templates/{org_id}/{name}");
-        match db.get(&key).await {
-            Ok(val) => json::from_slice(&val).unwrap(),
-            Err(_) => {
-                let key = format!("/templates/{DEFAULT_ORG}/{name}");
-                match db.get(&key).await {
-                    Ok(val) => json::from_slice(&val).unwrap(),
-                    Err(_) => None,
-                }
-            }
-        }
-    };
-    Ok(value)
+    if let Some(v) = ALERTS_TEMPLATES.get(&default_org_key) {
+        return Ok(v.value().clone());
+    }
+
+    let db = &infra_db::DEFAULT;
+    let key = format!("/templates/{org_id}/{name}");
+    if let Ok(val) = db.get(&key).await {
+        return Ok(json::from_slice(&val).unwrap());
+    }
+    let key = format!("/templates/{DEFAULT_ORG}/{name}");
+    Ok(json::from_slice(&db.get(&key).await?).unwrap())
 }
 
 pub async fn set(

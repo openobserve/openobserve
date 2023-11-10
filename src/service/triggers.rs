@@ -76,10 +76,10 @@ mod tests {
         assert!(resp.is_ok());
 
         let resp = crate::service::alerts::get_alert(
-            "dummy".to_string(),
-            "TestStream".to_string(),
+            "dummy",
+            "TestStream",
             crate::common::meta::StreamType::Logs,
-            "TestAlert".to_string(),
+            "TestAlert",
         )
         .await;
 
