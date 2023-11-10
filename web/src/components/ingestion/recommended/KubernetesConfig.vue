@@ -46,10 +46,10 @@
         <li>Collect events from your Kubernetes cluster</li>
         <li>Collect logs from your Kubernetes cluster</li>
         <li>
-          Allow you to capture traces without instrumenting your
-          applications that are written in following languages using
-          OpenTelemetry auto-instrumentation. It can be done by setting the
-          following to the pod/namespace annotations:
+          Allow you to capture traces without instrumenting your applications
+          that are written in following languages using OpenTelemetry
+          auto-instrumentation. It can be done by setting the following to the
+          pod/namespace annotations:
           <ol>
             <li>
               <b>Java:</b> instrumentation.opentelemetry.io/inject-java: "true"
@@ -133,7 +133,7 @@ const accessKey = computed(() => {
 const collectorCmd = computed(() => {
   return `helm --namespace openobserve-collector \\
   install o1c openobserve/openobserve-collector \\
-  --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\    
+  --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\
   --set exporters."otlphttp/openobserve".headers.Authorization="Basic ${accessKey.value}"  \\
   --set exporters."otlphttp/openobserve_k8s_events".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\
   --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic ${accessKey.value}"`;
