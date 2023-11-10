@@ -349,7 +349,7 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
                 continue;
             }
         }
-        let file_key = FileKey::from_file_name(&file);
+        let file_key = FileKey::from_file_name(file);
         if sql.match_source(&file_key, false, true, stream_type).await {
             result.push(file_key);
         } else {
