@@ -173,9 +173,9 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
 
 #[tracing::instrument]
 pub async fn list_stream_functions(
-    org_id: String,
+    org_id: &str,
     stream_type: StreamType,
-    stream_name: String,
+    stream_name: &str,
 ) -> Result<HttpResponse, Error> {
     if let Some(val) = STREAM_FUNCTIONS.get(&format!("{}/{}/{}", org_id, stream_type, stream_name))
     {
@@ -187,12 +187,12 @@ pub async fn list_stream_functions(
 
 #[tracing::instrument]
 pub async fn delete_stream_function(
-    org_id: String,
+    org_id: &str,
     stream_type: StreamType,
-    stream_name: String,
-    fn_name: String,
+    stream_name: &str,
+    fn_name: &str,
 ) -> Result<HttpResponse, Error> {
-    let mut existing_fn = match check_existing_fn(&org_id, &fn_name).await {
+    let mut existing_fn = match check_existing_fn(org_id, fn_name).await {
         Some(function) => function,
         None => {
             return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -212,7 +212,7 @@ pub async fn delete_stream_function(
                     .collect::<Vec<StreamOrder>>(),
             );
         }
-        if let Err(error) = db::functions::set(&org_id, &fn_name, &existing_fn).await {
+        if let Err(error) = db::functions::set(org_id, fn_name, &existing_fn).await {
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -222,7 +222,7 @@ pub async fn delete_stream_function(
         } else {
             // cant be removed from watcher of function as stream name & type wont be available , hence being removed here
             let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-            remove_stream_fn_from_cache(key, fn_name);
+            remove_stream_fn_from_cache(&key, fn_name);
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
                 FN_REMOVED.to_string(),
@@ -238,13 +238,13 @@ pub async fn delete_stream_function(
 
 #[tracing::instrument]
 pub async fn add_function_to_stream(
-    org_id: String,
+    org_id: &str,
     stream_type: StreamType,
-    stream_name: String,
-    fn_name: String,
+    stream_name: &str,
+    fn_name: &str,
     mut stream_order: StreamOrder,
 ) -> Result<HttpResponse, Error> {
-    let mut existing_fn = match check_existing_fn(&org_id, &fn_name).await {
+    let mut existing_fn = match check_existing_fn(org_id, fn_name).await {
         Some(function) => function,
         None => {
             return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -254,7 +254,7 @@ pub async fn add_function_to_stream(
         }
     };
 
-    stream_order.stream = stream_name;
+    stream_order.stream = stream_name.to_owned();
     stream_order.stream_type = stream_type;
 
     if let Some(mut val) = existing_fn.streams {
@@ -264,7 +264,7 @@ pub async fn add_function_to_stream(
         existing_fn.streams = Some(vec![stream_order]);
     }
 
-    if let Err(error) = db::functions::set(&org_id, &fn_name, &existing_fn).await {
+    if let Err(error) = db::functions::set(org_id, fn_name, &existing_fn).await {
         Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -303,8 +303,8 @@ async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
     }
 }
 
-fn remove_stream_fn_from_cache(key: String, fn_name: String) {
-    if let Some(val) = STREAM_FUNCTIONS.clone().get(&key) {
+fn remove_stream_fn_from_cache(key: &str, fn_name: &str) {
+    if let Some(val) = STREAM_FUNCTIONS.clone().get(key) {
         if val.list.len() > 1 {
             let final_list = val
                 .clone()
@@ -312,9 +312,9 @@ fn remove_stream_fn_from_cache(key: String, fn_name: String) {
                 .into_iter()
                 .filter(|x| x.transform.name != fn_name)
                 .collect::<Vec<StreamTransform>>();
-            STREAM_FUNCTIONS.insert(key, StreamFunctionsList { list: final_list });
+            STREAM_FUNCTIONS.insert(key.to_string(), StreamFunctionsList { list: final_list });
         } else {
-            STREAM_FUNCTIONS.remove(&key);
+            STREAM_FUNCTIONS.remove(key);
         }
     }
 }

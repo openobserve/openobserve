@@ -12,17 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{
-    http::{self, StatusCode},
-    HttpResponse,
-};
+use actix_web::{http, HttpResponse};
 use std::io::Error;
 
 use crate::common::meta::{
     dashboards::{Folder, FolderList, DEFAULT_FOLDER},
     http::HttpResponse as MetaHttpResponse,
 };
-
 use crate::service::db;
 
 #[tracing::instrument(skip(folder))]
@@ -35,7 +31,7 @@ pub async fn save_folder(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::BAD_REQUEST.into(),
-                "can't update default folder".to_string(),
+                "can't update default Dashboard folder".to_string(),
             )),
         );
     }
@@ -64,7 +60,7 @@ pub async fn update_folder(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::BAD_REQUEST.into(),
-                "can't update default folder".to_string(),
+                "can't update default Dashboard folder".to_string(),
             )),
         );
     }
@@ -81,7 +77,7 @@ pub async fn update_folder(
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
-        "folder updated".to_string(),
+        "Dashboard folder updated".to_string(),
     )))
 }
 
@@ -100,8 +96,8 @@ pub async fn get_folder(org_id: &str, folder_id: &str) -> Result<HttpResponse, E
         HttpResponse::Ok().json(folder)
     } else {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            "folder not found".to_string(),
+            http::StatusCode::NOT_FOUND.into(),
+            "Dashboard folder not found".to_string(),
         )));
     };
     Ok(resp)
@@ -112,18 +108,31 @@ pub async fn delete_folder(org_id: &str, folder_id: &str) -> Result<HttpResponse
     let dashboards = db::dashboards::list(org_id, folder_id).await.unwrap();
     if !dashboards.is_empty() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST.into(),
-            "folder contains dashboards, please move/delete dashboards from folder ".to_string(),
+            http::StatusCode::BAD_REQUEST.into(),
+            "Dashboard folder contains dashboards, please move/delete dashboards from folder "
+                .to_string(),
         )));
     }
 
-    let resp = if let Ok(folder) = db::dashboards::folders::delete(org_id, folder_id).await {
-        HttpResponse::Ok().json(folder)
-    } else {
+    if db::dashboards::folders::get(org_id, folder_id)
+        .await
+        .is_err()
+    {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            "folder not found".to_string(),
+            http::StatusCode::NOT_FOUND.into(),
+            "Dashboard folder not found".to_string(),
         )));
-    };
-    Ok(resp)
+    }
+    match db::dashboards::folders::delete(org_id, folder_id).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Dashboard folder deleted".to_string(),
+        ))),
+        Err(e) => Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                e.to_string(),
+            )),
+        ),
+    }
 }

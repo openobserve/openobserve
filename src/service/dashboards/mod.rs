@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::web;
-use actix_web::{http::StatusCode, HttpResponse};
+use actix_web::{http, web, HttpResponse};
 use std::io;
 
-use crate::common::meta::dashboards::DEFAULT_FOLDER;
-use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse};
-use crate::common::utils::json;
+use crate::common::{
+    meta::{
+        dashboards::{Dashboards, Folder, DEFAULT_FOLDER},
+        http::HttpResponse as MetaHttpResponse,
+    },
+    utils::json,
+};
 use crate::service::db::dashboards;
 
 pub mod folders;
@@ -39,7 +42,7 @@ pub async fn create_dashboard(
         }
         Err(_) => {
             if folder_id == DEFAULT_FOLDER {
-                let folder = meta::dashboards::Folder {
+                let folder = Folder {
                     folder_id: DEFAULT_FOLDER.to_string(),
                     name: DEFAULT_FOLDER.to_string(),
                     description: DEFAULT_FOLDER.to_string(),
@@ -49,7 +52,7 @@ pub async fn create_dashboard(
                 save_dashboard(org_id, &dashboard_id, folder_id, body).await
             } else {
                 Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                    StatusCode::NOT_FOUND.into(),
+                    http::StatusCode::NOT_FOUND.into(),
                     "folder not found".to_string(),
                 )))
             }
@@ -70,8 +73,6 @@ pub async fn update_dashboard(
 
 #[tracing::instrument]
 pub async fn list_dashboards(org_id: &str, folder_id: &str) -> Result<HttpResponse, io::Error> {
-    use meta::dashboards::Dashboards;
-
     Ok(HttpResponse::Ok().json(Dashboards {
         dashboards: dashboards::list(org_id, folder_id).await.unwrap(),
     }))
@@ -97,15 +98,27 @@ pub async fn delete_dashboard(
     dashboard_id: &str,
     folder_id: &str,
 ) -> Result<HttpResponse, io::Error> {
-    let resp = if dashboards::delete(org_id, dashboard_id, folder_id)
+    if dashboards::get(org_id, dashboard_id, folder_id)
         .await
         .is_err()
     {
-        return Ok(Response::NotFound("Dashboard".to_string()).into());
-    } else {
-        Response::OkMessage("Dashboard deleted".to_owned())
-    };
-    Ok(resp.into())
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "Dashboard not found".to_string(),
+        )));
+    }
+    match dashboards::delete(org_id, dashboard_id, folder_id).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Dashboard deleted".to_string(),
+        ))),
+        Err(error) => Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                error.to_string(),
+            )),
+        ),
+    }
 }
 
 async fn save_dashboard(
@@ -167,16 +180,20 @@ enum Response {
 impl From<Response> for HttpResponse {
     fn from(resp: Response) -> Self {
         match resp {
-            Response::OkMessage(message) => {
-                Self::Ok().json(MetaHttpResponse::message(StatusCode::OK.into(), message))
-            }
+            Response::OkMessage(message) => Self::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                message,
+            )),
             Response::NotFound(entity) => Self::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND.into(),
+                http::StatusCode::NOT_FOUND.into(),
                 format!("{entity} not found"),
             )),
-            Response::InternalServerError(err) => Self::InternalServerError().json(
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.into(), err.to_string()),
-            ),
+            Response::InternalServerError(err) => {
+                Self::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                ))
+            }
         }
     }
 }
