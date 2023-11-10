@@ -35,7 +35,7 @@ Major  Minor  Patch  PreReleaseLabel BuildLabel
     <hr />
     <div>
       <div class="text-subtitle1 q-pl-xs q-mt-md">
-        Once you have installed the OpenObserve collector, it will do following:
+        Once you have installed the OpenObserve collector, it will:
         <ol>
           <li>Collect logs from Windows event log</li>
           <li>Collect metrics from Windows performance counters</li>
