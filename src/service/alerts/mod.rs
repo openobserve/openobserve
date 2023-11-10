@@ -33,10 +33,10 @@ pub mod templates;
 
 #[tracing::instrument(skip_all)]
 pub async fn save_alert(
-    org_id: String,
-    stream_name: String,
+    org_id: &str,
+    stream_name: &str,
     stream_type: StreamType,
-    name: String,
+    name: &str,
     mut alert: Alert,
 ) -> Result<HttpResponse, Error> {
     alert.stream = stream_name.to_string();
@@ -45,19 +45,18 @@ pub async fn save_alert(
     let in_dest = alert.clone().destination;
 
     // before saving alert check alert destination
-    let dest = db::alerts::destinations::get(&org_id, &in_dest)
+    if db::alerts::destinations::get(org_id, &in_dest)
         .await
-        .unwrap();
-
-    if dest.is_none() {
+        .is_err()
+    {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
             format!("Destination with name {in_dest} not found"),
         )));
-    }
+    };
 
     // before saving alert check column type to decide numeric condition
-    let schema = db::schema::get(&org_id, &stream_name, stream_type)
+    let schema = db::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap();
     let fields = schema.to_cloned_fields();
@@ -119,24 +118,18 @@ pub async fn save_alert(
         }
     }
 
-    db::alerts::set(
-        org_id.as_str(),
-        stream_name.as_str(),
-        stream_type,
-        name.as_str(),
-        alert.clone(),
-    )
-    .await
-    .unwrap();
+    db::alerts::set(org_id, stream_name, stream_type, name, alert.clone())
+        .await
+        .unwrap();
     // For non-ingest alert set trigger immediately
     if !alert.is_real_time {
         let trigger = Trigger {
             timestamp: Utc::now().timestamp_micros(),
             is_valid: true,
             alert_name: alert.name,
-            stream: stream_name,
+            stream: stream_name.to_string(),
             stream_type,
-            org: org_id,
+            org: org_id.to_string(),
             last_sent_at: 0,
             count: 0,
             is_ingest_time: false,
@@ -152,11 +145,11 @@ pub async fn save_alert(
 
 #[tracing::instrument]
 pub async fn list_alert(
-    org_id: String,
+    org_id: &str,
     stream_name: Option<&str>,
     stream_type: Option<StreamType>,
 ) -> Result<HttpResponse, Error> {
-    let alerts_list = db::alerts::list(org_id.as_str(), stream_name, stream_type)
+    let alerts_list = db::alerts::list(org_id, stream_name, stream_type)
         .await
         .unwrap();
     Ok(HttpResponse::Ok().json(AlertList { list: alerts_list }))
@@ -164,44 +157,42 @@ pub async fn list_alert(
 
 #[tracing::instrument]
 pub async fn delete_alert(
-    org_id: String,
-    stream_name: String,
+    org_id: &str,
+    stream_name: &str,
     stream_type: StreamType,
-    name: String,
+    name: &str,
 ) -> Result<HttpResponse, Error> {
-    let result = db::alerts::delete(
-        org_id.as_str(),
-        stream_name.as_str(),
-        stream_type,
-        name.as_str(),
-    )
-    .await;
-    match result {
+    if db::alerts::get(org_id, stream_name, stream_type, name)
+        .await
+        .is_err()
+    {
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "Alert not found".to_string(),
+        )));
+    }
+    match db::alerts::delete(org_id, stream_name, stream_type, name).await {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "Alert deleted ".to_string(),
         ))),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                e.to_string(),
+            )),
+        ),
     }
 }
 
 #[tracing::instrument]
 pub async fn get_alert(
-    org_id: String,
-    stream_name: String,
+    org_id: &str,
+    stream_name: &str,
     stream_type: StreamType,
-    name: String,
+    name: &str,
 ) -> Result<HttpResponse, Error> {
-    let result = db::alerts::get(
-        org_id.as_str(),
-        stream_name.as_str(),
-        stream_type,
-        name.as_str(),
-    )
-    .await;
+    let result = db::alerts::get(org_id, stream_name, stream_type, name).await;
     match result {
         Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -213,27 +204,21 @@ pub async fn get_alert(
 
 #[tracing::instrument]
 pub async fn trigger_alert(
-    org_id: String,
-    stream_name: String,
+    org_id: &str,
+    stream_name: &str,
     stream_type: StreamType,
-    name: String,
+    name: &str,
 ) -> Result<HttpResponse, Error> {
-    let result = db::alerts::get(
-        org_id.as_str(),
-        stream_name.as_str(),
-        stream_type,
-        name.as_str(),
-    )
-    .await;
+    let result = db::alerts::get(org_id, stream_name, stream_type, name).await;
 
     match result {
         Ok(Some(alert)) => {
             let trigger = Trigger {
                 timestamp: Utc::now().timestamp_micros(),
                 is_valid: false,
-                alert_name: name,
-                stream: stream_name,
-                org: org_id,
+                alert_name: name.to_string(),
+                stream: stream_name.to_string(),
+                org: org_id.to_string(),
                 last_sent_at: 0,
                 count: 0,
                 is_ingest_time: alert.is_real_time,
@@ -298,43 +283,19 @@ mod test {
         let alert_name = "500error";
         let alert_stream: &str = "olympics";
         let alert = prepare_test_alert_object(alert_name, alert_stream);
-        let res = save_alert(
-            "nexus".to_string(),
-            "olympics".to_string(),
-            StreamType::Logs,
-            "500error".to_string(),
-            alert,
-        )
-        .await;
+        let res = save_alert("nexus", "olympics", StreamType::Logs, "500error", alert).await;
         assert!(res.is_ok());
 
-        let list_res = list_alert(
-            "nexus".to_string(),
-            Some("olympics"),
-            Some(StreamType::Logs),
-        )
-        .await;
+        let list_res = list_alert("nexus", Some("olympics"), Some(StreamType::Logs)).await;
         assert!(list_res.is_ok());
 
-        let list_res = list_alert("nexus".to_string(), None, None).await;
+        let list_res = list_alert("nexus", None, None).await;
         assert!(list_res.is_ok());
 
-        let get_res = get_alert(
-            "nexus".to_string(),
-            "olympics".to_string(),
-            StreamType::Logs,
-            "500error".to_string(),
-        )
-        .await;
+        let get_res = get_alert("nexus", "olympics", StreamType::Logs, "500error").await;
         assert!(get_res.is_ok());
 
-        let del_res = delete_alert(
-            "nexus".to_string(),
-            "olympics".to_string(),
-            StreamType::Logs,
-            "500error".to_string(),
-        )
-        .await;
+        let del_res = delete_alert("nexus", "olympics", StreamType::Logs, "500error").await;
         assert!(del_res.is_ok());
     }
 
@@ -343,23 +304,10 @@ mod test {
         let alert_name = "500error";
         let alert_stream: &str = "olympics";
         let alert = prepare_test_alert_object(alert_name, alert_stream);
-        let res = save_alert(
-            "nexus".to_string(),
-            "olympics".to_string(),
-            StreamType::Logs,
-            "500error".to_string(),
-            alert,
-        )
-        .await;
+        let res = save_alert("nexus", "olympics", StreamType::Logs, "500error", alert).await;
         assert!(res.is_ok());
 
-        let del_res = trigger_alert(
-            "nexus".to_string(),
-            "olympics".to_string(),
-            StreamType::Logs,
-            "500error".to_string(),
-        )
-        .await;
+        let del_res = trigger_alert("nexus", "olympics", StreamType::Logs, "500error").await;
         assert!(del_res.is_ok());
     }
 }

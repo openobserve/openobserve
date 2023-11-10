@@ -45,19 +45,16 @@ pub async fn save_destination(
 
     let dest = dest.into_inner();
 
-    match db::alerts::templates::get(org_id.as_str(), &dest.template).await {
-        Ok(temp) => match temp {
-            Some(_) => destinations::save_destination(org_id, name, dest).await,
-            None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Please specify valid template".to_string(),
-            ))),
-        },
-        Err(_) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+    if db::alerts::templates::get(org_id.as_str(), &dest.template)
+        .await
+        .is_err()
+    {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
             "Please specify valid template".to_string(),
-        ))),
+        )));
     }
+    destinations::save_destination(org_id, name, dest).await
 }
 
 /** ListDestinations */
@@ -117,8 +114,9 @@ async fn get_destination(path: web::Path<(String, String)>) -> impl Responder {
         ("destination_name" = String, Path, description = "Destination name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Error", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[delete("/{org_id}/alerts/destinations/{destination_name}")]

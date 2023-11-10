@@ -147,8 +147,9 @@ async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> i
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Dashboard deleted", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+        (status = StatusCode::OK, description = "Success", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
     ),
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]

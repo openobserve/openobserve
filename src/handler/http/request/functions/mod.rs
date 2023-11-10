@@ -142,8 +142,8 @@ async fn list_stream_functions(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
         Err(e) => {
             return Ok(
                 HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
@@ -153,11 +153,7 @@ async fn list_stream_functions(
             )
         }
     };
-    if stream_type.is_none() {
-        stream_type = Some(meta::StreamType::Logs);
-    }
-    crate::service::functions::list_stream_functions(org_id, stream_type.unwrap(), stream_name)
-        .await
+    crate::service::functions::list_stream_functions(&org_id, stream_type, &stream_name).await
 }
 
 /** RemoveStreamFunction*/
@@ -185,8 +181,8 @@ async fn delete_stream_function(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
         Err(e) => {
             return Ok(
                 HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
@@ -196,16 +192,8 @@ async fn delete_stream_function(
             )
         }
     };
-    if stream_type.is_none() {
-        stream_type = Some(meta::StreamType::Logs);
-    }
-    crate::service::functions::delete_stream_function(
-        org_id,
-        stream_type.unwrap(),
-        stream_name,
-        name,
-    )
-    .await
+    crate::service::functions::delete_stream_function(&org_id, stream_type, &stream_name, &name)
+        .await
 }
 
 /** ApplyFunctionToStream */
@@ -235,8 +223,8 @@ pub async fn add_function_to_stream(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let mut stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
         Err(e) => {
             return Ok(
                 HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
@@ -246,14 +234,11 @@ pub async fn add_function_to_stream(
             )
         }
     };
-    if stream_type.is_none() {
-        stream_type = Some(meta::StreamType::Logs);
-    }
     crate::service::functions::add_function_to_stream(
-        org_id,
-        stream_type.unwrap(),
-        stream_name,
-        name,
+        &org_id,
+        stream_type,
+        &stream_name,
+        &name,
         stream_order.into_inner(),
     )
     .await
