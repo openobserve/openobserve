@@ -133,7 +133,7 @@ impl TryFrom<&Statement> for Sql {
 
                 let fields = Projection(projection).try_into()?;
                 let selection = selection.as_ref().cloned();
-                let field_alias: Vec<(String, String)> = Projection(projection).try_into()?; 
+                let field_alias: Vec<(String, String)> = Projection(projection).try_into()?;
                 let time_range: Option<(i64, i64)> = Timerange(&selection).try_into()?;
 
                 let quick_text: Vec<(String, String, SqlOperator)> =
@@ -433,8 +433,8 @@ fn parse_expr_for_field(
                     fields.push((ident.value.to_string(), val.unwrap(), next_op, *expr_op));
                 }
             } else {
-                parse_expr_for_field(&left, &next_op, field, fields)?;
-                parse_expr_for_field(&right, expr_op, field, fields)?;
+                parse_expr_for_field(left, &next_op, field, fields)?;
+                parse_expr_for_field(right, expr_op, field, fields)?;
             }
         }
         SqlExpr::Like {
@@ -535,13 +535,13 @@ fn parse_expr_in_list(
         return Ok(());
     }
     let exprs_len = list.len();
-    for i in 0..exprs_len {
-        let op = if i +1 == exprs_len {
+    for (i, item) in list.iter().enumerate() {
+        let op = if i + 1 == exprs_len {
             *next_op
         } else {
             SqlOperator::Or
         };
-        if let Some(val )= get_value_from_expr(&list[i]) {
+        if let Some(val) = get_value_from_expr(item) {
             fields.push((field_name.to_string(), val, SqlOperator::Eq, op));
         }
     }

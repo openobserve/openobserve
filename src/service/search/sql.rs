@@ -651,7 +651,7 @@ pub fn generate_filter_from_quick_text(
         {
             let entry = filters.entry(k.as_str()).or_insert(vec![]);
             entry.push(v.as_str());
-        }else{
+        } else {
             filters.clear();
             break;
         }
