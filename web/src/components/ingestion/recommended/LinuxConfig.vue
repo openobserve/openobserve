@@ -5,7 +5,7 @@
     <hr />
     <div>
       <div class="text-subtitle1 q-pl-xs q-mt-md">
-        Once you have installed the OpenObserve collector, it will do following:
+        Once you have installed the OpenObserve collector, it will:
         <ol>
           <li>Collect system logs</li>
           <li>Collect host metrics</li>
