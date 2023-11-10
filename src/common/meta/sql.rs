@@ -34,10 +34,9 @@ pub struct Sql {
     pub(crate) group_by: Vec<String>,         // field
     pub(crate) offset: usize,
     pub(crate) limit: usize,
-    pub(crate) quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
-    pub(crate) full_text: Vec<(String, SqlOperator)>, // fulltext: value1 and value2, and: true / false
     pub(crate) time_range: Option<(i64, i64)>,
-    pub(crate) field_alias: Vec<(String, String)>, // alias for select field
+    pub(crate) quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
+    pub(crate) field_alias: Vec<(String, String)>,             // alias for select field
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -51,6 +50,7 @@ pub enum SqlOperator {
     Lt,
     Lte,
     Like,
+    Nop,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -61,7 +61,6 @@ pub enum SqlValue {
 
 pub struct Projection<'a>(pub(crate) &'a Vec<SelectItem>);
 pub struct Quicktext<'a>(pub(crate) &'a Option<SqlExpr>);
-pub struct Fulltext<'a>(pub(crate) &'a Option<SqlExpr>);
 pub struct Timerange<'a>(pub(crate) &'a Option<SqlExpr>);
 pub struct Source<'a>(pub(crate) &'a [TableWithJoins]);
 pub struct Order<'a>(pub(crate) &'a OrderByExpr);
@@ -81,7 +80,7 @@ impl Sql {
         }
         let statement = statement.unwrap();
         if statement.is_empty() {
-            return Err(anyhow::anyhow!("sql is empty"));
+            return Err(anyhow::anyhow!("SQL is empty"));
         }
         let statement = &statement[0];
         let sql: Result<Sql, anyhow::Error> = statement.try_into();
@@ -140,11 +139,10 @@ impl TryFrom<&Statement> for Sql {
                 let fields = Projection(projection).try_into()?;
                 let selection = selection.as_ref().cloned();
                 let field_alias: Vec<(String, String)> = Projection(projection).try_into()?;
+                let time_range: Option<(i64, i64)> = Timerange(&selection).try_into()?;
 
                 let quick_text: Vec<(String, String, SqlOperator)> =
                     Quicktext(&selection).try_into()?;
-                let full_text: Vec<(String, SqlOperator)> = Fulltext(&selection).try_into()?;
-                let time_range: Option<(i64, i64)> = Timerange(&selection).try_into()?;
 
                 Ok(Sql {
                     fields,
@@ -154,13 +152,98 @@ impl TryFrom<&Statement> for Sql {
                     group_by,
                     offset,
                     limit,
-                    quick_text,
-                    full_text,
                     time_range,
+                    quick_text,
                     field_alias,
                 })
             }
             _ => Err(anyhow::anyhow!("We only support Query at the moment")),
+        }
+    }
+}
+
+impl std::fmt::Display for SqlValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SqlValue::String(s) => write!(f, "{s}"),
+            SqlValue::Number(n) => write!(f, "{n}"),
+        }
+    }
+}
+
+impl<'a> From<Offset<'a>> for usize {
+    fn from(offset: Offset) -> Self {
+        match offset.0 {
+            SqlOffset {
+                value: SqlExpr::Value(Value::Number(v, _b)),
+                ..
+            } => v.parse().unwrap_or(0),
+            _ => 0,
+        }
+    }
+}
+
+impl<'a> From<Limit<'a>> for usize {
+    fn from(l: Limit<'a>) -> Self {
+        match l.0 {
+            SqlExpr::Value(Value::Number(v, _b)) => {
+                let mut v: usize = v.parse().unwrap_or(0);
+                if v > 10000 {
+                    v = 10000;
+                }
+                v
+            }
+            _ => 0,
+        }
+    }
+}
+
+impl<'a> TryFrom<Source<'a>> for String {
+    type Error = anyhow::Error;
+
+    fn try_from(source: Source<'a>) -> Result<Self, Self::Error> {
+        if source.0.len() != 1 {
+            return Err(anyhow::anyhow!(
+                "We only support single data source at the moment"
+            ));
+        }
+
+        let table = &source.0[0];
+        if !table.joins.is_empty() {
+            return Err(anyhow::anyhow!(
+                "We do not support joint data source at the moment"
+            ));
+        }
+
+        match &table.relation {
+            TableFactor::Table { name, .. } => Ok(name.0.first().unwrap().value.clone()),
+            _ => Err(anyhow::anyhow!("We only support table")),
+        }
+    }
+}
+
+impl<'a> TryFrom<Order<'a>> for (String, bool) {
+    type Error = anyhow::Error;
+
+    fn try_from(order: Order) -> Result<Self, Self::Error> {
+        match &order.0.expr {
+            SqlExpr::Identifier(id) => Ok((id.to_string(), !order.0.asc.unwrap_or(true))),
+            expr => Err(anyhow::anyhow!(
+                "We only support identifier for order by, got {expr}"
+            )),
+        }
+    }
+}
+
+impl<'a> TryFrom<Group<'a>> for String {
+    type Error = anyhow::Error;
+
+    fn try_from(g: Group) -> Result<Self, Self::Error> {
+        match &g.0 {
+            SqlExpr::Identifier(id) => Ok(id.to_string()),
+            expr => Err(anyhow::anyhow!(
+                "We only support identifier for order by, got {expr}"
+            )),
         }
     }
 }
@@ -171,18 +254,11 @@ impl<'a> TryFrom<Projection<'a>> for Vec<String> {
     fn try_from(projection: Projection<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
         for item in projection.0 {
-            match item {
-                SelectItem::UnnamedExpr(expr) => {
-                    let field = expr.to_string();
-                    let field = field.trim_matches(|v| v == '\'' || v == '"');
-                    fields.push(field.to_owned());
-                }
-                SelectItem::Wildcard(_) => {
-                    // we use empty to represent all fields
-                    // fields.push("*".to_string());
-                }
-                // _ => return Err(anyhow::anyhow!("We only support UnnamedExpr at the moment")),
-                _ => {}
+            // We only support UnnamedExpr at the moment
+            if let SelectItem::UnnamedExpr(expr) = item {
+                let field = expr.to_string();
+                let field = field.trim_matches(|v| v == '\'' || v == '"');
+                fields.push(field.to_owned());
             }
         }
         Ok(fields)
@@ -203,63 +279,18 @@ impl<'a> TryFrom<Projection<'a>> for Vec<(String, String)> {
     }
 }
 
-impl<'a> TryFrom<Fulltext<'a>> for Vec<(String, SqlOperator)> {
-    type Error = anyhow::Error;
-
-    fn try_from(selection: Fulltext<'a>) -> Result<Self, Self::Error> {
-        let mut fields = Vec::new();
-        match selection.0 {
-            Some(expr) => parse_expr_for_field(expr, "_all", &mut fields)?,
-            None => {}
-        }
-
-        let fields = fields
-            .iter()
-            .map(|(_field, value, _op, operator)| {
-                (value.to_owned().to_string(), operator.to_owned())
-            })
-            .collect();
-
-        Ok(fields)
-    }
-}
-
-impl<'a> TryFrom<Quicktext<'a>> for Vec<(String, String, SqlOperator)> {
-    type Error = anyhow::Error;
-
-    fn try_from(selection: Quicktext<'a>) -> Result<Self, Self::Error> {
-        let mut fields = Vec::new();
-        match selection.0 {
-            Some(expr) => parse_expr_for_field(expr, "*", &mut fields)?,
-            None => {}
-        }
-
-        let fields = fields
-            .iter()
-            .filter_map(|(field, value, op, operator)| {
-                if op == &SqlOperator::Eq || op == &SqlOperator::Like {
-                    Some((
-                        field.to_string(),
-                        value.to_owned().to_string(),
-                        operator.to_owned(),
-                    ))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        Ok(fields)
-    }
-}
-
 impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
     type Error = anyhow::Error;
 
     fn try_from(selection: Timerange<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
         match selection.0 {
-            Some(expr) => parse_expr_for_field(expr, &CONFIG.common.column_timestamp, &mut fields)?,
+            Some(expr) => parse_expr_for_field(
+                expr,
+                &SqlOperator::And,
+                &CONFIG.common.column_timestamp,
+                &mut fields,
+            )?,
             None => {}
         }
 
@@ -315,89 +346,31 @@ impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
     }
 }
 
-impl<'a> TryFrom<Source<'a>> for String {
+impl<'a> TryFrom<Quicktext<'a>> for Vec<(String, String, SqlOperator)> {
     type Error = anyhow::Error;
 
-    fn try_from(source: Source<'a>) -> Result<Self, Self::Error> {
-        if source.0.len() != 1 {
-            return Err(anyhow::anyhow!(
-                "We only support single data source at the moment"
-            ));
+    fn try_from(selection: Quicktext<'a>) -> Result<Self, Self::Error> {
+        let mut fields = Vec::new();
+        match selection.0 {
+            Some(expr) => parse_expr_for_field(expr, &SqlOperator::And, "*", &mut fields)?,
+            None => {}
         }
-
-        let table = &source.0[0];
-        if !table.joins.is_empty() {
-            return Err(anyhow::anyhow!(
-                "We do not support joint data source at the moment"
-            ));
-        }
-
-        match &table.relation {
-            TableFactor::Table { name, .. } => Ok(name.0.first().unwrap().value.clone()),
-            _ => Err(anyhow::anyhow!("We only support table")),
-        }
-    }
-}
-
-impl<'a> TryFrom<Order<'a>> for (String, bool) {
-    type Error = anyhow::Error;
-
-    fn try_from(order: Order) -> Result<Self, Self::Error> {
-        match &order.0.expr {
-            SqlExpr::Identifier(id) => Ok((id.to_string(), !order.0.asc.unwrap_or(true))),
-            expr => Err(anyhow::anyhow!(
-                "We only support identifier for order by, got {expr}"
-            )),
-        }
-    }
-}
-
-impl<'a> TryFrom<Group<'a>> for String {
-    type Error = anyhow::Error;
-
-    fn try_from(g: Group) -> Result<Self, Self::Error> {
-        match &g.0 {
-            SqlExpr::Identifier(id) => Ok(id.to_string()),
-            expr => Err(anyhow::anyhow!(
-                "We only support identifier for order by, got {expr}"
-            )),
-        }
-    }
-}
-
-impl std::fmt::Display for SqlValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SqlValue::String(s) => write!(f, "{s}"),
-            SqlValue::Number(n) => write!(f, "{n}"),
-        }
-    }
-}
-
-impl<'a> From<Offset<'a>> for usize {
-    fn from(offset: Offset) -> Self {
-        match offset.0 {
-            SqlOffset {
-                value: SqlExpr::Value(Value::Number(v, _b)),
-                ..
-            } => v.parse().unwrap_or(0),
-            _ => 0,
-        }
-    }
-}
-
-impl<'a> From<Limit<'a>> for usize {
-    fn from(l: Limit<'a>) -> Self {
-        match l.0 {
-            SqlExpr::Value(Value::Number(v, _b)) => {
-                let mut v: usize = v.parse().unwrap_or(0);
-                if v > 10000 {
-                    v = 10000;
+        let fields = fields
+            .iter()
+            .filter_map(|(field, value, op, operator)| {
+                if op == &SqlOperator::Eq || op == &SqlOperator::Like {
+                    Some((
+                        field.to_string(),
+                        value.to_owned().to_string(),
+                        operator.to_owned(),
+                    ))
+                } else {
+                    None
                 }
-                v
-            }
-            _ => 0,
-        }
+            })
+            .collect();
+
+        Ok(fields)
     }
 }
 
@@ -444,150 +417,45 @@ fn parse_timestamp(s: &SqlValue) -> Result<Option<i64>, anyhow::Error> {
 
 fn parse_expr_for_field(
     expr: &SqlExpr,
+    expr_op: &SqlOperator,
     field: &str,
     fields: &mut Vec<(String, SqlValue, SqlOperator, SqlOperator)>,
 ) -> Result<(), anyhow::Error> {
     // println!("! parse_expr -> {:?}", expr);
     match expr {
-        SqlExpr::Nested(e) => parse_expr_for_field(e, field, fields)?,
+        SqlExpr::Nested(e) => parse_expr_for_field(e, expr_op, field, fields)?,
         SqlExpr::BinaryOp { left, op, right } => {
             let next_op: SqlOperator = op.try_into()?;
-
-            match &**left {
-                SqlExpr::Nested(e) => parse_expr_for_field(e, field, fields)?,
-                SqlExpr::BinaryOp { left, op, right } => {
-                    parse_expr_for_field(
-                        &SqlExpr::BinaryOp {
-                            left: left.clone(),
-                            op: op.clone(),
-                            right: right.clone(),
-                        },
-                        field,
-                        fields,
-                    )?;
-                }
-                SqlExpr::Identifier(ident) => {
-                    let nop = op.try_into()?;
-                    let eq = parse_expr_check_field_name(&ident.value, field);
-                    if ident.value == field || (eq && nop == SqlOperator::Eq) {
-                        let val = get_value_from_expr(right);
-                        if val.is_none() {
-                            return Err(anyhow::anyhow!(
-                                "SqlExpr::Identifier: We only support Identifier at the moment"
-                            ));
-                        }
-                        fields.push((ident.value.to_string(), val.unwrap(), nop, next_op));
+            if let SqlExpr::Identifier(ident) = &**left {
+                let eq = parse_expr_check_field_name(&ident.value, field);
+                if ident.value == field || (eq && next_op == SqlOperator::Eq) {
+                    let val = get_value_from_expr(right);
+                    if val.is_none() {
+                        return Err(anyhow::anyhow!(
+                            "SqlExpr::Identifier: We only support Identifier at the moment"
+                        ));
                     }
+                    fields.push((ident.value.to_string(), val.unwrap(), next_op, *expr_op));
                 }
-                SqlExpr::Like {
-                    negated,
-                    expr,
-                    pattern,
-                    escape_char,
-                } => {
-                    parse_expr_like(negated, expr, pattern, escape_char, next_op, field, fields)
-                        .unwrap();
-                }
-                SqlExpr::InList {
-                    expr,
-                    list,
-                    negated,
-                } => {
-                    parse_expr_in_list(expr, list, negated, field, fields).unwrap();
-                }
-                SqlExpr::Between {
-                    expr,
-                    negated,
-                    low,
-                    high,
-                } => {
-                    let ret = parse_expr_between(expr, negated, low, high, field, fields);
-                    if ret.is_err() {
-                        return Err(anyhow::anyhow!("{:?}", ret.err()));
-                    }
-                }
-                SqlExpr::Function(f) => {
-                    // Hack _timestamp
-                    if field == CONFIG.common.column_timestamp {
-                        let f_name = f.to_string().to_lowercase();
-                        if parse_expr_check_field_name(&f_name, field) {
-                            let val = get_value_from_expr(right);
-                            if val.is_none() {
-                                return Err(anyhow::anyhow!(
-                                    "SqlExpr::Identifier: We only support Identifier at the moment [_timestamp]"
-                                ));
-                            }
-                            fields.push((
-                                CONFIG.common.column_timestamp.clone(),
-                                val.unwrap(),
-                                next_op,
-                                next_op,
-                            ));
-                        }
-                    }
-                    let ret = parse_expr_function(f, field, fields);
-                    if ret.is_err() {
-                        return Err(anyhow::anyhow!("{:?}", ret.err()));
-                    }
-                }
-                _ => {}
+            } else {
+                parse_expr_for_field(left, &next_op, field, fields)?;
+                parse_expr_for_field(right, expr_op, field, fields)?;
             }
-
-            match &**right {
-                SqlExpr::Nested(e) => parse_expr_for_field(e, field, fields)?,
-                SqlExpr::BinaryOp { left, op, right } => {
-                    parse_expr_for_field(
-                        &SqlExpr::BinaryOp {
-                            left: left.clone(),
-                            op: op.clone(),
-                            right: right.clone(),
-                        },
-                        field,
-                        fields,
-                    )?;
-                }
-                SqlExpr::Like {
-                    negated,
-                    expr,
-                    pattern,
-                    escape_char,
-                } => {
-                    parse_expr_like(negated, expr, pattern, escape_char, next_op, field, fields)
-                        .unwrap();
-                }
-                SqlExpr::InList {
-                    expr,
-                    list,
-                    negated,
-                } => {
-                    parse_expr_in_list(expr, list, negated, field, fields).unwrap();
-                }
-                SqlExpr::Between {
-                    expr,
-                    negated,
-                    low,
-                    high,
-                } => {
-                    let ret = parse_expr_between(expr, negated, low, high, field, fields);
-                    if ret.is_err() {
-                        return Err(anyhow::anyhow!("{:?}", ret.err()));
-                    }
-                }
-                SqlExpr::Function(f) => {
-                    let ret = parse_expr_function(f, field, fields);
-                    if ret.is_err() {
-                        return Err(anyhow::anyhow!("{:?}", ret.err()));
-                    }
-                }
-                _ => {}
-            }
+        }
+        SqlExpr::Like {
+            negated,
+            expr,
+            pattern,
+            escape_char,
+        } => {
+            parse_expr_like(negated, expr, pattern, escape_char, expr_op, field, fields).unwrap();
         }
         SqlExpr::InList {
             expr,
             list,
             negated,
         } => {
-            parse_expr_in_list(expr, list, negated, field, fields).unwrap();
+            parse_expr_in_list(expr, list, negated, expr_op, field, fields).unwrap();
         }
         SqlExpr::Between {
             expr,
@@ -630,20 +498,24 @@ fn parse_expr_like(
     expr: &SqlExpr,
     pattern: &SqlExpr,
     _escape_char: &Option<char>,
-    next_op: SqlOperator,
+    next_op: &SqlOperator,
     field: &str,
     fields: &mut Vec<(String, SqlValue, SqlOperator, SqlOperator)>,
 ) -> Result<(), anyhow::Error> {
     if let SqlExpr::Identifier(ident) = expr {
         if parse_expr_check_field_name(&ident.value, field) {
-            let nop = SqlOperator::Like;
             let val = get_value_from_expr(pattern);
             if val.is_none() {
                 return Err(anyhow::anyhow!(
                     "SqlExpr::Like: We only support Identifier at the moment"
                 ));
             }
-            fields.push((ident.value.to_string(), val.unwrap(), nop, next_op));
+            fields.push((
+                ident.value.to_string(),
+                val.unwrap(),
+                SqlOperator::Like,
+                *next_op,
+            ));
         }
     }
     Ok(())
@@ -653,24 +525,31 @@ fn parse_expr_in_list(
     expr: &SqlExpr,
     list: &[SqlExpr],
     negated: &bool,
+    next_op: &SqlOperator,
     field: &str,
     fields: &mut Vec<(String, SqlValue, SqlOperator, SqlOperator)>,
 ) -> Result<(), anyhow::Error> {
     if *negated {
         return Ok(());
     }
+    if list.is_empty() {
+        return Ok(());
+    }
     let field_name = get_value_from_expr(expr).unwrap().to_string();
-    if parse_expr_check_field_name(&field_name, field) {
-        for val in list.iter() {
-            fields.push((
-                field.to_string(),
-                SqlValue::String(val.to_string()),
-                SqlOperator::Eq,
-                SqlOperator::Or,
-            ));
+    if !parse_expr_check_field_name(&field_name, field) {
+        return Ok(());
+    }
+    let exprs_len = list.len();
+    for (i, item) in list.iter().enumerate() {
+        let op = if i + 1 == exprs_len {
+            *next_op
+        } else {
+            SqlOperator::Or
+        };
+        if let Some(val) = get_value_from_expr(item) {
+            fields.push((field_name.to_string(), val, SqlOperator::Eq, op));
         }
     }
-
     Ok(())
 }
 
@@ -878,7 +757,7 @@ mod tests {
     }
 
     #[test]
-    fn test_new_sql() {
+    fn test_sql_new() {
         let table = "index.1.2022";
         let sql = format!(
             "select a, b, c from \"{}\" where a=1 and b=1 or c=1 order by c desc limit 5 offset 10",
@@ -893,7 +772,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_sqls() {
+    fn test_sql_parse() {
         let sqls = [
             ("select * from table1", true),
             ("select * from table1 where a=1", true),
@@ -921,7 +800,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_timestamp() {
+    fn test_sql_parse_timestamp() {
         let val = 1666093521151350;
         let ts_val = SqlValue::Number(val);
         let ts = parse_timestamp(&ts_val).unwrap().unwrap();
@@ -932,7 +811,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_timerange() {
+    fn test_sql_parse_timerange() {
         let samples = vec![
             ("select * from tbl where ts in (1, 2, 3)", (0,0)),
             ("select * from tbl where _timestamp >= 1666093521151350", (1666093521151350,0)),

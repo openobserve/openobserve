@@ -51,7 +51,7 @@ pub(crate) async fn create_context(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-    _filters: &[(&str, &str)],
+    _filters: &[(&str, Vec<&str>)],
 ) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
     // get file list
     let files = get_file_list(org_id, stream_name, time_range).await?;
