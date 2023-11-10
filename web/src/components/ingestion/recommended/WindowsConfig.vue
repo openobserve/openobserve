@@ -1,7 +1,7 @@
 <template>
   <div class="q-pa-md">
     <div class="text-subtitle1 q-pb-sm">
-      You need minimum PowerShell 6 to run the install script. you can check
+      You need minimum PowerShell 6 to run the install script, you can check
       your PowerShell version by running
       <code class="q-px-xs q-py-xs text-subtitle1" style="border-radius: 4px"
         >$PSVersionTable.PSVersion</code
