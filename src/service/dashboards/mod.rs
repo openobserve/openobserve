@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::web;
-use actix_web::{http::StatusCode, HttpResponse};
 use std::io;
 
-use crate::common::meta::dashboards::DEFAULT_FOLDER;
+use actix_web::{http::StatusCode, HttpResponse};
+use actix_web::web;
+
 use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse};
+use crate::common::meta::dashboards::DEFAULT_FOLDER;
 use crate::common::utils::json;
 use crate::service::db::dashboards;
 
@@ -97,15 +98,10 @@ pub async fn delete_dashboard(
     dashboard_id: &str,
     folder_id: &str,
 ) -> Result<HttpResponse, io::Error> {
-    let resp = if dashboards::delete(org_id, dashboard_id, folder_id)
-        .await
-        .is_err()
-    {
-        return Ok(Response::NotFound("Dashboard".to_string()).into());
-    } else {
-        Response::OkMessage("Dashboard deleted".to_owned())
-    };
-    Ok(resp.into())
+    if dashboards::get(org_id, dashboard_id, folder_id).await.is_ok() && dashboards::delete(org_id, dashboard_id, folder_id).await.is_ok() {
+        return Ok(Response::OkMessage("Dashboard deleted".to_owned()).into());
+    }
+    Ok(Response::NotFound("Dashboard not found".to_string()).into())
 }
 
 async fn save_dashboard(
