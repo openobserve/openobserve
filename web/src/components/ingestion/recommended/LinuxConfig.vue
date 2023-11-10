@@ -1,6 +1,17 @@
 <template>
   <div class="q-pa-md">
     <ContentCopy :content="getCommand"></ContentCopy>
+    <br />
+    <hr />
+    <div>
+      <div class="text-subtitle1 q-pl-xs q-mt-md">
+        Once you have installed the OpenObserve collector, it will do following:
+        <ol>
+          <li>Collect system logs</li>
+          <li>Collect host metrics</li>
+        </ol>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -47,7 +58,7 @@ const accessKey = computed(() => {
 });
 
 const getCommand = computed(() => {
-  return `wget https://raw.githubusercontent.com/openobserve/agents/main/linux/install.sh \\      
+  return `curl -O https://raw.githubusercontent.com/openobserve/agents/main/linux/install.sh \\      
     && chmod +x install.sh && sudo ./install.sh ${endpoint.value.url}/api/${props.currOrgIdentifier}/ ${accessKey.value}`;
 });
 </script>

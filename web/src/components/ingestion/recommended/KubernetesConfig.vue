@@ -37,6 +37,54 @@
       Install OpenObserve collector
     </div>
     <ContentCopy class="q-mt-sm" :content="collectorCmd" />
+    <br />
+    <hr />
+    <div class="text-subtitle1 q-pl-xs q-mt-md">
+      Once you have installed the OpenObserve collector, it will do following:
+      <ol>
+        <li>Collect metrics from your Kubernetes cluster</li>
+        <li>Collect events from your Kubernetes cluster</li>
+        <li>Collect logs from your Kubernetes cluster</li>
+        <li>
+          Will allow you to capture traces without instrumenting your
+          applications that are written in following languages using
+          OpenTelemetry auto-instrumentation. It can be done by setting the
+          following to the pod/namespace annotations:
+          <ol>
+            <li>
+              <b>Java:</b> instrumentation.opentelemetry.io/inject-java: "true"
+            </li>
+            <li>
+              <b>DotNet:</b> instrumentation.opentelemetry.io/inject-dotnet:
+              "true"
+            </li>
+            <li>
+              <b>NodeJS:</b> instrumentation.opentelemetry.io/inject-nodejs:
+              "true"
+            </li>
+            <li>
+              <b>Python:</b> instrumentation.opentelemetry.io/inject-python:
+              "true"
+            </li>
+            <li>
+              <b>Go (Uses eBPF):</b>
+              <ul>
+                <li>instrumentation.opentelemetry.io/inject-go: "true"</li>
+                <li>
+                  instrumentation.opentelemetry.io/otel-go-auto-target-exe:
+                  "/path/to/container/executable"
+                </li>
+              </ul>
+            </li>
+          </ol>
+        </li>
+      </ol>
+      You can find official documentation for OpenTelemetry auto-instrumentation
+      at
+      <a href="https://github.com/open-telemetry/opentelemetry-operator"
+        >https://github.com/open-telemetry/opentelemetry-operator</a
+      >
+    </div>
   </div>
 </template>
 
