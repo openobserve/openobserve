@@ -33,8 +33,12 @@ FROM gcr.io/distroless/cc:latest-arm64 as runtime
 # RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 # RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 # RUN update-ca-certificates
+ENV TINI_VERSION v0.19.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+RUN chmod +x /tini
 COPY --from=builder /app/target/release/openobserve /
 COPY --from=builder /lib/aarch64-linux-gnu/liblzma.so.5 /lib/aarch64-linux-gnu/liblzma.so.5
 COPY --from=builder /lib/aarch64-linux-gnu/libz.so.1 /lib/aarch64-linux-gnu/libz.so.1
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
+ENTRYPOINT ["/tini", "--"]
 CMD ["/openobserve"]

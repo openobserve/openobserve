@@ -24,8 +24,9 @@ RUN cargo build --release
 # FROM gcr.io/distroless/cc as runtime
 FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
-RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
+RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools tini
 RUN update-ca-certificates
 COPY --from=builder /app/target/release/openobserve /
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/openobserve"]
