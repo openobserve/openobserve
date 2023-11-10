@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use actix_web::{http, HttpResponse};
 use std::io::Error;
 
-use actix_web::{http, HttpResponse};
-
 use crate::common::infra::config::ALERTS_DESTINATIONS;
-use crate::common::meta::alert::DestinationTemplate;
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::meta::{alert::DestinationTemplate, http::HttpResponse as MetaHttpResponse};
 use crate::service::db;
 
 #[tracing::instrument(skip_all)]
@@ -58,16 +56,27 @@ pub async fn delete_template(org_id: String, name: String) -> Result<HttpRespons
         }
     }
 
-    if db::alerts::templates::get(org_id.as_str(), name.as_str()).await.is_ok() && db::alerts::templates::delete(org_id.as_str(), name.as_str()).await.is_ok() {
-        return Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Alert template deleted".to_string(),
+    if db::alerts::templates::get(org_id.as_str(), name.as_str())
+        .await
+        .is_err()
+    {
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "Alert template not found".to_string(),
         )));
     }
-    Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-        http::StatusCode::NOT_FOUND.into(),
-        "Alert template not found".to_string(),
-    )))
+    match db::alerts::templates::delete(org_id.as_str(), name.as_str()).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Alert template deleted".to_string(),
+        ))),
+        Err(e) => Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                e.to_string(),
+            )),
+        ),
+    }
 }
 
 #[tracing::instrument]

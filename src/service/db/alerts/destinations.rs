@@ -21,29 +21,19 @@ use crate::common::{
 };
 use crate::service::db;
 
-pub async fn get(
-    org_id: &str,
-    name: &str,
-) -> Result<Option<AlertDestinationResponse>, anyhow::Error> {
+pub async fn get(org_id: &str, name: &str) -> Result<AlertDestinationResponse, anyhow::Error> {
     let map_key = format!("{org_id}/{name}");
-    let value: Option<AlertDestinationResponse> = if ALERTS_DESTINATIONS.contains_key(&map_key) {
-        let dest = ALERTS_DESTINATIONS.get(&map_key).unwrap().clone();
-        let template = db::alerts::templates::get(org_id, &dest.template).await?;
-        Some(dest.to_dest_resp(template))
-    } else {
-        let db = &infra_db::DEFAULT;
-        let key = format!("/destinations/{org_id}/{name}");
-        match db.get(&key).await {
-            Ok(val) => {
-                let dest: AlertDestination = json::from_slice(&val).unwrap();
-                let template = db::alerts::templates::get(org_id, &dest.template).await?;
-                Some(dest.to_dest_resp(template))
-            }
-            Err(_) => None,
-        }
-    };
+    if let Some(val) = ALERTS_DESTINATIONS.get(&map_key) {
+        let template = db::alerts::templates::get(org_id, &val.template).await?;
+        return Ok(val.to_dest_resp(Some(template)));
+    }
 
-    Ok(value)
+    let db = &infra_db::DEFAULT;
+    let key = format!("/destinations/{org_id}/{name}");
+    let val = db.get(&key).await?;
+    let dest: AlertDestination = json::from_slice(&val).unwrap();
+    let template = db::alerts::templates::get(org_id, &dest.template).await?;
+    Ok(dest.to_dest_resp(Some(template)))
 }
 
 pub async fn set(
@@ -76,7 +66,7 @@ pub async fn list(org_id: &str) -> Result<Vec<AlertDestinationResponse>, anyhow:
     for item_value in db.list_values(&key).await? {
         let dest: AlertDestination = json::from_slice(&item_value).unwrap();
         let template = db::alerts::templates::get(org_id, &dest.template).await?;
-        temp_list.push(dest.to_dest_resp(template))
+        temp_list.push(dest.to_dest_resp(Some(template)))
     }
     Ok(temp_list)
 }

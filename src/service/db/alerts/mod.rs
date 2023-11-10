@@ -45,7 +45,11 @@ pub async fn get(
             Err(_) => None,
         }
     };
-    Ok(value)
+    if value.is_none() {
+        Err(anyhow::anyhow!("Alert not found"))
+    } else {
+        Ok(value)
+    }
 }
 
 pub async fn set(
@@ -142,7 +146,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let alert_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
                 let item_name = item_key[item_key.rfind('/').unwrap() + 1..].to_string();
                 if alert_key.contains('/') {
-                    let mut group = STREAM_ALERTS.get(&alert_key.to_string()).unwrap().clone();
+                    let mut group = match STREAM_ALERTS.get(&alert_key) {
+                        Some(v) => v.clone(),
+                        None => continue,
+                    };
                     group.list.retain(|trans| !trans.name.eq(&item_name));
                     STREAM_ALERTS.insert(alert_key.to_string(), group);
                 } else {

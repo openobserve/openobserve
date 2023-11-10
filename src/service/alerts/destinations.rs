@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use actix_web::{http, HttpResponse};
 use std::io::Error;
 
-use actix_web::{http, HttpResponse};
-
 use crate::common::infra::config::STREAM_ALERTS;
-use crate::common::meta::alert::AlertDestination;
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::meta::{alert::AlertDestination, http::HttpResponse as MetaHttpResponse};
 use crate::service::db;
 
 #[tracing::instrument(skip(destination))]
@@ -58,28 +56,28 @@ pub async fn delete_destination(org_id: String, name: String) -> Result<HttpResp
         }
     }
 
-    if db::alerts::destinations::get(org_id.as_str(), name.as_str()).await.is_ok() {
-        let result = db::alerts::destinations::delete(org_id.as_str(), name.as_str()).await;
-        return match result {
-            Ok(_) => {
-                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK.into(),
-                    "Alert destination deleted ".to_string(),
-                )))
-            }
-            Err(e) => {
-                Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                    http::StatusCode::NOT_FOUND.into(),
-                    e.to_string(),
-                )))
-            }
-        };
+    if db::alerts::destinations::get(org_id.as_str(), name.as_str())
+        .await
+        .is_err()
+    {
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "Alert destination not found".to_string(),
+        )));
     }
-
-    Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-        http::StatusCode::NOT_FOUND.into(),
-        "Alert destination not found".to_string(),
-    )))
+    let result = db::alerts::destinations::delete(org_id.as_str(), name.as_str()).await;
+    match result {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Alert destination deleted ".to_string(),
+        ))),
+        Err(e) => Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                e.to_string(),
+            )),
+        ),
+    }
 }
 
 #[tracing::instrument]

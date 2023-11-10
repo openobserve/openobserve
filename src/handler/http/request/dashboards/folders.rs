@@ -142,8 +142,9 @@ pub async fn get_folder(path: web::Path<(String, String)>) -> Result<HttpRespons
         ("folder_id" = String, Path, description = "Folder ID"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Folder deleted", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+        (status = StatusCode::OK, description = "Success", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
     ),
 )]
 #[delete("/{org_id}/folders/{folder_id}")]
