@@ -28,7 +28,7 @@ use tokio::{
 
 use crate::common::{
     infra::{
-        config::{RwAHashSet, CONFIG, FILE_EXT_JSON},
+        config::{RwAHashSet, CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
         ider, metrics,
     },
     meta::{
@@ -374,7 +374,11 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = format!("{thread_id}/{key}/{id}{}", FILE_EXT_JSON);
+        let file_name = if schema.is_some() {
+            format!("{thread_id}/{key}/{id}{}", FILE_EXT_ARROW)
+        } else {
+            format!("{thread_id}/{key}/{id}{}", FILE_EXT_JSON)
+        };
         let file_path = format!("{dir_path}{file_name}");
         create_dir_all(Path::new(&file_path).parent().unwrap())
             .await
@@ -387,7 +391,7 @@ impl RwFile {
                 None,
             )
         } else if use_arrow {
-            let file_path = format!("{dir_path}{}", file_name.replace(".json", ".arrow"));
+            let file_path = format!("{dir_path}{file_name}");
             let file = std::fs::OpenOptions::new()
                 .write(true)
                 .create(true)
