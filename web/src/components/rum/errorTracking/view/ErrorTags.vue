@@ -130,15 +130,39 @@ const getOsIcon = () => {
   }
 };
 
-const getOsVersion = computed(
-  () =>
-    `Version ${props.error.user_agent_user_agent_major}.${props.error.user_agent_user_agent_minor}.${props.error.user_agent_user_agent_patch}`
-);
+const getOsVersion = computed(() => {
+  let version = "Version ";
 
-const getBrowserVersion = computed(
-  () =>
-    `Version ${props.error.user_agent_user_agent_major}.${props.error.user_agent_user_agent_minor}.${props.error.user_agent_user_agent_patch}`
-);
+  if (!props.error.user_agent_os_major) return version + "Unknown";
+
+  if (props.error.user_agent_os_major)
+    version += props.error.user_agent_os_major;
+
+  if (props.error.user_agent_os_minor)
+    version += "." + props.error.user_agent_os_minor;
+
+  if (props.error.user_agent_os_patch)
+    version += "." + props.error.user_agent_os_patch;
+
+  return version;
+});
+
+const getBrowserVersion = computed(() => {
+  let version = "Version ";
+
+  if (!props.error.user_agent_user_agent_major) return version + "Unknown";
+
+  if (props.error.user_agent_user_agent_major)
+    version += props.error.user_agent_user_agent_major;
+
+  if (props.error.user_agent_user_agent_minor)
+    version += "." + props.error.user_agent_user_agent_minor;
+
+  if (props.error.user_agent_user_agent_patch)
+    version += "." + props.error.user_agent_user_agent_patch;
+
+  return version;
+});
 
 const getTags = computed(() => {
   return {
