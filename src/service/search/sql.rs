@@ -28,7 +28,12 @@ use crate::common::{
         config::{CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS},
         errors::{Error, ErrorCodes},
     },
-    meta::{common::FileKey, sql::Sql as MetaSql, stream::StreamParams, StreamType},
+    meta::{
+        common::FileKey,
+        sql::{Sql as MetaSql, SqlOperator},
+        stream::StreamParams,
+        StreamType,
+    },
     utils::str::find,
 };
 use crate::handler::grpc::cluster_rpc;
@@ -610,18 +615,6 @@ impl Sql {
             }
         }
 
-        // log::info!(
-        //     "sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
-        //     sql.stream_name,
-        //     sql.meta.fields,
-        //     sql.meta.quick_text,
-        //     sql.fulltext,
-        //     sql.meta.time_range,
-        //     sql.meta.order_by,
-        //     sql.meta.offset,
-        //     sql.meta.limit,
-        // );
-
         Ok(sql)
     }
 
@@ -633,22 +626,37 @@ impl Sql {
         is_wal: bool,
         stream_type: StreamType,
     ) -> bool {
-        let filters = self
-            .meta
-            .quick_text
-            .iter()
-            .map(|(k, v, _)| (k.as_str(), v.as_str()))
-            .collect::<Vec<(_, _)>>();
+        let filters = generate_filter_from_quick_text(&self.meta.quick_text);
         match_source(
             StreamParams::new(&self.org_id, &self.stream_name, stream_type),
             self.meta.time_range,
-            &filters,
+            filters.as_slice(),
             source,
             is_wal,
             match_min_ts_only,
         )
         .await
     }
+}
+
+pub fn generate_filter_from_quick_text(
+    data: &[(String, String, SqlOperator)],
+) -> Vec<(&str, Vec<&str>)> {
+    let quick_text_len = data.len();
+    let mut filters = HashMap::with_capacity(quick_text_len);
+    for i in 0..quick_text_len {
+        let (k, v, op) = &data[i];
+        if op == &SqlOperator::And
+            || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
+        {
+            let entry = filters.entry(k.as_str()).or_insert(vec![]);
+            entry.push(v.as_str());
+        } else {
+            filters.clear();
+            break;
+        }
+    }
+    filters.into_iter().collect::<Vec<(_, _)>>()
 }
 
 fn check_field_in_use(sql: &Sql, field: &str) -> bool {
