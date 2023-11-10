@@ -45,7 +45,7 @@ impl TableProvider for StorageProvider {
         org_id: &str,
         stream_name: &str,
         time_range: (i64, i64),
-        filters: &[(&str, &str)],
+        filters: &[(&str, Vec<&str>)],
     ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
         let mut resp = Vec::new();
         // register storage table

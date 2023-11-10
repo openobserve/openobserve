@@ -401,13 +401,13 @@ impl Engine {
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
-        let filters: Vec<(&str, &str)> = selector
+        let filters = selector
             .matchers
             .matchers
             .iter()
             .filter(|mat| mat.op == MatchOp::Equal)
-            .map(|mat| (mat.name.as_str(), mat.value.as_str()))
-            .collect();
+            .map(|mat| (mat.name.as_str(), vec![mat.value.as_str()]))
+            .collect::<Vec<(_, _)>>();
         let ctxs = self
             .ctx
             .table_provider
