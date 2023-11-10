@@ -31,8 +31,12 @@
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
         <span class="text-bold">Event ID:</span>
-        <span :title="eventId" class="q-pl-xs cursor-pointer"
-          >{{ error.error_id }} <q-icon size="12px" name="content_copy"
+        <span :title="error.error_id" class="q-pl-xs cursor-pointer"
+          >{{ error.error_id }}
+          <q-icon
+            size="12px"
+            name="content_copy"
+            @click="copyErrorId(error.error_id)"
         /></span>
         <span class="q-ml-lg">{{ error.timestamp }}</span>
       </div>
@@ -57,10 +61,12 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, defineProps } from "vue";
+import { defineProps } from "vue";
 import { useRouter } from "vue-router";
+import { copyToClipboard, useQuasar } from "quasar";
 
 const router = useRouter();
+const q = useQuasar();
 const props = defineProps({
   error: {
     type: Object,
@@ -68,10 +74,14 @@ const props = defineProps({
   },
 });
 
-const eventId = "c595b5645b3d45e3b0946c50609f0c82";
-const getEventId = computed(() =>
-  "c595b5645b3d45e3b0946c50609f0c82".slice(0, 8)
-);
+const copyErrorId = (id: string) => {
+  q.notify({
+    type: "positive",
+    message: "Copied to clipboard",
+    timeout: 1500,
+  });
+  copyToClipboard(id);
+};
 </script>
 
 <style lang="scss">
