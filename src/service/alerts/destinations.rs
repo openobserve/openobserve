@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, HttpResponse};
 use std::io::Error;
+
+use actix_web::{http, HttpResponse};
 
 use crate::common::infra::config::STREAM_ALERTS;
 use crate::common::meta::alert::AlertDestination;
@@ -57,17 +58,28 @@ pub async fn delete_destination(org_id: String, name: String) -> Result<HttpResp
         }
     }
 
-    let result = db::alerts::destinations::delete(org_id.as_str(), name.as_str()).await;
-    match result {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Alert destination deleted ".to_string(),
-        ))),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+    if db::alerts::destinations::get(org_id.as_str(), name.as_str()).await.is_ok() {
+        let result = db::alerts::destinations::delete(org_id.as_str(), name.as_str()).await;
+        return match result {
+            Ok(_) => {
+                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                    http::StatusCode::OK.into(),
+                    "Alert destination deleted ".to_string(),
+                )))
+            }
+            Err(e) => {
+                Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                    http::StatusCode::NOT_FOUND.into(),
+                    e.to_string(),
+                )))
+            }
+        };
     }
+
+    Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        http::StatusCode::NOT_FOUND.into(),
+        "Alert destination not found".to_string(),
+    )))
 }
 
 #[tracing::instrument]
