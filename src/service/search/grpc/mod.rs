@@ -47,6 +47,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let sql = Arc::new(super::sql::Sql::new(req).await?);
     let stream_type = StreamType::from(req.stream_type.as_str());
+
     let session_id = Arc::new(req.job.as_ref().unwrap().session_id.to_string());
     let timeout = if req.timeout > 0 {
         req.timeout as u64
@@ -73,7 +74,7 @@ pub async fn search(
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                if CONFIG.common.use_arrow_for_wal {
+                if CONFIG.common.arrow_streams_wal.contains(&sql1.stream_name) {
                     wal::search_arrow(&session_id1, sql1, stream_type, timeout).await
                 } else {
                     wal::search(&session_id1, sql1, stream_type, timeout).await
