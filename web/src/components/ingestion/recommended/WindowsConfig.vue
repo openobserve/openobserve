@@ -28,7 +28,7 @@ Major  Minor  Patch  PreReleaseLabel BuildLabel
       >
     </div>
 
-    <div class="text-subtitle1 q-pl-xs q-mt-md">From powershell terminal:</div>
+    <div class="text-subtitle1 q-pl-xs q-mt-md">Run the powershell terminal as administrator and execute the following command:</div>
     <ContentCopy class="q-mt-sm" :content="getCommand" />
   </div>
 </template>
@@ -76,7 +76,7 @@ const accessKey = computed(() => {
 });
 
 const getCommand = computed(() => {
-  return `Invoke-WebRequest -Uri https://raw.githubusercontent.com/openobserve/agents/main/windows/install.ps1 -OutFile install.ps1 ; .\install.ps1 -URL ${endpoint.value.url}/api/${props.currOrgIdentifier}/ -AUTH_KEY ${accessKey.value}`;
+  return `Invoke-WebRequest -Uri https://raw.githubusercontent.com/openobserve/agents/main/windows/install.ps1 -OutFile install.ps1 ; .\\install.ps1 -URL ${endpoint.value.url}/api/${props.currOrgIdentifier}/ -AUTH_KEY ${accessKey.value}`;
 });
 </script>
 
