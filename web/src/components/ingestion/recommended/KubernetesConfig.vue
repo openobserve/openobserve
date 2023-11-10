@@ -40,13 +40,13 @@
     <br />
     <hr />
     <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Once you have installed the OpenObserve collector, it will do following:
+      Once you have installed the OpenObserve collector, it will:
       <ol>
         <li>Collect metrics from your Kubernetes cluster</li>
         <li>Collect events from your Kubernetes cluster</li>
         <li>Collect logs from your Kubernetes cluster</li>
         <li>
-          Will allow you to capture traces without instrumenting your
+          Allow you to capture traces without instrumenting your
           applications that are written in following languages using
           OpenTelemetry auto-instrumentation. It can be done by setting the
           following to the pod/namespace annotations:
