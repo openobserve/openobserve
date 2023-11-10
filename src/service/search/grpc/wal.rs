@@ -53,8 +53,8 @@ pub async fn search(
 ) -> super::SearchResult {
     // get file list
     let mut files = get_file_list(&sql, stream_type).await?;
-    let mut scan_stats = ScanStats::new();
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
+    let mut scan_stats = ScanStats::new();
 
     // cache files
     let work_dir = session_id.to_string();
@@ -100,6 +100,8 @@ pub async fn search(
 
     scan_stats.files = files.len() as i64;
     if scan_stats.files == 0 {
+        wal::release_files(&lock_files).await;
+        tmpfs::delete(session_id, true).unwrap();
         return Ok((HashMap::new(), scan_stats));
     }
     log::info!(
@@ -305,7 +307,7 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
 
     let mut result = Vec::with_capacity(files.len());
     let time_range = sql.meta.time_range.unwrap_or((0, 0));
-    for file in files {
+    for file in files.iter() {
         if time_range != (0, 0) {
             // check wal file created time, we can skip files which created time > end_time
             let source_file = wal_dir.to_string() + "/" + file.as_str();
@@ -313,6 +315,7 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
                 Ok(meta) => meta,
                 Err(_) => {
                     log::error!("skip wal file: {} get file meta error", file);
+                    wal::release_files(&[file.clone()]).await;
                     continue;
                 }
             };
@@ -342,12 +345,15 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
                     file_created,
                     file_modified
                 );
+                wal::release_files(&[file.clone()]).await;
                 continue;
             }
         }
-        let file_key = FileKey::from_file_name(&file);
+        let file_key = FileKey::from_file_name(file);
         if sql.match_source(&file_key, false, true, stream_type).await {
             result.push(file_key);
+        } else {
+            wal::release_files(&[file.clone()]).await;
         }
     }
     Ok(result)
