@@ -43,7 +43,12 @@ pub async fn handle_triggers(trigger: Trigger) {
     )
     .await
     {
-        Err(_) => log::error!("[ALERT MANAGER] Error fetching alert"),
+        Err(_) => {
+            let trigger_key = format!("{}/{}", &trigger.org, &trigger.alert_name);
+            let mut local_trigger = trigger;
+            local_trigger.parent_alert_deleted = true;
+            let _ = crate::service::db::triggers::set(&trigger_key, &local_trigger).await;
+        }
         Ok(result) => {
             let key = format!("{}/{}", &trigger.org, &trigger.alert_name);
             if let Some(alert) = result {
