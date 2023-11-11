@@ -65,14 +65,6 @@ const getOtelGrpcConfig = computed(() => {
         organization: ${props.currOrgIdentifier}
         stream-name: default
       tls:
-        insecure: true
-  otlp/openobserve_k8s_events:
-      endpoint: ${endpoint.value.host}:5081
-      headers:
-        Authorization: "Basic ${accessKey.value}"
-        organization: ${props.currOrgIdentifier}
-        stream-name: k8s_events
-      tls:
         insecure: true`;
 });
 
@@ -82,12 +74,7 @@ const getOtelHttpConfig = computed(() => {
     endpoint: ${endpoint.value.url}/api/${props.currOrgIdentifier}/
     headers:
       Authorization: Basic ${accessKey.value}
-      stream-name: default
-  otlphttp/openobserve_k8s_events:
-    endpoint: ${endpoint.value.url}/api/${props.currOrgIdentifier}/
-    headers:
-      Authorization: Basic ${accessKey.value}
-      stream-name: k8s_events`;
+      stream-name: default`;
 });
 </script>
 
