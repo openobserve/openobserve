@@ -560,65 +560,65 @@ mod tests {
     #[test]
     fn test_matches_by_partition_key_with_str() {
         let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kuberneteshost=gke-dev1/kubernetesnamespacename=ziox-dev/7052558621820981249.parquet";
-        assert!(filter_source_by_partition_key(path, &[]));
-        assert!(!filter_source_by_partition_key(
-            path,
-            &[("kuberneteshost", vec![""])]
-        ));
-        assert!(filter_source_by_partition_key(
-            path,
-            &[("kuberneteshost", vec!["gke-dev1"])]
-        ));
-        assert!(!filter_source_by_partition_key(
-            path,
-            &[("kuberneteshost", vec!["gke-dev2"])]
-        ));
-        assert!(
-            filter_source_by_partition_key(path, &[("some_other_key", vec!["no-matter"])]),
-            "Partition key was not found ==> the Parquet file has to be searched"
-        );
-        assert!(filter_source_by_partition_key(
-            path,
-            &[
-                ("kuberneteshost", vec!["gke-dev1"]),
-                ("kubernetesnamespacename", vec!["ziox-dev"])
-            ],
-        ));
-        assert!(!filter_source_by_partition_key(
-            path,
-            &[
-                ("kuberneteshost", vec!["gke-dev1"]),
-                ("kubernetesnamespacename", vec!["abcdefg"])
-            ],
-        ));
-        assert!(!filter_source_by_partition_key(
-            path,
-            &[
-                ("kuberneteshost", vec!["gke-dev2"]),
-                ("kubernetesnamespacename", vec!["ziox-dev"])
-            ],
-        ));
-        assert!(!filter_source_by_partition_key(
-            path,
-            &[
-                ("kuberneteshost", vec!["gke-dev2"]),
-                ("kubernetesnamespacename", vec!["abcdefg"])
-            ],
-        ));
-        assert!(filter_source_by_partition_key(
-            path,
-            &[
-                ("kuberneteshost", vec!["gke-dev1", "gke-dev2"]),
-                ("some_other_key", vec!["no-matter"])
-            ],
-        ));
-        assert!(filter_source_by_partition_key(
-            path,
-            &[
-                ("kuberneteshost", vec!["gke-dev1", "gke-dev2"]),
-                ("kubernetesnamespacename", vec!["ziox-dev"])
-            ],
-        ));
+        let filters = vec![
+            (vec![], true),
+            (vec![("kuberneteshost", vec!["gke-dev1"])], true),
+            (vec![("kuberneteshost", vec!["gke-dev2"])], false),
+            (vec![("kuberneteshost", vec!["gke-dev1", "gke-dev2"])], true),
+            (vec![("some_other_key", vec!["no-matter"])], true),
+            (
+                vec![
+                    ("kuberneteshost", vec!["gke-dev1"]),
+                    ("kubernetesnamespacename", vec!["ziox-dev"]),
+                ],
+                true,
+            ),
+            (
+                vec![
+                    ("kuberneteshost", vec!["gke-dev1"]),
+                    ("kubernetesnamespacename", vec!["abcdefg"]),
+                ],
+                false,
+            ),
+            (
+                vec![
+                    ("kuberneteshost", vec!["gke-dev2"]),
+                    ("kubernetesnamespacename", vec!["ziox-dev"]),
+                ],
+                false,
+            ),
+            (
+                vec![
+                    ("kuberneteshost", vec!["gke-dev2"]),
+                    ("kubernetesnamespacename", vec!["abcdefg"]),
+                ],
+                false,
+            ),
+            (
+                vec![
+                    ("kuberneteshost", vec!["gke-dev1", "gke-dev2"]),
+                    ("kubernetesnamespacename", vec!["ziox-dev"]),
+                ],
+                true,
+            ),
+            (
+                vec![
+                    ("kuberneteshost", vec!["gke-dev1", "gke-dev2"]),
+                    ("kubernetesnamespacename", vec!["abcdefg"]),
+                ],
+                false,
+            ),
+            (
+                vec![
+                    ("kuberneteshost", vec!["gke-dev1", "gke-dev2"]),
+                    ("some_other_key", vec!["no-matter"]),
+                ],
+                true,
+            ),
+        ];
+        for (filter, expected) in filters {
+            assert_eq!(filter_source_by_partition_key(path, &filter), expected);
+        }
     }
 
     #[test]
@@ -626,100 +626,33 @@ mod tests {
         use crate::common::meta::sql;
 
         let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kuberneteshost=gke-dev1/kubernetesnamespacename=ziox-dev/7052558621820981249.parquet";
-
-        let tsql = "SELECT * FROM tbl";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(!filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE some_other_key = 'no-matter'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' AND kubernetesnamespacename='ziox-dev'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kubernetesnamespacename='ziox-dev'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' AND kubernetesnamespacename='abcdefg'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(!filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kubernetesnamespacename='abcdefg'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' AND kubernetesnamespacename='ziox-dev'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(!filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' OR kubernetesnamespacename='ziox-dev'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' AND kubernetesnamespacename='abcdefg'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(!filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' OR kubernetesnamespacename='abcdefg'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kuberneteshost='gke-dev2'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1')";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev2')";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(!filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2')";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') AND kubernetesnamespacename='ziox-dev'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') AND some_other_key='abcdefg'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
-
-        let tsql = "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR some_other_key='abcdefg'";
-        let meta = sql::Sql::new(tsql).unwrap();
-        let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
-        assert!(filter_source_by_partition_key(path, &filter));
+        let sqls = vec![
+            ("SELECT * FROM tbl", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2'", false),
+            ("SELECT * FROM tbl WHERE some_other_key = 'no-matter'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' AND kubernetesnamespacename='ziox-dev'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' AND kubernetesnamespacename='abcdefg'", false),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' AND kubernetesnamespacename='ziox-dev'", false),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' AND kubernetesnamespacename='abcdefg'", false),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kubernetesnamespacename='ziox-dev'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kubernetesnamespacename='abcdefg'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' OR kubernetesnamespacename='ziox-dev'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' OR kubernetesnamespacename='abcdefg'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kuberneteshost='gke-dev2'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1')", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev2')", false),
+            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2')", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') AND kubernetesnamespacename='ziox-dev'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') AND kubernetesnamespacename='abcdefg'", false),
+            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR kubernetesnamespacename='ziox-dev'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR kubernetesnamespacename='abcdefg'", true),
+            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR some_other_key='abcdefg'", true),
+        ];
+        for (tsql, expected) in sqls {
+            let meta = sql::Sql::new(tsql).unwrap();
+            let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
+            assert_eq!(filter_source_by_partition_key(path, &filter), expected);
+        }
     }
 }
