@@ -26,7 +26,7 @@ use crate::service::triggers;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     for trigger in TRIGGERS.iter() {
-        if !trigger.is_ingest_time {
+        if !trigger.is_ingest_time && !trigger.parent_alert_deleted {
             let trigger = trigger.clone();
             tokio::task::spawn(async move { handle_triggers(trigger).await });
         }
@@ -89,7 +89,7 @@ async fn handle_trigger(alert_key: &str, frequency: i64) {
                 break;
             }
         };
-        if TRIGGERS_IN_PROCESS.clone().contains_key(alert_key) {
+        if !trigger.parent_alert_deleted && TRIGGERS_IN_PROCESS.clone().contains_key(alert_key) {
             let alert_resp = super::db::alerts::get(
                 &trigger.org,
                 &trigger.stream,

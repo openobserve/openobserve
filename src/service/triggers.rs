@@ -69,6 +69,7 @@ mod tests {
                 stream_type: crate::common::meta::StreamType::Logs,
                 count: 0,
                 is_ingest_time: false,
+                parent_alert_deleted: false,
             },
         )
         .await;

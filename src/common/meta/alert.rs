@@ -159,6 +159,8 @@ pub struct Trigger {
     pub is_ingest_time: bool,
     #[serde(default)]
     pub stream_type: StreamType,
+    #[serde(default)]
+    pub parent_alert_deleted: bool,
 }
 
 impl Default for Trigger {
@@ -173,6 +175,7 @@ impl Default for Trigger {
             count: 0,
             stream_type: StreamType::Logs,
             is_ingest_time: false,
+            parent_alert_deleted: false,
         }
     }
 }
