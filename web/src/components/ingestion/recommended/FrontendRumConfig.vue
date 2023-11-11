@@ -111,11 +111,11 @@ openobserveLogs.init({
 });
 
 // You can set a user context
-// openobserveRum.setUser({
-//   id: "<ID>",
-//   name: "<NAME>",
-//   email: "<EMAIL>",
-// });
+openobserveRum.setUser({
+  id: "1",
+  name: "Captain Hook",
+  email: "captainhook@example.com",
+});
 
 openobserveRum.startSessionReplayRecording();`;
     const initConfiguration = ref(defaultConfig);

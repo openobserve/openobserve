@@ -32,7 +32,7 @@
         </div>
       </div>
       <pre ref="copyHTTPTracesContent" data-test="traces-http-content-text">
-HTTP Endpoint: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/traces
+HTTP Endpoint: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/v1/traces
 Authorization: Basic {{ accessKey }}</pre
       >
     </div>
