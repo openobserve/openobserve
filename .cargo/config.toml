@@ -12,11 +12,11 @@ rustflags = ["-C", "target-feature=+neon"]
 linker = "aarch64-linux-gnu-gcc"
 rustflags = ["-C", "target-feature=+neon"]
 
-[target.x86_64-apple-darwin]
-rustflags = ["-C", "target-feature=+sse2,+ssse3,+sse4.1,+sse4.2"]
-
 [target.aarch64-apple-darwin]
 rustflags = ["-C", "target-feature=+neon"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "target-feature=+sse2,+ssse3,+sse4.1,+sse4.2"]
 
 [target.x86_64-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+sse2,+ssse3,+sse4.1,+sse4.2"]
