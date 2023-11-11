@@ -52,24 +52,28 @@
           pod/namespace annotations:
           <ol>
             <li>
-              <b>Java:</b> instrumentation.opentelemetry.io/inject-java: "true"
+              <b>Java:</b> instrumentation.opentelemetry.io/inject-java:
+              "openobserve-collector/openobserve"
             </li>
             <li>
               <b>DotNet:</b> instrumentation.opentelemetry.io/inject-dotnet:
-              "true"
+              "openobserve-collector/openobserve"
             </li>
             <li>
               <b>NodeJS:</b> instrumentation.opentelemetry.io/inject-nodejs:
-              "true"
+              "openobserve-collector/openobserve"
             </li>
             <li>
               <b>Python:</b> instrumentation.opentelemetry.io/inject-python:
-              "true"
+              "openobserve-collector/openobserve"
             </li>
             <li>
               <b>Go (Uses eBPF):</b>
               <ul>
-                <li>instrumentation.opentelemetry.io/inject-go: "true"</li>
+                <li>
+                  instrumentation.opentelemetry.io/inject-go:
+                  "openobserve-collector/openobserve"
+                </li>
                 <li>
                   instrumentation.opentelemetry.io/otel-go-auto-target-exe:
                   "/path/to/container/executable"
@@ -79,11 +83,13 @@
           </ol>
         </li>
       </ol>
-      You can find official documentation for OpenTelemetry auto-instrumentation
-      at
+      You can refer and install
+      <a href="https://github.com/openobserve/hotcommerce">HOT commerce</a> app
+      as an example to understand how this works in practice. Refer to
       <a href="https://github.com/open-telemetry/opentelemetry-operator"
-        >https://github.com/open-telemetry/opentelemetry-operator</a
+        >OpenTelemetry operator</a
       >
+      for further documentation.
     </div>
   </div>
 </template>
