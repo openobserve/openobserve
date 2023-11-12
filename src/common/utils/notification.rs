@@ -67,31 +67,37 @@ pub async fn send_notification(
     } else {
         reqwest::Client::new()
     };
-    let url = url::Url::parse(&local_dest.url);
-    let mut req = match local_dest.method {
-        alert::AlertHTTPType::POST => client.post(url.unwrap()),
-        alert::AlertHTTPType::PUT => client.put(url.unwrap()),
-        alert::AlertHTTPType::GET => client.get(url.unwrap()),
-    }
-    .header("Content-type", "application/json");
+    match url::Url::parse(&local_dest.url) {
+        Ok(url) => {
+            let mut req = match local_dest.method {
+                alert::AlertHTTPType::POST => client.post(url),
+                alert::AlertHTTPType::PUT => client.put(url),
+                alert::AlertHTTPType::GET => client.get(url),
+            }
+            .header("Content-type", "application/json");
 
-    // Add additional headers if any from destination description
-    if local_dest.headers.is_some() {
-        for (key, value) in local_dest.headers.unwrap() {
-            if !key.is_empty() && !value.is_empty() {
-                req = req.header(key, value);
+            // Add additional headers if any from destination description
+            if local_dest.headers.is_some() {
+                for (key, value) in local_dest.headers.unwrap() {
+                    if !key.is_empty() && !value.is_empty() {
+                        req = req.header(key, value);
+                    }
+                }
+            };
+
+            let resp = req.json(&msg).send().await;
+            match resp {
+                Ok(resp) => {
+                    if !resp.status().is_success() {
+                        log::error!("Notification sent error: {:?}", resp.bytes().await);
+                    }
+                }
+                Err(err) => log::error!("Notification sending error {:?}", err),
             }
         }
-    };
-
-    let resp = req.json(&msg).send().await;
-    match resp {
-        Ok(resp) => {
-            if !resp.status().is_success() {
-                log::error!("Notification sent error: {:?}", resp.bytes().await);
-            }
+        Err(err) => {
+            log::error!("Notification sending error {:?}", err);
         }
-        Err(err) => log::error!("Notification sending error {:?}", err),
     }
 
     Ok(())
@@ -133,6 +139,7 @@ mod tests {
             last_sent_at: chrono::Utc::now().timestamp_micros(),
             count: 1,
             is_ingest_time: true,
+            parent_alert_deleted: false,
         };
         let alert = Alert {
             name: "testAlert".to_string(),
