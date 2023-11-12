@@ -296,7 +296,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         if CONFIG.common.feature_per_thread_lock {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
-
         log::info!(
             "starting HTTP server at: {}, thread_id: {}",
             haddr,

@@ -297,6 +297,7 @@ async fn add_valid_record(
                                     last_sent_at: 0,
                                     count: 0,
                                     is_ingest_time: true,
+                                    parent_alert_deleted: false,
                                 });
                             }
                         }

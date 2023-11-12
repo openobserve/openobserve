@@ -145,6 +145,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let alert_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
                 let item_name = item_key[item_key.rfind('/').unwrap() + 1..].to_string();
+                let org_name = item_key[0..item_key.find('/').unwrap()].to_string();
                 if alert_key.contains('/') {
                     let mut group = match STREAM_ALERTS.get(&alert_key) {
                         Some(v) => v.clone(),
@@ -154,6 +155,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     STREAM_ALERTS.insert(alert_key.to_string(), group);
                 } else {
                     STREAM_ALERTS.remove(item_key);
+                }
+                let trigger_key = format!("{org_name}/{item_name}");
+                if let Ok(Some(mut trigger)) = crate::service::db::triggers::get(&trigger_key).await
+                {
+                    trigger.parent_alert_deleted = true;
+                    let _ = crate::service::db::triggers::set(&trigger_key, &trigger).await;
                 }
             }
             infra_db::Event::Empty => {}
