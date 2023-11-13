@@ -86,7 +86,7 @@
             },
           }"
           :icon="'img:' + getImageURL('images/common/monitoring.svg')"
-          label="Frontend Monitoring"
+          label="Real User Monitoring"
           content-class="tab_content"
         />
       </q-tabs>
