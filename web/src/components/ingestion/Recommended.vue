@@ -66,18 +66,6 @@
           content-class="tab_content"
         />
         <q-route-tab
-          name="ingestFromOtel"
-          :to="{
-            name: 'ingestFromOtel',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          label="OTEL Collector"
-          content-class="tab_content"
-        />
-        <q-route-tab
           name="ingestFromTraces"
           :to="{
             name: 'ingestFromTraces',
