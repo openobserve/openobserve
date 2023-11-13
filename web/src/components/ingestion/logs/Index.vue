@@ -115,6 +115,18 @@
           content-class="tab_content"
         />
         <q-route-tab
+          name="ingestLogsFromOtel"
+          :to="{
+            name: 'ingestLogsFromOtel',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+          label="OTEL Collector"
+          content-class="tab_content"
+        />
+        <q-route-tab
           v-if="showSyslog"
           name="syslogNg"
           :to="{

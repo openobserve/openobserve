@@ -88,6 +88,11 @@ const useIngestionRoutes = () => {
                   name: "filebeat",
                   component: FileBeat,
                 },
+                {
+                  path: "otel",
+                  name: "ingestLogsFromOtel",
+                  component: OtelConfig,
+                },
               ],
             },
             {
@@ -122,6 +127,11 @@ const useIngestionRoutes = () => {
                   name: "tracesOTLP",
                   component: OpenTelemetry,
                 },
+                {
+                  path: "otel",
+                  name: "ingestTracesFromOtel",
+                  component: OtelConfig,
+                },
               ],
             },
           ],
@@ -148,11 +158,6 @@ const useIngestionRoutes = () => {
               path: "linux",
               name: "ingestFromLinux",
               component: LinuxConfig,
-            },
-            {
-              path: "otel",
-              name: "ingestFromOtel",
-              component: OtelConfig,
             },
             {
               path: "traces",
