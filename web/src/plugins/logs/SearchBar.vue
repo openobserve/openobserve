@@ -32,6 +32,53 @@
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
         ></syntax-guide>
+        <q-btn-group class="q-ml-sm no-outline q-pa-none no-border">
+          <q-btn-dropdown
+            auto-close
+            size="12px"
+            icon="save"
+            icon-right="saved_search"
+            :title="t('search.savedViewsLabel')"
+            @click="fnSavedView"
+            split
+            class="no-outline saved-views-dropdown no-border"
+          >
+            <q-list>
+              <q-item-label header class="q-pa-sm">{{
+                t("search.savedViewDropdownLabel")
+              }}</q-item-label>
+              <q-separator inset></q-separator>
+
+              <div v-if="searchObj.data.savedViews.length">
+                <q-item
+                  class="q-pa-sm"
+                  clickable
+                  v-for="(item, i) in searchObj.data.savedViews"
+                  :key="'saved-view-' + i"
+                >
+                  <q-item-section @click.stop="applySavedView(item)">
+                    <q-item-label>{{ item.view_name }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section
+                    side
+                    @click.stop="handleDeleteSavedView(item)"
+                  >
+                    <q-icon name="delete" color="grey" />
+                  </q-item-section>
+                </q-item>
+              </div>
+              <div v-else>
+                <q-item>
+                  <q-item-section>
+                    <q-item-label>{{
+                      t("search.savedViewsNotFound")
+                    }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </div>
+            </q-list>
+          </q-btn-dropdown>
+        </q-btn-group>
       </div>
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
@@ -82,9 +129,9 @@
           </template>
           <template #no-option>
             <q-item>
-              <q-item-section class="text-xs"
-                >{{t('search.functionMessage')}}</q-item-section
-              >
+              <q-item-section class="text-xs">{{
+                t("search.functionMessage")
+              }}</q-item-section>
             </q-item>
           </template>
         </q-select>
@@ -104,7 +151,8 @@
         <q-btn
           class="q-mr-sm download-logs-btn q-px-sm"
           size="sm"
-          :disabled="
+          v-bind:disable="
+            searchObj.data.queryResults &&
             searchObj.data.queryResults.hasOwnProperty('hits') &&
             !searchObj.data.queryResults.hits.length
           "
@@ -144,9 +192,11 @@
               class="q-pa-none search-button"
               @click="handleRunQuery"
               :disable="
-                searchObj.loading || searchObj.data.streamResults.length == 0
+                searchObj.loading ||
+                (searchObj.data.hasOwnProperty('streamResults') &&
+                  searchObj.data.streamResults.length == 0)
               "
-              >{{t('search.runQuery')}}</q-btn
+              >{{ t("search.runQuery") }}</q-btn
             >
           </div>
         </div>
@@ -209,19 +259,94 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn :label="t('confirmDialog.cancel')" color="primary"
-@click="cancelConfirmDialog" />
-          <q-btn :label="t('confirmDialog.ok')" color="positive"
-@click="confirmDialogOK" />
+          <q-btn
+            :label="t('confirmDialog.cancel')"
+            color="primary"
+            @click="cancelConfirmDialog"
+          />
+          <q-btn
+            :label="t('confirmDialog.ok')"
+            color="positive"
+            @click="confirmDialogOK"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <q-dialog v-model="store.state.savedViewDialog">
+      <q-card style="width: 700px; max-width: 80vw">
+        <q-card-section>
+          <div class="text-h6">{{ t("search.savedViewsLabel") }}</div>
+        </q-card-section>
+
+        <q-card-section class="q-pt-none">
+          <q-label>Update</q-label>
+          <q-toggle
+            v-bind:disable="searchObj.data.savedViews.length == 0"
+            name="saved_view_action"
+            v-model="isSavedViewAction"
+            true-value="create"
+            false-value="update"
+            label=""
+            @change="savedViewName = ''"
+          />
+          <q-label>Create</q-label>
+          <div v-if="isSavedViewAction == 'create'">
+            <q-input
+              data-test="add-alert-name-input"
+              v-model="savedViewName"
+              :label="t('search.savedViewName')"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[(val: any) => !!val || 'Field is required!']"
+              tabindex="0"
+            />
+          </div>
+          <div v-else>
+            <q-select
+              v-model="savedViewSelectedName"
+              :options="searchObj.data.savedViews"
+              option-label="view_name"
+              option-value="view_id"
+              :label="t('search.savedViewName')"
+              :popup-content-style="{ textTransform: 'capitalize' }"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-sm showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            />
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right" class="bg-white text-teal">
+          <q-btn flat :label="t('confirmDialog.cancel')"
+v-close-popup />
+          <q-btn flat :label="t('confirmDialog.ok')"
+@click="handleSavedView" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+    <ConfirmDialog
+      title="Delete Saved View"
+      message="Are you sure you want to delete saved view?"
+      @update:ok="confirmDeleteSavedViews"
+      @update:cancel="confirmDelete = false"
+      v-model="confirmDelete"
+    />
   </div>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted, nextTick, watch } from "vue";
+import { defineComponent, ref, onMounted, nextTick, watch, toRaw } from "vue";
 import { useI18n } from "vue-i18n";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -244,6 +369,13 @@ import stream from "@/services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { cloneDeep } from "lodash-es";
+import {
+  b64DecodeUnicode,
+  mergeDeep,
+  b64EncodeUnicode,
+} from "@/utils/zincutils";
+import savedviewsService from "@/services/saved_views";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const defaultValue: any = () => {
   return {
@@ -261,6 +393,7 @@ export default defineComponent({
     QueryEditor,
     SyntaxGuide,
     AutoRefreshInterval,
+    ConfirmDialog,
   },
   emits: ["searchdata", "onChangeInterval", "onChangeTimezone"],
   methods: {
@@ -287,6 +420,13 @@ export default defineComponent({
         this.functionOptions.push(this.functionModel);
       }
     },
+    handleDeleteSavedView(item: any) {
+      this.deleteViewID = item.view_id;
+      this.confirmDelete = true;
+    },
+    confirmDeleteSavedViews() {
+      this.deleteSavedViews();
+    },
   },
   props: {
     fieldValues: {
@@ -300,7 +440,14 @@ export default defineComponent({
     const $q = useQuasar();
     const store = useStore();
 
-    const { searchObj, refreshData, handleRunQuery } = useLogs();
+    const {
+      searchObj,
+      refreshData,
+      handleRunQuery,
+      updatedLocalLogFilterField,
+      getSavedViews,
+      onStreamChange,
+    } = useLogs();
     const queryEditorRef = ref(null);
 
     const formData: any = ref(defaultValue());
@@ -328,6 +475,12 @@ export default defineComponent({
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = item.value;
     };
+
+    const isSavedViewAction = ref("create");
+    const savedViewName = ref("");
+    const savedViewSelectedName = ref("");
+    const confirmDelete = ref(false);
+    const deleteViewID = ref("");
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,
@@ -729,6 +882,255 @@ export default defineComponent({
       emit("onChangeInterval");
     };
 
+    const fnSavedView = () => {
+      if (!searchObj.data.stream.selectedStream.value) {
+        $q.notify({
+          type: "negative",
+          message: "No stream available to save view.",
+        });
+        return;
+      }
+      store.dispatch("setSavedViewDialog", true);
+    };
+
+    const applySavedView = (item) => {
+      savedviewsService
+        .getViewDetail(
+          store.state.selectedOrganization.identifier,
+          item.view_id
+        )
+        .then(async (res) => {
+          if (res.status == 200) {
+            const extractedObj = JSON.parse(b64DecodeUnicode(res.data.data));
+            // alert(JSON.stringify(searchObj.data.stream.selectedStream))
+            if (
+              extractedObj.data.stream.selectedStream.value !=
+              searchObj.data.stream.selectedStream.value
+            ) {
+              searchObj.value = mergeDeep(searchObj, extractedObj);
+              await nextTick();
+              updatedLocalLogFilterField();
+              await nextTick();
+              onStreamChange();
+            } else {
+              searchObj.value = mergeDeep(searchObj, extractedObj);
+              await nextTick();
+              updatedLocalLogFilterField();
+              handleRunQuery();
+            }
+          } else {
+            $q.notify({
+              message: `Error while applying saved view. ${res.data.error_detail}`,
+              color: "negative",
+              position: "bottom",
+              timeout: 1000,
+            });
+          }
+        })
+        .catch((err) => {
+          $q.notify({
+            message: `Error while applying saved view.`,
+            color: "negative",
+            position: "bottom",
+            timeout: 1000,
+          });
+          console.log(err);
+        });
+      // const extractedObj = JSON.parse(b64DecodeUnicode(item.data));
+      // searchObj.value = mergeDeep(searchObj, extractedObj);
+      // await nextTick();
+      // updatedLocalLogFilterField();
+      // handleRunQuery();
+    };
+
+    const handleSavedView = () => {
+      if (isSavedViewAction.value == "create") {
+        if (savedViewName.value == "") {
+          $q.notify({
+            message: `Please provide view name.`,
+            color: "negative",
+            position: "bottom",
+            timeout: 1000,
+          });
+        } else {
+          createSavedViews(savedViewName.value);
+        }
+      } else {
+        if (savedViewSelectedName.value.view_id) {
+          updateSavedViews(
+            savedViewSelectedName.value.view_id,
+            savedViewSelectedName.value.view_name
+          );
+        } else {
+          $q.notify({
+            message: `Please select saved view to update.`,
+            color: "negative",
+            position: "bottom",
+            timeout: 1000,
+          });
+        }
+      }
+    };
+
+    const deleteSavedViews = async () => {
+      try {
+        savedviewsService
+          .delete(
+            store.state.selectedOrganization.identifier,
+            deleteViewID.value
+          )
+          .then((res) => {
+            console.log(res);
+            if (res.status == 200) {
+              $q.notify({
+                message: `View deleted successfully.`,
+                color: "positive",
+                position: "bottom",
+                timeout: 1000,
+              });
+              getSavedViews();
+            } else {
+              $q.notify({
+                message: `Error while deleting saved view. ${res.data.error_detail}`,
+                color: "negative",
+                position: "bottom",
+                timeout: 1000,
+              });
+            }
+          })
+          .catch((err) => {
+            $q.notify({
+              message: `Error while deleting saved view.`,
+              color: "negative",
+              position: "bottom",
+              timeout: 1000,
+            });
+            console.log(err);
+          });
+      } catch (e: any) {
+        console.log("Error while getting saved views", e);
+      }
+    };
+
+    const getEncodedSearchObj = () => {
+      const savedSearchObj: any = toRaw(searchObj);
+
+      delete savedSearchObj.data.queryResults;
+      delete savedSearchObj.data.histogram;
+      delete savedSearchObj.data.sortedQueryResults;
+      delete savedSearchObj.data.stream.streamLists;
+      delete savedSearchObj.data.stream.functions;
+      delete savedSearchObj.data.streamResults;
+      delete savedSearchObj.data.savedViews;
+      delete savedSearchObj.data.transforms;
+      delete savedSearchObj.meta.scrollInfo;
+      savedSearchObj["version"] = "v1";
+
+      return b64EncodeUnicode(JSON.stringify(savedSearchObj));
+    };
+
+    const createSavedViews = (viewName: string) => {
+      try {
+        const data: any = {
+          data: getEncodedSearchObj(),
+          view_name: viewName,
+        };
+
+        savedviewsService
+          .post(store.state.selectedOrganization.identifier, data)
+          .then((res) => {
+            if (res.status == 200) {
+              store.dispatch("setSavedViewDialog", false);
+              searchObj.data.savedViews.push({
+                org_id: res.data.org_id,
+                payload: data.data,
+                view_id: res.data.view_id,
+                view_name: viewName,
+              });
+              $q.notify({
+                message: `View created successfully.`,
+                color: "positive",
+                position: "bottom",
+                timeout: 1000,
+              });
+              getSavedViews();
+              savedViewName.value = "";
+            } else {
+              $q.notify({
+                message: `Error while creating saved view. ${res.data.error_detail}`,
+                color: "negative",
+                position: "bottom",
+                timeout: 1000,
+              });
+            }
+          })
+          .catch((err) => {
+            $q.notify({
+              message: `Error while creating saved view.`,
+              color: "negative",
+              position: "bottom",
+              timeout: 1000,
+            });
+            console.log(err);
+          });
+      } catch (e: any) {
+        console.log("Error while saving view", e);
+      }
+    };
+
+    const updateSavedViews = (viewID: string, viewName: string) => {
+      try {
+        const data: any = {
+          data: getEncodedSearchObj(),
+          view_name: viewName,
+        };
+
+        savedviewsService
+          .put(store.state.selectedOrganization.identifier, viewID, data)
+          .then((res) => {
+            console.log(res);
+            if (res.status == 200) {
+              store.dispatch("setSavedViewDialog", false);
+              //update the payload and view_name in savedViews object based on id
+              searchObj.data.savedViews.forEach(
+                (item: { view_id: string }, index: string | number) => {
+                  if (item.view_id == viewID) {
+                    searchObj.data.savedViews[index].payload = data.data;
+                    searchObj.data.savedViews[index].view_name = viewName;
+                  }
+                }
+              );
+
+              $q.notify({
+                message: `View updated successfully.`,
+                color: "positive",
+                position: "bottom",
+                timeout: 1000,
+              });
+              savedViewSelectedName.value = "{}";
+            } else {
+              $q.notify({
+                message: `Error while updating saved view. ${res.data.error_detail}`,
+                color: "negative",
+                position: "bottom",
+                timeout: 1000,
+              });
+            }
+          })
+          .catch((err) => {
+            $q.notify({
+              message: `Error while updating saved view.`,
+              color: "negative",
+              position: "bottom",
+              timeout: 1000,
+            });
+            console.log(err);
+          });
+      } catch (e: any) {
+        console.log("Error while saving view", e);
+      }
+    };
+
     return {
       t,
       store,
@@ -763,6 +1165,15 @@ export default defineComponent({
       onRefreshIntervalUpdate,
       updateTimezone,
       dateTimeRef,
+      fnSavedView,
+      applySavedView,
+      isSavedViewAction,
+      savedViewName,
+      savedViewSelectedName,
+      handleSavedView,
+      deleteSavedViews,
+      deleteViewID,
+      confirmDelete,
     };
   },
   computed: {
@@ -1054,6 +1465,35 @@ export default defineComponent({
     min-height: 30px;
     max-height: 30px;
     padding: 0 4px;
+  }
+}
+
+.saved-views-dropdown {
+  border-radius: 4px;
+  button {
+    padding: 4px 5px;
+  }
+}
+
+.savedview-dropdown {
+  width: 215px;
+  display: inline-block;
+  border: 1px solid #dbdbdb;
+
+  .q-field__input {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .q-field__native,
+  .q-field__control {
+    min-height: 29px !important;
+    height: 29px;
+    padding: 0px 0px 0px 4px;
+  }
+
+  .q-field__marginal {
+    height: 30px;
   }
 }
 </style>
