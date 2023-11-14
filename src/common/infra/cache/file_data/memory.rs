@@ -30,6 +30,7 @@ pub struct FileData {
     max_size: usize,
     cur_size: usize,
     data: LruCache<String, usize>,
+    lock: RwLock<()>,
 }
 
 impl Default for FileData {
@@ -48,6 +49,7 @@ impl FileData {
             max_size,
             cur_size: 0,
             data: LruCache::unbounded(),
+            lock: RwLock::new(()),
         }
     }
 
@@ -67,40 +69,44 @@ impl FileData {
     pub async fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         let data_size = file.len() + data.len();
         if self.cur_size + data_size >= self.max_size {
-            log::info!(
-                "File memory cache is full {}/{}, can't cache {} bytes",
-                self.cur_size,
-                self.max_size,
-                data_size
-            );
-            // cache is full, need release some space
-            let need_release_size = max(CONFIG.memory_cache.release_size, data_size * 100);
-            let mut release_size = 0;
-            loop {
-                let item = self.data.pop_lru();
-                if item.is_none() {
-                    break;
+            let _lock = self.lock.write().await;
+            // after acquire lock, check again
+            if self.cur_size + data_size >= self.max_size {
+                log::info!(
+                    "File memory cache is full {}/{}, can't cache {} bytes",
+                    self.cur_size,
+                    self.max_size,
+                    data_size
+                );
+                // cache is full, need release some space
+                let need_release_size = max(CONFIG.memory_cache.release_size, data_size * 100);
+                let mut release_size = 0;
+                loop {
+                    let item = self.data.pop_lru();
+                    if item.is_none() {
+                        break;
+                    }
+                    let (key, data_size) = item.unwrap();
+                    // remove file from data cache
+                    DATA.remove(&key);
+                    // metrics
+                    let columns = key.split('/').collect::<Vec<&str>>();
+                    if columns[0] == "files" {
+                        metrics::QUERY_MEMORY_CACHE_FILES
+                            .with_label_values(&[columns[1], columns[3], columns[2]])
+                            .dec();
+                        metrics::QUERY_MEMORY_CACHE_USED_BYTES
+                            .with_label_values(&[columns[1], columns[3], columns[2]])
+                            .sub(data_size as i64);
+                    }
+                    release_size += data_size;
+                    if release_size >= need_release_size {
+                        break;
+                    }
                 }
-                let (key, data_size) = item.unwrap();
-                // remove file from data cache
-                DATA.remove(&key);
-                // metrics
-                let columns = key.split('/').collect::<Vec<&str>>();
-                if columns[0] == "files" {
-                    metrics::QUERY_MEMORY_CACHE_FILES
-                        .with_label_values(&[columns[1], columns[3], columns[2]])
-                        .dec();
-                    metrics::QUERY_MEMORY_CACHE_USED_BYTES
-                        .with_label_values(&[columns[1], columns[3], columns[2]])
-                        .sub(data_size as i64);
-                }
-                release_size += data_size;
-                if release_size >= need_release_size {
-                    break;
-                }
+                self.cur_size -= release_size;
+                DATA.shrink_to_fit();
             }
-            self.cur_size -= release_size;
-            DATA.shrink_to_fit();
         }
 
         self.cur_size += data_size;

@@ -77,12 +77,12 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { git = "https://github.com/apache/arrow-datafusion.git", rev = "656c6a93fadcec7bc43a8a881dfaf55388b0b5c6", version = "32", features = [
+datafusion = { git = "https://github.com/apache/arrow-datafusion.git", rev = "d2efaa965989278fc86291be5048c4b460ed82c7", version = "33", features = [
   "simd",
 ] }
-arrow = { version = "48", features = ["simd", "ipc_compression"] }
-arrow-schema = { version = "48", features = ["serde"] }
-parquet = { version = "48", features = ["arrow", "async"] }
+arrow = { version = "48.0.1", features = ["simd", "ipc_compression"] }
+arrow-schema = { version = "48.0.1", features = ["serde"] }
+parquet = { version = "48.0.1", features = ["arrow", "async"] }
 object_store = { version = "0.7", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
@@ -179,7 +179,7 @@ prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
-datafusion-expr = { git = "https://github.com/apache/arrow-datafusion.git", rev = "656c6a93fadcec7bc43a8a881dfaf55388b0b5c6", version = "32" }
+datafusion-expr = { git = "https://github.com/apache/arrow-datafusion.git", rev = "d2efaa965989278fc86291be5048c4b460ed82c7", version = "33" }
 
 expect-test = "1.4"
 float-cmp = "0.9"
