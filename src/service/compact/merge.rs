@@ -100,7 +100,11 @@ pub async fn merge_by_stream(
     // - second period, the last hour file list upload to storage
     // - third period, we can do the merge, at least 3 times of max_file_retention_time
     if offset >= time_now_hour
-        || (offset_time_hour + Duration::hours(1).num_microseconds().unwrap() == time_now_hour
+        || (offset_time_hour
+            + Duration::seconds(CONFIG.compact.step_secs)
+                .num_microseconds()
+                .unwrap()
+            == time_now_hour
             && time_now.timestamp_micros() - time_now_hour
                 < Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
                     .num_microseconds()
@@ -113,7 +117,10 @@ pub async fn merge_by_stream(
     // get current hour all files
     let (partition_offset_start, partition_offset_end) = (
         offset_time_hour,
-        offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
+        offset_time_hour
+            + Duration::seconds(CONFIG.compact.step_secs)
+                .num_microseconds()
+                .unwrap()
             - Duration::seconds(1).num_microseconds().unwrap(),
     );
     let files = file_list::query(
@@ -133,7 +140,10 @@ pub async fn merge_by_stream(
         // if offset > 0 && offset_time_hour + Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() < time_now_hour {
         // -- no check it
         // }
-        let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
+        let offset = offset_time_hour
+            + Duration::seconds(CONFIG.compact.step_secs)
+                .num_microseconds()
+                .unwrap();
         db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
         return Ok(());
     }
@@ -207,7 +217,10 @@ pub async fn merge_by_stream(
     }
 
     // write new offset
-    let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
+    let offset = offset_time_hour
+        + Duration::seconds(CONFIG.compact.step_secs)
+            .num_microseconds()
+            .unwrap();
     db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
 
     // update stream stats
@@ -345,10 +358,6 @@ async fn merge_files(
             }
 
             // do the convert
-            if CONFIG.compact.fake_mode {
-                log::info!("[COMPACT] fake convert parquet file: {}", &file.key);
-                continue;
-            }
             let mut buf = Vec::new();
             let file_tmp_dir = cache::tmpfs::Directory::default();
             let file_data = storage::get(&file.key).await?;
@@ -368,14 +377,6 @@ async fn merge_files(
             // replace the file in tmpfs
             tmp_dir.set(&file.key, buf.into())?;
         }
-    }
-
-    // FAKE MODE
-    if CONFIG.compact.fake_mode {
-        log::info!(
-            "[COMPACT] fake merge file succeeded, new file: fake.parquet, orginal_size: {new_file_size}, compressed_size: 0", 
-        );
-        return Ok(("".to_string(), FileMeta::default(), vec![]));
     }
 
     let mut buf = Vec::new();

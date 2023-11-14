@@ -431,11 +431,10 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
-    #[env_config(name = "ZO_COMPACT_FAKE_MODE", default = false)]
-    // this mode will skip merge file, just print the log
-    pub fake_mode: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
     pub interval: u64,
+    #[env_config(name = "ZO_COMPACT_STEP_SECS", default = 3600)] // seconds
+    pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 1800)] // seconds
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
@@ -725,6 +724,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.interval == 0 {
         cfg.compact.interval = 60;
+    }
+    // check compact_step_secs, min value is 600s
+    if cfg.compact.step_secs == 0 {
+        cfg.compact.step_secs = 3600;
+    } else if cfg.compact.step_secs <= 600 {
+        cfg.compact.step_secs = 600;
     }
     if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
         return Err(anyhow::anyhow!(
