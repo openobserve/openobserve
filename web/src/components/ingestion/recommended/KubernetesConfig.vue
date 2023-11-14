@@ -37,6 +37,60 @@
       Install OpenObserve collector
     </div>
     <ContentCopy class="q-mt-sm" :content="collectorCmd" />
+    <br />
+    <hr />
+    <div class="text-subtitle1 q-pl-xs q-mt-md">
+      Once you have installed the OpenObserve collector, it will:
+      <ol>
+        <li>Collect metrics from your Kubernetes cluster</li>
+        <li>Collect events from your Kubernetes cluster</li>
+        <li>Collect logs from your Kubernetes cluster</li>
+        <li>
+          Allow you to capture traces without instrumenting your applications
+          that are written in following languages using OpenTelemetry
+          auto-instrumentation. It can be done by setting the following to the
+          pod/namespace annotations:
+          <ol>
+            <li>
+              <b>Java:</b> instrumentation.opentelemetry.io/inject-java:
+              "openobserve-collector/openobserve-java"
+            </li>
+            <li>
+              <b>DotNet:</b> instrumentation.opentelemetry.io/inject-dotnet:
+              "openobserve-collector/openobserve-dotnet"
+            </li>
+            <li>
+              <b>NodeJS:</b> instrumentation.opentelemetry.io/inject-nodejs:
+              "openobserve-collector/openobserve-nodejs"
+            </li>
+            <li>
+              <b>Python:</b> instrumentation.opentelemetry.io/inject-python:
+              "openobserve-collector/openobserve-python"
+            </li>
+            <li>
+              <b>Go (Uses eBPF):</b>
+              <ul>
+                <li>
+                  instrumentation.opentelemetry.io/inject-go:
+                  "openobserve-collector/openobserve-go"
+                </li>
+                <li>
+                  instrumentation.opentelemetry.io/otel-go-auto-target-exe:
+                  "/path/to/container/executable"
+                </li>
+              </ul>
+            </li>
+          </ol>
+        </li>
+      </ol>
+      You can refer and install
+      <a href="https://github.com/openobserve/hotcommerce">HOT commerce</a> app
+      as an example to understand how this works in practice. Refer to
+      <a href="https://github.com/open-telemetry/opentelemetry-operator"
+        >OpenTelemetry operator</a
+      >
+      for further documentation.
+    </div>
   </div>
 </template>
 
@@ -85,7 +139,7 @@ const accessKey = computed(() => {
 const collectorCmd = computed(() => {
   return `helm --namespace openobserve-collector \\
   install o1c openobserve/openobserve-collector \\
-  --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\    
+  --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\
   --set exporters."otlphttp/openobserve".headers.Authorization="Basic ${accessKey.value}"  \\
   --set exporters."otlphttp/openobserve_k8s_events".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\
   --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic ${accessKey.value}"`;

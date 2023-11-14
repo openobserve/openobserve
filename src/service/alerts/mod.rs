@@ -133,6 +133,7 @@ pub async fn save_alert(
             last_sent_at: 0,
             count: 0,
             is_ingest_time: false,
+            parent_alert_deleted: false,
         };
         let _ = triggers::save_trigger(&trigger.alert_name, &trigger).await;
     }
@@ -223,6 +224,7 @@ pub async fn trigger_alert(
                 count: 0,
                 is_ingest_time: alert.is_real_time,
                 stream_type,
+                parent_alert_deleted: false,
             };
             let _ = send_notification(&alert, &trigger).await;
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
