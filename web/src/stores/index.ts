@@ -57,6 +57,7 @@ export default createStore({
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: {},
     timezone: useLocalTimezone() ? useLocalTimezone() : "UTC",
+    savedViewDialog: false,
   },
   mutations: {
     login(state, payload) {
@@ -144,6 +145,9 @@ export default createStore({
     setTimezone(state, payload) {
       state.timezone = payload;
     },
+    setSavedViewDialog(state, payload) {
+      state.savedViewDialog = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -223,6 +227,9 @@ export default createStore({
     },
     setTimezone(context, payload) {
       context.commit("setTimezone", payload);
+    },
+    setSavedViewDialog(context, payload) {
+      context.commit("setSavedViewDialog", payload);
     },
   },
   modules: {},

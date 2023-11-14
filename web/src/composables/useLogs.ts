@@ -14,7 +14,7 @@
 
 import { date, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, ref, type Ref } from "vue";
+import { reactive, ref, type Ref, toRaw } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -44,6 +44,7 @@ import useStreams from "@/composables/useStreams";
 
 import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
+import savedviewsService from "@/services/saved_views";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -147,6 +148,7 @@ const defaultObject = {
     tempFunctionName: "",
     tempFunctionContent: "",
     tempFunctionLoading: false,
+    savedViews: <any>[],
   },
 };
 
@@ -608,6 +610,7 @@ const useLogs = () => {
             }
           }
 
+          savedViews();
           searchObj.data.errorCode = 0;
           searchService
             .search({
@@ -1052,6 +1055,7 @@ const useLogs = () => {
     try {
       searchObj.loading = true;
       resetFunctions();
+      await getSavedViews();
       await getFunctions();
       await getStreamList();
       await getQueryData();
@@ -1190,6 +1194,33 @@ const useLogs = () => {
     searchObj.meta.flagWrapContent = flag;
   };
 
+  const getSavedViews = async () => {
+    try {
+      savedviewsService
+        .get(store.state.selectedOrganization.identifier)
+        .then((res) => {
+          searchObj.data.savedViews = res.data.views;
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    } catch (e: any) {
+      console.log("Error while getting saved views", e);
+    }
+  };
+
+  const onStreamChange = () => {
+    alert("onStreamChange")
+    const query = searchObj.meta.sqlMode
+      ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
+      : "";
+
+    searchObj.data.editorValue = query;
+    searchObj.data.query = query;
+
+    handleQueryData();
+  };
+
   return {
     searchObj,
     resetSearchObj,
@@ -1210,6 +1241,8 @@ const useLogs = () => {
     generateHistogramData,
     extractFTSFields,
     evaluateWrapContentFlag,
+    getSavedViews,
+    onStreamChange,
   };
 };
 

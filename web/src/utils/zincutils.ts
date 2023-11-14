@@ -505,4 +505,20 @@ export const localTimeSelectedTimezoneUTCTime = (
   //   timestampToTimezoneDate(unixTimestamp * 1000, "UTC", "yyyy/MM/dd HH:mm:ss"),
   //   "UTC"
   // );
+function isObject(item: any) {
+  return item && typeof item === "object" && !Array.isArray(item);
+}
+
+export const mergeDeep = (target: any, source: any) => {
+  if (isObject(target) && isObject(source)) {
+    for (const key in source) {
+      if (isObject(source[key])) {
+        if (!target[key]) target[key] = {};
+        mergeDeep(target[key], source[key]);
+      } else {
+        target[key] = source[key];
+      }
+    }
+  }
+  return target;
 };
