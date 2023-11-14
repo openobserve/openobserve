@@ -53,26 +53,26 @@
           <ol>
             <li>
               <b>Java:</b> instrumentation.opentelemetry.io/inject-java:
-              "openobserve-collector/openobserve"
+              "openobserve-collector/openobserve-java"
             </li>
             <li>
               <b>DotNet:</b> instrumentation.opentelemetry.io/inject-dotnet:
-              "openobserve-collector/openobserve"
+              "openobserve-collector/openobserve-dotnet"
             </li>
             <li>
               <b>NodeJS:</b> instrumentation.opentelemetry.io/inject-nodejs:
-              "openobserve-collector/openobserve"
+              "openobserve-collector/openobserve-nodejs"
             </li>
             <li>
               <b>Python:</b> instrumentation.opentelemetry.io/inject-python:
-              "openobserve-collector/openobserve"
+              "openobserve-collector/openobserve-python"
             </li>
             <li>
               <b>Go (Uses eBPF):</b>
               <ul>
                 <li>
                   instrumentation.opentelemetry.io/inject-go:
-                  "openobserve-collector/openobserve"
+                  "openobserve-collector/openobserve-go"
                 </li>
                 <li>
                   instrumentation.opentelemetry.io/otel-go-auto-target-exe:
