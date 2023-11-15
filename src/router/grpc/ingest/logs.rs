@@ -18,14 +18,12 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
 use tonic::{
-    codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request, Status,
+    codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request, Response,
+    Status,
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::{
-    infra::{cluster, config::CONFIG},
-    utils::rand::get_rand_element,
-};
+use crate::common::infra::{cluster, config::CONFIG};
 use crate::service::search::MetadataMap;
 
 #[derive(Default)]
@@ -35,8 +33,8 @@ pub struct LogsServer;
 impl LogsService for LogsServer {
     async fn export(
         &self,
-        request: tonic::Request<ExportLogsServiceRequest>,
-    ) -> Result<tonic::Response<ExportLogsServiceResponse>, tonic::Status> {
+        request: Request<ExportLogsServiceRequest>,
+    ) -> Result<Response<ExportLogsServiceResponse>, Status> {
         let (metadata, extensions, message) = request.into_parts();
 
         // basic validation
@@ -48,15 +46,8 @@ impl LogsService for LogsServer {
         }
 
         // call ingester
-        let nodes = cluster::get_cached_online_ingester_nodes();
-        if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
-            return Err(Status::internal("No online ingester nodes".to_string()));
-        }
-        // checking nodes
-        let nodes = nodes.unwrap();
-        let node = get_rand_element(&nodes);
-
-        let mut request = tonic::Request::from_parts(metadata, extensions, message);
+        let grpc_addr = super::get_rand_ingester_addr()?;
+        let mut request = Request::from_parts(metadata, extensions, message);
         opentelemetry::global::get_text_map_propagator(|propagator| {
             propagator.inject_context(
                 &tracing::Span::current().context(),
@@ -67,14 +58,14 @@ impl LogsService for LogsServer {
         let token: MetadataValue<_> = cluster::get_internal_grpc_token()
             .parse()
             .map_err(|_| Status::internal("invalid token".to_string()))?;
-        let channel = Channel::from_shared(node.grpc_addr.clone())
+        let channel = Channel::from_shared(grpc_addr.clone())
             .unwrap()
             .connect()
             .await
             .map_err(|err| {
                 log::error!(
                     "[ROUTER] grpc->ingest->logs: node: {}, connect err: {:?}",
-                    &node.grpc_addr,
+                    &grpc_addr,
                     err
                 );
                 Status::internal("connect querier error".to_string())

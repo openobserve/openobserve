@@ -166,13 +166,6 @@ fn get_url(path: &str) -> URLDetails {
     let node_type;
     let is_querier_path = check_querier_route(path);
 
-    if !is_querier_path && !CONFIG.route.ingester_srv_url.is_empty() {
-        return URLDetails {
-            is_error: false,
-            value: format!("{}{}", CONFIG.route.ingester_srv_url, path),
-        };
-    }
-
     let nodes = if is_querier_path {
         node_type = cluster::Role::Querier;
         cluster::get_cached_online_querier_nodes()
@@ -181,6 +174,15 @@ fn get_url(path: &str) -> URLDetails {
         cluster::get_cached_online_ingester_nodes()
     };
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
+        if node_type == cluster::Role::Ingester && !CONFIG.route.ingester_srv_url.is_empty() {
+            return URLDetails {
+                is_error: false,
+                value: format!(
+                    "http://{}:{}{}",
+                    CONFIG.route.ingester_srv_url, CONFIG.http.port, path
+                ),
+            };
+        }
         return URLDetails {
             is_error: true,
             value: format!("No online {node_type} nodes"),
