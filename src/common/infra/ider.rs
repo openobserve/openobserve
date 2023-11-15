@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use once_cell::sync::Lazy; 
-use snowflake::SnowflakeIdGenerator; 
+use once_cell::sync::Lazy;
+use snowflake::SnowflakeIdGenerator;
 
 use crate::common::utils::rand::generate_random_string;
 
@@ -31,7 +31,6 @@ pub fn generate() -> String {
     let id = unsafe { IDER.real_time_generate() };
     format!("{}{}", id, generate_random_string(6))
 }
-
 
 #[cfg(test)]
 mod tests {

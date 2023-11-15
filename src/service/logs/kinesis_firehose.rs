@@ -193,8 +193,7 @@ pub async fn process(
                 let local_val = value.as_object_mut().unwrap();
 
                 // check ingestion time
-                let earliest_time =
-                    Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
+                let earliest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
                 if timestamp < earliest_time.timestamp_micros() {
                     stream_status.status.failed += 1; // to old data, just discard
                     stream_status.status.error = super::get_upto_discard_error();

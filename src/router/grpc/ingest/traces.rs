@@ -50,7 +50,7 @@ impl TraceService for TraceServer {
         // call ingester
         let nodes = cluster::get_cached_online_ingester_nodes();
         if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
-            return Err(Status::internal(format!("No online ingester nodes")));
+            return Err(Status::internal("No online ingester nodes".to_string()));
         }
         // checking nodes
         let nodes = nodes.unwrap();

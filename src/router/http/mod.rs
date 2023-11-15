@@ -186,7 +186,7 @@ fn get_url(path: &str) -> URLDetails {
             value: format!("No online {node_type} nodes"),
         };
     }
-    
+
     let nodes = nodes.unwrap();
     let node = get_rand_element(&nodes);
     URLDetails {
