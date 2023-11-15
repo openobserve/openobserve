@@ -15,6 +15,8 @@
 
 use arrow::ipc::reader::StreamReader;
 use datafusion::arrow::json::ReaderBuilder;
+use std::collections::HashMap;
+use std::io::BufRead;
 use std::{
     fs,
     io::{BufReader, Seek, SeekFrom},
@@ -124,62 +126,71 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             }
             continue;
         }
-
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
-            let ret =
-                upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
+            let mut deleted_file_map: HashMap<String, bool> = HashMap::new();
+            let ret = if stream_type.eq(&StreamType::Metrics) && file_name.ends_with(".json") {
+                handle_metrics(&org_id, &stream_name, stream_type, &local_file).await
+            } else {
+                upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await
+            };
             if let Err(e) = ret {
                 log::error!("[JOB] Error while uploading disk file to storage {}", e);
                 drop(permit);
                 return Ok(());
             }
 
-            let (key, meta, _stream_type) = ret.unwrap();
-            let ret = db::file_list::local::set(&key, Some(meta.clone()), false).await;
-            if let Err(e) = ret {
-                log::error!(
-                    "[JOB] Failed write disk file meta: {}, error: {}",
-                    local_file,
-                    e.to_string()
-                );
-                drop(permit);
-                return Ok(());
-            }
-
-            // check if allowed to delete the file
-            loop {
-                if wal::lock_files_exists(&file_path).await {
-                    log::info!(
-                        "[JOB] the file is still in use, waiting for a few ms: {}",
-                        file_path
+            for (key, meta, _stream_type) in ret.unwrap() {
+                let ret = db::file_list::local::set(&key, Some(meta.clone()), false).await;
+                if let Err(e) = ret {
+                    log::error!(
+                        "[JOB] Failed write disk file meta: {}, error: {}",
+                        key,
+                        e.to_string()
                     );
-                    time::sleep(time::Duration::from_millis(100)).await;
-                } else {
-                    break;
+                    //drop(permit);
+                    return Ok(());
                 }
-            }
 
-            let ret = tokio::fs::remove_file(&local_file).await;
-            if let Err(e) = ret {
-                log::error!(
-                    "[JOB] Failed to remove disk file from disk: {}, {}",
-                    local_file,
-                    e.to_string()
-                );
-                drop(permit);
-                return Ok(());
-            }
+                // check if allowed to delete the file
+                loop {
+                    if wal::lock_files_exists(&file_path).await {
+                        log::info!(
+                            "[JOB] the file is still in use, waiting for a few ms: {}",
+                            file_path
+                        );
+                        time::sleep(time::Duration::from_millis(100)).await;
+                    } else {
+                        break;
+                    }
+                }
 
-            // metrics
-            let columns = key.split('/').collect::<Vec<&str>>();
-            if columns[0] == "files" {
-                metrics::INGEST_WAL_USED_BYTES
-                    .with_label_values(&[columns[1], columns[3], columns[2]])
-                    .sub(meta.original_size);
-                report_compression_stats(meta.into(), &org_id, &stream_name, stream_type).await;
-            }
+                if !deleted_file_map.contains_key(&local_file) {
+                    let ret = tokio::fs::remove_file(&local_file).await;
+                    if let Err(e) = ret {
+                        log::error!(
+                            "[JOB] Failed to remove disk file from disk: {}, {}",
+                            local_file,
+                            e.to_string()
+                        );
+                        //drop(permit);
+                        return Ok(());
+                    } else {
+                        deleted_file_map.insert(local_file.clone(), true);
+                    }
+                }
 
+                // metrics
+                let columns = key.split('/').collect::<Vec<&str>>();
+                if columns[0] == "files" {
+                    metrics::INGEST_WAL_USED_BYTES
+                        .with_label_values(&[columns[1], columns[3], columns[2]])
+                        .sub(meta.original_size);
+                    report_compression_stats(meta.into(), &org_id, &stream_name, stream_type).await;
+                }
+
+                //drop(permit);
+            }
             drop(permit);
             Ok(())
         });
@@ -200,7 +211,7 @@ async fn upload_file(
     stream_type: StreamType,
     path_str: &str,
     file_name: &str,
-) -> Result<(String, FileMeta, StreamType), anyhow::Error> {
+) -> Result<Vec<(String, FileMeta, StreamType)>, anyhow::Error> {
     let mut file = fs::File::open(path_str).unwrap();
     let file_meta = file.metadata().unwrap();
     let file_size = file_meta.len();
@@ -357,7 +368,7 @@ async fn upload_file(
         Ok(output) => match output.await {
             Ok(_) => {
                 log::info!("[JOB] disk file upload succeeded: {}", file_name);
-                Ok((file_name, file_meta, stream_type))
+                Ok(vec![(file_name, file_meta, stream_type)])
             }
             Err(err) => {
                 log::error!("[JOB] disk file upload error: {:?}", err);
@@ -369,4 +380,127 @@ async fn upload_file(
             Err(anyhow::anyhow!(err))
         }
     }
+}
+async fn handle_metrics(
+    org_id: &str,
+    in_stream_name: &str,
+    stream_type: StreamType,
+    path_str: &str,
+) -> Result<Vec<(String, FileMeta, StreamType)>, anyhow::Error> {
+    let file = fs::File::open(path_str).unwrap();
+    let file_meta = file.metadata().unwrap();
+    let file_size = file_meta.len();
+    log::info!("[JOB] Metrics json data conversion : : {}", path_str);
+    if file_size == 0 {
+        if let Err(e) = tokio::fs::remove_file(path_str).await {
+            log::error!(
+                "[JOB] Failed to remove disk file from disk: {}, {}",
+                path_str,
+                e
+            );
+        }
+        return Err(anyhow::anyhow!("file is empty: {}", path_str));
+    }
+    let reader = BufReader::new(file);
+
+    let mut rows = Vec::new();
+    for line in reader.lines() {
+        let line = line?;
+        let json: serde_json::Value = serde_json::from_str(&line)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        rows.push(json);
+    }
+
+    let mut partitions: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
+    for row in rows {
+        partitions
+            .entry(row.get("__name__").unwrap().as_str().unwrap().to_string())
+            .or_default()
+            .push(row);
+    }
+
+    let mut ret = vec![];
+    for (metric_name, value) in partitions {
+        let dest_stream_name = metric_name.clone();
+        let value_iter = value.iter().map(Ok);
+        let metrics_schema = infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
+
+        let local_org_id = org_id.to_owned();
+        //let metrics_schema = value.first().unwrap().schema();
+        // write metadata
+        let mut file_meta = FileMeta {
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: file_size as i64,
+            compressed_size: 0,
+        };
+
+        let mut json = vec![];
+        let mut batches = vec![];
+        let mut decoder = ReaderBuilder::new(Arc::new(metrics_schema.clone())).build_decoder()?;
+        for value in value {
+            decoder
+                .decode(json::to_string(&value).unwrap().as_bytes())
+                .unwrap();
+            json.push(decoder.flush()?.unwrap());
+        }
+        for batch in json {
+            batches.push(batch);
+        }
+        populate_file_meta(
+            Arc::new(metrics_schema.clone()),
+            vec![batches.clone()],
+            &mut file_meta,
+        )
+        .await?;
+        let key = path_str.replacen(in_stream_name, &dest_stream_name, 1);
+        schema_evolution(
+            org_id,
+            &metric_name,
+            stream_type,
+            Arc::new(metrics_schema.clone()),
+            file_meta.min_ts,
+        )
+        .await;
+        match task::spawn_blocking(move || async move {
+            let rw_file = crate::common::infra::wal::get_or_create_arrow(
+                0,
+                StreamParams::new(&local_org_id, &metric_name, StreamType::Metrics),
+                None,
+                &key,
+                false,
+                Some(metrics_schema),
+            )
+            .await;
+            let new_file_name = rw_file.name().to_owned();
+
+            for batch in &batches {
+                rw_file.write_arrow(batch.clone()).await;
+            }
+            file_meta.compressed_size = rw_file.size().await as i64;
+            Ok(new_file_name) as Result<String, anyhow::Error>
+        })
+        .await
+        {
+            Ok(output) => match output.await {
+                Ok(new_file_name) => {
+                    log::info!(
+                        "[JOB] disk file conversion succeeded for: {}",
+                        &dest_stream_name
+                    );
+                    ret.push((new_file_name, file_meta, stream_type));
+                }
+                Err(err) => {
+                    log::error!("[JOB] disk file conversion error: {:?}", err);
+                    return Err(anyhow::anyhow!(err));
+                }
+            },
+            Err(err) => {
+                log::error!("[JOB] disk file conversion error: {:?}", err);
+                return Err(anyhow::anyhow!(err));
+            }
+        }
+    }
+    Ok(ret)
 }

@@ -313,10 +313,17 @@ async fn get_file_list(
     };
 
     // get all files
-    let pattern = format!(
-        "{}/files/{}/{stream_type}/{}/",
-        wal_dir, &sql.org_id, &sql.stream_name
-    );
+    let pattern = if stream_type.eq(&meta::StreamType::Metrics) {
+        format!(
+            "{}/files/{}/{stream_type}/{}/",
+            wal_dir, &sql.org_id, &sql.org_id
+        )
+    } else {
+        format!(
+            "{}/files/{}/{stream_type}/{}/",
+            wal_dir, &sql.org_id, &sql.stream_name
+        )
+    };
     let files = scan_files(&pattern);
     if files.is_empty() {
         return Ok(vec![]);
