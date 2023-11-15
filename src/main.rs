@@ -12,23 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    str::FromStr,
-    sync::{
-        Arc,
-        atomic::{AtomicU16, Ordering},
-    },
-    time::Duration,
-};
-
-use actix_web::{App, http::KeepAlive, HttpServer, middleware, web};
+use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
 use log::LevelFilter;
 use opentelemetry::{
+    sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
     KeyValue,
-    sdk::{propagation::TraceContextPropagator, Resource, trace as sdktrace},
 };
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::{
@@ -40,6 +29,16 @@ use opentelemetry_proto::tonic::collector::{
 use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]
 use pyroscope_pprofrs::{pprof_backend, PprofConfig};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    str::FromStr,
+    sync::{
+        atomic::{AtomicU16, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
@@ -52,10 +51,7 @@ use openobserve::{
             config::{CONFIG, USERS, VERSION},
         },
         meta, migration,
-        utils::{
-            file::set_permission,
-            zo_logger::{self, EVENT_SENDER, ZoLogger},
-        },
+        utils::{file::set_permission, zo_logger},
     },
     handler::{
         grpc::{
@@ -90,31 +86,31 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
-env!("CARGO_MANIFEST_DIR"),
-"/ua_regex/regexes.yaml"
+    env!("CARGO_MANIFEST_DIR"),
+    "/ua_regex/regexes.yaml"
 ));
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
-        let agent = PyroscopeAgent::builder(
+    let agent = PyroscopeAgent::builder(
         &CONFIG.profiling.pyroscope_server_url,
         &CONFIG.profiling.pyroscope_project_name,
     )
-        .tags([("Host", "Rust")].to_vec())
-        .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
-        .build()
-        .expect("Failed to setup pyroscope agent");
+    .tags([("Host", "Rust")].to_vec())
+    .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+    .build()
+    .expect("Failed to setup pyroscope agent");
     #[cfg(feature = "profiling")]
-        let agent_running = agent.start().expect("Failed to start pyroscope agent");
+    let agent_running = agent.start().expect("Failed to start pyroscope agent");
 
     if cli().await? {
         return Ok(());
     }
 
     if CONFIG.log.events_enabled {
-        let logger = ZoLogger {
-            sender: EVENT_SENDER.clone(),
+        let logger = zo_logger::ZoLogger {
+            sender: zo_logger::EVENT_SENDER.clone(),
         };
         log::set_boxed_logger(Box::new(logger)).map(|()| {
             log::set_max_level(
@@ -214,7 +210,7 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("server stopped");
 
     #[cfg(feature = "profiling")]
-        let agent_ready = agent_running.stop().unwrap();
+    let agent_ready = agent_running.stop().unwrap();
     #[cfg(feature = "profiling")]
     agent_ready.shutdown();
 
@@ -379,11 +375,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-        .keep_alive(KeepAlive::Timeout(Duration::from_secs(
-            CONFIG.limit.keep_alive,
-        )))
-        .client_request_timeout(Duration::from_secs(CONFIG.limit.request_timeout))
-        .bind(haddr)?;
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
+        CONFIG.limit.keep_alive,
+    )))
+    .client_request_timeout(Duration::from_secs(CONFIG.limit.request_timeout))
+    .bind(haddr)?;
 
     server
         .workers(CONFIG.limit.http_worker_num)
@@ -519,7 +515,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                             last_name: "".to_owned(),
                         },
                     )
-                        .await?;
+                    .await?;
                 }
                 "user" => {
                     db::user::reset().await?;
