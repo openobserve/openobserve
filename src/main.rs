@@ -77,8 +77,8 @@ use openobserve::{
         },
         http::router::*,
     },
-    job,
-    service::{compact, db, distinct_values, file_list, router, users},
+    job, router,
+    service::{compact, db, distinct_values, file_list, users},
 };
 
 #[cfg(feature = "mimalloc")]
@@ -285,17 +285,15 @@ fn init_router_grpc_server(
     stopped_tx: oneshot::Sender<()>,
 ) -> Result<(), anyhow::Error> {
     let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
-    let logs_svc = LogsServiceServer::new(openobserve::router::grpc::ingest::logs::LogsServer)
+    let logs_svc = LogsServiceServer::new(router::grpc::ingest::logs::LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    let metrics_svc =
-        MetricsServiceServer::new(openobserve::router::grpc::ingest::metrics::MetricsServer)
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip);
-    let traces_svc =
-        TraceServiceServer::new(openobserve::router::grpc::ingest::traces::TraceServer)
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip);
+    let metrics_svc = MetricsServiceServer::new(router::grpc::ingest::metrics::MetricsServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let traces_svc = TraceServiceServer::new(router::grpc::ingest::traces::TraceServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
 
     tokio::task::spawn(async move {
         log::info!("starting gRPC server at {}", gaddr);
@@ -353,11 +351,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             app = app.service(
                 // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
                 web::scope(&CONFIG.common.base_uri)
-                    .service(router::config)
-                    .service(router::api)
-                    .service(router::aws)
-                    .service(router::gcp)
-                    .service(router::rum)
+                    .service(router::http::config)
+                    .service(router::http::api)
+                    .service(router::http::aws)
+                    .service(router::http::gcp)
+                    .service(router::http::rum)
                     .configure(get_basic_routes)
                     .configure(get_proxy_routes),
             )
