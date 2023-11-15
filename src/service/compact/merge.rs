@@ -94,22 +94,23 @@ pub async fn merge_by_stream(
         )
         .unwrap()
         .timestamp_micros();
-    // if offset is future, just wait
-    // if offset is last hour, must wait for at least 3 times of max_file_retention_time
-    // - first period: the last hour local file upload to storage, write file list
-    // - second period, the last hour file list upload to storage
-    // - third period, we can do the merge, at least 3 times of max_file_retention_time
-    if offset >= time_now_hour
-        || (offset_time_hour
-            + Duration::seconds(CONFIG.compact.step_secs)
+    // 1. if step_secs less than 1 hour, must wait for at least max_file_retention_time
+    // 2. if step_secs greater than 1 hour, must wait for at least 3 * max_file_retention_time
+    // -- first period: the last hour local file upload to storage, write file list
+    // -- second period, the last hour file list upload to storage
+    // -- third period, we can do the merge, so, at least 3 times of max_file_retention_time
+    if (CONFIG.compact.step_secs < 3600
+        && time_now.timestamp_micros() - offset
+            <= Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
                 .num_microseconds()
-                .unwrap()
-            == time_now_hour
-            && time_now.timestamp_micros() - time_now_hour
-                < Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
-                    .num_microseconds()
-                    .unwrap()
-                    * 3)
+                .unwrap())
+        || (CONFIG.compact.step_secs >= 3600
+            && (offset >= time_now_hour
+                || time_now.timestamp_micros() - time_now_hour
+                    <= Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+                        .num_microseconds()
+                        .unwrap()
+                        * 3))
     {
         return Ok(()); // the time is future, just wait
     }
@@ -117,10 +118,7 @@ pub async fn merge_by_stream(
     // get current hour all files
     let (partition_offset_start, partition_offset_end) = (
         offset_time_hour,
-        offset_time_hour
-            + Duration::seconds(CONFIG.compact.step_secs)
-                .num_microseconds()
-                .unwrap()
+        offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
             - Duration::seconds(1).num_microseconds().unwrap(),
     );
     let files = file_list::query(
@@ -140,7 +138,7 @@ pub async fn merge_by_stream(
         // if offset > 0 && offset_time_hour + Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() < time_now_hour {
         // -- no check it
         // }
-        let offset = offset_time_hour
+        let offset = offset
             + Duration::seconds(CONFIG.compact.step_secs)
                 .num_microseconds()
                 .unwrap();
@@ -217,7 +215,7 @@ pub async fn merge_by_stream(
     }
 
     // write new offset
-    let offset = offset_time_hour
+    let offset = offset
         + Duration::seconds(CONFIG.compact.step_secs)
             .num_microseconds()
             .unwrap();
