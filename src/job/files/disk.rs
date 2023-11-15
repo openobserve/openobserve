@@ -25,6 +25,7 @@ use std::{
 };
 use tokio::{sync::Semaphore, task, time};
 
+use crate::common::meta::stream::PartitionTimeLevel;
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics, storage, wal},
     meta::{common::FileMeta, stream::StreamParams, StreamType},
@@ -51,6 +52,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
         interval.tick().await;
         if let Err(e) = move_files_to_storage().await {
+            log::error!("Error moving disk files to remote: {}", e);
+        }
+        if let Err(e) = metrics_json_to_arrow().await {
             log::error!("Error moving disk files to remote: {}", e);
         }
     }
@@ -91,6 +95,10 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let stream_name = columns[3].to_string();
         let mut file_name = columns[4].to_string();
 
+        if stream_type.eq(&StreamType::Metrics) && file_name.ends_with(".json") {
+            continue;
+        }
+
         // Hack: compatible for <= 0.5.1
         if !file_name.contains('/') && file_name.contains('_') {
             file_name = file_name.replace('_', "/");
@@ -126,71 +134,62 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             }
             continue;
         }
+
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
-            let mut deleted_file_map: HashMap<String, bool> = HashMap::new();
-            let ret = if stream_type.eq(&StreamType::Metrics) && file_name.ends_with(".json") {
-                handle_metrics(&org_id, &stream_name, stream_type, &local_file).await
-            } else {
-                upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await
-            };
+            let ret =
+                upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
             if let Err(e) = ret {
                 log::error!("[JOB] Error while uploading disk file to storage {}", e);
                 drop(permit);
                 return Ok(());
             }
 
-            for (key, meta, _stream_type) in ret.unwrap() {
-                let ret = db::file_list::local::set(&key, Some(meta.clone()), false).await;
-                if let Err(e) = ret {
-                    log::error!(
-                        "[JOB] Failed write disk file meta: {}, error: {}",
-                        key,
-                        e.to_string()
-                    );
-                    //drop(permit);
-                    return Ok(());
-                }
-
-                // check if allowed to delete the file
-                loop {
-                    if wal::lock_files_exists(&file_path).await {
-                        log::info!(
-                            "[JOB] the file is still in use, waiting for a few ms: {}",
-                            file_path
-                        );
-                        time::sleep(time::Duration::from_millis(100)).await;
-                    } else {
-                        break;
-                    }
-                }
-
-                if !deleted_file_map.contains_key(&local_file) {
-                    let ret = tokio::fs::remove_file(&local_file).await;
-                    if let Err(e) = ret {
-                        log::error!(
-                            "[JOB] Failed to remove disk file from disk: {}, {}",
-                            local_file,
-                            e.to_string()
-                        );
-                        //drop(permit);
-                        return Ok(());
-                    } else {
-                        deleted_file_map.insert(local_file.clone(), true);
-                    }
-                }
-
-                // metrics
-                let columns = key.split('/').collect::<Vec<&str>>();
-                if columns[0] == "files" {
-                    metrics::INGEST_WAL_USED_BYTES
-                        .with_label_values(&[columns[1], columns[3], columns[2]])
-                        .sub(meta.original_size);
-                    report_compression_stats(meta.into(), &org_id, &stream_name, stream_type).await;
-                }
-
-                //drop(permit);
+            let (key, meta, _stream_type) = ret.unwrap();
+            let ret = db::file_list::local::set(&key, Some(meta.clone()), false).await;
+            if let Err(e) = ret {
+                log::error!(
+                    "[JOB] Failed write disk file meta: {}, error: {}",
+                    local_file,
+                    e.to_string()
+                );
+                drop(permit);
+                return Ok(());
             }
+
+            // check if allowed to delete the file
+            loop {
+                if wal::lock_files_exists(&file_path).await {
+                    log::info!(
+                        "[JOB] the file is still in use, waiting for a few ms: {}",
+                        file_path
+                    );
+                    time::sleep(time::Duration::from_millis(100)).await;
+                } else {
+                    break;
+                }
+            }
+
+            let ret = tokio::fs::remove_file(&local_file).await;
+            if let Err(e) = ret {
+                log::error!(
+                    "[JOB] Failed to remove disk file from disk: {}, {}",
+                    local_file,
+                    e.to_string()
+                );
+                drop(permit);
+                return Ok(());
+            }
+
+            // metrics
+            let columns = key.split('/').collect::<Vec<&str>>();
+            if columns[0] == "files" {
+                metrics::INGEST_WAL_USED_BYTES
+                    .with_label_values(&[columns[1], columns[3], columns[2]])
+                    .sub(meta.original_size);
+                report_compression_stats(meta.into(), &org_id, &stream_name, stream_type).await;
+            }
+
             drop(permit);
             Ok(())
         });
@@ -211,7 +210,7 @@ async fn upload_file(
     stream_type: StreamType,
     path_str: &str,
     file_name: &str,
-) -> Result<Vec<(String, FileMeta, StreamType)>, anyhow::Error> {
+) -> Result<(String, FileMeta, StreamType), anyhow::Error> {
     let mut file = fs::File::open(path_str).unwrap();
     let file_meta = file.metadata().unwrap();
     let file_size = file_meta.len();
@@ -368,7 +367,7 @@ async fn upload_file(
         Ok(output) => match output.await {
             Ok(_) => {
                 log::info!("[JOB] disk file upload succeeded: {}", file_name);
-                Ok(vec![(file_name, file_meta, stream_type)])
+                Ok((file_name, file_meta, stream_type))
             }
             Err(err) => {
                 log::error!("[JOB] disk file upload error: {:?}", err);
@@ -386,11 +385,12 @@ async fn handle_metrics(
     in_stream_name: &str,
     stream_type: StreamType,
     path_str: &str,
-) -> Result<Vec<(String, FileMeta, StreamType)>, anyhow::Error> {
+) -> Result<(), anyhow::Error> {
     let file = fs::File::open(path_str).unwrap();
     let file_meta = file.metadata().unwrap();
     let file_size = file_meta.len();
     log::info!("[JOB] Metrics json data conversion : : {}", path_str);
+
     if file_size == 0 {
         if let Err(e) = tokio::fs::remove_file(path_str).await {
             log::error!(
@@ -419,9 +419,8 @@ async fn handle_metrics(
             .push(row);
     }
 
-    let mut ret = vec![];
     for (metric_name, value) in partitions {
-        let dest_stream_name = metric_name.clone();
+        //let dest_stream_name = metric_name.clone();
         let value_iter = value.iter().map(Ok);
         let metrics_schema = infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
 
@@ -454,7 +453,14 @@ async fn handle_metrics(
             &mut file_meta,
         )
         .await?;
-        let key = path_str.replacen(in_stream_name, &dest_stream_name, 1);
+        // get hour key
+        let key = crate::service::ingestion::get_wal_time_key(
+            file_meta.min_ts,
+            &vec![],
+            PartitionTimeLevel::Daily,
+            &json::Map::new(),
+            None,
+        );
         schema_evolution(
             org_id,
             &metric_name,
@@ -484,12 +490,11 @@ async fn handle_metrics(
         .await
         {
             Ok(output) => match output.await {
-                Ok(new_file_name) => {
+                Ok(_) => {
                     log::info!(
                         "[JOB] disk file conversion succeeded for: {}",
-                        &dest_stream_name
+                        &in_stream_name
                     );
-                    ret.push((new_file_name, file_meta, stream_type));
                 }
                 Err(err) => {
                     log::error!("[JOB] disk file conversion error: {:?}", err);
@@ -502,5 +507,121 @@ async fn handle_metrics(
             }
         }
     }
-    Ok(ret)
+    Ok(())
+}
+
+/*
+ * upload compressed files to storage & delete moved files from local
+ */
+pub async fn metrics_json_to_arrow() -> Result<(), anyhow::Error> {
+    let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
+        .canonicalize()
+        .unwrap();
+
+    let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
+    let files = scan_files(&pattern);
+
+    // use multiple threads to upload files
+    let mut tasks = Vec::new();
+    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+    for file in files {
+        let local_file = file.to_owned();
+        let local_path = Path::new(&file).canonicalize().unwrap();
+        let file_path = local_path
+            .strip_prefix(&wal_dir)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace('\\', "/");
+        let columns = file_path.splitn(5, '/').collect::<Vec<&str>>();
+
+        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
+        // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
+        // let _= columns[0].to_string(); // files/
+        let org_id = columns[1].to_string();
+        let stream_type: StreamType = StreamType::from(columns[2]);
+        let stream_name = columns[3].to_string();
+        let mut file_name = columns[4].to_string();
+
+        // Hack: compatible for <= 0.5.1
+        if !file_name.contains('/') && file_name.contains('_') {
+            file_name = file_name.replace('_', "/");
+        }
+
+        // check the file is using for write
+        if wal::check_in_use(
+            StreamParams::new(&org_id, &stream_name, stream_type),
+            &file_name,
+        )
+        .await
+        {
+            // println!("file is using for write, skip, {}", file_name);
+            continue;
+        }
+        log::info!("[JOB] convert disk file: {}", file);
+
+        // check if we are allowed to ingest or just delete the file
+        if db::compact::retention::is_deleting_stream(&org_id, &stream_name, stream_type, None) {
+            log::info!(
+                "[JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
+                &org_id,
+                stream_type,
+                &stream_name,
+                file
+            );
+            if let Err(e) = tokio::fs::remove_file(&local_file).await {
+                log::error!(
+                    "[JOB] Failed to remove disk file from disk: {}, {}",
+                    local_file,
+                    e
+                );
+            }
+            continue;
+        }
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
+            if stream_type.eq(&StreamType::Metrics) && file_name.ends_with(".json") {
+                let ret = handle_metrics(&org_id, &stream_name, stream_type, &local_file).await;
+                if let Err(e) = ret {
+                    log::error!("[JOB] Error while converting json file to arrow {}", e);
+                    drop(permit);
+                    return Ok(());
+                }
+
+                // check if allowed to delete the file
+                loop {
+                    if wal::lock_files_exists(&file_path).await {
+                        log::info!(
+                            "[JOB] the file is still in use, waiting for a few ms: {}",
+                            file_path
+                        );
+                        time::sleep(time::Duration::from_millis(100)).await;
+                    } else {
+                        break;
+                    }
+                }
+
+                let ret = tokio::fs::remove_file(&local_file).await;
+                if let Err(e) = ret {
+                    log::error!(
+                        "[JOB] Failed to remove json file from disk: {}, {}",
+                        local_file,
+                        e.to_string()
+                    );
+                    drop(permit);
+                    return Ok(());
+                }
+            };
+
+            Ok(())
+        });
+        tasks.push(task);
+    }
+
+    for task in tasks {
+        if let Err(e) = task.await {
+            log::error!("[JOB] Error while uploading disk file to storage {}", e);
+        };
+    }
+    Ok(())
 }
