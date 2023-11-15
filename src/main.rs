@@ -168,8 +168,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // gRPC server
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
-    if !cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
-        init_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
+    if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
+        init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
+    } else {
+        init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     }
 
     // let node online
@@ -219,7 +221,7 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn init_grpc_server(
+fn init_common_grpc_server(
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
 ) -> Result<(), anyhow::Error> {
@@ -267,6 +269,41 @@ fn init_grpc_server(
             .add_service(trace_svc)
             .add_service(usage_svc)
             .add_service(logs_svc)
+            .serve_with_shutdown(gaddr, async {
+                shutdown_rx.await.ok();
+                log::info!("gRPC server starts shutting down");
+            })
+            .await
+            .expect("gRPC server init failed");
+        stopped_tx.send(()).ok();
+    });
+    Ok(())
+}
+
+fn init_router_grpc_server(
+    shutdown_rx: oneshot::Receiver<()>,
+    stopped_tx: oneshot::Sender<()>,
+) -> Result<(), anyhow::Error> {
+    let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
+    let logs_svc = LogsServiceServer::new(openobserve::router::grpc::ingest::logs::LogsServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let metrics_svc =
+        MetricsServiceServer::new(openobserve::router::grpc::ingest::metrics::MetricsServer)
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip);
+    let traces_svc =
+        TraceServiceServer::new(openobserve::router::grpc::ingest::traces::TraceServer)
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip);
+
+    tokio::task::spawn(async move {
+        log::info!("starting gRPC server at {}", gaddr);
+        tonic::transport::Server::builder()
+            .layer(tonic::service::interceptor(check_auth))
+            .add_service(logs_svc)
+            .add_service(metrics_svc)
+            .add_service(traces_svc)
             .serve_with_shutdown(gaddr, async {
                 shutdown_rx.await.ok();
                 log::info!("gRPC server starts shutting down");

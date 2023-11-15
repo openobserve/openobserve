@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use once_cell::sync::Lazy;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use snowflake::SnowflakeIdGenerator;
-use std::iter;
+use once_cell::sync::Lazy; 
+use snowflake::SnowflakeIdGenerator; 
+
+use crate::common::utils::rand::generate_random_string;
 
 use super::cluster;
 
@@ -32,14 +32,6 @@ pub fn generate() -> String {
     format!("{}{}", id, generate_random_string(6))
 }
 
-fn generate_random_string(len: usize) -> String {
-    let mut rng = thread_rng();
-    iter::repeat(())
-        .map(|()| rng.sample(Alphanumeric))
-        .map(char::from)
-        .take(len)
-        .collect()
-}
 
 #[cfg(test)]
 mod tests {

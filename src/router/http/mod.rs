@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
+use actix_web::http::Error;
+use actix_web::{route, web, HttpRequest, HttpResponse};
 use std::time::Duration;
 
-use crate::common::infra::{cluster, config::CONFIG};
+use crate::common::infra::cluster;
+use crate::common::infra::config::CONFIG;
 use crate::common::utils::rand::get_rand_element;
 
 const QUERIER_ROUTES: [&str; 13] = [
@@ -184,8 +186,7 @@ fn get_url(path: &str) -> URLDetails {
             value: format!("No online {node_type} nodes"),
         };
     }
-
-    // random nodes
+    
     let nodes = nodes.unwrap();
     let node = get_rand_element(&nodes);
     URLDetails {
