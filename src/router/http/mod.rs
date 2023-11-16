@@ -14,11 +14,11 @@
 
 use actix_web::http::Error;
 use actix_web::{route, web, HttpRequest, HttpResponse};
-use rand::{seq::SliceRandom, thread_rng};
 use std::time::Duration;
 
 use crate::common::infra::cluster;
 use crate::common::infra::config::CONFIG;
+use crate::common::utils::rand::get_rand_element;
 
 const QUERIER_ROUTES: [&str; 13] = [
     "/summary",
@@ -166,13 +166,6 @@ fn get_url(path: &str) -> URLDetails {
     let node_type;
     let is_querier_path = check_querier_route(path);
 
-    if !is_querier_path && !CONFIG.route.ingester_srv_url.is_empty() {
-        return URLDetails {
-            is_error: false,
-            value: format!("{}{}", CONFIG.route.ingester_srv_url, path),
-        };
-    }
-
     let nodes = if is_querier_path {
         node_type = cluster::Role::Querier;
         cluster::get_cached_online_querier_nodes()
@@ -180,26 +173,24 @@ fn get_url(path: &str) -> URLDetails {
         node_type = cluster::Role::Ingester;
         cluster::get_cached_online_ingester_nodes()
     };
-    if nodes.is_none() {
+    if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
+        if node_type == cluster::Role::Ingester && !CONFIG.route.ingester_srv_url.is_empty() {
+            return URLDetails {
+                is_error: false,
+                value: format!(
+                    "http://{}:{}{}",
+                    CONFIG.route.ingester_srv_url, CONFIG.http.port, path
+                ),
+            };
+        }
         return URLDetails {
             is_error: true,
             value: format!("No online {node_type} nodes"),
         };
     }
 
-    // checking nodes
-    let mut nodes = nodes.unwrap();
-    if nodes.is_empty() {
-        return URLDetails {
-            is_error: true,
-            value: format!("No online {node_type} nodes"),
-        };
-    }
-
-    // random nodes
-    let mut rng = thread_rng();
-    nodes.shuffle(&mut rng);
-    let node = nodes.first().unwrap();
+    let nodes = nodes.unwrap();
+    let node = get_rand_element(&nodes);
     URLDetails {
         is_error: false,
         value: format!("{}{}", node.http_addr, path),

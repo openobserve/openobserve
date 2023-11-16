@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod common;
-pub mod handler;
-pub mod job;
-pub mod router;
-pub mod service;
+use rand::distributions::{Alphanumeric, DistString};
 
-#[macro_use]
-extern crate lazy_static;
+pub fn get_rand_element<T>(arr: &[T]) -> &T {
+    let mut buf = [0u8; 1];
+    getrandom::getrandom(&mut buf).unwrap();
+    &arr[buf[0] as usize % arr.len()]
+}
+
+pub fn generate_random_string(len: usize) -> String {
+    Alphanumeric.sample_string(&mut rand::thread_rng(), len)
+}

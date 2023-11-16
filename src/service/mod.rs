@@ -35,7 +35,6 @@ pub mod logs;
 pub mod metrics;
 pub mod organization;
 pub mod promql;
-pub mod router;
 pub mod schema;
 pub mod search;
 pub mod stream;
