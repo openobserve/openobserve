@@ -55,7 +55,7 @@ pub async fn search(
     timeout: u64,
 ) -> super::SearchResult {
     // get file list
-    let mut files = get_file_list(session_id, &sql, stream_type).await?;
+    let mut files = get_file_list(&sql, stream_type, ".json".to_string()).await?;
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
     let mut scan_stats = ScanStats::new();
 
@@ -291,11 +291,11 @@ pub async fn search(
 }
 
 /// get file list from local wal, no need match_source, each file will be searched
-#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(session_id = ?session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
-    session_id: &str,
     sql: &Sql,
     stream_type: meta::StreamType,
+    extension: String,
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
         Ok(path) => {
@@ -313,7 +313,7 @@ async fn get_file_list(
     };
 
     // get all files
-    let pattern = if stream_type.eq(&meta::StreamType::Metrics) {
+    let pattern = if stream_type.eq(&meta::StreamType::Metrics) && extension == ".json" {
         format!(
             "{}/files/{}/{stream_type}/{}/",
             wal_dir, &sql.org_id, &sql.org_id
@@ -332,6 +332,7 @@ async fn get_file_list(
     // lock theses files
     let files = files
         .iter()
+        .filter(|f| f.as_str().ends_with(&extension))
         .map(|f| {
             f.strip_prefix(&wal_dir)
                 .unwrap()
@@ -418,7 +419,7 @@ pub async fn search_arrow(
     timeout: u64,
 ) -> super::SearchResult {
     // get file list
-    let mut files = get_file_list(&sql, stream_type).await?;
+    let mut files = get_file_list(&sql, stream_type, ".arrow".to_string()).await?;
     let mut scan_stats = ScanStats::new();
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
