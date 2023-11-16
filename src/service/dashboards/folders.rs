@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, HttpResponse};
 use std::io::Error;
 
+use actix_web::{http, HttpResponse};
+
 use crate::common::meta::{
-    dashboards::{Folder, FolderList, DEFAULT_FOLDER},
+    dashboards::{DEFAULT_FOLDER, Folder, FolderList},
     http::HttpResponse as MetaHttpResponse,
 };
 use crate::service::db;
@@ -27,6 +28,15 @@ pub async fn save_folder(
     mut folder: Folder,
     is_internal: bool,
 ) -> Result<HttpResponse, Error> {
+    if folder.name.trim().is_empty() {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                http::StatusCode::BAD_REQUEST.into(),
+                "folder name not allow empty".to_string(),
+            )),
+        );
+    }
+
     if !is_internal && folder.folder_id == DEFAULT_FOLDER {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(

@@ -239,19 +239,19 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
   
   
 /**
- * Formats the given date into a string in the format "DD-MM-YY HH:MM:SS".
+ * Formats the given date into a string in the format "YY-MM-DD HH:MM:SS".
  *
  * @param {any} date - The date to be formatted.
  * @return {string} The formatted date string.
  */
 export const formatDate = (date: any) => {
-    const day = String(date.getDate()).padStart(2, "0");
+    const year = String(date.getFullYear());
     const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = String(date.getFullYear()).slice(2);
+    const day = String(date.getDate()).padStart(2, "0");
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
     const seconds = String(date.getSeconds()).padStart(2, "0");
   
-    return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
   

@@ -25,6 +25,10 @@ use opentelemetry_proto::tonic::collector::{
     metrics::v1::metrics_service_server::MetricsServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
+#[cfg(feature = "profiling")]
+use pyroscope::PyroscopeAgent;
+#[cfg(feature = "profiling")]
+use pyroscope_pprofrs::{pprof_backend, PprofConfig};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -47,10 +51,7 @@ use openobserve::{
             config::{CONFIG, USERS, VERSION},
         },
         meta, migration,
-        utils::{
-            file::set_permission,
-            zo_logger::{self, ZoLogger, EVENT_SENDER},
-        },
+        utils::{file::set_permission, zo_logger},
     },
     handler::{
         grpc::{
@@ -72,14 +73,9 @@ use openobserve::{
         },
         http::router::*,
     },
-    job,
-    service::{compact, db, distinct_values, file_list, router, users},
+    job, router,
+    service::{compact, db, distinct_values, file_list, users},
 };
-
-#[cfg(feature = "profiling")]
-use pyroscope::PyroscopeAgent;
-#[cfg(feature = "profiling")]
-use pyroscope_pprofrs::{pprof_backend, PprofConfig};
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -113,8 +109,8 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     if CONFIG.log.events_enabled {
-        let logger = ZoLogger {
-            sender: EVENT_SENDER.clone(),
+        let logger = zo_logger::ZoLogger {
+            sender: zo_logger::EVENT_SENDER.clone(),
         };
         log::set_boxed_logger(Box::new(logger)).map(|()| {
             log::set_max_level(
@@ -168,8 +164,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // gRPC server
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
-    if !cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
-        init_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
+    if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
+        init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
+    } else {
+        init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     }
 
     // let node online
@@ -219,11 +217,16 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn init_grpc_server(
+fn init_common_grpc_server(
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
 ) -> Result<(), anyhow::Error> {
-    let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
+    let ip = if !CONFIG.grpc.addr.is_empty() {
+        CONFIG.grpc.addr.clone()
+    } else {
+        "0.0.0.0".to_string()
+    };
+    let gaddr: SocketAddr = format!("{}:{}", ip, CONFIG.grpc.port).parse()?;
     let event_svc = EventServer::new(Eventer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
@@ -273,6 +276,39 @@ fn init_grpc_server(
     Ok(())
 }
 
+fn init_router_grpc_server(
+    shutdown_rx: oneshot::Receiver<()>,
+    stopped_tx: oneshot::Sender<()>,
+) -> Result<(), anyhow::Error> {
+    let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
+    let logs_svc = LogsServiceServer::new(router::grpc::ingest::logs::LogsServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let metrics_svc = MetricsServiceServer::new(router::grpc::ingest::metrics::MetricsServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let traces_svc = TraceServiceServer::new(router::grpc::ingest::traces::TraceServer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+
+    tokio::task::spawn(async move {
+        log::info!("starting gRPC server at {}", gaddr);
+        tonic::transport::Server::builder()
+            .layer(tonic::service::interceptor(check_auth))
+            .add_service(logs_svc)
+            .add_service(metrics_svc)
+            .add_service(traces_svc)
+            .serve_with_shutdown(gaddr, async {
+                shutdown_rx.await.ok();
+                log::info!("gRPC server starts shutting down");
+            })
+            .await
+            .expect("gRPC server init failed");
+        stopped_tx.send(()).ok();
+    });
+    Ok(())
+}
+
 async fn init_http_server() -> Result<(), anyhow::Error> {
     // metrics
     let prometheus = infra::metrics::create_prometheus_handler();
@@ -288,7 +324,12 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
         format!("[::]:{}", CONFIG.http.port).parse()?
     } else {
-        format!("0.0.0.0:{}", CONFIG.http.port).parse()?
+        let ip = if !CONFIG.http.addr.is_empty() {
+            CONFIG.http.addr.clone()
+        } else {
+            "0.0.0.0".to_string()
+        };
+        format!("{}:{}", ip, CONFIG.http.port).parse()?
     };
 
     let server = HttpServer::new(move || {
@@ -306,11 +347,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             app = app.service(
                 // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
                 web::scope(&CONFIG.common.base_uri)
-                    .service(router::config)
-                    .service(router::api)
-                    .service(router::aws)
-                    .service(router::gcp)
-                    .service(router::rum)
+                    .service(router::http::config)
+                    .service(router::http::api)
+                    .service(router::http::aws)
+                    .service(router::http::gcp)
+                    .service(router::http::rum)
                     .configure(get_basic_routes)
                     .configure(get_proxy_routes),
             )

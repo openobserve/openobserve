@@ -265,7 +265,7 @@ pub async fn logs_json_handler(
 
                     // check ingestion time
                     let earliest_time =
-                        Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+                        Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
                     if timestamp < earliest_time.timestamp_micros() {
                         stream_status.status.failed += 1; // to old data, just discard
                         stream_status.status.error = super::get_upto_discard_error();
