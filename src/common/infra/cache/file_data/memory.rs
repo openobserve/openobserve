@@ -90,6 +90,7 @@ impl FileData {
             loop {
                 let item = self.data.pop_lru();
                 if item.is_none() {
+                    log::error!("[session_id {session_id}] File memory cache is crashed, it shouldn't be none");
                     break;
                 }
                 let (key, data_size) = item.unwrap();
