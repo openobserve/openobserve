@@ -12,11 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod common;
-pub mod handler;
-pub mod job;
-pub mod router;
-pub mod service;
-
-#[macro_use]
-extern crate lazy_static;
+pub mod ingest;

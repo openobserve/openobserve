@@ -16,24 +16,21 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use rand::distributions::{Alphanumeric, DistString};
 use std::io::Error;
 use uuid::Uuid;
 
 use super::db;
-use crate::common::{infra::config::USERS, meta::user::UpdateUser};
 use crate::common::{
-    infra::config::USERS_RUM_TOKEN,
-    meta::user::{User, UserList, UserResponse, UserRole},
-};
-use crate::{
-    common::infra::config::ROOT_USER,
-    common::meta::{
+    infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
+    meta::{
         http::HttpResponse as MetaHttpResponse,
         organization::DEFAULT_ORG,
-        user::{UserOrg, UserRequest},
+        user::{UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole},
     },
-    common::utils::auth::{get_hash, is_root_user},
+    utils::{
+        auth::{get_hash, is_root_user},
+        rand::generate_random_string,
+    },
 };
 
 pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {
@@ -45,11 +42,8 @@ pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpRespons
     if existing_user.is_err() {
         let salt = Uuid::new_v4().to_string();
         let password = get_hash(&usr_req.password, &salt);
-        let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-        let rum_token = format!(
-            "rum{}",
-            Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
-        );
+        let token = generate_random_string(16);
+        let rum_token = format!("rum{}", generate_random_string(16));
         let user =
             usr_req.to_new_dbuser(password, salt, org_id.replace(' ', "_"), token, rum_token);
         db::user::set(user).await.unwrap();
@@ -232,11 +226,8 @@ pub async fn add_user_to_org(
                 .unwrap()
         };
         if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
-            let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-            let rum_token = format!(
-                "rum{}",
-                Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
-            );
+            let token = generate_random_string(16);
+            let rum_token = format!("rum{}", generate_random_string(16));
             let mut orgs = db_user.clone().organizations;
             let new_orgs = if orgs.is_empty() {
                 vec![UserOrg {
