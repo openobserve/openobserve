@@ -42,7 +42,7 @@ use crate::service::{
 };
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(session_id = ?session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
@@ -55,7 +55,7 @@ pub async fn search(
         match db::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
             Ok(versions) => versions,
             Err(err) => {
-                log::error!("get schema error: {}", err);
+                log::error!("[session_id {session_id}] get schema error: {}", err);
                 return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
                     sql.stream_name.clone(),
                 )));
@@ -75,14 +75,14 @@ pub async fn search(
 
     // get file list
     let files = match file_list.is_empty() {
-        true => get_file_list(&sql, stream_type, partition_time_level).await?,
+        true => get_file_list(session_id, &sql, stream_type, partition_time_level).await?,
         false => file_list.to_vec(),
     };
     if files.is_empty() {
         return Ok((HashMap::new(), ScanStats::default()));
     }
     log::info!(
-        "search->storage: org {}, stream {}, load file_list num {}",
+        "[session_id {session_id}] search->storage: org {}, stream {}, load file_list num {}",
         &sql.org_id,
         &sql.stream_name,
         files.len(),
@@ -96,7 +96,10 @@ pub async fn search(
         scan_stats = match file_list::calculate_files_size(&files).await {
             Ok(size) => size,
             Err(err) => {
-                log::error!("calculate files size error: {}", err);
+                log::error!(
+                    "[session_id {session_id}] calculate files size error: {}",
+                    err
+                );
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     "calculate files size error".to_string(),
                 )));
@@ -119,7 +122,7 @@ pub async fn search(
                 Some(id) => id,
                 None => {
                     log::error!(
-                        "search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
+                        "[session_id {session_id}] search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
                         &file.key,
                         file.meta.min_ts,
                         file.meta.max_ts
@@ -134,7 +137,7 @@ pub async fn search(
     }
 
     log::info!(
-        "search->storage: org {}, stream {}, load files {}, scan_size {}, compressed_size {}",
+        "[session_id {session_id}] search->storage: org {}, stream {}, load files {}, scan_size {}, compressed_size {}",
         &sql.org_id,
         &sql.stream_name,
         scan_stats.files,
@@ -143,7 +146,7 @@ pub async fn search(
     );
 
     // load files to local cache
-    let (cache_type, deleted_files) = cache_parquet_files(&files, &scan_stats).await?;
+    let (cache_type, deleted_files) = cache_parquet_files(session_id, &files, &scan_stats).await?;
     if !deleted_files.is_empty() {
         // remove deleted files from files_group
         for (_, g_files) in files_group.iter_mut() {
@@ -151,7 +154,7 @@ pub async fn search(
         }
     }
     log::info!(
-        "search->storage: org {}, stream {}, load files {}, into {:?} cache done",
+        "[session_id {session_id}] search->storage: org {}, stream {}, load files {}, into {:?} cache done",
         &sql.org_id,
         &sql.stream_name,
         scan_stats.files,
@@ -187,7 +190,7 @@ pub async fn search(
                 }
             }
         }
-        let datafusion_span = info_span!("service:search:grpc:storage:datafusion", org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+        let datafusion_span = info_span!("service:search:grpc:storage:datafusion", session_id, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
@@ -225,7 +228,10 @@ pub async fn search(
                 }
             }
             Err(err) => {
-                log::error!("datafusion execute error: {}", err);
+                log::error!(
+                    "[session_id {session_id}] datafusion execute error: {}",
+                    err
+                );
                 return Err(super::handle_datafusion_error(err));
             }
         };
@@ -234,8 +240,9 @@ pub async fn search(
     Ok((results, scan_stats))
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(session_id = ?session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
+    session_id: &str,
     sql: &Sql,
     stream_type: meta::StreamType,
     time_level: PartitionTimeLevel,
@@ -254,7 +261,7 @@ async fn get_file_list(
     {
         Ok(file_list) => file_list,
         Err(err) => {
-            log::error!("get file list error: {}", err);
+            log::error!("[session_id {session_id}] get file list error: {}", err);
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 "get file list error".to_string(),
             )));
@@ -271,8 +278,13 @@ async fn get_file_list(
     Ok(files)
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:cache_parquet_files", skip_all)]
+#[tracing::instrument(
+    name = "service:search:grpc:storage:cache_parquet_files",
+    skip_all,
+    fields(session_id = ?session_id)
+)]
 async fn cache_parquet_files(
+    session_id: &str,
     files: &[FileKey],
     scan_stats: &ScanStats,
 ) -> Result<(file_data::CacheType, Vec<String>), Error> {
@@ -295,20 +307,25 @@ async fn cache_parquet_files(
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
+        let session_id = session_id.to_string();
         let file_name = file.key.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = match cache_type {
                 file_data::CacheType::Memory => {
                     if !file_data::memory::exist(&file_name).await {
-                        file_data::memory::download(&file_name).await.err()
+                        file_data::memory::download(&session_id, &file_name)
+                            .await
+                            .err()
                     } else {
                         None
                     }
                 }
                 file_data::CacheType::Disk => {
                     if !file_data::disk::exist(&file_name).await {
-                        file_data::disk::download(&file_name).await.err()
+                        file_data::disk::download(&session_id, &file_name)
+                            .await
+                            .err()
                     } else {
                         None
                     }
@@ -319,11 +336,14 @@ async fn cache_parquet_files(
                 if e.to_string().to_lowercase().contains("not found") {
                     // delete file from file list
                     if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                        log::error!("search->storage: delete from file_list err: {}", e);
+                        log::error!("[session_id {session_id}] search->storage: delete from file_list err: {}", e);
                     }
                     Some(file_name)
                 } else {
-                    log::error!("search->storage: download file to cache err: {}", e);
+                    log::error!(
+                        "[session_id {session_id}] search->storage: download file to cache err: {}",
+                        e
+                    );
                     None
                 }
             } else {
@@ -344,7 +364,10 @@ async fn cache_parquet_files(
                 }
             }
             Err(e) => {
-                log::error!("search->storage: load file task err: {}", e);
+                log::error!(
+                    "[session_id {session_id}] search->storage: load file task err: {}",
+                    e
+                );
             }
         }
     }

@@ -44,7 +44,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         timeout: 0,
     };
     // do search
-    match SearchService::search(org_id, meta::StreamType::EnrichmentTables, &req).await {
+    match SearchService::search("", org_id, meta::StreamType::EnrichmentTables, &req).await {
         Ok(res) => {
             if !res.hits.is_empty() {
                 Ok(res.hits.iter().map(convert_to_vrl).collect())

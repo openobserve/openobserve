@@ -21,7 +21,6 @@ use std::{
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use uuid::Uuid;
 
 use crate::common::{
     infra::{
@@ -94,7 +93,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
 
     // partition request, here plus 1 second, because division is integer, maybe lose some precision
     // XXX-REFACTORME: move this into a function
-    let session_id = Uuid::new_v4().to_string();
+    let session_id = uuid::Uuid::new_v4().to_string();
     let job_id = session_id[30..].to_string(); // take the last 6 characters as job id
     let job = cluster_rpc::Job {
         session_id,

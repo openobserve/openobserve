@@ -77,6 +77,7 @@ pub async fn sql(
     }
 
     let start = std::time::Instant::now();
+    let session_id = session.id.clone();
     let mut ctx = register_table(session, schema.clone(), "tbl", files, file_type.clone()).await?;
 
     // register UDF
@@ -105,7 +106,10 @@ pub async fn sql(
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
         if CONFIG.common.print_key_sql {
-            log::info!("Query agg sql: {}", orig_agg_sql.0);
+            log::info!(
+                "[session_id {session_id}] Query agg sql: {}",
+                orig_agg_sql.0
+            );
         }
 
         let mut agg_sql = orig_agg_sql.0.to_owned();
@@ -151,7 +155,7 @@ pub async fn sql(
         let batches = df.collect().await?;
         result.insert(format!("agg_{name}"), batches);
         log::info!(
-            "Query agg:{name} took {:.3} seconds.",
+            "[session_id {session_id}] Query agg:{name} took {:.3} seconds.",
             start.elapsed().as_secs_f64()
         );
     }
@@ -159,7 +163,7 @@ pub async fn sql(
     // drop table
     ctx.deregister_table("tbl")?;
     log::info!(
-        "Query all took {:.3} seconds.",
+        "[session_id {session_id}] Query all took {:.3} seconds.",
         start.elapsed().as_secs_f64()
     );
 
@@ -176,6 +180,7 @@ async fn exec_query(
     file_type: FileType,
 ) -> Result<Vec<RecordBatch>> {
     let start = std::time::Instant::now();
+    let session_id = session.id.clone();
 
     let mut fast_mode = false;
     let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
@@ -229,14 +234,14 @@ async fn exec_query(
 
     // Debug SQL
     if CONFIG.common.print_key_sql {
-        log::info!("Query sql: {}", query);
+        log::info!("[session_id {session_id}] Query sql: {}", query);
     }
 
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
         Err(e) => {
             log::error!(
-                "query sql execute failed, session: {:?}, sql: {}, err: {:?}",
+                "[session_id {session_id}] query sql execute failed, session: {:?}, sql: {}, err: {:?}",
                 session,
                 sql.origin_sql,
                 e
@@ -268,7 +273,10 @@ async fn exec_query(
 
     if field_fns.is_empty() && sql.query_fn.is_none() {
         let batches = df.clone().collect().await?;
-        log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
+        log::info!(
+            "[session_id {session_id}] Query took {:.3} seconds.",
+            start.elapsed().as_secs_f64()
+        );
         return Ok(batches);
     }
 
@@ -362,7 +370,10 @@ async fn exec_query(
         }
     };
     let batches = df.clone().collect().await?;
-    log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
+    log::info!(
+        "[session_id {session_id}] Query took {:.3} seconds.",
+        start.elapsed().as_secs_f64()
+    );
     Ok(batches)
 }
 

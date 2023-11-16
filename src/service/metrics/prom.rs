@@ -587,7 +587,7 @@ pub(crate) async fn get_series(
         encoding: search::RequestEncoding::Empty,
         timeout: 0,
     };
-    let series = match search_service::search(org_id, StreamType::Metrics, &req).await {
+    let series = match search_service::search("", org_id, StreamType::Metrics, &req).await {
         Err(err) => {
             log::error!("search series error: {err}");
             return Err(err);
@@ -729,7 +729,7 @@ pub(crate) async fn get_label_values(
         encoding: search::RequestEncoding::Empty,
         timeout: 0,
     };
-    let mut label_values = match search_service::search(org_id, stream_type, &req).await {
+    let mut label_values = match search_service::search("", org_id, stream_type, &req).await {
         Ok(resp) => resp
             .hits
             .iter()

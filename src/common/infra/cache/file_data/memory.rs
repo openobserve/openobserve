@@ -67,11 +67,16 @@ impl FileData {
         })
     }
 
-    async fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+    async fn set(
+        &mut self,
+        session_id: &str,
+        file: &str,
+        data: Bytes,
+    ) -> Result<(), anyhow::Error> {
         let data_size = file.len() + data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "File memory cache is full {}/{}, can't cache extra {} bytes",
+                "[session_id {session_id}] File memory cache is full {}/{}, can't cache extra {} bytes",
                 self.cur_size,
                 self.max_size,
                 data_size
@@ -164,12 +169,12 @@ pub async fn exist(file: &str) -> bool {
 }
 
 #[inline]
-pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+pub async fn set(session_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     if !CONFIG.memory_cache.enabled {
         return Ok(());
     }
     let mut files = FILES.write().await;
-    files.set(file, data).await
+    files.set(session_id, file, data).await
 }
 
 #[inline]
@@ -190,9 +195,9 @@ pub async fn is_empty() -> bool {
     files.is_empty()
 }
 
-pub async fn download(file: &str) -> Result<(), anyhow::Error> {
+pub async fn download(session_id: &str, file: &str) -> Result<(), anyhow::Error> {
     let data = storage::get(file).await?;
-    if let Err(e) = set(file, data).await {
+    if let Err(e) = set(session_id, file, data).await {
         return Err(anyhow::anyhow!(
             "set file {} to memory cache failed: {}",
             file,
@@ -208,6 +213,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_set_file() {
+        let session_id = "session_123";
         let mut file_data = FileData::with_capacity(1024);
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..100 {
@@ -215,21 +221,28 @@ mod tests {
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
-            let resp = file_data.set(&file_key, content.clone()).await;
+            let resp = file_data.set(session_id, &file_key, content.clone()).await;
             assert!(resp.is_ok());
         }
     }
 
     #[tokio::test]
     async fn test_cache_get_file() {
+        let session_id = "session_123";
         let mut file_data = FileData::default();
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
-        file_data.set(file_key, content.clone()).await.unwrap();
+        file_data
+            .set(session_id, file_key, content.clone())
+            .await
+            .unwrap();
         assert_eq!(file_data.get(file_key, None).await.unwrap(), content);
 
-        file_data.set(file_key, content.clone()).await.unwrap();
+        file_data
+            .set(session_id, file_key, content.clone())
+            .await
+            .unwrap();
         assert!(file_data.exist(file_key).await);
         assert_eq!(file_data.get(file_key, None).await.unwrap(), content);
         assert!(file_data.size().0 > 0);
@@ -237,15 +250,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_miss() {
+        let session_id = "session_456";
         let mut file_data = FileData::with_capacity(100);
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
-        file_data.set(file_key1, content.clone()).await.unwrap();
+        file_data
+            .set(session_id, file_key1, content.clone())
+            .await
+            .unwrap();
         assert_eq!(file_data.get(file_key1, None).await.unwrap(), content);
         // set another key, will release first key
-        file_data.set(file_key2, content.clone()).await.unwrap();
+        file_data
+            .set(session_id, file_key2, content.clone())
+            .await
+            .unwrap();
         assert_eq!(file_data.get(file_key2, None).await.unwrap(), content);
         // get first key, should get error
         assert!(file_data.get(file_key1, None).await.is_none());

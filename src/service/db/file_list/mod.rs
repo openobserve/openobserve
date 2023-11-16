@@ -74,7 +74,7 @@ pub async fn progress(
             && cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
         {
             // maybe load already merged file, no need report error
-            _ = cache::file_data::memory::download(key).await;
+            _ = cache::file_data::memory::download("", key).await;
         }
     }
 

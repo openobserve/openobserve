@@ -104,7 +104,6 @@ impl Display for SqlMode {
 }
 
 impl Sql {
-    #[tracing::instrument(name = "service:search:sql:new", skip(req), fields(org_id = req.org_id))]
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
         let req_query = req.query.as_ref().unwrap();
         let mut req_time_range = (req_query.start_time, req_query.end_time);
@@ -348,10 +347,10 @@ impl Sql {
         let where_pos = where_tokens
             .iter()
             .position(|x| x.to_lowercase() == "where");
-        let mut where_tokens = if where_pos.is_none() {
-            Vec::new()
+        let mut where_tokens = if let Some(v) = where_pos {
+            where_tokens[v + 1..].to_vec()
         } else {
-            where_tokens[where_pos.unwrap() + 1..].to_vec()
+            Vec::new()
         };
 
         // HACK full text search
