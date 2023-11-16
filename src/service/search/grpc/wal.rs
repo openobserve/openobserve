@@ -173,7 +173,6 @@ pub async fn search(
         );
     } else {
         for file in files {
-            println!("File name is {}", &file.location);
             let schema_version = get_schema_version(&file.location)?;
             let entry = files_group.entry(schema_version).or_default();
             entry.push(FileKey::from_file_name(&file.location));
@@ -524,7 +523,6 @@ pub async fn search_arrow(
 
     // check schema version
     let files = tmpfs::list(&work_dir, FILE_EXT_ARROW).unwrap_or_default();
-
     let mut files_group: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(2);
     if !CONFIG.common.widening_schema_evolution {
         files_group.insert(
