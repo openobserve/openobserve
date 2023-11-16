@@ -27,7 +27,7 @@ use tracing::{info_span, Instrument};
 use crate::common::{
     infra::{
         cache::tmpfs,
-        config::CONFIG,
+        config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
         errors::{Error, ErrorCodes},
         wal,
     },
@@ -55,7 +55,7 @@ pub async fn search(
     timeout: u64,
 ) -> super::SearchResult {
     // get file list
-    let mut files = get_file_list(&sql, stream_type, ".json").await?;
+    let mut files = get_file_list(&sql, stream_type, FILE_EXT_JSON).await?;
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
     let mut scan_stats = ScanStats::new();
 
@@ -140,7 +140,7 @@ pub async fn search(
     );
 
     // check schema version
-    let files = tmpfs::list(&work_dir, ".json").unwrap_or_default();
+    let files = tmpfs::list(&work_dir, FILE_EXT_JSON).unwrap_or_default();
 
     let mut files_group: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(2);
     if !CONFIG.common.widening_schema_evolution {
@@ -153,7 +153,6 @@ pub async fn search(
         );
     } else {
         for file in files {
-            println!("File name is {}", &file.location);
             let schema_version = get_schema_version(&file.location)?;
             let entry = files_group.entry(schema_version).or_default();
             entry.push(FileKey::from_file_name(&file.location));
@@ -315,7 +314,7 @@ async fn get_file_list(
     };
 
     // get all files
-    let pattern = if stream_type.eq(&meta::StreamType::Metrics) && extension == ".json" {
+    let pattern = if stream_type.eq(&meta::StreamType::Metrics) && extension == FILE_EXT_JSON {
         format!(
             "{}/files/{}/{stream_type}/{}/",
             wal_dir, &sql.org_id, &sql.org_id
@@ -421,7 +420,7 @@ pub async fn search_arrow(
     timeout: u64,
 ) -> super::SearchResult {
     // get file list
-    let mut files = get_file_list(&sql, stream_type, ".arrow").await?;
+    let mut files = get_file_list(&sql, stream_type, FILE_EXT_ARROW).await?;
     let mut scan_stats = ScanStats::new();
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
@@ -497,7 +496,7 @@ pub async fn search_arrow(
     );
 
     // check schema version
-    let files = tmpfs::list(&work_dir, ".arrow").unwrap_or_default();
+    let files = tmpfs::list(&work_dir, FILE_EXT_ARROW).unwrap_or_default();
     let mut files_group: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(2);
     if !CONFIG.common.widening_schema_evolution {
         files_group.insert(

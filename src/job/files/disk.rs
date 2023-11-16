@@ -25,6 +25,7 @@ use std::{
 };
 use tokio::{sync::Semaphore, task, time};
 
+use crate::common::infra::config::FILE_EXT_ARROW;
 use crate::common::meta::stream::PartitionTimeLevel;
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics, storage, wal},
@@ -231,7 +232,7 @@ async fn upload_file(
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(file_size);
 
-    let is_arrow = file_name.ends_with(".arrow");
+    let is_arrow = file_name.ends_with(FILE_EXT_ARROW);
 
     let arrow_schema;
     let mut batches = vec![];

@@ -23,7 +23,11 @@ use std::{
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::{
-    infra::{cluster, config::CONFIG, metrics, storage, wal},
+    infra::{
+        cluster,
+        config::{COLUMN_TRACE_ID, CONFIG, FILE_EXT_ARROW},
+        metrics, storage, wal,
+    },
     meta::{common::FileMeta, StreamType},
     utils::{
         json,
@@ -180,7 +184,7 @@ async fn upload_file(
     metrics::INGEST_WAL_READ_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(file_size);
-    let is_arrow = file_name.ends_with(".arrow");
+    let is_arrow = file_name.ends_with(FILE_EXT_ARROW);
 
     let arrow_schema;
     let mut batches = vec![];
