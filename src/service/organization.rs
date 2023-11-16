@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::distributions::{Alphanumeric, DistString};
-
 use super::stream::get_streams;
-use crate::common::infra::config::USERS_RUM_TOKEN;
-use crate::common::meta::organization::{
-    IngestionPasscode, IngestionTokensContainer, OrgSummary, RumIngestionToken,
+use crate::common::{
+    infra::config::USERS_RUM_TOKEN,
+    meta::{
+        organization::{
+            IngestionPasscode, IngestionTokensContainer, OrgSummary, RumIngestionToken,
+        },
+        user::UserOrg,
+    },
+    utils::{auth::is_root_user, rand::generate_random_string},
 };
-use crate::common::meta::user::UserOrg;
-use crate::common::utils::auth::is_root_user;
 use crate::service::db;
 
 #[tracing::instrument]
@@ -83,11 +85,8 @@ async fn update_passcode_inner(
     if org_id.is_some() {
         local_org_id = org_id.unwrap();
     }
-    let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-    let rum_token = format!(
-        "rum{}",
-        Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
-    );
+    let token = generate_random_string(16);
+    let rum_token = format!("rum{}", generate_random_string(16));
 
     let updated_org = |existing_org: &UserOrg| {
         if is_rum_update {

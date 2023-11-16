@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use once_cell::sync::Lazy;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use snowflake::SnowflakeIdGenerator;
-use std::iter;
+
+use crate::common::utils::rand::generate_random_string;
 
 use super::cluster;
 
@@ -30,15 +30,6 @@ pub fn init() -> Result<(), anyhow::Error> {
 pub fn generate() -> String {
     let id = unsafe { IDER.real_time_generate() };
     format!("{}{}", id, generate_random_string(6))
-}
-
-fn generate_random_string(len: usize) -> String {
-    let mut rng = thread_rng();
-    iter::repeat(())
-        .map(|()| rng.sample(Alphanumeric))
-        .map(char::from)
-        .take(len)
-        .collect()
 }
 
 #[cfg(test)]

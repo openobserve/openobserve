@@ -114,7 +114,7 @@ pub async fn usage_ingest(
             None => Utc::now().timestamp_micros(),
         };
         // check ingestion time
-        let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+        let earlest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
         if timestamp < earlest_time.timestamp_micros() {
             stream_status.status.failed += 1; // to old data, just discard
             stream_status.status.error = super::get_upto_discard_error();
@@ -318,8 +318,7 @@ pub async fn handle_grpc_request(
                 }
 
                 // check ingestion time
-                let earlest_time =
-                    Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+                let earlest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
 
                 let ts = if log_record.time_unix_nano != 0 {
                     log_record.time_unix_nano / 1000
