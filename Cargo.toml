@@ -46,8 +46,8 @@ actix-cors = "0.6"
 actix-multipart = { version = "0.6", features = ["derive"] }
 actix-web = "4.4"
 actix-web-httpauth = "0.8"
-actix-web-lab = "0.19.1"
-actix-web-opentelemetry = { version = "0.15", features = ["metrics"] }
+actix-web-lab = "0.20"
+actix-web-opentelemetry = { version = "0.16", features = ["metrics"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
   "support-rust-embed-for-web",
@@ -55,11 +55,11 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
 ] }
 ahash = { version = "0.8", features = ["serde"] }
 anyhow = "1.0"
-argon2 = { version = "0.4", features = ["alloc", "password-hash"] }
+argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
 async-trait = "0.1"
 async_once = "0.2"
 async-recursion = "1.0"
-awc = "3.1"
+awc = "3.2"
 aws-config = "0.56.1"
 aws-sdk-dynamodb = "0.30.0"
 base64 = "0.21"
@@ -93,14 +93,14 @@ flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 get_if_addrs = "0.5"
 glob = "0.3"
+hashlink = "0.8.4"
 hex = "0.4"
 http-auth-basic = "0.3"
 indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"
-itertools = "0.11"
+itertools = "0.12"
 lazy_static = "1.4"
 log = "0.4"
-lru = "0.10"
 maxminddb = "0.23.0"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
@@ -128,7 +128,7 @@ rand = "0.8"
 getrandom = "0.2.11"
 rayon = "1.7.0"
 regex = "1.7"
-regex-syntax = "0.6"
+regex-syntax = "0.8"
 reqwest = { version = "0.11", default-features = false, features = [
   "rustls-tls",
   "stream",
@@ -138,7 +138,7 @@ rust-embed-for-web = "11.1"
 segment = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-simd-json = "0.10.3"
+simd-json = "0.13"
 sled = "0.34"
 snap = "1"
 sqlparser = { version = "0.39", features = ["serde", "visitor"] }
@@ -148,7 +148,7 @@ sqlx = { version = "0.7", features = [
   "sqlite",
   "chrono",
 ] }
-strum = { version = "0.24", features = ["derive"] }
+strum = { version = "0.25", features = ["derive"] }
 sysinfo = "0.29"
 syslog_loose = "0.18.0"
 thiserror = "1.0"
@@ -163,14 +163,14 @@ tracing-opentelemetry = "0.18"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uaparser = "0.6.1"
 url = "2.2"
-utoipa = { version = "3", features = ["actix_extras", "openapi_extensions"] }
-utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
+utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
+utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "8eb52562" }
 vrl = { version = "0.6.0", features = ["value", "compiler"] }
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
-zstd = "0.12"
+zstd = "0.13"
 sha256 = "1.4.0"
 
 [build-dependencies]

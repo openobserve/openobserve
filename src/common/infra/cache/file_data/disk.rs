@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use bytes::Bytes;
-use lru::LruCache;
+use hashlink::lru_cache::LruCache;
 use once_cell::sync::Lazy;
 use std::{
     cmp::{max, min},
@@ -55,7 +55,7 @@ impl FileData {
             max_size,
             cur_size: 0,
             root_dir: CONFIG.common.data_cache_dir.to_string(),
-            data: LruCache::unbounded(),
+            data: LruCache::new_unbounded(),
         }
     }
 
@@ -73,7 +73,7 @@ impl FileData {
             let meta = get_file_meta(&file).await?;
             let data_size = meta.len() as usize;
             self.cur_size += data_size;
-            self.data.put(file_key.clone(), data_size);
+            self.data.insert(file_key.clone(), data_size);
             // metrics
             let columns = file_key.split('/').collect::<Vec<&str>>();
             if columns[0] == "files" {
@@ -113,8 +113,9 @@ impl FileData {
             );
             let mut release_size = 0;
             loop {
-                let item = self.data.pop_lru();
+                let item = self.data.remove_lru();
                 if item.is_none() {
+                    log::error!("[session_id {session_id}] File disk cache is corrupt, it shouldn't be none");
                     break;
                 }
                 let (key, data_size) = item.unwrap();
@@ -140,7 +141,7 @@ impl FileData {
         }
 
         self.cur_size += data_size;
-        self.data.put(file.to_string(), data_size);
+        self.data.insert(file.to_string(), data_size);
         // write file into local disk
         let file_path = format!("{}{}", self.root_dir, file);
         fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;

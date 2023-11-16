@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use bytes::Bytes;
-use lru::LruCache;
+use hashlink::lru_cache::LruCache;
 use once_cell::sync::Lazy;
 use std::{
     cmp::{max, min},
@@ -50,7 +50,7 @@ impl FileData {
         FileData {
             max_size,
             cur_size: 0,
-            data: LruCache::unbounded(),
+            data: LruCache::new_unbounded(),
         }
     }
 
@@ -88,9 +88,9 @@ impl FileData {
             );
             let mut release_size = 0;
             loop {
-                let item = self.data.pop_lru();
+                let item = self.data.remove_lru();
                 if item.is_none() {
-                    log::error!("[session_id {session_id}] File memory cache is crashed, it shouldn't be none");
+                    log::error!("[session_id {session_id}] File memory cache is corrupt, it shouldn't be none");
                     break;
                 }
                 let (key, data_size) = item.unwrap();
@@ -116,7 +116,7 @@ impl FileData {
         }
 
         self.cur_size += data_size;
-        self.data.put(file.to_string(), data_size);
+        self.data.insert(file.to_string(), data_size);
         // write file into cache
         DATA.insert(file.to_string(), data);
         // metrics
@@ -141,7 +141,7 @@ impl FileData {
     }
 
     fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.data.is_empty()
     }
 }
 
