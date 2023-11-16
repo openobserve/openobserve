@@ -66,18 +66,31 @@ impl Drop for Directory {
     }
 }
 
-pub fn list(path: &str) -> Result<Vec<File>> {
+pub fn list(path: &str, extension: &str) -> Result<Vec<File>> {
     let path = format_key(path);
-    Ok(FILES
-        .iter()
-        .filter_map(|x| {
-            if x.key().starts_with(&path) {
-                Some(x.value().clone())
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<File>>())
+
+    match extension {
+        ".json" | ".arrow" => Ok(FILES
+            .iter()
+            .filter_map(|x| {
+                if x.key().starts_with(&path) && x.key().ends_with(extension) {
+                    Some(x.value().clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<File>>()),
+        _ => Ok(FILES
+            .iter()
+            .filter_map(|x| {
+                if x.key().starts_with(&path) {
+                    Some(x.value().clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<File>>()),
+    }
 }
 
 pub fn empty(path: &str) -> bool {
@@ -114,7 +127,7 @@ pub fn delete(path: &str, prefix: bool) -> Result<()> {
         FILES.remove(&path);
         DATA.remove(&path);
     } else {
-        let files = list(&path)?;
+        let files = list(&path, "all")?;
         for f in files {
             FILES.remove(&f.location);
             DATA.remove(&f.location);
@@ -169,7 +182,7 @@ mod tests {
         let data = Bytes::from("hello world");
         set("/hello3", data.clone()).unwrap();
         assert_eq!(get("/hello3").unwrap(), data);
-        let files = list("/hello3").unwrap();
+        let files = list("/hello3", "all").unwrap();
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].location, "/hello3");
     }
@@ -199,8 +212,8 @@ mod tests {
     fn test_empty() {
         let data = Bytes::from("hello world");
         set("/hello6/a", data.clone()).unwrap();
-        assert!(!list("/hello6").unwrap().is_empty());
+        assert!(!list("/hello6", "all").unwrap().is_empty());
         delete("/hello6/a", true).unwrap();
-        assert!(list("/hello6").unwrap().is_empty());
+        assert!(list("/hello6", "all").unwrap().is_empty());
     }
 }
