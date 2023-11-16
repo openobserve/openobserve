@@ -173,6 +173,7 @@ pub async fn search(
         );
     } else {
         for file in files {
+            println!("File name is {}", &file.location);
             let schema_version = get_schema_version(&file.location)?;
             let entry = files_group.entry(schema_version).or_default();
             entry.push(FileKey::from_file_name(&file.location));
