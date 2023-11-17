@@ -23,17 +23,38 @@
         :chart="searchObj.data.histogram"
         @updated:chart="onChartUpdate"
         /> -->
-        <ChartRenderer
+      <ChartRenderer
         data-test="logs-search-result-bar-chart"
         id="traces_scatter_chart"
         :data="plotChart"
         v-show="searchObj.meta.showHistogram"
-        style="height: 150px;"
+        style="height: 150px"
         @updated:dataZoom="onChartUpdate"
         @click="onChartClick"
       />
 
       <q-virtual-scroll
+        id="tracesSearchGridComponent"
+        style="height: 400px"
+        :items="searchObj.data.queryResults.hits"
+        class="traces-table-container"
+        v-slot="{ item, index }"
+        :virtual-scroll-item-size="25"
+        :virtual-scroll-sticky-size-start="0"
+        :virtual-scroll-sticky-size-end="0"
+        :virtual-scroll-slice-size="50"
+        :virtual-scroll-slice-ratio-before="10"
+        @virtual-scroll="onScroll"
+      >
+        <q-item :key="index" dense>
+          <TraceBlock
+            :item="item"
+            :index="index"
+            @click="expandRowDetail(item)"
+          />
+        </q-item>
+      </q-virtual-scroll>
+      <!-- <q-virtual-scroll
         data-test="logs-search-result-logs-table"
         id="tracesSearchGridComponent"
         type="table"
@@ -102,7 +123,7 @@
                 :content="
                   column.name == 'source'
                     ? column.prop(row)
-                    : column.prop(row, column.name).length > 100
+                    : column.prop(row, column.name)?.length > 100
                     ? column.prop(row, column.name).substr(0, 100) + '...'
                     : column.name === 'duration'
                     ? column.format(row[column.name])
@@ -146,7 +167,7 @@
               </div>
             </q-td> </q-tr
         ></template>
-      </q-virtual-scroll>
+      </q-virtual-scroll> -->
       <q-dialog
         v-model="searchObj.meta.showTraceDetails"
         position="right"
@@ -172,15 +193,16 @@ import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import TraceDetails from "./TraceDetails.vue";
-import {convertTraceData} from "@/utils/traces/convertTraceData";
+import { convertTraceData } from "@/utils/traces/convertTraceData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
+import TraceBlock from "./TraceBlock.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
-    HighLight,
     TraceDetails,
-    ChartRenderer
+    ChartRenderer,
+    TraceBlock,
   },
   emits: [
     "update:scroll",
@@ -252,7 +274,10 @@ export default defineComponent({
         searchObj.data.histogram.layout
       ) {
         nextTick(() => {
-          plotChart.value = convertTraceData(searchObj.data.histogram, store.state.timezone);
+          plotChart.value = convertTraceData(
+            searchObj.data.histogram,
+            store.state.timezone
+          );
           // plotChart.value.forceReLayout();
         });
       }
@@ -300,9 +325,7 @@ export default defineComponent({
     };
 
     const onChartClick = (data: any) => {
-      expandRowDetail(
-        searchObj.data.queryResults.hits[data.dataIndex]
-      );
+      expandRowDetail(searchObj.data.queryResults.hits[data.dataIndex]);
     };
 
     return {

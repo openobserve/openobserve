@@ -302,7 +302,7 @@ export default defineComponent({
 
         collapseMapping.value[span.spanId] = true;
 
-        if (span.parentId && !traceTreeMock[span.parentId]) {
+        if (span.parentId && !traceTreeMock[span.parentId] && i !== 0) {
           noParentSpans.push(span);
         }
 
@@ -420,7 +420,8 @@ export default defineComponent({
         getService(span, serviceTree, "", 1, 1);
       });
       traceServiceMap.value = convertTraceServiceMapData(
-        cloneDeep(serviceTree)
+        cloneDeep(serviceTree),
+        maxDepth
       );
     };
 

@@ -513,7 +513,7 @@ export default defineComponent({
     const getDefaultRequest = () => {
       return {
         query: {
-          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time) as start_time, service_name, operation_name, count(span_id) as spans, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id, service_name, operation_name order by zo_sql_timestamp DESC`,
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time) as start_time, max(service_name) as service_name, min(operation_name) as operation_name, count(span_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from: 0,
@@ -527,7 +527,7 @@ export default defineComponent({
       return new Date(date.toISOString()).getTime() * 1000;
     };
 
-    // Function to return {chartInterval : "1 day", chartKeyFormat : "YYYY-MM-DD"}
+    // Function to return {chartInterval : "1 day", chartKeyFormat : "YYYY-MM-DD"}-
     const getChartSettings = (timestamps: {
       start_time: number | string;
       end_time: number | string;
@@ -706,7 +706,7 @@ export default defineComponent({
       });
     };
 
-    function getQueryData() {
+    async function getQueryData() {
       try {
         if (searchObj.data.stream.selectedStream.value == "") {
           return false;
@@ -742,24 +742,30 @@ export default defineComponent({
         }
 
         searchObj.data.errorCode = 0;
+        queryReq.query.from = 0;
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: "traces",
           })
-          .then((res) => {
+          .then(async (res) => {
             searchObj.loading = false;
             if (res.data.from > 0) {
               searchObj.data.queryResults.from = res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.hits.push(...res.data.hits);
+              const hits = getTracesMetaData(res.data.hits);
+              searchObj.data.queryResults.hits.push(...hits);
               // searchObj.data.queryResults.aggs.histogram.push(
               //   ...res.data.aggs.histogram
               // );
             } else {
-              searchObj.data.queryResults = res.data;
+              const hits = await getTracesMetaData(res.data.hits);
+              searchObj.data.queryResults = {
+                ...res.data,
+                hits: hits,
+              };
             }
 
             updateFieldValues(res.data.hits);
@@ -797,6 +803,47 @@ export default defineComponent({
         showErrorNotification("Search request failed");
       }
     }
+
+    const getTracesMetaData = (traces) => {
+      const traceMapping = {};
+      traces.forEach((trace) => {
+        traceMapping[trace.trace_id] = trace;
+        traceMapping[trace.trace_id].services = {};
+      });
+      const traceIds = traces.map((hit) => "'" + hit.trace_id + "'").join(",");
+      var req = getDefaultRequest();
+      req.query.sql = `select service_name, count(service_name) as count_service_name, trace_id  from default WHERE trace_id in (${traceIds}) group by trace_id, service_name`;
+      req.query.size = 10000;
+      req.query["sql_mode"] = "full";
+
+      let timestamps: any =
+        searchObj.data.datetime.type === "relative"
+          ? getConsumableRelativeTime(
+              searchObj.data.datetime.relativeTimePeriod
+            )
+          : cloneDeep(searchObj.data.datetime);
+
+      req.query.start_time = timestamps.startTime;
+      req.query.end_time = timestamps.endTime;
+
+      return new Promise((resolve, reject) => {
+        delete req.encoding;
+        searchService
+          .search({
+            org_identifier: searchObj.organizationIdetifier,
+            query: req,
+            page_type: "traces",
+          })
+          .then((res) => {
+            res.data.hits.forEach((metaData) => {
+              traceMapping[metaData.trace_id].services[metaData.service_name] =
+                metaData.count_service_name;
+            });
+            resolve(Object.values(traceMapping));
+          })
+          .finally(() => {});
+      });
+    };
 
     function extractFields() {
       try {

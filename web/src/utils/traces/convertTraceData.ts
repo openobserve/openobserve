@@ -1,19 +1,16 @@
 import { utcToZonedTime, format } from "date-fns-tz";
-export const convertTraceData = (
-    props:any,
-    timezone: string
-  ) => {
+export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
     backgroundColor: "transparent",
     grid: {
       containLabel: true,
       left: "20",
-      right:"20",
+      right: "20",
       top: "30",
       bottom: "0",
     },
     tooltip: {
-      show:true,
+      show: true,
       trigger: "axis",
       textStyle: {
         fontSize: 12,
@@ -24,19 +21,17 @@ export const convertTraceData = (
           show: true,
           fontsize: 12,
           formatter: (name: any) => {
-            if(name.axisDimension == "x")
+            if (name.axisDimension == "x")
               return `${formatDate(new Date(name.value))}`;
-            else
-              return `${name?.value?.toFixed(2)}ms`
-          }
+            else return `${name?.value?.toFixed(2)}ms`;
+          },
         },
       },
       formatter: function (name: any) {
         if (name.length == 0) return "";
         const date = new Date(name[0].data[0]);
 
-
-        const options:any = {
+        const options: any = {
           year: "numeric",
           month: "long",
           day: "numeric",
@@ -65,21 +60,24 @@ export const convertTraceData = (
         formatter: function (name: any) {
           return `${name} ms`;
         },
-      }
+      },
     },
     toolbox: {
       orient: "vertical",
-      show:true,
+      show: true,
       feature: {
         dataZoom: {
-          show:true,
+          show: true,
           yAxisIndex: "none",
         },
       },
     },
     series: [
       {
-        data: [...((props.data[0]?.x) || [])]?.map((it: any,index: any) => ([timezone != "UTC" ? utcToZonedTime(it, timezone) : it, props.data[0]?.y[index]||0])),
+        data: [...(props.data[0]?.x || [])]?.map((it: any, index: any) => [
+          timezone != "UTC" ? utcToZonedTime(it, timezone) : it,
+          props.data[0]?.y[index] || 0,
+        ]),
         type: "scatter",
         emphasis: { focus: "series" },
         symbolSize: 5,
@@ -88,95 +86,102 @@ export const convertTraceData = (
         },
       },
     ],
-   }
-    return {options};
-}
+  };
+  return { options };
+};
 
-export const convertTimelineData = (props:any)=>{  
-  const options =  {
+export const convertTimelineData = (props: any) => {
+  const options = {
     dataZoom: [
       {
-        type: 'slider',
+        type: "slider",
         xAxisIndex: 0,
-        filterMode: 'none',
+        filterMode: "none",
         height: 20,
         bottom: 20,
-        showDetail: false
-      }
+        showDetail: false,
+      },
     ],
     grid: {
       containLabel: true,
       left: "20",
-      right:"20",
+      right: "20",
       top: "30",
       bottom: "40",
     },
     yAxis: {
-      type: 'category',
-       axisTick: { show: false },
-        splitLine: { show: false },
-        axisLabel: { show: false }
+      type: "category",
+      axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: { show: false },
     },
     xAxis: {
-      type: 'value',
+      type: "value",
       axisTick: { show: false },
       splitLine: { show: false },
       axisLabel: {
-        formatter:(params:any)=>{          
-          return params+"ms"
-        }
-      }
+        formatter: (params: any) => {
+          return params + "ms";
+        },
+      },
     },
     series: [
       {
-        type: 'bar',
-        stack: 'Total',
+        type: "bar",
+        stack: "Total",
         silent: true,
         itemStyle: {
-          borderColor: 'transparent',
-          color: 'transparent'
+          borderColor: "transparent",
+          color: "transparent",
         },
         emphasis: {
           itemStyle: {
-            borderColor: 'transparent',
-            color: 'transparent'
-          }
+            borderColor: "transparent",
+            color: "transparent",
+          },
         },
-        data: props.value.data.map((it:any)=>(it.x0))
+        data: props.value.data.map((it: any) => it.x0),
       },
       {
-        type: 'bar',
-        stack: 'Total',
-        barWidth:"100%",
-        barCategoryGap:"0%",
-        data: props.value.data.map((it:any)=>({value:it.x1-it.x0,itemStyle:{color:it.fillcolor}})),
-      }
-    ]
+        type: "bar",
+        stack: "Total",
+        barWidth: "100%",
+        barCategoryGap: "0%",
+        data: props.value.data.map((it: any) => ({
+          value: it.x1 - it.x0,
+          itemStyle: { color: it.fillcolor },
+        })),
+      },
+    ],
   };
-  return {options};
-}
+  return { options };
+};
 
-export const convertTraceServiceMapData = (data:any)=>{    
-  const options =  {
+export const convertTraceServiceMapData = (
+  data: any,
+  treeDepth: number = 3
+) => {
+  const options = {
     tooltip: {
-      show:false
+      show: false,
     },
     series: [
       {
-        type: 'tree',
+        type: "tree",
         data: data,
         symbolSize: 20,
+        initialTreeDepth: treeDepth,
         label: {
           position: "bottom",
-          verticalAlign: 'bottom',
-          distance:25,
-          fontSize: 12
+          verticalAlign: "bottom",
+          distance: 25,
+          fontSize: 12,
         },
-      }
+      },
     ],
   };
-  return {options};
-}
+  return { options };
+};
 
 const formatDate = (date: any) => {
   const year = String(date.getFullYear());

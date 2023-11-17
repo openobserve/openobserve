@@ -1,0 +1,183 @@
+<template>
+  <div class="trace-container full-width px-mg cursor-pointer">
+    <div class="flex justify-between bg-indigo-1 q-px-sm q-py-xs">
+      <div class="trace-name text-subtitle1 text-bold">
+        {{ item.operation_name }}
+      </div>
+      <div class="trace-duration">
+        {{ getDuration }}
+      </div>
+    </div>
+    <div class="q-pa-sm row justify-between">
+      <div class="trace-summary flex" style="width: 156px">
+        <div class="trace-spans q-px-sm q-mr-xs">
+          <span class="">Spans : </span>
+          <span>{{ item.spans }}</span>
+        </div>
+        <div v-if="item.errors" class="trace-errors q-px-sm">
+          <span class="">Errors : </span>
+          <span>{{ item.errors }}</span>
+        </div>
+      </div>
+      <div
+        class="flex justify-start items-start q-px-md"
+        style="width: calc(100% - 332px)"
+      >
+        <template v-for="(count, service) in item.services" :key="service">
+          <div
+            class="q-mr-md flex trace-tag justify-center items-center q-mb-xs"
+            style="height: 22px; font-size: 12px"
+          >
+            <div class="bg-grey-8 full-height" style="width: 14px"></div>
+            <div class="q-mx-xs">{{ service }} ({{ count }})</div>
+          </div>
+        </template>
+      </div>
+      <div class="trace-date-time" style="width: 176px">
+        <div class="section-1 flex justify-end items-center">
+          <div style="font-size: 14px">{{ getFormattedDate.day }}</div>
+          <div
+            vertical
+            style="height: 16px; width: 2px"
+            class="q-mx-sm bg-grey-4"
+          />
+          <div style="font-size: 14px">{{ getFormattedDate.time }}</div>
+        </div>
+        <div class="section-2 text-right text-body2 text-blue-grey-8 q-pt-xs">
+          {{ getFormattedDate.diff }}
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from "vue";
+import { date, date as qDate } from "quasar";
+import {
+  timestampToTimezoneDate,
+  formatDuration,
+  formatTimeWithSuffix,
+} from "@/utils/zincutils";
+import { useStore } from "vuex";
+const props = defineProps({
+  item: {
+    type: Object,
+    default: () => {},
+  },
+  index: {
+    type: Number,
+    default: 0,
+  },
+});
+
+const store = useStore();
+
+const getFormattedDate = computed(() => {
+  const date1 = timestampToTimezoneDate(
+    props.item["start_time"] / 1000000,
+    store.state.timezone,
+    "MMM dd, yyyy HH:mm:ss.SSS Z"
+  );
+  const date2 = timestampToTimezoneDate(
+    new Date().getTime(),
+    store.state.timezone,
+    "MMM dd, yyyy HH:mm:ss.SSS Z"
+  );
+
+  const difference = qDate.getDateDiff(date2, date1, "seconds");
+  const minDiff = qDate.getDateDiff(date2, date1, "minutes");
+  const daysDiff = qDate.getDateDiff(date2, date1, "days");
+
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  // const date = new Date(props.item.start_time.toISOString());
+  const date3 = {
+    day: "",
+    time: "",
+    diff: "",
+  };
+  if (difference < 86400) date3.day = "Today";
+  else if (difference < 86400 * 2) date3.day = "Yesterday";
+  else
+    date3.day =
+      new Date(date1).getDate().toString() +
+      " " +
+      months[new Date(date1).getMonth()];
+
+  date3.time = formatDateTo12Hour(new Date(date1));
+
+  if (minDiff > 1440) {
+    date3.diff = Math.floor(minDiff / 1440).toString() + " days ago";
+  } else if (minDiff > 60) {
+    date3.diff = Math.floor(minDiff / 60).toString() + " hours ago";
+  } else {
+    date3.diff = minDiff.toString() + " minutes ago";
+  }
+
+  return date3;
+});
+
+function formatDateTo12Hour(date: any) {
+  let hours = date.getHours();
+  let minutes = date.getMinutes();
+  let seconds = date.getSeconds();
+  let ampm = hours >= 12 ? "PM" : "AM";
+
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+  minutes = minutes < 10 ? "0" + minutes : minutes;
+
+  hours = hours < 10 ? "0" + hours : hours;
+  seconds = seconds < 10 ? "0" + seconds : seconds;
+  let strTime = hours + ":" + minutes + ":" + seconds + " " + ampm;
+  return strTime;
+}
+
+const getDuration = computed(() => {
+  return formatTimeWithSuffix(props.item.duration);
+});
+</script>
+
+<style scoped lang="scss">
+.trace-container,
+.trace-spans,
+.trace-errors,
+.trace-tag {
+  border: 1px solid #ececec;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.trace-spans,
+.trace-errors {
+  width: fit-content;
+}
+
+.trace-errors {
+  border: 1px solid #ef9a9a;
+  color: #cd4545;
+}
+
+.trace-spans {
+  border: 1px solid #dddddd;
+  color: #555454;
+}
+
+.trace-summary {
+  height: fit-content;
+}
+</style>
