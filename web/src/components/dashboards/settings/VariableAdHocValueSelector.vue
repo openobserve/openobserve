@@ -15,7 +15,15 @@
                 </q-item>
             </template>
         </q-select>
-        <!-- <q-select style="min-width: 150px;" filled outlined dense v-model="selectedValue"></q-select> -->
+        <q-select
+          dense
+          filled
+          v-model="selectedOperator"
+          :display-value="selectedOperator ? selectedOperator : ''"
+          :options="operatorOptions"
+          label="Operator"
+          style="width: 100%"
+        />
     </div>
 </template>
 
@@ -31,6 +39,8 @@ export default defineComponent({
         console.log('VariableAdHocValueSelector');
 
         const selectedValue = ref(String(props.variableItem?.value));
+        const operatorOptions = ['+', '=', '<', '>', '<=', '>=']; 
+        const selectedOperator = ref(operatorOptions[0]);
         const options = toRef(props.variableItem, 'options');
         const isSelectVisible = ref(false);
 
@@ -47,8 +57,9 @@ export default defineComponent({
             }
         };
 
-        watch(selectedValue, () => {
-            emit('update:modelValue', selectedValue.value);
+        watch([selectedValue, selectedOperator], () => {
+            // Emit both selected value and selected operator
+            emit('update:modelValue', { value: selectedValue.value, operator: selectedOperator.value });
         });
 
         return {
@@ -57,6 +68,8 @@ export default defineComponent({
             fieldsFilteredOptions,
             isSelectVisible,
             addFields,
+            operatorOptions,
+            selectedOperator,
         };
     },
 });
