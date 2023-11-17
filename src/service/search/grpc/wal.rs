@@ -57,7 +57,7 @@ pub async fn search(
     timeout: u64,
 ) -> super::SearchResult {
     // get file list
-    let mut files = get_file_list(&sql, stream_type, FILE_EXT_JSON).await?;
+    let mut files = get_file_list(session_id, &sql, stream_type, FILE_EXT_JSON).await?;
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
     let mut scan_stats = ScanStats::new();
 
@@ -313,6 +313,7 @@ pub async fn search(
 /// get file list from local wal, no need match_source, each file will be searched
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
+    session_id: &str,
     sql: &Sql,
     stream_type: meta::StreamType,
     extension: &str,
@@ -439,7 +440,7 @@ pub async fn search_arrow(
     timeout: u64,
 ) -> super::SearchResult {
     // get file list
-    let mut files = get_file_list(&sql, stream_type, FILE_EXT_ARROW).await?;
+    let mut files = get_file_list(session_id, &sql, stream_type, FILE_EXT_ARROW).await?;
     let mut scan_stats = ScanStats::new();
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 

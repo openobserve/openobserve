@@ -25,7 +25,7 @@ use tokio::{sync::Semaphore, task, time};
 use crate::common::{
     infra::{
         cluster,
-        config::{COLUMN_TRACE_ID, CONFIG, FILE_EXT_ARROW},
+        config::{CONFIG, FILE_EXT_ARROW},
         metrics, storage, wal,
     },
     meta::{common::FileMeta, StreamType},
@@ -36,9 +36,7 @@ use crate::common::{
     },
 };
 use crate::service::{
-    db,
-    schema::{filter_schema_null_fields, schema_evolution},
-    search::datafusion::new_parquet_writer,
+    db, schema::schema_evolution, search::datafusion::new_parquet_writer,
     usage::report_compression_stats,
 };
 
