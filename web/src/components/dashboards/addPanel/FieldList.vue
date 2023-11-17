@@ -213,8 +213,10 @@ export default defineComponent({
       () => [data.schemaList, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type],
       () => {
 
+        // get the selected stream fields based on the selected stream type
         const fields: any = data.schemaList.find(
-          (it: any) => it.name == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream
+          (it: any) => it.name == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream &&
+            it.stream_type == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type
         );
         dashboardPanelData.meta.stream.selectedStreamFields =
           fields?.schema || [];
@@ -242,7 +244,10 @@ export default defineComponent({
         data.indexOptions.length > 0
       ) {
         const currentIndex = dashboardPanelData.layout.currentQueryIndex;
-        if (selectedStreamForQueries.value[currentIndex]) {
+        // Check if selected stream for current query exists in index options
+        // If not, set the first index option as the selected stream
+        if (selectedStreamForQueries.value[currentIndex] && 
+          data.indexOptions.find((it: any) => it.name == selectedStreamForQueries.value[currentIndex])) {
           dashboardPanelData.data.queries[currentIndex].fields.stream = selectedStreamForQueries.value[currentIndex];
         } else {
           dashboardPanelData.data.queries[currentIndex].fields.stream = data.indexOptions[0]?.name;
