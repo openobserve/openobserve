@@ -31,7 +31,7 @@ use crate::common::{
         errors::{Error, ErrorCodes},
         wal,
     },
-    meta::{self, common::FileKey, search::SearchType, stream::ScanStats},
+    meta::{self, common::FileKey, search::SearchType, stream::ScanStats, StreamType},
     utils::{
         file::{get_file_contents, get_file_meta, scan_files},
         schema::infer_json_schema,
@@ -79,11 +79,28 @@ pub async fn search(
                         if let Some(last_line) = s.lines().last() {
                             if serde_json::from_str::<serde_json::Value>(last_line).is_err() {
                                 // remove last line
+                                // filter by stream name if data is for metrics
                                 file_data = file_data[..file_data.len() - last_line.len()].to_vec();
                             }
                         }
                     }
                 }
+                if stream_type.eq(&StreamType::Metrics) {
+                    let metric_key = format!("\"__name__\":\"{}\"", &sql.stream_name);
+                    if let Ok(s) = String::from_utf8(file_data.clone()) {
+                        let filtered_lines: Vec<&str> = s
+                            .lines()
+                            .filter(|line| line.contains(&metric_key))
+                            .collect();
+
+                        // Convert the filtered lines back to a single String
+                        let filtered_content = filtered_lines.join("\n");
+
+                        // Convert the String back to a Vec<u8>
+                        file_data = filtered_content.into_bytes();
+                    }
+                }
+
                 scan_stats.original_size += file_data.len() as i64;
                 let file_name = format!("/{work_dir}/{}", file.key);
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
