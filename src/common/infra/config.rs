@@ -59,7 +59,6 @@ pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
 pub const HAS_FUNCTIONS: bool = true;
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
-pub const COLUMN_TRACE_ID: &str = "trace_id";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "events", "json"];
@@ -115,6 +114,29 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
             .unwrap(),
         CONFIG.common.telemetry_url.clone(),
     )
+});
+
+pub static BLOOM_FILTER_DEFAULT_COLUMNS: Lazy<Option<Vec<String>>> = Lazy::new(|| {
+    if !CONFIG.common.bloom_filter_enabled || CONFIG.common.bloom_filter_default_columns.is_empty()
+    {
+        None
+    } else {
+        Some(
+            CONFIG
+                .common
+                .bloom_filter_default_columns
+                .split(',')
+                .filter_map(|s| {
+                    let s = s.trim();
+                    if s.is_empty() {
+                        None
+                    } else {
+                        Some(s.to_string())
+                    }
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
 });
 
 // global cache variables
@@ -295,8 +317,10 @@ pub struct Common {
     pub ui_sql_base64_enabled: bool,
     #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
     pub metrics_dedup_enabled: bool,
-    #[env_config(name = "ZO_TRACES_BLOOM_FILTER_ENABLED", default = false)]
-    pub traces_bloom_filter_enabled: bool,
+    #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = false)]
+    pub bloom_filter_enabled: bool,
+    #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_COLUMNS", default = "")]
+    pub bloom_filter_default_columns: String,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
@@ -408,11 +432,10 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
-    #[env_config(name = "ZO_COMPACT_FAKE_MODE", default = false)]
-    // this mode will skip merge file, just print the log
-    pub fake_mode: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
     pub interval: u64,
+    #[env_config(name = "ZO_COMPACT_STEP_SECS", default = 3600)] // seconds
+    pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 1800)] // seconds
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
@@ -702,6 +725,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.interval == 0 {
         cfg.compact.interval = 60;
+    }
+    // check compact_step_secs, min value is 600s
+    if cfg.compact.step_secs == 0 {
+        cfg.compact.step_secs = 3600;
+    } else if cfg.compact.step_secs <= 600 {
+        cfg.compact.step_secs = 600;
     }
     if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
         return Err(anyhow::anyhow!(

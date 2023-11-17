@@ -77,6 +77,7 @@ pub(crate) async fn create_context(
 
     // get file list
     let mut files = get_file_list(
+        session_id,
         org_id,
         stream_name,
         partition_time_level,
@@ -144,8 +145,9 @@ pub(crate) async fn create_context(
     Ok((ctx, schema, scan_stats))
 }
 
-#[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip_all, fields(org_id = org_id, stream_name = stream_name))]
+#[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip_all, fields(session_id = ?session_id, org_id = org_id, stream_name = stream_name))]
 async fn get_file_list(
+    session_id: &str,
     org_id: &str,
     stream_name: &str,
     time_level: PartitionTimeLevel,
@@ -166,7 +168,7 @@ async fn get_file_list(
     {
         Ok(results) => results,
         Err(err) => {
-            log::error!("get file list error: {}", err);
+            log::error!("[session_id {session_id}] get file list error: {}", err);
             return Err(DataFusionError::Execution(
                 "get file list error".to_string(),
             ));
@@ -215,20 +217,25 @@ async fn cache_parquet_files(
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
+        let session_id = "";
         let file_name = file.key.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = match cache_type {
                 file_data::CacheType::Memory => {
                     if !file_data::memory::exist(&file_name).await {
-                        file_data::memory::download(&file_name).await.err()
+                        file_data::memory::download(session_id, &file_name)
+                            .await
+                            .err()
                     } else {
                         None
                     }
                 }
                 file_data::CacheType::Disk => {
                     if !file_data::disk::exist(&file_name).await {
-                        file_data::disk::download(&file_name).await.err()
+                        file_data::disk::download(session_id, &file_name)
+                            .await
+                            .err()
                     } else {
                         None
                     }

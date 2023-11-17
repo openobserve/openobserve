@@ -17,7 +17,7 @@ keywords = [
 license = "Apache-2.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.7.0"
+version = "0.7.1"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -46,8 +46,8 @@ actix-cors = "0.6"
 actix-multipart = { version = "0.6", features = ["derive"] }
 actix-web = "4.4"
 actix-web-httpauth = "0.8"
-actix-web-lab = "0.19.1"
-actix-web-opentelemetry = { version = "0.15", features = ["metrics"] }
+actix-web-lab = "0.20"
+actix-web-opentelemetry = { version = "0.16", features = ["metrics"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
   "support-rust-embed-for-web",
@@ -55,11 +55,11 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
 ] }
 ahash = { version = "0.8", features = ["serde"] }
 anyhow = "1.0"
-argon2 = { version = "0.4", features = ["alloc", "password-hash"] }
+argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
 async-trait = "0.1"
 async_once = "0.2"
 async-recursion = "1.0"
-awc = "3.1"
+awc = "3.2"
 aws-config = "0.56.1"
 aws-sdk-dynamodb = "0.30.0"
 base64 = "0.21"
@@ -77,31 +77,32 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { version = "31", features = ["simd"] }
-arrow = { version = "46", features = ["simd", "ipc_compression"] }
-arrow-schema = { version = "46", features = ["serde"] }
-parquet = { version = "46", features = ["arrow", "async"] }
+datafusion = { version = "33", features = ["simd"] }
+datafusion-expr = "33"
+arrow = { version = "48", features = ["simd", "ipc_compression"] }
+arrow-schema = { version = "48", features = ["serde"] }
+parquet = { version = "48", features = ["arrow", "async"] }
+object_store = { version = "0.7", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
-etcd-client = { version = "0.11", features = ["tls"] }
+etcd-client = { version = "0.12", features = ["tls"] }
 faststr = "0.2"
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 get_if_addrs = "0.5"
 glob = "0.3"
+hashlink = "0.8.4"
 hex = "0.4"
 http-auth-basic = "0.3"
 indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"
-itertools = "0.11"
+itertools = "0.12"
 lazy_static = "1.4"
 log = "0.4"
-lru = "0.10"
 maxminddb = "0.23.0"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
-object_store = { version = "0.7", features = ["aws", "azure", "gcp"] }
 once_cell = "1.17"
 opentelemetry = { version = "0.18", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.11", features = [
@@ -126,7 +127,7 @@ rand = "0.8"
 getrandom = "0.2.11"
 rayon = "1.7.0"
 regex = "1.7"
-regex-syntax = "0.6"
+regex-syntax = "0.8"
 reqwest = { version = "0.11", default-features = false, features = [
   "rustls-tls",
   "stream",
@@ -136,17 +137,18 @@ rust-embed-for-web = "11.1"
 segment = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-simd-json = "0.10.3"
+sha256 = "1.4.0"
+simd-json = "0.13"
 sled = "0.34"
 snap = "1"
-sqlparser = { version = "0.37", features = ["serde"] }
+sqlparser = { version = "0.39", features = ["serde", "visitor"] }
 sqlx = { version = "0.7", features = [
   "runtime-tokio-rustls",
   "postgres",
   "sqlite",
   "chrono",
 ] }
-strum = { version = "0.24", features = ["derive"] }
+strum = { version = "0.25", features = ["derive"] }
 sysinfo = "0.29"
 syslog_loose = "0.18.0"
 thiserror = "1.0"
@@ -161,22 +163,20 @@ tracing-opentelemetry = "0.18"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uaparser = "0.6.1"
 url = "2.2"
-utoipa = { version = "3", features = ["actix_extras", "openapi_extensions"] }
-utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
+utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
+utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "8eb52562" }
 vrl = { version = "0.6.0", features = ["value", "compiler"] }
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
-zstd = "0.12"
-sha256 = "1.4.0"
+zstd = "0.13"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
+prost-build = "0.11"
 
 [dev-dependencies]
-datafusion-expr = "31"
 expect-test = "1.4"
 float-cmp = "0.9"

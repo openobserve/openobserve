@@ -37,6 +37,7 @@ use crate::common::{
 };
 use crate::service::{
     db,
+    schema::filter_schema_null_fields,
     search::{
         datafusion::{exec, storage::StorageType},
         sql::Sql,
@@ -44,7 +45,7 @@ use crate::service::{
 };
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:wal:enter", skip_all, fields(session_id = ?session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
@@ -52,7 +53,7 @@ pub async fn search(
     timeout: u64,
 ) -> super::SearchResult {
     // get file list
-    let mut files = get_file_list(&sql, stream_type).await?;
+    let mut files = get_file_list(session_id, &sql, stream_type).await?;
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
     let mut scan_stats = ScanStats::new();
 
@@ -62,7 +63,10 @@ pub async fn search(
         let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
         match get_file_contents(&source_file) {
             Err(_) => {
-                log::error!("skip wal file: {} get file content error", &file.key);
+                log::error!(
+                    "[session_id {session_id}] skip wal file: {} get file content error",
+                    &file.key
+                );
                 files.retain(|x| x != file);
             }
             Ok(file_data) => {
@@ -105,7 +109,7 @@ pub async fn search(
         return Ok((HashMap::new(), scan_stats));
     }
     log::info!(
-        "wal->search: load files {}, scan_size {}",
+        "[session_id {session_id}] wal->search: load files {}, scan_size {}",
         scan_stats.files,
         scan_stats.original_size
     );
@@ -114,7 +118,7 @@ pub async fn search(
     let schema_latest = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(err) => {
-            log::error!("get schema error: {}", err);
+            log::error!("[session_id {session_id}] get schema error: {}", err);
             // release all files
             wal::release_files(&lock_files).await;
             tmpfs::delete(session_id, true).unwrap();
@@ -163,6 +167,7 @@ pub async fn search(
                 return Err(Error::from(err));
             }
         };
+        filter_schema_null_fields(&mut inferred_schema);
         // calulate schema diff
         let mut diff_fields = HashMap::new();
         let group_fields = inferred_schema.fields();
@@ -254,7 +259,10 @@ pub async fn search(
                 }
             }
             Err(err) => {
-                log::error!("datafusion execute error: {}", err);
+                log::error!(
+                    "[session_id {session_id}] datafusion execute error: {}",
+                    err
+                );
                 // release all files
                 wal::release_files(&lock_files).await;
                 tmpfs::delete(session_id, true).unwrap();
@@ -272,8 +280,12 @@ pub async fn search(
 }
 
 /// get file list from local wal, no need match_source, each file will be searched
-#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
-async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<FileKey>, Error> {
+#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(session_id = ?session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+async fn get_file_list(
+    session_id: &str,
+    sql: &Sql,
+    stream_type: meta::StreamType,
+) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
         Ok(path) => path.to_str().unwrap().to_string(),
         Err(_) => {
@@ -314,7 +326,10 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
             let file_meta = match get_file_meta(&source_file) {
                 Ok(meta) => meta,
                 Err(_) => {
-                    log::error!("skip wal file: {} get file meta error", file);
+                    log::error!(
+                        "[session_id {session_id}] skip wal file: {} get file meta error",
+                        file
+                    );
                     wal::release_files(&[file.clone()]).await;
                     continue;
                 }
@@ -340,7 +355,7 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<F
                 || (time_range.1 > 0 && file_created > time_range.1)
             {
                 log::info!(
-                    "skip wal file: {} time_range: [{},{}]",
+                    "[session_id {session_id}] skip wal file: {} time_range: [{},{}]",
                     file,
                     file_created,
                     file_modified

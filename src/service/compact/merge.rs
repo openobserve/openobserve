@@ -94,18 +94,23 @@ pub async fn merge_by_stream(
         )
         .unwrap()
         .timestamp_micros();
-    // if offset is future, just wait
-    // if offset is last hour, must wait for at least 3 times of max_file_retention_time
-    // - first period: the last hour local file upload to storage, write file list
-    // - second period, the last hour file list upload to storage
-    // - third period, we can do the merge, at least 3 times of max_file_retention_time
-    if offset >= time_now_hour
-        || (offset_time_hour + Duration::hours(1).num_microseconds().unwrap() == time_now_hour
-            && time_now.timestamp_micros() - time_now_hour
-                < Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
-                    .num_microseconds()
-                    .unwrap()
-                    * 3)
+    // 1. if step_secs less than 1 hour, must wait for at least max_file_retention_time
+    // 2. if step_secs greater than 1 hour, must wait for at least 3 * max_file_retention_time
+    // -- first period: the last hour local file upload to storage, write file list
+    // -- second period, the last hour file list upload to storage
+    // -- third period, we can do the merge, so, at least 3 times of max_file_retention_time
+    if (CONFIG.compact.step_secs < 3600
+        && time_now.timestamp_micros() - offset
+            <= Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+                .num_microseconds()
+                .unwrap())
+        || (CONFIG.compact.step_secs >= 3600
+            && (offset >= time_now_hour
+                || time_now.timestamp_micros() - time_now_hour
+                    <= Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+                        .num_microseconds()
+                        .unwrap()
+                        * 3))
     {
         return Ok(()); // the time is future, just wait
     }
@@ -133,7 +138,10 @@ pub async fn merge_by_stream(
         // if offset > 0 && offset_time_hour + Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() < time_now_hour {
         // -- no check it
         // }
-        let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
+        let offset = offset
+            + Duration::seconds(CONFIG.compact.step_secs)
+                .num_microseconds()
+                .unwrap();
         db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
         return Ok(());
     }
@@ -207,7 +215,10 @@ pub async fn merge_by_stream(
     }
 
     // write new offset
-    let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
+    let offset = offset
+        + Duration::seconds(CONFIG.compact.step_secs)
+            .num_microseconds()
+            .unwrap();
     db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
 
     // update stream stats
@@ -345,10 +356,6 @@ async fn merge_files(
             }
 
             // do the convert
-            if CONFIG.compact.fake_mode {
-                log::info!("[COMPACT] fake convert parquet file: {}", &file.key);
-                continue;
-            }
             let mut buf = Vec::new();
             let file_tmp_dir = cache::tmpfs::Directory::default();
             let file_data = storage::get(&file.key).await?;
@@ -370,23 +377,10 @@ async fn merge_files(
         }
     }
 
-    // FAKE MODE
-    if CONFIG.compact.fake_mode {
-        log::info!(
-            "[COMPACT] fake merge file succeeded, new file: fake.parquet, orginal_size: {new_file_size}, compressed_size: 0", 
-        );
-        return Ok(("".to_string(), FileMeta::default(), vec![]));
-    }
-
     let mut buf = Vec::new();
-    let mut new_file_meta = datafusion::exec::merge_parquet_files(
-        tmp_dir.name(),
-        &mut buf,
-        schema,
-        stream_type,
-        new_file_size,
-    )
-    .await?;
+    let mut new_file_meta =
+        datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema, new_file_size)
+            .await?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.records == 0 {

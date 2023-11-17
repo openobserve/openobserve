@@ -17,7 +17,7 @@ use std::io::Error;
 use actix_web::{http, HttpResponse};
 
 use crate::common::meta::{
-    dashboards::{DEFAULT_FOLDER, Folder, FolderList},
+    dashboards::{Folder, FolderList, DEFAULT_FOLDER},
     http::HttpResponse as MetaHttpResponse,
 };
 use crate::service::db;

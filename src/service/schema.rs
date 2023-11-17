@@ -277,7 +277,9 @@ pub async fn check_for_schema(
     }
 
     let mut schema_reader = BufReader::new(val_str.as_bytes());
-    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
+    let mut inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
+    filter_schema_null_fields(&mut inferred_schema);
+
     if schema.fields.eq(&inferred_schema.fields) {
         //return (true, None, schema.fields().to_vec());
         return SchemaEvolution {
@@ -709,7 +711,8 @@ pub async fn add_stream_schema(
     let mut local_file = file;
     local_file.seek(SeekFrom::Start(0)).unwrap();
     let mut schema_reader = BufReader::new(local_file);
-    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
+    let mut inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
+    filter_schema_null_fields(&mut inferred_schema);
 
     let existing_schema = stream_schema_map.get(&stream_name.to_string());
     let mut metadata = match existing_schema {
@@ -776,6 +779,28 @@ pub async fn set_schema_metadata(
         false,
     )
     .await
+}
+
+pub fn filter_schema_null_fields(schema: &mut Schema) {
+    let fields = schema.fields();
+    if fields
+        .iter()
+        .filter(|f| f.data_type() == &DataType::Null)
+        .count()
+        > 0
+    {
+        let fields = fields
+            .iter()
+            .filter_map(|f| {
+                if f.data_type() == &DataType::Null {
+                    None
+                } else {
+                    Some(f.as_ref().to_owned())
+                }
+            })
+            .collect::<Vec<_>>();
+        *schema = Schema::new(fields.to_vec());
+    }
 }
 
 #[cfg(test)]

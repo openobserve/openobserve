@@ -18,11 +18,7 @@ use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::{
-    infra::{
-        cluster,
-        config::{COLUMN_TRACE_ID, CONFIG},
-        metrics, storage, wal,
-    },
+    infra::{cluster, config::CONFIG, metrics, storage, wal},
     meta::{common::FileMeta, StreamType},
     utils::{
         json,
@@ -31,7 +27,9 @@ use crate::common::{
     },
 };
 use crate::service::{
-    db, schema::schema_evolution, search::datafusion::new_parquet_writer,
+    db,
+    schema::{filter_schema_null_fields, schema_evolution},
+    search::datafusion::new_parquet_writer,
     usage::report_compression_stats,
 };
 
@@ -181,8 +179,9 @@ async fn upload_file(
     let mut res_records: Vec<json::Value> = vec![];
     let mut schema_reader = BufReader::new(buf.as_ref());
     let inferred_schema = match infer_json_schema(&mut schema_reader, None, stream_type) {
-        Ok(inferred_schema) => {
+        Ok(mut inferred_schema) => {
             drop(schema_reader);
+            filter_schema_null_fields(&mut inferred_schema);
             inferred_schema
         }
         Err(err) => {
@@ -210,7 +209,10 @@ async fn upload_file(
                 return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
             }
             let value_iter = res_records.iter().map(Ok);
-            infer_json_schema_from_iterator(value_iter, stream_type).unwrap()
+            let mut inferred_schema =
+                infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
+            filter_schema_null_fields(&mut inferred_schema);
+            inferred_schema
         }
     };
     let arrow_schema = Arc::new(inferred_schema);
@@ -251,13 +253,7 @@ async fn upload_file(
 
     // write parquet file
     let mut buf_parquet = Vec::new();
-    let bf_fields =
-        if CONFIG.common.traces_bloom_filter_enabled && stream_type == StreamType::Traces {
-            Some(vec![COLUMN_TRACE_ID])
-        } else {
-            None
-        };
-    let mut writer = new_parquet_writer(&mut buf_parquet, &arrow_schema, &file_meta, bf_fields);
+    let mut writer = new_parquet_writer(&mut buf_parquet, &arrow_schema, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }

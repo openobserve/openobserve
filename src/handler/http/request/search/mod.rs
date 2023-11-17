@@ -104,6 +104,8 @@ pub async fn search(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let session_id = uuid::Uuid::new_v4().to_string();
+
     let org_id = org_id.into_inner();
     let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -145,7 +147,7 @@ pub async fn search(
     let took_wait = start.elapsed().as_millis() as usize;
 
     // do search
-    match SearchService::search(&org_id, stream_type, &req).await {
+    match SearchService::search(&session_id, &org_id, stream_type, &req).await {
         Ok(mut res) => {
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
@@ -270,6 +272,8 @@ pub async fn around(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let session_id = uuid::Uuid::new_v4().to_string();
+
     let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -340,7 +344,7 @@ pub async fn around(
         encoding: meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_forward = match SearchService::search(&org_id, stream_type, &req).await {
+    let resp_forward = match SearchService::search(&session_id, &org_id, stream_type, &req).await {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
@@ -394,7 +398,7 @@ pub async fn around(
         encoding: meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_backward = match SearchService::search(&org_id, stream_type, &req).await {
+    let resp_backward = match SearchService::search(&session_id, &org_id, stream_type, &req).await {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
@@ -575,6 +579,8 @@ async fn values_v1(
     query: &web::Query<AHashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let session_id = uuid::Uuid::new_v4().to_string();
+
     let mut uses_fn = false;
     let fields = match query.get("fields") {
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
@@ -670,7 +676,7 @@ async fn values_v1(
                 ),
             );
     }
-    let resp_search = match SearchService::search(org_id, stream_type, &req).await {
+    let resp_search = match SearchService::search(&session_id, org_id, stream_type, &req).await {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
@@ -769,6 +775,8 @@ async fn values_v2(
     query: &web::Query<AHashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let session_id = uuid::Uuid::new_v4().to_string();
+
     let mut query_sql =  format!("SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'", stream_type,stream_name,field);
     if let Some((key, val)) = filter {
         query_sql = format!(
@@ -817,39 +825,40 @@ async fn values_v2(
         encoding: meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_search = match SearchService::search(org_id, StreamType::Metadata, &req).await {
-        Ok(res) => res,
-        Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_values/v2",
-                    "500",
-                    org_id,
-                    stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_values/v2",
-                    "500",
-                    org_id,
-                    stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
-            log::error!("search values error: {:?}", err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
-        }
-    };
+    let resp_search =
+        match SearchService::search(&session_id, org_id, StreamType::Metadata, &req).await {
+            Ok(res) => res,
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/api/org/_values/v2",
+                        "500",
+                        org_id,
+                        stream_name,
+                        stream_type.to_string().as_str(),
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/api/org/_values/v2",
+                        "500",
+                        org_id,
+                        stream_name,
+                        stream_type.to_string().as_str(),
+                    ])
+                    .inc();
+                log::error!("search values error: {:?}", err);
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                        .json(meta::http::HttpResponse::error_code(code)),
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
+            }
+        };
 
     let mut resp = meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();

@@ -27,5 +27,7 @@ phases:
       - pwd
       - mkdir -p web/dist 
       - touch web/dist/index.html
+
+      # run tests
       - cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
       - ./coverage.sh

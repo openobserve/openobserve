@@ -400,7 +400,7 @@ async fn _get_stream_stats(
         encoding: meta::search::RequestEncoding::Empty,
         timeout: 0,
     };
-    match SearchService::search(&CONFIG.common.usage_org, meta::StreamType::Logs, &req).await {
+    match SearchService::search("", &CONFIG.common.usage_org, meta::StreamType::Logs, &req).await {
         Ok(res) => {
             let mut all_stats = HashMap::new();
             for item in res.hits {

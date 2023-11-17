@@ -43,17 +43,17 @@ use std::{str::FromStr, sync::Arc};
 use crate::common::{
     infra::{
         cache::tmpfs,
-        config::{COLUMN_TRACE_ID, CONFIG, PARQUET_BATCH_SIZE},
+        config::{CONFIG, PARQUET_BATCH_SIZE},
     },
     meta::{
         common::{FileKey, FileMeta},
         functions::VRLResultResolver,
         search::{SearchType, Session as SearchSession},
-        sql, StreamType,
+        sql,
     },
     utils::{flatten, json},
 };
-use crate::service::search::sql::Sql;
+use crate::service::{schema::filter_schema_null_fields, search::sql::Sql};
 
 use super::storage::{file_list, StorageType};
 use super::transform_udf::get_all_transform;
@@ -77,6 +77,7 @@ pub async fn sql(
     }
 
     let start = std::time::Instant::now();
+    let session_id = session.id.clone();
     let mut ctx = register_table(session, schema.clone(), "tbl", files, file_type.clone()).await?;
 
     // register UDF
@@ -105,7 +106,10 @@ pub async fn sql(
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
         if CONFIG.common.print_key_sql {
-            log::info!("Query agg sql: {}", orig_agg_sql.0);
+            log::info!(
+                "[session_id {session_id}] Query agg sql: {}",
+                orig_agg_sql.0
+            );
         }
 
         let mut agg_sql = orig_agg_sql.0.to_owned();
@@ -151,7 +155,7 @@ pub async fn sql(
         let batches = df.collect().await?;
         result.insert(format!("agg_{name}"), batches);
         log::info!(
-            "Query agg:{name} took {:.3} seconds.",
+            "[session_id {session_id}] Query agg:{name} took {:.3} seconds.",
             start.elapsed().as_secs_f64()
         );
     }
@@ -159,7 +163,7 @@ pub async fn sql(
     // drop table
     ctx.deregister_table("tbl")?;
     log::info!(
-        "Query all took {:.3} seconds.",
+        "[session_id {session_id}] Query all took {:.3} seconds.",
         start.elapsed().as_secs_f64()
     );
 
@@ -176,6 +180,7 @@ async fn exec_query(
     file_type: FileType,
 ) -> Result<Vec<RecordBatch>> {
     let start = std::time::Instant::now();
+    let session_id = session.id.clone();
 
     let mut fast_mode = false;
     let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
@@ -229,14 +234,14 @@ async fn exec_query(
 
     // Debug SQL
     if CONFIG.common.print_key_sql {
-        log::info!("Query sql: {}", query);
+        log::info!("[session_id {session_id}] Query sql: {}", query);
     }
 
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
         Err(e) => {
             log::error!(
-                "query sql execute failed, session: {:?}, sql: {}, err: {:?}",
+                "[session_id {session_id}] query sql execute failed, session: {:?}, sql: {}, err: {:?}",
                 session,
                 sql.origin_sql,
                 e
@@ -268,7 +273,10 @@ async fn exec_query(
 
     if field_fns.is_empty() && sql.query_fn.is_none() {
         let batches = df.clone().collect().await?;
-        log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
+        log::info!(
+            "[session_id {session_id}] Query took {:.3} seconds.",
+            start.elapsed().as_secs_f64()
+        );
         return Ok(batches);
     }
 
@@ -362,7 +370,10 @@ async fn exec_query(
         }
     };
     let batches = df.clone().collect().await?;
-    log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
+    log::info!(
+        "[session_id {session_id}] Query took {:.3} seconds.",
+        start.elapsed().as_secs_f64()
+    );
     Ok(batches)
 }
 
@@ -514,20 +525,9 @@ pub async fn merge(
             return Err(e);
         }
     };
-    let schema: Schema = df.schema().into();
     let mut batches = df.collect().await?;
     if batches.len() > 1 {
-        // try to merge recordbatch
-        let schema = Arc::new(schema);
-        let mut merged_batch = batches[0].clone();
-        for item in batches.iter().skip(1) {
-            if item.num_rows() > 0 {
-                merged_batch =
-                    arrow::compute::concat_batches(&schema.clone(), &[merged_batch, item.clone()])
-                        .unwrap();
-            }
-        }
-        batches = vec![merged_batch];
+        batches.retain(|batch| batch.num_rows() > 0);
     }
     ctx.deregister_table("tbl")?;
 
@@ -556,12 +556,13 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>,
             schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
             let file_name = format!("{work_dir}{i}.parquet");
             let mut buf_parquet = Vec::new();
-            let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema.clone(), None)?;
+            let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema, None)?;
             writer.write(row)?;
-            writer.close().unwrap();
+            writer.close()?;
             tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
         }
     }
+    filter_schema_null_fields(&mut schema); // fix schema
     Ok((Arc::new(schema), work_dir))
 }
 
@@ -855,7 +856,7 @@ pub async fn convert_parquet_file(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
     let file_meta = FileMeta::default();
-    let mut writer = super::new_parquet_writer(buf, &schema, &file_meta, None);
+    let mut writer = super::new_parquet_writer(buf, &schema, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -875,14 +876,13 @@ pub async fn merge_parquet_files(
     session_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
-    stream_type: StreamType,
     original_size: i64,
 ) -> Result<FileMeta> {
     let start = std::time::Instant::now();
     // query data
     let runtime_env = create_runtime_env()?;
     let session_config = create_session_config(&SearchType::Normal)?;
-    let ctx = SessionContext::with_config_rt(session_config, Arc::new(runtime_env));
+    let ctx = SessionContext::new_with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -929,13 +929,7 @@ pub async fn merge_parquet_files(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
 
-    let bf_fields =
-        if CONFIG.common.traces_bloom_filter_enabled && stream_type == StreamType::Traces {
-            Some(vec![COLUMN_TRACE_ID])
-        } else {
-            None
-        };
-    let mut writer = super::new_parquet_writer(buf, &schema, &file_meta, bf_fields);
+    let mut writer = super::new_parquet_writer(buf, &schema, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -959,7 +953,7 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
     }
-    if CONFIG.common.traces_bloom_filter_enabled {
+    if CONFIG.common.bloom_filter_enabled {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", true);
     }
     Ok(config)
@@ -1003,7 +997,7 @@ pub fn prepare_datafusion_context(
 ) -> Result<SessionContext, DataFusionError> {
     let session_config = create_session_config(search_type)?;
     let runtime_env = create_runtime_env()?;
-    Ok(SessionContext::with_config_rt(
+    Ok(SessionContext::new_with_config_rt(
         session_config,
         Arc::new(runtime_env),
     ))
@@ -1123,10 +1117,11 @@ fn apply_query_fn(
                 .collect();
 
             let value_iter = rows_val.iter().map(Ok);
-            let inf_schema =
+            let mut inferred_schema =
                 arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap();
+            filter_schema_null_fields(&mut inferred_schema);
             let mut decoder =
-                arrow::json::ReaderBuilder::new(Arc::new(inf_schema)).build_decoder()?;
+                arrow::json::ReaderBuilder::new(Arc::new(inferred_schema)).build_decoder()?;
 
             for value in rows_val {
                 decoder
@@ -1142,7 +1137,7 @@ fn apply_query_fn(
 
 #[cfg(test)]
 mod test {
-    use arrow::array::Int32Array;
+    use arrow::array::{Int32Array, NullArray, StringArray};
     use arrow_schema::Field;
 
     use super::*;
@@ -1157,21 +1152,34 @@ mod test {
     #[actix_web::test]
     async fn test_merge_write_recordbatch() {
         // define a schema.
-        let schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Int32, false)]));
+        let schema1 = Arc::new(Schema::new(vec![
+            Field::new("f", DataType::Int32, false),
+            Field::new("g", DataType::Utf8, false),
+        ]));
+        let schema2 = Arc::new(Schema::new(vec![
+            Field::new("f", DataType::Int32, false),
+            Field::new("g", DataType::Null, false),
+        ]));
         // define data.
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(Int32Array::from(vec![1, 10, 10, 100]))],
-        )
-        .unwrap();
-
         let batch2 = RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(Int32Array::from(vec![2, 20, 20, 200]))],
+            schema2.clone(),
+            vec![
+                Arc::new(Int32Array::from(vec![1, 10, 10, 100])),
+                Arc::new(NullArray::new(4)),
+            ],
         )
         .unwrap();
 
-        let res = merge_write_recordbatch(&[vec![batch, batch2]]).unwrap();
+        let batch1 = RecordBatch::try_new(
+            schema1.clone(),
+            vec![
+                Arc::new(Int32Array::from(vec![2, 20, 20, 200])),
+                Arc::new(StringArray::from(vec!["2", "20", "20", "200"])),
+            ],
+        )
+        .unwrap();
+
+        let res = merge_write_recordbatch(&[vec![batch1, batch2]]).unwrap();
         assert!(!res.0.fields().is_empty());
         assert!(!res.1.is_empty())
     }

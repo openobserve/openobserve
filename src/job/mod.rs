@@ -174,9 +174,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // check wal directory
     if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         // create wal dir
-        std::fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
+        if let Err(e) = std::fs::create_dir_all(&CONFIG.common.data_wal_dir) {
+            log::error!("Failed to create wal dir: {}", e);
+        }
         // clean empty sub dirs
-        clean_empty_dirs(&CONFIG.common.data_wal_dir)?;
+        _ = clean_empty_dirs(&CONFIG.common.data_wal_dir);
     }
 
     tokio::task::spawn(async move { files::run().await });
