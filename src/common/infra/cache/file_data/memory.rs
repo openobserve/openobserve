@@ -55,7 +55,7 @@ impl FileData {
     }
 
     async fn exist(&mut self, file: &str) -> bool {
-        self.data.get(file).is_some()
+        self.data.contains_key(file)
     }
 
     async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
@@ -175,6 +175,9 @@ pub async fn set(session_id: &str, file: &str, data: Bytes) -> Result<(), anyhow
         return Ok(());
     }
     let mut files = FILES.write().await;
+    if files.exist(file).await {
+        return Ok(());
+    }
     files.set(session_id, file, data).await
 }
 
