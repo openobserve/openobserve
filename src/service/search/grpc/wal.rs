@@ -314,6 +314,7 @@ pub async fn search(
 /// get file list from local wal, no need match_source, each file will be searched
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
+    session_id: &str,
     sql: &Sql,
     stream_type: meta::StreamType,
     extension: &str,
