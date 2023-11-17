@@ -836,6 +836,7 @@ export default defineComponent({
       ];
 
       let colorIndex = 0;
+      searchObj.meta.serviceColors = {};
 
       return new Promise((resolve, reject) => {
         delete req.encoding;
