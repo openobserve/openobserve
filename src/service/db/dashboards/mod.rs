@@ -59,7 +59,11 @@ pub(crate) async fn put(
     let d_version: DashboardVersion = json::from_slice(&body)?;
     if d_version.version == 1 {
         let mut dash: v1::Dashboard = json::from_slice(&body)?;
+        if dash.title.trim().is_empty() {
+            return Err(anyhow::anyhow!("Dashboard should have title"));
+        };
         dash.dashboard_id = dashboard_id.to_string();
+
         match infra_db::DEFAULT
             .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
             .await
@@ -73,6 +77,9 @@ pub(crate) async fn put(
         }
     } else {
         let mut dash: v2::Dashboard = json::from_slice(&body)?;
+        if dash.title.trim().is_empty() {
+            return Err(anyhow::anyhow!("Dashboard should have title"));
+        };
         dash.dashboard_id = dashboard_id.to_string();
         match infra_db::DEFAULT
             .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
