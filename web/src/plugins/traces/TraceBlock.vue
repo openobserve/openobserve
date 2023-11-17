@@ -9,7 +9,7 @@
       </div>
     </div>
     <div class="q-pa-sm row justify-between">
-      <div class="trace-summary flex" style="width: 156px">
+      <div class="trace-summary flex" style="width: 175px">
         <div class="trace-spans q-px-sm q-mr-xs">
           <span class="">Spans : </span>
           <span>{{ item.spans }}</span>
@@ -21,7 +21,7 @@
       </div>
       <div
         class="flex justify-start items-start q-px-md"
-        style="width: calc(100% - 332px)"
+        style="width: calc(100% - 350px)"
       >
         <template v-for="(count, service) in item.services" :key="service">
           <div
@@ -33,7 +33,7 @@
           </div>
         </template>
       </div>
-      <div class="trace-date-time" style="width: 176px">
+      <div class="trace-date-time" style="width: 175px">
         <div class="section-1 flex justify-end items-center">
           <div style="font-size: 14px">{{ getFormattedDate.day }}</div>
           <div
