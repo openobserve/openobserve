@@ -2301,8 +2301,9 @@ checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 
 [[package]]
 name = "datafusion"
-version = "32.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=656c6a93fadcec7bc43a8a881dfaf55388b0b5c6#656c6a93fadcec7bc43a8a881dfaf55388b0b5c6"
+version = "33.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "676796427e638d85e9eadf13765705212be60b34f8fc5d3934d95184c63ca1b4"
 dependencies = [
  "ahash 0.8.6",
  "arrow",
@@ -2333,7 +2334,6 @@ dependencies = [
  "object_store",
  "parking_lot 0.12.1",
  "parquet",
- "percent-encoding",
  "pin-project-lite",
  "rand",
  "sqlparser",
@@ -2348,8 +2348,9 @@ dependencies = [
 
 [[package]]
 name = "datafusion-common"
-version = "32.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=656c6a93fadcec7bc43a8a881dfaf55388b0b5c6#656c6a93fadcec7bc43a8a881dfaf55388b0b5c6"
+version = "33.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31e23b3d21a6531259d291bd20ce59282ea794bda1018b0a1e278c13cd52e50c"
 dependencies = [
  "ahash 0.8.6",
  "arrow",
@@ -2366,8 +2367,9 @@ dependencies = [
 
 [[package]]
 name = "datafusion-execution"
-version = "32.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=656c6a93fadcec7bc43a8a881dfaf55388b0b5c6#656c6a93fadcec7bc43a8a881dfaf55388b0b5c6"
+version = "33.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4de1fd0d8db0f2b8e4f4121bfa1c7c09d3a5c08a0a65c2229cd849eb65cff855"
 dependencies = [
  "arrow",
  "chrono",
@@ -2386,8 +2388,9 @@ dependencies = [
 
 [[package]]
 name = "datafusion-expr"
-version = "32.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=656c6a93fadcec7bc43a8a881dfaf55388b0b5c6#656c6a93fadcec7bc43a8a881dfaf55388b0b5c6"
+version = "33.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18e227fe88bf6730cab378d0cd8fc4c6b2ea42bc7e414a8ea9feba7225932735"
 dependencies = [
  "ahash 0.8.6",
  "arrow",
@@ -2400,8 +2403,9 @@ dependencies = [
 
 [[package]]
 name = "datafusion-optimizer"
-version = "32.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=656c6a93fadcec7bc43a8a881dfaf55388b0b5c6#656c6a93fadcec7bc43a8a881dfaf55388b0b5c6"
+version = "33.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c6648e62ea7605b9bfcd87fdc9d67e579c3b9ac563a87734ae5fe6d79ee4547"
 dependencies = [
  "arrow",
  "async-trait",
@@ -2417,13 +2421,15 @@ dependencies = [
 
 [[package]]
 name = "datafusion-physical-expr"
-version = "32.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=656c6a93fadcec7bc43a8a881dfaf55388b0b5c6#656c6a93fadcec7bc43a8a881dfaf55388b0b5c6"
+version = "33.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f32b8574add16a32411a9b3fb3844ac1fc09ab4e7be289f86fd56d620e4f2508"
 dependencies = [
  "ahash 0.8.6",
  "arrow",
  "arrow-array",
  "arrow-buffer",
+ "arrow-ord",
  "arrow-schema",
  "base64 0.21.5",
  "blake2",
@@ -2450,8 +2456,9 @@ dependencies = [
 
 [[package]]
 name = "datafusion-physical-plan"
-version = "32.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=656c6a93fadcec7bc43a8a881dfaf55388b0b5c6#656c6a93fadcec7bc43a8a881dfaf55388b0b5c6"
+version = "33.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "796abd77d5bfecd9e5275a99daf0ec45f5b3a793ec431349ce8211a67826fd22"
 dependencies = [
  "ahash 0.8.6",
  "arrow",
@@ -2480,8 +2487,9 @@ dependencies = [
 
 [[package]]
 name = "datafusion-sql"
-version = "32.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=656c6a93fadcec7bc43a8a881dfaf55388b0b5c6#656c6a93fadcec7bc43a8a881dfaf55388b0b5c6"
+version = "33.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ced70b8a5648ba7b95c61fc512183c33287ffe2c9f22ffe22700619d7d48c84f"
 dependencies = [
  "arrow",
  "arrow-schema",
@@ -2804,16 +2812,16 @@ dependencies = [
 
 [[package]]
 name = "etcd-client"
-version = "0.11.1"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4b0ea5ef6dc2388a4b1669fa32097249bc03a15417b97cb75e38afb309e4a89"
+checksum = "3d982a3b3088a5f95d19882d298b352a2e0be20703e3080c1e6767731d5dec79"
 dependencies = [
  "http",
- "prost",
+ "prost 0.12.2",
  "tokio",
  "tokio-stream",
- "tonic 0.9.2",
- "tonic-build 0.9.2",
+ "tonic 0.10.2",
+ "tonic-build 0.10.2",
  "tower",
  "tower-service",
 ]
@@ -4432,7 +4440,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openobserve"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "actix-cors",
  "actix-multipart",
@@ -4497,8 +4505,8 @@ dependencies = [
  "parquet",
  "prometheus",
  "promql-parser",
- "prost",
- "prost-build",
+ "prost 0.11.9",
+ "prost-build 0.11.9",
  "pyroscope",
  "pyroscope_pprofrs",
  "rand",
@@ -4610,7 +4618,7 @@ dependencies = [
  "opentelemetry 0.18.0",
  "opentelemetry-http",
  "opentelemetry-proto 0.1.0",
- "prost",
+ "prost 0.11.9",
  "reqwest",
  "serde",
  "thiserror",
@@ -4627,7 +4635,7 @@ dependencies = [
  "futures",
  "futures-util",
  "opentelemetry 0.18.0",
- "prost",
+ "prost 0.11.9",
  "tonic 0.8.3",
  "tonic-build 0.8.4",
 ]
@@ -4641,7 +4649,7 @@ dependencies = [
  "futures",
  "futures-util",
  "opentelemetry 0.19.0",
- "prost",
+ "prost 0.11.9",
  "protobuf",
  "serde",
  "serde_json",
@@ -5176,6 +5184,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prettyplease"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae005bd773ab59b4725093fd7df83fd7892f7d8eafb48dbd7de6e024e4215f9d"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.39",
+]
+
+[[package]]
 name = "prettytable-rs"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5281,7 +5299,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b82eaa1d779e9a4bc1c3217db8ffbeabaae1dca241bf70183242128d48681cd"
 dependencies = [
  "bytes",
- "prost-derive",
+ "prost-derive 0.11.9",
+]
+
+[[package]]
+name = "prost"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a5a410fc7882af66deb8d01d01737353cf3ad6204c408177ba494291a626312"
+dependencies = [
+ "bytes",
+ "prost-derive 0.12.2",
 ]
 
 [[package]]
@@ -5297,11 +5325,33 @@ dependencies = [
  "log",
  "multimap",
  "petgraph",
- "prettyplease",
- "prost",
- "prost-types",
+ "prettyplease 0.1.25",
+ "prost 0.11.9",
+ "prost-types 0.11.9",
  "regex",
  "syn 1.0.109",
+ "tempfile",
+ "which",
+]
+
+[[package]]
+name = "prost-build"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fa3d084c8704911bfefb2771be2f9b6c5c0da7343a71e0021ee3c665cada738"
+dependencies = [
+ "bytes",
+ "heck 0.4.1",
+ "itertools 0.11.0",
+ "log",
+ "multimap",
+ "once_cell",
+ "petgraph",
+ "prettyplease 0.2.15",
+ "prost 0.12.2",
+ "prost-types 0.12.2",
+ "regex",
+ "syn 2.0.39",
  "tempfile",
  "which",
 ]
@@ -5320,12 +5370,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "065717a5dfaca4a83d2fe57db3487b311365200000551d7a364e715dbf4346bc"
+dependencies = [
+ "anyhow",
+ "itertools 0.11.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.39",
+]
+
+[[package]]
 name = "prost-types"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "213622a1460818959ac1181aaeb2dc9c7f63df720db7d788b3e24eacd1983e13"
 dependencies = [
- "prost",
+ "prost 0.11.9",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8339f32236f590281e2f6368276441394fcd1b2133b549cc895d0ae80f2f9a52"
+dependencies = [
+ "prost 0.12.2",
 ]
 
 [[package]]
@@ -5369,7 +5441,7 @@ dependencies = [
  "libflate",
  "log",
  "names",
- "prost",
+ "prost 0.11.9",
  "reqwest",
  "thiserror",
  "url",
@@ -7179,8 +7251,8 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost",
- "prost-derive",
+ "prost 0.11.9",
+ "prost-derive 0.11.9",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -7193,17 +7265,15 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.9.2"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3082666a3a6433f7f511c7192923fa1fe07c69332d3c6a2e6bb040b569199d5a"
+checksum = "d560933a0de61cf715926b9cac824d4c883c2c43142f787595e48280c40a1d0e"
 dependencies = [
  "async-stream",
  "async-trait",
  "axum",
  "base64 0.21.5",
  "bytes",
- "futures-core",
- "futures-util",
  "h2",
  "http",
  "http-body",
@@ -7211,7 +7281,8 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost",
+ "prost 0.12.2",
+ "rustls",
  "rustls-pemfile",
  "tokio",
  "tokio-rustls",
@@ -7228,24 +7299,24 @@ version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bf5e9b9c0f7e0a7c027dcfaba7b2c60816c7049171f679d99ee2ff65d0de8c4"
 dependencies = [
- "prettyplease",
+ "prettyplease 0.1.25",
  "proc-macro2",
- "prost-build",
+ "prost-build 0.11.9",
  "quote",
  "syn 1.0.109",
 ]
 
 [[package]]
 name = "tonic-build"
-version = "0.9.2"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6fdaae4c2c638bb70fe42803a26fbd6fc6ac8c72f5c59f67ecc2a2dcabf4b07"
+checksum = "9d021fc044c18582b9a2408cd0dd05b1596e3ecdb5c4df822bb0183545683889"
 dependencies = [
- "prettyplease",
+ "prettyplease 0.2.15",
  "proc-macro2",
- "prost-build",
+ "prost-build 0.12.2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.39",
 ]
 
 [[package]]

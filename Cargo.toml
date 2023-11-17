@@ -17,7 +17,7 @@ keywords = [
 license = "Apache-2.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.7.0"
+version = "0.7.1"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -77,9 +77,8 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { git = "https://github.com/apache/arrow-datafusion.git", rev = "656c6a93fadcec7bc43a8a881dfaf55388b0b5c6", version = "32", features = [
-  "simd",
-] }
+datafusion = { version = "33", features = ["simd"] }
+datafusion-expr = "33"
 arrow = { version = "48", features = ["simd", "ipc_compression"] }
 arrow-schema = { version = "48", features = ["serde"] }
 parquet = { version = "48", features = ["arrow", "async"] }
@@ -87,7 +86,7 @@ object_store = { version = "0.7", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
-etcd-client = { version = "0.11", features = ["tls"] }
+etcd-client = { version = "0.12", features = ["tls"] }
 faststr = "0.2"
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
@@ -138,6 +137,7 @@ rust-embed-for-web = "11.1"
 segment = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha256 = "1.4.0"
 simd-json = "0.13"
 sled = "0.34"
 snap = "1"
@@ -171,15 +171,10 @@ vrl = { version = "0.6.0", features = ["value", "compiler"] }
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"
-sha256 = "1.4.0"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
-
-[dev-dependencies]
-datafusion-expr = { git = "https://github.com/apache/arrow-datafusion.git", rev = "656c6a93fadcec7bc43a8a881dfaf55388b0b5c6", version = "32" }
-
+prost-build = "0.11"
 expect-test = "1.4"
 float-cmp = "0.9"
