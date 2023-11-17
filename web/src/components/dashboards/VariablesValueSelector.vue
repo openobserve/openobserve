@@ -14,68 +14,32 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div
-    v-if="variablesData.values?.length > 0"
-    :key="variablesData.isVariablesLoading"
-    class="flex q-mt-sm q-ml-sm"
-  >
-    <div
-      v-for="item in variablesData.values"
-      :key="
-        item.name +
-        item.value +
-        item.type +
-        item.options?.length +
-        item.isLoading
-      "
-      class="q-mr-lg q-mt-sm"
-    >
+  <div v-if="variablesData.values?.length > 0" :key="variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
+    <div v-for="item in variablesData.values" :key="item.name +
+      item.value +
+      item.type +
+      item.options?.length +
+      item.isLoading
+      " class="q-mr-lg q-mt-sm">
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector v-model="item.value" :variableItem="item" />
       </div>
       <div v-else-if="item.type == 'constant'">
-        <q-input
-          style="max-width: 150px !important"
-          v-model="item.value"
-          :label="item.label || item.name"
-          dense
-          outlined
-          readonly
-        ></q-input>
+        <q-input style="max-width: 150px !important" v-model="item.value" :label="item.label || item.name" dense outlined
+          readonly></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
-        <q-input
-          style="max-width: 150px !important"
-          debounce="1000"
-          v-model="item.value"
-          :label="item.label || item.name"
-          dense
-          outlined
-        ></q-input>
+        <q-input style="max-width: 150px !important" debounce="1000" v-model="item.value" :label="item.label || item.name"
+          dense outlined></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
-        <q-select
-          style="min-width: 150px"
-          outlined
-          dense
-          v-model="item.value"
-          :display-value="
-            item.value
-              ? item.value
-              : !item.isLoading
+        <q-select style="min-width: 150px" outlined dense v-model="item.value" :display-value="item.value
+            ? item.value
+            : !item.isLoading
               ? '(No Options Available)'
               : ''
-          "
-          :options="item.options"
-          map-options
-          stack-label
-          filled
-          borderless
-          :label="item.label || item.name"
-          option-value="value"
-          option-label="label"
-          emit-value
-        >
+          " :options="item.options" map-options stack-label filled borderless :label="item.label || item.name"
+          option-value="value" option-label="label" emit-value>
           <template v-slot:no-option>
             <q-item>
               <q-item-section class="text-italic text-grey">
@@ -84,6 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item>
           </template>
         </q-select>
+      </div>
+      <div v-if="item.type == 'ad-hoc-filters'">
+        <VariableAdHocValueSelector v-model="item.value" :variableItem="item" />
       </div>
     </div>
   </div>
@@ -95,21 +62,25 @@ import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
+import VariableAdHocValueSelector from './settings/VariableAdHocValueSelector.vue';
 
 export default defineComponent({
   name: "VariablesValueSelector",
   props: ["selectedTimeDate", "variablesConfig", "initialVariableValues"],
   emits: ["variablesData"],
   components: {
-    VariableQueryValueSelector,
+    VariableQueryValueSelector, VariableAdHocValueSelector,
   },
   setup(props: any, { emit }) {
+    console.log("props", props)
     const store = useStore();
     // variables data derived from the variables config list
     const variablesData: any = reactive({
       isVariablesLoading: false,
       values: [],
     });
+    console.log("variablesData", variablesData);
+
     onMounted(() => {
       getVariablesData();
     });
@@ -210,8 +181,8 @@ export default defineComponent({
                       )
                         ? oldVariableObjectSelectedValue.value
                         : obj.options.length
-                        ? obj.options[0]
-                        : "";
+                          ? obj.options[0]
+                          : "";
                     } else {
                       obj.value = obj.options[0] || "";
                     }
@@ -284,6 +255,44 @@ export default defineComponent({
               }
               return obj;
               // break;
+            }
+            case "ad-hoc-filters": {
+              console.log("ad-hoc-filters");
+
+              obj.isLoading = true;  // Set loading state
+
+              return streamService
+                .nameList(store.state.selectedOrganization.identifier, "", true)
+                .then((res) => {
+                  console.log("obj", obj);
+
+                  obj.isLoading = false;  // Reset loading state
+                  obj.options = res.data.list;
+
+                  // Set value based on oldVariableValue or the first option
+                  let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
+                  obj.value = oldVariableObjectSelectedValue ? oldVariableObjectSelectedValue.value : obj.options.length ? obj.options[0] : "";
+                  console.log("objjj", obj.value);
+
+                  variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
+
+                  // triggers rerendering in the current component
+                  variablesData.values[index] = JSON.parse(JSON.stringify(obj));
+
+                  emitVariablesData();
+                  return obj;
+                })
+                .catch((error) => {
+                  obj.isLoading = false;  // Reset loading state
+                  // Handle error
+                  variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
+
+                  // triggers rerendering in the current component
+                  variablesData.values[index] = JSON.parse(JSON.stringify(obj));
+
+                  emitVariablesData();
+                  return obj;
+                });
             }
             default:
               obj.value = it.value;
