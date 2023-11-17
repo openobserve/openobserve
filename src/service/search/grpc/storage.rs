@@ -189,6 +189,11 @@ pub async fn search(
                     }
                 }
             }
+            for (field, alias) in sql.meta.field_alias.iter() {
+                if let Some(v) = diff_fields.get(field) {
+                    diff_fields.insert(alias.to_string(), v.clone());
+                }
+            }
         }
         let datafusion_span = info_span!("service:search:grpc:storage:datafusion", session_id, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
         let task = tokio::time::timeout(
