@@ -26,6 +26,7 @@ use std::{
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::infra::config::FILE_EXT_ARROW;
+use crate::common::meta::prom::NAME_LABEL;
 use crate::common::meta::stream::PartitionTimeLevel;
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics, storage, wal},
@@ -415,7 +416,7 @@ async fn handle_metrics(
     let mut partitions: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
     for row in rows {
         partitions
-            .entry(row.get("__name__").unwrap().as_str().unwrap().to_string())
+            .entry(row.get(NAME_LABEL).unwrap().as_str().unwrap().to_string())
             .or_default()
             .push(row);
     }

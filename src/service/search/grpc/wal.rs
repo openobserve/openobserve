@@ -31,7 +31,9 @@ use crate::common::{
         errors::{Error, ErrorCodes},
         wal,
     },
-    meta::{self, common::FileKey, search::SearchType, stream::ScanStats, StreamType},
+    meta::{
+        self, common::FileKey, prom::NAME_LABEL, search::SearchType, stream::ScanStats, StreamType,
+    },
     utils::{
         file::{get_file_contents, get_file_meta, scan_files},
         schema::infer_json_schema,
@@ -86,7 +88,7 @@ pub async fn search(
                     }
                 }
                 if stream_type.eq(&StreamType::Metrics) {
-                    let metric_key = format!("\"__name__\":\"{}\"", &sql.stream_name);
+                    let metric_key = format!("\"{NAME_LABEL}\":\"{}\"", &sql.stream_name);
                     if let Ok(s) = String::from_utf8(file_data.clone()) {
                         let filtered_lines: Vec<&str> = s
                             .lines()
