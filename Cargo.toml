@@ -176,5 +176,7 @@ zstd = "0.13"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 tonic-build = { version = "0.8", features = ["prost"] }
 prost-build = "0.11"
+
+[dev-dependencies]
 expect-test = "1.4"
 float-cmp = "0.9"
