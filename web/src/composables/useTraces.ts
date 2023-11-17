@@ -66,6 +66,7 @@ const defaultObject = {
       },
     },
     scrollInfo: {},
+    serviceColors: {} as any,
   },
   data: {
     query: "",

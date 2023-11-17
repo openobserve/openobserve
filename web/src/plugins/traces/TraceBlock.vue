@@ -28,7 +28,13 @@
             class="q-mr-md flex trace-tag justify-center items-center q-mb-xs"
             style="height: 22px; font-size: 12px"
           >
-            <div class="bg-grey-8 full-height" style="width: 14px"></div>
+            <div
+              class="full-height"
+              :style="{
+                width: '14px',
+                backgroundColor: searchObj.meta.serviceColors[service],
+              }"
+            ></div>
             <div class="q-mx-xs">{{ service }} ({{ count }})</div>
           </div>
         </template>
@@ -60,6 +66,8 @@ import {
   formatTimeWithSuffix,
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import useTraces from "@/composables/useTraces";
+
 const props = defineProps({
   item: {
     type: Object,
@@ -70,6 +78,8 @@ const props = defineProps({
     default: 0,
   },
 });
+
+const { searchObj } = useTraces();
 
 const store = useStore();
 

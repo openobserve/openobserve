@@ -805,6 +805,7 @@ export default defineComponent({
     }
 
     const getTracesMetaData = (traces) => {
+      if (!traces.length) return;
       const traceMapping = {};
       traces.forEach((trace) => {
         traceMapping[trace.trace_id] = trace;
@@ -826,6 +827,16 @@ export default defineComponent({
       req.query.start_time = timestamps.startTime;
       req.query.end_time = timestamps.endTime;
 
+      const serviceColors = [
+        "#b7885e",
+        "#1ab8be",
+        "#ffcb99",
+        "#f89570",
+        "#839ae2",
+      ];
+
+      let colorIndex = 0;
+
       return new Promise((resolve, reject) => {
         delete req.encoding;
         searchService
@@ -836,6 +847,17 @@ export default defineComponent({
           })
           .then((res) => {
             res.data.hits.forEach((metaData) => {
+              // ADding service color
+              if (!searchObj.meta.serviceColors[metaData.service_name]) {
+                if (colorIndex >= serviceColors.length) colorIndex = 0;
+
+                searchObj.meta.serviceColors[metaData.service_name] =
+                  serviceColors[colorIndex];
+
+                console.log(colorIndex);
+
+                colorIndex++;
+              }
               traceMapping[metaData.trace_id].services[metaData.service_name] =
                 metaData.count_service_name;
             });
