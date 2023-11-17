@@ -54,7 +54,7 @@ pub(crate) async fn create_context(
     _filters: &[(&str, Vec<&str>)],
 ) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
     // get file list
-    let files = get_file_list(org_id, stream_name, time_range).await?;
+    let files = get_file_list(session_id, org_id, stream_name, time_range).await?;
     if files.is_empty() {
         return Ok((
             SessionContext::new(),
@@ -104,6 +104,7 @@ pub(crate) async fn create_context(
 /// get file list from local cache, no need match_source, each file will be searched
 #[tracing::instrument(name = "promql:search:grpc:wal:get_file_list")]
 async fn get_file_list(
+    session_id: &str,
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
@@ -116,6 +117,7 @@ async fn get_file_list(
 
     let mut tasks = Vec::new();
     for node in nodes {
+        let session_id = session_id.to_string();
         let node_addr = node.grpc_addr.clone();
         let org_id = org_id.to_string();
         let req = cluster_rpc::MetricsWalFileRequest {
@@ -124,7 +126,8 @@ async fn get_file_list(
             start_time: time_range.0,
             end_time: time_range.1,
         };
-        let grpc_span = info_span!("promql:search:grpc:wal:grpc_wal_file");
+        let grpc_span =
+            info_span!("promql:search:grpc:wal:grpc_wal_file", session_id = ?session_id);
         let task: tokio::task::JoinHandle<
             std::result::Result<cluster_rpc::MetricsWalFileResponse, DataFusionError>,
         > = tokio::task::spawn(
@@ -168,7 +171,7 @@ async fn get_file_list(
                     match client.wal_file(request).await {
                         Ok(response) => response.into_inner(),
                         Err(err) => {
-                            log::error!("get wal file list from search node error: {}", err);
+                            log::error!("[session_id {session_id}] get wal file list from search node error: {}", err);
                             return Err(DataFusionError::Execution(
                                 "get wal file list from search node error".to_string(),
                             ));

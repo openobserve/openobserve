@@ -116,7 +116,7 @@ async fn handle_trigger(alert_key: &str, frequency: i64) {
                         timeout: 0,
                     };
                     // do search
-                    match SearchService::search(&trigger.org, alert.stream_type.unwrap(), &req)
+                    match SearchService::search("", &trigger.org, alert.stream_type.unwrap(), &req)
                         .await
                     {
                         Ok(res) => {

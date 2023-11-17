@@ -13,9 +13,12 @@
 // limitations under the License.
 
 use bytes::Bytes;
-use lru::LruCache;
+use hashlink::lru_cache::LruCache;
 use once_cell::sync::Lazy;
-use std::{cmp::max, ops::Range};
+use std::{
+    cmp::{max, min},
+    ops::Range,
+};
 use tokio::sync::RwLock;
 
 use crate::common::infra::{
@@ -47,15 +50,15 @@ impl FileData {
         FileData {
             max_size,
             cur_size: 0,
-            data: LruCache::unbounded(),
+            data: LruCache::new_unbounded(),
         }
     }
 
-    pub async fn exist(&mut self, file: &str) -> bool {
+    async fn exist(&mut self, file: &str) -> bool {
         self.data.get(file).is_some()
     }
 
-    pub async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+    async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
         let data = DATA.get(file)?;
         Some(if let Some(range) = range {
             data.value().slice(range)
@@ -64,21 +67,30 @@ impl FileData {
         })
     }
 
-    pub async fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+    async fn set(
+        &mut self,
+        session_id: &str,
+        file: &str,
+        data: Bytes,
+    ) -> Result<(), anyhow::Error> {
         let data_size = file.len() + data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "File memory cache is full {}/{}, can't cache {} bytes",
+                "[session_id {session_id}] File memory cache is full {}/{}, can't cache extra {} bytes",
                 self.cur_size,
                 self.max_size,
                 data_size
             );
             // cache is full, need release some space
-            let need_release_size = max(CONFIG.memory_cache.release_size, data_size * 100);
+            let need_release_size = min(
+                CONFIG.disk_cache.max_size,
+                max(CONFIG.disk_cache.release_size, data_size * 100),
+            );
             let mut release_size = 0;
             loop {
-                let item = self.data.pop_lru();
+                let item = self.data.remove_lru();
                 if item.is_none() {
+                    log::error!("[session_id {session_id}] File memory cache is corrupt, it shouldn't be none");
                     break;
                 }
                 let (key, data_size) = item.unwrap();
@@ -104,7 +116,7 @@ impl FileData {
         }
 
         self.cur_size += data_size;
-        self.data.put(file.to_string(), data_size);
+        self.data.insert(file.to_string(), data_size);
         // write file into cache
         DATA.insert(file.to_string(), data);
         // metrics
@@ -120,16 +132,16 @@ impl FileData {
         Ok(())
     }
 
-    pub fn size(&self) -> (usize, usize) {
+    fn size(&self) -> (usize, usize) {
         (self.max_size, self.cur_size)
     }
 
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.data.len()
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
 }
 
@@ -158,12 +170,12 @@ pub async fn exist(file: &str) -> bool {
 }
 
 #[inline]
-pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+pub async fn set(session_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     if !CONFIG.memory_cache.enabled {
         return Ok(());
     }
     let mut files = FILES.write().await;
-    files.set(file, data).await
+    files.set(session_id, file, data).await
 }
 
 #[inline]
@@ -175,20 +187,25 @@ pub async fn stats() -> (usize, usize) {
 #[inline]
 pub async fn len() -> usize {
     let files = FILES.read().await;
-    files.data.len()
+    files.len()
 }
 
 #[inline]
-pub async fn download(file: &str) -> Result<Bytes, anyhow::Error> {
+pub async fn is_empty() -> bool {
+    let files = FILES.read().await;
+    files.is_empty()
+}
+
+pub async fn download(session_id: &str, file: &str) -> Result<(), anyhow::Error> {
     let data = storage::get(file).await?;
-    if let Err(e) = set(file, data.clone()).await {
+    if let Err(e) = set(session_id, file, data).await {
         return Err(anyhow::anyhow!(
             "set file {} to memory cache failed: {}",
             file,
             e
         ));
     };
-    Ok(data)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -197,6 +214,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_set_file() {
+        let session_id = "session_123";
         let mut file_data = FileData::with_capacity(1024);
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..100 {
@@ -204,21 +222,28 @@ mod tests {
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
-            let resp = file_data.set(&file_key, content.clone()).await;
+            let resp = file_data.set(session_id, &file_key, content.clone()).await;
             assert!(resp.is_ok());
         }
     }
 
     #[tokio::test]
     async fn test_cache_get_file() {
+        let session_id = "session_123";
         let mut file_data = FileData::default();
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
-        file_data.set(file_key, content.clone()).await.unwrap();
+        file_data
+            .set(session_id, file_key, content.clone())
+            .await
+            .unwrap();
         assert_eq!(file_data.get(file_key, None).await.unwrap(), content);
 
-        file_data.set(file_key, content.clone()).await.unwrap();
+        file_data
+            .set(session_id, file_key, content.clone())
+            .await
+            .unwrap();
         assert!(file_data.exist(file_key).await);
         assert_eq!(file_data.get(file_key, None).await.unwrap(), content);
         assert!(file_data.size().0 > 0);
@@ -226,15 +251,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_miss() {
+        let session_id = "session_456";
         let mut file_data = FileData::with_capacity(100);
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
-        file_data.set(file_key1, content.clone()).await.unwrap();
+        file_data
+            .set(session_id, file_key1, content.clone())
+            .await
+            .unwrap();
         assert_eq!(file_data.get(file_key1, None).await.unwrap(), content);
         // set another key, will release first key
-        file_data.set(file_key2, content.clone()).await.unwrap();
+        file_data
+            .set(session_id, file_key2, content.clone())
+            .await
+            .unwrap();
         assert_eq!(file_data.get(file_key2, None).await.unwrap(), content);
         // get first key, should get error
         assert!(file_data.get(file_key1, None).await.is_none());

@@ -20,7 +20,6 @@ use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use uuid::Uuid;
 
 use crate::common::{
     infra::{
@@ -49,11 +48,18 @@ pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
 
 #[tracing::instrument(name = "service:search:enter", skip(req))]
 pub async fn search(
+    session_id: &str,
     org_id: &str,
     stream_type: StreamType,
     req: &search::Request,
 ) -> Result<search::Response, Error> {
+    let session_id = if session_id.is_empty() {
+        uuid::Uuid::new_v4().to_string()
+    } else {
+        session_id.to_string()
+    };
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
+    req.job.as_mut().unwrap().session_id = session_id;
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as i32;
     req.stream_type = stream_type.to_string();
@@ -80,8 +86,9 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
     (time_min, time_max)
 }
 
-#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(skip(sql), fields(session_id = ?_session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
+    _session_id: &str,
     sql: &sql::Sql,
     stream_type: StreamType,
     time_level: PartitionTimeLevel,
@@ -120,10 +127,11 @@ async fn get_file_list(
 #[tracing::instrument(
     name = "service:search:cluster",
     skip(req),
-    fields(org_id = req.org_id)
+    fields(session_id = req.job.as_ref().unwrap().session_id, org_id = req.org_id)
 )]
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
+    let session_id = req.job.as_ref().unwrap().session_id.clone();
 
     // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
@@ -148,11 +156,19 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         n => n,
     };
 
+    // partition request, here plus 1 second, because division is integer, maybe lose some precision
+    let job = cluster_rpc::Job {
+        session_id: session_id.clone(),
+        job: session_id[0..6].to_string(), // take the frist 6 characters as job id
+        stage: 0,
+        partition: 0,
+    };
+
     let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
     let partition_time_level =
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
-    let file_list = get_file_list(&meta, stream_type, partition_time_level).await;
+    let file_list = get_file_list(&session_id, &meta, stream_type, partition_time_level).await;
     let file_num = file_list.len();
     let offset = if querier_num >= file_num {
         1
@@ -160,23 +176,15 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         (file_num / querier_num) + 1
     };
     log::info!(
-        "search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
+        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
     );
-
-    // partition request, here plus 1 second, because division is integer, maybe lose some precision
-    let mut session_id = Uuid::new_v4().to_string();
-    let job = cluster_rpc::Job {
-        session_id: session_id.clone(),
-        job: session_id.split_off(30), // take the last 6 characters as job id
-        stage: 0,
-        partition: 0,
-    };
 
     // make cluster request
     let mut tasks = Vec::new();
     let mut offset_start: usize = 0;
     for (partition_no, node) in nodes.iter().cloned().enumerate() {
+        let session_id = session_id.clone();
         let mut req = req.clone();
         let mut job = job.clone();
         job.partition = partition_no as i32;
@@ -198,7 +206,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         }
 
         let node_addr = node.grpc_addr.clone();
-        let grpc_span = info_span!("service:search:cluster:grpc_search", org_id = req.org_id);
+        let grpc_span = info_span!(
+            "service:search:cluster:grpc_search",
+            session_id,
+            org_id = req.org_id
+        );
         let task = tokio::task::spawn(
             async move {
                 let org_id: MetadataValue<_> = req
@@ -223,7 +235,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                     .connect()
                     .await
                     .map_err(|err| {
-                        log::error!("search->grpc: node: {}, connect err: {:?}", &node.grpc_addr, err);
+                        log::error!("[session_id {session_id}] search->grpc: node: {}, connect err: {:?}", &node.grpc_addr, err);
                         server_internal_error("connect search node error")
                     })?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
@@ -241,7 +253,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 let response: cluster_rpc::SearchResponse = match client.search(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
-                        log::error!("search->grpc: node: {}, search err: {:?}", &node.grpc_addr, err);
+                        log::error!("[session_id {session_id}] search->grpc: node: {}, search err: {:?}", &node.grpc_addr, err);
                         if err.code() == tonic::Code::Internal {
                             let err = ErrorCodes::from_json(err.message())?;
                             return Err(Error::ErrorCode(err));
@@ -251,7 +263,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 };
 
                 log::info!(
-                    "search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}, scan_size: {}",
+                    "[session_id {session_id}] search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}, scan_size: {}",
                     &node.grpc_addr,
                     is_querier,
                     response.total,
@@ -418,7 +430,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     }
 
     log::info!(
-        "search->result: total: {}, took: {}, scan_size: {}",
+        "[session_id {session_id}] search->result: total: {}, took: {}, scan_size: {}",
         result.total,
         result.took,
         result.scan_size,
