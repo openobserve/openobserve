@@ -103,28 +103,14 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     .collect()
 });
 
-pub static CONFIG: Lazy<Config> = Lazy::new(init);
-pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
-
-pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
-    segment::HttpClient::new(
-        Client::builder()
-            .connect_timeout(Duration::new(10, 0))
-            .build()
-            .unwrap(),
-        CONFIG.common.telemetry_url.clone(),
-    )
-});
-
-pub static BLOOM_FILTER_DEFAULT_COLUMNS: Lazy<Option<Vec<String>>> = Lazy::new(|| {
-    if !CONFIG.common.bloom_filter_enabled || CONFIG.common.bloom_filter_default_columns.is_empty()
-    {
+pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Option<Vec<String>>> = Lazy::new(|| {
+    if !CONFIG.common.bloom_filter_enabled || CONFIG.common.bloom_filter_default_fields.is_empty() {
         None
     } else {
         Some(
             CONFIG
                 .common
-                .bloom_filter_default_columns
+                .bloom_filter_default_fields
                 .split(',')
                 .filter_map(|s| {
                     let s = s.trim();
@@ -137,6 +123,19 @@ pub static BLOOM_FILTER_DEFAULT_COLUMNS: Lazy<Option<Vec<String>>> = Lazy::new(|
                 .collect::<Vec<_>>(),
         )
     }
+});
+
+pub static CONFIG: Lazy<Config> = Lazy::new(init);
+pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
+
+pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
+    segment::HttpClient::new(
+        Client::builder()
+            .connect_timeout(Duration::new(10, 0))
+            .build()
+            .unwrap(),
+        CONFIG.common.telemetry_url.clone(),
+    )
 });
 
 // global cache variables
@@ -319,8 +318,8 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = false)]
     pub bloom_filter_enabled: bool,
-    #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_COLUMNS", default = "")]
-    pub bloom_filter_default_columns: String,
+    #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
+    pub bloom_filter_default_fields: String,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
