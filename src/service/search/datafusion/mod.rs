@@ -24,7 +24,7 @@ use std::{str::FromStr, sync::Arc};
 
 use crate::common::{
     infra::config::{
-        BLOOM_FILTER_DEFAULT_COLUMNS, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
+        BLOOM_FILTER_DEFAULT_FIELDS, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
         PARQUET_PAGE_SIZE, SQL_FULL_TEXT_SEARCH_FIELDS,
     },
     meta::{common::FileMeta, functions::ZoFunction},
@@ -140,8 +140,8 @@ pub fn new_parquet_writer<'a>(
     } else {
         num_rows
     };
-    if let Some(fields) = BLOOM_FILTER_DEFAULT_COLUMNS.as_ref() {
-        for field in fields {
+    if CONFIG.common.bloom_filter_enabled {
+        for field in BLOOM_FILTER_DEFAULT_FIELDS.iter() {
             writer_props = writer_props
                 .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
             if metadata.records > 0 {

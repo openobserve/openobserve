@@ -498,10 +498,7 @@ fn process_sum(
         let mut dp_rec = rec.clone();
         process_data_point(&mut dp_rec, dp);
         let val_map = dp_rec.as_object_mut().unwrap();
-
-        let vec: Vec<&str> = get_exclude_labels();
-
-        let hash = super::signature_without_labels(val_map, &vec);
+        let hash = super::signature_without_labels(val_map, &get_exclude_labels());
         val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
         records.push(dp_rec.clone());
     }
@@ -539,8 +536,7 @@ fn process_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_hist_data_point(&mut dp_rec, dp) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let vec: Vec<&str> = get_exclude_labels();
-            let hash = super::signature_without_labels(val_map, &vec);
+            let hash = super::signature_without_labels(val_map, &get_exclude_labels());
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             records.push(bucket_rec);
         }
@@ -572,8 +568,7 @@ fn process_summary(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, dp) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let vec: Vec<&str> = get_exclude_labels();
-            let hash = super::signature_without_labels(val_map, &vec);
+            let hash = super::signature_without_labels(val_map, &get_exclude_labels());
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             records.push(bucket_rec);
         }
@@ -605,7 +600,7 @@ fn process_gauge(
         let dp = data_point.as_object().unwrap();
         process_data_point(rec, dp);
         let val_map = rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
+        let hash = super::signature_without_labels(val_map, &get_exclude_labels());
         val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
         records.push(rec.clone());
     }
@@ -642,8 +637,7 @@ fn process_exponential_histogram(
         let dp = data_point.as_object().unwrap();
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, dp) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let vec: Vec<&str> = get_exclude_labels();
-            let hash = super::signature_without_labels(val_map, &vec);
+            let hash = super::signature_without_labels(val_map, &get_exclude_labels());
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             records.push(bucket_rec);
         }

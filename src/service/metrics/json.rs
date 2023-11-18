@@ -36,6 +36,8 @@ use crate::service::{
     usage::report_request_usage_stats,
 };
 
+use super::get_exclude_labels;
+
 pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
 
@@ -139,10 +141,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         // remove type from labels
         record.remove(TYPE_LABEL);
         // add hash
-        let hash = super::signature_without_labels(
-            record,
-            &[VALUE_LABEL, CONFIG.common.column_timestamp.as_str()],
-        );
+        let hash = super::signature_without_labels(record, &get_exclude_labels());
         record.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
 
         // convert every label to string
