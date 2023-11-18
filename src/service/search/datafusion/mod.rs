@@ -140,8 +140,8 @@ pub fn new_parquet_writer<'a>(
     } else {
         num_rows
     };
-    if let Some(fields) = BLOOM_FILTER_DEFAULT_FIELDS.as_ref() {
-        for field in fields {
+    if CONFIG.common.bloom_filter_enabled {
+        for field in BLOOM_FILTER_DEFAULT_FIELDS.iter() {
             writer_props = writer_props
                 .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
             if metadata.records > 0 {

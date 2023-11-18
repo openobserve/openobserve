@@ -103,26 +103,24 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     .collect()
 });
 
-pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Option<Vec<String>>> = Lazy::new(|| {
-    if !CONFIG.common.bloom_filter_enabled || CONFIG.common.bloom_filter_default_fields.is_empty() {
-        None
-    } else {
-        Some(
-            CONFIG
-                .common
-                .bloom_filter_default_fields
-                .split(',')
-                .filter_map(|s| {
-                    let s = s.trim();
-                    if s.is_empty() {
-                        None
-                    } else {
-                        Some(s.to_string())
-                    }
-                })
-                .collect::<Vec<_>>(),
-        )
-    }
+const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
+pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    chain(
+        _DEFAULT_BLOOM_FILTER_FIELDS.iter().map(|s| s.to_string()),
+        CONFIG
+            .common
+            .bloom_filter_default_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect()
 });
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
@@ -316,7 +314,7 @@ pub struct Common {
     pub ui_sql_base64_enabled: bool,
     #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
     pub metrics_dedup_enabled: bool,
-    #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = false)]
+    #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
