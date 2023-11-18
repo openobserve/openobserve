@@ -178,6 +178,11 @@ pub async fn search(
                 }
             }
         }
+        for (field, alias) in sql.meta.field_alias.iter() {
+            if let Some(v) = diff_fields.get(field) {
+                diff_fields.insert(alias.to_string(), v.clone());
+            }
+        }
         // add not exists field for wal infered schema
         let mut new_fields = Vec::new();
         for field in schema_latest.fields() {
