@@ -18,14 +18,14 @@ use regex::{self, Regex};
 
 use crate::common;
 use crate::common::infra::config::CONFIG;
-use crate::common::meta::prom::{Metadata, METADATA_LABEL, VALUE_LABEL};
+use crate::common::meta::prom::{Metadata, HASH_LABEL, METADATA_LABEL, VALUE_LABEL};
 
 pub mod json;
 pub mod otlp_grpc;
 pub mod otlp_http;
 pub mod prom;
 
-const EXCLUDE_LABELS: [&str; 5] = [VALUE_LABEL, "start_time", "is_monotonic", "exemplars", "le"];
+const EXCLUDE_LABELS: [&str; 2] = [VALUE_LABEL, HASH_LABEL];
 
 static RE_CORRECT_LABEL_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
