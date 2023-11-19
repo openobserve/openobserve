@@ -15,11 +15,11 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
-use sqlx::{Postgres, QueryBuilder, Row};
+use sqlx::{MySql, QueryBuilder, Row};
 
 use crate::common::{
     infra::{
-        db::postgres::CLIENT,
+        db::mysql::CLIENT,
         errors::{Error, Result},
     },
     meta::{
@@ -29,22 +29,22 @@ use crate::common::{
     },
 };
 
-pub struct PostgresFileList {}
+pub struct MysqlFileList {}
 
-impl PostgresFileList {
+impl MysqlFileList {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Default for PostgresFileList {
+impl Default for MysqlFileList {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[async_trait]
-impl super::FileList for PostgresFileList {
+impl super::FileList for MysqlFileList {
     async fn create_table(&self) -> Result<()> {
         create_table().await
     }
@@ -67,9 +67,8 @@ impl super::FileList for PostgresFileList {
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         match  sqlx::query(
             r#"
-INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    ON CONFLICT DO NOTHING;
+INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             "#,
         )
         .bind(org_id)
@@ -97,7 +96,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     async fn remove(&self, file: &str) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-        sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
+        sqlx::query(r#"DELETE FROM file_list WHERE stream = ? AND date = ? AND file = ?;"#)
             .bind(stream_key)
             .bind(date_key)
             .bind(file_name)
@@ -114,7 +113,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
         let chunks = files.chunks(100);
         for files in chunks {
             let mut tx = pool.begin().await?;
-            let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
+            let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
                     super::parse_file_key_columns(&item.key).expect("parse file key failed");
@@ -137,31 +136,31 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
                         true
                     } else {
                         if let Err(e) = tx.rollback().await {
-                            log::error!("[POSTGRES] rollback file_list batch add error: {}", e);
+                            log::error!("[MYSQL] rollback file_list batch add error: {}", e);
                         }
                         return Err(Error::Message(e.to_string()));
                     }
                 }
                 Err(e) => {
                     if let Err(e) = tx.rollback().await {
-                        log::error!("[POSTGRES] rollback file_list batch add error: {}", e);
+                        log::error!("[MYSQL] rollback file_list batch add error: {}", e);
                     }
                     return Err(e.into());
                 }
             };
             if need_single_insert {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[POSTGRES] rollback file_list batch add error: {}", e);
+                    log::error!("[MYSQL] rollback file_list batch add error: {}", e);
                     return Err(e.into());
                 }
                 for item in files {
                     if let Err(e) = self.add(&item.key, &item.meta).await {
-                        log::error!("[POSTGRES] single insert file_list add error: {}", e);
+                        log::error!("[MYSQL] single insert file_list add error: {}", e);
                         return Err(e);
                     }
                 }
             } else if let Err(e) = tx.commit().await {
-                log::error!("[POSTGRES] commit file_list batch add error: {}", e);
+                log::error!("[MYSQL] commit file_list batch add error: {}", e);
                 return Err(e.into());
             }
         }
@@ -183,14 +182,14 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
                     Ok(_) => {}
                     Err(e) => {
                         if let Err(e) = tx.rollback().await {
-                            log::error!("[POSTGRES] rollback batch remove error: {}", e);
+                            log::error!("[MYSQL] rollback batch remove error: {}", e);
                         }
                         return Err(e.into());
                     }
                 }
             }
             if let Err(e) = tx.commit().await {
-                log::error!("[POSTGRES] commit file_list batch remove error: {}", e);
+                log::error!("[MYSQL] commit file_list batch remove error: {}", e);
                 return Err(e.into());
             }
         }
@@ -210,7 +209,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
         let chunks = files.chunks(100);
         for files in chunks {
             let mut tx = pool.begin().await?;
-            let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+            let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
                 "INSERT INTO file_list_deleted (org, stream, date, file, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
@@ -224,15 +223,12 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             });
             if let Err(e) = query_builder.build().execute(&mut *tx).await {
                 if let Err(e) = tx.rollback().await {
-                    log::error!(
-                        "[POSTGRES] rollback file_list_deleted batch add error: {}",
-                        e
-                    );
+                    log::error!("[MYSQL] rollback file_list_deleted batch add error: {}", e);
                 }
                 return Err(e.into());
             };
             if let Err(e) = tx.commit().await {
-                log::error!("[POSTGRES] commit file_list_deleted batch add error: {}", e);
+                log::error!("[MYSQL] commit file_list_deleted batch add error: {}", e);
                 return Err(e.into());
             }
         }
@@ -255,7 +251,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
                     Err(e) => {
                         if let Err(e) = tx.rollback().await {
                             log::error!(
-                                "[POSTGRES] rollback file_list_deleted batch remove error: {}",
+                                "[MYSQL] rollback file_list_deleted batch remove error: {}",
                                 e
                             );
                         }
@@ -264,10 +260,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
                 }
             }
             if let Err(e) = tx.commit().await {
-                log::error!(
-                    "[POSTGRES] commit file_list_deleted batch remove error: {}",
-                    e
-                );
+                log::error!("[MYSQL] commit file_list_deleted batch remove error: {}", e);
                 return Err(e.into());
             }
         }
@@ -280,7 +273,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
-    FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
+    FROM file_list WHERE stream = ? AND date = ? AND file = ?;
             "#,
         )
         .bind(stream_key)
@@ -297,7 +290,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let ret = sqlx::query(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
-    FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
+    FROM file_list WHERE stream = ? AND date = ? AND file = ?;
             "#,
         )
         .bind(stream_key)
@@ -347,7 +340,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
     FROM file_list 
-    WHERE stream = $1 AND min_ts <= $2 AND max_ts >= $3;
+    WHERE stream = ? AND min_ts <= ? AND max_ts >= ?;
             "#,
         )
         .bind(stream_key)
@@ -372,7 +365,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         }
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file FROM file_list_deleted WHERE org = $1 AND created_at < $2;"#,
+            r#"SELECT stream, date, file FROM file_list_deleted WHERE org = ? AND created_at < ?;"#,
         )
         .bind(org_id)
         .bind(time_max)
@@ -386,7 +379,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
     async fn get_max_pk_value(&self) -> Result<i64> {
         let pool = CLIENT.clone();
-        let ret: i64 = sqlx::query_scalar(r#"SELECT MAX(id)::BIGINT AS id FROM file_list;"#)
+        let ret: i64 = sqlx::query_scalar(r#"SELECT MAX(id) AS id FROM file_list;"#)
             .fetch_one(&pool)
             .await?;
         Ok(ret)
@@ -414,8 +407,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         };
         let sql = format!(
             r#"
-SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num, 
-    SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size
+SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SIGNED) AS file_num, 
+    CAST(SUM(records) AS SIGNED) AS records, CAST(SUM(original_size) AS SIGNED) AS original_size, CAST(SUM(compressed_size) AS SIGNED) AS compressed_size
     FROM file_list 
     WHERE {field} = '{value}'
             "#,
@@ -492,7 +485,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
                 r#"
 INSERT INTO stream_stats 
     (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
-    VALUES ($1, $2, 0, 0, 0, 0, 0, 0);
+    VALUES (?, ?, 0, 0, 0, 0, 0, 0);
                 "#,
             )
             .bind(org_id)
@@ -501,13 +494,13 @@ INSERT INTO stream_stats
             .await
             {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[POSTGRES] rollback insert stream stats error: {}", e);
+                    log::error!("[MYSQL] rollback insert stream stats error: {}", e);
                 }
                 return Err(e.into());
             }
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit set stream stats error: {}", e);
+            log::error!("[MYSQL] commit set stream stats error: {}", e);
             return Err(e.into());
         }
 
@@ -516,8 +509,8 @@ INSERT INTO stream_stats
             if let Err(e) = sqlx::query(
                 r#"
 UPDATE stream_stats 
-    SET file_num = $1, min_ts = $2, max_ts = $3, records = $4, original_size = $5, compressed_size = $6
-    WHERE stream = $7;
+    SET file_num = ?, min_ts = ?, max_ts = ?, records = ?, original_size = ?, compressed_size = ?
+    WHERE stream = ?;
                 "#,
             )
             .bind(stats.file_num)
@@ -528,15 +521,16 @@ UPDATE stream_stats
             .bind(stats.compressed_size as i64)
             .bind(stream_key)
             .execute(&mut *tx)
-            .await{
+            .await
+            {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[POSTGRES] rollback set stream stats error: {}", e);
+                    log::error!("[MYSQL] rollback set stream stats error: {}", e);
                 }
                 return Err(e.into());
             }
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit set stream stats error: {}", e);
+            log::error!("[MYSQL] commit set stream stats error: {}", e);
             return Err(e.into());
         }
 
@@ -558,7 +552,7 @@ UPDATE stream_stats
         min_ts: i64,
     ) -> Result<()> {
         let pool = CLIENT.clone();
-        sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
+        sqlx::query(r#"UPDATE stream_stats SET min_ts = ? WHERE stream = ?;"#)
             .bind(min_ts)
             .bind(stream)
             .execute(&pool)
@@ -568,13 +562,13 @@ UPDATE stream_stats
 
     async fn len(&self) -> usize {
         let pool = CLIENT.clone();
-        let ret = match sqlx::query(r#"SELECT COUNT(*)::BIGINT AS num FROM file_list;"#)
+        let ret = match sqlx::query(r#"SELECT CAST(COUNT(*) AS SIGNED) AS num FROM file_list;"#)
             .fetch_one(&pool)
             .await
         {
             Ok(r) => r,
             Err(e) => {
-                log::error!("[POSTGRES] get file list len error: {}", e);
+                log::error!("[MYSQL] get file list len error: {}", e);
                 return 0;
             }
         };
@@ -599,7 +593,7 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS file_list
 (
-    id       BIGINT GENERATED ALWAYS AS IDENTITY,
+    id       BIGINT not null primary key AUTO_INCREMENT,
     org      VARCHAR(100) not null,
     stream   VARCHAR(256) not null,
     date     VARCHAR(16)  not null,
@@ -620,7 +614,7 @@ CREATE TABLE IF NOT EXISTS file_list
         r#"
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
-    id       BIGINT GENERATED ALWAYS AS IDENTITY,
+    id       BIGINT not null primary key AUTO_INCREMENT,
     org      VARCHAR(100) not null,
     stream   VARCHAR(256) not null,
     date     VARCHAR(16)  not null,
@@ -636,7 +630,7 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
         r#"
 CREATE TABLE IF NOT EXISTS stream_stats
 (
-    id       BIGINT GENERATED ALWAYS AS IDENTITY,
+    id       BIGINT not null primary key AUTO_INCREMENT,
     org      VARCHAR(100) not null,
     stream   VARCHAR(256) not null,
     file_num BIGINT not null,
@@ -658,36 +652,45 @@ pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
     let sqls = vec![
         (
-            "file_list", 
-            "CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);"),
-        (
             "file_list",
-            "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
+            "CREATE INDEX file_list_org_idx on file_list (org);",
         ),
         (
             "file_list",
-            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);",
+            "CREATE INDEX file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
+        ),
+        (
+            "file_list",
+            "CREATE UNIQUE INDEX file_list_stream_file_idx on file_list (stream, date, file);",
         ),
         (
             "file_list_deleted",
-            "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_idx on file_list_deleted (stream);",
+            "CREATE INDEX file_list_deleted_stream_idx on file_list_deleted (stream);",
         ),
         (
             "file_list_deleted",
-            "CREATE INDEX IF NOT EXISTS file_list_deleted_created_at_idx on file_list_deleted (org, created_at);",
+            "CREATE INDEX file_list_deleted_created_at_idx on file_list_deleted (org, created_at);",
         ),
         (
             "stream_stats",
-            "CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);",
+            "CREATE INDEX stream_stats_org_idx on stream_stats (org);",
         ),
         (
             "stream_stats",
-            "CREATE UNIQUE INDEX IF NOT EXISTS stream_stats_stream_idx on stream_stats (stream);",
+            "CREATE UNIQUE INDEX stream_stats_stream_idx on stream_stats (stream);",
         ),
     ];
     for (table, sql) in sqls {
         if let Err(e) = sqlx::query(sql).execute(&pool).await {
-            log::error!("[POSTGRES] create table {} index error: {}", table, e);
+            if let sqlx::Error::Database(e) = &e {
+                if let Some(code) = e.code() {
+                    if code == "42000" {
+                        // index already exists
+                        continue;
+                    }
+                }
+            }
+            log::error!("[MYSQL] create table {} index error: {}", table, e);
             return Err(e.into());
         }
     }

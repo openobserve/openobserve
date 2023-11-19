@@ -15,14 +15,14 @@
 use crate::common::infra::{config, db as infra_db};
 
 pub async fn get() -> Result<String, anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let ret = db.get("/meta/kv/version").await?;
     let version = std::str::from_utf8(&ret).unwrap();
     Ok(version.to_string())
 }
 
 pub async fn set() -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     db.put(
         "/meta/kv/version",
         bytes::Bytes::from(config::VERSION),

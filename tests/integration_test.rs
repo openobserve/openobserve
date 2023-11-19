@@ -19,7 +19,7 @@ mod tests {
     use chrono::Utc;
     use core::time;
     use openobserve::{
-        common::infra::{config::CONFIG, db::default},
+        common::infra::config::CONFIG,
         common::meta::dashboards::{Dashboard, Dashboards},
         common::{meta::dashboards::v1, utils::json},
         handler::http::router::*,
@@ -43,7 +43,6 @@ mod tests {
             env::set_var("ZO_PAYLOAD_LIMIT", "209715200");
             env::set_var("ZO_JSON_LIMIT", "209715200");
             env::set_var("ZO_TIME_STAMP_COL", "_timestamp");
-            let _db = default();
 
             env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
 

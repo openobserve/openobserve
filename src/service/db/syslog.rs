@@ -25,7 +25,8 @@ use crate::common::{
 
 #[tracing::instrument(name = "service:db:syslog:toggle_syslog_setting")]
 pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
-    Ok(infra_db::DEFAULT
+    let db = infra_db::get_db().await;
+    Ok(db
         .put(
             "/syslog/enabled",
             json::to_vec(&json::Value::Bool(enabled)).unwrap().into(),
@@ -36,7 +37,8 @@ pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
 
 #[tracing::instrument(name = "service:db:syslog:list")]
 pub async fn list() -> Result<Vec<SyslogRoute>, anyhow::Error> {
-    Ok(infra_db::DEFAULT
+    let db = infra_db::get_db().await;
+    Ok(db
         .list("/syslog/route/")
         .await?
         .values()
@@ -46,7 +48,8 @@ pub async fn list() -> Result<Vec<SyslogRoute>, anyhow::Error> {
 
 #[tracing::instrument(name = "service:db:syslog:set", skip_all)]
 pub async fn set(route: &SyslogRoute) -> Result<(), anyhow::Error> {
-    Ok(infra_db::DEFAULT
+    let db = infra_db::get_db().await;
+    Ok(db
         .put(
             &format!("/syslog/route/{}", route.id),
             json::to_vec(route).unwrap().into(),
@@ -57,23 +60,23 @@ pub async fn set(route: &SyslogRoute) -> Result<(), anyhow::Error> {
 
 #[tracing::instrument(name = "service:db:syslog:get")]
 pub async fn get(id: &str) -> Result<SyslogRoute, anyhow::Error> {
-    let val = infra_db::DEFAULT
-        .get(&format!("/syslog/route/{id}"))
-        .await?;
+    let db = infra_db::get_db().await;
+    let val = db.get(&format!("/syslog/route/{id}")).await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
 #[tracing::instrument(name = "service:db:syslog:delete")]
 pub async fn delete(id: &str) -> Result<(), anyhow::Error> {
-    Ok(infra_db::DEFAULT
+    let db = infra_db::get_db().await;
+    Ok(db
         .delete(&format!("/syslog/route/{id}"), false, infra_db::NEED_WATCH)
         .await?)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/syslog/route/";
-    let db = &infra_db::CLUSTER_COORDINATOR;
-    let mut events = db.watch(key).await?;
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching syslog routes");
     loop {
@@ -101,7 +104,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/syslog/route/";
-    let ret = infra_db::DEFAULT.list(key).await?;
+    let db = infra_db::get_db().await;
+    let ret = db.list(key).await?;
     for (_, item_value) in ret {
         let json_val: SyslogRoute = json::from_slice(&item_value).unwrap();
         SYSLOG_ROUTES.insert(json_val.id.to_owned(), json_val);
@@ -112,8 +116,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
 pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
     let key = "/syslog/enabled";
-    let db = &infra_db::CLUSTER_COORDINATOR;
-    let mut events = db.watch(key).await?;
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching SyslogServer settings");
     loop {
@@ -142,7 +146,8 @@ pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
 
 pub async fn cache_syslog_settings() -> Result<(), anyhow::Error> {
     let key = "/syslog/enabled";
-    if let Ok(val) = infra_db::DEFAULT.get(key).await {
+    let db = infra_db::get_db().await;
+    if let Ok(val) = db.get(key).await {
         let item_value: bool = json::from_slice(&val).unwrap();
         let mut syslog_enabled = SYSLOG_ENABLED.write();
         *syslog_enabled = item_value;

@@ -30,7 +30,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<DestinationTemplate, anyhow
         return Ok(v.value().clone());
     }
 
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/templates/{org_id}/{name}");
     if let Ok(val) = db.get(&key).await {
         return Ok(json::from_slice(&val).unwrap());
@@ -44,7 +44,7 @@ pub async fn set(
     name: &str,
     mut template: DestinationTemplate,
 ) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     template.is_default = Some(org_id == DEFAULT_ORG);
     let key = format!("/templates/{org_id}/{name}");
     Ok(db
@@ -57,7 +57,7 @@ pub async fn set(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/templates/{org_id}/{name}");
     Ok(db.delete(&key, false, infra_db::NEED_WATCH).await?)
 }
@@ -74,7 +74,7 @@ pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Erro
             })
             .collect())
     } else {
-        let db = &infra_db::DEFAULT;
+        let db = infra_db::get_db().await;
         let key = format!("/templates/{org_id}/", org_id = org_id);
         let ret = db.list(key.as_str()).await?;
         let mut templates = Vec::new();
@@ -88,8 +88,8 @@ pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Erro
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/templates/";
-    let db = &infra_db::CLUSTER_COORDINATOR;
-    let mut events = db.watch(key).await?;
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching alert templates");
     loop {
@@ -117,7 +117,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/templates/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {

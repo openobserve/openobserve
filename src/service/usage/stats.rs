@@ -235,7 +235,7 @@ async fn report_stats(
 }
 
 async fn get_last_stats_offset(org_id: &str) -> (i64, String) {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/stats/last_updated/org/{org_id}");
     let value = match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
@@ -256,7 +256,7 @@ pub async fn set_last_stats_offset(
     offset: i64,
     node: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let val = if let Some(node) = node {
         format!("{};{}", offset, node)
     } else {
@@ -268,7 +268,7 @@ pub async fn set_last_stats_offset(
 }
 
 pub async fn _set_cache_expiry(offset: i64) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/stats/cache_expiry".to_string();
     db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
         .await?;

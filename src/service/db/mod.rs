@@ -30,7 +30,7 @@ pub mod user;
 pub mod version;
 
 pub async fn get_instance() -> Result<Option<String>, anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/instance/";
     let ret = db.get(key).await?;
     let loc_value = json::from_slice(&ret).unwrap();
@@ -39,7 +39,7 @@ pub async fn get_instance() -> Result<Option<String>, anyhow::Error> {
 }
 
 pub async fn set_instance(id: &str) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/instance/";
     match db
         .put(
