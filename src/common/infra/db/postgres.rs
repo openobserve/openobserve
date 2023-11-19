@@ -127,8 +127,8 @@ INSERT INTO meta (module, key1, key2, value)
 
         // event watch
         if need_watch {
-            let tx = &super::CLUSTER_COORDINATOR;
-            tx.put(key, value, true).await?;
+            let cluster_coordinator = super::get_coordinator().await;
+            cluster_coordinator.put(key, value, true).await?;
         }
 
         Ok(())
@@ -143,10 +143,10 @@ INSERT INTO meta (module, key1, key2, value)
             } else {
                 vec![key.to_string()]
             };
-            let tx = &super::CLUSTER_COORDINATOR;
+            let cluster_coordinator = super::get_coordinator().await;
             tokio::task::spawn(async move {
                 for key in items {
-                    if let Err(e) = tx.delete(&key, false, true).await {
+                    if let Err(e) = cluster_coordinator.delete(&key, false, true).await {
                         log::error!("[POSTGRES] send event error: {}", e);
                     }
                 }

@@ -144,7 +144,7 @@ pub async fn register_and_keepalive() -> Result<()> {
             }
             log::error!("[CLUSTER] keepalive lease id expired or revoked, set node online again.");
             // get new lease id
-            let mut client = etcd::ETCD_CLIENT.get().await.clone().unwrap();
+            let mut client = etcd::get_etcd_client().await.clone();
             let resp = match client
                 .lease_grant(CONFIG.etcd.node_heartbeat_ttl, None)
                 .await
@@ -221,7 +221,7 @@ pub async fn register() -> Result<()> {
     NODES.insert(LOCAL_NODE_UUID.clone(), val.clone());
     let val = json::to_string(&val).unwrap();
     // register node to cluster
-    let mut client = etcd::ETCD_CLIENT.get().await.clone().unwrap();
+    let mut client = etcd::get_etcd_client().await.clone();
     let resp = client
         .lease_grant(CONFIG.etcd.node_heartbeat_ttl, None)
         .await?;
@@ -282,7 +282,7 @@ pub async fn set_online() -> Result<()> {
     NODES.insert(LOCAL_NODE_UUID.clone(), val.clone());
     let val = json::to_string(&val).unwrap();
 
-    let mut client = etcd::ETCD_CLIENT.get().await.clone().unwrap();
+    let mut client = etcd::get_etcd_client().await.clone();
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let _resp = client.put(key, val, Some(opt)).await?;
@@ -300,7 +300,7 @@ pub async fn leave() -> Result<()> {
         LOCAL_NODE_STATUS = NodeStatus::Offline;
     }
 
-    let mut client = etcd::ETCD_CLIENT.get().await.clone().unwrap();
+    let mut client = etcd::get_etcd_client().await.clone();
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let _resp = client.delete(key, None).await?;
 
@@ -364,7 +364,7 @@ pub fn get_internal_grpc_token() -> String {
 /// List nodes from cluster or local cache
 pub async fn list_nodes() -> Result<Vec<Node>> {
     let mut nodes = Vec::new();
-    let mut client = etcd::ETCD_CLIENT.get().await.clone().unwrap();
+    let mut client = etcd::get_etcd_client().await.clone();
     let key = format!("{}nodes/", &CONFIG.etcd.prefix);
     let opt = etcd_client::GetOptions::new().with_prefix();
     let ret = client.get(key.clone(), Some(opt)).await.map_err(|e| {
@@ -381,9 +381,9 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
 }
 
 async fn watch_node_list() -> Result<()> {
-    let db = &super::db::CLUSTER_COORDINATOR;
+    let cluster_coordinator = super::db::get_coordinator().await;
     let key = "/nodes/";
-    let mut events = db.watch(key).await?;
+    let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching node_list");
     loop {

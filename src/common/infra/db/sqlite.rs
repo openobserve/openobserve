@@ -688,7 +688,8 @@ async fn delete(
     if need_watch {
         // find all keys then send event
         let items = if with_prefix {
-            super::DEFAULT.list_keys(key).await?
+            let db = super::get_db().await;
+            db.list_keys(key).await?
         } else {
             vec![key.to_string()]
         };

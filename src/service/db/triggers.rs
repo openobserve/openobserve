@@ -21,7 +21,7 @@ use crate::common::{
 };
 
 pub async fn get(alert_name: &str) -> Result<Option<Trigger>, anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/trigger/{alert_name}");
     Ok(db
         .get(&key)
@@ -31,7 +31,7 @@ pub async fn get(alert_name: &str) -> Result<Option<Trigger>, anyhow::Error> {
 }
 
 pub async fn set(alert_name: &str, trigger: &Trigger) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/trigger/{alert_name}");
     match db
         .put(
@@ -51,13 +51,13 @@ pub async fn set(alert_name: &str, trigger: &Trigger) -> Result<(), anyhow::Erro
 }
 
 pub async fn delete(alert_name: &str) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/trigger/{alert_name}");
     Ok(db.delete(&key.clone(), false, infra_db::NEED_WATCH).await?)
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/trigger/";
     for (item_key, item_value) in db.list(key).await? {
         let item_key = item_key.strip_prefix(key).unwrap();
@@ -70,8 +70,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/trigger/";
-    let db = &infra_db::CLUSTER_COORDINATOR;
-    let mut events = db.watch(key).await?;
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching Triggers");
     loop {

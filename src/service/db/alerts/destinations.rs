@@ -28,7 +28,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<AlertDestinationResponse, a
         return Ok(val.to_dest_resp(Some(template)));
     }
 
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/{name}");
     let val = db.get(&key).await?;
     let dest: AlertDestination = json::from_slice(&val).unwrap();
@@ -41,7 +41,7 @@ pub async fn set(
     name: &str,
     mut destination: AlertDestination,
 ) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     destination.name = Some(name.to_owned());
     let key = format!("/destinations/{org_id}/{name}");
     Ok(db
@@ -54,13 +54,13 @@ pub async fn set(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/{name}");
     Ok(db.delete(&key, false, infra_db::NEED_WATCH).await?)
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<AlertDestinationResponse>, anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}");
     let mut temp_list: Vec<AlertDestinationResponse> = Vec::new();
     for item_value in db.list_values(&key).await? {
@@ -73,8 +73,8 @@ pub async fn list(org_id: &str) -> Result<Vec<AlertDestinationResponse>, anyhow:
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/destinations/";
-    let db = &infra_db::CLUSTER_COORDINATOR;
-    let mut events = db.watch(key).await?;
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching alert destinations");
     loop {
@@ -102,7 +102,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/destinations/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {

@@ -111,7 +111,6 @@ pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String,
 }
 
 pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<String, json::Value> {
-    let db = &db::DEFAULT;
     let iter = STREAM_SCHEMAS.iter().clone();
     let mut num_streams = 0;
     let mut logs_streams = 0;
@@ -143,6 +142,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
             CONFIG.common.local_mode_storage.clone().into(),
         );
     }
+    let db = db::get_db().await;
     match db.list_keys("/dashboard/").await {
         Ok(keys) => {
             data.insert("num_dashboards".to_string(), keys.len().into());

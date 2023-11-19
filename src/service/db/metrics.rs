@@ -22,7 +22,7 @@ use crate::common::{
 };
 
 pub async fn set_prom_cluster_info(cluster: &str, members: &[String]) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/metrics_members/{cluster}");
     Ok(db
         .put(
@@ -37,7 +37,7 @@ pub async fn set_prom_cluster_leader(
     cluster: &str,
     leader: &ClusterLeader,
 ) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/metrics_leader/{cluster}");
     match db
         .put(
@@ -58,8 +58,8 @@ pub async fn set_prom_cluster_leader(
 
 pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
     let key = "/metrics_leader/";
-    let db = &infra_db::CLUSTER_COORDINATOR;
-    let mut events = db.watch(key).await?;
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching prometheus cluster leader");
     loop {
@@ -92,7 +92,7 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache_prom_cluster_leader() -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/metrics_leader/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {

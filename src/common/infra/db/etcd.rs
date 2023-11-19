@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use ahash::HashMap;
-use async_once::AsyncOnce;
 use async_trait::async_trait;
 use bytes::Bytes;
 use etcd_client::{
@@ -26,14 +25,24 @@ use std::{
         Arc,
     },
 };
-use tokio::{sync::mpsc, task::JoinHandle, time};
+use tokio::{
+    sync::{mpsc, OnceCell},
+    task::JoinHandle,
+    time,
+};
 
 use super::{Event, EventData};
 use crate::common::infra::{cluster, config::CONFIG, errors::*};
 
-lazy_static! {
-    pub static ref ETCD_CLIENT: AsyncOnce<Option<etcd_client::Client>> =
-        AsyncOnce::new(async { connect_etcd().await });
+static ETCD_CLIENT: OnceCell<etcd_client::Client> = OnceCell::const_new();
+
+pub async fn get_etcd_client() -> &'static etcd_client::Client {
+    ETCD_CLIENT.get_or_init(connect_etcd).await
+}
+
+pub async fn init() {
+    // enable keep alive for auth token
+    tokio::task::spawn(async move { keepalive_connection().await });
 }
 
 pub struct Etcd {
@@ -62,7 +71,7 @@ impl super::Db for Etcd {
     }
 
     async fn stats(&self) -> Result<super::Stats> {
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let stats = client.status().await?;
         let bytes_len = stats.db_size();
         let resp = client
@@ -80,7 +89,7 @@ impl super::Db for Etcd {
 
     async fn get(&self, key: &str) -> Result<Bytes> {
         let key = format!("{}{}", self.prefix, key);
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let ret = client.get(key.as_str(), None).await?;
         if ret.kvs().is_empty() {
             return Err(Error::from(DbError::KeyNotExists(key)));
@@ -90,14 +99,14 @@ impl super::Db for Etcd {
 
     async fn put(&self, key: &str, value: Bytes, _need_watch: bool) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let _ = client.put(key, value, None).await?;
         Ok(())
     }
 
     async fn delete(&self, key: &str, with_prefix: bool, _need_watch: bool) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let opt = with_prefix.then(|| DeleteOptions::new().with_prefix());
         let _ = client.delete(key.as_str(), opt).await?.deleted();
         Ok(())
@@ -106,7 +115,7 @@ impl super::Db for Etcd {
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let mut result = HashMap::default();
         let key = format!("{}{}", self.prefix, prefix);
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let mut opt = GetOptions::new()
             .with_prefix()
             .with_sort(SortTarget::Key, SortOrder::Ascend)
@@ -150,7 +159,7 @@ impl super::Db for Etcd {
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let mut result = Vec::new();
         let key = format!("{}{}", self.prefix, prefix);
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let mut opt = GetOptions::new()
             .with_prefix()
             .with_sort(SortTarget::Key, SortOrder::Ascend)
@@ -194,7 +203,7 @@ impl super::Db for Etcd {
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
         let mut result = Vec::new();
         let key = format!("{}{}", self.prefix, prefix);
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let mut opt = GetOptions::new()
             .with_prefix()
             .with_sort(SortTarget::Key, SortOrder::Ascend)
@@ -236,7 +245,7 @@ impl super::Db for Etcd {
 
     async fn count(&self, prefix: &str) -> Result<i64> {
         let key = format!("{}{}", self.prefix, prefix);
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let opt = GetOptions::new().with_prefix().with_count_only();
         let resp = client.get(key.clone(), Some(opt)).await?;
         Ok(resp.count())
@@ -251,7 +260,7 @@ impl super::Db for Etcd {
                 if cluster::is_offline() {
                     break;
                 }
-                let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+                let mut client = get_etcd_client().await.clone();
                 let opt = etcd_client::WatchOptions::new().with_prefix();
                 let (mut _watcher, mut stream) =
                     match client.watch(key.clone(), Some(opt.clone())).await {
@@ -309,10 +318,7 @@ pub async fn create_table() -> Result<()> {
     Ok(())
 }
 
-pub async fn connect_etcd() -> Option<etcd_client::Client> {
-    if CONFIG.common.local_mode {
-        return None;
-    }
+pub async fn connect_etcd() -> etcd_client::Client {
     if CONFIG.common.print_key_config {
         log::info!("etcd init config: {:?}", CONFIG.etcd);
     }
@@ -336,14 +342,9 @@ pub async fn connect_etcd() -> Option<etcd_client::Client> {
         opts = opts.with_tls(tls);
     }
     let addrs = CONFIG.etcd.addr.split(',').collect::<Vec<&str>>();
-    let client = etcd_client::Client::connect(addrs, Some(opts))
+    etcd_client::Client::connect(addrs, Some(opts))
         .await
-        .expect("Etcd connect failed");
-
-    // enable keep alive for auth token
-    tokio::task::spawn(async move { keepalive_connection().await });
-
-    Some(client)
+        .expect("Etcd connect failed")
 }
 
 pub async fn keepalive_connection() -> Result<()> {
@@ -351,7 +352,7 @@ pub async fn keepalive_connection() -> Result<()> {
         if cluster::is_offline() {
             break;
         }
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let key = format!("{}healthz", &CONFIG.etcd.prefix);
         let key = key.as_str();
         client.put(key, "OK", None).await?;
@@ -381,7 +382,7 @@ where
         if stopper() {
             break;
         }
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let (mut keeper, mut stream) = match client.lease_keep_alive(id).await {
             Ok((keeper, stream)) => (keeper, stream),
             Err(e) => {
@@ -443,7 +444,7 @@ impl Locker {
 
     /// lock with timeout, 0 means use default timeout, unit: second
     pub async fn lock(&mut self, timeout: u64) -> Result<()> {
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         let mut last_err = None;
         let timeout = if timeout == 0 {
             CONFIG.etcd.lock_wait_timeout
@@ -480,7 +481,7 @@ impl Locker {
         if self.state.load(Ordering::SeqCst) != 1 {
             return Ok(());
         }
-        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let mut client = get_etcd_client().await.clone();
         match client.unlock(self.lock_id.as_str()).await {
             Ok(_) => {}
             Err(err) => {

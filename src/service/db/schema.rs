@@ -44,7 +44,7 @@ pub async fn get(
         return Ok(schema.value().clone().last().unwrap().clone());
     }
 
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
@@ -69,7 +69,7 @@ pub async fn get_from_db(
     stream_type: StreamType,
 ) -> Result<Schema, anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
@@ -100,7 +100,7 @@ pub async fn get_versions(
         return Ok(STREAM_SCHEMAS.get(map_key).unwrap().value().clone());
     }
 
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
@@ -126,7 +126,7 @@ pub async fn set(
     min_ts: Option<i64>,
     new_version: bool,
 ) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let mut versions: Vec<Schema>;
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let map_key = key.strip_prefix("/schema/").unwrap();
@@ -205,7 +205,7 @@ pub async fn delete(
 ) -> Result<(), anyhow::Error> {
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     match db.delete(&key, false, infra_db::NEED_WATCH).await {
         Ok(_) => {}
         Err(e) => {
@@ -263,7 +263,7 @@ pub async fn list(
         return Ok(list_stream_schemas(org_id, stream_type, fetch_schema));
     }
 
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let db_key = match stream_type {
         None => format!("/schema/{org_id}/"),
         Some(stream_type) => format!("/schema/{org_id}/{stream_type}/"),
@@ -297,8 +297,8 @@ pub async fn list(
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/schema/";
-    let db = &infra_db::CLUSTER_COORDINATOR;
-    let mut events = db.watch(key).await?;
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching stream schema");
     loop {
@@ -366,7 +366,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/schema/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {

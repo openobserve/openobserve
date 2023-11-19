@@ -29,6 +29,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     wal::init().await?;
     cache::init().await?;
     // init db
+    db::init().await?;
     db::create_table().await?;
     file_list::create_table().await?;
     // because of asynchronous, we need to wait for a while

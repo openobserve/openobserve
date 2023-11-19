@@ -29,7 +29,8 @@ pub(crate) async fn get(
     folder: &str,
 ) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
-    let bytes = infra_db::DEFAULT.get(&key).await?;
+    let db = infra_db::get_db().await;
+    let bytes = db.get(&key).await?;
     let d_version: DashboardVersion = json::from_slice(&bytes)?;
     if d_version.version == 1 {
         let dash: v1::Dashboard = json::from_slice(&bytes)?;
@@ -56,6 +57,7 @@ pub(crate) async fn put(
     body: web::Bytes,
 ) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{}", dashboard_id);
+    let db = infra_db::get_db().await;
     let d_version: DashboardVersion = json::from_slice(&body)?;
     if d_version.version == 1 {
         let mut dash: v1::Dashboard = json::from_slice(&body)?;
@@ -64,7 +66,7 @@ pub(crate) async fn put(
         };
         dash.dashboard_id = dashboard_id.to_string();
 
-        match infra_db::DEFAULT
+        match db
             .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
             .await
         {
@@ -81,7 +83,7 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-        match infra_db::DEFAULT
+        match db
             .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
             .await
         {
@@ -98,8 +100,8 @@ pub(crate) async fn put(
 #[tracing::instrument]
 pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
     let db_key = format!("/dashboard/{org_id}/{folder}/");
-    infra_db::DEFAULT
-        .list(&db_key)
+    let db = infra_db::get_db().await;
+    db.list(&db_key)
         .await?
         .into_values()
         .map(|val| {
@@ -130,15 +132,13 @@ pub(crate) async fn delete(
     folder: &str,
 ) -> Result<(), anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
-    Ok(infra_db::DEFAULT
-        .delete(&key, false, infra_db::NO_NEED_WATCH)
-        .await?)
+    let db = infra_db::get_db().await;
+    Ok(db.delete(&key, false, infra_db::NO_NEED_WATCH).await?)
 }
 
 #[tracing::instrument]
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/dashboard/";
-    Ok(infra_db::DEFAULT
-        .delete(key, true, infra_db::NO_NEED_WATCH)
-        .await?)
+    let db = infra_db::get_db().await;
+    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH).await?)
 }

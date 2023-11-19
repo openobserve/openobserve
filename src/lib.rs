@@ -17,6 +17,3 @@ pub mod handler;
 pub mod job;
 pub mod router;
 pub mod service;
-
-#[macro_use]
-extern crate lazy_static;

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use ahash::HashMap;
-use async_once::AsyncOnce;
 use async_trait::async_trait;
 use aws_sdk_dynamodb::{
     config::Region,
@@ -26,16 +25,21 @@ use aws_sdk_dynamodb::{
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, OnceCell};
 
 use super::Event;
 use super::Stats;
 use crate::common::infra::{config::CONFIG, errors::*};
 
-lazy_static! {
-    pub static ref DYNAMO_DB: AsyncOnce<DynamoDb> = AsyncOnce::new(async { DynamoDb {} });
-    pub static ref DYNAMO_DB_CLIENT: AsyncOnce<Client> =
-        AsyncOnce::new(async { DynamoDb::connect().await });
+static DB: OnceCell<DynamoDb> = OnceCell::const_new();
+static DB_CLIENT: OnceCell<Client> = OnceCell::const_new();
+
+pub async fn get_db() -> &'static DynamoDb {
+    DB.get_or_init(default).await
+}
+
+pub async fn get_db_client() -> &'static Client {
+    DB_CLIENT.get_or_init(connect).await
 }
 
 #[derive(Default)]
@@ -64,17 +68,19 @@ fn default_oper() -> String {
     "query".to_string()
 }
 
-impl DynamoDb {
-    pub async fn connect() -> Client {
-        if CONFIG.common.local_mode {
-            let region = Region::new("us-west-2");
-            let shared_config = aws_config::from_env()
-                .region(region)
-                .endpoint_url("http://localhost:8000");
-            Client::new(&shared_config.load().await)
-        } else {
-            Client::new(&aws_config::load_from_env().await)
-        }
+async fn default() -> DynamoDb {
+    DynamoDb {}
+}
+
+async fn connect() -> Client {
+    if CONFIG.common.local_mode {
+        let region = Region::new("us-west-2");
+        let shared_config = aws_config::from_env()
+            .region(region)
+            .endpoint_url("http://localhost:8000");
+        Client::new(&shared_config.load().await)
+    } else {
+        Client::new(&aws_config::load_from_env().await)
     }
 }
 
@@ -90,7 +96,7 @@ impl super::Db for DynamoDb {
 
     async fn get(&self, in_key: &str) -> Result<Bytes> {
         let table = get_dynamo_key(in_key, DbOperation::Get);
-        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        let client = get_db_client().await.clone();
         match client
             .query()
             .table_name(&table.name)
@@ -122,7 +128,7 @@ impl super::Db for DynamoDb {
 
     async fn put(&self, in_key: &str, value: Bytes, need_watch: bool) -> Result<()> {
         let table: DynamoTableDetails = get_dynamo_key(in_key, DbOperation::Put);
-        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        let client = get_db_client().await.clone();
         match client
             .put_item()
             .table_name(table.name)
@@ -147,8 +153,8 @@ impl super::Db for DynamoDb {
 
         // event watch
         if need_watch {
-            let tx = &super::CLUSTER_COORDINATOR;
-            tx.put(in_key, value, true).await?;
+            let cluster_coordinator = super::get_coordinator().await;
+            cluster_coordinator.put(in_key, value, true).await?;
         }
 
         Ok(())
@@ -158,14 +164,14 @@ impl super::Db for DynamoDb {
     async fn delete(&self, in_key: &str, _with_prefix: bool, need_watch: bool) -> Result<()> {
         // event watch
         if need_watch {
-            let tx = &super::CLUSTER_COORDINATOR;
-            if let Err(e) = tx.delete(in_key, false, true).await {
+            let cluster_coordinator = super::get_coordinator().await;
+            if let Err(e) = cluster_coordinator.delete(in_key, false, true).await {
                 log::error!("[DYNAMODB] send event error: {}", e);
             }
         }
 
         let table = get_dynamo_key(in_key, DbOperation::Delete);
-        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        let client = get_db_client().await.clone();
         match client
             .delete_item()
             .table_name(table.name)
@@ -189,7 +195,7 @@ impl super::Db for DynamoDb {
         let table = get_dynamo_key(prefix, DbOperation::List);
         let mut last_evaluated_key: Option<std::collections::HashMap<String, AttributeValue>> =
             None;
-        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        let client = get_db_client().await.clone();
         if table.operation == "query" {
             loop {
                 let mut query = client
@@ -259,7 +265,7 @@ impl super::Db for DynamoDb {
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
         let mut result = Vec::new();
         let table = get_dynamo_key(prefix, DbOperation::List);
-        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        let client = get_db_client().await.clone();
         let mut last_evaluated_key: Option<std::collections::HashMap<String, AttributeValue>> =
             None;
         loop {
@@ -311,7 +317,7 @@ impl super::Db for DynamoDb {
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let mut result = Vec::new();
         let table = get_dynamo_key(prefix, DbOperation::List);
-        let client = DYNAMO_DB_CLIENT.get().await.clone();
+        let client = get_db_client().await.clone();
         let mut last_evaluated_key: Option<std::collections::HashMap<String, AttributeValue>> =
             None;
         if table.operation == "query" {
@@ -764,7 +770,7 @@ async fn create_table_inner(
     hash_key: &str,
     range_key: &str,
 ) -> std::result::Result<(), aws_sdk_dynamodb::Error> {
-    let client = DYNAMO_DB_CLIENT.get().await.clone();
+    let client = get_db_client().await.clone();
     let tables = client.list_tables().send().await?;
     if !tables
         .table_names()

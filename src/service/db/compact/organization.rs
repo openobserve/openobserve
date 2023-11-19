@@ -23,7 +23,7 @@ fn mk_key(org_id: &str, module: &str) -> String {
 }
 
 pub async fn get_offset(org_id: &str, module: &str) -> (i64, String) {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = mk_key(org_id, module);
     let value = match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
@@ -45,7 +45,7 @@ pub async fn set_offset(
     offset: i64,
     node: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = mk_key(org_id, module);
     let val = if let Some(node) = node {
         format!("{};{}", offset, node)

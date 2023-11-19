@@ -15,9 +15,8 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
-use once_cell::sync::Lazy;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, OnceCell};
 
 use crate::common::{
     infra::{config::CONFIG, errors::Result},
@@ -37,10 +36,23 @@ pub mod sqlite;
 pub static NEED_WATCH: bool = true;
 pub static NO_NEED_WATCH: bool = false;
 
-pub static DEFAULT: Lazy<Box<dyn Db>> = Lazy::new(default);
-pub static CLUSTER_COORDINATOR: Lazy<Box<dyn Db>> = Lazy::new(cluster_coordinator);
+static DEFAULT: OnceCell<Box<dyn Db>> = OnceCell::const_new();
+static CLUSTER_COORDINATOR: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 
-pub fn default() -> Box<dyn Db> {
+pub async fn get_db() -> &'static Box<dyn Db> {
+    DEFAULT.get_or_init(default).await
+}
+
+pub async fn get_coordinator() -> &'static Box<dyn Db> {
+    CLUSTER_COORDINATOR.get_or_init(cluster_coordinator).await
+}
+
+pub async fn init() -> Result<()> {
+    etcd::init().await;
+    Ok(())
+}
+
+async fn default() -> Box<dyn Db> {
     if !CONFIG.common.local_mode
         && (CONFIG.common.meta_store == "sled" || CONFIG.common.meta_store == "sqlite")
     {
@@ -56,16 +68,7 @@ pub fn default() -> Box<dyn Db> {
     }
 }
 
-pub async fn create_table() -> Result<()> {
-    // check db dir
-    std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
-    // create for meta store
-    CLUSTER_COORDINATOR.create_table().await?;
-    DEFAULT.create_table().await?;
-    Ok(())
-}
-
-pub fn cluster_coordinator() -> Box<dyn Db> {
+async fn cluster_coordinator() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
         match CONFIG.common.meta_store.as_str().into() {
             MetaStore::Sled => Box::<sled::SledDb>::default(),
@@ -74,6 +77,17 @@ pub fn cluster_coordinator() -> Box<dyn Db> {
     } else {
         Box::<etcd::Etcd>::default()
     }
+}
+
+pub async fn create_table() -> Result<()> {
+    // check db dir
+    std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
+    // create for meta store
+    let cluster_coordinator = get_coordinator().await;
+    cluster_coordinator.create_table().await?;
+    let db = get_db().await;
+    db.create_table().await?;
+    Ok(())
 }
 
 #[async_trait]
@@ -258,7 +272,7 @@ mod tests {
     #[actix_web::test]
     async fn test_put() {
         create_table().await.unwrap();
-        let db = default();
+        let db = get_db().await;
         db.put("/foo/put/bar", Bytes::from("hello"), false)
             .await
             .unwrap();
@@ -267,9 +281,8 @@ mod tests {
     #[actix_web::test]
     async fn test_get() {
         create_table().await.unwrap();
-        let db = default();
+        let db = get_db().await;
         let hello = Bytes::from("hello");
-
         db.put("/foo/get/bar", hello.clone(), false).await.unwrap();
         assert_eq!(db.get("/foo/get/bar").await.unwrap(), hello);
     }
@@ -277,7 +290,7 @@ mod tests {
     #[actix_web::test]
     async fn test_delete() {
         create_table().await.unwrap();
-        let db = default();
+        let db = get_db().await;
         let hello = Bytes::from("hello");
 
         db.put("/foo/del/bar1", hello.clone(), false).await.unwrap();
