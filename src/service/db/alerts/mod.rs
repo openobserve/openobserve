@@ -38,7 +38,7 @@ pub async fn get(
         val.list.retain(|alert| alert.name.eq(name));
         val.list.first().cloned()
     } else {
-        let db = &infra_db::DEFAULT;
+        let db = infra_db::get_db().await;
         let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
         match db.get(&key).await {
             Ok(val) => json::from_slice(&val).unwrap(),
@@ -59,7 +59,7 @@ pub async fn set(
     name: &str,
     alert: Alert,
 ) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
     match db
         .put(
@@ -84,7 +84,7 @@ pub async fn delete(
     stream_type: StreamType,
     name: &str,
 ) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
     db.delete(&key, false, infra_db::NEED_WATCH)
         .await
@@ -96,7 +96,7 @@ pub async fn list(
     stream_name: Option<&str>,
     stream_type: Option<StreamType>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
 
     let loc_stream_type = stream_type.unwrap_or_default();
     let key = match stream_name {
@@ -114,8 +114,8 @@ pub async fn list(
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/alerts/";
-    let db = &infra_db::CLUSTER_COORDINATOR;
-    let mut events = db.watch(key).await?;
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching alerts");
     loop {
@@ -170,7 +170,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/alerts/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
@@ -188,7 +188,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/alerts/";
     Ok(db.delete(key, true, infra_db::NO_NEED_WATCH).await?)
 }

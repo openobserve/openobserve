@@ -24,7 +24,7 @@ pub async fn get_offset() -> (i64, String) {
         return (offset, String::from(""));
     }
 
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/compact/stream_stats/offset";
     let value = match db.get(key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
@@ -46,7 +46,7 @@ pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::E
         return Ok(());
     }
 
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/compact/stream_stats/offset";
     let val = if let Some(node) = node {
         format!("{};{}", offset, node)

@@ -37,7 +37,7 @@ pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
         return Ok(());
     }
     let (src, dest) = if CONFIG.common.local_mode {
-        (Box::<db::sled::SledDb>::default(), db::default())
+        (Box::<db::sled::SledDb>::default(), db::get_db().await)
     } else {
         panic!("enable local mode to migrate from sled");
     };
@@ -82,7 +82,7 @@ pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
 pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
     println!("load meta from etcd");
     let (src, dest) = if !CONFIG.common.local_mode {
-        (Box::<db::etcd::Etcd>::default(), db::default())
+        (Box::<db::etcd::Etcd>::default(), db::get_db().await)
     } else {
         panic!("disable local mode to migrate from etcd");
     };

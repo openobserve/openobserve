@@ -16,7 +16,7 @@ use crate::common::{infra::db as infra_db, meta::dashboards::Folder, utils::json
 
 #[tracing::instrument]
 pub(crate) async fn get(org_id: &str, folder_id: &str) -> Result<Folder, anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let val = db.get(&format!("/folders/{org_id}/{folder_id}")).await?;
     Ok(json::from_slice(&val).unwrap())
 }
@@ -24,8 +24,8 @@ pub(crate) async fn get(org_id: &str, folder_id: &str) -> Result<Folder, anyhow:
 #[tracing::instrument(skip(folder))]
 pub(crate) async fn put(org_id: &str, folder: Folder) -> Result<Folder, anyhow::Error> {
     let key = format!("/folders/{org_id}/{}", folder.folder_id);
-
-    match infra_db::DEFAULT
+    let db = infra_db::get_db().await;
+    match db
         .put(&key, json::to_vec(&folder)?.into(), infra_db::NO_NEED_WATCH)
         .await
     {
@@ -37,8 +37,8 @@ pub(crate) async fn put(org_id: &str, folder: Folder) -> Result<Folder, anyhow::
 #[tracing::instrument]
 pub(crate) async fn list(org_id: &str) -> Result<Vec<Folder>, anyhow::Error> {
     let db_key = format!("/folders/{org_id}/");
-    infra_db::DEFAULT
-        .list(&db_key)
+    let db = infra_db::get_db().await;
+    db.list(&db_key)
         .await?
         .into_values()
         .map(|val| json::from_slice(&val).map_err(|e| anyhow::anyhow!(e)))
@@ -48,7 +48,6 @@ pub(crate) async fn list(org_id: &str) -> Result<Vec<Folder>, anyhow::Error> {
 #[tracing::instrument]
 pub(crate) async fn delete(org_id: &str, folder_id: &str) -> Result<(), anyhow::Error> {
     let key = format!("/folders/{org_id}/{folder_id}");
-    Ok(infra_db::DEFAULT
-        .delete(&key, false, infra_db::NO_NEED_WATCH)
-        .await?)
+    let db = infra_db::get_db().await;
+    Ok(db.delete(&key, false, infra_db::NO_NEED_WATCH).await?)
 }

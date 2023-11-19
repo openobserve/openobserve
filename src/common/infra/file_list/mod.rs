@@ -31,6 +31,7 @@ use crate::common::{
 };
 
 pub mod dynamo;
+pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
@@ -42,6 +43,7 @@ pub fn connect() -> Box<dyn FileList> {
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Etcd => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::DynamoDB => Box::<dynamo::DynamoFileList>::default(),
+        MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresFileList>::default(),
     }
 }

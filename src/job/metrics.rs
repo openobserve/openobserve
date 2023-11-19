@@ -93,7 +93,7 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
 }
 
 async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
+    let db = crate::common::infra::db::get_db().await;
     let stats = db.stats().await?;
     metrics::META_STORAGE_BYTES
         .with_label_values(&[])

@@ -37,7 +37,7 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
 
     let org_id = org_id.expect("Missing org_id");
 
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/user/{name}");
     let val = db.get(&key).await?;
     let db_user: DBUser = json::from_slice(&val).unwrap();
@@ -60,7 +60,7 @@ pub async fn get_by_token(
 
     let org_id = org_id.expect("Missing org_id");
 
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/user/";
     let ret = db.list_values(key).await.unwrap();
 
@@ -85,14 +85,14 @@ pub async fn get_by_token(
 }
 
 pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/user/{name}");
     let val = db.get(&key).await?;
     Ok(json::from_slice::<DBUser>(&val).unwrap())
 }
 
 pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/user/{}", user.email);
     db.put(
         &key,
@@ -129,7 +129,7 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
 }
 
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = format!("/user/{name}");
     match db.delete(&key, false, infra_db::NEED_WATCH).await {
         Ok(_) => {}
@@ -143,8 +143,8 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/user/";
-    let db = &infra_db::CLUSTER_COORDINATOR;
-    let mut events = db.watch(key).await?;
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching user");
     loop {
@@ -187,7 +187,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/user/";
     let ret = db.list(key).await?;
     for (_, item_value) in ret {
@@ -211,7 +211,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn root_user_exists() -> bool {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/user/";
     let mut ret = db.list_values(key).await.unwrap();
     ret.retain(|item| {
@@ -227,7 +227,7 @@ pub async fn root_user_exists() -> bool {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let db = &infra_db::DEFAULT;
+    let db = infra_db::get_db().await;
     let key = "/user/";
     db.delete(key, true, infra_db::NO_NEED_WATCH).await?;
     Ok(())

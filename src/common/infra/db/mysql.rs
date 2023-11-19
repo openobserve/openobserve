@@ -17,53 +17,54 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use once_cell::sync::Lazy;
 use sqlx::{
-    postgres::{PgConnectOptions, PgPoolOptions},
-    ConnectOptions, Pool, Postgres,
+    mysql::{MySqlConnectOptions, MySqlPoolOptions},
+    ConnectOptions, MySql, Pool,
 };
 use std::{str::FromStr, sync::Arc};
 use tokio::sync::mpsc;
 
 use crate::common::infra::{config::CONFIG, errors::*};
 
-pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
+pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(connect);
 
-fn connect() -> Pool<Postgres> {
-    let db_opts = PgConnectOptions::from_str(&CONFIG.common.meta_postgres_dsn)
-        .expect("postgres connect options create failed")
+fn connect() -> Pool<MySql> {
+    let db_opts = MySqlConnectOptions::from_str(&CONFIG.common.meta_mysql_dsn)
+        .expect("mysql connect options create failed")
         .disable_statement_logging();
 
-    PgPoolOptions::new()
+    MySqlPoolOptions::new()
         .min_connections(10)
         .max_connections(512)
         .connect_lazy_with(db_opts)
 }
 
-pub struct PostgresDb {}
+pub struct MysqlDb {}
 
-impl PostgresDb {
+impl MysqlDb {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Default for PostgresDb {
+impl Default for MysqlDb {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[async_trait]
-impl super::Db for PostgresDb {
+impl super::Db for MysqlDb {
     async fn create_table(&self) -> Result<()> {
         create_table().await
     }
 
     async fn stats(&self) -> Result<super::Stats> {
         let pool = CLIENT.clone();
-        let keys_count: i64 = sqlx::query_scalar(r#"SELECT COUNT(*)::BIGINT AS num FROM meta;"#)
-            .fetch_one(&pool)
-            .await
-            .unwrap_or_default();
+        let keys_count: i64 =
+            sqlx::query_scalar(r#"SELECT CAST(COUNT(*) AS SIGNED) AS num FROM meta;"#)
+                .fetch_one(&pool)
+                .await
+                .unwrap_or_default();
         Ok(super::Stats {
             bytes_len: 0,
             keys_count,
@@ -74,7 +75,7 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let value: String = match sqlx::query_scalar(
-            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
+            r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ?;"#,
         )
         .bind(module)
         .bind(key1)
@@ -94,34 +95,28 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
-        sqlx::query(
-            r#"
-INSERT INTO meta (module, key1, key2, value) 
-    VALUES ($1, $2, $3, '')
-    ON CONFLICT DO NOTHING;"#,
-        )
-        .bind(&module)
-        .bind(&key1)
-        .bind(&key2)
-        .execute(&mut *tx)
-        .await?;
-        if let Err(e) = sqlx::query(
-            r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
-        )
-        .bind(&module)
-        .bind(&key1)
-        .bind(&key2)
-        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-        .execute(&mut *tx)
-        .await
+        sqlx::query(r#"INSERT IGNORE INTO meta (module, key1, key2, value) VALUES (?, ?, ?, '');"#)
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .execute(&mut *tx)
+            .await?;
+        if let Err(e) =
+            sqlx::query(r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ?;"#)
+                .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+                .bind(&module)
+                .bind(&key1)
+                .bind(&key2)
+                .execute(&mut *tx)
+                .await
         {
             if let Err(e) = tx.rollback().await {
-                log::error!("[POSTGRES] rollback put meta error: {}", e);
+                log::error!("[MYSQL] rollback put meta error: {}", e);
             }
             return Err(e.into());
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit put meta error: {}", e);
+            log::error!("[MYSQL] commit put meta error: {}", e);
             return Err(e.into());
         }
 
@@ -147,7 +142,7 @@ INSERT INTO meta (module, key1, key2, value)
             tokio::task::spawn(async move {
                 for key in items {
                     if let Err(e) = cluster_coordinator.delete(&key, false, true).await {
-                        log::error!("[POSTGRES] send event error: {}", e);
+                        log::error!("[MYSQL] send event error: {}", e);
                     }
                 }
             });
@@ -268,7 +263,7 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS meta
 (
-    id      BIGINT GENERATED ALWAYS AS IDENTITY,
+    id      BIGINT not null primary key AUTO_INCREMENT,
     module  VARCHAR(100) not null,
     key1    VARCHAR(256) not null,
     key2    VARCHAR(256) not null,
@@ -280,23 +275,20 @@ CREATE TABLE IF NOT EXISTS meta
     .await
     {
         if let Err(e) = tx.rollback().await {
-            log::error!("[POSTGRES] rollback create table meta error: {}", e);
+            log::error!("[MYSQL] rollback create table meta error: {}", e);
         }
         return Err(e.into());
     }
     if let Err(e) = tx.commit().await {
-        log::error!("[POSTGRES] commit create table meta error: {}", e);
+        log::error!("[MYSQL] commit create table meta error: {}", e);
         return Err(e.into());
     }
 
     // create table index
-    create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
-    create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);")
+    create_index_item("CREATE INDEX meta_module_idx on meta (module);").await?;
+    create_index_item("CREATE INDEX meta_module_key1_idx on meta (module, key1);").await?;
+    create_index_item("CREATE UNIQUE INDEX meta_module_key2_idx on meta (module, key1, key2);")
         .await?;
-    create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (module, key1, key2);",
-    )
-    .await?;
 
     Ok(())
 }
@@ -304,7 +296,15 @@ CREATE TABLE IF NOT EXISTS meta
 async fn create_index_item(sql: &str) -> Result<()> {
     let pool = CLIENT.clone();
     if let Err(e) = sqlx::query(sql).execute(&pool).await {
-        log::error!("[POSTGRES] create table meta index error: {}", e);
+        if let sqlx::Error::Database(e) = &e {
+            if let Some(code) = e.code() {
+                if code == "42000" {
+                    // index already exists
+                    return Ok(());
+                }
+            }
+        }
+        log::error!("[MYSQL] create table meta index error: {}", e);
         return Err(e.into());
     }
     Ok(())
