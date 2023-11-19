@@ -21,6 +21,7 @@ pub enum MetaStore {
     Sqlite,
     Etcd,
     DynamoDB,
+    MySQL,
     PostgreSQL,
 }
 
@@ -31,6 +32,7 @@ impl From<&str> for MetaStore {
             "sqlite" => MetaStore::Sqlite,
             "etcd" => MetaStore::Etcd,
             "dynamo" | "dynamodb" => MetaStore::DynamoDB,
+            "mysql" => MetaStore::MySQL,
             "postgres" | "postgresql" => MetaStore::PostgreSQL,
             _ => MetaStore::Sqlite,
         }
@@ -44,6 +46,7 @@ impl From<String> for MetaStore {
             "sqlite" => MetaStore::Sqlite,
             "etcd" => MetaStore::Etcd,
             "dynamo" | "dynamodb" => MetaStore::DynamoDB,
+            "mysql" => MetaStore::MySQL,
             "postgres" | "postgresql" => MetaStore::PostgreSQL,
             _ => MetaStore::Sqlite,
         }
@@ -57,6 +60,7 @@ impl std::fmt::Display for MetaStore {
             MetaStore::Sqlite => write!(f, "sqlite"),
             MetaStore::Etcd => write!(f, "etcd"),
             MetaStore::DynamoDB => write!(f, "dynamodb"),
+            MetaStore::MySQL => write!(f, "mysql"),
             MetaStore::PostgreSQL => write!(f, "postgresql"),
         }
     }

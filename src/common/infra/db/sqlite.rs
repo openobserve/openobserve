@@ -76,11 +76,11 @@ fn connect_rw() -> Pool<Sqlite> {
         // .disable_statement_logging()
         .create_if_missing(true);
 
-    let pool_opts = SqlitePoolOptions::new()
+    SqlitePoolOptions::new()
         .min_connections(1)
         .max_connections(1)
-        .acquire_timeout(Duration::from_secs(30));
-    pool_opts.connect_lazy_with(db_opts)
+        .acquire_timeout(Duration::from_secs(30))
+        .connect_lazy_with(db_opts)
 }
 
 fn connect_ro() -> Pool<Sqlite> {
@@ -93,11 +93,11 @@ fn connect_ro() -> Pool<Sqlite> {
         .busy_timeout(Duration::from_secs(30))
         // .disable_statement_logging()
         .read_only(true);
-    let pool_opts = SqlitePoolOptions::new()
+    SqlitePoolOptions::new()
         .min_connections(10)
         .max_connections(512)
-        .acquire_timeout(Duration::from_secs(30));
-    pool_opts.connect_lazy_with(db_opts)
+        .acquire_timeout(Duration::from_secs(30))
+        .connect_lazy_with(db_opts)
 }
 
 pub struct SqliteDbChannel {

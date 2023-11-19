@@ -29,6 +29,7 @@ use crate::common::{
 
 pub mod dynamo;
 pub mod etcd;
+pub mod mysql;
 pub mod postgres;
 pub mod sled;
 pub mod sqlite;
@@ -64,6 +65,7 @@ async fn default() -> Box<dyn Db> {
         MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
         MetaStore::Etcd => Box::<etcd::Etcd>::default(),
         MetaStore::DynamoDB => Box::<dynamo::DynamoDb>::default(),
+        MetaStore::MySQL => Box::<mysql::MysqlDb>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresDb>::default(),
     }
 }
