@@ -2,6 +2,7 @@
   <div class="trace-container full-width px-mg cursor-pointer">
     <div class="flex justify-between bg-indigo-1 q-px-sm q-py-xs">
       <div class="trace-name text-subtitle1 text-bold">
+        <span class="q-mr-xs"> {{ item.service_name }}:</span>
         {{ item.operation_name }}
       </div>
       <div class="trace-duration">
