@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage">
+  <q-page class="tracePage" id="tracePage" style="min-height: auto">
     <div id="tracesSecondLevel">
       <search-bar
         data-test="logs-search-bar"
@@ -513,7 +513,7 @@ export default defineComponent({
     const getDefaultRequest = () => {
       return {
         query: {
-          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time) as start_time, max(service_name) as service_name, min(operation_name) as operation_name, count(span_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time/1000) as trace_start_time, max(end_time/1000) as trace_end_time, max(service_name) as service_name, min(operation_name) as operation_name, count(span_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from: 0,
@@ -676,8 +676,8 @@ export default defineComponent({
       const req = getDefaultRequest();
       req.query.from = 0;
       req.query.size = 1000;
-      req.query.start_time = trace.zo_sql_timestamp - 30000000;
-      req.query.end_time = trace.zo_sql_timestamp + 30000000;
+      req.query.start_time = trace.trace_start_time - 30000000;
+      req.query.end_time = trace.trace_end_time + 30000000;
 
       req.query.sql = b64EncodeUnicode(
         `SELECT * FROM ${searchObj.data.stream.selectedStream.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
@@ -855,8 +855,6 @@ export default defineComponent({
                 searchObj.meta.serviceColors[metaData.service_name] =
                   serviceColors[colorIndex];
 
-                console.log(colorIndex);
-
                 colorIndex++;
               }
               traceMapping[metaData.trace_id].services[metaData.service_name] =
@@ -905,12 +903,12 @@ export default defineComponent({
             start_time: 1,
           };
           const importantFields = {
+            service_name: 1,
+            operation_name: 1,
             trace_id: 1,
             span_id: 1,
             reference_parent_span_id: 1,
             reference_parent_trace_id: 1,
-            service_name: 1,
-            operation_name: 1,
             start_time: 1,
           };
 
@@ -963,13 +961,13 @@ export default defineComponent({
           name: "@timestamp",
           field: (row: any) =>
             timestampToTimezoneDate(
-              row["start_time"] / 1000000,
+              row["trace_start_time"] / 1000000,
               store.state.timezone,
               "MMM dd, yyyy HH:mm:ss.SSS Z"
             ),
           prop: (row: any) =>
             timestampToTimezoneDate(
-              row["start_time"] / 1000000,
+              row["trace_start_time"] / 1000000,
               store.state.timezone,
               "MMM dd, yyyy HH:mm:ss.SSS Z"
             ),
@@ -1443,7 +1441,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-search-result-container {
-  height: calc(100vh - 168px) !important;
+  height: calc(100vh - 140px) !important;
 }
 </style>
 <style lang="scss">

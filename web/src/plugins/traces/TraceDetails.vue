@@ -89,9 +89,12 @@
           :splitterWidth="splitterModel"
         />
         <div class="histogram-spans-container">
-          <q-splitter v-model="splitterModel" :style="{ height: '100%' }">
+          <q-splitter v-model="splitterModel">
             <template v-slot:before>
-              <div class="trace-tree-container">
+              <div
+                class="trace-tree-container"
+                :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+              >
                 <trace-tree
                   :collapseMapping="collapseMapping"
                   :spans="spanPositionList"

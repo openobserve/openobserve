@@ -62,9 +62,15 @@
             <span class="text-subtitle2 text-bold q-mr-sm">
               {{ span.serviceName }}
             </span>
-            <span class="text-body2 text-blue-grey-9">{{
-              span.operationName
-            }}</span>
+            <span
+              class="text-body2"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'text-grey-5'
+                  : 'text-blue-grey-9'
+              "
+              >{{ span.operationName }}</span
+            >
           </div>
         </div>
       </div>
@@ -76,6 +82,8 @@
 import { defineComponent } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
+import type store from "@/test/unit/helpers/store";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TraceTree",
@@ -109,6 +117,8 @@ export default defineComponent({
   setup(props, { emit }) {
     const { searchObj } = useTraces();
 
+    const store = useStore();
+
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
     }
@@ -122,6 +132,7 @@ export default defineComponent({
       toggleSpanCollapse,
       getImageURL,
       selectSpan,
+      store,
     };
   },
 });

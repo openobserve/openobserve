@@ -354,7 +354,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-table-container {
-  height: calc(100vh - 318px) !important;
+  height: calc(100vh - 290px) !important;
 }
 .max-result {
   width: 170px;

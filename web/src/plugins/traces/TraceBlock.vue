@@ -1,7 +1,13 @@
 <template>
-  <div class="trace-container full-width px-mg cursor-pointer">
-    <div class="flex justify-between bg-indigo-1 q-px-sm q-py-xs">
-      <div class="trace-name text-subtitle1 text-bold">
+  <div
+    class="trace-container full-width px-mg cursor-pointer"
+    :class="store.state.theme === 'dark' ? 'dark' : ''"
+  >
+    <div
+      class="flex justify-between q-px-sm q-py-xs"
+      :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-indigo-1'"
+    >
+      <div class="trace-name text-body2 text-bold">
         <span class="q-mr-xs"> {{ item.service_name }}:</span>
         {{ item.operation_name }}
       </div>
@@ -11,7 +17,10 @@
     </div>
     <div class="q-pa-sm row justify-between">
       <div class="trace-summary flex" style="width: 175px">
-        <div class="trace-spans q-px-sm q-mr-xs">
+        <div
+          class="trace-spans q-px-sm q-mr-xs"
+          :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-8'"
+        >
           <span class="">Spans : </span>
           <span>{{ item.spans }}</span>
         </div>
@@ -50,9 +59,6 @@
           />
           <div style="font-size: 14px">{{ getFormattedDate.time }}</div>
         </div>
-        <div class="section-2 text-right text-body2 text-blue-grey-8 q-pt-xs">
-          {{ getFormattedDate.diff }}
-        </div>
       </div>
     </div>
   </div>
@@ -86,7 +92,7 @@ const store = useStore();
 
 const getFormattedDate = computed(() => {
   const date1 = timestampToTimezoneDate(
-    props.item["start_time"] / 1000000,
+    props.item["trace_start_time"] / 1000000,
     store.state.timezone,
     "MMM dd, yyyy HH:mm:ss.SSS Z"
   );
@@ -115,7 +121,6 @@ const getFormattedDate = computed(() => {
     "Dec",
   ];
 
-  // const date = new Date(props.item.start_time.toISOString());
   const date3 = {
     day: "",
     time: "",
@@ -173,6 +178,18 @@ const getDuration = computed(() => {
   overflow: hidden;
 }
 
+.trace-container {
+  &.dark {
+    border: 1px solid #787676;
+
+    .trace-spans,
+    .trace-errors,
+    .trace-tag {
+      border: 1px solid #787676;
+    }
+  }
+}
+
 .trace-spans,
 .trace-errors {
   width: fit-content;
@@ -185,7 +202,6 @@ const getDuration = computed(() => {
 
 .trace-spans {
   border: 1px solid #dddddd;
-  color: #555454;
 }
 
 .trace-summary {
