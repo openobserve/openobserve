@@ -115,9 +115,8 @@ export default defineComponent({
       this.$emit("update:datetime");
     },
     onScroll(info: any) {
-      this.searchObj.meta.scrollInfo = info;
       if (
-        info.ref.items.length / info.index <= 2 &&
+        info.ref.items.length / info.index <= 1.2 &&
         this.searchObj.loading == false &&
         this.searchObj.data.resultGrid.currentPage <=
           this.searchObj.data.queryResults.from /

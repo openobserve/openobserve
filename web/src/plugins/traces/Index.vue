@@ -707,7 +707,14 @@ export default defineComponent({
           // searchObj.data.editorValue = "";
         }
         // dismiss = Notify();
-        const queryReq = buildSearch();
+        let queryReq;
+
+        if (!searchObj.data.resultGrid.currentPage) {
+          queryReq = buildSearch();
+          searchObj.data.queryPayload = queryReq;
+        } else {
+          queryReq = searchObj.data.queryPayload;
+        }
 
         if (queryReq == null) {
           // dismiss();
@@ -790,7 +797,9 @@ export default defineComponent({
             //   color: "negative",
             // });
           })
-          .finally(() => dismiss());
+          .finally(() => {
+            if (dismiss) dismiss();
+          });
       } catch (e) {
         console.log(e?.message);
         searchObj.loading = false;

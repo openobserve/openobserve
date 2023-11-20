@@ -88,6 +88,7 @@ const defaultObject = {
       currentPage: 0,
       columns: <any>[],
     },
+    queryPayload: <any>{},
     transforms: <any>[],
     queryResults: <any>[],
     sortedQueryResults: <any>[],
