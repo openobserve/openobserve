@@ -12,82 +12,71 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, HttpResponse};
-use std::io::Error;
+use actix_web::http;
 
 use crate::common::infra::config::STREAM_ALERTS;
-use crate::common::meta::{alert::AlertDestination, http::HttpResponse as MetaHttpResponse};
+use crate::common::meta::alert::{AlertDestination, AlertDestinationResponse};
 use crate::service::db;
 
 #[tracing::instrument(skip(destination))]
 pub async fn save_destination(
-    org_id: String,
-    name: String,
+    org_id: &str,
+    name: &str,
     destination: AlertDestination,
-) -> Result<HttpResponse, Error> {
-    db::alerts::destinations::set(org_id.as_str(), name.as_str(), destination.clone())
+) -> Result<(), anyhow::Error> {
+    if db::alerts::templates::get(org_id, &destination.template)
         .await
-        .unwrap();
-
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK.into(),
-        "Alert destination saved".to_string(),
-    )))
+        .is_err()
+    {
+        return Err(anyhow::anyhow!(
+            "Template {} not found",
+            destination.template
+        ));
+    }
+    db::alerts::destinations::set(org_id, name, destination).await
 }
 
 #[tracing::instrument]
-pub async fn list_destinations(org_id: String) -> Result<HttpResponse, Error> {
-    let list = db::alerts::destinations::list(org_id.as_str())
-        .await
-        .unwrap();
-    Ok(HttpResponse::Ok().json(list))
+pub async fn list_destinations(
+    org_id: &str,
+) -> Result<Vec<AlertDestinationResponse>, anyhow::Error> {
+    db::alerts::destinations::list(org_id).await
 }
 
 #[tracing::instrument]
-pub async fn delete_destination(org_id: String, name: String) -> Result<HttpResponse, Error> {
+pub async fn delete_destination(
+    org_id: &str,
+    name: &str,
+) -> Result<(), (http::StatusCode, anyhow::Error)> {
     for alert_list in STREAM_ALERTS.iter() {
         for alert in alert_list.value().list.clone() {
             if alert_list.key().starts_with(&org_id) && alert.destination.eq(&name) {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    http::StatusCode::FORBIDDEN.into(),
-                    format!("Destination is in use for alert {}", alert.name),
-                )));
+                return Err((
+                    http::StatusCode::FORBIDDEN,
+                    anyhow::anyhow!("Alert Destination is in use for alert {}", alert.name),
+                ));
             }
         }
     }
 
-    if db::alerts::destinations::get(org_id.as_str(), name.as_str())
+    if db::alerts::destinations::get(org_id, name).await.is_err() {
+        return Err((
+            http::StatusCode::NOT_FOUND,
+            anyhow::anyhow!("Alert Destination not found {}", name),
+        ));
+    }
+
+    db::alerts::destinations::delete(org_id, name)
         .await
-        .is_err()
-    {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "Alert destination not found".to_string(),
-        )));
-    }
-    let result = db::alerts::destinations::delete(org_id.as_str(), name.as_str()).await;
-    match result {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Alert destination deleted ".to_string(),
-        ))),
-        Err(e) => Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                e.to_string(),
-            )),
-        ),
-    }
+        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
 #[tracing::instrument]
-pub async fn get_destination(org_id: String, name: String) -> Result<HttpResponse, Error> {
-    let result = db::alerts::destinations::get(org_id.as_str(), name.as_str()).await;
-    match result {
-        Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
-        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "Alert destination not found".to_string(),
-        ))),
-    }
+pub async fn get_destination(
+    org_id: &str,
+    name: &str,
+) -> Result<AlertDestinationResponse, anyhow::Error> {
+    db::alerts::destinations::get(org_id, name)
+        .await
+        .map_err(|_| anyhow::anyhow!("Alert destination not found"))
 }

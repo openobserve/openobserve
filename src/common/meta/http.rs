@@ -66,11 +66,44 @@ impl HttpResponse {
         }
     }
 
-    /// Send a bad request response in json format and associate the
+    /// Send a normal response in json format and associate the
+    /// provided message as `message` field.
+    pub fn ok(msg: impl ToString) -> ActixHttpResponse {
+        ActixHttpResponse::Ok().json(Self::message(StatusCode::OK.into(), msg.to_string()))
+    }
+
+    /// Send a BadRequest response in json format and associate the
     /// provided error as `error` field.
     pub fn bad_request(error: impl ToString) -> ActixHttpResponse {
         ActixHttpResponse::BadRequest().json(Self::error(
             StatusCode::BAD_REQUEST.into(),
+            error.to_string(),
+        ))
+    }
+
+    /// Send a Forbidden response in json format and associate the
+    /// provided error as `error` field.
+    pub fn forbidden(error: impl ToString) -> ActixHttpResponse {
+        ActixHttpResponse::Forbidden().json(Self::error(
+            StatusCode::FORBIDDEN.into(),
+            error.to_string(),
+        ))
+    }
+
+    /// Send a NotFound response in json format and associate the
+    /// provided error as `error` field.
+    pub fn not_found(error: impl ToString) -> ActixHttpResponse {
+        ActixHttpResponse::NotFound().json(Self::error(
+            StatusCode::NOT_FOUND.into(),
+            error.to_string(),
+        ))
+    }
+
+    /// Send a InternalServerError response in json format and associate the
+    /// provided error as `error` field.
+    pub fn internal_error(error: impl ToString) -> ActixHttpResponse {
+        ActixHttpResponse::InternalServerError().json(Self::error(
+            StatusCode::INTERNAL_SERVER_ERROR.into(),
             error.to_string(),
         ))
     }
