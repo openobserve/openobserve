@@ -92,7 +92,7 @@ const store = useStore();
 
 const getFormattedDate = computed(() => {
   const date1 = timestampToTimezoneDate(
-    props.item["trace_start_time"] / 1000000,
+    props.item["trace_start_time"] / 1000,
     store.state.timezone,
     "MMM dd, yyyy HH:mm:ss.SSS Z"
   );
