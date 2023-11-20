@@ -53,12 +53,11 @@
           >
         </div>
         <q-btn
-          v-if="searchObj.data.queryResults.hits"
           class="q-mr-sm float-left download-logs-btn q-pa-sm"
           size="sm"
-          :disable="!searchObj.data.queryResults.hits.length"
+          :disable="!searchObj.data.queryResults?.hits?.length"
           icon="download"
-          title="Export logs"
+          title="Export Traces"
           @click="downloadLogs"
         ></q-btn>
       </div>
@@ -442,7 +441,7 @@ export default defineComponent({
   }
   .monaco-editor {
     width: 100% !important;
-    height: 70px !important;
+    height: 40px !important;
   }
 
   .search-button {

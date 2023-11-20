@@ -89,9 +89,12 @@
           :splitterWidth="splitterModel"
         />
         <div class="histogram-spans-container">
-          <q-splitter v-model="splitterModel" :style="{ height: '100%' }">
+          <q-splitter v-model="splitterModel">
             <template v-slot:before>
-              <div class="trace-tree-container">
+              <div
+                class="trace-tree-container"
+                :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+              >
                 <trace-tree
                   :collapseMapping="collapseMapping"
                   :spans="spanPositionList"
@@ -273,7 +276,6 @@ export default defineComponent({
 
       if (!spanList.value?.length) return;
       spanMapping.value[spanList.value[0].span_id] = spanList.value[0];
-      let colorIndex = 0;
       let noParentSpans = [];
       for (let i = 0; i < spanList.value.length; i++) {
         if (spanList.value[i].start_time < lowestStartTime) {
@@ -289,20 +291,13 @@ export default defineComponent({
 
         const span = getFormattedSpan(spanList.value[i]);
 
-        if (span.serviceName && !serviceColorMapping[span.serviceName]) {
-          serviceColorMapping[span.serviceName] =
-            spanDimensions.colors[colorIndex];
-          colorIndex++;
-          if (colorIndex > spanDimensions.colors.length - 1) colorIndex = 0;
-        }
-
-        span.style.color = serviceColorMapping[span.serviceName];
+        span.style.color = searchObj.meta.serviceColors[span.serviceName];
 
         span.index = i;
 
         collapseMapping.value[span.spanId] = true;
 
-        if (span.parentId && !traceTreeMock[span.parentId]) {
+        if (span.parentId && !traceTreeMock[span.parentId] && i !== 0) {
           noParentSpans.push(span);
         }
 
@@ -321,7 +316,7 @@ export default defineComponent({
         converTimeFromNsToMs(lowestStartTime);
       traceTree.value[0].highestEndTime = converTimeFromNsToMs(highestEndTime);
       traceTree.value[0].style.color =
-        serviceColorMapping[traceTree.value[0].serviceName];
+        searchObj.meta.serviceColors[traceTree.value[0].serviceName];
       traceTree.value[0]["spans"] = cloneDeep(
         traceTreeMock[spanList.value[0]["span_id"]] || []
       );
@@ -337,7 +332,7 @@ export default defineComponent({
 
       calculateTracePosition();
       buildTraceChart();
-      buildServiceTree(serviceColorMapping);
+      buildServiceTree();
     };
     let index = 0;
     const addSpansPositions = (span: any, depth: number) => {
@@ -372,7 +367,7 @@ export default defineComponent({
       }
     };
 
-    const buildServiceTree = (serviceColors: any) => {
+    const buildServiceTree = () => {
       const serviceTree: any[] = [];
       let maxDepth = 0;
       let maxHeight: number[] = [0];
@@ -393,7 +388,7 @@ export default defineComponent({
             duration: span.durationMs,
             children: children,
             itemStyle: {
-              color: serviceColors[span.serviceName],
+              color: searchObj.meta.serviceColors[span.serviceName],
             },
             emphasis: {
               disabled: true,
@@ -420,7 +415,8 @@ export default defineComponent({
         getService(span, serviceTree, "", 1, 1);
       });
       traceServiceMap.value = convertTraceServiceMapData(
-        cloneDeep(serviceTree)
+        cloneDeep(serviceTree),
+        maxDepth
       );
     };
 

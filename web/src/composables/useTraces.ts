@@ -58,7 +58,7 @@ const defaultObject = {
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
-      rowsPerPage: 150,
+      rowsPerPage: 25,
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
@@ -66,6 +66,7 @@ const defaultObject = {
       },
     },
     scrollInfo: {},
+    serviceColors: {} as any,
   },
   data: {
     query: "",
@@ -87,6 +88,7 @@ const defaultObject = {
       currentPage: 0,
       columns: <any>[],
     },
+    queryPayload: <any>{},
     transforms: <any>[],
     queryResults: <any>[],
     sortedQueryResults: <any>[],
@@ -108,7 +110,7 @@ const defaultObject = {
       traceId: "",
       spanList: [],
       loading: false,
-      selectedSpanId: null,
+      selectedSpanId: null as string | null,
       showSpanDetails: false,
     },
   },
