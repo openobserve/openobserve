@@ -90,7 +90,7 @@ impl Metrics for Querier {
             }
         };
 
-        let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/",);
+        let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/");
         let files = scan_files(&pattern);
         if files.is_empty() {
             return Ok(Response::new(resp));

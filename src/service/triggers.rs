@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{
-    http::{self, StatusCode},
-    HttpResponse,
-};
-use std::io::Error;
+use actix_web::{http, HttpResponse};
 
 use super::db;
 use crate::common::meta::alert::Trigger;
@@ -37,18 +33,8 @@ pub async fn save_trigger(
 }
 
 #[tracing::instrument]
-pub async fn delete_trigger(alert_name: String) -> Result<HttpResponse, Error> {
-    let result = db::triggers::delete(&alert_name).await;
-    match result {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Trigger deleted ".to_string(),
-        ))),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
-    }
+pub async fn delete_trigger(alert_name: String) -> Result<(), anyhow::Error> {
+    db::triggers::delete(&alert_name).await
 }
 
 #[cfg(test)]
@@ -73,7 +59,6 @@ mod tests {
             },
         )
         .await;
-
         assert!(resp.is_ok());
 
         let resp = crate::service::alerts::get_alert(
@@ -83,11 +68,9 @@ mod tests {
             "TestAlert",
         )
         .await;
-
         assert!(resp.is_ok());
 
         let resp = delete_trigger("TestAlert".to_string()).await;
-
         assert!(resp.is_ok());
     }
 }
