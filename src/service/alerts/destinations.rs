@@ -29,7 +29,7 @@ pub async fn save_destination(
         .is_err()
     {
         return Err(anyhow::anyhow!(
-            "Template {} not found",
+            "Alert template {} not found",
             destination.template
         ));
     }
@@ -50,10 +50,10 @@ pub async fn delete_destination(
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
     for alert_list in STREAM_ALERTS.iter() {
         for alert in alert_list.value().list.clone() {
-            if alert_list.key().starts_with(&org_id) && alert.destination.eq(&name) {
+            if alert_list.key().starts_with(org_id) && alert.destination.eq(&name) {
                 return Err((
                     http::StatusCode::FORBIDDEN,
-                    anyhow::anyhow!("Alert Destination is in use for alert {}", alert.name),
+                    anyhow::anyhow!("Alert destination is in use for alert {}", alert.name),
                 ));
             }
         }
@@ -62,7 +62,7 @@ pub async fn delete_destination(
     if db::alerts::destinations::get(org_id, name).await.is_err() {
         return Err((
             http::StatusCode::NOT_FOUND,
-            anyhow::anyhow!("Alert Destination not found {}", name),
+            anyhow::anyhow!("Alert destination not found {}", name),
         ));
     }
 

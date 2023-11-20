@@ -84,19 +84,15 @@ impl HttpResponse {
     /// Send a Forbidden response in json format and associate the
     /// provided error as `error` field.
     pub fn forbidden(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::Forbidden().json(Self::error(
-            StatusCode::FORBIDDEN.into(),
-            error.to_string(),
-        ))
+        ActixHttpResponse::Forbidden()
+            .json(Self::error(StatusCode::FORBIDDEN.into(), error.to_string()))
     }
 
     /// Send a NotFound response in json format and associate the
     /// provided error as `error` field.
     pub fn not_found(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::NotFound().json(Self::error(
-            StatusCode::NOT_FOUND.into(),
-            error.to_string(),
-        ))
+        ActixHttpResponse::NotFound()
+            .json(Self::error(StatusCode::NOT_FOUND.into(), error.to_string()))
     }
 
     /// Send a InternalServerError response in json format and associate the
