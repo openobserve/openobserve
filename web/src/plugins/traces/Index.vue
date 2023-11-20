@@ -159,7 +159,6 @@ import {
   onDeactivated,
   onActivated,
   onBeforeMount,
-  watch,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -170,7 +169,6 @@ import SearchBar from "./SearchBar.vue";
 import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
 import useTraces from "@/composables/useTraces";
-import { deepKeys, byString } from "@/utils/json";
 import { Parser } from "node-sql-parser/build/mysql";
 
 import streamService from "@/services/stream";
@@ -178,26 +176,18 @@ import searchService from "@/services/search";
 import TransformService from "@/services/jstransform";
 import {
   b64EncodeUnicode,
-  useLocalTraceFilterField,
   verifyOrganizationStatus,
   b64DecodeUnicode,
   formatTimeWithSuffix,
   timestampToTimezoneDate,
-  histogramDateTimezone,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
-import { number } from "@intlify/core-base";
-import { stringLiteral } from "@babel/types";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
-import {
-  getDurationObjectFromParams,
-  getQueryParamsForDuration,
-} from "@/utils/date";
-import useSqlSuggestions from "@/composables/useSuggestions";
+import { q } from "msw/lib/SetupApi-8ab693f7";
 
 export default defineComponent({
   name: "PageSearch",
@@ -236,17 +226,7 @@ export default defineComponent({
       }
     },
     getMoreData() {
-      if (
-        this.searchObj.meta.refreshInterval == 0 &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.from &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.size &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.size +
-            this.searchObj.data.queryResults.from
-      ) {
-        this.searchObj.loading = true;
+      if (this.searchObj.meta.refreshInterval == 0) {
         this.getQueryData();
 
         if (config.isCloud == "true") {
@@ -513,7 +493,7 @@ export default defineComponent({
     const getDefaultRequest = () => {
       return {
         query: {
-          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time/1000) as trace_start_time, max(end_time/1000) as trace_end_time, max(service_name) as service_name, min(operation_name) as operation_name, count(span_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time/1000) as trace_start_time, max(end_time/1000) as trace_end_time, min(service_name) as service_name, min(operation_name) as operation_name, count(trace_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from: 0,
@@ -712,13 +692,6 @@ export default defineComponent({
           return false;
         }
 
-        searchObj.data.searchAround.indexTimestamp = 0;
-        searchObj.data.searchAround.size = 0;
-        if (searchObj.data.searchAround.histogramHide) {
-          searchObj.data.searchAround.histogramHide = false;
-          searchObj.meta.showHistogram = true;
-        }
-
         searchObj.data.errorMsg = "";
         if (searchObj.data.resultGrid.currentPage == 0) {
           // searchObj.data.stream.selectedFields = [];
@@ -742,7 +715,27 @@ export default defineComponent({
         }
 
         searchObj.data.errorCode = 0;
-        queryReq.query.from = 0;
+        queryReq.query.from =
+          searchObj.data.resultGrid.currentPage *
+          searchObj.meta.resultGrid.rowsPerPage;
+
+        let dismiss = null;
+        if (searchObj.data.resultGrid.currentPage) {
+          dismiss = $q.notify({
+            type: "positive",
+            message: "Fetching more traces...",
+            actions: [
+              {
+                icon: "cancel",
+                color: "white",
+                handler: () => {
+                  /* ... */
+                },
+              },
+            ],
+          });
+        }
+
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
@@ -755,7 +748,7 @@ export default defineComponent({
               searchObj.data.queryResults.from = res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
-              const hits = getTracesMetaData(res.data.hits);
+              const hits = await getTracesMetaData(res.data.hits);
               searchObj.data.queryResults.hits.push(...hits);
               // searchObj.data.queryResults.aggs.histogram.push(
               //   ...res.data.aggs.histogram
@@ -796,7 +789,8 @@ export default defineComponent({
             //   message: searchObj.data.errorMsg,
             //   color: "negative",
             // });
-          });
+          })
+          .finally(() => dismiss());
       } catch (e) {
         console.log(e?.message);
         searchObj.loading = false;
@@ -805,11 +799,12 @@ export default defineComponent({
     }
 
     const getTracesMetaData = (traces) => {
-      if (!traces.length) return;
+      if (!traces.length) return [];
       const traceMapping = {};
       traces.forEach((trace) => {
         traceMapping[trace.trace_id] = trace;
         traceMapping[trace.trace_id].services = {};
+        traceMapping[trace.trace_id].spans = 0;
       });
       const traceIds = traces.map((hit) => "'" + hit.trace_id + "'").join(",");
       var req = getDefaultRequest();
@@ -836,7 +831,6 @@ export default defineComponent({
       ];
 
       let colorIndex = 0;
-      searchObj.meta.serviceColors = {};
 
       return new Promise((resolve, reject) => {
         delete req.encoding;
@@ -858,6 +852,9 @@ export default defineComponent({
                 colorIndex++;
               }
               traceMapping[metaData.trace_id].services[metaData.service_name] =
+                metaData.count_service_name;
+
+              traceMapping[metaData.trace_id].spans +=
                 metaData.count_service_name;
             });
             resolve(Object.values(traceMapping));
