@@ -254,6 +254,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :type="'number'"
     >
     </q-input>
+
+    <q-input v-model.number="dashboardPanelData.data.config.limit" :value="0" @update:model-value="(value) => dashboardPanelData.data.config.limit = value ? value : 0" label="Limit" color="input-border"
+      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot placeholder="0" :type="'number'">
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">
+          Limit
+        </div>
+      </template>
+    </q-input>
+
   </div>
 </template>
 

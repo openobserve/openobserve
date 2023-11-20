@@ -69,6 +69,7 @@ const getDefaultDashboardPanelData: any = () => ({
           latitude: null,
           longitude: null,
           weight: null,
+          limit: 0
         },
         config: {
           promql_legend: "",

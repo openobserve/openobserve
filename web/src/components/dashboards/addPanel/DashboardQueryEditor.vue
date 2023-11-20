@@ -249,57 +249,30 @@ export default defineComponent({
       dashboardPanelData.meta.errors.queryErrors = [];
     });
 
-    let query = "";
-    // Generate the query when the fields are updated
-    watch(
-      () => [
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.x,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.latitude,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.longitude,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.weight,
-      ],
-      () => {
-        // only continue if current mode is auto query generation
-        if (
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery
-        ) {
-          if (dashboardPanelData.data.type == "geomap") {
-            query = geoMapChart();
-          } else {
-            query = sqlchart();
-          }
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].query = query;
-        }
-      },
-      { deep: true }
-    );
+        let query = "";
+        // Generate the query when the fields are updated
+        watch(() => [
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight, 
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.limit 
+        ], () => {
+            // only continue if current mode is auto query generation
+            if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
+                if(dashboardPanelData.data.type == 'geomap'){
+                    query = geoMapChart()
+                }else{
+                    query = sqlchart()
+                }
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = query
+            }
+        }, { deep: true })
 
     const geoMapChart = () => {
       let query = "";
