@@ -260,7 +260,7 @@ export default defineComponent({
     };
 
     const downloadLogs = () => {
-      const filename = "logs-data.csv";
+      const filename = "traces-data.csv";
       const data = jsonToCsv(searchObj.data.queryResults.hits);
       const file = new File([data], filename, {
         type: "text/csv",

@@ -15,11 +15,17 @@
 
 <template>
   <div
-    :style="{ height: '30px', border: '1px solid #ececec' }"
-    class="flex justify-start items-center header-bg "
+    :style="{
+      height: '30px',
+      border:
+        store.state.theme === 'dark'
+          ? '1px solid #3c3c3c'
+          : '1px solid #ececec',
+    }"
+    class="flex justify-start items-center header-bg"
   >
     <div
-      class="flex justify-start items-center no-wrap row q-px-sm "
+      class="flex justify-start items-center no-wrap row q-px-sm"
       :style="{
         width: splitterWidth + '%',
       }"
@@ -27,7 +33,7 @@
       Operation Name
     </div>
     <div
-      class="flex justify-start items-center no-wrap row  relative-position"
+      class="flex justify-start items-center no-wrap row relative-position"
       :style="{
         width: 100 - splitterWidth + '%',
       }"
@@ -54,7 +60,7 @@
           left: tick.left,
           top: '0px',
           width: '1px',
-          backgroundColor: '#ececec',
+          backgroundColor: store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
         }"
       ></div>
     </div>
@@ -63,6 +69,7 @@
 
 <script lang="ts">
 import { defineComponent } from "vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TraceNavbar",
@@ -81,7 +88,10 @@ export default defineComponent({
     },
   },
   setup() {
-    return {};
+    const store = useStore();
+    return {
+      store,
+    };
   },
 });
 </script>
@@ -104,6 +114,6 @@ $traceChartHeight: 250px;
 }
 
 .header-bg {
-  background-color: color-mix(in srgb, currentColor 5%, transparent)
+  background-color: color-mix(in srgb, currentColor 5%, transparent);
 }
 </style>

@@ -187,7 +187,6 @@ import { logsErrorMessage } from "@/utils/common";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
-import { q } from "msw/lib/SetupApi-8ab693f7";
 
 export default defineComponent({
   name: "PageSearch",
@@ -843,6 +842,7 @@ export default defineComponent({
 
       return new Promise((resolve, reject) => {
         delete req.encoding;
+        searchObj.loading = true;
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
@@ -868,7 +868,9 @@ export default defineComponent({
             });
             resolve(Object.values(traceMapping));
           })
-          .finally(() => {});
+          .finally(() => {
+            searchObj.loading = false;
+          });
       });
     };
 
@@ -967,13 +969,13 @@ export default defineComponent({
           name: "@timestamp",
           field: (row: any) =>
             timestampToTimezoneDate(
-              row["trace_start_time"] / 1000000,
+              row["trace_start_time"] / 1000,
               store.state.timezone,
               "MMM dd, yyyy HH:mm:ss.SSS Z"
             ),
           prop: (row: any) =>
             timestampToTimezoneDate(
-              row["trace_start_time"] / 1000000,
+              row["trace_start_time"] / 1000,
               store.state.timezone,
               "MMM dd, yyyy HH:mm:ss.SSS Z"
             ),

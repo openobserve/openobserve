@@ -82,7 +82,6 @@
 import { defineComponent } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
-import type store from "@/test/unit/helpers/store";
 import { useStore } from "vuex";
 
 export default defineComponent({

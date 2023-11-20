@@ -35,7 +35,7 @@
           <div class="q-pb-xs q-mr-lg">
             Trace ID: {{ spanList[0]["trace_id"] }}
           </div>
-          <div class="q-pb-xs">Spans: {{ spanList.length - 1 }}</div>
+          <div class="q-pb-xs">Spans: {{ spanList.length }}</div>
         </div>
         <q-btn v-close-popup="true" round flat icon="cancel" size="md" />
       </div>
