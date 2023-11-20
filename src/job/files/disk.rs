@@ -28,6 +28,8 @@ use tokio::{sync::Semaphore, task, time};
 use crate::common::infra::config::FILE_EXT_ARROW;
 use crate::common::meta::prom::NAME_LABEL;
 use crate::common::meta::stream::PartitionTimeLevel;
+use crate::common::utils::hasher::get_schema_key_xxh3;
+use crate::common::utils::schema::infer_json_schema;
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics, storage, wal},
     meta::{common::FileMeta, stream::StreamParams, StreamType},
@@ -140,7 +142,11 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             let ret =
                 upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
             if let Err(e) = ret {
-                log::error!("[JOB] Error while uploading disk file to storage {}", e);
+                log::error!(
+                    "[JOB] Error while uploading disk file {} to storage {}",
+                    &file_name,
+                    e
+                );
                 drop(permit);
                 return Ok(());
             }
@@ -382,7 +388,7 @@ async fn upload_file(
 }
 async fn handle_metrics(
     org_id: &str,
-    in_stream_name: &str,
+    _in_stream_name: &str,
     stream_type: StreamType,
     path_str: &str,
 ) -> Result<(), anyhow::Error> {
@@ -403,23 +409,29 @@ async fn handle_metrics(
     }
     let reader = BufReader::new(file);
 
-    let mut rows = Vec::new();
+    let mut partitions: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
     for line in reader.lines() {
         let line = line?;
+        let inferred_schema =
+            infer_json_schema(&mut BufReader::new(line.as_bytes()), None, stream_type).unwrap();
+        // get hour key
+        let schema_key = get_schema_key_xxh3(&inferred_schema);
         let json: serde_json::Value = serde_json::from_str(&line)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        rows.push(json);
-    }
-
-    let mut partitions: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
-    for row in rows {
         partitions
-            .entry(row.get(NAME_LABEL).unwrap().as_str().unwrap().to_string())
+            .entry(format!(
+                "{}#_#{}",
+                schema_key,
+                json.get(NAME_LABEL).unwrap().as_str().unwrap()
+            ))
             .or_default()
-            .push(row);
+            .push(json);
     }
 
-    for (metric_name, value) in partitions {
+    for (metric_key, value) in partitions {
+        let metric_meta: Vec<&str> = metric_key.split("#_#").collect();
+        let metric_name = metric_meta[1].to_owned();
+        let schema_key = metric_meta[0].to_owned();
         //let dest_stream_name = metric_name.clone();
         let value_iter = value.iter().map(Ok);
         let metrics_schema = infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
@@ -453,13 +465,13 @@ async fn handle_metrics(
             &mut file_meta,
         )
         .await?;
-        // get hour key
+
         let key = crate::service::ingestion::get_wal_time_key(
             file_meta.min_ts,
             &vec![],
             PartitionTimeLevel::Daily,
             &json::Map::new(),
-            None,
+            Some(&schema_key),
         );
         schema_evolution(
             org_id,
@@ -490,11 +502,11 @@ async fn handle_metrics(
         .await
         {
             Ok(output) => match output.await {
-                Ok(_) => {
-                    log::info!(
+                Ok(_new_file_name) => {
+                    /*  log::info!(
                         "[JOB] disk file conversion succeeded for: {}",
-                        &in_stream_name
-                    );
+                        &new_file_name
+                    ); */
                 }
                 Err(err) => {
                     log::error!("[JOB] disk file conversion error: {:?}", err);
@@ -506,6 +518,7 @@ async fn handle_metrics(
                 return Err(anyhow::anyhow!(err));
             }
         }
+        log::info!("[JOB] disk file conversion succeeded for: {}", &path_str);
     }
     Ok(())
 }
@@ -620,7 +633,10 @@ pub async fn metrics_json_to_arrow() -> Result<(), anyhow::Error> {
 
     for task in tasks {
         if let Err(e) = task.await {
-            log::error!("[JOB] Error while uploading disk file to storage {}", e);
+            log::error!(
+                "[JOB] metrics_json_to_arrow: Error while converting json to arrow{}",
+                e
+            );
         };
     }
     Ok(())
