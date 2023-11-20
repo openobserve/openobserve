@@ -803,13 +803,13 @@ const useLogs = () => {
           timestampToTimezoneDate(
             row[store.state.zoConfig.timestamp_column] / 1000,
             store.state.timezone,
-            "MMM dd, yyyy HH:mm:ss.SSS Z"
+            "yyyy-MM-dd HH:mm:ss.SSS"
           ),
         prop: (row: any) =>
           timestampToTimezoneDate(
             row[store.state.zoConfig.timestamp_column] / 1000,
             store.state.timezone,
-            "MMM dd, yyyy HH:mm:ss.SSS Z"
+            "yyyy-MM-dd HH:mm:ss.SSS"
           ),
         label: t("search.timestamp") + ` (${store.state.timezone})`,
         align: "left",

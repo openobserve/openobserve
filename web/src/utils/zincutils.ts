@@ -433,7 +433,7 @@ export function formatDuration(ms: number) {
 export const timestampToTimezoneDate = (
   unixMilliTimestamp: number,
   timezone: string = "UTC",
-  format: string = "MMM dd, yyyy HH:mm:ss.SSS Z"
+  format: string = "yyyy-MM-dd HH:mm:ss.SSS Z"
 ) => {
   return DateTime.fromMillis(Math.floor(unixMilliTimestamp))
     .setZone(timezone)
