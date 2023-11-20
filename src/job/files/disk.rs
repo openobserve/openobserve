@@ -523,7 +523,6 @@ async fn handle_metrics(
                 return Err(anyhow::anyhow!(err));
             }
         }
-        log::info!("[JOB] disk file conversion succeeded for: {}", &path_str);
     }
     log::info!("[JOB] disk file conversion succeeded for: {}", &path_str);
     Ok(arrow_files)
