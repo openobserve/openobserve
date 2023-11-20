@@ -4,6 +4,10 @@ import { reactive } from "vue";
 const getDefaultHoveredSeries: any = () => {
   return {
     hoveredSeriesName: "",
+    hoveredSeriesValue: null,
+    offsetX: 0,
+    offsetY: 0,
+    seriesId: "",
   };
 };
 
@@ -15,9 +19,30 @@ const usehoveredSeriesState = () => {
     hoveredSeriesState.hoveredSeriesName = name;
   };
 
+  const setHoveredSeriesValue = (value: any) => {
+    hoveredSeriesState.hoveredSeriesValue = value;
+  };
+
+  const setSeriesId = (seriesId: string) => {
+    hoveredSeriesState.seriesId = seriesId ?? "";
+  };
+
+  const resetHoveredSeriesState = () => {
+    Object.assign(hoveredSeriesState, { ...getDefaultHoveredSeries() });
+  };
+
+  const setOffset = (offsetX: number, offsetY: number) => {
+    hoveredSeriesState.offsetX = offsetX;
+    hoveredSeriesState.offsetY = offsetY;
+  };
+
   return {
     hoveredSeriesState,
     setHoveredSeriesName,
+    setHoveredSeriesValue,
+    setOffset,
+    setSeriesId,
+    resetHoveredSeriesState,
   };
 };
 

@@ -58,8 +58,14 @@ export default defineComponent({
     };
 
     // currently hovered series state
-    const { hoveredSeriesState, setHoveredSeriesName } =
-      usehoveredSeriesState();
+    const {
+      hoveredSeriesState,
+      setHoveredSeriesName,
+      setOffset,
+      setHoveredSeriesValue,
+      setSeriesId,
+      resetHoveredSeriesState,
+    } = usehoveredSeriesState();
 
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
@@ -71,6 +77,9 @@ export default defineComponent({
 
       // set current hovered series name in state
       setHoveredSeriesName(params?.seriesName);
+      setHoveredSeriesValue(params?.value);
+      setOffset(params?.event?.offsetX ?? 0, params?.event?.offsetY ?? 0);
+      setSeriesId(params?.seriesId);
 
       // scroll legend upto current series index
       const legendOption = chart?.getOption()?.legend[0];
@@ -79,6 +88,10 @@ export default defineComponent({
         legendOption.scrollDataIndex = params?.seriesIndex || 0;
         chart?.setOption({ legend: [legendOption] });
       }
+    };
+
+    const mouseOutEffectFn = () => {
+      resetHoveredSeriesState();
     };
 
     const legendSelectChangedFn = (params: any) => {
@@ -111,12 +124,33 @@ export default defineComponent({
 
     // dispatch tooltip action for all charts
     watch(
-      () => hoveredSeriesState.hoveredSeriesName,
-      (newcurrentSeriesName) => {
-        console.log(newcurrentSeriesName, "newcurrentSeriesName");
+      hoveredSeriesState,
+      () => {
+        // console.log(hoveredSeriesState?.hoveredSeriesValue, "hoveredSeriesState");
+        // console.log(hoveredSeriesState?.hoveredSeriesValue[0].getTime(), hoveredSeriesState.seriesId ,chart?.convertToPixel({ seriesId: hoveredSeriesState?.seriesId }, [hoveredSeriesState?.hoveredSeriesValue[0], null]), "hoveredSeriesState");
 
-        chart?.dispatchAction({ type: "showTip", x: 100, y: 100 });
-      }
+        // chart?.dispatchAction({ type: 'showTip', x: hoveredSeriesState?.offsetX, y: hoveredSeriesState?.offsetY });
+        // chart?.dispatchAction({
+        //   type: 'showAxisPointer',
+        //   tooltip: false,
+        // });
+
+        // console.log(JSON.parse(JSON.stringify(hoveredSeriesState)), "hoveredSeriesState");
+
+        chart?.dispatchAction({
+          type: "highlight",
+          seriesName: hoveredSeriesState?.hoveredSeriesName,
+        });
+        // console.log(hoveredSeriesState?.offsetX, "---");
+
+        // chart?.dispatchAction({type: "downplay", seriesId: hoveredSeriesState?.hoveredSeriesName});
+
+        // console.log(chart?.getOption(), "hoveredSeriesValue");
+        // const hoveredSeries = chart?.getOption()?.series?.find((series: any) => series?.name === hoveredSeriesState?.hoveredSeriesName);
+
+        // hoveredSeriesValue && Array.isArray(hoveredSeriesValue) && chart?.dispatchAction({ type: 'showTip', seriesIndex: 0, dataIndex: hoveredSeries.findIndex((series: any) => series.value[0] === hoveredSeriesValue[0]) });
+      },
+      { deep: true }
     );
 
     watch(
@@ -139,6 +173,7 @@ export default defineComponent({
         chart?.setOption(options, true);
         chart?.setOption({ animation: true });
         chart?.on("mouseover", mouseHoverEffectFn);
+        chart?.on("mouseout", mouseOutEffectFn);
         chart?.on("globalout", () => {
           mouseHoverEffectFn({});
         });
@@ -167,10 +202,14 @@ export default defineComponent({
       }
       chart?.setOption(props?.data?.options || {}, true);
       chart?.on("mouseover", mouseHoverEffectFn);
+      chart?.on("mouseout", mouseOutEffectFn);
       chart?.on("globalout", () => {
         mouseHoverEffectFn({});
       });
       chart?.on("legendselectchanged", legendSelectChangedFn);
+      // chart?.on("mousemove", (e: any) => { console.log(e, "mousemove") });
+      // chart?.on("mouseover", (e: any) => { console.log(e, "mouseover") });
+      // chart?.on("downplay", (e: any) => { console.log(e, "mousemove") });
 
       emit("updated:chart", {
         start: chart?.getOption()?.dataZoom[0]?.startValue || 0,

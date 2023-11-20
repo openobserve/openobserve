@@ -37,7 +37,7 @@ export const convertSQLData = (
 ) => {
   // hovered series state
   // used to show tooltip axis for all charts
-  const { hoveredSeriesState } = usehoveredSeriesState();
+  const { hoveredSeriesState, setHoveredSeriesName } = usehoveredSeriesState();
 
   // if no data than return it
   if (
@@ -127,6 +127,10 @@ export const convertSQLData = (
       padding: 10,
       textStyle: {
         fontSize: 12,
+      },
+      formatter: (params: any) => {
+        setHoveredSeriesName(params?.name);
+        return params?.name;
       },
     },
     textStyle: {
