@@ -386,10 +386,11 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
     async fn get_max_pk_value(&self) -> Result<i64> {
         let pool = CLIENT.clone();
-        let ret: i64 = sqlx::query_scalar(r#"SELECT MAX(id)::BIGINT AS id FROM file_list;"#)
-            .fetch_one(&pool)
-            .await?;
-        Ok(ret)
+        let ret: Option<i64> =
+            sqlx::query_scalar(r#"SELECT MAX(id)::BIGINT AS id FROM file_list;"#)
+                .fetch_one(&pool)
+                .await?;
+        Ok(ret.unwrap_or_default())
     }
 
     async fn stats(
