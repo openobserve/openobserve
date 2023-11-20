@@ -444,15 +444,22 @@ export const usePanelDataLoader = (
       });
 
       if (queryType === "promql") {
+        console.log("inside promql");
         const adHocVariables = [
           {
-            name: "kubernetes_namespace_name",
-            value: "ziox-alpha1",
+            name: "_timestamp",
+            value: startISOTimestamp,
+            operator: "=",
           },
         ];
 
         adHocVariables.forEach((variable: any) => {
-          query = addLabelToPromQlQuery(query, variable.name, variable.value);
+          query = addLabelToPromQlQuery(
+            query,
+            variable.name,
+            variable.value,
+            variable.operator
+          );
         });
         console.log("query", query);
       }
