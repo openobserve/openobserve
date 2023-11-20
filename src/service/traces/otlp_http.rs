@@ -378,8 +378,7 @@ pub async fn traces_json(
                     }
 
                     if partition_keys.is_empty() {
-                        let partition_key =
-                            format!("service_name={}", format_stream_name(&service_name));
+                        let partition_key = format!("service_name={}", service_name);
                         hour_key.push_str(&format!("/{}", format_partition_key(&partition_key)));
                     }
 
