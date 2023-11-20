@@ -18,134 +18,36 @@
 <template>
   <div class="col column oveflow-hidden">
     <div class="search-list" style="width: 100%">
-      <!-- <trace-chart
-        ref="plotChart"
-        :chart="searchObj.data.histogram"
-        @updated:chart="onChartUpdate"
-        /> -->
-        <ChartRenderer
+      <ChartRenderer
         data-test="logs-search-result-bar-chart"
         id="traces_scatter_chart"
         :data="plotChart"
         v-show="searchObj.meta.showHistogram"
-        style="height: 150px;"
+        style="height: 150px"
         @updated:dataZoom="onChartUpdate"
         @click="onChartClick"
       />
 
       <q-virtual-scroll
-        data-test="logs-search-result-logs-table"
         id="tracesSearchGridComponent"
-        type="table"
-        ref="searchTableRef"
+        style="height: 400px"
+        :items="searchObj.data.queryResults.hits"
         class="traces-table-container"
+        v-slot="{ item, index }"
         :virtual-scroll-item-size="25"
         :virtual-scroll-sticky-size-start="0"
         :virtual-scroll-sticky-size-end="0"
-        :virtual-scroll-slice-size="300"
+        :virtual-scroll-slice-size="50"
         :virtual-scroll-slice-ratio-before="10"
-        :items="searchObj.data.queryResults.hits"
         @virtual-scroll="onScroll"
       >
-        <template v-slot:before>
-          <thead class="thead-sticky text-left">
-            <tr>
-              <th
-                v-for="(col, index) in searchObj.data.resultGrid.columns"
-                :key="'result_' + index"
-                class="table-header"
-                :data-test="`log-search-result-table-th-${col.label}`"
-              >
-                <q-chip
-                  v-if="col.closable"
-                  :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
-                  :icon-remove="
-                    'img:' + getImageURL('images/common/close_icon.svg')
-                  "
-                  class="q-ma-none table-head-chip"
-                  removable
-                  square
-                  @remove="closeColumn(col)"
-                >
-                  {{ col.label }}
-                </q-chip>
-
-                <span v-else class="table-head-label">
-                  {{ col.label }}
-                </span>
-              </th>
-            </tr>
-          </thead>
-        </template>
-
-        <template v-slot="{ item: row, index }">
-          <q-tr
-            :data-test="`logs-search-result-detail-${
-              row[store.state.zoConfig.timestamp_column]
-            }`"
-            :key="'expand_' + index"
-            @click="expandRowDetail(row)"
-            style="cursor: pointer"
-            :style="
-              row[store.state.zoConfig.timestamp_column] ==
-              searchObj.data.searchAround.indexTimestamp
-                ? 'background-color:lightgray'
-                : ''
-            "
-          >
-            <q-td
-              v-for="column in searchObj.data.resultGrid.columns"
-              :key="index + '-' + column.name"
-              class="field_list"
-            >
-              <high-light
-                :content="
-                  column.name == 'source'
-                    ? column.prop(row)
-                    : column.prop(row, column.name).length > 100
-                    ? column.prop(row, column.name).substr(0, 100) + '...'
-                    : column.name === 'duration'
-                    ? column.format(row[column.name])
-                    : column.name != '@timestamp'
-                    ? row[column.name]
-                    : column.prop(row, column.name)
-                "
-                :query-string="
-                  searchObj.meta.sqlMode
-                    ? searchObj.data.query.split('where')[1]
-                    : searchObj.data.query
-                "
-                :title="
-                  column.prop(row, column.name).length > 100 &&
-                  column.name != 'source'
-                    ? column.prop(row, column.name)
-                    : ''
-                "
-              ></high-light>
-              <div
-                v-if="column.closable && row[column.name]"
-                class="field_overlay"
-                :title="row.name"
-              >
-                <q-icon
-                  :name="'img:' + getImageURL('images/common/add_icon.svg')"
-                  size="1rem"
-                  title="Add to search query"
-                  @click.prevent.stop="
-                    addSearchTerm(`${column.name}='${row[column.name]}'`)
-                  "
-                />
-                <q-icon
-                  :name="'img:' + getImageURL('images/common/remove_icon.svg')"
-                  size="1rem"
-                  title="Add to search query"
-                  @click.prevent.stop="
-                    addSearchTerm(`${column.name}!='${row[column.name]}'`)
-                  "
-                />
-              </div>
-            </q-td> </q-tr
-        ></template>
+        <q-item :key="index" dense>
+          <TraceBlock
+            :item="item"
+            :index="index"
+            @click="expandRowDetail(item)"
+          />
+        </q-item>
       </q-virtual-scroll>
       <q-dialog
         v-model="searchObj.meta.showTraceDetails"
@@ -163,24 +65,24 @@
 
 <script lang="ts">
 import { defineComponent, nextTick, ref } from "vue";
-import { useQuasar, date } from "quasar";
+import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
-import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import TraceDetails from "./TraceDetails.vue";
-import {convertTraceData} from "@/utils/traces/convertTraceData";
+import { convertTraceData } from "@/utils/traces/convertTraceData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
+import TraceBlock from "./TraceBlock.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
-    HighLight,
     TraceDetails,
-    ChartRenderer
+    ChartRenderer,
+    TraceBlock,
   },
   emits: [
     "update:scroll",
@@ -213,9 +115,8 @@ export default defineComponent({
       this.$emit("update:datetime");
     },
     onScroll(info: any) {
-      this.searchObj.meta.scrollInfo = info;
       if (
-        info.ref.items.length / info.index <= 2 &&
+        info.ref.items.length / info.index <= 1.2 &&
         this.searchObj.loading == false &&
         this.searchObj.data.resultGrid.currentPage <=
           this.searchObj.data.queryResults.from /
@@ -252,7 +153,10 @@ export default defineComponent({
         searchObj.data.histogram.layout
       ) {
         nextTick(() => {
-          plotChart.value = convertTraceData(searchObj.data.histogram, store.state.timezone);
+          plotChart.value = convertTraceData(
+            searchObj.data.histogram,
+            store.state.timezone
+          );
           // plotChart.value.forceReLayout();
         });
       }
@@ -300,9 +204,8 @@ export default defineComponent({
     };
 
     const onChartClick = (data: any) => {
-      expandRowDetail(
-        searchObj.data.queryResults.hits[data.dataIndex]
-      );
+      console.log("onChartClick", data);
+      expandRowDetail(searchObj.data.queryResults.hits[data.dataIndex]);
     };
 
     return {
@@ -331,7 +234,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-table-container {
-  height: calc(100vh - 318px) !important;
+  height: calc(100vh - 290px) !important;
 }
 .max-result {
   width: 170px;
