@@ -469,9 +469,9 @@ const useLogs = () => {
         }
 
         whereClause = whereClause
-            .split("\n")
-            .filter((line: string) => !line.trim().startsWith("--"))
-            .join("\n");
+          .split("\n")
+          .filter((line: string) => !line.trim().startsWith("--"))
+          .join("\n");
         if (whereClause.trim() != "") {
           whereClause = whereClause
             .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
@@ -592,17 +592,19 @@ const useLogs = () => {
 
           if (isPagination) dismiss = showNotification();
 
-          if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
-          else {
-            if (
-              searchObj.meta.refreshInterval == 0 &&
-              router.currentRoute.value.name == "logs" &&
-              searchObj.data.queryResults.hasOwnProperty("hits")
-            ) {
-              queryReq.query.start_time =
-                initialQueryPayload.value?.query?.start_time;
-              queryReq.query.end_time =
-                initialQueryPayload.value?.query?.end_time;
+          if (searchObj.data.datetime.type === "relative") {
+            if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
+            else {
+              if (
+                searchObj.meta.refreshInterval == 0 &&
+                router.currentRoute.value.name == "logs" &&
+                searchObj.data.queryResults.hasOwnProperty("hits")
+              ) {
+                queryReq.query.start_time =
+                  initialQueryPayload.value?.query?.start_time;
+                queryReq.query.end_time =
+                  initialQueryPayload.value?.query?.end_time;
+              }
             }
           }
 
