@@ -258,8 +258,8 @@ import { byString } from "../../utils/json";
 import DetailTable from "./DetailTable.vue";
 import {
   getImageURL,
-  timestampToTimezoneDate,
   useLocalWrapContent,
+  localTimeSelectedTimezoneUTCTime,
 } from "../../utils/zincutils";
 import EqualIcon from "../../components/icons/EqualIcon.vue";
 import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
@@ -308,9 +308,14 @@ export default defineComponent({
     onChartUpdate({ start, end }: { start: any; end: any }) {
       this.searchObj.meta.showDetailTab = false;
       this.searchObj.data.datetime.type = "absolute";
-      this.searchObj.data.datetime.startTime = new Date(start).getTime() * 1000;
-      this.searchObj.data.datetime.endTime = new Date(end).getTime() * 1000;
-      this.searchObj.runQuery = true;
+      this.searchObj.data.datetime.startTime = localTimeSelectedTimezoneUTCTime(
+        start,
+        this.store.state.timezone
+      );
+      this.searchObj.data.datetime.endTime = localTimeSelectedTimezoneUTCTime(
+        end,
+        this.store.state.timezone
+      );
       this.$emit("update:datetime");
     },
     onScroll(info: any) {

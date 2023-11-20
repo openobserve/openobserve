@@ -971,13 +971,13 @@ export default defineComponent({
             timestampToTimezoneDate(
               row["trace_start_time"] / 1000,
               store.state.timezone,
-              "MMM dd, yyyy HH:mm:ss.SSS Z"
+              "yyyy-MM-dd HH:mm:ss.SSS"
             ),
           prop: (row: any) =>
             timestampToTimezoneDate(
               row["trace_start_time"] / 1000,
               store.state.timezone,
-              "MMM dd, yyyy HH:mm:ss.SSS Z"
+              "yyyy-MM-dd HH:mm:ss.SSS"
             ),
           label: "Start Time",
           align: "left",
