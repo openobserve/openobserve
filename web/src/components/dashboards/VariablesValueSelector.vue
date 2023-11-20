@@ -34,10 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else-if="item.type == 'custom'">
         <q-select style="min-width: 150px" outlined dense v-model="item.value" :display-value="item.value
-            ? item.value
-            : !item.isLoading
-              ? '(No Options Available)'
-              : ''
+          ? item.value
+          : !item.isLoading
+            ? '(No Options Available)'
+            : ''
           " :options="item.options" map-options stack-label filled borderless :label="item.label || item.name"
           option-value="value" option-label="label" emit-value>
           <template v-slot:no-option>
@@ -232,25 +232,23 @@ export default defineComponent({
               return obj;
             }
             case "textbox": {
-              let oldVariableObjectSelectedValue = oldVariableValue.find(
-                (it2: any) => it2.name === it.name
-              );
+              let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
               if (oldVariableObjectSelectedValue) {
                 obj.value = oldVariableObjectSelectedValue.value;
-              } else {
+              }
+              else {
                 obj.value = it.value;
               }
               return obj;
             }
             case "custom": {
               obj["options"] = it?.options;
-              let oldVariableObjectSelectedValue = oldVariableValue.find(
-                (it2: any) => it2.name === it.name
-              );
+              let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
               // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
               if (oldVariableObjectSelectedValue) {
                 obj.value = oldVariableObjectSelectedValue.value;
-              } else {
+              }
+              else {
                 obj.value = obj.options[0]?.value || "";
               }
               return obj;
@@ -267,7 +265,14 @@ export default defineComponent({
                   console.log("obj", obj);
 
                   obj.isLoading = false;  // Reset loading state
-                  obj.options = res.data.list;
+
+                  console.log("res.data.list", res.data.list.filter((item: any) => !item.schema));
+
+                  const options = res.data.list.map((item: any) => item.schema || []).flat().map((it2: any) => it2.name);
+                  // get unique values of the options array
+                  const uniqueOptions = [...new Set(options)];
+
+                  obj.options = uniqueOptions;
 
                   // Set value based on oldVariableValue or the first option
                   let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
@@ -283,6 +288,8 @@ export default defineComponent({
                   return obj;
                 })
                 .catch((error) => {
+                  console.log(error, "error");
+
                   obj.isLoading = false;  // Reset loading state
                   // Handle error
                   variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
