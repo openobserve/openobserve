@@ -28,6 +28,8 @@
         @click="onChartClick"
       />
 
+      <div>Traces {{ searchObj.data.queryResults?.hits?.length }}</div>
+
       <q-virtual-scroll
         id="tracesSearchGridComponent"
         style="height: 400px"

@@ -52,9 +52,9 @@
         <div>{{ baseTracePosition.tics[4].label }}</div>
       </div>
       <div
-        v-for="tick in baseTracePosition['tics']"
+        v-for="(tick, index) in baseTracePosition['tics']"
         class="trace-tic"
-        :key="tick.value"
+        :key="tick.value + index"
         :style="{
           position: 'absolute',
           left: tick.left,
