@@ -122,17 +122,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val) => val.length > 0 || 'Required']"
                 />
                 <q-select
-                      v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.x[index].sortBy
-                      "
-                      :options="['None', 'ASC', 'DESC']"
-                      dense
-                      filled
-                      emit-value
-                      map-options
-                      label="Sort"
+                  v-if="
+                    !(
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                    )
+                  "
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x[index].sortBy
+                  "
+                  :options="['None', 'ASC', 'DESC']"
+                  dense
+                  filled
+                  emit-value
+                  map-options
+                  label="Sort"
                   />
               </div>
             </q-menu>
@@ -289,17 +296,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val) => val.length > 0 || 'Required']"
                 />
                 <q-select
-                      v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.y[index].sortBy
-                      "
-                      :options="['None', 'ASC', 'DESC']"
-                      dense
-                      filled
-                      emit-value
-                      map-options
-                      label="Sort"
+                  v-if="
+                    !(
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                    )
+                  "
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y[index].sortBy
+                  "
+                  :options="['None', 'ASC', 'DESC']"
+                  dense
+                  filled
+                  emit-value
+                  map-options
+                  label="Sort"
                   />
               </div>
             </q-menu>
