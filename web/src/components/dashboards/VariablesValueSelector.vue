@@ -94,6 +94,7 @@ export default defineComponent({
     watch(
       () => variablesData,
       () => {
+        console.log("deep emit", variablesData);
         emitVariablesData();
       },
       { deep: true }
@@ -274,9 +275,20 @@ export default defineComponent({
 
                   obj.options = uniqueOptions;
 
+                  console.log("oldVariableValue", oldVariableValue);
+
                   // Set value based on oldVariableValue or the first option
                   let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
-                  obj.value = oldVariableObjectSelectedValue ? oldVariableObjectSelectedValue.value : obj.options.length ? obj.options[0] : "";
+                  if (oldVariableObjectSelectedValue) {
+                    console.log("oldVariableObjectSelectedValue optiomms", oldVariableObjectSelectedValue);
+
+                    console.log("obj.optiomms", obj.options)
+                    obj.value = obj.options.includes(oldVariableObjectSelectedValue.value) ? oldVariableObjectSelectedValue.value : obj.options.length ? obj.options[0] : "";
+                    console.log("optiomms.value", obj.value);
+                  }
+                  else {
+                    obj.value = obj.options[0] || "";
+                  }
                   console.log("objjj", obj.value);
 
                   variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);

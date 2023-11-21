@@ -222,10 +222,13 @@ export const usePanelDataLoader = (
         return queryService
           .metrics_query_range({
             org_identifier: store.state.selectedOrganization.identifier,
-            query: replaceQueryValue(
-              it.query,
-              startISOTimestamp,
-              endISOTimestamp,
+            query: applyAdhocVariables(
+              replaceQueryValue(
+                it.query,
+                startISOTimestamp,
+                endISOTimestamp,
+                panelSchema.value.queryType
+              ),
               panelSchema.value.queryType
             ),
             start_time: startISOTimestamp,
@@ -260,10 +263,13 @@ export const usePanelDataLoader = (
               org_identifier: store.state.selectedOrganization.identifier,
               query: {
                 query: {
-                  sql: replaceQueryValue(
-                    it.query,
-                    startISOTimestamp,
-                    endISOTimestamp,
+                  sql: applyAdhocVariables(
+                    replaceQueryValue(
+                      it.query,
+                      startISOTimestamp,
+                      endISOTimestamp,
+                      panelSchema.value.queryType
+                    ),
                     panelSchema.value.queryType
                   ),
                   sql_mode: "full",
@@ -443,52 +449,71 @@ export const usePanelDataLoader = (
         query = query.replaceAll(variableName, variableValue);
       });
 
-      if (queryType === "promql") {
-        console.log("inside promql");
-        const adHocVariables = [
-          {
-            name: "_timestamp",
-            value: startISOTimestamp,
-            operator: "=",
-          },
-        ];
-
-        adHocVariables.forEach((variable: any) => {
-          query = addLabelToPromQlQuery(
-            query,
-            variable.name,
-            variable.value,
-            variable.operator
-          );
-        });
-        console.log("query", query);
-      }
-
-      if (queryType === "sql") {
-        console.log("inside sql");
-
-        const adHocSQLVariables = [
-          {
-            name: "kubernetes_namespace_name",
-            value: "ziox-alpha1",
-            operator: "=",
-          },
-        ];
-
-        adHocSQLVariables.forEach((variable: any) => {
-          query = addLabelToSQlQuery(
-            query,
-            variable.name,
-            variable.value,
-            variable.operator
-          );
-        });
-        console.log("querySQL", query);
-      }
       return query;
     } else {
       return query;
     }
+  };
+
+  const applyAdhocVariables = (query: any, queryType: any) => {
+    console.log("checking for ad hoc variables");
+
+    const adHocVariables = variablesData.value?.values
+      ?.filter((it: any) => it.type === "ad-hoc-filters")
+      ?.map((it: any) => it?.value)
+      ?.filter((it: any) => it?.operator && it?.name && it?.value);
+
+    if (!adHocVariables.length) {
+      return query;
+    }
+
+    console.log("ad hoc variables found");
+
+    // continue if there are any adhoc queries
+    if (queryType === "promql") {
+      console.log("inside promql");
+      // const adHocVariables = [
+      //   {
+      //     name: "_timestamp",
+      //     value: startISOTimestamp,
+      //     operator: "=",,
+      //   },
+      // ];
+
+      adHocVariables.forEach((variable: any) => {
+        query = addLabelToPromQlQuery(
+          query,
+          variable.name,
+          variable.value,
+          variable.operator
+        );
+      });
+      console.log("query", query);
+    }
+
+    if (queryType === "sql") {
+      console.log("inside sql");
+
+      // const adHocSQLVariables = [
+      //   {
+      //     name: "kubernetes_namespace_name",
+      //     value: "ziox-alpha1",
+      //     operator: "=",
+      //   },
+      // ];
+
+      adHocVariables.forEach((variable: any) => {
+        query = addLabelToSQlQuery(
+          query,
+          variable.name,
+          variable.value,
+          variable.operator
+        );
+      });
+      console.log("querySQL", query);
+    }
+
+    return query;
   };
 
   /**
@@ -551,6 +576,8 @@ export const usePanelDataLoader = (
   watch(
     () => variablesData.value?.values,
     () => {
+      console.log("variables values changed");
+
       // ensure the query is there
       if (!panelSchema.value.queries?.length) {
         return;

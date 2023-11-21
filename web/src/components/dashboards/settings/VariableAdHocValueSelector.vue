@@ -1,11 +1,11 @@
 <template>
-    <div>
+    <div class="row no-wrap items-center">
         <q-btn class="text-bold no-border bg-grey-3" no-caps no-outline rounded :label="variableItem?.name" />
-        <q-btn class="text-bold no-border q-ml-xs" no-caps no-outline rounded icon="add" padding="xs" @click="addFields" />
-        <q-select style="min-width: 150px;" filled outlined dense v-model="selectedValue"
-            :display-value="selectedValue ? selectedValue : !variableItem.isLoading ? '(No Data Found)' : ''"
+        <div class="row no-wrap items-center" v-if="isSelectVisible">
+        <q-select style="width: auto" filled outlined dense v-model="selectedField"
+            :display-value="selectedField ? selectedField : !variableItem.isLoading ? '(No Data Found)' : ''"
             :options="fieldsFilteredOptions" input-debounce="0" behavior="menu" use-input stack-label
-            @filter="fieldsFilterFn" option-value="name" option-label="name" emit-value class="textbox col no-case"
+            @filter="fieldsFilterFn" class="textbox col no-case q-ml-sm"
             :loading="variableItem.isLoading">
             <template v-slot:no-option>
                 <q-item>
@@ -21,9 +21,19 @@
           v-model="selectedOperator"
           :display-value="selectedOperator ? selectedOperator : ''"
           :options="operatorOptions"
-          label="Operator"
-          style="width: 100%"
+          style="width: auto"
+          class="q-ml-sm"
         />
+        <q-input
+          v-model="inputValue"
+          dense
+          filled 
+          :input-debounce="1000"
+          style="width: auto"
+          class="q-ml-sm"
+        />
+        </div>
+        <q-btn class="text-bold no-border q-ml-xs" no-caps no-outline rounded icon="add" padding="xs" @click="addFields" />
     </div>
 </template>
 
@@ -38,16 +48,19 @@ export default defineComponent({
     setup(props: any, { emit }) {
         console.log('VariableAdHocValueSelector');
 
-        const selectedValue = ref(String(props.variableItem?.value));
-        const operatorOptions = ['=', '<', '>', '<=', '>=']; 
+        const selectedField = ref(String(props.variableItem?.value?.name));
+        const operatorOptions = ['=', '!=', '<', '>', '<=', '>=']; 
         const selectedOperator = ref(operatorOptions[0]);
         const options = toRef(props.variableItem, 'options');
         const isSelectVisible = ref(false);
-
+        const inputValue = ref('');
         const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } = useSelectAutoComplete(options, 'name');
 
-        watch(() => props.variableItem, () => {
+        watch( props.variableItem, () => {
+            console.log("props.variableItem", props.variableItem.value);
+            
             options.value = props.variableItem?.options;
+            
         });
 
         const addFields = () => {
@@ -56,20 +69,23 @@ export default defineComponent({
                 isSelectVisible.value = true;
             }
         };
-
-        watch([selectedValue, selectedOperator], () => {
+        
+        console.log("VariableAdHocValueSelector::--", selectedField.value, selectedOperator.value, inputValue.value);
+        watch([selectedField, selectedOperator, inputValue], () => {
             // Emit both selected value and selected operator
-            emit('update:modelValue', { value: selectedValue.value, operator: selectedOperator.value });
+            console.log("VariableAdHocValueSelector::", selectedField.value, selectedOperator.value, inputValue.value);
+            emit('update:modelValue', { name: selectedField.value, operator: selectedOperator.value, value: inputValue.value });
         });
 
         return {
-            selectedValue,
+            selectedField,
             fieldsFilterFn,
             fieldsFilteredOptions,
             isSelectVisible,
             addFields,
             operatorOptions,
             selectedOperator,
+            inputValue
         };
     },
 });

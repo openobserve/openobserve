@@ -50,7 +50,7 @@ export const addLabelToPromQlQuery = (
   console.log("updatequery", originalQuery);
   console.log("label", label);
 
-  const conditionToAdd = value ? `${label} ${operator} "${value}"` : `${label}`;
+  const conditionToAdd = value ? `${label}${operator}"${value}"` : `${label}`;
 
   try {
     const parsedQuery = parsePromQlQuery(originalQuery);
