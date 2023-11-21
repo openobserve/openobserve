@@ -95,7 +95,7 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
                                     &read_batch,
                                 ]) {
                                     Ok(res) => res,
-                                    Err(err) => {
+                                    Err(_err) => {
                                         vec![]
                                     }
                                 };
@@ -103,7 +103,7 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
                                 json_rows.into_iter().map(json::Value::Object).collect();
                             rows.append(&mut sources);
                         }
-                        Err(err) => {
+                        Err(_err) => {
                             continue;
                         }
                     }
