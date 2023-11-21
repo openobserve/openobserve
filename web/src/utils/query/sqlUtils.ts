@@ -15,12 +15,39 @@ export const addLabelToSQlQuery = (
 
   let query = "";
   if (!ast.where) {
-    console.log("inside");
+    // If there is no WHERE clause, create a new one
+    const newWhereClause = {
+      type: "binary_expr",
+      operator: operator,
+      left: {
+        type: "column_ref",
+        table: null,
+        column: label,
+      },
+      right: {
+        type: "string",
+        value: value,
+      },
+    };
 
-
-    const sql = parser.sqlify({
+    const newAst = {
       ...ast,
-      where: {
+      where: newWhereClause,
+    };
+
+    const sql = parser.sqlify(newAst);
+    const quotedSql = sql.replace(/`/g, '"');
+    console.log("sqlll", ast);
+    
+    console.log("sqlll", sql);
+
+    query = quotedSql;
+  } else {
+    const newCondition = {
+      type: "binary_expr",
+      operator: "AND",
+      left: ast.where,
+      right: {
         type: "binary_expr",
         operator: operator,
         left: {
@@ -33,8 +60,14 @@ export const addLabelToSQlQuery = (
           value: value,
         },
       },
-    });
-    
+    };
+
+    const newAst = {
+      ...ast,
+      where: newCondition,
+    };
+
+    const sql = parser.sqlify(newAst);
     const quotedSql = sql.replace(/`/g, '"');
     console.log("sqlll", sql);
 
