@@ -256,11 +256,7 @@ import { useI18n } from "vue-i18n";
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import DetailTable from "./DetailTable.vue";
-import {
-  getImageURL,
-  timestampToTimezoneDate,
-  useLocalWrapContent,
-} from "../../utils/zincutils";
+import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import EqualIcon from "../../components/icons/EqualIcon.vue";
 import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
@@ -307,11 +303,7 @@ export default defineComponent({
     },
     onChartUpdate({ start, end }: { start: any; end: any }) {
       this.searchObj.meta.showDetailTab = false;
-      this.searchObj.data.datetime.type = "absolute";
-      this.searchObj.data.datetime.startTime = new Date(start).getTime() * 1000;
-      this.searchObj.data.datetime.endTime = new Date(end).getTime() * 1000;
-      this.searchObj.runQuery = true;
-      this.$emit("update:datetime");
+      this.$emit("update:datetime", { start, end });
     },
     onScroll(info: any) {
       this.searchObj.meta.scrollInfo = info;
