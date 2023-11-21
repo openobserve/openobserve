@@ -128,6 +128,11 @@ export default defineComponent({
             chart?.on("globalout", () => {mouseHoverEffectFn({})});
             chart?.on("legendselectchanged",legendSelectChangedFn);
 
+            emit("updated:chart", {
+                start: chart?.getOption()?.dataZoom[0]?.startValue||0,
+                end: chart?.getOption()?.dataZoom[0]?.endValue||0,
+            });
+
             //on dataZoom emit an event of start x and end x
             chart?.on('dataZoom', function (params:any) {
                 //if batch then emit dataZoom event

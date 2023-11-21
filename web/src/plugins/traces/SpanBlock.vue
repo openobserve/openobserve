@@ -117,6 +117,18 @@ export default defineComponent({
     const getLeftPosition = computed(() => {
       const left =
         props.span.startTimeMs - props.baseTracePosition["startTimeMs"];
+
+      // if (props.span.startTimeMs < props.baseTracePosition["startTimeMs"]) {
+      //   props.baseTracePosition + props.baseTracePosition["durationMs"];
+      //   console.log(left);
+      // }
+      //   return 0;
+      // console.log(
+      //   props.span.startTimeMs,
+      //   props.baseTracePosition["startTimeMs"],
+      //   left,
+      //   props.baseTracePosition?.durationMs
+      // );
       return (left / props.baseTracePosition?.durationMs) * 100;
     });
     const getWidth = computed(() => {
