@@ -305,19 +305,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
     }
 
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
-        let pool = CLIENT.clone();
-        let ret = sqlx::query_as::<_, super::FileRecord>(r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size FROM file_list;"#)
-        .fetch_all(&pool)
-        .await?;
-        Ok(ret
-            .into_iter()
-            .map(|r| {
-                (
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
-                    FileMeta::from(&r),
-                )
-            })
-            .collect())
+        return Ok(vec![]); // disallow list all data
     }
 
     async fn query(
