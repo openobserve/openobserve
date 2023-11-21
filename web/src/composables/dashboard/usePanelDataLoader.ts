@@ -180,6 +180,10 @@ export const usePanelDataLoader = (
     ? JSON.parse(JSON.stringify(variablesData.value?.values))
     : [];
 
+  let currentAdHocVariablesData = variablesData.value?.values
+    ? JSON.parse(JSON.stringify(variablesData.value?.values))
+    : [];
+
   const store = useStore();
   let controller: AbortController | null = null;
 
@@ -595,32 +599,83 @@ export const usePanelDataLoader = (
         return;
       }
 
-      // 1. get the dependent variables list
-      const newDependentVariablesData = variablesData.value?.values
-        ?.filter((it: any) => it.type != "ad-hoc-filters") // ad hoc filters are not considered as dependent filters as they are globally applied
-        ?.filter((it: any) =>
-          panelSchema.value.queries
-            ?.map((q: any) => q?.query?.includes(`$${it.name}`))
-            ?.includes(true)
-        );
+      // we have 2 types of variables, ad-hoc and others
+      // let's check for other variables
+      const shouldITriggerTheQueryForOtherVariables = (() => {
+        // 1. get the dependent variables list
+        const newDependentVariablesData = variablesData.value?.values
+          ?.filter((it: any) => it.type != "ad-hoc-filters") // ad hoc filters are not considered as dependent filters as they are globally applied
+          ?.filter((it: any) =>
+            panelSchema.value.queries
+              ?.map((q: any) => q?.query?.includes(`$${it.name}`))
+              ?.includes(true)
+          );
 
-      // if no variables, no need to rerun the query
-      if (!newDependentVariablesData?.length) {
-        return;
-      }
+        // if no variables, no need to rerun the query
+        if (!newDependentVariablesData?.length) {
+          return false;
+        }
 
-      // 2. compare with the previously saved variable values, the variables data is an array of objects with name and value
-      const isAllValuesSame = newDependentVariablesData.every((it: any) => {
-        const oldValue = currentDependentVariablesData.find(
-          (it2: any) => it2.name == it.name
-        );
-        return it.value == oldValue?.value && oldValue?.value != "";
-      });
+        // 2. compare with the previously saved variable values, the variables data is an array of objects with name and value
+        const isAllValuesSame = newDependentVariablesData.every((it: any) => {
+          const oldValue = currentDependentVariablesData.find(
+            (it2: any) => it2.name == it.name
+          );
+          return it.value == oldValue?.value && oldValue?.value != "";
+        });
 
-      if (!isAllValuesSame) {
-        currentDependentVariablesData = JSON.parse(
-          JSON.stringify(newDependentVariablesData)
-        );
+        if (!isAllValuesSame) {
+          currentDependentVariablesData = JSON.parse(
+            JSON.stringify(newDependentVariablesData)
+          );
+          return true;
+        }
+
+        return false;
+      })();
+
+      // let's check for the ad-hoc variables
+      const shouldITriggerTheQueryForAdHocVariables = (() => {
+        const adHocVariables = variablesData.value?.values
+          ?.filter((it: any) => it.type === "ad-hoc-filters")
+          ?.map((it: any) => it?.value)
+          .flat()
+          ?.filter((it: any) => it?.operator && it?.name && it?.value);
+
+        console.log("adHocVariables", adHocVariables);
+
+        if (!adHocVariables.length) {
+          return false;
+        }
+
+        // 2. compare with the previously saved variable values, the variables data is an array of objects with name and value
+        const isAllValuesSame = adHocVariables.every((it: any) => {
+          const oldValue = currentAdHocVariablesData.find(
+            (it2: any) => it2.name == it.name
+          );
+          return it.value == oldValue?.value && oldValue?.value != "";
+        });
+
+        if (!isAllValuesSame) {
+          currentAdHocVariablesData = JSON.parse(
+            JSON.stringify(adHocVariables)
+          );
+          return true;
+        }
+
+        return false;
+      })();
+
+      console.log(
+        "triggerCheck",
+        shouldITriggerTheQueryForOtherVariables,
+        shouldITriggerTheQueryForAdHocVariables
+      );
+
+      if (
+        shouldITriggerTheQueryForOtherVariables ||
+        shouldITriggerTheQueryForAdHocVariables
+      ) {
         isDirty.value = true;
         if (isVisible.value) {
           loadData();
