@@ -96,7 +96,6 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
                                 ]) {
                                     Ok(res) => res,
                                     Err(err) => {
-                                        println!("error:reading batch {}", err);
                                         vec![]
                                     }
                                 };
@@ -105,7 +104,6 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
                             rows.append(&mut sources);
                         }
                         Err(err) => {
-                            println!("error:reading batch {}", err);
                             continue;
                         }
                     }
@@ -113,7 +111,6 @@ async fn data(path: web::Path<(String, String)>, file: web::Json<String>) -> Htt
             }
         }
     }
-    println!("got rows {}", rows.len());
     HttpResponse::Ok()
         .content_type("application/json")
         .json(rows)

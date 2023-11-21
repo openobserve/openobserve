@@ -511,7 +511,6 @@ async fn handle_metrics(
         {
             Ok(output) => match output.await {
                 Ok(new_file_name) => {
-                    println!("excluding file {}", new_file_name.clone());
                     arrow_files.push(new_file_name.clone());
                     wal::exclude_file(new_file_name).await
                 }

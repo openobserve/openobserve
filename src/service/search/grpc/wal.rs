@@ -370,10 +370,7 @@ async fn get_file_list(
     } else {
         files
             .iter()
-            .filter(|f| {
-                println!("file is {f}");
-                f.as_str().ends_with(&extension)
-            })
+            .filter(|f| f.as_str().ends_with(&extension))
             .map(|f| {
                 f.strip_prefix(&wal_dir)
                     .unwrap()

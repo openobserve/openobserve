@@ -123,7 +123,6 @@ pub async fn search(
             )))
         }
     };
-    println!("scanned batches json :{:?}", batches1.len());
     if !batches1.is_empty() {
         for (key, batch) in batches1 {
             if !batch.is_empty() {
@@ -144,7 +143,6 @@ pub async fn search(
             )))
         }
     };
-    println!("scanned batches parquet :{:?}", batches2.len());
     if !batches2.is_empty() {
         for (key, batch) in batches2 {
             if !batch.is_empty() {
@@ -166,7 +164,6 @@ pub async fn search(
         }
     };
 
-    println!("scanned batches arrow :{:?}", batches3.len());
     if !batches3.is_empty() {
         for (key, batch) in batches3 {
             if !batch.is_empty() {
