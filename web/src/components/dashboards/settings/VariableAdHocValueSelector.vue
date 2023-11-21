@@ -18,7 +18,7 @@
                 :display-value="adhocVariables[index].operator ? adhocVariables[index].operator : ''"
                 :options="operatorOptions" style="width: auto" class="operator" />
             <q-input v-model="adhocVariables[index].value" dense filled debounce="1000" style="width: 125px" class="" />
-            <q-btn class="close" size="xs" padding="13px 0px" square flat dense @click="removeField(index)" icon="close" />
+            <q-btn class="close" size="xs" padding="13px 2px" square flat dense @click="removeField(index)" icon="close" />
             <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border">AND</div>
         </div>
         <q-btn class="text-bold no-border q-ml-xs q-mb-sm" no-caps no-outline rounded icon="add" padding="xs"

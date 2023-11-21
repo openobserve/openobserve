@@ -455,13 +455,21 @@ export const usePanelDataLoader = (
     }
   };
 
+  console.log("currentDependentVariablesData", currentDependentVariablesData);
+
+  console.log("currentDependentVariablesData", currentDependentVariablesData);
+
   const applyAdhocVariables = (query: any, queryType: any) => {
     console.log("checking for ad hoc variables");
+    console.log("variablesData(())", variablesData.value?.values);
 
     const adHocVariables = variablesData.value?.values
       ?.filter((it: any) => it.type === "ad-hoc-filters")
       ?.map((it: any) => it?.value)
+      .flat()
       ?.filter((it: any) => it?.operator && it?.name && it?.value);
+
+    console.log("adHocVariables(())", adHocVariables);
 
     if (!adHocVariables.length) {
       return query;
