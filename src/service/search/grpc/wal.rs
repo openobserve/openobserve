@@ -22,6 +22,7 @@ use datafusion::{
 use futures::future::try_join_all;
 use std::{io::BufReader, path::Path, sync::Arc, time::UNIX_EPOCH};
 use tokio::time::Duration;
+
 use tracing::{info_span, Instrument};
 
 use crate::common::{
@@ -351,18 +352,38 @@ async fn get_file_list(
     }
 
     // lock theses files
-    let files = files
-        .iter()
-        .filter(|f| f.as_str().ends_with(&extension))
-        .map(|f| {
-            f.strip_prefix(&wal_dir)
-                .unwrap()
-                .to_string()
-                .replace('\\', "/")
-                .trim_start_matches('/')
-                .to_string()
-        })
-        .collect::<Vec<_>>();
+    let files = if stream_type.eq(&meta::StreamType::Metrics) && extension == FILE_EXT_ARROW {
+        let mut ret = vec![];
+        for file in files {
+            if file.as_str().ends_with(&extension) && !wal::should_exclude_file(&file).await {
+                ret.push(
+                    file.strip_prefix(&wal_dir)
+                        .unwrap()
+                        .to_string()
+                        .replace('\\', "/")
+                        .trim_start_matches('/')
+                        .to_string(),
+                );
+            }
+        }
+        ret
+    } else {
+        files
+            .iter()
+            .filter(|f| {
+                println!("file is {f}");
+                f.as_str().ends_with(&extension)
+            })
+            .map(|f| {
+                f.strip_prefix(&wal_dir)
+                    .unwrap()
+                    .to_string()
+                    .replace('\\', "/")
+                    .trim_start_matches('/')
+                    .to_string()
+            })
+            .collect::<Vec<_>>()
+    };
     wal::lock_files(&files).await;
 
     let mut result = Vec::with_capacity(files.len());
@@ -445,7 +466,7 @@ pub async fn search_arrow(
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
     // cache files
-    let work_dir = session_id.to_string();
+    let work_dir = format!("{}_arrow", session_id);
     for file in files.clone().iter() {
         let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
         match get_file_contents(&source_file) {

@@ -48,6 +48,7 @@ use crate::service::{
 pub async fn run() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
     interval.tick().await; // trigger the first run
+
     loop {
         if cluster::is_offline() {
             break;
@@ -56,10 +57,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if let Err(e) = move_files_to_storage().await {
             log::error!("Error moving disk files to remote: {}", e);
         }
+
         if let Err(e) = metrics_json_to_arrow().await {
-            log::error!("Error moving disk files to remote: {}", e);
+            log::error!("Error converting metrics json to arrow : {}", e);
         }
     }
+
     log::info!("job::files::disk is stopped");
     Ok(())
 }
@@ -388,13 +391,13 @@ async fn upload_file(
 }
 async fn handle_metrics(
     org_id: &str,
-    _in_stream_name: &str,
     stream_type: StreamType,
     path_str: &str,
-) -> Result<(), anyhow::Error> {
+) -> Result<Vec<String>, anyhow::Error> {
     let file = fs::File::open(path_str).unwrap();
     let file_meta = file.metadata().unwrap();
     let file_size = file_meta.len();
+    let mut arrow_files = vec![];
     log::info!("[JOB] Metrics json data conversion : : {}", path_str);
 
     if file_size == 0 {
@@ -491,7 +494,12 @@ async fn handle_metrics(
                 Some(metrics_schema),
             )
             .await;
-            let new_file_name = rw_file.name().to_owned();
+            let wal_dir = if let Ok(path) = Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
+                path.to_str().unwrap().to_string()
+            } else {
+                return Err(anyhow::anyhow!("Unable to get wal dir"));
+            };
+            let new_file_name = format!("{wal_dir}/{}", rw_file.wal_name().to_owned());
 
             for batch in &batches {
                 rw_file.write_arrow(batch.clone()).await;
@@ -502,11 +510,10 @@ async fn handle_metrics(
         .await
         {
             Ok(output) => match output.await {
-                Ok(_new_file_name) => {
-                    /*  log::info!(
-                        "[JOB] disk file conversion succeeded for: {}",
-                        &new_file_name
-                    ); */
+                Ok(new_file_name) => {
+                    println!("excluding file {}", new_file_name.clone());
+                    arrow_files.push(new_file_name.clone());
+                    wal::exclude_file(new_file_name).await
                 }
                 Err(err) => {
                     log::error!("[JOB] disk file conversion error: {:?}", err);
@@ -520,11 +527,11 @@ async fn handle_metrics(
         }
     }
     log::info!("[JOB] disk file conversion succeeded for: {}", &path_str);
-    Ok(())
+    Ok(arrow_files)
 }
 
 /*
- * upload compressed files to storage & delete moved files from local
+ * converts single metrics json file to per stream arrow file & delete moved files from local
  */
 pub async fn metrics_json_to_arrow() -> Result<(), anyhow::Error> {
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
@@ -594,7 +601,7 @@ pub async fn metrics_json_to_arrow() -> Result<(), anyhow::Error> {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
             if stream_type.eq(&StreamType::Metrics) && file_name.ends_with(".json") {
-                let ret = handle_metrics(&org_id, &stream_name, stream_type, &local_file).await;
+                let ret = handle_metrics(&org_id, stream_type, &local_file).await;
                 if let Err(e) = ret {
                     log::error!("[JOB] Error while converting json file to arrow {}", e);
                     drop(permit);
@@ -614,7 +621,18 @@ pub async fn metrics_json_to_arrow() -> Result<(), anyhow::Error> {
                     }
                 }
 
-                let ret = tokio::fs::remove_file(&local_file).await;
+                match tokio::fs::remove_file(&local_file).await {
+                    Ok(_) => wal::remove_excluded_files(ret.as_ref().unwrap().as_ref()).await,
+                    Err(e) => {
+                        log::error!(
+                            "[JOB] Failed to remove json file from disk: {}, {}",
+                            local_file,
+                            e.to_string()
+                        );
+                        drop(permit);
+                        return Ok(());
+                    }
+                }
                 if let Err(e) = ret {
                     log::error!(
                         "[JOB] Failed to remove json file from disk: {}, {}",

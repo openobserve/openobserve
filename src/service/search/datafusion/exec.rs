@@ -95,7 +95,10 @@ pub async fn sql(
         let ctx = prepare_datafusion_context(&session.search_type)?;
         let mut record_batches = Vec::<RecordBatch>::new();
         for file in files.iter() {
-            let file_data = tmpfs::get(&file.key).unwrap();
+            let file_data = match tmpfs::get(&file.key) {
+                Ok(data) => data,
+                Err(_) => continue,
+            };
             let buf_reader = Cursor::new(file_data);
             let stream_reader = StreamReader::try_new(buf_reader, None)?;
 

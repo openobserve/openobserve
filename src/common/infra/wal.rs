@@ -41,6 +41,10 @@ use crate::common::{
 // SEARCHING_FILES for searching files, in use, should not move to s3
 static SEARCHING_FILES: Lazy<RwAHashSet<String>> = Lazy::new(|| RwLock::new(Default::default()));
 
+// EXCLUDE_ARROW_FILES for exclusion from searching files, since json isn't converted yet
+static EXCLUDE_ARROW_FILES: Lazy<RwAHashSet<String>> =
+    Lazy::new(|| RwLock::new(Default::default()));
+
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
 
@@ -596,6 +600,23 @@ pub async fn release_files(files: &[String]) {
 
 pub async fn lock_files_exists(file: &str) -> bool {
     SEARCHING_FILES.read().await.get(file).is_some()
+}
+
+pub async fn exclude_file(file: String) {
+    let mut locker = EXCLUDE_ARROW_FILES.write().await;
+    locker.insert(file);
+}
+
+pub async fn remove_excluded_files(files: &[String]) {
+    let mut locker = EXCLUDE_ARROW_FILES.write().await;
+    for file in files.iter() {
+        locker.remove(file);
+    }
+    locker.shrink_to_fit();
+}
+
+pub async fn should_exclude_file(file: &str) -> bool {
+    EXCLUDE_ARROW_FILES.read().await.get(file).is_some()
 }
 
 #[cfg(test)]
