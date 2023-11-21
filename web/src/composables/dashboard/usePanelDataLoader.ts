@@ -323,11 +323,13 @@ export const usePanelDataLoader = (
    * @return {boolean} Returns true if the query is dependent on any variables, false otherwise.
    */
   const isQueryDependentOnTheVariables = () => {
-    const dependentVariables = variablesData.value?.values?.filter((it: any) =>
-      panelSchema?.value?.queries
-        ?.map((q: any) => q?.query?.includes(`$${it.name}`))
-        ?.includes(true)
-    );
+    const dependentVariables = variablesData.value?.values
+      ?.filter((it: any) => it.type != "ad-hoc-filters") // ad hoc filters are not considered as dependent filters as they are globally applied
+      ?.filter((it: any) =>
+        panelSchema?.value?.queries
+          ?.map((q: any) => q?.query?.includes(`$${it.name}`)) // check if the query includes the variable
+          ?.includes(true)
+      );
     return dependentVariables?.length > 0;
   };
 
@@ -337,14 +339,16 @@ export const usePanelDataLoader = (
    * @return {boolean} Whether the query can be executed based on the variables.
    */
   const canRunQueryBasedOnVariables = () => {
-    const dependentVariables = variablesData.value?.values?.filter((it: any) =>
-      panelSchema?.value?.queries
-        ?.map((q: any) => {
-          const includes = q?.query?.includes(`$${it.name}`);
-          return includes;
-        })
-        ?.includes(true)
-    );
+    const dependentVariables = variablesData.value?.values
+      ?.filter((it: any) => it.type != "ad-hoc-filters") // ad hoc filters are not considered as dependent filters as they are globally applied
+      ?.filter((it: any) =>
+        panelSchema?.value?.queries
+          ?.map((q: any) => {
+            const includes = q?.query?.includes(`$${it.name}`);
+            return includes;
+          })
+          ?.includes(true)
+      );
 
     if (dependentVariables?.length > 0) {
       const dependentAvailableVariables = dependentVariables.filter(
@@ -592,12 +596,13 @@ export const usePanelDataLoader = (
       }
 
       // 1. get the dependent variables list
-      const newDependentVariablesData = variablesData.value?.values?.filter(
-        (it: any) =>
+      const newDependentVariablesData = variablesData.value?.values
+        ?.filter((it: any) => it.type != "ad-hoc-filters") // ad hoc filters are not considered as dependent filters as they are globally applied
+        ?.filter((it: any) =>
           panelSchema.value.queries
             ?.map((q: any) => q?.query?.includes(`$${it.name}`))
             ?.includes(true)
-      );
+        );
 
       // if no variables, no need to rerun the query
       if (!newDependentVariablesData?.length) {
