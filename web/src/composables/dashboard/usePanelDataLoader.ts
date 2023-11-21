@@ -642,7 +642,13 @@ export const usePanelDataLoader = (
           .flat()
           ?.filter((it: any) => it?.operator && it?.name && it?.value);
 
-        console.log("adHocVariables", adHocVariables);
+        // if number of adHocVariables have changed, fire the query
+        if (adHocVariables.length !== currentAdHocVariablesData.length) {
+          currentAdHocVariablesData = JSON.parse(
+            JSON.stringify(adHocVariables)
+          );
+          return true;
+        }
 
         if (!adHocVariables.length) {
           return false;
