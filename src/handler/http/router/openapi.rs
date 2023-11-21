@@ -46,6 +46,7 @@ use crate::handler::http::request;
         request::logs::ingest::multi,
         request::logs::ingest::json,
         request::traces::traces_write,
+        request::traces::get_latest_traces,
         request::metrics::ingest::json,
         request::prom::remote_write,
         request::prom::query_get,
@@ -102,8 +103,6 @@ use crate::handler::http::request;
         request::syslog::update_route,
         request::syslog::list_routes,
         request::syslog::delete_route,
-        request::enrichment_table::save_enrichment_table,
-        request::traces::get_latest_traces,
     ),
     components(
         schemas(

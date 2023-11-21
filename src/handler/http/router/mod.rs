@@ -196,6 +196,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(logs::ingest::otlp_logs_write)
             .service(traces::traces_write)
             .service(traces::otlp_traces_write)
+            .service(traces::get_latest_traces)
             .service(metrics::ingest::json)
             .service(metrics::ingest::otlp_metrics_write)
             .service(prom::remote_write)
@@ -255,18 +256,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(syslog::create_route)
             .service(syslog::delete_route)
             .service(syslog::update_route)
-            .service(syslog::toggle_state)
-            .service(enrichment_table::save_enrichment_table)
-            .service(metrics::ingest::otlp_metrics_write)
-            .service(logs::ingest::otlp_logs_write)
-            .service(traces::otlp_traces_write)
-            .service(create_folder)
-            .service(list_folders)
-            .service(update_folder)
-            .service(get_folder)
-            .service(delete_folder)
-            .service(move_dashboard)
-            .service(traces::get_latest_traces),
+            .service(syslog::toggle_state),
     );
 }
 
