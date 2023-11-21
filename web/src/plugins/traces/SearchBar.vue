@@ -25,6 +25,7 @@
       <div class="float-right col-auto">
         <div class="float-left">
           <date-time
+            ref="dateTimeRef"
             auto-apply
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
@@ -134,6 +135,7 @@ export default defineComponent({
 
     const parser = new Parser();
     let streamName = "";
+    const dateTimeRef = ref(null);
 
     const {
       autoCompleteData,
@@ -295,6 +297,7 @@ export default defineComponent({
       setEditorValue,
       autoCompleteKeywords,
       updateTimezone,
+      dateTimeRef,
     };
   },
   computed: {
