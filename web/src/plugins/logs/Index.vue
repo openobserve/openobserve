@@ -177,7 +177,7 @@
                       :key="searchObj.data.histogram.xData.length || -1"
                       ref="searchResultRef"
                       :expandedLogs="expandedLogs"
-                      @update:datetime="searchData"
+                      @update:datetime="setHistogramDate"
                       @update:scroll="getMoreData"
                       @expandlog="toggleExpandLog"
                     />
@@ -230,6 +230,9 @@ export default defineComponent({
     SearchResult,
   },
   methods: {
+    setHistogramDate(date: any) {
+      this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
+    },
     searchData() {
       if (this.searchObj.loading == false) {
         this.searchObj.loading = true;

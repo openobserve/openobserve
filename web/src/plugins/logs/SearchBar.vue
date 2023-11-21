@@ -114,6 +114,7 @@
         ></q-btn>
         <div class="float-left">
           <date-time
+            ref="dateTimeRef"
             auto-apply
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
@@ -313,6 +314,7 @@ export default defineComponent({
     let streamName = "";
 
     const parser = new Parser();
+    const dateTimeRef = ref(null);
 
     const {
       autoCompleteData,
@@ -401,7 +403,7 @@ export default defineComponent({
       }
     };
 
-    const updateDateTime = (value: object) => {
+    const updateDateTime = async (value: object) => {
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
@@ -410,6 +412,14 @@ export default defineComponent({
           : searchObj.data.datetime.relativeTimePeriod,
         type: value.relativeTimePeriod ? "relative" : "absolute",
       };
+
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+
+      searchObj.loading = true;
+      searchObj.runQuery = true;
 
       if (config.isCloud == "true" && value.userChangedValue) {
         segment.track("Button Click", {
@@ -752,6 +762,7 @@ export default defineComponent({
       autoCompleteSuggestions,
       onRefreshIntervalUpdate,
       updateTimezone,
+      dateTimeRef,
     };
   },
   computed: {
