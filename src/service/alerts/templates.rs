@@ -27,11 +27,10 @@ pub async fn save_template(
     mut template: DestinationTemplate,
 ) -> Result<HttpResponse, Error> {
     if template.body.is_null() {
-        return Ok(
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(), "Alert template body empty".to_string(),
-            )),
-        );
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Alert template body empty".to_string(),
+        )));
     }
 
     template.name = Some(name.clone());
