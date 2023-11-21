@@ -94,17 +94,20 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
-        sqlx::query(
-            r#"
-INSERT INTO meta (module, key1, key2, value) 
-    VALUES ($1, $2, $3, '')
-    ON CONFLICT DO NOTHING;"#,
+        if let Err(e) = sqlx::query(
+            r#"INSERT INTO meta (module, key1, key2, value) VALUES ($1, $2, $3, '') ON CONFLICT DO NOTHING;"#,
         )
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
         .execute(&mut *tx)
-        .await?;
+        .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback put meta error: {}", e);
+            }
+            return Err(e.into());
+        }
         if let Err(e) = sqlx::query(
             r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
         )

@@ -95,12 +95,20 @@ impl super::Db for MysqlDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
-        sqlx::query(r#"INSERT IGNORE INTO meta (module, key1, key2, value) VALUES (?, ?, ?, '');"#)
-            .bind(&module)
-            .bind(&key1)
-            .bind(&key2)
-            .execute(&mut *tx)
-            .await?;
+        if let Err(e) = sqlx::query(
+            r#"INSERT IGNORE INTO meta (module, key1, key2, value) VALUES (?, ?, ?, '');"#,
+        )
+        .bind(&module)
+        .bind(&key1)
+        .bind(&key2)
+        .execute(&mut *tx)
+        .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback put meta error: {}", e);
+            }
+            return Err(e.into());
+        }
         if let Err(e) =
             sqlx::query(r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ?;"#)
                 .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
