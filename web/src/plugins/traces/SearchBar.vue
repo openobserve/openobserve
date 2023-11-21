@@ -220,6 +220,14 @@ export default defineComponent({
         type: value.relativeTimePeriod ? "relative" : "absolute",
       };
 
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+
+      searchObj.loading = true;
+      searchObj.runQuery = true;
+
       if (config.isCloud == "true" && value.userChangedValue) {
         segment.track("Button Click", {
           button: "Date Change",
