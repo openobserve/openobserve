@@ -304,13 +304,9 @@ CREATE TABLE IF NOT EXISTS meta
 async fn create_index_item(sql: &str) -> Result<()> {
     let pool = CLIENT.clone();
     if let Err(e) = sqlx::query(sql).execute(&pool).await {
-        if let sqlx::Error::Database(e) = &e {
-            if let Some(code) = e.code() {
-                if code == "42000" {
-                    // index already exists
-                    return Ok(());
-                }
-            }
+        if e.to_string().contains("Duplicate key") {
+            // index already exists
+            return Ok(());
         }
         log::error!("[MYSQL] create table meta index error: {}", e);
         return Err(e.into());
