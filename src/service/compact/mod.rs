@@ -26,7 +26,7 @@ use crate::common::meta::StreamType;
 use crate::service::db;
 
 mod file_list;
-mod file_list_deleted;
+pub mod file_list_deleted;
 mod merge;
 pub mod retention;
 pub mod stats;
