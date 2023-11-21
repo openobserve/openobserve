@@ -210,7 +210,7 @@ export default defineComponent({
       }
     };
 
-    const updateDateTime = (value: object) => {
+    const updateDateTime = async (value: object) => {
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
