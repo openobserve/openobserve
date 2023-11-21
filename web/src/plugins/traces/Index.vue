@@ -633,25 +633,26 @@ export default defineComponent({
       }
     }
 
-    const getTraceDetails = (trace: string) => {
-      searchObj.meta.showTraceDetails = true;
-      searchObj.data.traceDetails.loading = true;
-      searchObj.data.traceDetails.spanList = [];
-      const req = buildTraceSearchQuery(trace);
-      delete req.aggs;
-
-      searchService
-        .search({
-          org_identifier: searchObj.organizationIdetifier,
-          query: req,
-          page_type: "traces",
-        })
-        .then((res) => {
-          searchObj.data.traceDetails.spanList = res.data?.hits || [];
-        })
-        .finally(() => {
-          searchObj.data.traceDetails.loading = false;
+    const openTraceDetails = () => {
+      const trace = searchObj.data.queryResults.hits.find(
+        (hit) => hit.trace_id === router.currentRoute.value.query.trace_id
+      );
+      if (!trace) {
+        showErrorNotification(
+          `Trace ${router.currentRoute.value.query.trace_id} not found`
+        );
+        const query = cloneDeep(router.currentRoute.value.query);
+        delete query.trace_id;
+        router.push({
+          name: "traces",
+          query: {
+            ...query,
+          },
         });
+        return;
+      }
+      searchObj.data.traceDetails.selectedTrace = trace;
+      getTraceDetails();
     };
 
     const buildTraceSearchQuery = (trace: string) => {
@@ -666,6 +667,30 @@ export default defineComponent({
       );
 
       return req;
+    };
+
+    const getTraceDetails = () => {
+      searchObj.meta.showTraceDetails = true;
+      searchObj.data.traceDetails.loading = true;
+      searchObj.data.traceDetails.spanList = [];
+      const req = buildTraceSearchQuery(
+        searchObj.data.traceDetails.selectedTrace
+      );
+
+      delete req.aggs;
+
+      searchService
+        .search({
+          org_identifier: searchObj.organizationIdetifier,
+          query: req,
+          page_type: "traces",
+        })
+        .then((res) => {
+          searchObj.data.traceDetails.spanList = res.data?.hits || [];
+        })
+        .finally(() => {
+          searchObj.data.traceDetails.loading = false;
+        });
     };
 
     const updateFieldValues = (data) => {
@@ -777,6 +802,9 @@ export default defineComponent({
             generateHistogramData();
             //update grid columns
             updateGridColumns();
+
+            if (router.currentRoute.value.query.trace_id) openTraceDetails();
+
             // dismiss();
           })
           .catch((err) => {
@@ -1318,6 +1346,9 @@ export default defineComponent({
       query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
 
       query["org_identifier"] = store.state.selectedOrganization.identifier;
+
+      query["trace_id"] = router.currentRoute.value.query.trace_id;
+
       router.push({ query });
     }
 

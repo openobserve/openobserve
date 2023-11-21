@@ -28,7 +28,9 @@
         @click="onChartClick"
       />
 
-      <div>Traces {{ searchObj.data.queryResults?.hits?.length }}</div>
+      <div class="text-subtitle1 text-bold q-pt-sm q-px-sm">
+        {{ searchObj.data.queryResults?.hits?.length }} Traces
+      </div>
 
       <q-virtual-scroll
         id="tracesSearchGridComponent"
@@ -78,6 +80,8 @@ import TraceDetails from "./TraceDetails.vue";
 import { convertTraceData } from "@/utils/traces/convertTraceData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TraceBlock from "./TraceBlock.vue";
+import { useRouter } from "vue-router";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "SearchResult",
@@ -136,7 +140,9 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
-    const showTraceDetails = ref(true);
+    const router = useRouter();
+
+    const showTraceDetails = ref(false);
     const { searchObj, updatedLocalLogFilterField } = useTraces();
     const totalHeight = ref(0);
 
@@ -165,7 +171,18 @@ export default defineComponent({
     };
 
     const expandRowDetail = (props: any) => {
-      searchObj.meta.showTraceDetails = true;
+      searchObj.data.traceDetails.selectedTrace = props;
+      router.push({
+        name: "traces",
+        query: {
+          ...router.currentRoute.value.query,
+          trace_id: props.trace_id,
+        },
+      });
+      setTimeout(() => {
+        searchObj.meta.showTraceDetails = true;
+      }, 100);
+
       emit("get:traceDetails", props);
     };
 
@@ -196,13 +213,22 @@ export default defineComponent({
     };
 
     const closeTraceDetails = () => {
-      searchObj.meta.showTraceDetails = false;
-      searchObj.data.traceDetails.showSpanDetails = false;
-      searchObj.data.traceDetails.selectedSpanId = null;
+      const query = cloneDeep(router.currentRoute.value.query);
+      delete query.trace_id;
+
+      router.push({
+        query: {
+          ...query,
+        },
+      });
+      setTimeout(() => {
+        searchObj.meta.showTraceDetails = false;
+        searchObj.data.traceDetails.showSpanDetails = false;
+        searchObj.data.traceDetails.selectedSpanId = null;
+      }, 100);
     };
 
     const onChartClick = (data: any) => {
-      console.log("onChartClick", data);
       expandRowDetail(searchObj.data.queryResults.hits[data.dataIndex]);
     };
 
