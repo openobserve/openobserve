@@ -57,7 +57,12 @@ pub async fn run_for_dynamo() -> Result<(), anyhow::Error> {
     // load stream list
     db::schema::cache().await?;
     // load file list from DynamoDB
-    let stream_types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
+    let stream_types = [
+        StreamType::Logs,
+        StreamType::Metrics,
+        StreamType::Traces,
+        StreamType::Metadata,
+    ];
     let start_time = BASE_TIME.timestamp_micros();
     let end_time = chrono::Utc::now().timestamp_micros();
     let orgs = db::schema::list_organizations_from_cache();
@@ -88,5 +93,43 @@ pub async fn run_for_dynamo() -> Result<(), anyhow::Error> {
     infra_file_list::dynamo::create_table_file_list_org_crated_at_index()
         .await
         .expect("file list migration create index failed");
+    Ok(())
+}
+
+pub async fn run_for_deleted() -> Result<(), anyhow::Error> {
+    if get_file_meta(&CONFIG.common.data_wal_dir).is_err() {
+        // there is no local wal files, no need upgrade
+        return Ok(());
+    }
+
+    // move files from wal for disk
+    if let Err(e) = files::disk::move_files_to_storage().await {
+        log::error!("Error moving disk files to remote: {}", e);
+    }
+
+    // move file_list from wal for disk
+    if let Err(e) = file_list::move_file_list_to_storage(false).await {
+        log::error!("Error moving disk files to remote: {}", e);
+    }
+
+    // load stream list
+    db::schema::cache().await?;
+    let max_time = chrono::Utc::now().timestamp_micros();
+    let orgs = db::schema::list_organizations_from_cache();
+    for org_id in orgs.iter() {
+        let files = crate::service::compact::file_list_deleted::load_prefix_from_s3(org_id).await?;
+        if files.is_empty() {
+            continue;
+        }
+        let files = files
+            .values()
+            .flatten()
+            .map(|file| file.to_owned())
+            .collect::<Vec<_>>();
+        if let Err(e) = infra_file_list::batch_add_deleted(org_id, max_time, &files).await {
+            log::error!("load file_list_deleted into db err: {}", e);
+            continue;
+        }
+    }
     Ok(())
 }
