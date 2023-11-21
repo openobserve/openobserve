@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, HttpResponse};
 use std::io::Error;
+
+use actix_web::{http, HttpResponse};
 
 use crate::common::infra::config::ALERTS_DESTINATIONS;
 use crate::common::meta::{alert::DestinationTemplate, http::HttpResponse as MetaHttpResponse};
@@ -25,6 +26,14 @@ pub async fn save_template(
     name: String,
     mut template: DestinationTemplate,
 ) -> Result<HttpResponse, Error> {
+    if template.body.is_null() {
+        return Ok(
+            HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(), "Alert template body empty".to_string(),
+            )),
+        );
+    }
+
     template.name = Some(name.clone());
     db::alerts::templates::set(org_id.as_str(), name.as_str(), template.clone())
         .await
