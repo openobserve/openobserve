@@ -325,9 +325,7 @@ export default defineComponent({
         addSpansPositions(span, 0);
       });
 
-      timeRange.value.end = (
-        traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime
-      ).toFixed(2);
+      timeRange.value.end = 0;
       timeRange.value.start = 0;
 
       calculateTracePosition();
@@ -428,8 +426,8 @@ export default defineComponent({
           span[store.state.zoConfig.timestamp_column],
         startTimeMs: converTimeFromNsToMs(span.start_time),
         endTimeMs: converTimeFromNsToMs(span.end_time),
-        durationMs: Number((span.duration / 1000).toFixed(2)), // This key is standard, we use for calculating width of span block. This should always be in ms
-        durationUs: Number(span.duration.toFixed(2)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
+        durationMs: Number((span.duration / 1000).toFixed(4)), // This key is standard, we use for calculating width of span block. This should always be in ms
+        durationUs: Number(span.duration.toFixed(4)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: convertTime(span.idle_ns),
         busyMs: convertTime(span.busy_ns),
         spanId: span.span_id,
@@ -490,7 +488,7 @@ export default defineComponent({
           x0: absoluteStartTime,
           x1: Number(
             (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(
-              2
+              4
             )
           ),
           fillcolor: spanPositionList.value[i].style.color,
