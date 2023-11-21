@@ -16,7 +16,6 @@ You can reduce your log storage costs by ~140x compared to Elasticsearch by usin
 
 ## Introduction video
 
-
 https://github.com/openobserve/openobserve/assets/4242188/77c71e8c-23f6-4123-b42a-7113b464f7a6
 
 

@@ -305,19 +305,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
     }
 
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
-        let pool = CLIENT.clone();
-        let ret = sqlx::query_as::<_, super::FileRecord>(r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size FROM file_list;"#)
-        .fetch_all(&pool)
-        .await?;
-        Ok(ret
-            .into_iter()
-            .map(|r| {
-                (
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
-                    FileMeta::from(&r),
-                )
-            })
-            .collect())
+        return Ok(vec![]); // disallow list all data
     }
 
     async fn query(
@@ -659,10 +647,10 @@ pub async fn create_table_index() -> Result<()> {
             "file_list",
             "CREATE INDEX file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
         ),
-        (
-            "file_list",
-            "CREATE UNIQUE INDEX file_list_stream_file_idx on file_list (stream, date, file);",
-        ),
+        // (
+        //     "file_list",
+        //     "CREATE UNIQUE INDEX file_list_stream_file_idx on file_list (stream, date, file);",
+        // ),
         (
             "file_list_deleted",
             "CREATE INDEX file_list_deleted_stream_idx on file_list_deleted (stream);",
@@ -682,17 +670,52 @@ pub async fn create_table_index() -> Result<()> {
     ];
     for (table, sql) in sqls {
         if let Err(e) = sqlx::query(sql).execute(&pool).await {
-            if let sqlx::Error::Database(e) = &e {
-                if let Some(code) = e.code() {
-                    if code == "42000" {
-                        // index already exists
-                        continue;
-                    }
-                }
+            if e.to_string().contains("Duplicate key") {
+                // index already exists
+                continue;
             }
             log::error!("[MYSQL] create table {} index error: {}", table, e);
             return Err(e.into());
         }
     }
+
+    // create UNIQUE index for file_list
+    let unique_index_sql =
+        r#"CREATE UNIQUE INDEX file_list_stream_file_idx on file_list (stream, date, file);"#;
+    if let Err(e) = sqlx::query(unique_index_sql).execute(&pool).await {
+        if e.to_string().contains("Duplicate key") {
+            return Ok(()); // index already exists
+        } else if e.to_string().contains("Duplicate entry") {
+            log::warn!("[MYSQL] starting delete duplicate records");
+            // delete duplicate records
+            let ret = sqlx::query(
+                r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
+            ).fetch_all(&pool).await?;
+            log::warn!("[MYSQL] total: {} duplicate records", ret.len());
+            for (i, r) in ret.iter().enumerate() {
+                let stream = r.get::<String, &str>("stream");
+                let date = r.get::<String, &str>("date");
+                let file = r.get::<String, &str>("file");
+                let id = r.get::<i64, &str>("id");
+                sqlx::query(
+                    r#"DELETE FROM file_list WHERE id != ? AND stream = ? AND date = ? AND file = ?;"#,
+                ).bind(id).bind(stream).bind(date).bind(file).execute(&pool).await?;
+                if i / 1000 == 0 {
+                    log::warn!("[MYSQL] delete duplicate records: {}/{}", i, ret.len());
+                }
+            }
+            log::warn!(
+                "[MYSQL] delete duplicate records: {}/{}",
+                ret.len(),
+                ret.len()
+            );
+            // create index again
+            sqlx::query(unique_index_sql).execute(&pool).await?;
+            log::warn!("[MYSQL] create table index(file_list_stream_file_idx) succeed");
+        } else {
+            return Err(e.into());
+        }
+    }
+
     Ok(())
 }
