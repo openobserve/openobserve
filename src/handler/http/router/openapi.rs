@@ -102,6 +102,8 @@ use crate::handler::http::request;
         request::syslog::update_route,
         request::syslog::list_routes,
         request::syslog::delete_route,
+        request::enrichment_table::save_enrichment_table,
+        request::traces::get_latest_traces,
     ),
     components(
         schemas(

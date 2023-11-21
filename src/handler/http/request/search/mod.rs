@@ -309,7 +309,7 @@ pub async fn around(
 
     let around_size = query
         .get("size")
-        .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
+        .map_or(10, |v| v.parse::<usize>().unwrap_or(10));
 
     // get a local search queue lock
     let locker = SearchService::QUEUE_LOCKER.clone();
@@ -625,7 +625,7 @@ async fn values_v1(
 
     let size = query
         .get("size")
-        .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
+        .map_or(10, |v| v.parse::<usize>().unwrap_or(10));
     let start_time = query
         .get("start_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -787,7 +787,7 @@ async fn values_v2(
 
     let size = query
         .get("size")
-        .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
+        .map_or(10, |v| v.parse::<usize>().unwrap_or(10));
     let start_time = query
         .get("start_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));

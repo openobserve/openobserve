@@ -35,7 +35,7 @@
           <div class="q-pb-xs q-mr-lg">
             Trace ID: {{ spanList[0]["trace_id"] }}
           </div>
-          <div class="q-pb-xs">Spans: {{ spanList.length - 1 }}</div>
+          <div class="q-pb-xs">Spans: {{ spanList.length }}</div>
         </div>
         <q-btn v-close-popup="true" round flat icon="cancel" size="md" />
       </div>
@@ -89,9 +89,12 @@
           :splitterWidth="splitterModel"
         />
         <div class="histogram-spans-container">
-          <q-splitter v-model="splitterModel" :style="{ height: '100%' }">
+          <q-splitter v-model="splitterModel">
             <template v-slot:before>
-              <div class="trace-tree-container">
+              <div
+                class="trace-tree-container"
+                :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+              >
                 <trace-tree
                   :collapseMapping="collapseMapping"
                   :spans="spanPositionList"
@@ -273,7 +276,6 @@ export default defineComponent({
 
       if (!spanList.value?.length) return;
       spanMapping.value[spanList.value[0].span_id] = spanList.value[0];
-      let colorIndex = 0;
       let noParentSpans = [];
       for (let i = 0; i < spanList.value.length; i++) {
         if (spanList.value[i].start_time < lowestStartTime) {
@@ -289,20 +291,13 @@ export default defineComponent({
 
         const span = getFormattedSpan(spanList.value[i]);
 
-        if (span.serviceName && !serviceColorMapping[span.serviceName]) {
-          serviceColorMapping[span.serviceName] =
-            spanDimensions.colors[colorIndex];
-          colorIndex++;
-          if (colorIndex > spanDimensions.colors.length - 1) colorIndex = 0;
-        }
-
-        span.style.color = serviceColorMapping[span.serviceName];
+        span.style.color = searchObj.meta.serviceColors[span.serviceName];
 
         span.index = i;
 
         collapseMapping.value[span.spanId] = true;
 
-        if (span.parentId && !traceTreeMock[span.parentId]) {
+        if (span.parentId && !traceTreeMock[span.parentId] && i !== 0) {
           noParentSpans.push(span);
         }
 
@@ -321,7 +316,7 @@ export default defineComponent({
         converTimeFromNsToMs(lowestStartTime);
       traceTree.value[0].highestEndTime = converTimeFromNsToMs(highestEndTime);
       traceTree.value[0].style.color =
-        serviceColorMapping[traceTree.value[0].serviceName];
+        searchObj.meta.serviceColors[traceTree.value[0].serviceName];
       traceTree.value[0]["spans"] = cloneDeep(
         traceTreeMock[spanList.value[0]["span_id"]] || []
       );
@@ -330,14 +325,12 @@ export default defineComponent({
         addSpansPositions(span, 0);
       });
 
-      timeRange.value.end = (
-        traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime
-      ).toFixed(2);
+      timeRange.value.end = 0;
       timeRange.value.start = 0;
 
       calculateTracePosition();
       buildTraceChart();
-      buildServiceTree(serviceColorMapping);
+      buildServiceTree();
     };
     let index = 0;
     const addSpansPositions = (span: any, depth: number) => {
@@ -372,7 +365,7 @@ export default defineComponent({
       }
     };
 
-    const buildServiceTree = (serviceColors: any) => {
+    const buildServiceTree = () => {
       const serviceTree: any[] = [];
       let maxDepth = 0;
       let maxHeight: number[] = [0];
@@ -393,7 +386,7 @@ export default defineComponent({
             duration: span.durationMs,
             children: children,
             itemStyle: {
-              color: serviceColors[span.serviceName],
+              color: searchObj.meta.serviceColors[span.serviceName],
             },
             emphasis: {
               disabled: true,
@@ -420,7 +413,8 @@ export default defineComponent({
         getService(span, serviceTree, "", 1, 1);
       });
       traceServiceMap.value = convertTraceServiceMapData(
-        cloneDeep(serviceTree)
+        cloneDeep(serviceTree),
+        maxDepth
       );
     };
 
@@ -432,8 +426,8 @@ export default defineComponent({
           span[store.state.zoConfig.timestamp_column],
         startTimeMs: converTimeFromNsToMs(span.start_time),
         endTimeMs: converTimeFromNsToMs(span.end_time),
-        durationMs: Number((span.duration / 1000).toFixed(2)), // This key is standard, we use for calculating width of span block. This should always be in ms
-        durationUs: Number(span.duration.toFixed(2)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
+        durationMs: Number((span.duration / 1000).toFixed(4)), // This key is standard, we use for calculating width of span block. This should always be in ms
+        durationUs: Number(span.duration.toFixed(4)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: convertTime(span.idle_ns),
         busyMs: convertTime(span.busy_ns),
         spanId: span.span_id,
@@ -494,7 +488,7 @@ export default defineComponent({
           x0: absoluteStartTime,
           x1: Number(
             (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(
-              2
+              4
             )
           ),
           fillcolor: spanPositionList.value[i].style.color,

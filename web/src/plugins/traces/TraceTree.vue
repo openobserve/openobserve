@@ -52,13 +52,25 @@
             />
           </div>
           <div
-            class="ellipsis q-ml-xs"
+            class="ellipsis q-ml-xs cursor-pointer"
             :style="{
               paddingLeft: '4px',
               borderLeft: `3px solid ${span.style.color}`,
             }"
+            @click="selectSpan(span.spanId)"
           >
-            {{ span.operationName }}
+            <span class="text-subtitle2 text-bold q-mr-sm">
+              {{ span.serviceName }}
+            </span>
+            <span
+              class="text-body2"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'text-grey-5'
+                  : 'text-blue-grey-9'
+              "
+              >{{ span.operationName }}</span
+            >
           </div>
         </div>
       </div>
@@ -69,6 +81,8 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import { getImageURL } from "@/utils/zincutils";
+import useTraces from "@/composables/useTraces";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TraceTree",
@@ -100,13 +114,24 @@ export default defineComponent({
   },
   emits: ["toggleCollapse"],
   setup(props, { emit }) {
+    const { searchObj } = useTraces();
+
+    const store = useStore();
+
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
     }
 
+    const selectSpan = (spanId: string | null) => {
+      searchObj.data.traceDetails.showSpanDetails = true;
+      searchObj.data.traceDetails.selectedSpanId = spanId;
+    };
+
     return {
       toggleSpanCollapse,
       getImageURL,
+      selectSpan,
+      store,
     };
   },
 });

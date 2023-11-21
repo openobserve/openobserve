@@ -312,19 +312,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
     }
 
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
-        let pool = CLIENT.clone();
-        let ret = sqlx::query_as::<_, super::FileRecord>(r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size FROM file_list;"#)
-        .fetch_all(&pool)
-        .await?;
-        Ok(ret
-            .into_iter()
-            .map(|r| {
-                (
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
-                    FileMeta::from(&r),
-                )
-            })
-            .collect())
+        return Ok(vec![]); // disallow list all data
     }
 
     async fn query(
@@ -386,10 +374,11 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
     async fn get_max_pk_value(&self) -> Result<i64> {
         let pool = CLIENT.clone();
-        let ret: i64 = sqlx::query_scalar(r#"SELECT MAX(id)::BIGINT AS id FROM file_list;"#)
-            .fetch_one(&pool)
-            .await?;
-        Ok(ret)
+        let ret: Option<i64> =
+            sqlx::query_scalar(r#"SELECT MAX(id)::BIGINT AS id FROM file_list;"#)
+                .fetch_one(&pool)
+                .await?;
+        Ok(ret.unwrap_or_default())
     }
 
     async fn stats(
@@ -664,10 +653,10 @@ pub async fn create_table_index() -> Result<()> {
             "file_list",
             "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
         ),
-        (
-            "file_list",
-            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);",
-        ),
+        // (
+        //     "file_list",
+        //     "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);",
+        // ),
         (
             "file_list_deleted",
             "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_idx on file_list_deleted (stream);",
@@ -691,5 +680,40 @@ pub async fn create_table_index() -> Result<()> {
             return Err(e.into());
         }
     }
+
+    // create UNIQUE index for file_list
+    let unique_index_sql = r#"CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);"#;
+    if let Err(e) = sqlx::query(unique_index_sql).execute(&pool).await {
+        if !e.to_string().contains("could not create unique index") {
+            return Err(e.into());
+        }
+        // delete duplicate records
+        log::warn!("[POSTGRES] starting delete duplicate records");
+        let ret = sqlx::query(
+                r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
+            ).fetch_all(&pool).await?;
+        log::warn!("[POSTGRES] total: {} duplicate records", ret.len());
+        for (i, r) in ret.iter().enumerate() {
+            let stream = r.get::<String, &str>("stream");
+            let date = r.get::<String, &str>("date");
+            let file = r.get::<String, &str>("file");
+            let id = r.get::<i64, &str>("id");
+            sqlx::query(
+                    r#"DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;"#,
+                ).bind(id).bind(stream).bind(date).bind(file).execute(&pool).await?;
+            if i / 1000 == 0 {
+                log::warn!("[POSTGRES] delete duplicate records: {}/{}", i, ret.len());
+            }
+        }
+        log::warn!(
+            "[POSTGRES] delete duplicate records: {}/{}",
+            ret.len(),
+            ret.len()
+        );
+        // create index again
+        sqlx::query(unique_index_sql).execute(&pool).await?;
+        log::warn!("[POSTGRES] create table index(file_list_stream_file_idx) succeed");
+    }
+
     Ok(())
 }

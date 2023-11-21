@@ -25,6 +25,7 @@
       <div class="float-right col-auto">
         <div class="float-left">
           <date-time
+            ref="dateTimeRef"
             auto-apply
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
@@ -53,12 +54,11 @@
           >
         </div>
         <q-btn
-          v-if="searchObj.data.queryResults.hits"
           class="q-mr-sm float-left download-logs-btn q-pa-sm"
           size="sm"
-          :disable="!searchObj.data.queryResults.hits.length"
+          :disable="!searchObj.data.queryResults?.hits?.length"
           icon="download"
-          title="Export logs"
+          title="Export Traces"
           @click="downloadLogs"
         ></q-btn>
       </div>
@@ -134,6 +134,7 @@ export default defineComponent({
 
     const parser = new Parser();
     let streamName = "";
+    const dateTimeRef = ref(null);
 
     const {
       autoCompleteData,
@@ -209,7 +210,7 @@ export default defineComponent({
       }
     };
 
-    const updateDateTime = (value: object) => {
+    const updateDateTime = async (value: object) => {
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
@@ -218,6 +219,14 @@ export default defineComponent({
           : searchObj.data.datetime.relativeTimePeriod,
         type: value.relativeTimePeriod ? "relative" : "absolute",
       };
+
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+
+      searchObj.loading = true;
+      searchObj.runQuery = true;
 
       if (config.isCloud == "true" && value.userChangedValue) {
         segment.track("Button Click", {
@@ -261,7 +270,7 @@ export default defineComponent({
     };
 
     const downloadLogs = () => {
-      const filename = "logs-data.csv";
+      const filename = "traces-data.csv";
       const data = jsonToCsv(searchObj.data.queryResults.hits);
       const file = new File([data], filename, {
         type: "text/csv",
@@ -295,6 +304,7 @@ export default defineComponent({
       setEditorValue,
       autoCompleteKeywords,
       updateTimezone,
+      dateTimeRef,
     };
   },
   computed: {
@@ -442,7 +452,7 @@ export default defineComponent({
   }
   .monaco-editor {
     width: 100% !important;
-    height: 70px !important;
+    height: 40px !important;
   }
 
   .search-button {

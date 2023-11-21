@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage">
+  <q-page class="tracePage" id="tracePage" style="min-height: auto">
     <div id="tracesSecondLevel">
       <search-bar
         data-test="logs-search-bar"
@@ -138,7 +138,7 @@
             >
               <search-result
                 ref="searchResultRef"
-                @update:datetime="searchData"
+                @update:datetime="setHistogramDate"
                 @update:scroll="getMoreData"
                 @search:timeboxed="searchAroundData"
                 @get:traceDetails="getTraceDetails"
@@ -159,7 +159,6 @@ import {
   onDeactivated,
   onActivated,
   onBeforeMount,
-  watch,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -170,7 +169,6 @@ import SearchBar from "./SearchBar.vue";
 import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
 import useTraces from "@/composables/useTraces";
-import { deepKeys, byString } from "@/utils/json";
 import { Parser } from "node-sql-parser/build/mysql";
 
 import streamService from "@/services/stream";
@@ -178,26 +176,17 @@ import searchService from "@/services/search";
 import TransformService from "@/services/jstransform";
 import {
   b64EncodeUnicode,
-  useLocalTraceFilterField,
   verifyOrganizationStatus,
   b64DecodeUnicode,
   formatTimeWithSuffix,
   timestampToTimezoneDate,
-  histogramDateTimezone,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
-import { number } from "@intlify/core-base";
-import { stringLiteral } from "@babel/types";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
-import {
-  getDurationObjectFromParams,
-  getQueryParamsForDuration,
-} from "@/utils/date";
-import useSqlSuggestions from "@/composables/useSuggestions";
 
 export default defineComponent({
   name: "PageSearch",
@@ -207,6 +196,9 @@ export default defineComponent({
     SearchResult,
   },
   methods: {
+    setHistogramDate(date: any) {
+      this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
+    },
     searchData() {
       if (
         !(
@@ -236,17 +228,7 @@ export default defineComponent({
       }
     },
     getMoreData() {
-      if (
-        this.searchObj.meta.refreshInterval == 0 &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.from &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.size &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.size +
-            this.searchObj.data.queryResults.from
-      ) {
-        this.searchObj.loading = true;
+      if (this.searchObj.meta.refreshInterval == 0) {
         this.getQueryData();
 
         if (config.isCloud == "true") {
@@ -513,7 +495,7 @@ export default defineComponent({
     const getDefaultRequest = () => {
       return {
         query: {
-          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time) as start_time, service_name, operation_name, count(span_id) as spans, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id, service_name, operation_name order by zo_sql_timestamp DESC`,
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time/1000) as trace_start_time, max(end_time/1000) as trace_end_time, min(service_name) as service_name, min(operation_name) as operation_name, count(trace_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from: 0,
@@ -527,7 +509,7 @@ export default defineComponent({
       return new Date(date.toISOString()).getTime() * 1000;
     };
 
-    // Function to return {chartInterval : "1 day", chartKeyFormat : "YYYY-MM-DD"}
+    // Function to return {chartInterval : "1 day", chartKeyFormat : "YYYY-MM-DD"}-
     const getChartSettings = (timestamps: {
       start_time: number | string;
       end_time: number | string;
@@ -676,8 +658,8 @@ export default defineComponent({
       const req = getDefaultRequest();
       req.query.from = 0;
       req.query.size = 1000;
-      req.query.start_time = trace.zo_sql_timestamp - 30000000;
-      req.query.end_time = trace.zo_sql_timestamp + 30000000;
+      req.query.start_time = trace.trace_start_time - 30000000;
+      req.query.end_time = trace.trace_end_time + 30000000;
 
       req.query.sql = b64EncodeUnicode(
         `SELECT * FROM ${searchObj.data.stream.selectedStream.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
@@ -706,17 +688,10 @@ export default defineComponent({
       });
     };
 
-    function getQueryData() {
+    async function getQueryData() {
       try {
         if (searchObj.data.stream.selectedStream.value == "") {
           return false;
-        }
-
-        searchObj.data.searchAround.indexTimestamp = 0;
-        searchObj.data.searchAround.size = 0;
-        if (searchObj.data.searchAround.histogramHide) {
-          searchObj.data.searchAround.histogramHide = false;
-          searchObj.meta.showHistogram = true;
         }
 
         searchObj.data.errorMsg = "";
@@ -734,7 +709,14 @@ export default defineComponent({
           // searchObj.data.editorValue = "";
         }
         // dismiss = Notify();
-        const queryReq = buildSearch();
+        let queryReq;
+
+        if (!searchObj.data.resultGrid.currentPage) {
+          queryReq = buildSearch();
+          searchObj.data.queryPayload = queryReq;
+        } else {
+          queryReq = searchObj.data.queryPayload;
+        }
 
         if (queryReq == null) {
           // dismiss();
@@ -742,24 +724,50 @@ export default defineComponent({
         }
 
         searchObj.data.errorCode = 0;
+        queryReq.query.from =
+          searchObj.data.resultGrid.currentPage *
+          searchObj.meta.resultGrid.rowsPerPage;
+
+        let dismiss = null;
+        if (searchObj.data.resultGrid.currentPage) {
+          dismiss = $q.notify({
+            type: "positive",
+            message: "Fetching more traces...",
+            actions: [
+              {
+                icon: "cancel",
+                color: "white",
+                handler: () => {
+                  /* ... */
+                },
+              },
+            ],
+          });
+        }
+
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: "traces",
           })
-          .then((res) => {
+          .then(async (res) => {
             searchObj.loading = false;
             if (res.data.from > 0) {
               searchObj.data.queryResults.from = res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.hits.push(...res.data.hits);
+              const hits = await getTracesMetaData(res.data.hits);
+              searchObj.data.queryResults.hits.push(...hits);
               // searchObj.data.queryResults.aggs.histogram.push(
               //   ...res.data.aggs.histogram
               // );
             } else {
-              searchObj.data.queryResults = res.data;
+              const hits = await getTracesMetaData(res.data.hits);
+              searchObj.data.queryResults = {
+                ...res.data,
+                hits: hits,
+              };
             }
 
             updateFieldValues(res.data.hits);
@@ -790,6 +798,9 @@ export default defineComponent({
             //   message: searchObj.data.errorMsg,
             //   color: "negative",
             // });
+          })
+          .finally(() => {
+            if (dismiss) dismiss();
           });
       } catch (e) {
         console.log(e?.message);
@@ -797,6 +808,74 @@ export default defineComponent({
         showErrorNotification("Search request failed");
       }
     }
+
+    const getTracesMetaData = (traces) => {
+      if (!traces.length) return [];
+      const traceMapping = {};
+      traces.forEach((trace) => {
+        traceMapping[trace.trace_id] = trace;
+        traceMapping[trace.trace_id].services = {};
+        traceMapping[trace.trace_id].spans = 0;
+      });
+      const traceIds = traces.map((hit) => "'" + hit.trace_id + "'").join(",");
+      var req = getDefaultRequest();
+      req.query.sql = `select service_name, count(service_name) as count_service_name, trace_id  from default WHERE trace_id in (${traceIds}) group by trace_id, service_name`;
+      req.query.size = 10000;
+      req.query["sql_mode"] = "full";
+
+      let timestamps: any =
+        searchObj.data.datetime.type === "relative"
+          ? getConsumableRelativeTime(
+              searchObj.data.datetime.relativeTimePeriod
+            )
+          : cloneDeep(searchObj.data.datetime);
+
+      req.query.start_time = timestamps.startTime;
+      req.query.end_time = timestamps.endTime;
+
+      const serviceColors = [
+        "#b7885e",
+        "#1ab8be",
+        "#ffcb99",
+        "#f89570",
+        "#839ae2",
+      ];
+
+      let colorIndex = 0;
+
+      return new Promise((resolve, reject) => {
+        delete req.encoding;
+        searchObj.loading = true;
+        searchService
+          .search({
+            org_identifier: searchObj.organizationIdetifier,
+            query: req,
+            page_type: "traces",
+          })
+          .then((res) => {
+            res.data.hits.forEach((metaData) => {
+              // ADding service color
+              if (!searchObj.meta.serviceColors[metaData.service_name]) {
+                if (colorIndex >= serviceColors.length) colorIndex = 0;
+
+                searchObj.meta.serviceColors[metaData.service_name] =
+                  serviceColors[colorIndex];
+
+                colorIndex++;
+              }
+              traceMapping[metaData.trace_id].services[metaData.service_name] =
+                metaData.count_service_name;
+
+              traceMapping[metaData.trace_id].spans +=
+                metaData.count_service_name;
+            });
+            resolve(Object.values(traceMapping));
+          })
+          .finally(() => {
+            searchObj.loading = false;
+          });
+      });
+    };
 
     function extractFields() {
       try {
@@ -835,12 +914,12 @@ export default defineComponent({
             start_time: 1,
           };
           const importantFields = {
+            service_name: 1,
+            operation_name: 1,
             trace_id: 1,
             span_id: 1,
             reference_parent_span_id: 1,
             reference_parent_trace_id: 1,
-            service_name: 1,
-            operation_name: 1,
             start_time: 1,
           };
 
@@ -893,15 +972,15 @@ export default defineComponent({
           name: "@timestamp",
           field: (row: any) =>
             timestampToTimezoneDate(
-              row["start_time"] / 1000000,
+              row["trace_start_time"] / 1000,
               store.state.timezone,
-              "MMM dd, yyyy HH:mm:ss.SSS Z"
+              "yyyy-MM-dd HH:mm:ss.SSS"
             ),
           prop: (row: any) =>
             timestampToTimezoneDate(
-              row["start_time"] / 1000000,
+              row["trace_start_time"] / 1000,
               store.state.timezone,
-              "MMM dd, yyyy HH:mm:ss.SSS Z"
+              "yyyy-MM-dd HH:mm:ss.SSS"
             ),
           label: "Start Time",
           align: "left",
@@ -1373,7 +1452,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-search-result-container {
-  height: calc(100vh - 168px) !important;
+  height: calc(100vh - 140px) !important;
 }
 </style>
 <style lang="scss">

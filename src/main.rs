@@ -572,8 +572,10 @@ async fn cli() -> Result<bool, anyhow::Error> {
                 Some(prefix) => prefix.to_string(),
                 None => "".to_string(),
             };
-            println!("Running migration with prefix: {}", prefix);
-            migration::file_list::run(&prefix).await?
+            println!("Running migration file_list with prefix: {}", prefix);
+            migration::file_list::run(&prefix).await?;
+            println!("Running migration file_list_deleted");
+            migration::file_list::run_for_deleted().await?;
         }
         "migrate-file-list-from-dynamo" => {
             println!("Running migration from DynamoDB");

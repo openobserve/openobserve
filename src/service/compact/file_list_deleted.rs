@@ -137,7 +137,9 @@ async fn query_deleted_from_s3(
     Ok(files)
 }
 
-async fn load_prefix_from_s3(prefix: &str) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
+pub async fn load_prefix_from_s3(
+    prefix: &str,
+) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
     let prefix = format!("file_list_deleted/{prefix}/");
     let files = storage::list(&prefix).await?;
     let files_num = files.len();

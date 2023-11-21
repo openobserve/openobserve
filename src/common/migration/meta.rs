@@ -9,17 +9,19 @@ use crate::common::{
     utils::{file::get_file_meta, json},
 };
 
-const ITEM_PREFIXES: [&str; 11] = [
+const ITEM_PREFIXES: [&str; 13] = [
     "/user",
     "/schema",
     "/syslog",
     "/function",
-    "/dashboard",
+    "/dashboard",    // dashboard
+    "/folders",      // dashboard
     "/templates",    // alert
     "/destinations", // alert
     "/alerts",       // alert
     "/trigger",      // alert
     "/compact",
+    "/organization",
     "/kv",
 ];
 

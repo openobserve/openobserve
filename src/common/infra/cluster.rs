@@ -403,7 +403,7 @@ async fn watch_node_list() -> Result<()> {
                     Some(v) => v.broadcasted,
                     None => false,
                 };
-                if !broadcasted {
+                if !CONFIG.common.meta_store_external && !broadcasted {
                     // The ingester need broadcast local file list to the new node
                     if is_ingester(&LOCAL_NODE_ROLE)
                         && (item_value.status.eq(&NodeStatus::Prepare)
