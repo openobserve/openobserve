@@ -19,6 +19,7 @@ use sqlx::{Postgres, QueryBuilder, Row};
 
 use crate::common::{
     infra::{
+        config::CONFIG,
         db::postgres::CLIENT,
         errors::{Error, Result},
     },
@@ -653,10 +654,10 @@ pub async fn create_table_index() -> Result<()> {
             "file_list",
             "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
         ),
-        (
-            "file_list",
-            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);",
-        ),
+        // (
+        //     "file_list",
+        //     "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);",
+        // ),
         (
             "file_list_deleted",
             "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_idx on file_list_deleted (stream);",
@@ -680,5 +681,39 @@ pub async fn create_table_index() -> Result<()> {
             return Err(e.into());
         }
     }
+
+    // create UNIQUE index for file_list
+    let unique_index_sql = r#"CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);"#;
+    if let Err(e) = sqlx::query(unique_index_sql).execute(&pool).await {
+        if !e.to_string().contains("could not create unique index") {
+            return Err(e.into());
+        }
+        // delete duplicate records
+        log::warn!("[POSTGRES] create table file_list index(file_list_stream_file_idx) starting delete duplicate records");
+        let ret = sqlx::query(
+                r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
+            ).fetch_all(&pool).await?;
+        for r in ret {
+            let stream = r.get::<String, &str>("stream");
+            let date = r.get::<String, &str>("date");
+            let file = r.get::<String, &str>("file");
+            let id = r.get::<i64, &str>("id");
+            if CONFIG.common.print_key_event {
+                log::warn!(
+                    "[POSTGRES] delete duplicate file: {}/{}/{}",
+                    stream,
+                    date,
+                    file
+                );
+            }
+            sqlx::query(
+                    r#"DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;"#,
+                ).bind(id).bind(stream).bind(date).bind(file).execute(&pool).await?;
+        }
+        // create index again
+        sqlx::query(unique_index_sql).execute(&pool).await?;
+        log::warn!("[POSTGRES] create table file_list index(file_list_stream_file_idx) succeed after delete duplicate records");
+    }
+
     Ok(())
 }
