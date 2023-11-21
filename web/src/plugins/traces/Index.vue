@@ -138,7 +138,7 @@
             >
               <search-result
                 ref="searchResultRef"
-                @update:datetime="searchData"
+                @update:datetime="setHistogramDate"
                 @update:scroll="getMoreData"
                 @search:timeboxed="searchAroundData"
                 @get:traceDetails="getTraceDetails"
@@ -196,6 +196,9 @@ export default defineComponent({
     SearchResult,
   },
   methods: {
+    setHistogramDate(date: any) {
+      this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
+    },
     searchData() {
       if (
         !(
@@ -971,13 +974,13 @@ export default defineComponent({
             timestampToTimezoneDate(
               row["trace_start_time"] / 1000,
               store.state.timezone,
-              "MMM dd, yyyy HH:mm:ss.SSS Z"
+              "yyyy-MM-dd HH:mm:ss.SSS"
             ),
           prop: (row: any) =>
             timestampToTimezoneDate(
               row["trace_start_time"] / 1000,
               store.state.timezone,
-              "MMM dd, yyyy HH:mm:ss.SSS Z"
+              "yyyy-MM-dd HH:mm:ss.SSS"
             ),
           label: "Start Time",
           align: "left",

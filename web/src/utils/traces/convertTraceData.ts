@@ -39,13 +39,11 @@ export const convertTraceData = (props: any, timezone: string) => {
           hourCycle: "h23", // Use a 24-hour cycle format without a day period.
           minute: "2-digit",
           second: "2-digit",
-          timeZoneName: "short",
-          timeZone: timezone, // specify the target timezone here
         };
 
         const formatter = new Intl.DateTimeFormat("en-US", options);
         const formattedDate = formatter.format(new Date(date));
-        return `(${formattedDate}, <b>${name[0].value[1]}</b>)`;
+        return `(${formattedDate} ${timezone}, <b>${name[0].value[1]}</b>)`;
       },
     },
     xAxis: {
