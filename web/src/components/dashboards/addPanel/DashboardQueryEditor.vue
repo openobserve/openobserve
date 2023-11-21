@@ -444,52 +444,50 @@ export default defineComponent({
         dashboardPanelData.layout.currentQueryIndex
       ].fields.y.map((it: any) => it.alias);
 
-      if (dashboardPanelData.data.type == "heatmap") {
-        query +=
-          xAxisAlias.length && yAxisAlias.length
-            ? " GROUP BY " +
-              xAxisAlias.join(", ") +
-              ", " +
-              yAxisAlias.join(", ")
-            : "";
-      } else {
-        query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
-      }
-      query += xAxisAlias.length ? " ORDER BY " + xAxisAlias.join(", ") : "";
-      return query;
-    };
+            if (dashboardPanelData.data.type == "heatmap") {
+                query += xAxisAlias.length && yAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") + ", " + yAxisAlias.join(", ") : '';
+            }
+            else {
+                query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : ''
+            }
+            
+            // array of sorting fields with followed by asc or desc
+            const orderByArr = [];
+            
+            fields.forEach((it: any) => {
+                // ignore if None is selected or sortBy is not there
+                if (it?.sortBy && it?.sortBy != "None") {
+                    orderByArr.push(`${it.alias} ${it.sortBy}`);
+                }
+            })
+            
+            // append with query by joining array with comma
+            query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : ''
 
-    watch(
-      () => [
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery,
-        dashboardPanelData.meta.stream.selectedStreamFields,
-      ],
-      () => {
-        // Only continue if the current mode is "show custom query"
-        if (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery &&
-          dashboardPanelData.data.queryType == "sql"
-        ) {
-          // Call the updateQueryValue function
-          updateQueryValue();
-        } else {
-          // auto query mode selected
-          // remove the custom fields from the list
-          dashboardPanelData.meta.stream.customQueryFields = [];
+            // append limit
+            // if limit is 0 then don't add
+            const queryLimit = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.limit ?? 0;            
+            query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
+            return query
         }
-        // if (dashboardPanelData.data.queryType == "promql") {
-        //     updatePromQLQuery()
-        // }
-      },
-      { deep: true }
-    );
+        
+        watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery, dashboardPanelData.meta.stream.selectedStreamFields], () => {
+            
+            // Only continue if the current mode is "show custom query"
+            if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType == "sql") {
+                // Call the updateQueryValue function
+                updateQueryValue()
+            } else {
+                // auto query mode selected
+                // remove the custom fields from the list
+                dashboardPanelData.meta.stream.customQueryFields = []
+            }
+            // if (dashboardPanelData.data.queryType == "promql") {
+            //     updatePromQLQuery()
+            // }
+        }, { deep: true })
+
 
     // This function parses the custom query and generates the errors and custom fields
     const updateQueryValue = () => {
