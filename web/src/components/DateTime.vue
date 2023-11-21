@@ -492,7 +492,38 @@ export default defineComponent({
       const date = getConsumableDateTime();
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
+      // date["relativeTimePeriod"] = "";
       emit("on:date-change", date);
+    };
+
+    function formatDate(d) {
+      var year = d.getFullYear();
+      var month = ("0" + (d.getMonth() + 1)).slice(-2); // Months are zero-based
+      var day = ("0" + d.getDate()).slice(-2);
+      var hours = ("0" + d.getHours()).slice(-2);
+      var minutes = ("0" + d.getMinutes()).slice(-2);
+
+      return {
+        date: year + "-" + month + "-" + day,
+        time: hours + ":" + minutes,
+      };
+    }
+
+    const setCustomDate = (dateType, dateobj) => {
+      var start_date = new Date(Math.floor(dateobj.start));
+      const startObj = formatDate(start_date);
+
+      var end_date = new Date(Math.floor(dateobj.end));
+      const endObj = formatDate(end_date);
+
+      selectedDate.value.from = startObj.date;
+      selectedDate.value.to = endObj.date;
+      selectedTime.value.startTime = startObj.time;
+      selectedTime.value.endTime = endObj.time;
+
+      selectedType.value = dateType;
+
+      saveDate(dateType);
     };
 
     const onBeforeShow = () => {
@@ -583,11 +614,8 @@ export default defineComponent({
         selectedDate.value.from + " " + selectedTime.value.startTime + ":00";
       let endTime =
         selectedDate.value.to + " " + selectedTime.value.endTime + ":00";
-      // console.log("start time", startTime);
-      // console.log("end time", endTime);
       const startUTC = convertToUtcTimestamp(startTime, store.state.timezone);
       const endUTC = convertToUtcTimestamp(endTime, store.state.timezone);
-      // console.log(store.state.timezone, startTime, startUTC, endTime, endUTC);
       return { startUTC, endUTC };
     };
 
@@ -656,6 +684,7 @@ export default defineComponent({
       timezone,
       filteredTimezone,
       timezoneFilterFn,
+      setCustomDate,
     };
   },
 });

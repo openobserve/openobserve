@@ -15,6 +15,7 @@
 import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
+import moment from "moment-timezone";
 
 const useLocalStorage = (
   key: string,
@@ -433,7 +434,7 @@ export function formatDuration(ms: number) {
 export const timestampToTimezoneDate = (
   unixMilliTimestamp: number,
   timezone: string = "UTC",
-  format: string = "yyyy-MM-dd HH:mm:ss.SSS Z"
+  format: string = "yyyy-MM-dd HH:mm:ss.SSS"
 ) => {
   return DateTime.fromMillis(Math.floor(unixMilliTimestamp))
     .setZone(timezone)
@@ -470,4 +471,38 @@ export const convertToUtcTimestamp = (
   const utcTimestamp = Math.round(dt.toUTC().toMillis());
 
   return utcTimestamp * 1000;
+};
+
+export const localTimeSelectedTimezoneUTCTime = (
+  time: any,
+  timezone: string
+) => {
+  // Creating a Date object using the timestamp
+  const date = new Date(time);
+
+  // Extracting date and time components
+  const year = date.getFullYear();
+  const month = date.getMonth(); // Months are zero-indexed
+  const day = date.getDate();
+  const hour = date.getHours();
+  const minute = date.getMinutes();
+  const second = date.getSeconds();
+
+  // Create a moment object using the provided date, time, and timezone
+  const convertedDate = moment.tz(
+    { year, month, day, hour, minute, second },
+    timezone
+  );
+
+  console.log(convertedDate.unix() * 1000000);
+
+  // Convert the moment object to a Unix timestamp (in seconds)
+  const unixTimestamp = convertedDate.unix() * 1000000;
+
+  return unixTimestamp;
+
+  // return convertToUtcTimestamp(
+  //   timestampToTimezoneDate(unixTimestamp * 1000, "UTC", "yyyy/MM/dd HH:mm:ss"),
+  //   "UTC"
+  // );
 };
