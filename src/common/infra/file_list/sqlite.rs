@@ -825,30 +825,31 @@ pub async fn create_table_index(client: &Pool<Sqlite>) -> Result<()> {
             return Err(e.into());
         }
         // delete duplicate records
-        log::warn!("[SQLITE] create table file_list index(file_list_stream_file_idx) starting delete duplicate records");
+        log::warn!("[SQLITE] starting delete duplicate records");
         let ret = sqlx::query(
                 r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
             ).fetch_all(client).await?;
-        for r in ret {
+        log::warn!("[SQLITE] total: {} duplicate records", ret.len());
+        for (i, r) in ret.iter().enumerate() {
             let stream = r.get::<String, &str>("stream");
             let date = r.get::<String, &str>("date");
             let file = r.get::<String, &str>("file");
             let id = r.get::<i64, &str>("id");
-            if CONFIG.common.print_key_event {
-                log::info!(
-                    "[SQLITE] delete duplicate file: {}/{}/{}",
-                    stream,
-                    date,
-                    file
-                );
-            }
             sqlx::query(
                     r#"DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;"#,
                 ).bind(id).bind(stream).bind(date).bind(file).execute(client).await?;
+            if i / 1000 == 0 {
+                log::warn!("[SQLITE] delete duplicate records: {}/{}", i, ret.len());
+            }
         }
+        log::warn!(
+            "[SQLITE] delete duplicate records: {}/{}",
+            ret.len(),
+            ret.len()
+        );
         // create index again
         sqlx::query(unique_index_sql).execute(client).await?;
-        log::warn!("[SQLITE] create table file_list index(file_list_stream_file_idx) succeed after delete duplicate records");
+        log::warn!("[SQLITE] create table index(file_list_stream_file_idx) succeed");
     }
 
     // delete trigger for old version
