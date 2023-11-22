@@ -92,6 +92,25 @@ const search = {
     const url = `/api/${org_identifier}/prometheus/api/v1/series?match[]=${labels}&start=${start_time}&end=${end_time}`;
     return http().get(url);
   },
+
+  get_traces: ({
+    org_identifier,
+    filter,
+    start_time,
+    end_time,
+    from,
+    size,
+  }: {
+    org_identifier: string;
+    filter: string;
+    start_time: number;
+    end_time: number;
+    from: number;
+    size: number;
+  }) => {
+    const url = `/api/${org_identifier}/traces/latest?filter=${filter}&start_time=${start_time}&end_time=${end_time}&from=${from}&size=${size}`;
+    return http().get(url);
+  },
 };
 
 export default search;

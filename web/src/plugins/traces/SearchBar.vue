@@ -86,7 +86,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";

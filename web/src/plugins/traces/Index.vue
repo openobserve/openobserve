@@ -140,7 +140,6 @@
                 ref="searchResultRef"
                 @update:datetime="setHistogramDate"
                 @update:scroll="getMoreData"
-                @search:timeboxed="searchAroundData"
                 @get:traceDetails="getTraceDetails"
               />
             </div>
@@ -505,58 +504,6 @@ export default defineComponent({
       };
     };
 
-    const getISOTimestamp = (date: any) => {
-      return new Date(date.toISOString()).getTime() * 1000;
-    };
-
-    // Function to return {chartInterval : "1 day", chartKeyFormat : "YYYY-MM-DD"}-
-    const getChartSettings = (timestamps: {
-      start_time: number | string;
-      end_time: number | string;
-    }) => {
-      if (
-        timestamps.start_time != "Invalid Date" &&
-        timestamps.end_time != "Invalid Date"
-      ) {
-        const chartSettings = {
-          chartInterval: "10 second",
-          chartKeyFormat: "HH:mm:ss",
-        };
-
-        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
-          chartSettings.chartInterval = "15 second";
-          chartSettings.chartKeyFormat = "HH:mm:ss";
-        }
-        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
-          chartSettings.chartInterval = "30 second";
-          chartSettings.chartKeyFormat = "HH:mm:ss";
-        }
-        if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
-          chartSettings.chartInterval = "1 minute";
-          chartSettings.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
-          chartSettings.chartInterval = "5 minute";
-          chartSettings.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
-          chartSettings.chartInterval = "30 minute";
-          chartSettings.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
-          chartSettings.chartInterval = "1 hour";
-          chartSettings.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
-          chartSettings.chartInterval = "1 day";
-          chartSettings.chartKeyFormat = "YYYY-MM-DD";
-        }
-        return chartSettings;
-      } else {
-        return false;
-      }
-    };
-
     function buildSearch() {
       try {
         let query = searchObj.data.editorValue;
@@ -634,25 +581,54 @@ export default defineComponent({
     }
 
     const openTraceDetails = () => {
-      const trace = searchObj.data.queryResults.hits.find(
-        (hit) => hit.trace_id === router.currentRoute.value.query.trace_id
-      );
-      if (!trace) {
-        showErrorNotification(
-          `Trace ${router.currentRoute.value.query.trace_id} not found`
-        );
-        const query = cloneDeep(router.currentRoute.value.query);
-        delete query.trace_id;
-        router.push({
-          name: "traces",
-          query: {
-            ...query,
-          },
+      searchObj.loading = true;
+      const queryReq = buildSearch();
+
+      let filter = searchObj.data.editorValue;
+
+      if (filter?.length)
+        filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
+      else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
+
+      searchService
+        .get_traces({
+          org_identifier: searchObj.organizationIdetifier,
+          start_time: queryReq.query.start_time,
+          end_time: queryReq.query.end_time,
+          filter: filter || "",
+          size: 1,
+          from: 0,
+        })
+        .then(async (res) => {
+          const trace = getTracesMetaData(res.data.hits)[0];
+          if (!trace) {
+            showTraceDetailsError();
+            return;
+          }
+          searchObj.data.traceDetails.selectedTrace = trace;
+          getTraceDetails();
+        })
+        .catch(() => {
+          showTraceDetailsError();
+        })
+        .finally(() => {
+          searchObj.loading = false;
         });
-        return;
-      }
-      searchObj.data.traceDetails.selectedTrace = trace;
-      getTraceDetails();
+    };
+
+    const showTraceDetailsError = () => {
+      showErrorNotification(
+        `Trace ${router.currentRoute.value.query.trace_id} not found`
+      );
+      const query = cloneDeep(router.currentRoute.value.query);
+      delete query.trace_id;
+      router.push({
+        name: "traces",
+        query: {
+          ...query,
+        },
+      });
+      return;
     };
 
     const buildTraceSearchQuery = (trace: string) => {
@@ -771,27 +747,24 @@ export default defineComponent({
         }
 
         searchService
-          .search({
+          .get_traces({
             org_identifier: searchObj.organizationIdetifier,
-            query: queryReq,
-            page_type: "traces",
+            start_time: queryReq.query.start_time,
+            end_time: queryReq.query.end_time,
+            filter: searchObj.data.editorValue || "",
+            size: queryReq.query.size,
+            from: queryReq.query.from,
           })
           .then(async (res) => {
             searchObj.loading = false;
+            const formattedHits = getTracesMetaData(res.data.hits);
             if (res.data.from > 0) {
               searchObj.data.queryResults.from = res.data.from;
-              searchObj.data.queryResults.scan_size += res.data.scan_size;
-              searchObj.data.queryResults.took += res.data.took;
-              const hits = await getTracesMetaData(res.data.hits);
-              searchObj.data.queryResults.hits.push(...hits);
-              // searchObj.data.queryResults.aggs.histogram.push(
-              //   ...res.data.aggs.histogram
-              // );
+              searchObj.data.queryResults.hits.push(...formattedHits);
             } else {
-              const hits = await getTracesMetaData(res.data.hits);
               searchObj.data.queryResults = {
                 ...res.data,
-                hits: hits,
+                hits: formattedHits,
               };
             }
 
@@ -839,27 +812,6 @@ export default defineComponent({
 
     const getTracesMetaData = (traces) => {
       if (!traces.length) return [];
-      const traceMapping = {};
-      traces.forEach((trace) => {
-        traceMapping[trace.trace_id] = trace;
-        traceMapping[trace.trace_id].services = {};
-        traceMapping[trace.trace_id].spans = 0;
-      });
-      const traceIds = traces.map((hit) => "'" + hit.trace_id + "'").join(",");
-      var req = getDefaultRequest();
-      req.query.sql = `select service_name, count(service_name) as count_service_name, trace_id  from default WHERE trace_id in (${traceIds}) group by trace_id, service_name`;
-      req.query.size = 10000;
-      req.query["sql_mode"] = "full";
-
-      let timestamps: any =
-        searchObj.data.datetime.type === "relative"
-          ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod
-            )
-          : cloneDeep(searchObj.data.datetime);
-
-      req.query.start_time = timestamps.startTime;
-      req.query.end_time = timestamps.endTime;
 
       const serviceColors = [
         "#b7885e",
@@ -871,37 +823,31 @@ export default defineComponent({
 
       let colorIndex = 0;
 
-      return new Promise((resolve, reject) => {
-        delete req.encoding;
-        searchObj.loading = true;
-        searchService
-          .search({
-            org_identifier: searchObj.organizationIdetifier,
-            query: req,
-            page_type: "traces",
-          })
-          .then((res) => {
-            res.data.hits.forEach((metaData) => {
-              // ADding service color
-              if (!searchObj.meta.serviceColors[metaData.service_name]) {
-                if (colorIndex >= serviceColors.length) colorIndex = 0;
+      return traces.map((trace) => {
+        const _trace = {
+          trace_id: trace.trace_id,
+          trace_start_time: Math.round(trace.start_time / 1000),
+          trace_end_time: Math.round(trace.end_time / 1000),
+          service_name: trace.first_event.service_name,
+          operation_name: trace.first_event.operation_name,
+          spans: trace.spans[0],
+          errors: trace.spans[1],
+          duration: trace.duration,
+          services: {},
+          zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
+        };
+        trace.service_name.forEach((service) => {
+          if (!searchObj.meta.serviceColors[service.service_name]) {
+            if (colorIndex >= serviceColors.length) colorIndex = 0;
 
-                searchObj.meta.serviceColors[metaData.service_name] =
-                  serviceColors[colorIndex];
+            searchObj.meta.serviceColors[service.service_name] =
+              serviceColors[colorIndex];
 
-                colorIndex++;
-              }
-              traceMapping[metaData.trace_id].services[metaData.service_name] =
-                metaData.count_service_name;
-
-              traceMapping[metaData.trace_id].spans +=
-                metaData.count_service_name;
-            });
-            resolve(Object.values(traceMapping));
-          })
-          .finally(() => {
-            searchObj.loading = false;
-          });
+            colorIndex++;
+          }
+          _trace.services[service.service_name] = service.count;
+        });
+        return _trace;
       });
     };
 
@@ -1000,13 +946,13 @@ export default defineComponent({
           name: "@timestamp",
           field: (row: any) =>
             timestampToTimezoneDate(
-              row["trace_start_time"] / 1000,
+              row["trace_start_time"],
               store.state.timezone,
               "yyyy-MM-dd HH:mm:ss.SSS"
             ),
           prop: (row: any) =>
             timestampToTimezoneDate(
-              row["trace_start_time"] / 1000,
+              row["trace_start_time"],
               store.state.timezone,
               "yyyy-MM-dd HH:mm:ss.SSS"
             ),
@@ -1143,7 +1089,9 @@ export default defineComponent({
 
     function loadPageData() {
       searchObj.loading = true;
+
       searchObj.data.resultGrid.currentPage = 0;
+
       resetSearchObj();
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
@@ -1229,87 +1177,6 @@ export default defineComponent({
       }
     };
 
-    const searchAroundData = (obj: any) => {
-      try {
-        dismiss = Notify();
-        searchObj.data.errorCode = 0;
-        searchService
-          .search_around({
-            org_identifier: searchObj.organizationIdetifier,
-            index: searchObj.data.stream.selectedStream.value,
-            key: obj.key,
-            size: obj.size,
-          })
-          .then((res) => {
-            searchObj.loading = false;
-            if (res.data.from > 0) {
-              searchObj.data.queryResults.from = res.data.from;
-              searchObj.data.queryResults.scan_size += res.data.scan_size;
-              searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.hits.push(...res.data.hits);
-            } else {
-              searchObj.data.queryResults = res.data;
-            }
-            //extract fields from query response
-            extractFields();
-            generateHistogramData();
-            //update grid columns
-            updateGridColumns();
-
-            if (searchObj.meta.showHistogram) {
-              searchObj.meta.showHistogram = false;
-              searchObj.data.searchAround.histogramHide = true;
-            }
-            segment.track("Button Click", {
-              button: "Search Around Data",
-              user_org: store.state.selectedOrganization.identifier,
-              user_id: store.state.userInfo.email,
-              stream_name: searchObj.data.stream.selectedStream.value,
-              show_timestamp: obj.key,
-              show_size: obj.size,
-              show_histogram: searchObj.meta.showHistogram,
-              sqlMode: searchObj.meta.sqlMode,
-              showFields: searchObj.meta.showFields,
-              page: "Search Logs - Search around data",
-            });
-
-            const visibleIndex =
-              obj.size > 30 ? obj.size / 2 - 12 : obj.size / 2;
-            setTimeout(() => {
-              searchResultRef.value.searchTableRef.scrollTo(
-                visibleIndex,
-                "start-force"
-              );
-            }, 500);
-
-            dismiss();
-          })
-          .catch((err) => {
-            searchObj.loading = false;
-            dismiss();
-            if (err.response != undefined) {
-              searchObj.data.errorMsg = err.response.data.error;
-            } else {
-              searchObj.data.errorMsg = err.message;
-            }
-
-            const customMessage = logsErrorMessage(err.response.data.code);
-            searchObj.data.errorCode = err.response.data.code;
-            if (customMessage != "") {
-              searchObj.data.errorMsg = t(customMessage);
-            }
-
-            // $q.notify({
-            //   message: searchObj.data.errorMsg,
-            //   color: "negative",
-            // });
-          });
-      } catch (e) {
-        searchObj.loading = false;
-        showErrorNotification("Request failed.");
-      }
-    };
-
     function restoreUrlQueryParams() {
       const queryParams = router.currentRoute.value.query;
 
@@ -1376,7 +1243,6 @@ export default defineComponent({
       getConsumableDateTime,
       runQueryFn,
       setQuery,
-      searchAroundData,
       getTraceDetails,
       verifyOrganizationStatus,
       fieldValues,
