@@ -105,7 +105,7 @@ pub struct AxisItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aggregation_function: Option<AggregationFunc>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub sortBy: Option<String>,
+    pub sort_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ToSchema)]
