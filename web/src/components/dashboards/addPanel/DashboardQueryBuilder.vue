@@ -121,7 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val.length > 0 || 'Required']"
                 />
-                <q-select
+                Sort By: 
+                <q-btn-group
                   v-if="
                     !(
                       dashboardPanelData.data.queries[
@@ -129,18 +130,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery && dashboardPanelData.data.queryType == 'sql'
                     )
                   "
-                  v-model="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.x[index].sortBy
-                  "
-                  :options="['None', 'ASC', 'DESC']"
-                  dense
-                  filled
-                  emit-value
-                  map-options
-                  label="Sort"
-                  />
+                >
+                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index].sortBy) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index].sortBy === 'None' ? 'selected' : ''" @click="updateSortOption(index, 'x', 'None')" icon="block" size="sm" />
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index].sortBy === 'ASC' ? 'selected' : ''" @click="updateSortOption(index, 'x', 'ASC')"><AscSort/></q-btn>
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index].sortBy === 'DESC' ? 'selected' : ''" @click="updateSortOption(index, 'x', 'DESC')"><DescSort/></q-btn>
+                </q-btn-group>
               </div>
             </q-menu>
           </q-btn>
@@ -295,26 +289,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val.length > 0 || 'Required']"
                 />
-                <q-select
-                  v-if="
-                    !(
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery && dashboardPanelData.data.queryType == 'sql'
-                    )
-                  "
-                  v-model="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.y[index].sortBy
-                  "
-                  :options="['None', 'ASC', 'DESC']"
-                  dense
-                  filled
-                  emit-value
-                  map-options
-                  label="Sort"
-                  />
+                Sort By: 
+                <q-btn-group
+                    class="q-mr-sm"
+                    v-if="
+                      !(
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                      )
+                    "
+                  >
+                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index].sortBy) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index].sortBy === 'None' ? 'selected' : ''" @click="updateSortOption(index, 'y', 'None')" icon="block" size="sm" />
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index].sortBy === 'ASC' ? 'selected' : ''" @click="updateSortOption(index, 'y', 'ASC')" ><AscSort/></q-btn>
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index].sortBy === 'DESC' ? 'selected' : ''" @click="updateSortOption(index, 'y', 'DESC')" ><DescSort/></q-btn>
+                </q-btn-group>
               </div>
             </q-menu>
           </q-btn>
@@ -438,6 +427,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :rules="[(val) => val.length > 0 || 'Required']"
                   />
+                  Sort By: 
+                  <q-btn-group
+                    class="q-mr-sm"
+                    v-if="
+                      !(
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                      )
+                    "
+                  >
+                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[index].sortBy) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[index].sortBy === 'None' ? 'selected' : ''" @click="updateSortOption(index, 'z', 'None')" icon="block" size="sm" />
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[index].sortBy === 'ASC' ? 'selected' : ''" @click="updateSortOption(index, 'z', 'ASC')" ><AscSort/></q-btn>
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[index].sortBy === 'DESC' ? 'selected' : ''" @click="updateSortOption(index, 'z', 'DESC')" ><DescSort/></q-btn>
+                </q-btn-group>
                 </div>
               </q-menu>
             </q-btn>
@@ -709,10 +713,12 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
+import AscSort from "@/components/icons/AscSort.vue"
+import DescSort from "@/components/icons/DescSort.vue"
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
-  components: { DashboardMapQueryBuilder },
+  components: { DashboardMapQueryBuilder, AscSort, DescSort },
   setup() {
     const showXAxis = ref(true);
     const panelName = ref("");
@@ -892,6 +898,11 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
+
+    const updateSortOption = (index:any, field: any, value: any) => {      
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields[field][index].sortBy = value
+    }
+
     return {
       showXAxis,
       t,
@@ -938,6 +949,7 @@ export default defineComponent({
       xLabel,
       yLabel,
       zLabel,
+      updateSortOption,
     };
   },
 });
@@ -1189,5 +1201,10 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
+}
+.selected {
+    background-color: var(--q-primary) !important;
+    font-weight: bold;
+    color: white;
 }
 </style>

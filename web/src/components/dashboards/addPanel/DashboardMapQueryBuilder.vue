@@ -89,6 +89,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val > 0 || 'Required']"
                 />
+                Sort By: 
+                <q-btn-group
+                    class="q-mr-sm"
+                    v-if="
+                      !(
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                      )
+                    "
+                  >
+                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sortBy) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sortBy === 'None' ? 'selected' : ''" @click="updateSortOption('latitude', 'None')" icon="block" size="sm" />
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sortBy === 'ASC' ? 'selected' : ''" @click="updateSortOption('latitude', 'ASC')" ><AscSort/></q-btn>
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sortBy === 'DESC' ? 'selected' : ''" @click="updateSortOption('latitude', 'DESC')" ><DescSort/></q-btn>
+                </q-btn-group>
               </div>
             </q-menu>
           </q-btn>
@@ -192,6 +207,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val > 0 || 'Required']"
                 />
+                Sort By: 
+                <q-btn-group
+                    class="q-mr-sm"
+                    v-if="
+                      !(
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                      )
+                    "
+                  >
+                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sortBy) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sortBy === 'None' ? 'selected' : ''" @click="updateSortOption('longitude', 'None')" icon="block" size="sm" />
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sortBy === 'ASC' ? 'selected' : ''" @click="updateSortOption('longitude', 'ASC')" ><AscSort/></q-btn>
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sortBy === 'DESC' ? 'selected' : ''" @click="updateSortOption('longitude', 'DESC')" ><DescSort/></q-btn>
+                </q-btn-group>
               </div>
             </q-menu>
           </q-btn>
@@ -330,6 +360,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val > 0 || 'Required']"
                 />
+                Sort By: 
+                <q-btn-group
+                    class="q-mr-sm"
+                    v-if="
+                      !(
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                      )
+                    "
+                  >
+                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sortBy) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sortBy === 'None' ? 'selected' : ''" @click="updateSortOption('weight', 'None')" icon="block" size="sm" />
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sortBy === 'ASC' ? 'selected' : ''" @click="updateSortOption('weight', 'ASC')" ><AscSort/></q-btn>
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sortBy === 'DESC' ? 'selected' : ''" @click="updateSortOption('weight', 'DESC')" ><DescSort/></q-btn>
+                </q-btn-group>
               </div>
             </q-menu>
           </q-btn>
@@ -367,10 +412,12 @@ import { defineComponent, ref, reactive, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
+import AscSort from "@/components/icons/AscSort.vue"
+import DescSort from "@/components/icons/DescSort.vue"
 
 export default defineComponent({
   name: "DashboardMapQueryBuilder",
-  components: {},
+  components: { AscSort, DescSort},
   setup() {
     const { t } = useI18n();
     const expansionItems = reactive({
@@ -490,6 +537,10 @@ export default defineComponent({
       return commonBtnLabel(weightField);
     });
 
+    const updateSortOption = (field: any, value: any) => {            
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields[field].sortBy = value
+    }
+
     return {
       t,
       dashboardPanelData,
@@ -516,6 +567,7 @@ export default defineComponent({
       WeightHint,
       promqlMode,
       weightLabel,
+      updateSortOption,
     };
   },
 });
@@ -781,5 +833,10 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
+}
+.selected {
+    background-color: var(--q-primary) !important;
+    font-weight: bold;
+    color: white;
 }
 </style>
