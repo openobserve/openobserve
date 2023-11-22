@@ -100,9 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                   >
-                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sort_by) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sort_by === 'None' ? 'selected' : ''" @click="updateSortOption('latitude', 'None')" icon="block" size="sm" />
-                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sort_by === 'ASC' ? 'selected' : ''" @click="updateSortOption('latitude', 'ASC')" ><AscSort/></q-btn>
-                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sort_by === 'DESC' ? 'selected' : ''" @click="updateSortOption('latitude', 'DESC')" ><DescSort/></q-btn>
+                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sortBy) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sortBy === 'None' ? 'selected' : ''" @click="updateSortOption('latitude', 'None')" icon="block" size="sm" />
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sortBy === 'ASC' ? 'selected' : ''" @click="updateSortOption('latitude', 'ASC')" ><AscSort/></q-btn>
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude.sortBy === 'DESC' ? 'selected' : ''" @click="updateSortOption('latitude', 'DESC')" ><DescSort/></q-btn>
                 </q-btn-group>
               </div>
             </q-menu>
@@ -218,9 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                   >
-                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sort_by) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sort_by === 'None' ? 'selected' : ''" @click="updateSortOption('longitude', 'None')" icon="block" size="sm" />
-                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sort_by === 'ASC' ? 'selected' : ''" @click="updateSortOption('longitude', 'ASC')" ><AscSort/></q-btn>
-                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sort_by === 'DESC' ? 'selected' : ''" @click="updateSortOption('longitude', 'DESC')" ><DescSort/></q-btn>
+                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sortBy) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sortBy === 'None' ? 'selected' : ''" @click="updateSortOption('longitude', 'None')" icon="block" size="sm" />
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sortBy === 'ASC' ? 'selected' : ''" @click="updateSortOption('longitude', 'ASC')" ><AscSort/></q-btn>
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude.sortBy === 'DESC' ? 'selected' : ''" @click="updateSortOption('longitude', 'DESC')" ><DescSort/></q-btn>
                 </q-btn-group>
               </div>
             </q-menu>
@@ -371,9 +371,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                   >
-                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sort_by) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sort_by === 'None' ? 'selected' : ''" @click="updateSortOption('weight', 'None')" icon="block" size="sm" />
-                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sort_by === 'ASC' ? 'selected' : ''" @click="updateSortOption('weight', 'ASC')" ><AscSort/></q-btn>
-                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sort_by === 'DESC' ? 'selected' : ''" @click="updateSortOption('weight', 'DESC')" ><DescSort/></q-btn>
+                  <q-btn :class="(!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sortBy) || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sortBy === 'None' ? 'selected' : ''" @click="updateSortOption('weight', 'None')" icon="block" size="sm" />
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sortBy === 'ASC' ? 'selected' : ''" @click="updateSortOption('weight', 'ASC')" ><AscSort/></q-btn>
+                  <q-btn :class="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight.sortBy === 'DESC' ? 'selected' : ''" @click="updateSortOption('weight', 'DESC')" ><DescSort/></q-btn>
                 </q-btn-group>
               </div>
             </q-menu>
@@ -538,7 +538,7 @@ export default defineComponent({
     });
 
     const updateSortOption = (field: any, value: any) => {            
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields[field].sort_by = value
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields[field].sortBy = value
     }
 
     return {
