@@ -69,12 +69,12 @@ const getDefaultDashboardPanelData: any = () => ({
           latitude: null,
           longitude: null,
           weight: null,
-          limit: 0
         },
         config: {
           promql_legend: "",
           layer_type: "scatter",
           weight_fixed: 1,
+          limit: 0,
         },
       },
     ],
