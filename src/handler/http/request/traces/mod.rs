@@ -259,7 +259,11 @@ pub async fn get_latest_traces(
         .map(|v| v.trace_id.clone())
         .collect::<Vec<String>>()
         .join("','");
-    let query_sql = format!("SELECT trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM default WHERE trace_id IN ('{trace_ids}') ORDER BY {} ASC LIMIT 9999",  CONFIG.common.column_timestamp);
+    let query_sql = format!("SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM default WHERE trace_id IN ('{}') ORDER BY {} ASC LIMIT 9999",
+        CONFIG.common.column_timestamp,
+        trace_ids,
+        CONFIG.common.column_timestamp,
+    );
     req.query.sql = query_sql.to_string();
     req.query.start_time = start_time;
     req.query.end_time = end_time;
