@@ -47,9 +47,7 @@
             :title="t('search.runQuery')"
             class="search-button bg-secondary"
             @click="searchData"
-            :disable="
-              searchObj.loading || searchObj.data.streamResults.length == 0
-            "
+            :disable="isLoading"
             >{{ t("search.runQuery") }}</q-btn
           >
         </div>
@@ -113,6 +111,13 @@ export default defineComponent({
     fieldValues: {
       type: Object,
       default: () => {},
+    },
+    // Using loading key directly from traces composable was not working
+    // so have added as prop
+    // Run query btn was not getting disabled while loading
+    isLoading: {
+      type: Boolean,
+      default: false,
     },
   },
   methods: {
@@ -225,7 +230,6 @@ export default defineComponent({
       await nextTick();
       await nextTick();
 
-      searchObj.loading = true;
       searchObj.runQuery = true;
 
       if (config.isCloud == "true" && value.userChangedValue) {

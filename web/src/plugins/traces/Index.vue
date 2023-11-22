@@ -23,6 +23,7 @@
         ref="searchBarRef"
         :fieldValues="fieldValues"
         :key="searchObj.data.stream.streamLists.length"
+        :isLoading="searchObj.loading"
         @searchdata="searchData"
         @onChangeTimezone="refreshTimezone"
       />
@@ -697,6 +698,7 @@ export default defineComponent({
 
         searchObj.data.errorMsg = "";
         if (searchObj.data.resultGrid.currentPage == 0) {
+          searchObj.loading = true;
           // searchObj.data.stream.selectedFields = [];
           // searchObj.data.stream.addToFilter = "";
           searchObj.data.queryResults = {};
