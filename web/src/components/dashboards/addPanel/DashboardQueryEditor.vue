@@ -318,9 +318,9 @@ export default defineComponent({
              const orderByArr = [];
             
             [latitude, longitude, weight].forEach((it: any) => {
-                // ignore if None is selected or sortBy is not there
-                if (it?.sortBy && it?.sortBy != "None") {
-                    orderByArr.push(`${it.alias} ${it.sortBy}`);
+                // ignore if None is selected or sort_by is not there
+                if (it?.sort_by && it?.sort_by != "None") {
+                    orderByArr.push(`${it.alias} ${it.sort_by}`);
                 }
             })
             
@@ -474,9 +474,9 @@ export default defineComponent({
             const orderByArr = [];
             
             fields.forEach((it: any) => {
-                // ignore if None is selected or sortBy is not there
-                if (it?.sortBy && it?.sortBy != "None") {
-                    orderByArr.push(`${it.alias} ${it.sortBy}`);
+                // ignore if None is selected or sort_by is not there
+                if (it?.sort_by && it?.sort_by != "None") {
+                    orderByArr.push(`${it.alias} ${it.sort_by}`);
                 }
             })
             
