@@ -261,7 +261,7 @@ export default defineComponent({
     };
 
     // Find out spans who has reference_parent_span_id as span_id of first span in sampleTrace
-    const buildTracesTree = async () => {
+    async function buildTracesTree() {
       if (!spanList.value?.length) return;
 
       spanMapping.value = {};
@@ -331,7 +331,8 @@ export default defineComponent({
       calculateTracePosition();
       buildTraceChart();
       buildServiceTree();
-    };
+    }
+
     let index = 0;
     const addSpansPositions = (span: any, depth: number) => {
       if (!span.index) index = 0;

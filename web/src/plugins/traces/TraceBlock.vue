@@ -66,7 +66,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { date, date as qDate } from "quasar";
+import { date as qDate } from "quasar";
 import {
   timestampToTimezoneDate,
   formatDuration,
@@ -74,6 +74,7 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import useTraces from "@/composables/useTraces";
+import moment from "moment";
 
 const props = defineProps({
   item: {
@@ -91,20 +92,17 @@ const { searchObj } = useTraces();
 const store = useStore();
 
 const getFormattedDate = computed(() => {
-  const date1 = timestampToTimezoneDate(
-    props.item["trace_start_time"] / 1000,
-    store.state.timezone,
-    "MMM dd, yyyy HH:mm:ss.SSS Z"
-  );
-  const date2 = timestampToTimezoneDate(
-    new Date().getTime(),
-    store.state.timezone,
-    "MMM dd, yyyy HH:mm:ss.SSS Z"
-  );
+  const format = "YYYY-MM-DD HH:mm:ss";
+  const timezone = store.state.timezone;
+
+  const date1 = moment
+    .tz(new Date(props.item["trace_start_time"] / 1000), timezone)
+    .format(format);
+
+  const date2 = moment.tz(new Date(), timezone).format(format);
 
   const difference = qDate.getDateDiff(date2, date1, "seconds");
   const minDiff = qDate.getDateDiff(date2, date1, "minutes");
-  const daysDiff = qDate.getDateDiff(date2, date1, "days");
 
   const months = [
     "Jan",
@@ -126,6 +124,7 @@ const getFormattedDate = computed(() => {
     time: "",
     diff: "",
   };
+
   if (difference < 86400) date3.day = "Today";
   else if (difference < 86400 * 2) date3.day = "Yesterday";
   else
