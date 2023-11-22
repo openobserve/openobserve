@@ -107,6 +107,7 @@ const defaultObject = {
       histogramHide: false,
     },
     traceDetails: {
+      selectedTrace: null,
       traceId: "",
       spanList: [],
       loading: false,

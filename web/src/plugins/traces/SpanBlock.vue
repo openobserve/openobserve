@@ -119,16 +119,17 @@ export default defineComponent({
         props.span.startTimeMs - props.baseTracePosition["startTimeMs"];
 
       // if (props.span.startTimeMs < props.baseTracePosition["startTimeMs"]) {
-      //   props.baseTracePosition + props.baseTracePosition["durationMs"];
-      //   console.log(left);
+      //   const left =
+      //     props.baseTracePosition["startTimeMs"] - props.span.startTimeMs;
+      //   // props.baseTracePosition + props.baseTracePosition["durationMs"];
+      //   return -(left / props.baseTracePosition?.durationMs) * 100;
       // }
-      //   return 0;
-      // console.log(
-      //   props.span.startTimeMs,
-      //   props.baseTracePosition["startTimeMs"],
-      //   left,
-      //   props.baseTracePosition?.durationMs
-      // );
+      // // console.log(
+      // //   props.span.startTimeMs,
+      // //   props.baseTracePosition["startTimeMs"],
+      // //   left,
+      // //   props.baseTracePosition?.durationMs
+      // // );
       return (left / props.baseTracePosition?.durationMs) * 100;
     });
     const getWidth = computed(() => {
