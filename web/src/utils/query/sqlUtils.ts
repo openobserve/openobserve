@@ -46,7 +46,11 @@ export const addLabelToSQlQuery = (
     const newCondition = {
       type: "binary_expr",
       operator: "AND",
-      left: ast.where,
+      parentheses: true,
+      left: {
+        parentheses: true,
+        ...ast.where,
+      },
       right: {
         type: "binary_expr",
         operator: operator,
