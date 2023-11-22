@@ -73,9 +73,9 @@ async fn get_in_wal() -> Result<Vec<FileKey>, anyhow::Error> {
     let mut result = Vec::with_capacity(1024);
     let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
     let files = scan_files(&pattern);
-    let mut line_num = 0;
+    let mut line_no = 0;
     for file in files {
-        line_num += 1;
+        line_no += 1;
         let data = get_file_contents(&file)
             .await
             .expect("open wal file list failed");
@@ -89,10 +89,14 @@ async fn get_in_wal() -> Result<Vec<FileKey>, anyhow::Error> {
             let item: FileKey = match json::from_slice(line.as_bytes()) {
                 Ok(item) => item,
                 Err(err) => {
-                    panic!(
+                    log::error!(
                         "parse wal file list failed:\nfile: {}\nline_no: {}\nline: {}\nerr: {}",
-                        file, line_num, line, err
+                        file,
+                        line_no,
+                        line,
+                        err
                     );
+                    continue;
                 }
             };
             result.push(item);
