@@ -100,9 +100,9 @@ pub async fn handle_grpc_request(
                     stream_partitioning_map
                         .insert(metric_name.clone().to_owned(), partition_det.clone());
                 }
-                let partition_det = stream_partitioning_map.get(metric_name).unwrap();
-                let partition_keys = partition_det.partition_keys.clone();
-                let partition_time_level = unwrap_partition_time_level(
+                let mut partition_det = stream_partitioning_map.get(metric_name).unwrap();
+                let mut partition_keys = partition_det.partition_keys.clone();
+                let mut partition_time_level = unwrap_partition_time_level(
                     partition_det.partition_time_level,
                     StreamType::Metrics,
                 );
@@ -113,7 +113,7 @@ pub async fn handle_grpc_request(
                 // End get stream alert
 
                 // Start Register Transforms for stream
-                let (local_trans, stream_vrl_map) =
+                let (mut local_trans, mut stream_vrl_map) =
                     crate::service::ingestion::register_stream_transforms(
                         org_id,
                         StreamType::Metrics,
@@ -121,7 +121,6 @@ pub async fn handle_grpc_request(
                     );
                 // End Register Transforms for stream
 
-                let buf = metric_data_map.entry(metric_name.to_owned()).or_default();
                 let mut rec = json::json!({});
                 match &resource_metric.resource {
                     Some(res) => {
@@ -183,12 +182,60 @@ pub async fn handle_grpc_request(
                     // flattening
                     rec = flatten::flatten(&rec)?;
 
+                    let local_metric_name =
+                        &format_stream_name(rec.get(NAME_LABEL).unwrap().as_str().unwrap());
+
+                    if local_metric_name != metric_name {
+                        // check for schema
+                        stream_schema_exists(
+                            org_id,
+                            local_metric_name,
+                            StreamType::Metrics,
+                            &mut metric_schema_map,
+                        )
+                        .await;
+
+                        // get partition keys
+                        if !stream_partitioning_map.contains_key(local_metric_name) {
+                            let partition_det =
+                                crate::service::ingestion::get_stream_partition_keys(
+                                    local_metric_name,
+                                    &metric_schema_map,
+                                )
+                                .await;
+                            stream_partitioning_map
+                                .insert(local_metric_name.to_owned(), partition_det.clone());
+                        }
+                        partition_det = stream_partitioning_map.get(local_metric_name).unwrap();
+                        partition_keys = partition_det.partition_keys.clone();
+                        partition_time_level = unwrap_partition_time_level(
+                            partition_det.partition_time_level,
+                            StreamType::Metrics,
+                        );
+
+                        // Start get stream alerts
+                        let key =
+                            format!("{}/{}/{}", &org_id, StreamType::Metrics, local_metric_name);
+                        crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map)
+                            .await;
+                        // End get stream alert
+
+                        // Start Register Transforms for stream
+                        (local_trans, stream_vrl_map) =
+                            crate::service::ingestion::register_stream_transforms(
+                                org_id,
+                                StreamType::Metrics,
+                                local_metric_name,
+                            );
+                        // End Register Transforms for stream
+                    }
+
                     if !local_trans.is_empty() {
                         rec = crate::service::ingestion::apply_stream_transform(
                             &local_trans,
                             &rec,
                             &stream_vrl_map,
-                            metric_name,
+                            local_metric_name,
                             &mut runtime,
                         )?;
                     }
@@ -208,12 +255,15 @@ pub async fn handle_grpc_request(
                         &mut metric_schema_map,
                         org_id,
                         StreamType::Metrics,
-                        metric_name,
+                        local_metric_name,
                         timestamp,
                         &value_str,
                     )
                     .await;
 
+                    let buf = metric_data_map
+                        .entry(local_metric_name.to_owned())
+                        .or_default();
                     // get hour key
                     let hour_key = crate::service::ingestion::get_wal_time_key(
                         timestamp,
@@ -232,7 +282,7 @@ pub async fn handle_grpc_request(
                             "{}/{}/{}",
                             &org_id,
                             StreamType::Metrics,
-                            metric_name.clone()
+                            local_metric_name.clone()
                         );
                         if let Some(alerts) = stream_alerts_map.get(&key) {
                             for alert in alerts {
@@ -243,12 +293,12 @@ pub async fn handle_grpc_request(
                                     );
                                     if set_trigger {
                                         stream_trigger_map.insert(
-                                            metric_name.to_owned(),
+                                            local_metric_name.to_owned(),
                                             alert::Trigger {
                                                 timestamp,
                                                 is_valid: true,
                                                 alert_name: alert.name.clone(),
-                                                stream: metric_name.to_owned(),
+                                                stream: local_metric_name.to_owned(),
                                                 org: org_id.to_string(),
                                                 stream_type: StreamType::Metrics,
                                                 last_sent_at: 0,
