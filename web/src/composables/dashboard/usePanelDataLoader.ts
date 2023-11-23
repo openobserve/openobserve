@@ -164,6 +164,7 @@ export const usePanelDataLoader = (
     data: [] as any,
     loading: false,
     errorDetail: "",
+    metadata: {},
   });
 
   // observer for checking if panel is visible on the screen
@@ -222,26 +223,41 @@ export const usePanelDataLoader = (
       // Iterate through each query in the panel schema
       const queryPromises = panelSchema.value.queries?.map(async (it: any) => {
         console.log("queryPromises", it);
+
+        const { query: query1, metadata: metadata1 } = replaceQueryValue(
+          it.query,
+          startISOTimestamp,
+          endISOTimestamp,
+          panelSchema.value.queryType
+        );
+
+        const { query: query2, metadata: metadata2 } = applyAdhocVariables(
+          query1,
+          panelSchema.value.queryType
+        );
+
+        const query = query2;
+        const metadata = {
+          originalQuery: it.query,
+          query: query,
+          startTime: startISOTimestamp,
+          endTime: endISOTimestamp,
+          queryType: panelSchema.value.queryType,
+          variables: [...(metadata1 || []), ...(metadata2 || [])],
+        };
+
         // Call the metrics_query_range API
         return queryService
           .metrics_query_range({
             org_identifier: store.state.selectedOrganization.identifier,
-            query: applyAdhocVariables(
-              replaceQueryValue(
-                it.query,
-                startISOTimestamp,
-                endISOTimestamp,
-                panelSchema.value.queryType
-              ),
-              panelSchema.value.queryType
-            ),
+            query: query,
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
           })
           .then((res) => {
             // Set searchQueryData.data to the API response data
             state.errorDetail = "";
-            return res.data.data;
+            return {result: res.data.data, metadata: metadata};
           })
           .catch((error) => {
             // Process API error for "promql"
@@ -252,7 +268,8 @@ export const usePanelDataLoader = (
       // Wait for all query promises to resolve
       const queryResults = await Promise.all(queryPromises);
       state.loading = false;
-      state.data = queryResults;
+      state.data = queryResults.map((it: any) => it.result);
+      state.metadata = queryResults.map((it: any) => it.metadata);
     } else {
       // Call search API
 
@@ -262,20 +279,40 @@ export const usePanelDataLoader = (
       const sqlqueryPromise = panelSchema.value.queries?.map(
         async (it: any) => {
           console.log("sqlqueryPromise", it);
+
+          const {query: query1, metadata: metadata1} = replaceQueryValue(
+              it.query,
+              startISOTimestamp,
+              endISOTimestamp,
+              panelSchema.value.queryType
+            )
+
+            console.log('query1', query1);
+            
+
+          const {query: query2, metadata: metadata2} = applyAdhocVariables(
+            query1,
+            panelSchema.value.queryType
+          );
+
+          const query = query2
+          console.log("query2", query2);
+          
+          const metadata = {
+            originalQuery: it.query,
+            query: query,
+            startTime: startISOTimestamp,
+            endTime: endISOTimestamp,
+            queryType: panelSchema.value.queryType,
+            variables: [...(metadata1 || []), ...(metadata2 || [])],
+          };
+
           return await queryService
             .search({
               org_identifier: store.state.selectedOrganization.identifier,
               query: {
                 query: {
-                  sql: applyAdhocVariables(
-                    replaceQueryValue(
-                      it.query,
-                      startISOTimestamp,
-                      endISOTimestamp,
-                      panelSchema.value.queryType
-                    ),
-                    panelSchema.value.queryType
-                  ),
+                  sql: query,
                   sql_mode: "full",
                   start_time: startISOTimestamp,
                   end_time: endISOTimestamp,
@@ -288,7 +325,7 @@ export const usePanelDataLoader = (
               // Set searchQueryData.data to the API response hits
               // state.data = res.data.hits;
               state.errorDetail = "";
-              return res.data.hits;
+              return {result: res.data.hits, metadata: metadata};
             })
             .catch((error) => {
               // Process API error for "sql"
@@ -299,7 +336,8 @@ export const usePanelDataLoader = (
       // Wait for all query promises to resolve
       const sqlqueryResults = await Promise.all(sqlqueryPromise);
       state.loading = false;
-      state.data = sqlqueryResults;
+      state.data = sqlqueryResults.map((it: any) => it.result);
+      state.metadata = sqlqueryResults.map((it: any) => it.metadata);
     }
   };
 
@@ -387,6 +425,8 @@ export const usePanelDataLoader = (
       startISOTimestamp,
       endISOTimestamp,
       queryType
+
+    const metadata: any[] = []
     );
 
     //fixed variables value calculations
@@ -443,6 +483,13 @@ export const usePanelDataLoader = (
     fixedVariables?.forEach((variable: any) => {
       const variableName = `$${variable.name}`;
       const variableValue = variable.value;
+      if (query.includes(variableName)) {
+        metadata.push({
+          type: "fixed",
+          name: variable.name,
+          value: variable.value,
+        });
+      }
       query = query.replaceAll(variableName, variableValue);
     });
 
@@ -454,12 +501,19 @@ export const usePanelDataLoader = (
       currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
         const variableValue = variable.value;
+        if(query.includes(variableName)) {
+          metadata.push({
+            type: 'variable',
+            name: variable.name,
+            value: variable.value
+          })
+        }
         query = query.replaceAll(variableName, variableValue);
       });
 
-      return query;
+      return {query, metadata};
     } else {
-      return query;
+      return {query, metadata};
     }
   };
 
@@ -470,6 +524,7 @@ export const usePanelDataLoader = (
   const applyAdhocVariables = (query: any, queryType: any) => {
     console.log("checking for ad hoc variables");
     console.log("variablesData(())", variablesData.value?.values);
+    const metadata : any[] = []
 
     const adHocVariables = variablesData.value?.values
       ?.filter((it: any) => it.type === "ad-hoc-filters")
@@ -480,7 +535,7 @@ export const usePanelDataLoader = (
     console.log("adHocVariables(())", adHocVariables);
 
     if (!adHocVariables.length) {
-      return query;
+      return { query, metadata };
     }
 
     console.log("ad hoc variables found");
@@ -497,6 +552,12 @@ export const usePanelDataLoader = (
       // ];
 
       adHocVariables.forEach((variable: any) => {
+        metadata.push({
+          type: 'dynamicVariable',
+          name: variable.name,
+          value: variable.value,
+          operator: variable.operator
+        })
         query = addLabelToPromQlQuery(
           query,
           variable.name,
@@ -518,6 +579,14 @@ export const usePanelDataLoader = (
       //   },
       // ];
 
+      adHocVariables.forEach((variable: any) => {
+        metadata.push({
+          type: 'dynamicVariable',
+          name: variable.name,
+          value: variable.value,
+          operator: variable.operator
+        })
+      });
       query = addLabelsToSQlQuery(
         query,
         adHocVariables
@@ -526,7 +595,7 @@ export const usePanelDataLoader = (
       console.log("querySQL", query);
     }
 
-    return query;
+    return {query, metadata};
   };
 
   /**
@@ -708,6 +777,7 @@ export const usePanelDataLoader = (
       observer.disconnect();
     }
   });
+  console.log("panelDataLoader state", toRefs(state));
 
   return {
     ...toRefs(state),
