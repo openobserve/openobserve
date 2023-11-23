@@ -12,8 +12,8 @@ export const addLabelsToSQlQuery = (originalQuery: any, labels: any) => {
     });
 
     const parser = new Parser();
-    const astOfOriginalQuery = parser.astify(originalQuery);
-    const astOfDummy = parser.astify(dummyQuery);
+    const astOfOriginalQuery: any = parser.astify(originalQuery);
+    const astOfDummy: any = parser.astify(dummyQuery);
   
   // if ast already has a where clause
   if (astOfOriginalQuery.where) {
@@ -55,7 +55,7 @@ export const addLabelToSQlQuery = (
   operator: any
 ) => {
   const parser = new Parser();
-  const ast = parser.astify(originalQuery)
+  const ast: any = parser.astify(originalQuery)
 
   let query = "";
   if (!ast.where) {
