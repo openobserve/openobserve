@@ -28,60 +28,30 @@
     <div>
       <q-form ref="addJSTransformForm" @submit="onSubmit">
         <div class="row">
-          <q-input
-            v-model="formData.name"
-            :label="t('function.name')"
-            color="input-border"
-            bg-color="input-bg"
-            class="col-12 q-py-md showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            tabindex="0"
-          />
+          <q-input v-model="formData.name" :label="t('function.name')" color="input-border" bg-color="input-bg"
+            class="col-12 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="isUpdating"
+            v-bind:disable="isUpdating" :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
 
-          <q-file
-            color="lime-11"
-            filled
-            v-model="formData.file"
-            :label="t('function.uploadCSVFile')"
-            bg-color="input-bg"
-            class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader"
-            stack-label
-            outlined
-            dense
-          >
+          <q-file color="lime-11" filled v-model="formData.file" :label="t('function.uploadCSVFile')" bg-color="input-bg"
+            class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader" stack-label outlined dense>
             <template v-slot:prepend>
               <q-icon name="attachment" />
             </template>
           </q-file>
+          <div v-if="isUpdating">
+            <q-toggle class="col-12 q-py-md text-grey" v-model="formData.append" :label="t('function.appendData')" />
+          </div>
         </div>
 
         <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
           compilationErr
         }}</pre>
+
         <div class="flex justify-center q-mt-lg">
-          <q-btn
-            v-close-popup="true"
-            class="q-mb-md text-bold"
-            :label="t('function.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            no-caps
-            @click="$emit('cancel:hideform')"
-          />
-          <q-btn
-            :label="t('function.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
-            no-caps
-          />
+          <q-btn v-close-popup="true" class="q-mb-md text-bold" :label="t('function.cancel')" text-color="light-text"
+            padding="sm md" no-caps @click="$emit('cancel:hideform')" />
+          <q-btn :label="t('function.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
+            type="submit" no-caps />
         </div>
       </q-form>
     </div>
@@ -100,6 +70,7 @@ const defaultValue: any = () => {
   return {
     name: "",
     file: "",
+    append: false,
   };
 };
 
@@ -147,7 +118,8 @@ export default defineComponent({
         .create_enrichment_table(
           store.state.selectedOrganization.identifier,
           formData.value.name,
-          reqformData
+          reqformData,
+          formData.value.append
         )
         .then((res) => {
           formData.value = { ...defaultValue() };
@@ -218,6 +190,7 @@ export default defineComponent({
 .no-case .q-field__native span {
   text-transform: none !important;
 }
+
 .lookup-table-file-uploader {
   .q-field__label {
     left: -30px;

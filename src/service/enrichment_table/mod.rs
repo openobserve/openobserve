@@ -52,6 +52,7 @@ pub async fn save_enrichment_data(
     table_name: &str,
     mut payload: Multipart,
     thread_id: usize,
+    append_data: bool,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let mut hour_key = String::new();
@@ -91,12 +92,23 @@ pub async fn save_enrichment_data(
     )
     .await;
 
-    if stream_schema.has_fields {
+    if stream_schema.has_fields && !append_data {
         delete_enrichment_table(org_id, stream_name, StreamType::EnrichmentTables).await;
     }
 
     let mut records = vec![];
-    let timestamp = Utc::now().timestamp_micros();
+    let timestamp = if !append_data {
+        Utc::now().timestamp_micros()
+    } else {
+        let schema = stream_schema_map.get(stream_name).unwrap();
+        println!("schema: {:?}", schema);
+        schema
+            .metadata()
+            .get("created_at")
+            .unwrap()
+            .parse::<i64>()
+            .unwrap()
+    };
     while let Ok(Some(mut field)) = payload.try_next().await {
         let content_disposition = field.content_disposition();
         let filename = content_disposition.get_filename();
