@@ -431,7 +431,9 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
 
-    if query_type == "metrics" {
+    if query_type == "table" {
+        result.response_type = "table".to_string();
+    } else if query_type == "metrics" {
         result.response_type = "matrix".to_string();
     }
 
