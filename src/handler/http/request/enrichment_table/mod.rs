@@ -14,6 +14,7 @@
 
 use actix_multipart::Multipart;
 use actix_web::{post, web, HttpRequest, HttpResponse};
+use ahash::AHashMap;
 use std::io::Error;
 
 use crate::common::{
@@ -72,7 +73,13 @@ pub async fn save_enrichment_table(
                 .unwrap_or("")
                 .starts_with("multipart/form-data")
             {
-                save_enrichment_data(&org_id, &table_name, payload, **thread_id).await
+                let query =
+                    web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+                let append_data = match query.get("append") {
+                    Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
+                    None => false,
+                };
+                save_enrichment_data(&org_id, &table_name, payload, **thread_id, append_data).await
             } else {
                 Ok(MetaHttpResponse::bad_request(
                     "Bad Request, content-type must be multipart/form-data",
