@@ -85,10 +85,11 @@ const jstransform = {
   create_enrichment_table: (
     org_identifier: string,
     table_name: string,
-    data: any
+    data: any,
+    append: boolean
   ) => {
     return http({ headers: { "Content-Type": "multipart/form-data" } }).post(
-      `/api/${org_identifier}/enrichment_tables/${table_name}`,
+      `/api/${org_identifier}/enrichment_tables/${table_name}?append=${append}`,
       data
     );
   },
