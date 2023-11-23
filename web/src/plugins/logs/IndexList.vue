@@ -382,9 +382,14 @@ export default defineComponent({
     };
 
     watch(
-      () => searchObj.data.stream.streamLists.length,
       () => {
-        streamOptions.value = searchObj.data.stream.streamLists;
+        searchObj.data.stream.streamLists.length;
+        store.state.organizationData.streams;
+      },
+      () => {
+        streamOptions.value =
+          searchObj.data.stream.streamLists ||
+          store.state.organizationData.streams;
       }
     );
 

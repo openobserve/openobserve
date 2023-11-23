@@ -49,7 +49,7 @@ import savedviewsService from "@/services/saved_views";
 const defaultObject = {
   organizationIdetifier: "",
   runQuery: false,
-  loading: false,
+  loading: true,
   config: {
     splitterModel: 20,
     lastSplitterPosition: 0,
@@ -271,7 +271,7 @@ const useLogs = () => {
     searchObj.data.searchAround.size = 0;
   }
 
-  function loadStreamLists() {
+  async function loadStreamLists() {
     try {
       if (searchObj.data.streamResults.list.length > 0) {
         let lastUpdatedStreamTime = 0;
@@ -317,7 +317,7 @@ const useLogs = () => {
       const streamType = searchObj.data.stream.streamType || "logs";
       const streamData = await getStreams(streamType, true);
       searchObj.data.streamResults = streamData;
-      loadStreamLists();
+      await loadStreamLists();
       return;
     } catch (e: any) {
       console.log("Error while getting stream list");
@@ -610,7 +610,6 @@ const useLogs = () => {
             }
           }
 
-          savedViews();
           searchObj.data.errorCode = 0;
           searchService
             .search({
@@ -1053,11 +1052,10 @@ const useLogs = () => {
 
   const loadLogsData = async () => {
     try {
-      searchObj.loading = true;
       resetFunctions();
+      await getStreamList();
       await getSavedViews();
       await getFunctions();
-      await getStreamList();
       await getQueryData();
       refreshData();
     } catch (e: any) {
@@ -1210,7 +1208,6 @@ const useLogs = () => {
   };
 
   const onStreamChange = () => {
-    alert("onStreamChange")
     const query = searchObj.meta.sqlMode
       ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
       : "";
@@ -1223,6 +1220,7 @@ const useLogs = () => {
 
   return {
     searchObj,
+    getStreams,
     resetSearchObj,
     updatedLocalLogFilterField,
     getFunctions,
