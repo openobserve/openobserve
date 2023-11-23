@@ -14,7 +14,6 @@
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
 pub mod alert;
 pub mod common;
 pub mod dashboards;
@@ -27,6 +26,7 @@ pub mod middleware_data;
 pub mod organization;
 pub mod prom;
 pub mod proxy;
+pub mod saved_view;
 pub mod search;
 pub mod service;
 pub mod sql;

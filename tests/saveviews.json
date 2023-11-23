@@ -1,0 +1,324 @@
+{
+    "data": {
+        "organizationIdetifier": "default",
+        "runQuery": false,
+        "loading": false,
+        "config": {
+            "splitterModel": 20,
+            "lastSplitterPosition": 0,
+            "splitterLimit": [
+                0,
+                40
+            ],
+            "fnSplitterModel": 99.5,
+            "fnLastSplitterPosition": 0,
+            "fnSplitterLimit": [
+                40,
+                100
+            ],
+            "refreshTimes": [
+                [
+                    {
+                        "label": "5 sec",
+                        "value": 5
+                    },
+                    {
+                        "label": "1 min",
+                        "value": 60
+                    },
+                    {
+                        "label": "1 hr",
+                        "value": 3600
+                    }
+                ],
+                [
+                    {
+                        "label": "10 sec",
+                        "value": 10
+                    },
+                    {
+                        "label": "5 min",
+                        "value": 300
+                    },
+                    {
+                        "label": "2 hr",
+                        "value": 7200
+                    }
+                ],
+                [
+                    {
+                        "label": "15 sec",
+                        "value": 15
+                    },
+                    {
+                        "label": "15 min",
+                        "value": 900
+                    },
+                    {
+                        "label": "1 day",
+                        "value": 86400
+                    }
+                ],
+                [
+                    {
+                        "label": "30 sec",
+                        "value": 30
+                    },
+                    {
+                        "label": "30 min",
+                        "value": 1800
+                    }
+                ]
+            ]
+        },
+        "meta": {
+            "refreshInterval": "0",
+            "refreshIntervalLabel": "Off",
+            "showFields": true,
+            "showQuery": true,
+            "showHistogram": true,
+            "showDetailTab": false,
+            "toggleFunction": false,
+            "toggleSourceWrap": false,
+            "histogramDirtyFlag": false,
+            "sqlMode": false,
+            "queryEditorPlaceholderFlag": true,
+            "functionEditorPlaceholderFlag": true,
+            "resultGrid": {
+                "wrapCells": false,
+                "manualRemoveFields": true,
+                "rowsPerPage": 150,
+                "chartInterval": "10 second",
+                "chartKeyFormat": "HH:mm:ss",
+                "navigation": {
+                    "currentRowIndex": 0
+                }
+            },
+            "flagWrapContent": false
+        },
+        "data": {
+            "query": "",
+            "parsedQuery": {},
+            "errorMsg": "",
+            "errorCode": 0,
+            "additionalErrorMsg": "",
+            "stream": {
+                "selectedStream": {
+                    "label": "stream1",
+                    "value": "stream1"
+                },
+                "selectedStreamFields": [
+                    {
+                        "name": "kubernetes_labels_pod_template_hash",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_container_name",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "level",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_component",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_operator_prometheus_io_shard",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_docker_id",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_app_kubernetes_io_instance",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_prometheus",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_statefulset_kubernetes_io_pod_name",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_app_kubernetes_io_part_of",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_pod_name",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "_timestamp",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_role",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_deploy",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_controller_revision_hash",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "log",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_app_kubernetes_io_name",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_app_kubernetes_io_managed_by",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_namespace_name",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "method",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_host",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_annotations_kubectl_kubernetes_io_default_container",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "stream",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_annotations_prometheus_io_path",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_annotations_prometheus_io_scrape",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "message",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_app_kubernetes_io_component",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_pod_id",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_annotations_kubernetes_io_psp",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_annotations_prometheus_io_port",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "took",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_name",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_operator_prometheus_io_name",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_app",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_labels_app_kubernetes_io_version",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_container_hash",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "code",
+                        "ftsKey": false
+                    },
+                    {
+                        "name": "kubernetes_container_image",
+                        "ftsKey": false
+                    }
+                ],
+                "selectedFields": [
+                    "kubernetes_docker_id",
+                    "kubernetes_labels_component",
+                    "level"
+                ],
+                "filterField": "",
+                "addToFilter": "",
+                "streamType": "logs"
+            },
+            "resultGrid": {
+                "currentDateTime": "2023-11-21T13:29:01.550Z",
+                "currentPage": 0,
+                "columns": [
+                    {
+                        "name": "@timestamp",
+                        "label": "timestamp (Asia/Calcutta)",
+                        "align": "left",
+                        "sortable": true
+                    },
+                    {
+                        "name": "kubernetes_docker_id",
+                        "label": "kubernetes_docker_id",
+                        "align": "left",
+                        "sortable": true,
+                        "closable": true
+                    },
+                    {
+                        "name": "kubernetes_labels_component",
+                        "label": "kubernetes_labels_component",
+                        "align": "left",
+                        "sortable": true,
+                        "closable": true
+                    },
+                    {
+                        "name": "level",
+                        "label": "level",
+                        "align": "left",
+                        "sortable": true,
+                        "closable": true
+                    }
+                ]
+            },
+            "editorValue": "",
+            "datetime": {
+                "startTime": 1700573045992000,
+                "endTime": 1700573345992000,
+                "relativeTimePeriod": "5m",
+                "type": "relative"
+            },
+            "searchAround": {
+                "indexTimestamp": -1,
+                "size": 0,
+                "histogramHide": false
+            },
+            "tempFunctionName": "",
+            "tempFunctionContent": "",
+            "tempFunctionLoading": false
+        }
+    },
+    "view_name": "view1"
+}
