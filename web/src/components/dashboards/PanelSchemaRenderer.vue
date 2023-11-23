@@ -36,7 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? panelData
             : { options: {backgroundColor: 'transparent'} } 
         "
-      @updated:data-zoom="$emit('updated:data-zoom', $event)" />
+        @updated:data-zoom="$emit('updated:data-zoom', $event)"
+      />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div
@@ -107,16 +108,16 @@ export default defineComponent({
     const { panelSchema, selectedTimeObj, variablesData } = toRefs(props);
 
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail } = usePanelDataLoader(
+    let { data, loading, errorDetail, metadata } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
       variablesData,
       chartPanelRef
     );
 
-  // hovered series state
-  // used to show tooltip axis for all charts
-  const hoveredSeriesState: any = inject("hoveredSeriesState", null);
+    // hovered series state
+    // used to show tooltip axis for all charts
+    const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(
@@ -154,6 +155,11 @@ export default defineComponent({
       },
       { deep: true }
     );
+
+    watch(metadata, () => {
+      console.log("metadata", JSON.stringify(metadata.value, null, 2));
+      emit("metadata-update", metadata.value);
+    });
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
@@ -246,6 +252,7 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      metadata,
     };
   },
 });
