@@ -502,18 +502,26 @@ export const localTimeSelectedTimezoneUTCTime = (
   return unixTimestamp;
 };
 
-function isObject(item: any) {
-  return item && typeof item === "object" && !Array.isArray(item);
-}
+const isObject = (obj: any) => obj !== null && typeof obj === "object";
+
+const isValidKey = (key: string) => {
+  // Add any additional checks to ensure key validity
+  return key !== "__proto__" && key !== "constructor" && key !== "prototype";
+};
 
 export const mergeDeep = (target: any, source: any) => {
   if (isObject(target) && isObject(source)) {
     for (const key in source) {
-      if (isObject(source[key])) {
-        if (!target[key]) target[key] = {};
-        mergeDeep(target[key], source[key]);
-      } else {
-        target[key] = source[key];
+      if (
+        isValidKey(key) &&
+        Object.prototype.hasOwnProperty.call(source, key)
+      ) {
+        if (isObject(source[key])) {
+          if (!target[key]) target[key] = {};
+          mergeDeep(target[key], source[key]);
+        } else {
+          target[key] = source[key];
+        }
       }
     }
   }
