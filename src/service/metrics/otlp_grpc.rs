@@ -544,13 +544,13 @@ fn process_hist_data_point(
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = data_point.count.into();
-    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
+    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
     sum_rec[VALUE_LABEL] = data_point.sum.into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
+    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(sum_rec);
 
     // add bucket records
@@ -592,13 +592,13 @@ fn process_exp_hist_data_point(
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = data_point.count.into();
-    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
+    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
     sum_rec[VALUE_LABEL] = data_point.sum.into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
+    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(sum_rec);
 
     let base = 2 ^ (2 ^ -data_point.scale);
@@ -652,13 +652,13 @@ fn process_summary_data_point(
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = data_point.count.into();
-    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
+    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
     sum_rec[VALUE_LABEL] = data_point.sum.into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
+    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(sum_rec);
 
     // add bucket records
