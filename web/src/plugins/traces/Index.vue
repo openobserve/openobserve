@@ -256,6 +256,7 @@ export default defineComponent({
     const parser = new Parser();
     const fieldValues = ref({});
     const { showErrorNotification } = useNotifications();
+    const serviceColorIndex = ref(0);
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -823,8 +824,6 @@ export default defineComponent({
         "#839ae2",
       ];
 
-      let colorIndex = 0;
-
       return traces.map((trace) => {
         const _trace = {
           trace_id: trace.trace_id,
@@ -840,12 +839,13 @@ export default defineComponent({
         };
         trace.service_name.forEach((service) => {
           if (!searchObj.meta.serviceColors[service.service_name]) {
-            if (colorIndex >= serviceColors.length) colorIndex = 0;
+            if (serviceColorIndex.value >= serviceColors.length)
+              serviceColorIndex.value = 0;
 
             searchObj.meta.serviceColors[service.service_name] =
-              serviceColors[colorIndex];
+              serviceColors[serviceColorIndex.value];
 
-            colorIndex++;
+            serviceColorIndex.value++;
           }
           _trace.services[service.service_name] = service.count;
         });
