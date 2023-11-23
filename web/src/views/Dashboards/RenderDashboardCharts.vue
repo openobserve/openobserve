@@ -56,7 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div style="height: 100%">
             <PanelContainer
-              @onDeletePanel="OnDeletePanel"
+              @onDeletePanel="onDeletePanel"
+              @onViewPanel="onViewPanel"
               :viewOnly="viewOnly"
               :data="item"
               :dashboardId="dashboardData.id"
@@ -94,7 +95,7 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 
 export default defineComponent({
   name: "RenderDashboardCharts",
-  emits: ["onDeletePanel", "variablesData"],
+  emits: ["onDeletePanel", "onViewPanel", "variablesData"],
   props: [
     "viewOnly",
     "dashboardData",
@@ -234,8 +235,11 @@ export default defineComponent({
     };
   },
   methods: {
-    OnDeletePanel(panelId) {
+    onDeletePanel(panelId) {
       this.$emit("onDeletePanel", panelId);
+    },
+    onViewPanel(panelId) {
+      this.$emit("onViewPanel", panelId);
     },
   },
 });

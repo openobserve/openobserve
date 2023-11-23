@@ -33,6 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item
               clickable
               v-close-popup="true"
+              @click="onPanelModifyClick('ViewPanel')"
+            >
+              <q-item-section>
+                <q-item-label class="q-pa-sm">View Panel</q-item-label>
+              </q-item-section>
+            </q-item>
+            <q-item
+              clickable
+              v-close-popup="true"
               @click="onPanelModifyClick('EditPanel')"
             >
               <q-item-section>
@@ -71,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 
-<script  lang="ts">
+<script lang="ts">
 import { defineComponent } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
@@ -81,7 +90,7 @@ import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "PanelContainer",
-  emits: ["onDeletePanel"],
+  emits: ["onDeletePanel", "onViewPanel"],
   props: [
     "data",
     "selectedTimeDate",
@@ -173,7 +182,9 @@ export default defineComponent({
   },
   methods: {
     onPanelModifyClick(evt: any) {
-      if (evt == "EditPanel") {
+      if (evt == "ViewPanel") {
+        this.$emit("onViewPanel", this.props.data.id);
+      } else if (evt == "EditPanel") {
         this.onEditPanel(this.props.data);
       } else if (evt == "DeletePanel") {
         this.$emit("onDeletePanel", this.props.data.id);
