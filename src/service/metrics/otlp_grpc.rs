@@ -54,7 +54,6 @@ pub async fn handle_grpc_request(
     request: ExportMetricsServiceRequest,
     is_grpc: bool,
 ) -> Result<HttpResponse, anyhow::Error> {
-    println!("handle_grpc_request");
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
