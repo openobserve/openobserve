@@ -56,10 +56,6 @@ export const addLabelToSQlQuery = (
 ) => {
   const parser = new Parser();
   const ast = parser.astify(originalQuery)
-  console.log("ast",ast);
-  
-  console.log("originalQuery", originalQuery);
-  console.log("label", label);
 
   let query = "";
   if (!ast.where) {
@@ -85,10 +81,6 @@ export const addLabelToSQlQuery = (
 
     const sql = parser.sqlify(newAst);
     const quotedSql = sql.replace(/`/g, '"');
-    console.log("sqlll", ast);
-    
-    console.log("sqlll", sql);
-
     query = quotedSql;
   } else {
     const newCondition = {
@@ -121,7 +113,6 @@ export const addLabelToSQlQuery = (
 
     const sql = parser.sqlify(newAst);
     const quotedSql = sql.replace(/`/g, '"');
-    console.log("sqlll", sql);
 
     query = quotedSql;
   }
