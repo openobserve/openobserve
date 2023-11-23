@@ -292,7 +292,15 @@ async fn get_file_list(
     stream_type: meta::StreamType,
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
-        Ok(path) => path.to_str().unwrap().to_string(),
+        Ok(path) => {
+            let mut path = path.to_str().unwrap().to_string();
+            // Hack for windows
+            if path.starts_with("\\\\?\\") {
+                path = path[4..].to_string();
+                path = path.replace('\\', "/");
+            }
+            path
+        }
         Err(_) => {
             return Ok(vec![]);
         }

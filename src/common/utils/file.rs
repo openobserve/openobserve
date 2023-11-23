@@ -77,7 +77,10 @@ pub fn set_permission<P: AsRef<std::path::Path>>(path: P, mode: u32) -> Result<(
 }
 
 #[cfg(not(unix))]
-pub fn set_permission<P: AsRef<std::path::Path>>(path: P, mode: u32) -> Result<(), std::io::Error> {
+pub fn set_permission<P: AsRef<std::path::Path>>(
+    path: P,
+    _mode: u32,
+) -> Result<(), std::io::Error> {
     std::fs::create_dir_all(path.as_ref())
 }
 
