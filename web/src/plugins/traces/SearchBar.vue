@@ -230,7 +230,10 @@ export default defineComponent({
       await nextTick();
       await nextTick();
 
-      searchObj.runQuery = true;
+      if (searchObj.loading == false) {
+        searchObj.loading = true;
+        searchObj.runQuery = true;
+      }
 
       if (config.isCloud == "true" && value.userChangedValue) {
         segment.track("Button Click", {
