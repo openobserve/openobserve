@@ -28,18 +28,44 @@
     <div>
       <q-form ref="addJSTransformForm" @submit="onSubmit">
         <div class="row">
-          <q-input v-model="formData.name" :label="t('function.name')" color="input-border" bg-color="input-bg"
-            class="col-12 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating" :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
+          <q-input
+            v-model="formData.name"
+            :label="t('function.name')"
+            color="input-border"
+            bg-color="input-bg"
+            class="col-12 q-py-md showLabelOnTop text-grey-8 text-bold"
+            stack-label
+            outlined
+            filled
+            dense
+            v-bind:readonly="isUpdating"
+            v-bind:disable="isUpdating"
+            :rules="[(val: any) => !!val || 'Field is required!']"
+            tabindex="0"
+          />
 
-          <q-file color="lime-11" filled v-model="formData.file" :label="t('function.uploadCSVFile')" bg-color="input-bg"
-            class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader" stack-label outlined dense>
+          <q-file
+            color="lime-11"
+            filled
+            v-model="formData.file"
+            :label="t('function.uploadCSVFile')"
+            bg-color="input-bg"
+            class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader"
+            stack-label
+            outlined
+            dense
+            :rules="[(val: any) => !!val || 'CSV File is required!']"
+          >
             <template v-slot:prepend>
               <q-icon name="attachment" />
             </template>
           </q-file>
           <div v-if="isUpdating">
-            <q-toggle class="col-12 q-py-md text-grey" v-model="formData.append" :label="t('function.appendData')" />
+            <q-toggle
+              class="col-12 q-py-md text-grey-8 text-bold"
+              v-model="formData.append"
+              :label="t('function.appendData')"
+            />
           </div>
         </div>
 
@@ -48,10 +74,23 @@
         }}</pre>
 
         <div class="flex justify-center q-mt-lg">
-          <q-btn v-close-popup="true" class="q-mb-md text-bold" :label="t('function.cancel')" text-color="light-text"
-            padding="sm md" no-caps @click="$emit('cancel:hideform')" />
-          <q-btn :label="t('function.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
-            type="submit" no-caps />
+          <q-btn
+            v-close-popup="true"
+            class="q-mb-md text-bold"
+            :label="t('function.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            no-caps
+            @click="$emit('cancel:hideform')"
+          />
+          <q-btn
+            :label="t('function.save')"
+            class="q-mb-md text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            type="submit"
+            no-caps
+          />
         </div>
       </q-form>
     </div>
@@ -173,6 +212,7 @@ export default defineComponent({
     if (this.isUpdating) {
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
+      if (this.formData.append == undefined) this.formData.append = false;
     }
   },
 });
