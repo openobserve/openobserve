@@ -51,7 +51,7 @@
 
               <div v-if="searchObj.data.savedViews.length">
                 <q-item
-                  class="q-pa-sm"
+                  class="q-pa-sm saved-view-item"
                   clickable
                   v-for="(item, i) in searchObj.data.savedViews"
                   :key="'saved-view-' + i"
@@ -63,7 +63,7 @@
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey" />
+                    <q-icon name="delete" color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -1555,5 +1555,9 @@ export default defineComponent({
   .q-field__marginal {
     height: 30px;
   }
+}
+
+.saved-view-item {
+  padding: 4px 5px !important;
 }
 </style>
