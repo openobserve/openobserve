@@ -256,6 +256,8 @@ export default defineComponent({
     const parser = new Parser();
     const fieldValues = ref({});
     const { showErrorNotification } = useNotifications();
+    const serviceColorIndex = ref(0);
+    const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -815,16 +817,6 @@ export default defineComponent({
     const getTracesMetaData = (traces) => {
       if (!traces.length) return [];
 
-      const serviceColors = [
-        "#b7885e",
-        "#1ab8be",
-        "#ffcb99",
-        "#f89570",
-        "#839ae2",
-      ];
-
-      let colorIndex = 0;
-
       return traces.map((trace) => {
         const _trace = {
           trace_id: trace.trace_id,
@@ -840,18 +832,28 @@ export default defineComponent({
         };
         trace.service_name.forEach((service) => {
           if (!searchObj.meta.serviceColors[service.service_name]) {
-            if (colorIndex >= serviceColors.length) colorIndex = 0;
+            if (serviceColorIndex.value >= colors.value.length)
+              generateNewColor();
 
+            console.log(serviceColorIndex.value, colors.value);
             searchObj.meta.serviceColors[service.service_name] =
-              serviceColors[colorIndex];
+              colors.value[serviceColorIndex.value];
 
-            colorIndex++;
+            serviceColorIndex.value++;
           }
           _trace.services[service.service_name] = service.count;
         });
         return _trace;
       });
     };
+
+    function generateNewColor() {
+      // Generate a color in HSL format
+      const hue = colors.value.length * (360 / 50);
+      const lightness = 50 + (colors.value.length % 2) * 15;
+      colors.value.push(`hsl(${hue}, 100%, ${lightness}%)`);
+      return colors;
+    }
 
     function extractFields() {
       try {
