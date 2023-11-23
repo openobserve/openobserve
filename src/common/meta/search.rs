@@ -113,8 +113,8 @@ impl Default for Query {
             start_time: 0,
             end_time: 0,
             sort_by: None,
-            sql_mode: "context".to_string(),
-            query_type: "logs".to_string(),
+            sql_mode: "".to_string(),
+            query_type: "".to_string(),
             track_total_hits: false,
             query_context: None,
             uses_zo_fn: false,
@@ -157,6 +157,8 @@ pub struct Response {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub took_detail: Option<ResponseTook>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub columns: Vec<String>,
     #[schema(value_type = Vec<Object>)]
     pub hits: Vec<json::Value>,
     #[serde(default)]
@@ -193,6 +195,7 @@ impl Response {
             size,
             file_count: 0,
             scan_size: 0,
+            columns: Vec::new(),
             hits: Vec::new(),
             aggs: HashMap::new(),
             response_type: "".to_string(),

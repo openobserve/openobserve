@@ -138,7 +138,8 @@ pub async fn search(
 
     // merge all batches
     let (offset, limit) = (0, sql.meta.offset + sql.meta.limit);
-    for (name, batches) in results.iter_mut() {
+    let mut merge_results = HashMap::new();
+    for (name, batches) in results.iter() {
         let merge_sql = if name == "query" {
             sql.origin_sql.clone()
         } else {
@@ -148,7 +149,7 @@ pub async fn search(
                 .0
                 .clone()
         };
-        *batches =
+        let batches =
             match super::datafusion::exec::merge(&sql.org_id, offset, limit, &merge_sql, batches)
                 .await
             {
@@ -158,16 +159,18 @@ pub async fn search(
                     return Err(handle_datafusion_error(err));
                 }
             };
+        merge_results.insert(name.to_string(), batches);
     }
+    drop(results);
 
     // clear session data
     datafusion::storage::file_list::clear(&session_id);
 
     // final result
     let mut hits_buf = Vec::new();
-    let result_query = results.get("query").cloned().unwrap_or_default();
-    if !result_query.is_empty() && !result_query[0].is_empty() {
-        let schema = result_query[0][0].schema();
+    let result_query = merge_results.get("query").cloned().unwrap_or_default();
+    if !result_query.is_empty() && !result_query.is_empty() {
+        let schema = result_query[0].schema();
         let ipc_options = ipc::writer::IpcWriteOptions::default();
         let ipc_options = ipc_options
             .try_with_compression(Some(ipc::CompressionType::ZSTD))
@@ -175,9 +178,7 @@ pub async fn search(
         let mut writer =
             ipc::writer::FileWriter::try_new_with_options(hits_buf, &schema, ipc_options).unwrap();
         for batch in result_query {
-            for item in batch {
-                writer.write(&item).unwrap();
-            }
+            writer.write(&batch).unwrap();
         }
         writer.finish().unwrap();
         hits_buf = writer.into_inner().unwrap();
@@ -185,12 +186,12 @@ pub async fn search(
 
     // finally aggs result
     let mut aggs_buf = Vec::new();
-    for (key, batches) in results {
+    for (key, batches) in merge_results {
         if key == "query" || batches.is_empty() {
             continue;
         }
         let mut buf = Vec::new();
-        let schema = batches[0][0].schema();
+        let schema = batches[0].schema();
         let ipc_options = ipc::writer::IpcWriteOptions::default();
         let ipc_options = ipc_options
             .try_with_compression(Some(ipc::CompressionType::ZSTD))
@@ -198,9 +199,7 @@ pub async fn search(
         let mut writer =
             ipc::writer::FileWriter::try_new_with_options(buf, &schema, ipc_options).unwrap();
         for batch in batches {
-            for item in batch {
-                writer.write(&item).unwrap();
-            }
+            writer.write(&batch).unwrap();
         }
         writer.finish().unwrap();
         buf = writer.into_inner().unwrap();

@@ -26,13 +26,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::meta::{
-    http::HttpResponse as MetaHttpResponse,
-    saved_view::{CreateViewRequest, UpdateViewRequest, CreateViewResponse, DeleteViewResponse},
-};
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
+use crate::common::meta::{
+    http::HttpResponse as MetaHttpResponse,
+    saved_view::{CreateViewRequest, CreateViewResponse, DeleteViewResponse, UpdateViewRequest},
+};
 use crate::service::db::saved_view;
 
 // GetSavedView
