@@ -33,7 +33,7 @@
             :label="t('function.name')"
             color="input-border"
             bg-color="input-bg"
-            class="col-12 q-py-md showLabelOnTop"
+            class="col-12 q-py-md showLabelOnTop text-grey-8 text-bold"
             stack-label
             outlined
             filled
@@ -54,16 +54,25 @@
             stack-label
             outlined
             dense
+            :rules="[(val: any) => !!val || 'CSV File is required!']"
           >
             <template v-slot:prepend>
               <q-icon name="attachment" />
             </template>
           </q-file>
+          <div v-if="isUpdating">
+            <q-toggle
+              class="col-12 q-py-md text-grey-8 text-bold"
+              v-model="formData.append"
+              :label="t('function.appendData')"
+            />
+          </div>
         </div>
 
         <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
           compilationErr
         }}</pre>
+
         <div class="flex justify-center q-mt-lg">
           <q-btn
             v-close-popup="true"
@@ -100,6 +109,7 @@ const defaultValue: any = () => {
   return {
     name: "",
     file: "",
+    append: false,
   };
 };
 
@@ -147,7 +157,8 @@ export default defineComponent({
         .create_enrichment_table(
           store.state.selectedOrganization.identifier,
           formData.value.name,
-          reqformData
+          reqformData,
+          formData.value.append
         )
         .then((res) => {
           formData.value = { ...defaultValue() };
@@ -201,6 +212,7 @@ export default defineComponent({
     if (this.isUpdating) {
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
+      if (this.formData.append == undefined) this.formData.append = false;
     }
   },
 });
@@ -218,6 +230,7 @@ export default defineComponent({
 .no-case .q-field__native span {
   text-transform: none !important;
 }
+
 .lookup-table-file-uploader {
   .q-field__label {
     left: -30px;
