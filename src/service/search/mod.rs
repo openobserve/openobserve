@@ -322,7 +322,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     }
 
     // merge all batches
-    for (name, batch) in batches.iter_mut() {
+    let mut merge_batches = HashMap::new();
+    for (name, batch) in batches.iter() {
         let merge_sql = if name == "query" {
             sql.origin_sql.clone()
         } else {
@@ -332,7 +333,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 .0
                 .clone()
         };
-        *batch = match datafusion::exec::merge(
+        let batch = match datafusion::exec::merge(
             &sql.org_id,
             sql.meta.offset,
             sql.meta.limit,
@@ -348,7 +349,9 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 )));
             }
         };
+        merge_batches.insert(name.to_string(), batch);
     }
+    drop(batches);
 
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
@@ -356,12 +359,13 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     // hits
     let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
     let empty_vec = vec![];
-    let batches_query = match batches.get("query") {
+    let batches_query = match merge_batches.get("query") {
         Some(batches) => batches,
         None => &empty_vec,
     };
     if !batches_query.is_empty() {
-        let batches_query_ref: Vec<&RecordBatch> = batches_query[0].iter().collect();
+        let schema = batches_query[0].schema();
+        let batches_query_ref: Vec<&RecordBatch> = batches_query.iter().collect();
         let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches_query_ref) {
             Ok(res) => res,
             Err(err) => {
@@ -376,8 +380,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             .map(json::Value::Object)
             .collect();
 
-        // handle metrics response
-        if query_type == "metrics" {
+        // handle query type: json, metrics, table
+        if query_type == "table" {
+            (result.columns, sources) = handle_table_response(schema, sources);
+        } else if query_type == "metrics" {
             sources = handle_metrics_response(sources);
         }
 
@@ -393,12 +399,12 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     }
 
     // aggs
-    for (name, batch) in batches {
+    for (name, batch) in merge_batches {
         if name == "query" || batch.is_empty() {
             continue;
         }
         let name = name.strip_prefix("agg_").unwrap().to_string();
-        let batch_ref: Vec<&RecordBatch> = batch[0].iter().collect();
+        let batch_ref: Vec<&RecordBatch> = batch.iter().collect();
         let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batch_ref) {
             Ok(res) => res,
             Err(err) => {
@@ -437,6 +443,31 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     );
 
     Ok(result)
+}
+
+fn handle_table_response(
+    schema: Arc<Schema>,
+    sources: Vec<json::Value>,
+) -> (Vec<String>, Vec<json::Value>) {
+    let columns = schema
+        .fields()
+        .iter()
+        .map(|f| f.name().to_string())
+        .collect::<Vec<_>>();
+    let mut table = Vec::with_capacity(sources.len());
+    for row in &sources {
+        let mut new_row = Vec::with_capacity(columns.len());
+        let row = row.as_object().unwrap();
+        for column in &columns {
+            let value = match row.get(column) {
+                Some(v) => v.to_owned(),
+                None => json::Value::Null,
+            };
+            new_row.push(value);
+        }
+        table.push(json::Value::Array(new_row));
+    }
+    (columns, table)
 }
 
 fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
