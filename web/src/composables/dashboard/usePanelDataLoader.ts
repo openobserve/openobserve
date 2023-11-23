@@ -17,7 +17,7 @@ import { ref, watch, reactive, toRefs, onMounted, onUnmounted } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
-import { addLabelToSQlQuery } from "@/utils/query/sqlUtils";
+import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 
 const formatInterval = (interval: any) => {
   switch (true) {
@@ -518,14 +518,11 @@ export const usePanelDataLoader = (
       //   },
       // ];
 
-      adHocVariables.forEach((variable: any) => {
-        query = addLabelToSQlQuery(
-          query,
-          variable.name,
-          variable.value,
-          variable.operator
-        );
-      });
+      query = addLabelsToSQlQuery(
+        query,
+        adHocVariables
+      );
+      
       console.log("querySQL", query);
     }
 
