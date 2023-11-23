@@ -28,7 +28,7 @@
 
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
-    saved_view::{RequestCreateView, RequestUpdateView, ResponseCreateView, ResponseDeleteView},
+    saved_view::{CreateViewRequest, UpdateViewRequest, CreateViewResponse, DeleteViewResponse},
 };
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use std::io::Error;
@@ -135,7 +135,7 @@ pub async fn delete_view(
     let (org_id, view_id) = path.into_inner();
     saved_view::delete_view(&org_id, &view_id).await.unwrap();
 
-    let resp = ResponseDeleteView { org_id, view_id };
+    let resp = DeleteViewResponse { org_id, view_id };
     Ok(MetaHttpResponse::json(resp))
 }
 
@@ -166,13 +166,13 @@ pub async fn delete_view(
 #[post("/{org_id}/savedviews")]
 pub async fn create_view(
     path: web::Path<String>,
-    view: web::Json<RequestCreateView>,
+    view: web::Json<CreateViewRequest>,
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
     let created_view = saved_view::set_view(&org_id, &view).await.unwrap();
-    let resp = ResponseCreateView {
+    let resp = CreateViewResponse {
         org_id,
         view_id: created_view.view_id,
         view_name: view.view_name.clone(),
@@ -210,7 +210,7 @@ pub async fn create_view(
 #[put("/{org_id}/savedviews/{view_id}")]
 pub async fn update_view(
     path: web::Path<(String, String)>,
-    view: web::Json<RequestUpdateView>,
+    view: web::Json<UpdateViewRequest>,
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, view_id) = path.into_inner();
@@ -229,7 +229,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_create_view_post() {
-        let payload = RequestCreateView {
+        let payload = CreateViewRequest {
             data: "base64-encoded-data".into(),
             view_name: "query-for-blah".into(),
         };
@@ -240,7 +240,7 @@ mod tests {
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
-        let json_body: ResponseCreateView = test::read_body_json(resp).await;
+        let json_body: CreateViewResponse = test::read_body_json(resp).await;
         assert!(!json_body.view_id.is_empty());
     }
 }

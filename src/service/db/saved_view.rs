@@ -15,14 +15,14 @@
 use crate::common::{
     infra::{db as infra_db, errors::Error},
     meta::saved_view::{
-        RequestCreateView, RequestUpdateView, View, ViewWithoutData, Views, ViewsWithoutData,
+        CreateViewRequest, UpdateViewRequest, View, ViewWithoutData, Views, ViewsWithoutData,
     },
     utils::json,
 };
 
 pub const SAVED_VIEWS_KEY_PREFIX: &str = "/organization/savedviews";
 
-pub async fn set_view(org_id: &str, view: &RequestCreateView) -> Result<View, Error> {
+pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Error> {
     let db = &infra_db::get_db().await;
     let view_id = uuid::Uuid::new_v4().to_string();
     let view = View {
@@ -45,7 +45,7 @@ pub async fn set_view(org_id: &str, view: &RequestCreateView) -> Result<View, Er
 pub async fn update_view(
     org_id: &str,
     view_id: &str,
-    view: &RequestUpdateView,
+    view: &UpdateViewRequest,
 ) -> Result<View, Error> {
     let db = &infra_db::get_db().await;
 
