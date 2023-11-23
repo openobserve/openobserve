@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, post, web, HttpRequest, HttpResponse};
+use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
 use serde::Serialize;
 use std::{collections::HashMap, io::Error};
@@ -121,7 +121,7 @@ async fn handle_req(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/traces/latest")]
+#[get("/{org_id}/traces/latest")]
 pub async fn get_latest_traces(
     org_id: web::Path<String>,
     in_req: HttpRequest,
@@ -259,7 +259,11 @@ pub async fn get_latest_traces(
         .map(|v| v.trace_id.clone())
         .collect::<Vec<String>>()
         .join("','");
-    let query_sql = format!("SELECT trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM default WHERE trace_id IN ('{trace_ids}') ORDER BY {} ASC LIMIT 9999",  CONFIG.common.column_timestamp);
+    let query_sql = format!("SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM default WHERE trace_id IN ('{}') ORDER BY {} ASC LIMIT 9999",
+        CONFIG.common.column_timestamp,
+        trace_ids,
+        CONFIG.common.column_timestamp,
+    );
     req.query.sql = query_sql.to_string();
     req.query.start_time = start_time;
     req.query.end_time = end_time;
@@ -368,7 +372,7 @@ pub async fn get_latest_traces(
         .inc();
 
     let mut resp: HashMap<&str, json::Value> = HashMap::new();
-    resp.insert("took", json::Value::from(time as usize));
+    resp.insert("took", json::Value::from((time * 1000.0) as usize));
     resp.insert("total", json::Value::from(traces_data.len()));
     resp.insert("from", json::Value::from(from));
     resp.insert("size", json::Value::from(size));

@@ -159,12 +159,24 @@ async fn process_file(file: &str) -> Result<Vec<FileKey>, anyhow::Error> {
     let uncompress_reader = BufReader::new(uncompress.reader());
     // parse file list
     let mut records = Vec::with_capacity(1024);
-    for line in uncompress_reader.lines() {
+    for (line_no, line) in uncompress_reader.lines().enumerate() {
         let line = line?;
         if line.is_empty() {
             continue;
         }
-        let item: FileKey = json::from_slice(line.as_bytes())?;
+        let item: FileKey = match json::from_slice(line.as_bytes()) {
+            Ok(item) => item,
+            Err(err) => {
+                log::error!(
+                    "parse remote file list failed:\nfile: {}\nline_no: {}\nline: {}\nerr: {}",
+                    file,
+                    line_no,
+                    line,
+                    err
+                );
+                continue;
+            }
+        };
         // check backlist
         if !super::BLOCKED_ORGS.is_empty() {
             let columns = item.key.split('/').collect::<Vec<&str>>();
