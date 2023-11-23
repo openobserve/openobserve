@@ -53,7 +53,9 @@
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
-                    :key="searchObj.data.stream.streamLists"
+                    :key="
+                      searchObj.data.stream.selectedStream.value || 'default'
+                    "
                     class="full-height"
                   />
                   <q-btn
@@ -95,7 +97,9 @@
                     </span>
                   </div>
                 </div>
-                <div v-else-if="!areStreamsPresent">
+                <div
+                  v-else-if="!areStreamsPresent && searchObj.loading == false"
+                >
                   <h5 data-test="logs-search-error-message" class="text-center">
                     <q-icon
                       name="warning"
@@ -370,8 +374,12 @@ export default defineComponent({
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
       // expandedLogs.value = {};
-      await getQueryData();
-      refreshHistogramChart();
+      try {
+        await getQueryData();
+        refreshHistogramChart();
+      } catch (e) {
+        console.log(e);
+      }
     };
 
     const refreshTimezone = () => {
@@ -403,6 +411,11 @@ export default defineComponent({
           let selectFields = "";
           let whereClause = "";
           let currentQuery = searchObj.data.query;
+
+          //check if user try to applied saved views in which sql mode is enabled.
+          if (currentQuery.indexOf("SELECT") >= 0) {
+            return;
+          }
           currentQuery = currentQuery.split("|");
           if (currentQuery.length > 1) {
             selectFields = "," + currentQuery[0].trim();

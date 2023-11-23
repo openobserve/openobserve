@@ -327,10 +327,10 @@
         </q-card-section>
 
         <q-card-actions align="right" class="bg-white text-teal">
-          <q-btn flat :label="t('confirmDialog.cancel')"
-v-close-popup />
-          <q-btn flat :label="t('confirmDialog.ok')"
-@click="handleSavedView" />
+          <q-btn flat
+:label="t('confirmDialog.cancel')" v-close-popup />
+          <q-btn flat
+:label="t('confirmDialog.ok')" @click="handleSavedView" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -446,7 +446,8 @@ export default defineComponent({
       handleRunQuery,
       updatedLocalLogFilterField,
       getSavedViews,
-      onStreamChange,
+      handleQueryData,
+      getStreams,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -571,8 +572,10 @@ export default defineComponent({
       await nextTick();
       await nextTick();
 
-      searchObj.loading = true;
-      searchObj.runQuery = true;
+      if (searchObj.loading == false) {
+        searchObj.loading = true;
+        searchObj.runQuery = true;
+      }
 
       if (config.isCloud == "true" && value.userChangedValue) {
         segment.track("Button Click", {
@@ -901,23 +904,58 @@ export default defineComponent({
         )
         .then(async (res) => {
           if (res.status == 200) {
-            const extractedObj = JSON.parse(b64DecodeUnicode(res.data.data));
+            // const extractedObj = JSON.parse(b64DecodeUnicode(res.data.data));
+            const extractedObj = res.data.data;
             // alert(JSON.stringify(searchObj.data.stream.selectedStream))
-            if (
-              extractedObj.data.stream.selectedStream.value !=
-              searchObj.data.stream.selectedStream.value
-            ) {
-              searchObj.value = mergeDeep(searchObj, extractedObj);
-              await nextTick();
-              updatedLocalLogFilterField();
-              await nextTick();
-              onStreamChange();
-            } else {
-              searchObj.value = mergeDeep(searchObj, extractedObj);
-              await nextTick();
-              updatedLocalLogFilterField();
-              handleRunQuery();
+            // if (
+            //   extractedObj.data.stream.selectedStream.value !=
+            //   searchObj.data.stream.selectedStream.value
+            // ) {
+            extractedObj.data.stream.streamLists =
+              searchObj.data.stream.streamLists;
+            extractedObj.data.transforms = searchObj.data.transforms;
+            extractedObj.data.stream.functions =
+              searchObj.data.stream.functions;
+            extractedObj.data.histogram = {
+              xData: [],
+              yData: [],
+              chartParams: {},
+            };
+            extractedObj.data.savedViews = searchObj.data.savedViews;
+            extractedObj.data.queryResults = [];
+            extractedObj.meta.scrollInfo = {};
+            searchObj.value = mergeDeep(searchObj, extractedObj);
+            await nextTick();
+            if (extractedObj.data.tempFunctionContent != "") {
+              populateFunctionImplementation({
+                name: "",
+                function: searchObj.data.tempFunctionContent,
+              });
+              searchObj.data.tempFunctionContent =
+                extractedObj.data.tempFunctionContent;
+              searchObj.meta.functionEditorPlaceholderFlag = false;
             }
+            dateTimeRef.value.setSavedDate(searchObj.data.datetime);
+            if (searchObj.meta.refreshInterval != "0") {
+              onRefreshIntervalUpdate();
+            }
+
+            if(searchObj.data?.timezone) {
+              store.dispatch("setTimezone", searchObj.data.timezone);
+            }
+            await updatedLocalLogFilterField();
+            await getStreams("logs", true);
+
+            setTimeout(() => {
+              handleQueryData();
+            }, 1000);
+
+            // } else {
+            //   searchObj.value = mergeDeep(searchObj, extractedObj);
+            //   await nextTick();
+            //   updatedLocalLogFilterField();
+            //   handleRunQuery();
+            // }
           } else {
             $q.notify({
               message: `Error while applying saved view. ${res.data.error_detail}`,
@@ -1012,38 +1050,48 @@ export default defineComponent({
       }
     };
 
-    const getEncodedSearchObj = () => {
-      const savedSearchObj: any = toRaw(searchObj);
+    const getSearchObj = () => {
+      try {
+        let savedSearchObj = cloneDeep(searchObj);
 
-      delete savedSearchObj.data.queryResults;
-      delete savedSearchObj.data.histogram;
-      delete savedSearchObj.data.sortedQueryResults;
-      delete savedSearchObj.data.stream.streamLists;
-      delete savedSearchObj.data.stream.functions;
-      delete savedSearchObj.data.streamResults;
-      delete savedSearchObj.data.savedViews;
-      delete savedSearchObj.data.transforms;
-      delete savedSearchObj.meta.scrollInfo;
-      savedSearchObj["version"] = "v1";
+        delete savedSearchObj.data.queryResults;
+        delete savedSearchObj.data.histogram;
+        delete savedSearchObj.data.sortedQueryResults;
+        delete savedSearchObj.data.stream.streamLists;
+        delete savedSearchObj.data.stream.functions;
+        delete savedSearchObj.data.streamResults;
+        delete savedSearchObj.data.savedViews;
+        delete savedSearchObj.data.transforms;
+        delete savedSearchObj.meta.scrollInfo;
 
-      return b64EncodeUnicode(JSON.stringify(savedSearchObj));
+        savedSearchObj.data.timezone = store.state.timezone;
+        delete savedSearchObj.value;
+
+        return savedSearchObj;
+        // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
+      } catch (e) {
+        console.log("Error while encoding search obj", e);
+      }
     };
 
     const createSavedViews = (viewName: string) => {
       try {
-        const data: any = {
-          data: getEncodedSearchObj(),
+        const viewObj: any = {
+          data: getSearchObj(),
           view_name: viewName,
         };
 
         savedviewsService
-          .post(store.state.selectedOrganization.identifier, data)
+          .post(store.state.selectedOrganization.identifier, viewObj)
           .then((res) => {
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
+              if (searchObj.data.hasOwnProperty("savedViews") == false) {
+                searchObj.data.savedViews = [];
+              }
               searchObj.data.savedViews.push({
                 org_id: res.data.org_id,
-                payload: data.data,
+                payload: viewObj.data,
                 view_id: res.data.view_id,
                 view_name: viewName,
               });
@@ -1074,19 +1122,25 @@ export default defineComponent({
             console.log(err);
           });
       } catch (e: any) {
+        $q.notify({
+          message: `Error while saving view: ${e}`,
+          color: "negative",
+          position: "bottom",
+          timeout: 1000,
+        });
         console.log("Error while saving view", e);
       }
     };
 
     const updateSavedViews = (viewID: string, viewName: string) => {
       try {
-        const data: any = {
-          data: getEncodedSearchObj(),
+        const viewObj: any = {
+          data: getSearchObj(),
           view_name: viewName,
         };
 
         savedviewsService
-          .put(store.state.selectedOrganization.identifier, viewID, data)
+          .put(store.state.selectedOrganization.identifier, viewID, viewObj)
           .then((res) => {
             console.log(res);
             if (res.status == 200) {
@@ -1095,7 +1149,7 @@ export default defineComponent({
               searchObj.data.savedViews.forEach(
                 (item: { view_id: string }, index: string | number) => {
                   if (item.view_id == viewID) {
-                    searchObj.data.savedViews[index].payload = data.data;
+                    searchObj.data.savedViews[index].payload = viewObj.data;
                     searchObj.data.savedViews[index].view_name = viewName;
                   }
                 }
@@ -1127,6 +1181,12 @@ export default defineComponent({
             console.log(err);
           });
       } catch (e: any) {
+        $q.notify({
+          message: `Error while saving view: ${e}`,
+          color: "negative",
+          position: "bottom",
+          timeout: 1000,
+        });
         console.log("Error while saving view", e);
       }
     };

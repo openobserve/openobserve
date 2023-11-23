@@ -500,11 +500,8 @@ export const localTimeSelectedTimezoneUTCTime = (
   const unixTimestamp = convertedDate.unix() * 1000000;
 
   return unixTimestamp;
+};
 
-  // return convertToUtcTimestamp(
-  //   timestampToTimezoneDate(unixTimestamp * 1000, "UTC", "yyyy/MM/dd HH:mm:ss"),
-  //   "UTC"
-  // );
 function isObject(item: any) {
   return item && typeof item === "object" && !Array.isArray(item);
 }
