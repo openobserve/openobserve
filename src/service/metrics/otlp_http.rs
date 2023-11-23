@@ -182,9 +182,9 @@ pub async fn metrics_json_handler(
                         stream_partitioning_map
                             .insert(metric_name.to_owned(), partition_det.clone());
                     }
-                    let partition_det = stream_partitioning_map.get(metric_name).unwrap();
-                    let partition_keys = partition_det.partition_keys.clone();
-                    let partition_time_level = unwrap_partition_time_level(
+                    let mut partition_det = stream_partitioning_map.get(metric_name).unwrap();
+                    let mut partition_keys = partition_det.partition_keys.clone();
+                    let mut partition_time_level = unwrap_partition_time_level(
                         partition_det.partition_time_level,
                         StreamType::Metrics,
                     );
@@ -195,7 +195,7 @@ pub async fn metrics_json_handler(
                     // End get stream alert
 
                     // Start Register Transforms for stream
-                    let (local_trans, stream_vrl_map) =
+                    let (mut local_trans, mut stream_vrl_map) =
                         crate::service::ingestion::register_stream_transforms(
                             org_id,
                             StreamType::Metrics,
@@ -203,7 +203,6 @@ pub async fn metrics_json_handler(
                         );
                     // End Register Transforms for stream
 
-                    let buf = metric_data_map.entry(metric_name.to_owned()).or_default();
                     let mut rec = json::json!({});
 
                     rec[NAME_LABEL] = metric_name.to_owned().into();
@@ -290,12 +289,67 @@ pub async fn metrics_json_handler(
                         rec = flatten::flatten(&rec).expect("failed to flatten");
                         // get json object
 
+                        let local_metric_name =
+                            &format_stream_name(rec.get(NAME_LABEL).unwrap().as_str().unwrap());
+
+                        if local_metric_name != metric_name {
+                            // check for schema
+                            stream_schema_exists(
+                                org_id,
+                                local_metric_name,
+                                StreamType::Metrics,
+                                &mut metric_schema_map,
+                            )
+                            .await;
+
+                            // get partition keys
+                            if !stream_partitioning_map.contains_key(local_metric_name) {
+                                let partition_det =
+                                    crate::service::ingestion::get_stream_partition_keys(
+                                        local_metric_name,
+                                        &metric_schema_map,
+                                    )
+                                    .await;
+                                stream_partitioning_map
+                                    .insert(local_metric_name.to_owned(), partition_det.clone());
+                            }
+                            partition_det = stream_partitioning_map.get(local_metric_name).unwrap();
+                            partition_keys = partition_det.partition_keys.clone();
+                            partition_time_level = unwrap_partition_time_level(
+                                partition_det.partition_time_level,
+                                StreamType::Metrics,
+                            );
+
+                            // Start get stream alerts
+                            let key = format!(
+                                "{}/{}/{}",
+                                &org_id,
+                                StreamType::Metrics,
+                                local_metric_name
+                            );
+                            crate::service::ingestion::get_stream_alerts(
+                                key,
+                                &mut stream_alerts_map,
+                            )
+                            .await;
+                            // End get stream alert
+
+                            // Start Register Transforms for stream
+                            (local_trans, stream_vrl_map) =
+                                crate::service::ingestion::register_stream_transforms(
+                                    org_id,
+                                    StreamType::Metrics,
+                                    local_metric_name,
+                                );
+                            // End Register Transforms for stream
+                        }
+
                         if !local_trans.is_empty() {
                             rec = crate::service::ingestion::apply_stream_transform(
                                 &local_trans,
                                 &rec,
                                 &stream_vrl_map,
-                                metric_name,
+                                local_metric_name,
                                 &mut runtime,
                             )
                             .unwrap_or(rec);
@@ -315,12 +369,15 @@ pub async fn metrics_json_handler(
                             &mut metric_schema_map,
                             org_id,
                             StreamType::Metrics,
-                            metric_name,
+                            local_metric_name,
                             timestamp,
                             &value_str,
                         )
                         .await;
 
+                        let buf = metric_data_map
+                            .entry(local_metric_name.to_owned())
+                            .or_default();
                         // get hour key
                         let hour_key = crate::service::ingestion::get_wal_time_key(
                             timestamp,
@@ -335,8 +392,12 @@ pub async fn metrics_json_handler(
                         // real time alert
                         if !stream_alerts_map.is_empty() {
                             // Start check for alert trigger
-                            let key =
-                                format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
+                            let key = format!(
+                                "{}/{}/{}",
+                                &org_id,
+                                StreamType::Metrics,
+                                local_metric_name
+                            );
                             if let Some(alerts) = stream_alerts_map.get(&key) {
                                 for alert in alerts {
                                     if alert.is_real_time {
@@ -346,12 +407,12 @@ pub async fn metrics_json_handler(
                                         );
                                         if set_trigger {
                                             stream_trigger_map.insert(
-                                                metric_name.to_owned(),
+                                                local_metric_name.to_owned(),
                                                 Trigger {
                                                     timestamp,
                                                     is_valid: true,
                                                     alert_name: alert.name.clone(),
-                                                    stream: metric_name.to_owned(),
+                                                    stream: local_metric_name.to_owned(),
                                                     org: org_id.to_string(),
                                                     stream_type: StreamType::Metrics,
                                                     last_sent_at: 0,
@@ -731,13 +792,13 @@ fn process_hist_data_point(
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = data_point.get("count").unwrap().as_str().into();
-    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
+    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
     sum_rec[VALUE_LABEL] = data_point.get("sum").unwrap().as_str().into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
+    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(sum_rec);
 
     // add bucket records
@@ -810,13 +871,13 @@ fn process_exp_hist_data_point(
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = data_point.get("count").unwrap().as_str().into();
-    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
+    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
     sum_rec[VALUE_LABEL] = data_point.get("sum").unwrap().as_str().into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
+    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(sum_rec);
 
     let base = 2 ^ (2 ^ -data_point.get("scale").unwrap().as_i64().unwrap());
@@ -903,13 +964,13 @@ fn process_summary_data_point(
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = data_point.get("count").unwrap().as_str().into();
-    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL]).into();
+    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
     sum_rec[VALUE_LABEL] = data_point.get("sum").unwrap().as_str().into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL]).into();
+    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(sum_rec);
 
     // add bucket records
