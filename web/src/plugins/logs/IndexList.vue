@@ -351,8 +351,12 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { searchObj, updatedLocalLogFilterField, handleQueryData } =
-      useLogs();
+    const {
+      searchObj,
+      updatedLocalLogFilterField,
+      handleQueryData,
+      onStreamChange,
+    } = useLogs();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
     const fieldValues: Ref<{
       [key: string | number]: {
@@ -378,9 +382,14 @@ export default defineComponent({
     };
 
     watch(
-      () => searchObj.data.stream.streamLists.length,
       () => {
-        streamOptions.value = searchObj.data.stream.streamLists;
+        searchObj.data.stream.streamLists.length;
+        store.state.organizationData.streams;
+      },
+      () => {
+        streamOptions.value =
+          searchObj.data.stream.streamLists ||
+          store.state.organizationData.streams;
       }
     );
 
@@ -563,16 +572,17 @@ export default defineComponent({
       searchObj.data.stream.addToFilter = term;
     };
 
-    const onStreamChange = () => {
-      const query = searchObj.meta.sqlMode
-        ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
-        : "";
+    // const onStreamChange = () => {
+    //   alert("onStreamChange")
+    //   const query = searchObj.meta.sqlMode
+    //     ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
+    //     : "";
 
-      searchObj.data.editorValue = query;
-      searchObj.data.query = query;
+    //   searchObj.data.editorValue = query;
+    //   searchObj.data.query = query;
 
-      handleQueryData();
-    };
+    //   handleQueryData();
+    // };
 
     return {
       t,

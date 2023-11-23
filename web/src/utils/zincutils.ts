@@ -500,9 +500,30 @@ export const localTimeSelectedTimezoneUTCTime = (
   const unixTimestamp = convertedDate.unix() * 1000000;
 
   return unixTimestamp;
+};
 
-  // return convertToUtcTimestamp(
-  //   timestampToTimezoneDate(unixTimestamp * 1000, "UTC", "yyyy/MM/dd HH:mm:ss"),
-  //   "UTC"
-  // );
+const isObject = (obj: any) => obj !== null && typeof obj === "object";
+
+const isValidKey = (key: string) => {
+  // Add any additional checks to ensure key validity
+  return key !== "__proto__" && key !== "constructor" && key !== "prototype";
+};
+
+export const mergeDeep = (target: any, source: any) => {
+  if (isObject(target) && isObject(source)) {
+    for (const key in source) {
+      if (
+        isValidKey(key) &&
+        Object.prototype.hasOwnProperty.call(source, key)
+      ) {
+        if (isObject(source[key])) {
+          if (!target[key]) target[key] = {};
+          mergeDeep(target[key], source[key]);
+        } else {
+          target[key] = source[key];
+        }
+      }
+    }
+  }
+  return target;
 };
