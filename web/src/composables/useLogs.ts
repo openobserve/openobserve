@@ -14,7 +14,7 @@
 
 import { date, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, ref, type Ref } from "vue";
+import { reactive, ref, type Ref, toRaw } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -44,11 +44,12 @@ import useStreams from "@/composables/useStreams";
 
 import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
+import savedviewsService from "@/services/saved_views";
 
 const defaultObject = {
   organizationIdetifier: "",
   runQuery: false,
-  loading: false,
+  loading: true,
   config: {
     splitterModel: 20,
     lastSplitterPosition: 0,
@@ -147,6 +148,7 @@ const defaultObject = {
     tempFunctionName: "",
     tempFunctionContent: "",
     tempFunctionLoading: false,
+    savedViews: <any>[],
   },
 };
 
@@ -269,7 +271,7 @@ const useLogs = () => {
     searchObj.data.searchAround.size = 0;
   }
 
-  function loadStreamLists() {
+  async function loadStreamLists() {
     try {
       if (searchObj.data.streamResults.list.length > 0) {
         let lastUpdatedStreamTime = 0;
@@ -315,7 +317,7 @@ const useLogs = () => {
       const streamType = searchObj.data.stream.streamType || "logs";
       const streamData = await getStreams(streamType, true);
       searchObj.data.streamResults = streamData;
-      loadStreamLists();
+      await loadStreamLists();
       return;
     } catch (e: any) {
       console.log("Error while getting stream list");
@@ -1050,10 +1052,10 @@ const useLogs = () => {
 
   const loadLogsData = async () => {
     try {
-      searchObj.loading = true;
       resetFunctions();
-      await getFunctions();
       await getStreamList();
+      await getSavedViews();
+      await getFunctions();
       await getQueryData();
       refreshData();
     } catch (e: any) {
@@ -1190,8 +1192,35 @@ const useLogs = () => {
     searchObj.meta.flagWrapContent = flag;
   };
 
+  const getSavedViews = async () => {
+    try {
+      savedviewsService
+        .get(store.state.selectedOrganization.identifier)
+        .then((res) => {
+          searchObj.data.savedViews = res.data.views;
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    } catch (e: any) {
+      console.log("Error while getting saved views", e);
+    }
+  };
+
+  const onStreamChange = () => {
+    const query = searchObj.meta.sqlMode
+      ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
+      : "";
+
+    searchObj.data.editorValue = query;
+    searchObj.data.query = query;
+
+    handleQueryData();
+  };
+
   return {
     searchObj,
+    getStreams,
     resetSearchObj,
     updatedLocalLogFilterField,
     getFunctions,
@@ -1210,6 +1239,8 @@ const useLogs = () => {
     generateHistogramData,
     extractFTSFields,
     evaluateWrapContentFlag,
+    getSavedViews,
+    onStreamChange,
   };
 };
 

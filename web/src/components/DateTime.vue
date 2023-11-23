@@ -619,6 +619,20 @@ export default defineComponent({
       return { startUTC, endUTC };
     };
 
+    const setSavedDate = (dateobj) => {
+      selectedType.value = dateobj.type;
+      if (dateobj.type === "relative") {
+        setRelativeTime(dateobj.relativeTimePeriod);
+      } else {
+        setCustomDate(dateobj.type, {
+          start: dateobj.startTime,
+          end: dateobj.endTime,
+        });
+      }
+
+      displayValue.value = getDisplayValue();
+    };
+
     const getDisplayValue = () => {
       if (selectedType.value === "relative") {
         return `Past ${relativeValue.value} ${getPeriodLabel.value}`;
@@ -685,6 +699,7 @@ export default defineComponent({
       filteredTimezone,
       timezoneFilterFn,
       setCustomDate,
+      setSavedDate,
     };
   },
 });
