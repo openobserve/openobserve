@@ -101,7 +101,6 @@ pub async fn save_enrichment_data(
         Utc::now().timestamp_micros()
     } else {
         let schema = stream_schema_map.get(stream_name).unwrap();
-        println!("schema: {:?}", schema);
         schema
             .metadata()
             .get("created_at")
