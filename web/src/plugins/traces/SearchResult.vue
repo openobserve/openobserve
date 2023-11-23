@@ -122,7 +122,10 @@ export default defineComponent({
         this.searchObj.loading == false &&
         this.searchObj.data.resultGrid.currentPage <=
           this.searchObj.data.queryResults.from /
-            this.searchObj.meta.resultGrid.rowsPerPage
+            this.searchObj.meta.resultGrid.rowsPerPage &&
+        this.searchObj.data.queryResults.hits.length >
+          this.searchObj.meta.resultGrid.rowsPerPage *
+            this.searchObj.data.resultGrid.currentPage
       ) {
         this.searchObj.data.resultGrid.currentPage += 1;
         this.$emit("update:scroll");
