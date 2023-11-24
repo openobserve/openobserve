@@ -719,7 +719,6 @@ fn process_summary_data_point(
     // add bucket records
     for value in &data_point.quantile_values {
         let mut bucket_rec = rec.clone();
-        bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
         bucket_rec[VALUE_LABEL] = value.value.into();
         bucket_rec["quantile"] = value.quantile.to_string().into();
         bucket_recs.push(bucket_rec);

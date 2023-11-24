@@ -553,7 +553,13 @@ fn process_sum(
         rec,
         sum.get("aggregationTemporality").unwrap().as_u64().unwrap(),
     );
-    rec["is_monotonic"] = sum.get("isMonotonic").unwrap().as_bool().unwrap().into();
+    rec["is_monotonic"] = sum
+        .get("isMonotonic")
+        .unwrap()
+        .as_bool()
+        .unwrap()
+        .to_string()
+        .into();
     for data_point in sum.get("dataPoints").unwrap().as_array().unwrap_or(&vec![]) {
         let dp = data_point.as_object().unwrap();
         let mut dp_rec = rec.clone();
@@ -720,7 +726,7 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_int_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
 
     set_data_point_value(rec, data_point);
@@ -756,7 +762,7 @@ fn process_hist_data_point(
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_int_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -824,7 +830,7 @@ fn process_exp_hist_data_point(
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_int_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -909,7 +915,7 @@ fn process_summary_data_point(
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_int_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -939,7 +945,6 @@ fn process_summary_data_point(
         .unwrap();
     for value in buckets {
         let mut bucket_rec = rec.clone();
-        bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
         let value = value.as_object().unwrap();
         bucket_rec[VALUE_LABEL] = get_float_value(value.get("value").unwrap()).into();
         bucket_rec["quantile"] = value.get("quantile").unwrap().clone();
@@ -1025,7 +1030,7 @@ fn set_data_point_value(rec: &mut json::Value, data_point: &json::Map<String, js
     if data_point.get("asInt").is_some() {
         rec[VALUE_LABEL] = (data_point.get("asInt").unwrap().as_i64().unwrap() as f64).into();
     } else {
-        rec[VALUE_LABEL] = data_point.get("asDouble").unwrap().clone();
+        rec[VALUE_LABEL] = get_float_value(data_point.get("asDouble").unwrap()).into();
     }
 }
 
@@ -1079,5 +1084,12 @@ fn get_int_value(val: &json::Value) -> i64 {
         json::Value::String(v) => v.parse::<i64>().unwrap_or(0),
         json::Value::Number(v) => v.as_i64().unwrap_or(0),
         _ => 0,
+    }
+}
+fn get_string_value(val: &json::Value) -> String {
+    match val {
+        json::Value::String(v) => v.to_string(),
+        json::Value::Number(v) => v.as_i64().unwrap_or(0).to_string(),
+        _ => "".to_string(),
     }
 }
