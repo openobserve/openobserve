@@ -63,8 +63,8 @@
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey"
-size="xs" />
+                    <q-icon name="delete"
+color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -1076,7 +1076,9 @@ export default defineComponent({
 
     const getSearchObj = () => {
       try {
+        delete searchObj.meta.scrollInfo;
         let savedSearchObj = toRaw(searchObj);
+        savedSearchObj = JSON.parse(JSON.stringify(savedSearchObj));
 
         delete savedSearchObj.data.queryResults;
         delete savedSearchObj.data.histogram;
@@ -1129,6 +1131,7 @@ export default defineComponent({
               savedViewName.value = "";
               saveViewLoader.value = false;
             } else {
+              saveViewLoader.value = false;
               $q.notify({
                 message: `Error while creating saved view. ${res.data.error_detail}`,
                 color: "negative",
@@ -1138,6 +1141,7 @@ export default defineComponent({
             }
           })
           .catch((err) => {
+            saveViewLoader.value = false;
             $q.notify({
               message: `Error while creating saved view.`,
               color: "negative",
@@ -1147,6 +1151,8 @@ export default defineComponent({
             console.log(err);
           });
       } catch (e: any) {
+        savedViewName.value = "";
+        saveViewLoader.value = false;
         $q.notify({
           message: `Error while saving view: ${e}`,
           color: "negative",
@@ -1167,7 +1173,6 @@ export default defineComponent({
         savedviewsService
           .put(store.state.selectedOrganization.identifier, viewID, viewObj)
           .then((res) => {
-            console.log(res);
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               //update the payload and view_name in savedViews object based on id
@@ -1189,6 +1194,7 @@ export default defineComponent({
               savedViewSelectedName.value = "{}";
               saveViewLoader.value = false;
             } else {
+              saveViewLoader.value = false;
               $q.notify({
                 message: `Error while updating saved view. ${res.data.error_detail}`,
                 color: "negative",
@@ -1198,6 +1204,7 @@ export default defineComponent({
             }
           })
           .catch((err) => {
+            saveViewLoader.value = false;
             $q.notify({
               message: `Error while updating saved view.`,
               color: "negative",
@@ -1207,6 +1214,8 @@ export default defineComponent({
             console.log(err);
           });
       } catch (e: any) {
+        savedViewSelectedName.value = "{}";
+        saveViewLoader.value = false;
         $q.notify({
           message: `Error while saving view: ${e}`,
           color: "negative",
