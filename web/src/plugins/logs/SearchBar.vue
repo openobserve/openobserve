@@ -916,6 +916,10 @@ export default defineComponent({
         return;
       }
       store.dispatch("setSavedViewDialog", true);
+      isSavedViewAction.value = "create";
+      savedViewName.value = "";
+      saveViewLoader.value = false;
+      savedViewSelectedName.value = "";
     };
 
     const applySavedView = (item) => {
@@ -1134,6 +1138,7 @@ export default defineComponent({
                 timeout: 1000,
               });
               getSavedViews();
+              isSavedViewAction.value = "create";
               savedViewName.value = "";
               saveViewLoader.value = false;
             } else {
@@ -1157,6 +1162,7 @@ export default defineComponent({
             console.log(err);
           });
       } catch (e: any) {
+        isSavedViewAction.value = "create";
         savedViewName.value = "";
         saveViewLoader.value = false;
         $q.notify({
@@ -1197,7 +1203,8 @@ export default defineComponent({
                 position: "bottom",
                 timeout: 1000,
               });
-              savedViewSelectedName.value = "{}";
+              isSavedViewAction.value = "create";
+              savedViewSelectedName.value = "";
               saveViewLoader.value = false;
             } else {
               saveViewLoader.value = false;
@@ -1220,7 +1227,8 @@ export default defineComponent({
             console.log(err);
           });
       } catch (e: any) {
-        savedViewSelectedName.value = "{}";
+        isSavedViewAction.value = "create";
+        savedViewSelectedName.value = "";
         saveViewLoader.value = false;
         $q.notify({
           message: `Error while saving view: ${e}`,
