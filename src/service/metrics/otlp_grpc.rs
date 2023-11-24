@@ -607,6 +607,7 @@ fn process_hist_data_point(
     let len = data_point.bucket_counts.len();
     for i in 0..len {
         let mut bucket_rec = rec.clone();
+        bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
         if let Some(val) = data_point.bucket_counts.get(i) {
             bucket_rec[VALUE_LABEL] = (*val as f64).into()
         }
@@ -658,7 +659,9 @@ fn process_exp_hist_data_point(
             let offset = buckets.offset;
             for (i, val) in buckets.bucket_counts.iter().enumerate() {
                 let mut bucket_rec = rec.clone();
-                bucket_rec[VALUE_LABEL] = (*val).into();
+                bucket_rec[NAME_LABEL] =
+                    format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
+                bucket_rec[VALUE_LABEL] = (*val as f64).into();
                 bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
                 bucket_recs.push(bucket_rec);
             }
@@ -671,7 +674,9 @@ fn process_exp_hist_data_point(
             let offset = buckets.offset;
             for (i, val) in buckets.bucket_counts.iter().enumerate() {
                 let mut bucket_rec = rec.clone();
-                bucket_rec[VALUE_LABEL] = (*val).into();
+                bucket_rec[NAME_LABEL] =
+                    format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
+                bucket_rec[VALUE_LABEL] = (*val as f64).into();
                 bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
                 bucket_recs.push(bucket_rec);
             }
@@ -714,6 +719,7 @@ fn process_summary_data_point(
     // add bucket records
     for value in &data_point.quantile_values {
         let mut bucket_rec = rec.clone();
+        bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
         bucket_rec[VALUE_LABEL] = value.value.into();
         bucket_rec["quantile"] = value.quantile.to_string().into();
         bucket_recs.push(bucket_rec);

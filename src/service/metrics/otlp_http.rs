@@ -719,19 +719,8 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
                 get_attribute_value(v)
         }
     }
-    let ts = data_point
-        .get("timeUnixNano")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .parse::<u64>()
-        .unwrap();
-    rec["start_time"] = data_point
-        .get("startTimeUnixNano")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .into();
+    let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
+    rec["start_time"] = get_int_value(data_point.get("startTimeUnixNano").unwrap()).into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
 
     set_data_point_value(rec, data_point);
@@ -766,19 +755,8 @@ fn process_hist_data_point(
                 get_attribute_value(v);
         }
     }
-    let ts = data_point
-        .get("timeUnixNano")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .parse::<u64>()
-        .unwrap();
-    rec["start_time"] = data_point
-        .get("startTimeUnixNano")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .into();
+    let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
+    rec["start_time"] = get_int_value(data_point.get("startTimeUnixNano").unwrap()).into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -791,13 +769,13 @@ fn process_hist_data_point(
     process_exemplars(rec, data_point);
     // add count record
     let mut count_rec = rec.clone();
-    count_rec[VALUE_LABEL] = data_point.get("count").unwrap().as_str().into();
+    count_rec[VALUE_LABEL] = get_float_value(data_point.get("count").unwrap()).into();
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
-    sum_rec[VALUE_LABEL] = data_point.get("sum").unwrap().as_str().into();
+    sum_rec[VALUE_LABEL] = get_float_value(data_point.get("sum").unwrap()).into();
     sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(sum_rec);
 
@@ -812,14 +790,15 @@ fn process_hist_data_point(
     let len = buckets.len();
     for i in 0..len {
         let mut bucket_rec = rec.clone();
+        bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
         if let Some(val) = buckets.get(i) {
-            bucket_rec[VALUE_LABEL] = (*val).clone()
+            bucket_rec[VALUE_LABEL] = get_float_value(val).into();
         }
         if let Some(val) = explicit_bounds.get(i) {
-            bucket_rec["le"] = (*val).clone()
+            bucket_rec["le"] = (*val.to_string()).into()
         }
         if i == len - 1 {
-            bucket_rec["le"] = std::f64::INFINITY.into();
+            bucket_rec["le"] = std::f64::INFINITY.to_string().into();
         }
         bucket_recs.push(bucket_rec);
     }
@@ -844,19 +823,8 @@ fn process_exp_hist_data_point(
                 get_attribute_value(v);
         }
     }
-    let ts = data_point
-        .get("timeUnixNano")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .parse::<u64>()
-        .unwrap();
-    rec["start_time"] = data_point
-        .get("startTimeUnixNano")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .into();
+    let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
+    rec["start_time"] = get_int_value(data_point.get("startTimeUnixNano").unwrap()).into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -870,13 +838,13 @@ fn process_exp_hist_data_point(
 
     // add count record
     let mut count_rec = rec.clone();
-    count_rec[VALUE_LABEL] = data_point.get("count").unwrap().as_str().into();
+    count_rec[VALUE_LABEL] = get_float_value(data_point.get("count").unwrap()).into();
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
-    sum_rec[VALUE_LABEL] = data_point.get("sum").unwrap().as_str().into();
+    sum_rec[VALUE_LABEL] = get_float_value(data_point.get("sum").unwrap()).into();
     sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(sum_rec);
 
@@ -894,8 +862,9 @@ fn process_exp_hist_data_point(
             .enumerate()
         {
             let mut bucket_rec = rec.clone();
-            bucket_rec[VALUE_LABEL] = (*val).clone();
-            bucket_rec["le"] = (base ^ (offset + (i as i64) + 1)).into();
+            bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
+            bucket_rec[VALUE_LABEL] = get_float_value(val).into();
+            bucket_rec["le"] = (base ^ (offset + (i as i64) + 1)).to_string().into();
             bucket_recs.push(bucket_rec);
         }
     }
@@ -912,8 +881,8 @@ fn process_exp_hist_data_point(
             .enumerate()
         {
             let mut bucket_rec = rec.clone();
-            bucket_rec[VALUE_LABEL] = (*val).clone();
-            bucket_rec["le"] = (base ^ (offset + (i as i64) + 1)).into();
+            bucket_rec[VALUE_LABEL] = get_float_value(val).into();
+            bucket_rec["le"] = (base ^ (offset + (i as i64) + 1)).to_string().into();
             bucket_recs.push(bucket_rec);
         }
     }
@@ -939,19 +908,8 @@ fn process_summary_data_point(
                 get_attribute_value(v)
         }
     }
-    let ts = data_point
-        .get("timeUnixNano")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .parse::<u64>()
-        .unwrap();
-    rec["start_time"] = data_point
-        .get("startTimeUnixNano")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .into();
+    let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
+    rec["start_time"] = get_int_value(data_point.get("startTimeUnixNano").unwrap()).into();
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -963,13 +921,13 @@ fn process_summary_data_point(
     }
     // add count record
     let mut count_rec = rec.clone();
-    count_rec[VALUE_LABEL] = data_point.get("count").unwrap().as_str().into();
+    count_rec[VALUE_LABEL] = get_float_value(data_point.get("count").unwrap()).into();
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
     // add sum record
     let mut sum_rec = rec.clone();
-    sum_rec[VALUE_LABEL] = data_point.get("sum").unwrap().as_str().into();
+    sum_rec[VALUE_LABEL] = get_float_value(data_point.get("sum").unwrap()).into();
     sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(sum_rec);
 
@@ -981,8 +939,9 @@ fn process_summary_data_point(
         .unwrap();
     for value in buckets {
         let mut bucket_rec = rec.clone();
+        bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
         let value = value.as_object().unwrap();
-        bucket_rec[VALUE_LABEL] = value.get("value").unwrap().clone();
+        bucket_rec[VALUE_LABEL] = get_float_value(value.get("value").unwrap()).into();
         bucket_rec["quantile"] = value.get("quantile").unwrap().clone();
         bucket_recs.push(bucket_rec);
     }
@@ -1104,5 +1063,21 @@ fn get_metric_value(val: &json::Value) -> f64 {
         val.get("doubleValue").unwrap().as_f64().unwrap()
     } else {
         0.0
+    }
+}
+
+fn get_float_value(val: &json::Value) -> f64 {
+    match val {
+        json::Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
+        json::Value::Number(v) => v.as_f64().unwrap_or(0.0),
+        _ => 0.0,
+    }
+}
+
+fn get_int_value(val: &json::Value) -> i64 {
+    match val {
+        json::Value::String(v) => v.parse::<i64>().unwrap_or(0),
+        json::Value::Number(v) => v.as_i64().unwrap_or(0),
+        _ => 0,
     }
 }
