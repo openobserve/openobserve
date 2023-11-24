@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use crate::common::{
     infra::{config::TRIGGERS, db as infra_db},
-    meta::alert::Trigger,
+    meta::alerts::Trigger,
     utils::json,
 };
 

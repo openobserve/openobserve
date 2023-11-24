@@ -38,7 +38,7 @@ use crate::{
             metrics,
         },
         meta::{
-            alert,
+            alerts,
             functions::StreamTransform,
             prom::*,
             search,
@@ -81,8 +81,8 @@ pub async fn remote_write(
     let mut cluster_name = String::new();
     let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<alert::Alert>> = AHashMap::new();
-    let mut stream_trigger_map: AHashMap<String, alert::Trigger> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<alerts::Alert>> = AHashMap::new();
+    let stream_trigger_map: AHashMap<String, alerts::Trigger> = AHashMap::new();
     let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
@@ -307,27 +307,27 @@ pub async fn remote_write(
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     for alert in alerts {
                         if alert.is_real_time {
-                            let set_trigger = alert::Evaluate::evaluate(
-                                &alert.condition,
-                                value.as_object().unwrap().clone(),
-                            );
-                            if set_trigger {
-                                stream_trigger_map.insert(
-                                    metric_name.clone(),
-                                    alert::Trigger {
-                                        timestamp,
-                                        is_valid: true,
-                                        alert_name: alert.name.clone(),
-                                        stream: metric_name.clone(),
-                                        org: org_id.to_string(),
-                                        stream_type: StreamType::Metrics,
-                                        last_sent_at: 0,
-                                        count: 0,
-                                        is_ingest_time: true,
-                                        parent_alert_deleted: false,
-                                    },
-                                );
-                            }
+                            // let set_trigger = alerts::Evaluate::evaluate(
+                            //     &alert.condition,
+                            //     value.as_object().unwrap().clone(),
+                            // );
+                            // if set_trigger {
+                            //     stream_trigger_map.insert(
+                            //         metric_name.clone(),
+                            //         alerts::Trigger {
+                            //             timestamp,
+                            //             is_valid: true,
+                            //             alert_name: alert.name.clone(),
+                            //             stream: metric_name.clone(),
+                            //             org: org_id.to_string(),
+                            //             stream_type: StreamType::Metrics,
+                            //             last_sent_at: 0,
+                            //             count: 0,
+                            //             is_ingest_time: true,
+                            //             parent_alert_deleted: false,
+                            //         },
+                            //     );
+                            // }
                         }
                     }
                 }

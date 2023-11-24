@@ -28,7 +28,7 @@ use vector_enrichment::TableRegistry;
 
 use crate::common::{
     meta::{
-        alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer},
+        alerts::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer},
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
         organization::OrganizationSetting,

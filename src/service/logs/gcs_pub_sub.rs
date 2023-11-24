@@ -10,7 +10,7 @@ use crate::common::{
         metrics,
     },
     meta::{
-        alert::{Alert, Trigger},
+        alerts::{Alert, Trigger},
         ingestion::{GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus},
         stream::StreamParams,
         usage::UsageType,

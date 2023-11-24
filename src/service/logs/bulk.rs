@@ -26,7 +26,7 @@ use crate::common::{
         metrics,
     },
     meta::{
-        alert::{Alert, Trigger},
+        alerts::{Alert, Trigger},
         functions::{StreamTransform, VRLResultResolver},
         ingestion::{
             BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,

@@ -19,7 +19,6 @@ use regex::{self, Regex};
 
 use crate::common::meta::stream::StreamParams;
 
-pub mod alert_manager;
 pub mod alerts;
 pub mod compact;
 pub mod dashboards;
@@ -40,7 +39,6 @@ pub mod search;
 pub mod stream;
 pub mod syslogs_route;
 pub mod traces;
-pub mod triggers;
 pub mod usage;
 pub mod users;
 

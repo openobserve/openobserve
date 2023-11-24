@@ -15,7 +15,7 @@
 use actix_web::{delete, get, http, post, web, HttpResponse};
 use std::io::Error;
 
-use crate::common::meta::{alert::DestinationTemplate, http::HttpResponse as MetaHttpResponse};
+use crate::common::meta::{alerts::DestinationTemplate, http::HttpResponse as MetaHttpResponse};
 use crate::service::alerts::templates;
 
 /** CreateTemplate */

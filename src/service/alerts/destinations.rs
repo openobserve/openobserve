@@ -15,7 +15,7 @@
 use actix_web::http;
 
 use crate::common::infra::config::STREAM_ALERTS;
-use crate::common::meta::alert::{AlertDestination, AlertDestinationResponse};
+use crate::common::meta::alerts::{AlertDestination, AlertDestinationResponse};
 use crate::service::db;
 
 #[tracing::instrument(skip(destination))]
@@ -50,7 +50,9 @@ pub async fn delete_destination(
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
     for alert_list in STREAM_ALERTS.iter() {
         for alert in alert_list.value().list.clone() {
-            if alert_list.key().starts_with(org_id) && alert.destination.eq(&name) {
+            if alert_list.key().starts_with(org_id)
+                && alert.destinations.contains(&name.to_string())
+            {
                 return Err((
                     http::StatusCode::FORBIDDEN,
                     anyhow::anyhow!("Alert destination is in use for alert {}", alert.name),

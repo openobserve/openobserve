@@ -19,7 +19,7 @@ use datafusion::arrow::datatypes::Schema;
 use crate::common::{
     infra::config::CONFIG,
     meta::{
-        alert::{Alert, Evaluate, Trigger},
+        alerts::{Alert, Trigger},
         ingestion::RecordStatus,
         stream::PartitionTimeLevel,
         StreamType,
@@ -210,7 +210,7 @@ async fn add_valid_record(
     buf: &mut AHashMap<String, Vec<String>>,
     local_val: &mut Map<String, Value>,
 ) -> Option<Trigger> {
-    let mut trigger: Option<Trigger> = None;
+    let trigger: Option<Trigger> = None;
     let timestamp: i64 = local_val
         .get(&CONFIG.common.column_timestamp)
         .unwrap()
@@ -284,22 +284,22 @@ async fn add_valid_record(
                 if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
                     for alert in alerts {
                         if alert.is_real_time {
-                            let set_trigger = alert.condition.evaluate(local_val.clone());
-                            if set_trigger {
-                                // let _ = triggers::save_trigger(alert.name.clone(), trigger).await;
-                                trigger = Some(Trigger {
-                                    timestamp,
-                                    is_valid: true,
-                                    alert_name: alert.name.clone(),
-                                    stream: stream_meta.stream_name.to_string(),
-                                    org: stream_meta.org_id.to_string(),
-                                    stream_type: StreamType::Logs,
-                                    last_sent_at: 0,
-                                    count: 0,
-                                    is_ingest_time: true,
-                                    parent_alert_deleted: false,
-                                });
-                            }
+                            // let set_trigger = alert.condition.evaluate(local_val.clone());
+                            // if set_trigger {
+                            //     // let _ = triggers::save_trigger(alert.name.clone(), trigger).await;
+                            //     trigger = Some(Trigger {
+                            //         timestamp,
+                            //         is_valid: true,
+                            //         alert_name: alert.name.clone(),
+                            //         stream: stream_meta.stream_name.to_string(),
+                            //         org: stream_meta.org_id.to_string(),
+                            //         stream_type: StreamType::Logs,
+                            //         last_sent_at: 0,
+                            //         count: 0,
+                            //         is_ingest_time: true,
+                            //         parent_alert_deleted: false,
+                            //     });
+                            // }
                         }
                     }
                 }

@@ -13,16 +13,10 @@
 // limitations under the License.
 
 use chrono::Utc;
-use std::collections::HashMap;
 use tokio::time;
 
 use crate::common::infra::config::{TRIGGERS, TRIGGERS_IN_PROCESS};
-use crate::common::meta;
-use crate::common::meta::alert::{Evaluate, Trigger, TriggerTimer};
-use crate::common::meta::search::Request;
-use crate::common::utils::notification::send_notification;
-use crate::service::search as SearchService;
-use crate::service::triggers;
+use crate::common::meta::alerts::{Trigger, TriggerTimer};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     for trigger in TRIGGERS.iter() {
@@ -47,7 +41,7 @@ pub async fn handle_triggers(trigger: Trigger) {
             let trigger_key = format!("{}/{}", &trigger.org, &trigger.alert_name);
             let mut local_trigger = trigger;
             local_trigger.parent_alert_deleted = true;
-            let _ = crate::service::db::triggers::set(&trigger_key, &local_trigger).await;
+            let _ = crate::service::db::alerts::triggers::set(&trigger_key, &local_trigger).await;
         }
         Ok(result) => {
             let key = format!("{}/{}", &trigger.org, &trigger.alert_name);
@@ -95,7 +89,7 @@ async fn handle_trigger(alert_key: &str, frequency: i64) {
             }
         };
         if !trigger.parent_alert_deleted && TRIGGERS_IN_PROCESS.clone().contains_key(alert_key) {
-            let alert_resp = super::db::alerts::get(
+            let _ = super::db::alerts::get(
                 &trigger.org,
                 &trigger.stream,
                 trigger.stream_type,
@@ -103,52 +97,52 @@ async fn handle_trigger(alert_key: &str, frequency: i64) {
             )
             .await;
 
-            match alert_resp.unwrap_or(None) {
-                Some(alert) => {
-                    let mut query = alert.query.clone().unwrap();
-                    let curr_ts = Utc::now().timestamp_micros();
-                    query.end_time = curr_ts;
-                    query.start_time = curr_ts - get_micros_from_min(alert.duration);
-                    let req: meta::search::Request = Request {
-                        query,
-                        aggs: HashMap::new(),
-                        encoding: meta::search::RequestEncoding::Empty,
-                        timeout: 0,
-                    };
-                    // do search
-                    match SearchService::search("", &trigger.org, alert.stream_type.unwrap(), &req)
-                        .await
-                    {
-                        Ok(res) => {
-                            if !res.hits.is_empty() {
-                                let record = res.hits.first().unwrap().as_object().unwrap();
-                                if alert.condition.evaluate(record.clone()) {
-                                    let curr_ts = Utc::now().timestamp_micros();
-                                    let mut local_trigger = trigger.clone();
+            // match alert_resp.unwrap_or(None) {
+            //     Some(alert) => {
+            //         let mut query = alert.query.clone().unwrap();
+            //         let curr_ts = Utc::now().timestamp_micros();
+            //         query.end_time = curr_ts;
+            //         query.start_time = curr_ts - get_micros_from_min(alert.duration);
+            //         let req: meta::search::Request = Request {
+            //             query,
+            //             aggs: HashMap::new(),
+            //             encoding: meta::search::RequestEncoding::Empty,
+            //             timeout: 0,
+            //         };
+            //         // do search
+            //         match SearchService::search("", &trigger.org, alert.stream_type.unwrap(), &req)
+            //             .await
+            //         {
+            //             Ok(res) => {
+            //                 if !res.hits.is_empty() {
+            //                     let record = res.hits.first().unwrap().as_object().unwrap();
+            //                     if alert.condition.evaluate(record.clone()) {
+            //                         let curr_ts = Utc::now().timestamp_micros();
+            //                         let mut local_trigger = trigger.clone();
 
-                                    if trigger.last_sent_at == 0
-                                        || (trigger.last_sent_at > 0
-                                            && curr_ts - trigger.last_sent_at
-                                                > get_micros_from_min(alert.time_between_alerts))
-                                    {
-                                        let _ = send_notification(&alert, &trigger).await;
-                                        local_trigger.last_sent_at = curr_ts;
-                                    }
-                                    //Update trigger for last sent
+            //                         if trigger.last_sent_at == 0
+            //                             || (trigger.last_sent_at > 0
+            //                                 && curr_ts - trigger.last_sent_at
+            //                                     > get_micros_from_min(alert.time_between_alerts))
+            //                         {
+            //                             let _ = send_notification(&alert, &trigger).await;
+            //                             local_trigger.last_sent_at = curr_ts;
+            //                         }
+            //                         //Update trigger for last sent
 
-                                    local_trigger.count += 1;
-                                    let _ =
-                                        triggers::save_trigger(&alert.name, &local_trigger).await;
-                                }
-                            }
-                        }
-                        Err(err) => {
-                            log::error!("alert_manager search error: {:?}", err);
-                        }
-                    }
-                }
-                None => log::error!("Error fetching alert "),
-            }
+            //                         local_trigger.count += 1;
+            //                         let _ =
+            //                             triggers::save_trigger(&alert.name, &local_trigger).await;
+            //                     }
+            //                 }
+            //             }
+            //             Err(err) => {
+            //                 log::error!("alert_manager search error: {:?}", err);
+            //             }
+            //         }
+            //     }
+            //     None => log::error!("Error fetching alert "),
+            // }
         }
     }
 }

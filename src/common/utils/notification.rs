@@ -14,23 +14,24 @@
 
 use std::error::Error as StdError;
 
-use crate::common::meta::alert::{self, Alert};
+use crate::common::meta::alerts::{self, Alert};
 use crate::common::utils::json::{self, Value};
 use crate::service::db;
 
 pub async fn send_notification(
     alert: &Alert,
-    trigger: &alert::Trigger,
+    trigger: &alerts::Trigger,
 ) -> Result<(), Box<dyn StdError>> {
     let alert_type = match &trigger.is_ingest_time {
         true => "Real time",
         false => "Scheduled",
     };
     let curr_ts = chrono::Utc::now().timestamp_micros();
-    let local_dest = match db::alerts::destinations::get(&trigger.org, &alert.destination).await {
+    let local_dest = match db::alerts::destinations::get(&trigger.org, &alert.destinations[0]).await
+    {
         Ok(v) => v,
         Err(_) => {
-            log::error!("Destination Not found: {}", &alert.destination);
+            log::error!("Destination Not found: {}", &alert.destinations[0]);
             return Ok(());
         }
     };
@@ -70,9 +71,9 @@ pub async fn send_notification(
     match url::Url::parse(&local_dest.url) {
         Ok(url) => {
             let mut req = match local_dest.method {
-                alert::AlertHTTPType::POST => client.post(url),
-                alert::AlertHTTPType::PUT => client.put(url),
-                alert::AlertHTTPType::GET => client.get(url),
+                alerts::AlertHTTPType::POST => client.post(url),
+                alerts::AlertHTTPType::PUT => client.put(url),
+                alerts::AlertHTTPType::GET => client.get(url),
             }
             .header("Content-type", "application/json");
 
@@ -106,8 +107,7 @@ pub async fn send_notification(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::meta::alert::{AlertDestination, Condition, DestinationTemplate, Trigger};
-    use crate::common::meta::search::Query;
+    use crate::common::meta::alerts::{AlertDestination, Condition, DestinationTemplate, Trigger};
     use crate::common::meta::StreamType;
 
     #[actix_web::test]
@@ -121,7 +121,7 @@ mod tests {
 
         let destination = AlertDestination {
             url: "http://dummy/alert".to_string(),
-            method: alert::AlertHTTPType::POST,
+            method: alerts::AlertHTTPType::POST,
             skip_tls_verify: false,
             headers: None,
             template: "testTemplate".to_string(),
@@ -144,34 +144,26 @@ mod tests {
         let alert = Alert {
             name: "testAlert".to_string(),
             stream: "olympics".to_string(),
-            stream_type: Some(StreamType::Logs),
-            query: Some(Query {
-                sql: "select * from olympics".to_string(),
-                from: 0,
-                size: 0,
-                start_time: 0,
-                end_time: 0,
-                sort_by: None,
-                sql_mode: "full".to_string(),
-                query_type: "".to_string(),
-                track_total_hits: false,
-                query_context: None,
-                uses_zo_fn: false,
-                query_fn: None,
-            }),
-            condition: Condition {
-                column: "Country".to_string(),
-                operator: alert::AllOperator::EqualTo,
-                ignore_case: Some(false),
-                value: json::Value::String("USA".to_string()),
-                is_numeric: Some(false),
+            stream_type: StreamType::Logs,
+            query_condition: alerts::QueryCondition {
+                conditions: Some(vec![Condition {
+                    column: "Country".to_string(),
+                    operator: alerts::AllOperator::EqualTo,
+                    ignore_case: Some(false),
+                    value: json::Value::String("USA".to_string()),
+                    is_numeric: Some(false),
+                }]),
+                sql: None,
+                promql: None,
             },
             duration: 5,
             frequency: 1,
-            time_between_alerts: 10,
-            destination: "testDest".to_string(),
+            threshold: 1,
+            silence: 10,
+            destinations: vec!["testDest".to_string()],
             is_real_time: true,
             context_attributes: None,
+            enabled: true,
         };
 
         send_notification(&alert, &obj).await.unwrap();

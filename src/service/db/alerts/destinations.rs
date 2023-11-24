@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use crate::common::{
     infra::{config::ALERTS_DESTINATIONS, db as infra_db},
-    meta::alert::{AlertDestination, AlertDestinationResponse},
+    meta::alerts::{AlertDestination, AlertDestinationResponse},
     utils::json,
 };
 use crate::service::db;

@@ -15,7 +15,7 @@
 use actix_web::{http, HttpResponse};
 
 use super::db;
-use crate::common::meta::alert::Trigger;
+use crate::common::meta::alerts::Trigger;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 #[tracing::instrument(skip_all)]
@@ -23,7 +23,7 @@ pub async fn save_trigger(
     alert_name: &str,
     trigger: &Trigger,
 ) -> Result<HttpResponse, anyhow::Error> {
-    db::triggers::set(format!("{}/{alert_name}", &trigger.org).as_str(), trigger)
+    db::alerts::triggers::set(format!("{}/{alert_name}", &trigger.org).as_str(), trigger)
         .await
         .unwrap();
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
@@ -34,7 +34,7 @@ pub async fn save_trigger(
 
 #[tracing::instrument]
 pub async fn delete_trigger(alert_name: String) -> Result<(), anyhow::Error> {
-    db::triggers::delete(&alert_name).await
+    db::alerts::triggers::delete(&alert_name).await
 }
 
 #[cfg(test)]

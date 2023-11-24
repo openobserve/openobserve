@@ -24,7 +24,7 @@ use crate::common::{
         metrics,
     },
     meta::{
-        alert::{Alert, Trigger},
+        alerts::{Alert, Trigger},
         ingestion::{
             AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest,
             StreamStatus,

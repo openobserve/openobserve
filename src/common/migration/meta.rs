@@ -5,7 +5,7 @@ use crate::common::{
         config::CONFIG,
         db::{self, Db},
     },
-    meta::alert::Trigger,
+    meta::alerts::Trigger,
     utils::{file::get_file_meta, json},
 };
 

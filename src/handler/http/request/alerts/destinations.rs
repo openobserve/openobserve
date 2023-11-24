@@ -15,7 +15,7 @@
 use actix_web::{delete, get, http, post, web, HttpResponse};
 use std::io::Error;
 
-use crate::common::meta::{alert::AlertDestination, http::HttpResponse as MetaHttpResponse};
+use crate::common::meta::{alerts::AlertDestination, http::HttpResponse as MetaHttpResponse};
 use crate::service::alerts::destinations;
 
 /** CreateDestination */

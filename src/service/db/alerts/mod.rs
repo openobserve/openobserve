@@ -17,7 +17,7 @@ use std::sync::Arc;
 use crate::common::{
     infra::{config::STREAM_ALERTS, db as infra_db},
     meta::{
-        alert::{Alert, AlertList},
+        alerts::{Alert, AlertList},
         StreamType,
     },
     utils::json,
@@ -25,6 +25,7 @@ use crate::common::{
 
 pub mod destinations;
 pub mod templates;
+pub mod triggers;
 
 pub async fn get(
     org_id: &str,
@@ -157,10 +158,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     STREAM_ALERTS.remove(item_key);
                 }
                 let trigger_key = format!("{org_name}/{item_name}");
-                if let Ok(Some(mut trigger)) = crate::service::db::triggers::get(&trigger_key).await
-                {
+                if let Ok(Some(mut trigger)) = triggers::get(&trigger_key).await {
                     trigger.parent_alert_deleted = true;
-                    let _ = crate::service::db::triggers::set(&trigger_key, &trigger).await;
+                    let _ = triggers::set(&trigger_key, &trigger).await;
                 }
             }
             infra_db::Event::Empty => {}

@@ -15,7 +15,7 @@
 use actix_web::http;
 
 use crate::common::infra::config::ALERTS_DESTINATIONS;
-use crate::common::meta::alert::DestinationTemplate;
+use crate::common::meta::alerts::DestinationTemplate;
 use crate::service::db;
 
 #[tracing::instrument(skip_all)]

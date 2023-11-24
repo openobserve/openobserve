@@ -17,29 +17,33 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use utoipa::ToSchema;
 
-use super::{search::Query, StreamType};
+use super::StreamType;
 use crate::common::utils::json::{Map, Value};
+
+pub mod destinations;
+pub mod templates;
+pub mod triggers;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
     #[serde(default)]
     pub name: String,
     #[serde(default)]
+    pub stream_type: StreamType,
+    #[serde(default)]
     pub stream: String,
-    #[schema(value_type = Option<SearchQuery>)]
-    pub query: Option<Query>,
-    pub condition: Condition,
-    pub duration: i64,
-    pub frequency: i64,
-    pub time_between_alerts: i64,
-    pub destination: String,
     #[serde(default)]
     pub is_real_time: bool,
+    pub query_condition: QueryCondition,
+    pub duration: i64,  // 10 minutes
+    pub threshold: i64, // 3 times
+    pub frequency: i64, // 1 minute
+    pub silence: i64,   // silence for 10 minutes after fire an alert
+    pub destinations: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_type: Option<StreamType>,
+    pub enabled: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -110,24 +114,6 @@ pub struct DestinationTemplate {
     pub is_default: Option<bool>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-pub enum AlertDestType {
-    #[default]
-    #[serde(rename = "slack")]
-    Slack,
-    #[serde(rename = "alertmanager")]
-    AlertManager,
-}
-
-impl fmt::Display for AlertDestType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AlertDestType::Slack => write!(f, "slack"),
-            AlertDestType::AlertManager => write!(f, "alertmanager"),
-        }
-    }
-}
-
 impl PartialEq for Alert {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.stream == other.stream
@@ -186,6 +172,13 @@ pub struct TriggerTimer {
     pub updated_at: i64,
     #[serde(default)]
     pub expires_at: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct QueryCondition {
+    pub conditions: Option<Vec<Condition>>,
+    pub sql: Option<String>,
+    pub promql: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

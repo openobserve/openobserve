@@ -29,7 +29,7 @@ use crate::common::{
         metrics,
     },
     meta::{
-        alert::{Alert, Trigger},
+        alerts::{Alert, Trigger},
         http::HttpResponse as MetaHttpResponse,
         ingestion::StreamStatus,
         stream::StreamParams,

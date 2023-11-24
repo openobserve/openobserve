@@ -16,7 +16,7 @@ use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 use ahash::AHashMap as HashMap;
 use std::io::Error;
 
-use crate::common::meta::{alert::Alert, http::HttpResponse as MetaHttpResponse};
+use crate::common::meta::{alerts::Alert, http::HttpResponse as MetaHttpResponse};
 use crate::common::utils::http::get_stream_type_from_request;
 use crate::service::alerts;
 

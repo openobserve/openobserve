@@ -32,7 +32,7 @@ use crate::common::{
         metrics,
     },
     meta::{
-        alert::{Alert, Evaluate, Trigger},
+        alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
         stream::{PartitionTimeLevel, StreamParams},
         traces::{Event, Span, SpanRefType},
@@ -130,7 +130,7 @@ pub async fn handle_trace_request(
     );
     // End Register Transforms for stream
 
-    let mut trigger: Option<Trigger> = None;
+    // let mut trigger: Option<Trigger> = None;
 
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
@@ -291,22 +291,22 @@ pub async fn handle_trace_request(
                     if let Some(alerts) = stream_alerts_map.get(&key) {
                         for alert in alerts {
                             if alert.is_real_time {
-                                let set_trigger =
-                                    alert.condition.evaluate(value.as_object().unwrap().clone());
-                                if set_trigger {
-                                    trigger = Some(Trigger {
-                                        timestamp: timestamp.try_into().unwrap(),
-                                        is_valid: true,
-                                        alert_name: alert.name.clone(),
-                                        stream: traces_stream_name.to_string(),
-                                        org: org_id.to_string(),
-                                        stream_type: StreamType::Traces,
-                                        last_sent_at: 0,
-                                        count: 0,
-                                        is_ingest_time: true,
-                                        parent_alert_deleted: false,
-                                    });
-                                }
+                                // let set_trigger =
+                                //     alert.query_condition[0].evaluate(value.as_object().unwrap().clone());
+                                // if set_trigger {
+                                //     trigger = Some(Trigger {
+                                //         timestamp: timestamp.try_into().unwrap(),
+                                //         is_valid: true,
+                                //         alert_name: alert.name.clone(),
+                                //         stream: traces_stream_name.to_string(),
+                                //         org: org_id.to_string(),
+                                //         stream_type: StreamType::Traces,
+                                //         last_sent_at: 0,
+                                //         count: 0,
+                                //         is_ingest_time: true,
+                                //         parent_alert_deleted: false,
+                                //     });
+                                // }
                             }
                         }
                     }
@@ -415,27 +415,27 @@ pub async fn handle_trace_request(
     }
 
     // only one trigger per request, as it updates etcd
-    if trigger.is_some() {
-        let val = trigger.unwrap();
-        let mut alerts = stream_alerts_map
-            .get(&format!(
-                "{}/{}/{}",
-                val.org,
-                StreamType::Traces,
-                val.stream
-            ))
-            .unwrap()
-            .clone();
+    // if trigger.is_some() {
+    //     let val = trigger.unwrap();
+    //     let mut alerts = stream_alerts_map
+    //         .get(&format!(
+    //             "{}/{}/{}",
+    //             val.org,
+    //             StreamType::Traces,
+    //             val.stream
+    //         ))
+    //         .unwrap()
+    //         .clone();
 
-        alerts.retain(|alert| alert.name.eq(&val.alert_name));
-        if !alerts.is_empty() {
-            crate::service::ingestion::send_ingest_notification(
-                val,
-                alerts.first().unwrap().clone(),
-            )
-            .await;
-        }
-    }
+    //     alerts.retain(|alert| alert.name.eq(&val.alert_name));
+    //     if !alerts.is_empty() {
+    //         crate::service::ingestion::send_ingest_notification(
+    //             val,
+    //             alerts.first().unwrap().clone(),
+    //         )
+    //         .await;
+    //     }
+    // }
 
     let res = ExportTraceServiceResponse {
         partial_success: None,

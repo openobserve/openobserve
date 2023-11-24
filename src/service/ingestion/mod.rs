@@ -30,7 +30,7 @@ use crate::common::{
         wal::get_or_create,
     },
     meta::{
-        alert::{Alert, Trigger},
+        alerts::{Alert, Trigger},
         functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
         stream::{PartitionTimeLevel, PartitioningDetails, StreamParams},
         usage::RequestStats,
@@ -45,7 +45,7 @@ use crate::common::{
     },
 };
 use crate::service::{
-    db, format_partition_key, schema::filter_schema_null_fields, stream::stream_settings, triggers,
+    db, format_partition_key, schema::filter_schema_null_fields, stream::stream_settings,
 };
 
 pub mod grpc;
@@ -202,12 +202,12 @@ pub async fn send_ingest_notification(trigger: Trigger, alert: Alert) {
         alert.stream
     );
     let _ = send_notification(&alert, &trigger).await;
-    let trigger_to_save = Trigger {
-        last_sent_at: Utc::now().timestamp_micros(),
-        count: trigger.count + 1,
-        ..trigger
-    };
-    let _ = triggers::save_trigger(&trigger_to_save.alert_name, &trigger_to_save).await;
+    // let trigger_to_save = Trigger {
+    //     last_sent_at: Utc::now().timestamp_micros(),
+    //     count: trigger.count + 1,
+    //     ..trigger
+    // };
+    // let _ = triggers::save_trigger(&trigger_to_save.alert_name, &trigger_to_save).await;
 }
 
 pub fn register_stream_transforms(
