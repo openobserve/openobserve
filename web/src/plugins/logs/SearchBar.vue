@@ -303,11 +303,10 @@ size="xs" />
               outlined
               filled
               dense
-              mask="[A-Za-z0-9]+"
               :rules="[
                 (val) => !!val || 'This field is required',
                 (val) =>
-                  /^[A-Za-z0-9]+$/.test(val) || 'Input must be alphanumeric',
+                  /^[A-Za-z0-9 ]+$/.test(val) || 'Input must be alphanumeric',
               ]"
               tabindex="0"
             />
