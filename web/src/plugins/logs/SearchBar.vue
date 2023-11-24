@@ -63,8 +63,8 @@
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete"
-color="grey" size="xs" />
+                    <q-icon name="delete" color="grey"
+size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -303,7 +303,12 @@ color="grey" size="xs" />
               outlined
               filled
               dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              mask="[A-Za-z0-9]+"
+              :rules="[
+                (val) => !!val || 'This field is required',
+                (val) =>
+                  /^[A-Za-z0-9]+$/.test(val) || 'Input must be alphanumeric',
+              ]"
               tabindex="0"
             />
           </div>
