@@ -269,7 +269,9 @@ export const usePanelDataLoader = (
       const queryResults = await Promise.all(queryPromises);
       state.loading = false;
       state.data = queryResults.map((it: any) => it.result);
-      state.metadata = queryResults.map((it: any) => it.metadata);
+      state.metadata = {
+        queries: queryResults.map((it) => it.metadata),
+      };
     } else {
       // Call search API
 
@@ -336,8 +338,10 @@ export const usePanelDataLoader = (
       // Wait for all query promises to resolve
       const sqlqueryResults = await Promise.all(sqlqueryPromise);
       state.loading = false;
-      state.data = sqlqueryResults.map((it: any) => it.result);
-      state.metadata = sqlqueryResults.map((it: any) => it.metadata);
+      state.data = sqlqueryResults.map((it) => it.result);
+      state.metadata = {
+        queries: sqlqueryResults.map((it) => it.metadata),
+      };
     }
   };
 
