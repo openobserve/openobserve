@@ -342,7 +342,8 @@
   },
   "confirmDialog": {
     "cancel": "Cancel",
-    "ok": "Ok"
+    "ok": "Ok",
+    "loading": "Loading..."
   },
   "ingestion": {
     "header": "Ingestion",
