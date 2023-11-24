@@ -1,6 +1,6 @@
 {
   "common": {
-    "close": "Close",
+    "close":  "Close",
     "cancel": "Cancel",
     "ok": "Ok",
     "apply": "Apply",
@@ -70,7 +70,7 @@
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
     "logs": "Logs",
-    "enrichmentTables": "Enrichment Tables",
+    "enrichmentTables":  "Enrichment Tables",
     "savedViewsLabel": "Saved Views",
     "savedViewsNotFound": "Saved view not found!",
     "savedViewAction": "Create/Update Saved View",
@@ -550,7 +550,7 @@
     "duration": "Duration for which alert is evaluated",
     "condition": "Condition",
     "interval": "Frequency at which alert is evaluated",
-    "delayNotificationUntil": "Delay notification until, after one notification",
+    "silenceNotification": "Silence notification after",
     "destination": "Destination",
     "stream_name": "Stream Name",
     "actions": "Actions",
@@ -560,7 +560,8 @@
     "addTitle": "Add Alert",
     "updateTitle": "Update Alert",
     "delete": "Delete",
-    "stream_type": "Stream Type"
+    "stream_type": "Stream Type",
+    "description": "Description"
   },
   "home": {
     "streams": "Streams",

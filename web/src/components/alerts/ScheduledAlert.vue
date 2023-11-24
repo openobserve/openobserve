@@ -1,0 +1,198 @@
+<template>
+  <div class="scheduled-alerts">
+    <div class="scheduled-alert-tabs q-mb-lg">
+      <q-tabs
+        v-model="tab"
+        no-caps
+        outside-arrows
+        size="sm"
+        mobile-arrows
+        class="bg-white text-primary"
+      >
+        <q-tab name="custom" label="Custom" />
+        <q-tab name="sql" label="Custom SQL" />
+      </q-tabs>
+    </div>
+    <template v-if="tab === 'custom'">
+      <fields-input
+        class="q-mt-md"
+        :stream-fields="columns"
+        :fields="conditions"
+        @add="addField"
+        @remove="removeField"
+      />
+    </template>
+    <template v-else>
+      <div class="text-bold q-mr-sm q-my-sm">SQL</div>
+      <query-editor
+        ref="queryEditorRef"
+        editor-id="alerts-query-editor"
+        class="monaco-editor q-mb-md"
+        v-model:query="query"
+        @update:query="updateQueryValue"
+      />
+    </template>
+
+    <div class="text-bold q-mr-sm q-mt-sm">Trigger</div>
+    <div class="flex justify-start items-center">
+      <div
+        class="flex items-center q-mr-sm"
+        style="border: 1px solid rgba(0, 0, 0, 0.05)"
+      >
+        <div
+          style="width: 80px; margin-left: 0 !important"
+          class="silence-notification-input"
+        >
+          <q-input
+            data-test="add-alert-delay-input"
+            v-model="triggerData.time"
+            type="number"
+            dense
+            filled
+            min="0"
+            style="background: none"
+            @update:model-value="updateTrigger"
+          />
+        </div>
+        <div
+          style="
+            min-width: 100px;
+            margin-left: 0 !important;
+            background: #f2f2f2;
+            height: 40px;
+          "
+          class="flex justify-center items-center"
+        >
+          Minutes
+        </div>
+      </div>
+
+      <div class="q-mr-sm">
+        <q-select
+          data-test="add-alert-stream-select"
+          v-model="triggerData.operator"
+          :options="triggerOperators"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-sm showLabelOnTop no-case"
+          filled
+          borderless
+          dense
+          use-input
+          hide-selected
+          fill-input
+          :rules="[(val: any) => !!val || 'Field is required!']"
+          style="width: 80px"
+          @update:model-value="updateTrigger"
+        />
+      </div>
+      <div
+        class="flex items-center"
+        style="border: 1px solid rgba(0, 0, 0, 0.05)"
+      >
+        <div
+          style="width: 80px; margin-left: 0 !important"
+          class="silence-notification-input"
+        >
+          <q-input
+            data-test="add-alert-delay-input"
+            v-model="triggerData.frequency"
+            type="number"
+            dense
+            filled
+            min="0"
+            style="background: none"
+            @update:model-value="updateTrigger"
+          />
+        </div>
+        <div
+          style="
+            min-width: 100px;
+            margin-left: 0 !important;
+            background: #f2f2f2;
+            height: 40px;
+          "
+          class="flex justify-center items-center"
+        >
+          Times
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from "vue";
+import FieldsInput from "./FieldsInput.vue";
+import { useI18n } from "vue-i18n";
+import QueryEditor from "@/components/QueryEditor.vue";
+
+const props = defineProps(["columns", "conditions", "trigger", "sql"]);
+
+const emits = defineEmits([
+  "field:add",
+  "field:remove",
+  "update:trigger",
+  "update:sql",
+]);
+
+const { t } = useI18n();
+
+const triggerData = ref(props.trigger);
+
+const query = ref(props.sql);
+
+const tab = ref("custom");
+
+const addField = (field: any) => {
+  emits("field:add", field);
+};
+
+var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
+
+const removeField = (field: any) => {
+  emits("field:remove", field);
+};
+
+const updateQueryValue = (value: string) => {
+  query.value = value;
+  emits("update:sql", value);
+};
+
+const updateTrigger = () => {
+  emits("update:trigger", triggerData.value);
+};
+</script>
+
+<style lang="scss" scoped>
+.scheduled-alert-tabs {
+  border: 1px solid $primary;
+  width: 200px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+</style>
+<style lang="scss">
+.scheduled-alert-tabs {
+  .q-tab--active {
+    background-color: $primary;
+    color: $white;
+  }
+
+  .q-tab__indicator {
+    display: none;
+  }
+
+  .q-tab {
+    height: 28px;
+    min-height: 28px;
+  }
+}
+.scheduled-alerts {
+  .monaco-editor {
+    width: 500px !important;
+    height: 100px !important;
+    border: 1px solid $border-color;
+  }
+}
+</style>
