@@ -593,7 +593,7 @@ fn process_hist_data_point(
     process_exemplars(rec, &data_point.exemplars);
     // add count record
     let mut count_rec = rec.clone();
-    count_rec[VALUE_LABEL] = data_point.count.into();
+    count_rec[VALUE_LABEL] = (data_point.count as f64).into();
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
@@ -604,16 +604,16 @@ fn process_hist_data_point(
     bucket_recs.push(sum_rec);
 
     // add bucket records
-    let last_index = data_point.bucket_counts.len() - 1;
-    for i in 0..last_index {
+    let len = data_point.bucket_counts.len();
+    for i in 0..len {
         let mut bucket_rec = rec.clone();
         if let Some(val) = data_point.bucket_counts.get(i) {
-            bucket_rec[VALUE_LABEL] = (*val).into()
+            bucket_rec[VALUE_LABEL] = (*val as f64).into()
         }
         if let Some(val) = data_point.explicit_bounds.get(i) {
             bucket_rec["le"] = (*val.to_string()).into()
         }
-        if i == last_index {
+        if i == len - 1 {
             bucket_rec["le"] = std::f64::INFINITY.to_string().into();
         }
         bucket_recs.push(bucket_rec);
@@ -641,7 +641,7 @@ fn process_exp_hist_data_point(
     process_exemplars(rec, &data_point.exemplars);
     // add count record
     let mut count_rec = rec.clone();
-    count_rec[VALUE_LABEL] = data_point.count.into();
+    count_rec[VALUE_LABEL] = (data_point.count as f64).into();
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
@@ -701,7 +701,7 @@ fn process_summary_data_point(
     .into();
     // add count record
     let mut count_rec = rec.clone();
-    count_rec[VALUE_LABEL] = data_point.count.into();
+    count_rec[VALUE_LABEL] = (data_point.count as f64).into();
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 

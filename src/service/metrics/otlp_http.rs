@@ -809,8 +809,8 @@ fn process_hist_data_point(
         .unwrap()
         .as_array()
         .unwrap();
-    let last_index = buckets.len() - 1;
-    for i in 0..last_index {
+    let len = buckets.len();
+    for i in 0..len {
         let mut bucket_rec = rec.clone();
         if let Some(val) = buckets.get(i) {
             bucket_rec[VALUE_LABEL] = (*val).clone()
@@ -818,7 +818,7 @@ fn process_hist_data_point(
         if let Some(val) = explicit_bounds.get(i) {
             bucket_rec["le"] = (*val).clone()
         }
-        if i == last_index {
+        if i == len - 1 {
             bucket_rec["le"] = std::f64::INFINITY.into();
         }
         bucket_recs.push(bucket_rec);
