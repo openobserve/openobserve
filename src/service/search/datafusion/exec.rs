@@ -435,12 +435,12 @@ pub async fn merge(
     limit: usize,
     sql: &str,
     batches: &Vec<Vec<RecordBatch>>,
-) -> Result<Vec<Vec<RecordBatch>>> {
+) -> Result<Vec<RecordBatch>> {
     if batches.is_empty() {
         return Ok(vec![]);
     }
     if offset == 0 && batches.len() == 1 && batches[0].len() <= 1 {
-        return Ok(batches.to_owned());
+        return Ok(batches[0].to_owned());
     }
 
     // let start = std::time::Instant::now();
@@ -536,7 +536,7 @@ pub async fn merge(
     // clear temp file
     tmpfs::delete(&work_dir, true).unwrap();
 
-    Ok(vec![batches])
+    Ok(batches)
 }
 
 fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>, String)> {

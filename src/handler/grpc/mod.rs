@@ -228,7 +228,7 @@ mod test {
             query: meta::search::Query {
                 sql: "SELECT * FROM test".to_string(),
                 sql_mode: "default".to_string(),
-                query_type: "logs".to_string(),
+                query_type: "".to_string(),
                 from: 0,
                 size: 100,
                 start_time: 0,

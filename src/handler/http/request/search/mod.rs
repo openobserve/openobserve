@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod saved_view;
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
 use chrono::Duration;
@@ -333,8 +334,8 @@ pub async fn around(
             start_time: around_key - Duration::seconds(900).num_microseconds().unwrap(),
             end_time: around_key,
             sort_by: Some(format!("{} DESC", CONFIG.common.column_timestamp)),
-            sql_mode: "context".to_string(),
-            query_type: "logs".to_string(),
+            sql_mode: "".to_string(),
+            query_type: "".to_string(),
             track_total_hits: false,
             query_context: query_context.clone(),
             uses_zo_fn: uses_fn,
@@ -387,8 +388,8 @@ pub async fn around(
             start_time: around_key,
             end_time: around_key + Duration::seconds(900).num_microseconds().unwrap(),
             sort_by: Some(format!("{} ASC", CONFIG.common.column_timestamp)),
-            sql_mode: "context".to_string(),
-            query_type: "logs".to_string(),
+            sql_mode: "".to_string(),
+            query_type: "".to_string(),
             track_total_hits: false,
             query_context,
             uses_zo_fn: uses_fn,
@@ -656,8 +657,8 @@ async fn values_v1(
             start_time,
             end_time,
             sort_by: None,
-            sql_mode: "context".to_string(),
-            query_type: "logs".to_string(),
+            sql_mode: "".to_string(),
+            query_type: "".to_string(),
             track_total_hits: false,
             query_context,
             uses_zo_fn: uses_fn,

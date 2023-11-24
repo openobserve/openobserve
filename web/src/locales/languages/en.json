@@ -1,6 +1,6 @@
 {
   "common": {
-    "close":"Close",
+    "close": "Close",
     "cancel": "Cancel",
     "ok": "Ok",
     "apply": "Apply",
@@ -69,7 +69,12 @@
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
     "logs": "Logs",
-    "enrichmentTables":"Enrichment Tables"
+    "enrichmentTables":"Enrichment Tables",
+    "savedViewsLabel": "Saved Views",
+    "savedViewsNotFound": "Saved view not found!",
+    "savedViewAction": "Create/Update Saved View",
+    "savedViewDropdownLabel": "Saved View's",
+    "savedViewName": "View Name"
   },
   "menu": {
     "home": "Home",
@@ -89,7 +94,7 @@
     "ingestion": "Ingestion",
     "metrics": "Metrics",
     "slack": "Slack",
-    "help":"Help",
+    "help": "Help",
     "dashboard": "Dashboards",
     "alerts": "Alerts",
     "openapi": "OpenAPI",
@@ -132,8 +137,8 @@
     "durationms": "Duration (ms)",
     "sizekb": "Size (kb)",
     "viewURL": "View URL",
-    "events":"Events",
-    "location":"Location"
+    "events": "Events",
+    "location": "Location"
   },
   "about": {
     "name": "OpenObserve",
@@ -332,7 +337,8 @@
     "updateEnrichmentTable": "Update Enrichment Table",
     "searchEnrichmentTable": "Search Enrichment Table",
     "uploadCSVFile": "Upload CSV File",
-    "selectFunction": "Select Function"
+    "selectFunction": "Select Function",
+    "appendData": "Append data to existing Enrichment Table"
   },
   "confirmDialog": {
     "cancel": "Cancel",
@@ -469,10 +475,10 @@
     "right": "Right",
     "bottom": "Bottom",
     "default": "Default",
-    "bytes":"Bytes",
-    "kilobytes":"Kilobytes (kb)",
-    "megabytes":"Megabytes (mb)",
-    "bytesPerSecond":"Bytes/Second",
+    "bytes": "Bytes",
+    "kilobytes": "Kilobytes (kb)",
+    "megabytes": "Megabytes (mb)",
+    "bytesPerSecond": "Bytes/Second",
     "seconds": "Seconds (s)",
     "microseconds": "Microseconds (μs)",
     "milliseconds": "Milliseconds (ms)",

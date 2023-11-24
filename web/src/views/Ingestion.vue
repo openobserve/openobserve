@@ -17,7 +17,7 @@
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-page class="ingestionPage">
-    <div class="q-px-md flex full-width float-right">
+    <div class="q-px-md full-width">
       <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
       <q-btn
         v-if="
@@ -70,7 +70,6 @@
         v-model="confirmRUMUpdate"
       />
     </div>
-
     <q-tabs v-model="ingestTabType" horizontal align="left">
       <q-route-tab
         default

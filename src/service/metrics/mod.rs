@@ -25,7 +25,7 @@ pub mod otlp_grpc;
 pub mod otlp_http;
 pub mod prom;
 
-const EXCLUDE_LABELS: [&str; 2] = [VALUE_LABEL, HASH_LABEL];
+const EXCLUDE_LABELS: [&str; 4] = [VALUE_LABEL, HASH_LABEL, "is_monotonic", "exemplars"];
 
 static RE_CORRECT_LABEL_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
