@@ -23,6 +23,11 @@
         </span>
       </div>
       <div class="flex q-gutter-sm">
+        <q-select v-model="histogramInterval"
+        label="Histogram interval"
+        :options="histogramIntervalOptions" behavior="menu" filled borderless dense
+        class="q-ml-sm" style="width: 150px;">
+      </q-select>
         <DateTimePickerDashboard v-model="selectedDate" ref="dateTimePickerRef"/>
         <AutoRefreshInterval
           v-model="refreshInterval"
@@ -138,6 +143,81 @@ export default defineComponent({
     // refresh interval v-model
     const refreshInterval = ref(0);
 
+    // histogram interval
+    const histogramInterval = ref("auto");
+
+    const histogramIntervalOptions = [
+      {
+        label: "Auto",
+        value: "auto",
+      },
+      {
+        label: "1 second",
+        value: "1s",
+      },
+      {
+        label: "5 seconds",
+        value: "5s",
+      
+      },
+      {
+        label: "10 seconds",
+        value: "10s",
+      
+      },
+      {
+        label: "30 seconds",
+        value: "30s",
+      
+      },
+      {
+        label: "1 minute",
+        value: "1m",
+      
+      },
+      {
+        label: "5 minutes",
+        value: "5m",
+      },
+      {
+        label: "10 minutes",
+        value: "10m",
+      },
+      {
+        label: "30 minutes",
+        value: "30m",
+      },
+      {
+        label: "1 hour",
+        value: "1h",
+      },
+      {
+        label: "6 hours",
+        value: "6h",
+      },
+      {
+        label: "12 hours",
+        value: "12h",
+      },
+      {
+        label: "1 day",
+        value: "1d",
+      },
+      {
+        label: "7 days",
+        value: "7d",
+      },
+      {
+        label: "30 days",
+        value: "30d",
+      }
+    ]
+
+
+    watch(() => histogramInterval.value , () => {
+      console.log(histogramInterval.value, dashboardPanelData,"new value");
+    })
+
     onUnmounted(async () => {
       // clear a few things
       resetDashboardPanelData();
@@ -241,6 +321,8 @@ export default defineComponent({
       dateTimePickerRef,
       refreshInterval,
       refreshData,
+      histogramInterval,
+      histogramIntervalOptions
     };
   }
 });
