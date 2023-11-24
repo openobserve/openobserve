@@ -100,7 +100,8 @@ import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRende
 import _ from "lodash-es";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { onActivated } from "vue";
-import { generateDurationLabel, parseDuration } from "@/utils/date";
+import { parseDuration } from "@/utils/date";
+import { Parser } from "node-sql-parser/build/mysql"
 
 export default defineComponent({
   name: "ViewPanel",
@@ -154,74 +155,112 @@ export default defineComponent({
       },
       {
         label: "1 second",
-        value: "1s",
+        value: "1 second",
       },
       {
         label: "5 seconds",
-        value: "5s",
+        value: "5 seconds",
       
       },
       {
         label: "10 seconds",
-        value: "10s",
+        value: "10 seconds",
       
       },
       {
         label: "30 seconds",
-        value: "30s",
+        value: "30 seconds",
       
       },
       {
         label: "1 minute",
-        value: "1m",
+        value: "1 minute",
       
       },
       {
         label: "5 minutes",
-        value: "5m",
+        value: "5 minutes",
       },
       {
         label: "10 minutes",
-        value: "10m",
+        value: "10 minutes",
       },
       {
         label: "30 minutes",
-        value: "30m",
+        value: "30 minutes",
       },
       {
         label: "1 hour",
-        value: "1h",
+        value: "1 hour",
       },
       {
         label: "6 hours",
-        value: "6h",
+        value: "6 hours",
       },
       {
         label: "12 hours",
-        value: "12h",
+        value: "12 hours",
       },
       {
         label: "1 day",
-        value: "1d",
+        value: "1 day",
       },
       {
         label: "7 days",
-        value: "7d",
+        value: "7 days",
       },
       {
         label: "30 days",
-        value: "30d",
+        value: "30 days",
       }
     ]
 
 
     watch(() => histogramInterval.value , () => {
       // replace the histogram interval in the query by finding histogram aggregation
-      dashboardPanelData?.data?.queries?.forEach((query: any) => {        
-        // query.query = query?.query?.replace(/histogram\(_timestamp(?:, '[^']+')?\)/g, "histogram(_timestamp" +( histogramInterval.value.label == "Auto" ? "" : ", '" + histogramInterval.value.label + "'") + ")")
-        query.query = query?.query?.replace(/histogram\((.*?)\)/g, (match: any, query: any) => {
-          return "histogram("+ query.split(",")[0] +( histogramInterval.value.label == "Auto" ? "" : ", '" + histogramInterval.value.label + "'") + ")";
-        })
+      dashboardPanelData?.data?.queries?.forEach((query: any) => {
+        const parser = new Parser();
+        const ast: any = parser.astify(query?.query);
+        
+        // Iterate over the columns to check if the column is histogram
+        ast.columns.forEach((column: any) => {
+
+          // check if the column is histogram
+          if (column.expr.type === "function" && column.expr.name === "histogram") {
+
+            const histogramExpr = column.expr;
+            if (histogramExpr.args && histogramExpr.args.type === "expr_list") {
+
+              // if selected histogramInterval is auto then remove interval argument
+              if(histogramInterval.value.value == "auto"){
+                histogramExpr.args.value = histogramExpr.args.value.slice(0, 1);
+              }
+
+              // else update interval argument
+              else{
+                // check if there is existing interval value
+                // if have then simply update
+                // else insert new arg
+                if(histogramExpr.args.value[1]){
+                  // Update existing interval value
+                  histogramExpr.args.value[1] = {
+                    type: "single_quote_string",
+                    value: `${histogramInterval.value.value}`
+                  }
+                }
+                else{
+                  // create new arg for interval
+                  histogramExpr.args.value.push({
+                    type: "single_quote_string",
+                    value: `${histogramInterval.value.value}`
+                  })
+                }
+              }
+            } 
+          }
+          const sql = parser.sqlify(ast);
+          query.query = sql.replace(/`/g, '"');  
+        });
       })
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
