@@ -18,14 +18,6 @@
   <div style="height: calc(100vh - 57px);" class="scroll">
     <div class="flex justify-between items-center q-pa-md">
       <div class="flex items-center q-table__title q-mr-md">
-        <q-btn
-          no-caps
-          @click="goBack"
-          padding="xs"
-          class="q-mr-md"
-          outline
-          icon="arrow_back_ios_new"
-        />
         <span>
           {{ dashboardPanelData.data.title }}
         </span>
@@ -44,6 +36,14 @@
           no-caps
           icon="refresh"
           @click="refreshData"
+        />
+        <q-btn
+          no-caps
+          @click="goBack"
+          padding="xs"
+          class="q-ml-md"
+          flat
+          icon="close"
         />
       </div>
     </div>
