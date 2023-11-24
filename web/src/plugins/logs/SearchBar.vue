@@ -968,6 +968,12 @@ export default defineComponent({
             await updatedLocalLogFilterField();
             await getStreams("logs", true);
 
+            $q.notify({
+              message: `${item.view_name} view applied successfully.`,
+              color: "postive",
+              position: "bottom",
+              timeout: 1000,
+            });
             setTimeout(() => {
               handleQueryData();
             }, 1000);
@@ -1077,6 +1083,7 @@ export default defineComponent({
     const getSearchObj = () => {
       try {
         delete searchObj.meta.scrollInfo;
+        delete searchObj?.value;
         let savedSearchObj = toRaw(searchObj);
         savedSearchObj = JSON.parse(JSON.stringify(savedSearchObj));
 
@@ -1088,7 +1095,6 @@ export default defineComponent({
         delete savedSearchObj.data.streamResults;
         delete savedSearchObj.data.savedViews;
         delete savedSearchObj.data.transforms;
-        delete savedSearchObj.meta.scrollInfo;
 
         savedSearchObj.data.timezone = store.state.timezone;
         delete savedSearchObj.value;
