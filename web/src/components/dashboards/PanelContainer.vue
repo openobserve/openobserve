@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item>
             <q-item
               clickable
-              v-if="metaData"
+              v-if="metaData && metaData.queries.length > 0"
               v-close-popup="true"
               @click="showViewPanel = true"
             >
@@ -93,48 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @metadata-update="metaDataValue"
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
     ></PanelSchemaRenderer>
-    <q-dialog v-model="showViewPanel">
-      <q-card style="min-width: 500px; min-height: 300px">
-        <q-card-section class="q-pt-md">
-          <h4 class="q-mb-sm">Metadata Details</h4>
-          <div v-for="query in metaData.queries" :key="query.originalQuery">
-            <div>
-              <strong>Original Query:</strong> {{ query.originalQuery }}
-            </div>
-            <div><strong>Query:</strong> {{ query.query }}</div>
-            <div>
-              <strong>Start Time:</strong> {{ query.startTime }} ({{
-                new Date(query.startTime / 1000).toLocaleString()
-              }})
-            </div>
-            <div>
-              <strong>End Time:</strong> {{ query.endTime }} ({{
-                new Date(query.endTime / 1000).toLocaleString()
-              }})
-            </div>
-            <div><strong>Query Type:</strong> {{ query.queryType }}</div>
-            <div v-if="query.variables && query.variables.length > 0">
-              <strong>Variables:</strong>
-              <ul>
-                <li v-for="variable in query.variables" :key="variable.name">
-                  <strong> {{ variable.type }} : </strong>{{ variable.name }}
-                  {{ variable.operator }} {{ variable.value }}
-                </li>
-              </ul>
-            </div>
-          </div>
-        </q-card-section>
-
-        <q-card-section v-if="metaData && metaData.length > 0">
-          <h4 class="q-mb-sm">Additional Details</h4>
-          <q-table
-            :rows="metaData"
-            :columns="columns"
-            row-key="originalQuery"
-          ></q-table>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
+    <MetaDataDialog
+      :metaData="metaData"
+      v-if="metaData"
+      v-model="showViewPanel"
+    ></MetaDataDialog>
   </div>
 </template>
 
@@ -145,6 +108,7 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
+import MetaDataDialog from "@/components/dashboards/MetaDataDialog.vue";
 import { ref } from "vue";
 
 export default defineComponent({
@@ -158,9 +122,11 @@ export default defineComponent({
     "height",
     "variablesData",
     "dashboardId",
+    "metaData",
   ],
   components: {
     PanelSchemaRenderer,
+    MetaDataDialog,
   },
   setup(props) {
     const store = useStore();
@@ -173,29 +139,6 @@ export default defineComponent({
       metaData.value = metadata;
       console.log("metadata panel", metadata);
     };
-
-    const columns: any = [
-      {
-        name: "originalQuery",
-        label: "Original Query",
-        align: "left",
-        field: "originalQuery",
-      },
-      { name: "query", label: "Query", align: "left", field: "query" },
-      {
-        name: "startTime",
-        label: "Start Time",
-        align: "left",
-        field: "startTime",
-      },
-      { name: "endTime", label: "End Time", align: "left", field: "endTime" },
-      {
-        name: "queryType",
-        label: "Query Type",
-        align: "left",
-        field: "queryType",
-      },
-    ];
 
     // for full screen button
     const showFullScreenBtn: any = ref(false);
@@ -274,7 +217,6 @@ export default defineComponent({
       metaDataValue,
       metaData,
       showViewPanel,
-      columns,
     };
   },
   methods: {
