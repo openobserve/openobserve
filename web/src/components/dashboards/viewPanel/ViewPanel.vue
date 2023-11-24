@@ -22,7 +22,7 @@
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex q-gutter-sm">
+      <div class="flex q-gutter-sm items-center">
         <!-- histogram interval for sql queries -->
         <q-select v-if="!promqlMode" v-model="histogramInterval"
         label="Histogram interval"
