@@ -978,7 +978,7 @@ export default defineComponent({
 
             $q.notify({
               message: `${item.view_name} view applied successfully.`,
-              color: "postive",
+              color: "positive",
               position: "bottom",
               timeout: 1000,
             });
