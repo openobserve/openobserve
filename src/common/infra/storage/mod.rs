@@ -47,7 +47,6 @@ fn local_cache() -> Box<dyn ObjectStore> {
 pub async fn list(prefix: &str) -> Result<Vec<String>, anyhow::Error> {
     let files = DEFAULT
         .list(Some(&prefix.into()))
-        .await?
         .map_ok(|meta| meta.location.to_string())
         .try_collect::<Vec<String>>()
         .await

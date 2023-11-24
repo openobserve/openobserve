@@ -145,6 +145,7 @@ pub async fn sql(
                 exprs.push(match rules.get(field.name()) {
                     Some(rule) => Expr::Alias(Alias::new(
                         cast(col(field.name()), rule.clone()),
+                        None::<&str>,
                         field.name().to_string(),
                     )),
                     None => col(field.name()),
@@ -263,6 +264,7 @@ async fn exec_query(
             exprs.push(match rules.get(field.name()) {
                 Some(rule) => Expr::Alias(Alias::new(
                     cast(col(field.name()), rule.clone()),
+                    None::<&str>,
                     field.name().to_string(),
                 )),
                 None => col(field.name()),
@@ -845,6 +847,7 @@ pub async fn convert_parquet_file(
             exprs.push(match rules.get(field.name()) {
                 Some(rule) => Expr::Alias(Alias::new(
                     cast(col(field.name()), rule.clone()),
+                    None::<&str>,
                     field.name().to_string(),
                 )),
                 None => col(field.name()),

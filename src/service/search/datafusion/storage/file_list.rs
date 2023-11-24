@@ -39,6 +39,7 @@ pub async fn set(session_id: &str, files: &[FileKey]) {
             last_modified: modified,
             size: file.meta.compressed_size as usize,
             e_tag: None,
+            version: None,
         });
     }
     FILES.insert(session_id.to_string(), values);
