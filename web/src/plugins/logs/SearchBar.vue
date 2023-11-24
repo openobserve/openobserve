@@ -63,8 +63,8 @@
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey"
-size="xs" />
+                    <q-icon name="delete"
+color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -916,6 +916,10 @@ export default defineComponent({
         return;
       }
       store.dispatch("setSavedViewDialog", true);
+      isSavedViewAction.value = "create";
+      savedViewName.value = "";
+      saveViewLoader.value = false;
+      savedViewSelectedName.value = "";
     };
 
     const applySavedView = (item) => {
@@ -968,6 +972,12 @@ export default defineComponent({
             await updatedLocalLogFilterField();
             await getStreams("logs", true);
 
+            $q.notify({
+              message: `${item.view_name} view applied successfully.`,
+              color: "postive",
+              position: "bottom",
+              timeout: 1000,
+            });
             setTimeout(() => {
               handleQueryData();
             }, 1000);
@@ -1076,7 +1086,10 @@ export default defineComponent({
 
     const getSearchObj = () => {
       try {
+        delete searchObj.meta.scrollInfo;
+        delete searchObj?.value;
         let savedSearchObj = toRaw(searchObj);
+        savedSearchObj = JSON.parse(JSON.stringify(savedSearchObj));
 
         delete savedSearchObj.data.queryResults;
         delete savedSearchObj.data.histogram;
@@ -1086,7 +1099,6 @@ export default defineComponent({
         delete savedSearchObj.data.streamResults;
         delete savedSearchObj.data.savedViews;
         delete savedSearchObj.data.transforms;
-        delete savedSearchObj.meta.scrollInfo;
 
         savedSearchObj.data.timezone = store.state.timezone;
         delete savedSearchObj.value;
@@ -1126,9 +1138,11 @@ export default defineComponent({
                 timeout: 1000,
               });
               getSavedViews();
+              isSavedViewAction.value = "create";
               savedViewName.value = "";
               saveViewLoader.value = false;
             } else {
+              saveViewLoader.value = false;
               $q.notify({
                 message: `Error while creating saved view. ${res.data.error_detail}`,
                 color: "negative",
@@ -1138,6 +1152,7 @@ export default defineComponent({
             }
           })
           .catch((err) => {
+            saveViewLoader.value = false;
             $q.notify({
               message: `Error while creating saved view.`,
               color: "negative",
@@ -1147,6 +1162,9 @@ export default defineComponent({
             console.log(err);
           });
       } catch (e: any) {
+        isSavedViewAction.value = "create";
+        savedViewName.value = "";
+        saveViewLoader.value = false;
         $q.notify({
           message: `Error while saving view: ${e}`,
           color: "negative",
@@ -1167,7 +1185,6 @@ export default defineComponent({
         savedviewsService
           .put(store.state.selectedOrganization.identifier, viewID, viewObj)
           .then((res) => {
-            console.log(res);
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               //update the payload and view_name in savedViews object based on id
@@ -1186,9 +1203,11 @@ export default defineComponent({
                 position: "bottom",
                 timeout: 1000,
               });
-              savedViewSelectedName.value = "{}";
+              isSavedViewAction.value = "create";
+              savedViewSelectedName.value = "";
               saveViewLoader.value = false;
             } else {
+              saveViewLoader.value = false;
               $q.notify({
                 message: `Error while updating saved view. ${res.data.error_detail}`,
                 color: "negative",
@@ -1198,6 +1217,7 @@ export default defineComponent({
             }
           })
           .catch((err) => {
+            saveViewLoader.value = false;
             $q.notify({
               message: `Error while updating saved view.`,
               color: "negative",
@@ -1207,6 +1227,9 @@ export default defineComponent({
             console.log(err);
           });
       } catch (e: any) {
+        isSavedViewAction.value = "create";
+        savedViewSelectedName.value = "";
+        saveViewLoader.value = false;
         $q.notify({
           message: `Error while saving view: ${e}`,
           color: "negative",
