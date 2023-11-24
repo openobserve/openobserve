@@ -34,6 +34,7 @@
         ></syntax-guide>
         <q-btn-group class="q-ml-sm no-outline q-pa-none no-border">
           <q-btn-dropdown
+            v-model="savedViewDropdownModel"
             auto-close
             size="12px"
             icon="save"
@@ -442,6 +443,7 @@ export default defineComponent({
       }
     },
     handleDeleteSavedView(item: any) {
+      this.savedViewDropdownModel = false;
       this.deleteViewID = item.view_id;
       this.confirmDelete = true;
     },
@@ -504,6 +506,7 @@ export default defineComponent({
     const savedViewSelectedName = ref("");
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
+    const savedViewDropdownModel = ref(false);
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,
@@ -920,6 +923,7 @@ export default defineComponent({
       savedViewName.value = "";
       saveViewLoader.value = false;
       savedViewSelectedName.value = "";
+      savedViewDropdownModel.value = false;
     };
 
     const applySavedView = (item) => {
@@ -1284,6 +1288,7 @@ export default defineComponent({
       deleteViewID,
       confirmDelete,
       saveViewLoader,
+      savedViewDropdownModel,
     };
   },
   computed: {
