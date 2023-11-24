@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- view panel dialog -->
     <q-dialog v-model="showViewPanel">
       <q-card style="min-width: 95vw; min-height: 90vh;">
-        <ViewPanel :panelId="viewPanelId" @close-panel="() => (showViewPanel = false)" :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"/>
+        <ViewPanel :panelId="viewPanelId" :selectedDate="selectedDate" @close-panel="() => (showViewPanel = false)" :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"/>
       </q-card>
     </q-dialog>
 

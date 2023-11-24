@@ -116,6 +116,9 @@ export default defineComponent({
     panelId: {
       type: String,
       required: true,
+    },
+    selectedDate: {
+      type: Object,
     }
   },
   emits: ["closePanel"],
@@ -129,7 +132,7 @@ export default defineComponent({
     const store = useStore();
     const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
       useDashboardPanelData();
-    const selectedDate = ref()
+    const selectedDate = ref(JSON.parse(JSON.stringify(props.selectedDate ?? {})));
     const dateTimePickerRef: any = ref(null);
     const errorData: any = reactive({
       errors: []
@@ -287,7 +290,6 @@ export default defineComponent({
         Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData)));
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
-        // updateDateTime(selectedDate.value)
       }
       await nextTick();
       loadDashboard();
@@ -326,19 +328,6 @@ export default defineComponent({
     watch(selectedDate, () => {
       updateDateTime(selectedDate.value)
     })
-
-    // whenever the refreshInterval is changed, update the query params
-    // watch([refreshInterval, selectedDate], () => {
-    //   router.replace({
-    //     query: {
-    //       org_identifier: store.state.selectedOrganization.identifier,
-    //       dashboard: route.query.dashboard,
-    //       folder: route.query.folder,
-    //       refresh: generateDurationLabel(refreshInterval.value),
-    //       ...getQueryParamsForDuration(selectedDate.value),
-    //     },
-    //   });
-    // });
 
     const updateDateTime = (value: object) => {
       dashboardPanelData.meta.dateTime = {
