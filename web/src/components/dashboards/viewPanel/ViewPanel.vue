@@ -60,7 +60,7 @@
               <div class="col" style="height: 100%">
                     <div class="layout-panel-container col" style="height:100%;">
                       <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables"
-                        :selectedTimeDate="dashboardPanelData.meta.dateTime" @variablesData="variablesDataUpdated" />
+                        :selectedTimeDate="dashboardPanelData.meta.dateTime" :initialVariableValues="initialVariableValues" @variablesData="variablesDataUpdated" />
                       <div style="flex:1;">
                         <PanelSchemaRenderer :key="dashboardPanelData.data.type" :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                       </div>
@@ -118,6 +118,9 @@ export default defineComponent({
       required: true,
     },
     selectedDate: {
+      type: Object,
+    },
+    initialVariableValues:{
       type: Object,
     }
   },
