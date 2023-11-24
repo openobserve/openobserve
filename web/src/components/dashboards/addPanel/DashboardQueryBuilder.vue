@@ -121,6 +121,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val.length > 0 || 'Required']"
                 />
+                <!-- histogram interval if auto sql and aggregation function is histogram-->
+                <div
+                  v-if="
+                    !dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery &&
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x[index].aggregationFunction === 'histogram'
+                  "
+                >
+                  histogram::::
+                </div>
                 <div
                   v-if="
                     !dashboardPanelData.data.queries[
