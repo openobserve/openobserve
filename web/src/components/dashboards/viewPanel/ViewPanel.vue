@@ -23,7 +23,8 @@
         </span>
       </div>
       <div class="flex q-gutter-sm">
-        <q-select v-model="histogramInterval"
+        <!-- histogram interval for sql queries -->
+        <q-select v-if="!promqlMode" v-model="histogramInterval"
         label="Histogram interval"
         :options="histogramIntervalOptions" behavior="menu" filled borderless dense
         class="q-ml-sm" style="width: 150px;">
@@ -125,7 +126,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { dashboardPanelData, resetDashboardPanelData } =
+    const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
       useDashboardPanelData();
     const selectedDate = ref()
     const dateTimePickerRef: any = ref(null);
@@ -144,7 +145,7 @@ export default defineComponent({
     const refreshInterval = ref(0);
 
     // histogram interval
-    const histogramInterval = ref("auto");
+    const histogramInterval: any = ref("auto");
 
     const histogramIntervalOptions = [
       {
@@ -215,7 +216,17 @@ export default defineComponent({
 
 
     watch(() => histogramInterval.value , () => {
-      console.log(histogramInterval.value, dashboardPanelData,"new value");
+      // replace the histogram interval in the query by finding histogram aggregation
+      dashboardPanelData?.data?.queries?.forEach((query: any) => {        
+        // query.query = query?.query?.replace(/histogram\(_timestamp(?:, '[^']+')?\)/g, "histogram(_timestamp" +( histogramInterval.value.label == "Auto" ? "" : ", '" + histogramInterval.value.label + "'") + ")")
+        query.query = query?.query?.replace(/histogram\((.*?)\)/g, (match: any, query: any) => {
+          return "histogram("+ query.split(",")[0] +( histogramInterval.value.label == "Auto" ? "" : ", '" + histogramInterval.value.label + "'") + ")";
+        })
+      })
+      // copy the data object excluding the reactivity
+      chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // refresh the date time based on current time if relative date is selected
+      dateTimePickerRef.value && dateTimePickerRef.value.refresh();
     })
 
     onUnmounted(async () => {
@@ -321,6 +332,7 @@ export default defineComponent({
       dateTimePickerRef,
       refreshInterval,
       refreshData,
+      promqlMode,
       histogramInterval,
       histogramIntervalOptions
     };
