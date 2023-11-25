@@ -28,7 +28,7 @@ pub fn infer_json_schema<R: BufRead>(
     max_read_records: Option<usize>,
     stream_type: StreamType,
 ) -> Result<Schema, ArrowError> {
-    let mut schema = reader::infer_json_schema(reader, max_read_records)?;
+    let (mut schema, _) = reader::infer_json_schema(reader, max_read_records)?;
     if stream_type == StreamType::Traces {
         schema = fix_traces_schema(schema);
     }
@@ -40,7 +40,7 @@ pub fn infer_json_schema_from_seekable<R: BufRead + Seek>(
     max_read_records: Option<usize>,
     stream_type: StreamType,
 ) -> Result<Schema, ArrowError> {
-    let mut schema = reader::infer_json_schema_from_seekable(reader, max_read_records)?;
+    let (mut schema, _) = reader::infer_json_schema_from_seekable(reader, max_read_records)?;
     if stream_type == StreamType::Traces {
         schema = fix_traces_schema(schema);
     }
