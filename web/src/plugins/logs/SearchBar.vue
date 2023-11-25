@@ -64,8 +64,8 @@
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete"
-color="grey" size="xs" />
+                    <q-icon name="delete" color="grey"
+size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -305,7 +305,7 @@ color="grey" size="xs" />
               filled
               dense
               :rules="[
-                (val) => !!val || 'This field is required',
+                (val) => !!val.trim() || 'This field is required',
                 (val) =>
                   /^[A-Za-z0-9 ]+$/.test(val) || 'Input must be alphanumeric',
               ]"
@@ -1116,6 +1116,16 @@ export default defineComponent({
 
     const createSavedViews = (viewName: string) => {
       try {
+        if (viewName.trim() == "") {
+          $q.notify({
+            message: `Please provide valid view name.`,
+            color: "negative",
+            position: "bottom",
+            timeout: 1000,
+          });
+          return;
+        }
+
         const viewObj: any = {
           data: getSearchObj(),
           view_name: viewName,
