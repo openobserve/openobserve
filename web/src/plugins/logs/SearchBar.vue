@@ -34,6 +34,7 @@
         ></syntax-guide>
         <q-btn-group class="q-ml-sm no-outline q-pa-none no-border">
           <q-btn-dropdown
+            v-model="savedViewDropdownModel"
             auto-close
             size="12px"
             icon="save"
@@ -63,7 +64,8 @@
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey" size="xs" />
+                    <q-icon name="delete" color="grey"
+size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -302,7 +304,11 @@
               outlined
               filled
               dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              :rules="[
+                (val) => !!val.trim() || 'This field is required',
+                (val) =>
+                  /^[A-Za-z0-9 ]+$/.test(val) || 'Input must be alphanumeric',
+              ]"
               tabindex="0"
             />
           </div>
@@ -327,10 +333,31 @@
         </q-card-section>
 
         <q-card-actions align="right" class="bg-white text-teal">
-          <q-btn flat
-:label="t('confirmDialog.cancel')" v-close-popup />
-          <q-btn flat
-:label="t('confirmDialog.ok')" @click="handleSavedView" />
+          <q-btn
+            unelevated
+            no-caps
+            class="q-mr-sm text-bold"
+            :label="t('confirmDialog.cancel')"
+            color="secondary"
+            v-close-popup
+          />
+          <q-btn
+            v-if="!saveViewLoader"
+            unelevated
+            no-caps
+            :label="t('confirmDialog.ok')"
+            color="primary"
+            class="text-bold"
+            @click="handleSavedView"
+          />
+          <q-btn
+            v-if="saveViewLoader"
+            unelevated
+            no-caps
+            :label="t('confirmDialog.loading')"
+            color="primary"
+            class="text-bold"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -368,12 +395,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import stream from "@/services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { cloneDeep } from "lodash-es";
-import {
-  b64DecodeUnicode,
-  mergeDeep,
-  b64EncodeUnicode,
-} from "@/utils/zincutils";
+import { mergeDeep } from "@/utils/zincutils";
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
@@ -421,6 +443,7 @@ export default defineComponent({
       }
     },
     handleDeleteSavedView(item: any) {
+      this.savedViewDropdownModel = false;
       this.deleteViewID = item.view_id;
       this.confirmDelete = true;
     },
@@ -463,6 +486,7 @@ export default defineComponent({
 
     const parser = new Parser();
     const dateTimeRef = ref(null);
+    const saveViewLoader = ref(false);
 
     const {
       autoCompleteData,
@@ -482,6 +506,7 @@ export default defineComponent({
     const savedViewSelectedName = ref("");
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
+    const savedViewDropdownModel = ref(false);
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,
@@ -894,6 +919,11 @@ export default defineComponent({
         return;
       }
       store.dispatch("setSavedViewDialog", true);
+      isSavedViewAction.value = "create";
+      savedViewName.value = "";
+      saveViewLoader.value = false;
+      savedViewSelectedName.value = "";
+      savedViewDropdownModel.value = false;
     };
 
     const applySavedView = (item) => {
@@ -940,12 +970,18 @@ export default defineComponent({
               onRefreshIntervalUpdate();
             }
 
-            if(searchObj.data?.timezone) {
+            if (searchObj.data?.timezone) {
               store.dispatch("setTimezone", searchObj.data.timezone);
             }
             await updatedLocalLogFilterField();
             await getStreams("logs", true);
 
+            $q.notify({
+              message: `${item.view_name} view applied successfully.`,
+              color: "positive",
+              position: "bottom",
+              timeout: 1000,
+            });
             setTimeout(() => {
               handleQueryData();
             }, 1000);
@@ -991,10 +1027,12 @@ export default defineComponent({
             timeout: 1000,
           });
         } else {
+          saveViewLoader.value = true;
           createSavedViews(savedViewName.value);
         }
       } else {
         if (savedViewSelectedName.value.view_id) {
+          saveViewLoader.value = true;
           updateSavedViews(
             savedViewSelectedName.value.view_id,
             savedViewSelectedName.value.view_name
@@ -1052,7 +1090,10 @@ export default defineComponent({
 
     const getSearchObj = () => {
       try {
-        let savedSearchObj = cloneDeep(searchObj);
+        delete searchObj.meta.scrollInfo;
+        delete searchObj?.value;
+        let savedSearchObj = toRaw(searchObj);
+        savedSearchObj = JSON.parse(JSON.stringify(savedSearchObj));
 
         delete savedSearchObj.data.queryResults;
         delete savedSearchObj.data.histogram;
@@ -1062,7 +1103,6 @@ export default defineComponent({
         delete savedSearchObj.data.streamResults;
         delete savedSearchObj.data.savedViews;
         delete savedSearchObj.data.transforms;
-        delete savedSearchObj.meta.scrollInfo;
 
         savedSearchObj.data.timezone = store.state.timezone;
         delete savedSearchObj.value;
@@ -1076,6 +1116,16 @@ export default defineComponent({
 
     const createSavedViews = (viewName: string) => {
       try {
+        if (viewName.trim() == "") {
+          $q.notify({
+            message: `Please provide valid view name.`,
+            color: "negative",
+            position: "bottom",
+            timeout: 1000,
+          });
+          return;
+        }
+
         const viewObj: any = {
           data: getSearchObj(),
           view_name: viewName,
@@ -1102,8 +1152,11 @@ export default defineComponent({
                 timeout: 1000,
               });
               getSavedViews();
+              isSavedViewAction.value = "create";
               savedViewName.value = "";
+              saveViewLoader.value = false;
             } else {
+              saveViewLoader.value = false;
               $q.notify({
                 message: `Error while creating saved view. ${res.data.error_detail}`,
                 color: "negative",
@@ -1113,6 +1166,7 @@ export default defineComponent({
             }
           })
           .catch((err) => {
+            saveViewLoader.value = false;
             $q.notify({
               message: `Error while creating saved view.`,
               color: "negative",
@@ -1122,6 +1176,9 @@ export default defineComponent({
             console.log(err);
           });
       } catch (e: any) {
+        isSavedViewAction.value = "create";
+        savedViewName.value = "";
+        saveViewLoader.value = false;
         $q.notify({
           message: `Error while saving view: ${e}`,
           color: "negative",
@@ -1142,7 +1199,6 @@ export default defineComponent({
         savedviewsService
           .put(store.state.selectedOrganization.identifier, viewID, viewObj)
           .then((res) => {
-            console.log(res);
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               //update the payload and view_name in savedViews object based on id
@@ -1161,8 +1217,11 @@ export default defineComponent({
                 position: "bottom",
                 timeout: 1000,
               });
-              savedViewSelectedName.value = "{}";
+              isSavedViewAction.value = "create";
+              savedViewSelectedName.value = "";
+              saveViewLoader.value = false;
             } else {
+              saveViewLoader.value = false;
               $q.notify({
                 message: `Error while updating saved view. ${res.data.error_detail}`,
                 color: "negative",
@@ -1172,6 +1231,7 @@ export default defineComponent({
             }
           })
           .catch((err) => {
+            saveViewLoader.value = false;
             $q.notify({
               message: `Error while updating saved view.`,
               color: "negative",
@@ -1181,6 +1241,9 @@ export default defineComponent({
             console.log(err);
           });
       } catch (e: any) {
+        isSavedViewAction.value = "create";
+        savedViewSelectedName.value = "";
+        saveViewLoader.value = false;
         $q.notify({
           message: `Error while saving view: ${e}`,
           color: "negative",
@@ -1234,6 +1297,8 @@ export default defineComponent({
       deleteSavedViews,
       deleteViewID,
       confirmDelete,
+      saveViewLoader,
+      savedViewDropdownModel,
     };
   },
   computed: {
