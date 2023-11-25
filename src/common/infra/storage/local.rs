@@ -17,7 +17,7 @@ use bytes::Bytes;
 use futures::stream::BoxStream;
 use object_store::{
     limit::LimitStore, local::LocalFileSystem, path::Path, Error, GetOptions, GetResult,
-    ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
+    ListResult, MultipartId, ObjectMeta, ObjectStore, PutOptions, PutResult, Result,
 };
 use std::ops::Range;
 use tokio::io::AsyncWrite;
@@ -57,7 +57,12 @@ impl std::fmt::Display for Local {
 
 #[async_trait]
 impl ObjectStore for Local {
-    async fn put(&self, location: &Path, bytes: Bytes) -> Result<()> {
+    async fn put_opts(
+        &self,
+        location: &Path,
+        bytes: Bytes,
+        _opts: PutOptions,
+    ) -> Result<PutResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data_size = bytes.len();
@@ -77,7 +82,10 @@ impl ObjectStore for Local {
                         .with_label_values(&[columns[1], columns[3], columns[2], "put"])
                         .inc_by(time);
                 }
-                Ok(())
+                Ok(PutResult {
+                    e_tag: None,
+                    version: None,
+                })
             }
             Err(err) => {
                 log::error!("disk File upload error: {:?}", err);
@@ -199,10 +207,9 @@ impl ObjectStore for Local {
         result
     }
 
-    async fn list(&self, prefix: Option<&Path>) -> Result<BoxStream<'_, Result<ObjectMeta>>> {
-        self.client
-            .list(Some(&format_key(prefix.unwrap().as_ref()).into()))
-            .await
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+        let prefix = format_key(prefix.unwrap().as_ref());
+        self.client.list(Some(&prefix.into()))
     }
 
     async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {

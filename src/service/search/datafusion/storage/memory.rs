@@ -17,7 +17,7 @@ use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
     path::Path, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, ObjectMeta,
-    ObjectStore, Result,
+    ObjectStore, PutOptions, PutResult, Result,
 };
 use std::ops::Range;
 use tokio::io::AsyncWrite;
@@ -68,6 +68,7 @@ impl ObjectStore for FS {
                     last_modified: *BASE_TIME,
                     size: data.len(),
                     e_tag: None,
+                    version: None,
                 };
                 let range = Range {
                     start: 0,
@@ -97,6 +98,7 @@ impl ObjectStore for FS {
                     last_modified: *BASE_TIME,
                     size: data.len(),
                     e_tag: None,
+                    version: None,
                 };
                 let (range, data) = match options.range {
                     Some(range) => (range.clone(), data.slice(range)),
@@ -119,6 +121,8 @@ impl ObjectStore for FS {
                         if_unmodified_since: options.if_unmodified_since,
                         if_match: options.if_match.clone(),
                         if_none_match: options.if_none_match.clone(),
+                        version: options.version.clone(),
+                        head: options.head,
                     },
                 )
                 .await
@@ -184,6 +188,7 @@ impl ObjectStore for FS {
                 last_modified: *BASE_TIME,
                 size: data.len(),
                 e_tag: None,
+                version: None,
             }),
             None => match storage::LOCAL_CACHE.head(location).await {
                 Ok(data) => Ok(data),
@@ -193,14 +198,14 @@ impl ObjectStore for FS {
     }
 
     #[tracing::instrument(name = "datafusion::storage::memory::list", skip_all)]
-    async fn list(&self, prefix: Option<&Path>) -> Result<BoxStream<'_, Result<ObjectMeta>>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
         let key = prefix.unwrap().to_string();
         let objects = super::file_list::get(&key).unwrap();
         let values = objects
             .iter()
             .map(|file| Ok(file.to_owned()))
             .collect::<Vec<Result<ObjectMeta>>>();
-        Ok(futures::stream::iter(values).boxed())
+        futures::stream::iter(values).boxed()
     }
 
     async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
@@ -208,8 +213,13 @@ impl ObjectStore for FS {
         Err(object_store::Error::NotImplemented {})
     }
 
-    async fn put(&self, location: &Path, _bytes: Bytes) -> Result<()> {
-        log::error!("NotImplemented put: {}", location);
+    async fn put_opts(
+        &self,
+        location: &Path,
+        _bytes: Bytes,
+        _opts: PutOptions,
+    ) -> Result<PutResult> {
+        log::error!("NotImplemented put_opts: {}", location);
         Err(object_store::Error::NotImplemented {})
     }
 

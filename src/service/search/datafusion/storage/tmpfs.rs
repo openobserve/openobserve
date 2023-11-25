@@ -18,7 +18,7 @@ use chrono::Utc;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
     path::Path, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, ObjectMeta,
-    ObjectStore, Result,
+    ObjectStore, PutOptions, PutResult, Result,
 };
 use std::ops::Range;
 use thiserror::Error as ThisError;
@@ -66,6 +66,7 @@ impl ObjectStore for Tmpfs {
             last_modified: *BASE_TIME,
             size: data.len(),
             e_tag: None,
+            version: None,
         };
         let range = Range {
             start: 0,
@@ -88,6 +89,7 @@ impl ObjectStore for Tmpfs {
             last_modified: *BASE_TIME,
             size: data.len(),
             e_tag: None,
+            version: None,
         };
         let (range, data) = match options.range {
             Some(range) => (range.clone(), data.slice(range)),
@@ -140,10 +142,11 @@ impl ObjectStore for Tmpfs {
             last_modified,
             size: bytes.len(),
             e_tag: None,
+            version: None,
         })
     }
 
-    async fn list(&self, prefix: Option<&Path>) -> Result<BoxStream<'_, Result<ObjectMeta>>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
         // log::info!("list: {:?}", prefix);
         let mut values = Vec::new();
         let key = prefix.unwrap().to_string();
@@ -154,9 +157,10 @@ impl ObjectStore for Tmpfs {
                 last_modified: file.last_modified,
                 size: file.size,
                 e_tag: None,
+                version: None,
             }));
         }
-        Ok(futures::stream::iter(values).boxed())
+        futures::stream::iter(values).boxed()
     }
 
     /// The memory implementation returns all results, as opposed to the cloud
@@ -173,6 +177,7 @@ impl ObjectStore for Tmpfs {
                 last_modified: file.last_modified,
                 size: file.size,
                 e_tag: None,
+                version: None,
             });
         }
         Ok(ListResult {
@@ -181,8 +186,13 @@ impl ObjectStore for Tmpfs {
         })
     }
 
-    async fn put(&self, location: &Path, _bytes: Bytes) -> Result<()> {
-        log::error!("NotImplemented put: {}", location);
+    async fn put_opts(
+        &self,
+        location: &Path,
+        _bytes: Bytes,
+        _opts: PutOptions,
+    ) -> Result<PutResult> {
+        log::error!("NotImplemented put_opts: {}", location);
         Err(object_store::Error::NotImplemented {})
     }
 
