@@ -59,7 +59,7 @@ pub async fn handle_triggers(trigger: Trigger) {
                     }
                 } else {
                     let expires_at =
-                        Utc::now().timestamp_micros() + get_micros_from_min(alert.duration); // * 60 * 1000000;
+                        Utc::now().timestamp_micros() + get_micros_from_min(alert.period); // * 60 * 1000000;
                     log::info!("Setting timeout for trigger to {}", expires_at);
                     TRIGGERS_IN_PROCESS.insert(
                         key.to_owned(),

@@ -143,8 +143,8 @@ mod tests {
         };
         let alert = Alert {
             name: "testAlert".to_string(),
-            stream: "olympics".to_string(),
             stream_type: StreamType::Logs,
+            stream_name: "olympics".to_string(),
             query_condition: alerts::QueryCondition {
                 conditions: Some(vec![Condition {
                     column: "Country".to_string(),
@@ -156,9 +156,9 @@ mod tests {
                 sql: None,
                 promql: None,
             },
-            duration: 5,
-            frequency: 1,
+            period: 5,
             threshold: 1,
+            frequency: 1,
             silence: 10,
             destinations: vec!["testDest".to_string()],
             is_real_time: true,

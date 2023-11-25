@@ -36,8 +36,8 @@ pub async fn save_alert(
     mut alert: Alert,
 ) -> Result<(), anyhow::Error> {
     alert.name = name.to_string();
-    alert.stream = stream_name.to_string();
     alert.stream_type = stream_type;
+    alert.stream_name = stream_name.to_string();
 
     // before saving alert check alert destination
     for dest in alert.destinations.iter() {
@@ -156,6 +156,29 @@ pub async fn delete_alert(
 }
 
 #[tracing::instrument]
+pub async fn enable_alert(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    name: &str,
+    value: bool,
+) -> Result<(), (http::StatusCode, anyhow::Error)> {
+    let mut alert = match db::alerts::get(org_id, stream_name, stream_type, name).await {
+        Ok(Some(alert)) => alert,
+        _ => {
+            return Err((
+                http::StatusCode::NOT_FOUND,
+                anyhow::anyhow!("Alert not found"),
+            ));
+        }
+    };
+    alert.enabled = value;
+    db::alerts::set(org_id, stream_name, stream_type, name, alert)
+        .await
+        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+#[tracing::instrument]
 pub async fn get_alert(
     org_id: &str,
     stream_name: &str,
@@ -205,8 +228,8 @@ mod test {
     fn prepare_test_alert_object(name: &str, stream: &str) -> Alert {
         Alert {
             name: name.to_string(),
-            stream: stream.to_string(),
             stream_type: StreamType::Logs,
+            stream_name: stream.to_string(),
             query_condition: QueryCondition {
                 conditions: Some(vec![Condition {
                     column: "occurrence".to_owned(),
@@ -218,7 +241,7 @@ mod test {
                 sql: None,
                 promql: None,
             },
-            duration: 1,
+            period: 1,
             threshold: 1,
             frequency: 1,
             silence: 10,

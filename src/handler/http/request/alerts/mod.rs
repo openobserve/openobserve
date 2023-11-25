@@ -189,7 +189,6 @@ async fn get_alert(
     ),
     responses(
         (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
-        (status = 403, description = "Forbidden", content_type = "application/json", body = HttpResponse),
         (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Error",     content_type = "application/json", body = HttpResponse),
     )
@@ -210,7 +209,54 @@ async fn delete_alert(
     match alerts::delete_alert(&org_id, &stream_name, stream_type, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert deleted")),
         Err(e) => match e {
-            (http::StatusCode::FORBIDDEN, e) => Ok(MetaHttpResponse::forbidden(e)),
+            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
+            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+        },
+    }
+}
+
+/** EnableAlert */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "EnableAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("alert_name" = String, Path, description = "Alert name"),
+        ("value" = bool, Query, description = "Enable or disable alert"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Error",     content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/{org_id}/{stream_name}/alerts/{alert_name}/enable")]
+async fn enable_alert(
+    path: web::Path<(String, String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name, name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    };
+    let enable = match query.get("value") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
+    let mut resp = HashMap::new();
+    resp.insert("enabled".to_string(), enable);
+    match alerts::enable_alert(&org_id, &stream_name, stream_type, &name, enable).await {
+        Ok(_) => Ok(MetaHttpResponse::json(resp)),
+        Err(e) => match e {
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
             (_, e) => Ok(MetaHttpResponse::internal_error(e)),
         },

@@ -199,7 +199,7 @@ pub async fn send_ingest_notification(trigger: Trigger, alert: Alert) {
     log::info!(
         "Sending notification for alert {} {}",
         alert.name,
-        alert.stream
+        alert.stream_name
     );
     let _ = send_notification(&alert, &trigger).await;
     // let trigger_to_save = Trigger {

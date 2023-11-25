@@ -31,11 +31,11 @@ pub struct Alert {
     #[serde(default)]
     pub stream_type: StreamType,
     #[serde(default)]
-    pub stream: String,
+    pub stream_name: String,
     #[serde(default)]
     pub is_real_time: bool,
     pub query_condition: QueryCondition,
-    pub duration: i64,  // 10 minutes
+    pub period: i64,    // 10 minutes
     pub threshold: i64, // 3 times
     pub frequency: i64, // 1 minute
     pub silence: i64,   // silence for 10 minutes after fire an alert
@@ -116,7 +116,9 @@ pub struct DestinationTemplate {
 
 impl PartialEq for Alert {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.stream == other.stream
+        self.name == other.name
+            && self.stream_type == other.stream_type
+            && self.stream_name == other.stream_name
     }
 }
 

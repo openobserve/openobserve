@@ -91,6 +91,7 @@ use crate::handler::http::request;
         request::alerts::list_alerts,
         request::alerts::get_alert,
         request::alerts::delete_alert,
+        request::alerts::enable_alert,
         request::alerts::trigger_alert,
         request::alerts::templates::list_templates,
         request::alerts::templates::get_template,
