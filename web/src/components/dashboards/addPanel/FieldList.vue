@@ -1,61 +1,118 @@
 <!-- Copyright 2023 Zinc Labs Inc.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-     http:www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License. 
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column index-menu" :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+  <div
+    class="column index-menu"
+    :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
+  >
     <div class="col-auto">
-      <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type" :label="t('dashboard.selectStreamType')"
-        :options="data.streamType" data-test="index-dropdown-stream_type" input-debounce="0" behavior="menu" filled borderless dense
-        class="q-mb-xs"></q-select>
-      <q-select v-model="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream" :label="t('dashboard.selectIndex')"
-        :options="filteredStreams" data-test="index-dropdown-stream" input-debounce="0" behavior="menu" use-input filled borderless
-        dense hide-selected fill-input @filter="filterStreamFn" :loading="streamDataLoading.isLoading.value" 
-        option-label="name" option-value="name" emit-value :class="selectedMetricTypeIcon && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics' ? 'metric_icon_present' : ''">
-        
+      <q-select
+        v-model="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type
+        "
+        :label="t('dashboard.selectStreamType')"
+        :options="data.streamType"
+        data-test="index-dropdown-stream_type"
+        input-debounce="0"
+        behavior="menu"
+        filled
+        borderless
+        dense
+        class="q-mb-xs"
+      ></q-select>
+      <q-select
+        v-model="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream
+        "
+        :label="t('dashboard.selectIndex')"
+        :options="filteredStreams"
+        data-test="index-dropdown-stream"
+        input-debounce="0"
+        behavior="menu"
+        use-input
+        filled
+        borderless
+        dense
+        hide-selected
+        fill-input
+        @filter="filterStreamFn"
+        :loading="streamDataLoading.isLoading.value"
+        option-label="name"
+        option-value="name"
+        emit-value
+        :class="
+          selectedMetricTypeIcon &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type == 'metrics'
+            ? 'metric_icon_present'
+            : ''
+        "
+      >
         <template
-          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics' && selectedMetricTypeIcon"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type == 'metrics' && selectedMetricTypeIcon
+          "
           v-slot:prepend
         >
           <q-icon
-            style="margin-top: 14px;"
+            style="margin-top: 14px"
             size="xs"
-            :name="metricsIconMapping[
-              selectedMetricTypeIcon || ''
-              ]
-              "
+            :name="metricsIconMapping[selectedMetricTypeIcon || '']"
           />
         </template>
 
-        <template v-slot:option="scope"
-          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'">
-            <q-item 
-              :class="store.state.theme === 'dark' &&
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream !== scope.opt.value
-                  ? 'text-white'
-                  : ''
+        <template
+          v-slot:option="scope"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type == 'metrics'
+          "
+        >
+          <q-item
+            :class="
+              store.state.theme === 'dark' &&
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream !== scope.opt.value
+                ? 'text-white'
+                : ''
+            "
+            v-bind="scope.itemProps"
+          >
+            <q-item-section avatar class="metric-explore-metric-icon">
+              <q-icon
+                size="xs"
+                :name="
+                  metricsIconMapping[scope.opt.metrics_meta.metric_type] || ''
                 "
-                v-bind="scope.itemProps"
-              >
-              <q-item-section avatar class="metric-explore-metric-icon">
-                <q-icon size="xs"
-                  :name="metricsIconMapping[scope.opt.metrics_meta.metric_type] || ''" />            
-              </q-item-section>
-              <q-item-section>
+              />
+            </q-item-section>
+            <q-item-section>
               <q-item-label> {{ scope.opt.name }} </q-item-label>
-              </q-item-section>
-            </q-item>
+            </q-item-section>
+          </q-item>
         </template>
 
         <template #no-option>
@@ -89,68 +146,208 @@
       >
         <template #body-cell-name="props">
           <q-tr :props="props">
-            <q-td class="field_list" :props="props" v-mutation="mutationHandler" @dragenter="onDragEnter"
-              @dragleave="onDragLeave" @dragover="onDragOver" @drop="onDrop"
-              :style="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex == dashboardPanelData.meta.stream.customQueryFields.length ? 'border: 1px solid black' : ''">
-              <div class="field_overlay" :title="props.row.name" :data-test="`field-list-item-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.stream_type}-${dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.stream}-${props.row.name}`">
-                <div class="field_label"
-                  :draggable="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))"
-                  @dragstart="onDragStart($event, props.row)">
-                  <q-icon name="drag_indicator" color="grey-13"
-                    :class="['q-mr-xs', !(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length)) ? 'drag_indicator' : 'drag_disabled']"
-                    v-if="!promqlMode" data-test="dashboard-add-data-indicator"/>
+            <q-td
+              class="field_list"
+              :props="props"
+              v-mutation="mutationHandler"
+              @dragenter="onDragEnter"
+              @dragleave="onDragLeave"
+              @dragover="onDragOver"
+              @drop="onDrop"
+              :style="
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].customQuery &&
+                props.pageIndex ==
+                  dashboardPanelData.meta.stream.customQueryFields.length
+                  ? 'border: 1px solid black'
+                  : ''
+              "
+            >
+              <div
+                class="field_overlay"
+                :title="props.row.name"
+                :data-test="`field-list-item-${
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields?.stream_type
+                }-${
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].fields?.stream
+                }-${props.row.name}`"
+              >
+                <div
+                  class="field_label"
+                  :draggable="
+                    !(
+                      promqlMode ||
+                      (dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery &&
+                        props.pageIndex >=
+                          dashboardPanelData.meta.stream.customQueryFields
+                            .length)
+                    )
+                  "
+                  @dragstart="onDragStart($event, props.row)"
+                >
+                  <q-icon
+                    name="drag_indicator"
+                    color="grey-13"
+                    :class="[
+                      'q-mr-xs',
+                      !(
+                        promqlMode ||
+                        (dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery &&
+                          props.pageIndex >=
+                            dashboardPanelData.meta.stream.customQueryFields
+                              .length)
+                      )
+                        ? 'drag_indicator'
+                        : 'drag_disabled',
+                    ]"
+                    v-if="!promqlMode"
+                    data-test="dashboard-add-data-indicator"
+                  />
 
                   <q-icon
-                    :name="props.row.type == 'Utf8' ? 'text_fields' : props.row.type == 'Int64' ? 'tag' : 'toggle_off'"
-                    color="grey-6" class="q-mr-xs" />
+                    :name="
+                      props.row.type == 'Utf8'
+                        ? 'text_fields'
+                        : props.row.type == 'Int64'
+                        ? 'tag'
+                        : 'toggle_off'
+                    "
+                    color="grey-6"
+                    class="q-mr-xs"
+                  />
                   {{ props.row.name }}
                 </div>
-                <div class="field_icons"
-                  v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length) || dashboardPanelData.data.type == 'geomap')">
-                  <q-btn padding="sm" :disabled="isAddXAxisNotAllowed" @click="addXAxisItem(props.row)"  data-test="dashboard-add-x-data">
+                <div
+                  class="field_icons"
+                  v-if="
+                    !(
+                      promqlMode ||
+                      (dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery &&
+                        props.pageIndex >=
+                          dashboardPanelData.meta.stream.customQueryFields
+                            .length) ||
+                      dashboardPanelData.data.type == 'geomap'
+                    )
+                  "
+                >
+                  <q-btn
+                    padding="sm"
+                    :disabled="isAddXAxisNotAllowed"
+                    @click="addXAxisItem(props.row)"
+                    data-test="dashboard-add-x-data"
+                  >
                     <div>
                       {{
                         dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y"
                       }}
                     </div>
                   </q-btn>
-                  <q-btn padding="sm" :disabled="isAddYAxisNotAllowed" @click="addYAxisItem(props.row)" data-test="dashboard-add-y-data">
+                  <q-btn
+                    padding="sm"
+                    :disabled="isAddYAxisNotAllowed"
+                    @click="addYAxisItem(props.row)"
+                    data-test="dashboard-add-y-data"
+                  >
                     <div>
                       {{
                         dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X"
                       }}
                     </div>
                   </q-btn>
-                  <q-btn v-if="dashboardPanelData.data.type == 'heatmap'" padding="sm" :disabled="isAddZAxisNotAllowed" @click="addZAxisItem(props.row)">
-                     <div>+Z</div>
-                    </q-btn>
-                  <q-btn padding="sm" @click="addFilteredItem(props.row.name)" data-test="dashboard-add-filter-data">
+                  <q-btn
+                    v-if="dashboardPanelData.data.type == 'heatmap'"
+                    padding="sm"
+                    :disabled="isAddZAxisNotAllowed"
+                    @click="addZAxisItem(props.row)"
+                  >
+                    <div>+Z</div>
+                  </q-btn>
+                  <q-btn
+                    padding="sm"
+                    @click="addFilteredItem(props.row.name)"
+                    data-test="dashboard-add-filter-data"
+                  >
                     <div>+F</div>
                   </q-btn>
                 </div>
-                <div class="field_icons"
-                    v-if="!(promqlMode || (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length)) && dashboardPanelData.data.type == 'geomap'">
-                    <q-btn :disabled="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.latitude != null"  no-caps padding="sm" @click="addLatitude(props.row)"  data-test="dashboard-add-x-data">
-                      <div>
-                        +Lat
-                      </div>
-                    </q-btn>
-                    <q-btn :disabled="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.longitude != null" no-caps padding="sm" @click="addLongitude(props.row)" data-test="dashboard-add-y-data">
-                      <div>
-                        +Lng
-                      </div>
-                    </q-btn>
-                    <q-btn :disabled="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.weight != null" padding="sm" @click="addWeight(props.row)">
-                       <div>+W</div>
-                      </q-btn>
-                  </div>
+                <div
+                  class="field_icons"
+                  v-if="
+                    !(
+                      promqlMode ||
+                      (dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery &&
+                        props.pageIndex >=
+                          dashboardPanelData.meta.stream.customQueryFields
+                            .length)
+                    ) && dashboardPanelData.data.type == 'geomap'
+                  "
+                >
+                  <q-btn
+                    :disabled="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields?.latitude != null
+                    "
+                    no-caps
+                    padding="sm"
+                    @click="addLatitude(props.row)"
+                    data-test="dashboard-add-x-data"
+                  >
+                    <div>+Lat</div>
+                  </q-btn>
+                  <q-btn
+                    :disabled="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields?.longitude != null
+                    "
+                    no-caps
+                    padding="sm"
+                    @click="addLongitude(props.row)"
+                    data-test="dashboard-add-y-data"
+                  >
+                    <div>+Lng</div>
+                  </q-btn>
+                  <q-btn
+                    :disabled="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields?.weight != null
+                    "
+                    padding="sm"
+                    @click="addWeight(props.row)"
+                  >
+                    <div>+W</div>
+                  </q-btn>
+                </div>
               </div>
             </q-td>
           </q-tr>
         </template>
         <template #top-right>
-          <q-input v-model="dashboardPanelData.meta.stream.filterField" data-test="index-field-search-input" filled
-            borderless dense clearable debounce="1" :placeholder="t('search.searchField')">
+          <q-input
+            v-model="dashboardPanelData.meta.stream.filterField"
+            data-test="index-field-search-input"
+            filled
+            borderless
+            dense
+            clearable
+            debounce="1"
+            :placeholder="t('search.searchField')"
+          >
             <template #prepend>
               <q-icon name="search" />
             </template>
@@ -162,7 +359,15 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, watch, onActivated, computed, onMounted } from "vue";
+import {
+  defineComponent,
+  reactive,
+  ref,
+  watch,
+  onActivated,
+  computed,
+  onMounted,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -173,7 +378,7 @@ import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "FieldList",
-  props: ["selectedXAxisValue", "selectedYAxisValue", 'editMode'],
+  props: ["selectedXAxisValue", "selectedYAxisValue", "editMode"],
   emits: ["update:selectedXAxisValue", "update:selectedYAxisValue"],
   setup(props) {
     const store = useStore();
@@ -187,9 +392,21 @@ export default defineComponent({
     });
     const filteredStreams = ref([]);
     const $q = useQuasar();
-    const { dashboardPanelData, addXAxisItem, addYAxisItem, addZAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, isAddZAxisNotAllowed, promqlMode, addLatitude, addLongitude, addWeight } =
-      useDashboardPanelData();
-      
+    const {
+      dashboardPanelData,
+      addXAxisItem,
+      addYAxisItem,
+      addZAxisItem,
+      addFilteredItem,
+      isAddXAxisNotAllowed,
+      isAddYAxisNotAllowed,
+      isAddZAxisNotAllowed,
+      promqlMode,
+      addLatitude,
+      addLongitude,
+      addWeight,
+    } = useDashboardPanelData();
+
     const metricsIconMapping: any = {
       Summary: "description",
       Gauge: "speed",
@@ -198,8 +415,14 @@ export default defineComponent({
     };
 
     const selectedMetricTypeIcon = computed(() => {
-      return dashboardPanelData.meta.stream.streamResults.find((it: any) => it.name == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream)?.metrics_meta?.metric_type
-    })
+      return dashboardPanelData.meta.stream.streamResults.find(
+        (it: any) =>
+          it.name ==
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream
+      )?.metrics_meta?.metric_type;
+    });
 
     const streamDataLoading = useLoading(async () => {
       await getStreamList();
@@ -210,13 +433,27 @@ export default defineComponent({
 
     // update the selected stream fields list
     watch(
-      () => [data.schemaList, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type],
+      () => [
+        data.schemaList,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type,
+      ],
       () => {
-
         // get the selected stream fields based on the selected stream type
         const fields: any = data.schemaList.find(
-          (it: any) => it.name == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream &&
-            it.stream_type == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type
+          (it: any) =>
+            it.name ==
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream &&
+            it.stream_type ==
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream_type
         );
         dashboardPanelData.meta.stream.selectedStreamFields =
           fields?.schema || [];
@@ -225,35 +462,67 @@ export default defineComponent({
     const selectedStreamForQueries: any = ref({});
 
     // Watch for changes in the current query selected stream
-    watch(() => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream, (newStream) => {
-      selectedStreamForQueries.value[dashboardPanelData.layout.currentQueryIndex] = newStream;
-    });
-
-    watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type, dashboardPanelData.meta.stream.streamResults], () => {
-
-      if (!props.editMode) {
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream = ""
+    watch(
+      () =>
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+      (newStream) => {
+        selectedStreamForQueries.value[
+          dashboardPanelData.layout.currentQueryIndex
+        ] = newStream;
       }
+    );
 
-      data.indexOptions = dashboardPanelData.meta.stream.streamResults
-        .filter((data: any) => data.stream_type == dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type)
-       
-      // set the first stream as the selected stream when the api loads the data
-      if (!props.editMode &&
-        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream &&
-        data.indexOptions.length > 0
-      ) {
-        const currentIndex = dashboardPanelData.layout.currentQueryIndex;
-        // Check if selected stream for current query exists in index options
-        // If not, set the first index option as the selected stream
-        if (selectedStreamForQueries.value[currentIndex] && 
-          data.indexOptions.find((it: any) => it.name == selectedStreamForQueries.value[currentIndex])) {
-          dashboardPanelData.data.queries[currentIndex].fields.stream = selectedStreamForQueries.value[currentIndex];
-        } else {
-          dashboardPanelData.data.queries[currentIndex].fields.stream = data.indexOptions[0]?.name;
+    watch(
+      () => [
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type,
+        dashboardPanelData.meta.stream.streamResults,
+      ],
+      () => {
+        if (!props.editMode) {
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream = "";
+        }
+
+        data.indexOptions = dashboardPanelData.meta.stream.streamResults.filter(
+          (data: any) =>
+            data.stream_type ==
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type
+        );
+
+        // set the first stream as the selected stream when the api loads the data
+        if (
+          !props.editMode &&
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream &&
+          data.indexOptions.length > 0
+        ) {
+          const currentIndex = dashboardPanelData.layout.currentQueryIndex;
+          // Check if selected stream for current query exists in index options
+          // If not, set the first index option as the selected stream
+          if (
+            selectedStreamForQueries.value[currentIndex] &&
+            data.indexOptions.find(
+              (it: any) =>
+                it.name == selectedStreamForQueries.value[currentIndex]
+            )
+          ) {
+            dashboardPanelData.data.queries[currentIndex].fields.stream =
+              selectedStreamForQueries.value[currentIndex];
+          } else {
+            dashboardPanelData.data.queries[currentIndex].fields.stream =
+              data.indexOptions[0]?.name;
+          }
         }
       }
-    })
+    );
     // update the current list fields if any of the lists changes
     watch(
       () => [
@@ -261,7 +530,6 @@ export default defineComponent({
         dashboardPanelData.meta.stream.customQueryFields,
       ],
       () => {
-
         data.currentFieldsList = [];
         data.currentFieldsList = [
           ...dashboardPanelData.meta.stream.customQueryFields,
@@ -269,10 +537,10 @@ export default defineComponent({
         ];
       }
     );
-    
+
     // get the stream list by making an API call
     const getStreamList = async () => {
-     await IndexService.nameList(
+      await IndexService.nameList(
         store.state.selectedOrganization.identifier,
         "",
         true
@@ -294,7 +562,7 @@ export default defineComponent({
       return filtered;
     };
 
-    const mutationHandler = (mutationRecords: any) => { };
+    const mutationHandler = (mutationRecords: any) => {};
 
     const onDragEnter = (e: any) => {
       e.preventDefault();
@@ -321,11 +589,9 @@ export default defineComponent({
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
-        filteredStreams.value = data.indexOptions.filter(
-          (stream: any) => {
-           return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1
-          }
-        );
+        filteredStreams.value = data.indexOptions.filter((stream: any) => {
+          return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+        });
       });
     };
 
@@ -358,7 +624,7 @@ export default defineComponent({
       promqlMode,
       streamDataLoading,
       metricsIconMapping,
-      selectedMetricTypeIcon
+      selectedMetricTypeIcon,
     };
   },
 });
@@ -502,7 +768,7 @@ export default defineComponent({
     &.selected {
       .field_overlay {
         background-color: rgba(89, 96, 178, 0.3);
-        
+
         .field_icons {
           opacity: 0;
         }
@@ -522,7 +788,6 @@ export default defineComponent({
 
     &:hover {
       .field_overlay {
-
         .field_icons {
           // background-color: white;
           opacity: 1;
@@ -533,7 +798,6 @@ export default defineComponent({
 }
 
 .theme-dark {
-
   .field_overlay {
     &:hover {
       box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
@@ -568,17 +832,17 @@ export default defineComponent({
     font-size: 0.75rem;
   }
 
-  &.q-manual-focusable--focused>.q-focus-helper {
+  &.q-manual-focusable--focused > .q-focus-helper {
     background: none !important;
     opacity: 0.3 !important;
   }
 
-  &.q-manual-focusable--focused>.q-focus-helper,
+  &.q-manual-focusable--focused > .q-focus-helper,
   &--active {
     background-color: $selected-list-bg !important;
   }
 
-  &.q-manual-focusable--focused>.q-focus-helper,
+  &.q-manual-focusable--focused > .q-focus-helper,
   &:hover,
   &--active {
     color: $primary;
