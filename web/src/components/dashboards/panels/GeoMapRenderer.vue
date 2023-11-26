@@ -1,145 +1,163 @@
 <!-- Copyright 2023 Zinc Labs Inc.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-     http:www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License. 
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div style="padding: 5px; height: 100%; width: 100%;">
-        <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%;"></div>
-    </div> 
+  <div style="padding: 5px; height: 100%; width: 100%">
+    <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%"></div>
+  </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  watch,
+  onUnmounted,
+  nextTick,
+} from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
-import L from 'leaflet';
-import '@/utils/dashboard/leaflet-echarts/index';
+import L from "leaflet";
+import "@/utils/dashboard/leaflet-echarts/index";
 
 // import {tileLayer as LtileLayer } from 'leaflet';
 import "leaflet/dist/leaflet.css";
 
 export default defineComponent({
-    name: "GeoMapRenderer",
-    props: {
-        data: {
-            required: true,
-            type: Object,
-            default: () => ({ options: {} })
-        },
+  name: "GeoMapRenderer",
+  props: {
+    data: {
+      required: true,
+      type: Object,
+      default: () => ({ options: {} }),
     },
-    setup(props: any) {
-        const chartRef: any = ref(null);
-        let chart: any;
-        let lmap: any;
-        let lmapComponent: any;
-        const lmapOptions = { ...props.data.options?.lmap } || {};
+  },
+  setup(props: any) {
+    const chartRef: any = ref(null);
+    let chart: any;
+    let lmap: any;
+    let lmapComponent: any;
+    const lmapOptions = { ...props.data.options?.lmap } || {};
 
-        const store = useStore();
-        const windowResizeEventCallback = async () => {
-            await nextTick();
-            await nextTick();
-            chart?.resize();
+    const store = useStore();
+    const windowResizeEventCallback = async () => {
+      await nextTick();
+      await nextTick();
+      chart?.resize();
+    };
+
+    onMounted(async () => {
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      if (chartRef.value) {
+        chart = echarts.init(chartRef.value);
+      }
+      const options = {
+        ...props.data.options,
+        lmap: lmapOptions,
+      };
+      chart?.setOption(options || {}, true);
+      window.addEventListener("resize", windowResizeEventCallback);
+
+      // Get Leaflet extension component
+      // getModel and getComponent do not seem to be exported in echarts typescript
+      // add the following two comments to circumvent this
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      lmapComponent = chart?.getModel()?.getComponent("lmap");
+
+      // Get the instance of Leaflet
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      lmap = lmapComponent?.getLeaflet();
+
+      if (lmap) {
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(lmap);
+      }
+      if (props.data.options?.lmap?.center) {
+        lmap.setView(
+          [
+            props.data.options?.lmap?.center[1],
+            props.data.options?.lmap?.center[0],
+          ],
+          props.data.options?.lmap?.zoom
+        );
+      }
+      // L.geoJson(mapData).addTo(lmap);
+    });
+    onUnmounted(() => {
+      window.removeEventListener("resize", windowResizeEventCallback);
+      if (lmap) {
+        lmap.off();
+      }
+      if (chart) {
+        chart?.dispose();
+      }
+    });
+
+    watch(
+      () => props.data.options,
+      async (newOptions) => {
+        await nextTick();
+        chart?.resize();
+        const options = {
+          ...props.data.options,
+          lmap: lmapOptions,
         };
+        chart?.setOption(options || {}, true);
+        // Get Leaflet extension component
+        // getModel and getComponent do not seem to be exported in echarts typescript
+        // add the following two comments to circumvent this
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        lmapComponent = chart?.getModel().getComponent("lmap");
 
-        onMounted(async () => {
-            await nextTick();
-            await nextTick();
-            await nextTick();
-            await nextTick();
-            await nextTick();
-            await nextTick();
-            await nextTick();
-            if (chartRef.value) {
-                chart = echarts.init(chartRef.value);
-            }
-            const options = {
-                ...props.data.options,
-                lmap: lmapOptions,
-            };
-            chart?.setOption(options || {}, true);
-            window.addEventListener("resize", windowResizeEventCallback);
+        // Get the instance of Leaflet
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        lmap = lmapComponent.getLeaflet();
 
-            // Get Leaflet extension component
-            // getModel and getComponent do not seem to be exported in echarts typescript
-            // add the following two comments to circumvent this
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            lmapComponent = chart?.getModel()?.getComponent('lmap');
-
-            // Get the instance of Leaflet
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            lmap = lmapComponent?.getLeaflet();
-
-            if (lmap) {
-                L.tileLayer(
-                    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                    {
-                        attribution:
-                            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                    }
-                ).addTo(lmap);
-            }
-            if (props.data.options?.lmap?.center) {
-                lmap.setView([props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]], props.data.options?.lmap?.zoom);
-            }
-            // L.geoJson(mapData).addTo(lmap);
-        });
-        onUnmounted(() => {
-            window.removeEventListener("resize", windowResizeEventCallback);
-            if (lmap) {
-                lmap.off();
-            }
-            if (chart) {
-                chart?.dispose();
-            }
-        });
-
-        watch(() => props.data.options, async (newOptions) => {
-            await nextTick();
-            chart?.resize();
-            const options = {
-                ...props.data.options,
-                lmap: lmapOptions,
-            };
-            chart?.setOption(options || {}, true);
-            // Get Leaflet extension component
-            // getModel and getComponent do not seem to be exported in echarts typescript
-            // add the following two comments to circumvent this
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            lmapComponent = chart?.getModel().getComponent('lmap');
-
-            // Get the instance of Leaflet
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            lmap = lmapComponent.getLeaflet();
-
-            if (lmap) {
-                L.tileLayer(
-                    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                    {
-                        attribution:
-                            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                    }
-                ).addTo(lmap);
-            }
-            if (props.data.options?.lmap?.center) {
-                lmap.setView([props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]], props.data.options?.lmap?.zoom);
-            }
-        }, { deep: true });
-        return { chartRef };
-    },
-})
+        if (lmap) {
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          }).addTo(lmap);
+        }
+        if (props.data.options?.lmap?.center) {
+          lmap.setView(
+            [
+              props.data.options?.lmap?.center[1],
+              props.data.options?.lmap?.center[0],
+            ],
+            props.data.options?.lmap?.zoom
+          );
+        }
+      },
+      { deep: true }
+    );
+    return { chartRef };
+  },
+});
 </script>

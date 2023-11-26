@@ -1,40 +1,58 @@
 <!-- Copyright 2023 Zinc Labs Inc.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-     http:www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License. 
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
   <div ref="chartPanelRef" style="height: 100%; position: relative">
-    <div
-      v-show="!errorDetail"
-      style="height: 100%; width: 100%"
-    >
-    <GeoMapRenderer v-if="panelSchema.type == 'geomap'" :data="panelData.chartType == 'geomap'? panelData: {options: {}}" />
-    <TableRenderer
-    v-else-if="panelSchema.type == 'table'"
-    :data="panelData.chartType == 'table'? panelData: {options: {}}"
-    />
-    <ChartRenderer v-else :data="panelSchema.queryType === 'promql' || (data.length && data[0]?.length  && panelData.chartType != 'geomap' && panelData.chartType != 'table') ? panelData : {options:{}}" />
+    <div v-show="!errorDetail" style="height: 100%; width: 100%">
+      <GeoMapRenderer
+        v-if="panelSchema.type == 'geomap'"
+        :data="panelData.chartType == 'geomap' ? panelData : { options: {} }"
+      />
+      <TableRenderer
+        v-else-if="panelSchema.type == 'table'"
+        :data="panelData.chartType == 'table' ? panelData : { options: {} }"
+      />
+      <ChartRenderer
+        v-else
+        :data="
+          panelSchema.queryType === 'promql' ||
+          (data.length &&
+            data[0]?.length &&
+            panelData.chartType != 'geomap' &&
+            panelData.chartType != 'table')
+            ? panelData
+            : { options: {} }
+        "
+      />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
-    <div v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling" class="errorMessage">
+    <div
+      v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling"
+      class="errorMessage"
+    >
       <q-icon size="md" name="warning" />
       <div style="height: 80%; width: 100%">{{ errorDetail }}</div>
     </div>
-    <div v-if="errorDetail 
-        && panelSchema?.error_config?.custom_error_handeling 
-        && !panelSchema?.error_config?.default_data_on_error 
-        && panelSchema?.error_config?.custom_error_message" 
+    <div
+      v-if="
+        errorDetail &&
+        panelSchema?.error_config?.custom_error_handeling &&
+        !panelSchema?.error_config?.default_data_on_error &&
+        panelSchema?.error_config?.custom_error_message
+      "
       class="customErrorMessage"
     >
       {{ panelSchema?.error_config?.custom_error_message }}
@@ -42,9 +60,13 @@
     <div
       v-if="loading"
       class="row"
-      style="position: absolute; top: 0px; width: 100%; z-index: 999;"
+      style="position: absolute; top: 0px; width: 100%; z-index: 999"
     >
-      <q-spinner-dots color="primary" size="40px" style="margin: 0 auto; z-index: 999;" />
+      <q-spinner-dots
+        color="primary"
+        size="40px"
+        style="margin: 0 auto; z-index: 999"
+      />
     </div>
   </div>
 </template>
@@ -92,32 +114,50 @@ export default defineComponent({
     );
 
     // when we get the new data from the apis, convert the data to render the panel
-    watch([data, store?.state], async () => {
-      // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-      if (!errorDetail.value) {
+    watch(
+      [data, store?.state],
+      async () => {
+        // panelData.value = convertPanelData(panelSchema.value, data.value, store);
+        if (!errorDetail.value) {
+          try {
+            panelData.value = convertPanelData(
+              panelSchema.value,
+              data.value,
+              store
+            );
+            errorDetail.value = "";
+          } catch (error: any) {
+            errorDetail.value = error.message;
+          }
+        } else {
+          // if no data is available, then show the default data
+          // if there is an error config in the panel schema, then show the default data on error
+          // if no default data on error is set, then show the custom error message
+          if (
+            panelSchema.value?.error_config?.custom_error_handeling &&
+            panelSchema.value?.error_config?.default_data_on_error
+          ) {
+            data.value = JSON.parse(
+              panelSchema.value?.error_config?.default_data_on_error
+            );
+            errorDetail.value = "";
+          }
+        }
+      },
+      { deep: true }
+    );
 
-        try {
-          panelData.value = convertPanelData(panelSchema.value, data.value, store);
-          errorDetail.value = "";
-        } catch (error: any) {
-          errorDetail.value = error.message;
-        }
-      } else {
-        // if no data is available, then show the default data
-        // if there is an error config in the panel schema, then show the default data on error
-        // if no default data on error is set, then show the custom error message
-        if(panelSchema.value?.error_config?.custom_error_handeling && panelSchema.value?.error_config?.default_data_on_error){
-          data.value = JSON.parse(panelSchema.value?.error_config?.default_data_on_error)
-          errorDetail.value = ""
-        }
-      }
-    },{ deep: true });
-    
     const handleNoData = (panelType: any) => {
-      const xAlias = panelSchema.value.queries[0].fields.x.map((it: any) => it.alias)
-      const yAlias = panelSchema.value.queries[0].fields.y.map((it: any) => it.alias)
-      const zAlias = panelSchema.value.queries[0].fields.z.map((it: any) => it.alias)      
-      
+      const xAlias = panelSchema.value.queries[0].fields.x.map(
+        (it: any) => it.alias
+      );
+      const yAlias = panelSchema.value.queries[0].fields.y.map(
+        (it: any) => it.alias
+      );
+      const zAlias = panelSchema.value.queries[0].fields.z.map(
+        (it: any) => it.alias
+      );
+
       switch (panelType) {
         case "area":
         case "area-stacked":
@@ -127,29 +167,43 @@ export default defineComponent({
         case "h-stacked":
         case "line":
         case "scatter":
-        case "table":
-          {
-            // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
-            return data.value[0]?.length > 1 || xAlias.every((x: any) => data.value[0][0][x]) && yAlias.every((y: any) => data.value[0][0][y]);
-          }
-        case "metric":
-          {
-            return data.value[0]?.length > 1 || yAlias.every((y: any) => data.value[0][0][y] != null || data.value[0][0][y] === 0);
-          }
-        case "heatmap":
-          {
-            return data.value[0]?.length > 1 || xAlias.every((x: any) => data.value[0][0][x]) && yAlias.every((y: any) => data.value[0][0][y]) && zAlias.every((z: any) => data.value[0][0][z]);
-          }
+        case "table": {
+          // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
+          return (
+            data.value[0]?.length > 1 ||
+            (xAlias.every((x: any) => data.value[0][0][x]) &&
+              yAlias.every((y: any) => data.value[0][0][y]))
+          );
+        }
+        case "metric": {
+          return (
+            data.value[0]?.length > 1 ||
+            yAlias.every(
+              (y: any) =>
+                data.value[0][0][y] != null || data.value[0][0][y] === 0
+            )
+          );
+        }
+        case "heatmap": {
+          return (
+            data.value[0]?.length > 1 ||
+            (xAlias.every((x: any) => data.value[0][0][x]) &&
+              yAlias.every((y: any) => data.value[0][0][y]) &&
+              zAlias.every((z: any) => data.value[0][0][z]))
+          );
+        }
         case "pie":
-        case "donut":
-          {
-            return data.value[0]?.length > 1 || yAlias.every((y: any) => data.value[0][0][y]);
-          }
+        case "donut": {
+          return (
+            data.value[0]?.length > 1 ||
+            yAlias.every((y: any) => data.value[0][0][y])
+          );
+        }
         default:
           break;
       }
-    } 
-    
+    };
+
     // Compute the value of the 'noData' variable
     const noData = computed(() => {
       // Check if the queryType is 'promql'
@@ -160,8 +214,12 @@ export default defineComponent({
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
       } else {
-        // The queryType is not 'promql'        
-        return data.value.length && data.value[0]?.length && handleNoData(panelSchema.value.type) ? "" : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
+        // The queryType is not 'promql'
+        return data.value.length &&
+          data.value[0]?.length &&
+          handleNoData(panelSchema.value.type)
+          ? ""
+          : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
       }
     });
 
