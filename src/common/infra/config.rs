@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{path::Path, sync::Arc, time::Duration};
+
 use ahash::{AHashMap, AHashSet};
 use dashmap::{DashMap, DashSet};
 use datafusion::arrow::datatypes::Schema;
@@ -22,7 +24,6 @@ use itertools::chain;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use reqwest::Client;
-use std::{path::Path, sync::Arc, time::Duration};
 use sysinfo::{DiskExt, SystemExt};
 use tokio::sync::RwLock as TRwLock;
 use vector_enrichment::TableRegistry;
@@ -255,6 +256,8 @@ pub struct Route {
 
 #[derive(EnvConfig)]
 pub struct Common {
+    #[env_config(name = "ZO_APP_NAME", default = "openobserve")]
+    pub app_name: String,
     #[env_config(name = "ZO_LOCAL_MODE", default = true)]
     pub local_mode: bool,
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
@@ -373,6 +376,9 @@ pub struct Common {
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
+    // logger timestamp local setup
+    #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
+    pub log_local_time_format: String,
 }
 
 #[derive(EnvConfig)]
