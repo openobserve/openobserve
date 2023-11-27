@@ -138,7 +138,7 @@ const accessKey = computed(() => {
 
 const collectorCmd = computed(() => {
   return `helm --namespace openobserve-collector \\
-  install o1c openobserve/openobserve-collector \\
+  install o2c openobserve/openobserve-collector \\
   --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\
   --set exporters."otlphttp/openobserve".headers.Authorization="Basic ${accessKey.value}"  \\
   --set exporters."otlphttp/openobserve_k8s_events".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}/  \\

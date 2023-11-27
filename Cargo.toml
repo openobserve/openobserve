@@ -14,7 +14,7 @@ keywords = [
   "open-source",
   "opensource",
 ]
-license = "Apache-2.0"
+license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
 version = "0.7.1"
@@ -76,12 +76,14 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { version = "33", features = ["simd"] }
-datafusion-expr = "33"
-arrow = { version = "48", features = ["simd", "ipc_compression"] }
-arrow-schema = { version = "48", features = ["serde"] }
-parquet = { version = "48", features = ["arrow", "async"] }
-object_store = { version = "0.7", features = ["aws", "azure", "gcp"] }
+datafusion = { git = "https://github.com/apache/arrow-datafusion.git", rev = "b648d4e22e82989c65523e62312e1995a1543888", version = "33", features = [
+  "simd",
+] }
+datafusion-expr = { git = "https://github.com/apache/arrow-datafusion.git", rev = "b648d4e22e82989c65523e62312e1995a1543888", version = "33" }
+arrow = { version = "49", features = ["simd", "ipc_compression"] }
+arrow-schema = { version = "49", features = ["serde"] }
+parquet = { version = "49", features = ["arrow", "async"] }
+object_store = { version = "0.8", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"

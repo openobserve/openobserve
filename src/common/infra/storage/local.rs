@@ -1,23 +1,24 @@
 // Copyright 2023 Zinc Labs Inc.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use object_store::{
     limit::LimitStore, local::LocalFileSystem, path::Path, Error, GetOptions, GetResult,
-    ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
+    ListResult, MultipartId, ObjectMeta, ObjectStore, PutOptions, PutResult, Result,
 };
 use std::ops::Range;
 use tokio::io::AsyncWrite;
@@ -57,7 +58,12 @@ impl std::fmt::Display for Local {
 
 #[async_trait]
 impl ObjectStore for Local {
-    async fn put(&self, location: &Path, bytes: Bytes) -> Result<()> {
+    async fn put_opts(
+        &self,
+        location: &Path,
+        bytes: Bytes,
+        _opts: PutOptions,
+    ) -> Result<PutResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data_size = bytes.len();
@@ -77,7 +83,10 @@ impl ObjectStore for Local {
                         .with_label_values(&[columns[1], columns[3], columns[2], "put"])
                         .inc_by(time);
                 }
-                Ok(())
+                Ok(PutResult {
+                    e_tag: None,
+                    version: None,
+                })
             }
             Err(err) => {
                 log::error!("disk File upload error: {:?}", err);
@@ -199,10 +208,9 @@ impl ObjectStore for Local {
         result
     }
 
-    async fn list(&self, prefix: Option<&Path>) -> Result<BoxStream<'_, Result<ObjectMeta>>> {
-        self.client
-            .list(Some(&format_key(prefix.unwrap().as_ref()).into()))
-            .await
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+        let prefix = format_key(prefix.unwrap().as_ref());
+        self.client.list(Some(&prefix.into()))
     }
 
     async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {

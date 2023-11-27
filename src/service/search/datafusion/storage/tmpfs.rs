@@ -1,16 +1,17 @@
 // Copyright 2023 Zinc Labs Inc.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -18,7 +19,7 @@ use chrono::Utc;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
     path::Path, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, ObjectMeta,
-    ObjectStore, Result,
+    ObjectStore, PutOptions, PutResult, Result,
 };
 use std::ops::Range;
 use thiserror::Error as ThisError;
@@ -66,6 +67,7 @@ impl ObjectStore for Tmpfs {
             last_modified: *BASE_TIME,
             size: data.len(),
             e_tag: None,
+            version: None,
         };
         let range = Range {
             start: 0,
@@ -88,6 +90,7 @@ impl ObjectStore for Tmpfs {
             last_modified: *BASE_TIME,
             size: data.len(),
             e_tag: None,
+            version: None,
         };
         let (range, data) = match options.range {
             Some(range) => (range.clone(), data.slice(range)),
@@ -140,10 +143,11 @@ impl ObjectStore for Tmpfs {
             last_modified,
             size: bytes.len(),
             e_tag: None,
+            version: None,
         })
     }
 
-    async fn list(&self, prefix: Option<&Path>) -> Result<BoxStream<'_, Result<ObjectMeta>>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
         // log::info!("list: {:?}", prefix);
         let mut values = Vec::new();
         let key = prefix.unwrap().to_string();
@@ -154,9 +158,10 @@ impl ObjectStore for Tmpfs {
                 last_modified: file.last_modified,
                 size: file.size,
                 e_tag: None,
+                version: None,
             }));
         }
-        Ok(futures::stream::iter(values).boxed())
+        futures::stream::iter(values).boxed()
     }
 
     /// The memory implementation returns all results, as opposed to the cloud
@@ -173,6 +178,7 @@ impl ObjectStore for Tmpfs {
                 last_modified: file.last_modified,
                 size: file.size,
                 e_tag: None,
+                version: None,
             });
         }
         Ok(ListResult {
@@ -181,8 +187,13 @@ impl ObjectStore for Tmpfs {
         })
     }
 
-    async fn put(&self, location: &Path, _bytes: Bytes) -> Result<()> {
-        log::error!("NotImplemented put: {}", location);
+    async fn put_opts(
+        &self,
+        location: &Path,
+        _bytes: Bytes,
+        _opts: PutOptions,
+    ) -> Result<PutResult> {
+        log::error!("NotImplemented put_opts: {}", location);
         Err(object_store::Error::NotImplemented {})
     }
 
