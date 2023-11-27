@@ -1123,6 +1123,7 @@ export default defineComponent({
             position: "bottom",
             timeout: 1000,
           });
+          saveViewLoader.value = false;
           return;
         }
 
