@@ -50,6 +50,7 @@ use crate::service::{
 };
 
 pub mod grpc;
+pub mod otlp_json;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
