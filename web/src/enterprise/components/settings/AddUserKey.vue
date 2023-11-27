@@ -25,7 +25,8 @@
           >
             {{ t("settings.updateuserKey") }}
           </div>
-          <div v-else class="text-body1 text-bold" data-test="create-userkey">
+          <div v-else
+class="text-body1 text-bold" data-test="create-userkey">
             {{ t("settings.addUserKeyTitle") }}
           </div>
         </div>
@@ -42,62 +43,78 @@
     </q-card-section>
     <q-separator></q-separator>
     <q-card-section class="q-w-lg">
-      <q-input
-        v-if="beingUpdated"
-        v-model="formData.id"
-        :readonly="beingUpdated"
-        :disabled="beingUpdated"
-        :label="t('settings.id')"
-      />
-      <q-input
-        v-model="formData.api_name"
-        :placeholder="t('settings.apiNamePlaceHolder')"
-        :label="t('settings.apiNamePlaceHolder') + '*'"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
-        stack-label
-        outlined
-        filled
-        dense
-        :rules="[(val) => !!val]"
-        data-test="userapi-name"
-      />
-      <div class="text-title text-bold">
-        {{ t("settings.organizationLabel") }}
+      <div v-if="organizationOptionList.length == 0">
+        <div class="text-body1 text-bold">
+          {{ t("settings.noOrganization") }}
+          <br />
+          <q-btn
+            class="text-bold"
+            :label="t('settings.clickUpgradePlan')"
+            color="primary"
+            padding="sm md"
+            no-caps
+            @click="router.replace({ name: 'plans' })"
+          />
+        </div>
       </div>
-      <q-option-group
-        type="checkbox"
-        v-model="formData.org_identifier"
-        :dense="true"
-        size="sm"
-        :class="['q-mt-sm']"
-        :options="organizationOptionList"
-      ></q-option-group>
+      <div v-else>
+        <q-input
+          v-if="beingUpdated"
+          v-model="formData.id"
+          :readonly="beingUpdated"
+          :disabled="beingUpdated"
+          :label="t('settings.id')"
+        />
+        <q-input
+          v-model="formData.api_name"
+          :placeholder="t('settings.apiNamePlaceHolder')"
+          :label="t('settings.apiNamePlaceHolder') + '*'"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          :rules="[(val) => !!val]"
+          data-test="userapi-name"
+        />
+        <div class="text-title text-bold">
+          {{ t("settings.organizationLabel") }}
+        </div>
+        <q-option-group
+          type="checkbox"
+          v-model="formData.org_identifier"
+          :dense="true"
+          size="sm"
+          :class="['q-mt-sm']"
+          :options="organizationOptionList"
+        ></q-option-group>
 
-      <div class="flex justify-center q-mt-lg">
-        <q-btn
-          v-close-popup="true"
-          class="q-mb-md text-bold"
-          :label="t('settings.cancel')"
-          text-color="light-text"
-          padding="sm md"
-          no-caps
-          @click="router.replace({ name: 'apiKeys' })"
-        />
-        <q-btn
-          :disable="
-            formData.org_identifier.length == 0 || formData.api_name == ''
-          "
-          :label="beingUpdated ? t('settings.update') : t('settings.save')"
-          class="q-mb-md text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          type="submit"
-          no-caps
-          data-test="add-org"
-          @click="generateUserKey()"
-        />
+        <div class="flex justify-center q-mt-lg">
+          <q-btn
+            v-close-popup="true"
+            class="q-mb-md text-bold"
+            :label="t('settings.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            no-caps
+            @click="router.replace({ name: 'apiKeys' })"
+          />
+          <q-btn
+            :disable="
+              formData.org_identifier.length == 0 || formData.api_name == ''
+            "
+            :label="beingUpdated ? t('settings.update') : t('settings.save')"
+            class="q-mb-md text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            type="submit"
+            no-caps
+            data-test="add-org"
+            @click="generateUserKey()"
+          />
+        </div>
       </div>
     </q-card-section>
   </q-card>
@@ -209,14 +226,20 @@ export default defineComponent({
     });
 
     const getOrganizationsList = (
-      organizations: [{ name: any; identifier: any }]
+      organizations: [{ name: any; identifier: any; CustomerBillingObj: any }]
     ) => {
       organizationOptionList.value = [];
       for (let i = 0; i < organizations.length; i++) {
-        organizationOptionList.value.push({
-          label: organizations[i].name,
-          value: organizations[i].identifier,
-        });
+        if (
+          organizations[i].CustomerBillingObj.subscription_type !==
+            "Free-Plan-USD-Monthly" &&
+          organizations[i].CustomerBillingObj.subscription_type !== ""
+        ) {
+          organizationOptionList.value.push({
+            label: organizations[i].name,
+            value: organizations[i].identifier,
+          });
+        }
       }
     };
 

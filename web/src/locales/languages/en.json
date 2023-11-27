@@ -678,6 +678,8 @@
     "generalLabel": "General",
     "apikeyLabel": "API Keys",
     "generalPageTitle": "General Settings",
-    "scrapintervalLabel": "Scrape Interval (In Seconds) *"
+    "scrapintervalLabel": "Scrape Interval (In Seconds) *",
+    "noOrganization": "Upgrade your plan to generate an API key. There is no organization found with a subscribed plan.",
+    "clickUpgradePlan": "Click here to upgrade your plan."
   }
 }
