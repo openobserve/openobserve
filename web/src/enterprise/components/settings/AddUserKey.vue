@@ -25,8 +25,8 @@
           >
             {{ t("settings.updateuserKey") }}
           </div>
-          <div v-else
-class="text-body1 text-bold" data-test="create-userkey">
+          <div v-else class="text-body1 text-bold"
+data-test="create-userkey">
             {{ t("settings.addUserKeyTitle") }}
           </div>
         </div>
@@ -128,6 +128,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
+import config from "@/aws-exports";
 
 const defaultValue = () => {
   return {
@@ -165,11 +166,11 @@ export default defineComponent({
           });
           this.router.replace({ name: "apiKeys" });
         })
-        .catch(() => {
-          this.$emit("listUserAPIKeys");
+        .catch((e) => {
+          // this.$emit("listUserAPIKeys");
           this.$q.notify({
             type: "negative",
-            message: "Error while generating User API Key.",
+            message: e.response.data.error || "Error while generating API Key.",
             timeout: 3000,
           });
         });
@@ -209,16 +210,13 @@ export default defineComponent({
     const beingUpdated = ref(false);
 
     onBeforeMount(() => {
-      if (store.state.organizations.length > 0) {
-        getOrganizationsList(store.state.organizations);
-      } else {
-        organizationsService
-          .list(0, 100000, "name", false, "")
-          .then((res: any) => {
-            store.dispatch("setOrganizations", res.data.data);
-            getOrganizationsList(res.data.data);
-          });
-      }
+      // pull the latest information from the server
+      organizationsService
+        .list(0, 100000, "name", false, "")
+        .then((res: any) => {
+          store.dispatch("setOrganizations", res.data.data);
+          getOrganizationsList(res.data.data);
+        });
     });
 
     onUpdated(() => {
@@ -232,7 +230,7 @@ export default defineComponent({
       for (let i = 0; i < organizations.length; i++) {
         if (
           organizations[i].CustomerBillingObj.subscription_type !==
-            "Free-Plan-USD-Monthly" &&
+            config.freePlan &&
           organizations[i].CustomerBillingObj.subscription_type !== ""
         ) {
           organizationOptionList.value.push({
