@@ -115,7 +115,7 @@ fn flatten_array(
 }
 
 /// We need every character in the key to be lowercase alphanumeric or underscore
-fn format_key(key: &str) -> String {
+pub fn format_key(key: &str) -> String {
     if key
         .chars()
         .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')

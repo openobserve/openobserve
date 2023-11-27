@@ -26,10 +26,9 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use super::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request};
-use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
     db,
-    ingestion::{chk_schema_by_record, grpc::get_val_for_attr, write_file},
+    ingestion::{chk_schema_by_record, otlp_json::get_val_for_attr, write_file},
     schema::{set_schema_metadata, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
@@ -49,6 +48,10 @@ use crate::{
         utils::{flatten, json},
     },
     service::format_stream_name,
+};
+use crate::{
+    handler::http::request::CONTENT_TYPE_JSON,
+    service::ingestion::otlp_json::{get_float_value, get_int_value, get_string_value},
 };
 
 const SERVICE: &str = "service";
@@ -145,16 +148,15 @@ pub async fn metrics_json_handler(
                             SERVICE,
                             format_label_name(local_attr.get("key").unwrap().as_str().unwrap())
                         ),
-                        get_val_for_attr(local_attr.get("value").unwrap().clone()),
+                        get_val_for_attr(local_attr.get("value").unwrap()),
                     );
                 }
             }
         }
-        let scope_resources = res_metric.get("scopeMetrics");
-        let inst_resources = if let Some(v) = scope_resources {
-            v.as_array().unwrap()
+        let inst_resources = if res_metric.get("scopeMetrics").is_some() {
+            res_metric.get("scopeMetrics").unwrap().as_array().unwrap()
         } else {
-            continue;
+            res_metric.get("scope_metrics").unwrap().as_array().unwrap()
         };
         for inst_metrics in inst_resources {
             if inst_metrics.get("metrics").is_some() {
@@ -554,14 +556,22 @@ fn process_sum(
         rec,
         sum.get("aggregationTemporality").unwrap().as_u64().unwrap(),
     );
-    rec["is_monotonic"] = sum
-        .get("isMonotonic")
-        .unwrap()
-        .as_bool()
-        .unwrap()
-        .to_string()
-        .into();
-    for data_point in sum.get("dataPoints").unwrap().as_array().unwrap_or(&vec![]) {
+    rec["is_monotonic"] = if sum.get("isMonotonic").is_some() {
+        sum.get("isMonotonic")
+    } else {
+        sum.get("is_monotonic")
+    }
+    .unwrap()
+    .as_bool()
+    .unwrap()
+    .to_string()
+    .into();
+    for data_point in sum.get("dataPoints").unwrap().as_array().unwrap_or(
+        sum.get("data_points")
+            .unwrap()
+            .as_array()
+            .unwrap_or(&vec![]),
+    ) {
         let dp = data_point.as_object().unwrap();
         let mut dp_rec = rec.clone();
         process_data_point(&mut dp_rec, dp);
@@ -626,12 +636,13 @@ fn process_summary(
     );
 
     let mut records = vec![];
-    for data_point in summary
-        .get("dataPoints")
-        .unwrap()
-        .as_array()
-        .unwrap_or(&vec![])
-    {
+    for data_point in summary.get("dataPoints").unwrap().as_array().unwrap_or(
+        summary
+            .get("data_points")
+            .unwrap()
+            .as_array()
+            .unwrap_or(&vec![]),
+    ) {
         let dp = data_point.as_object().unwrap();
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, dp) {
@@ -659,12 +670,13 @@ fn process_gauge(
         json::to_string(&metadata).unwrap(),
     );
 
-    for data_point in gauge
-        .get("dataPoints")
-        .unwrap()
-        .as_array()
-        .unwrap_or(&vec![])
-    {
+    for data_point in gauge.get("dataPoints").unwrap().as_array().unwrap_or(
+        gauge
+            .get("data_points")
+            .unwrap()
+            .as_array()
+            .unwrap_or(&vec![]),
+    ) {
         let dp = data_point.as_object().unwrap();
         process_data_point(rec, dp);
         let val_map = rec.as_object_mut().unwrap();
@@ -695,12 +707,12 @@ fn process_exponential_histogram(
             .as_u64()
             .unwrap(),
     );
-    for data_point in hist
-        .get("dataPoints")
-        .unwrap()
-        .as_array()
-        .unwrap_or(&vec![])
-    {
+    for data_point in hist.get("dataPoints").unwrap().as_array().unwrap_or(
+        hist.get("data_points")
+            .unwrap()
+            .as_array()
+            .unwrap_or(&vec![]),
+    ) {
         let mut dp_rec = rec.clone();
         let dp = data_point.as_object().unwrap();
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, dp) {
@@ -722,12 +734,13 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
     {
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
-            rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
-                get_attribute_value(v)
+            rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] = get_val_for_attr(v)
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    if data_point.get("startTimeUnixNano").is_some() {
+        rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    }
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
 
     set_data_point_value(rec, data_point);
@@ -759,11 +772,13 @@ fn process_hist_data_point(
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
             rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
-                get_attribute_value(v);
+                get_val_for_attr(v);
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    if data_point.get("startTimeUnixNano").is_some() {
+        rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    }
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -827,11 +842,13 @@ fn process_exp_hist_data_point(
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
             rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
-                get_attribute_value(v);
+                get_val_for_attr(v);
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    if data_point.get("startTimeUnixNano").is_some() {
+        rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    }
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -916,7 +933,9 @@ fn process_summary_data_point(
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    if data_point.get("startTimeUnixNano").is_some() {
+        rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    }
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -1069,28 +1088,5 @@ fn get_metric_value(val: &json::Value) -> f64 {
         val.get("doubleValue").unwrap().as_f64().unwrap()
     } else {
         0.0
-    }
-}
-
-fn get_float_value(val: &json::Value) -> f64 {
-    match val {
-        json::Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
-        json::Value::Number(v) => v.as_f64().unwrap_or(0.0),
-        _ => 0.0,
-    }
-}
-
-fn get_int_value(val: &json::Value) -> i64 {
-    match val {
-        json::Value::String(v) => v.parse::<i64>().unwrap_or(0),
-        json::Value::Number(v) => v.as_i64().unwrap_or(0),
-        _ => 0,
-    }
-}
-fn get_string_value(val: &json::Value) -> String {
-    match val {
-        json::Value::String(v) => v.to_string(),
-        json::Value::Number(v) => v.as_i64().unwrap_or(0).to_string(),
-        _ => "".to_string(),
     }
 }
