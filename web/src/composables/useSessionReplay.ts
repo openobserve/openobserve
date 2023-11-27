@@ -90,6 +90,9 @@ const defaultObject = {
       city: "",
       country: "",
       session_id: "",
+      timestamp: 0,
+      type: "",
+      time_spent: 0,
     },
   },
 };
