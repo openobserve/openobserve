@@ -16,24 +16,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
-    <q-bar class="row sql-bar" style="display: flex; justify-content: space-between" @click.stop="onDropDownClick">
-      <div style="display: flex; flex-direction: row; align-items: center" data-test="dashboard-query-data">
+    <q-bar
+      class="row sql-bar"
+      style="display: flex; justify-content: space-between"
+      @click.stop="onDropDownClick"
+    >
+      <div
+        style="display: flex; flex-direction: row; align-items: center"
+        data-test="dashboard-query-data"
+      >
         <div>
-          <q-icon flat :name="!dashboardPanelData.layout.showQueryBar
-            ? 'arrow_right'
-            : 'arrow_drop_down'
-            " text-color="black" class="q-mr-sm" />
+          <q-icon
+            flat
+            :name="
+              !dashboardPanelData.layout.showQueryBar
+                ? 'arrow_right'
+                : 'arrow_drop_down'
+            "
+            text-color="black"
+            class="q-mr-sm"
+          />
         </div>
         <q-space />
         <div style="max-width: 600px">
-          <q-tabs v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
-            v-model="dashboardPanelData.layout.currentQueryIndex" narrow-indicator dense inline-label outside-arrows
-            mobile-arrows @click.stop>
-            <q-tab no-caps :ripple="false" v-for="(tab, index) in dashboardPanelData.data.queries" :key="index"
-              :name="index" :label="'Query ' + (index + 1)" @click.stop>
-              <q-icon v-if="index > 0 ||
-                (index === 0 && dashboardPanelData.data.queries.length > 1)
-                " name="close" class="q-ml-sm" @click.stop="removeTab(index)" style="cursor: pointer" />
+          <q-tabs
+            v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+            v-model="dashboardPanelData.layout.currentQueryIndex"
+            narrow-indicator
+            dense
+            inline-label
+            outside-arrows
+            mobile-arrows
+            @click.stop
+          >
+            <q-tab
+              no-caps
+              :ripple="false"
+              v-for="(tab, index) in dashboardPanelData.data.queries"
+              :key="index"
+              :name="index"
+              :label="'Query ' + (index + 1)"
+              @click.stop
+            >
+              <q-icon
+                v-if="
+                  index > 0 ||
+                  (index === 0 && dashboardPanelData.data.queries.length > 1)
+                "
+                name="close"
+                class="q-ml-sm"
+                @click.stop="removeTab(index)"
+                style="cursor: pointer"
+              />
             </q-tab>
           </q-tabs>
           <!-- <div v-if="promqlMode" class="query-tabs-container">
@@ -45,29 +79,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                 </div> -->
         </div>
-        <span v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')" class="text-subtitle2 text-weight-bold">{{
-          t("panel.sql") }}</span>
-        <q-btn v-if="promqlMode || dashboardPanelData.data.type == 'geomap'" round flat @click.stop="addTab" icon="add"
-          style="margin-right: 10px"></q-btn>
+        <span
+          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
+          class="text-subtitle2 text-weight-bold"
+          >{{ t("panel.sql") }}</span
+        >
+        <q-btn
+          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+          round
+          flat
+          @click.stop="addTab"
+          icon="add"
+          style="margin-right: 10px"
+        ></q-btn>
       </div>
       <div>
         <QueryTypeSelector></QueryTypeSelector>
       </div>
     </q-bar>
   </div>
-  <div class="col" :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'
-    " style="overflow: hidden" data-test="dashboard-query">
+  <div
+    class="col"
+    :style="
+      !dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'
+    "
+    style="overflow: hidden"
+    data-test="dashboard-query"
+  >
     <div class="column" style="width: 100%; height: 100%">
       <div class="col" style="width: 100%">
-        <query-editor ref="queryEditorRef" class="monaco-editor" v-model:query="currentQuery"
-          data-test="dashboard-panel-query-editor" v-model:functions="dashboardPanelData.meta.stream.functions"
-          v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields" :keywords="dashboardPanelData.data.queryType === 'promql'
-            ? autoCompletePromqlKeywords
-            : []
-            " @update-query="updateQuery" @run-query="searchData" :readOnly="!dashboardPanelData.data.queries[
-    dashboardPanelData.layout.currentQueryIndex
-  ].customQuery
-    " :language="dashboardPanelData.data.queryType"></query-editor>
+        <query-editor
+          ref="queryEditorRef"
+          class="monaco-editor"
+          v-model:query="currentQuery"
+          data-test="dashboard-panel-query-editor"
+          v-model:functions="dashboardPanelData.meta.stream.functions"
+          v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
+          :keywords="
+            dashboardPanelData.data.queryType === 'promql'
+              ? autoCompletePromqlKeywords
+              : []
+          "
+          @update-query="updateQuery"
+          @run-query="searchData"
+          :readOnly="
+            !dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].customQuery
+          "
+          :language="dashboardPanelData.data.queryType"
+        ></query-editor>
       </div>
       <div style="color: red; z-index: 100000" class="q-mx-sm col-auto">
         {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
@@ -103,7 +164,7 @@ export default defineComponent({
   components: {
     QueryEditor,
     ConfirmDialog,
-    QueryTypeSelector
+    QueryTypeSelector,
   },
   emits: ["searchdata"],
   methods: {
@@ -115,55 +176,75 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { dashboardPanelData, promqlMode, updateXYFieldsOnCustomQueryChange, addQuery, removeQuery } = useDashboardPanelData()
-    const confirmQueryModeChangeDialog = ref(false)
+    const {
+      dashboardPanelData,
+      promqlMode,
+      updateXYFieldsOnCustomQueryChange,
+      addQuery,
+      removeQuery,
+    } = useDashboardPanelData();
+    const confirmQueryModeChangeDialog = ref(false);
     const parser = new Parser();
     let streamName = "";
-    const {
-      autoCompleteData,
-      autoCompletePromqlKeywords,
-      getSuggestions,
-      parsePromQlQuery
-    } = usePromqlSuggestions();
+    const { autoCompleteData, autoCompletePromqlKeywords, getSuggestions } =
+      usePromqlSuggestions();
     const queryEditorRef = ref(null);
 
     const addTab = () => {
       addQuery();
-      dashboardPanelData.layout.currentQueryIndex = dashboardPanelData.data.queries.length - 1;
+      dashboardPanelData.layout.currentQueryIndex =
+        dashboardPanelData.data.queries.length - 1;
     };
     const updateQuery = (query, fields) => {
-      if (dashboardPanelData.data.queryType === 'promql') {
+      if (dashboardPanelData.data.queryType === "promql") {
         updatePromQLQuery(query, fields);
       }
-    }
+    };
 
     const removeTab = async (index) => {
-      if (dashboardPanelData.layout.currentQueryIndex >= dashboardPanelData.data.queries.length - 1) dashboardPanelData.layout.currentQueryIndex -= 1;
+      if (
+        dashboardPanelData.layout.currentQueryIndex >=
+        dashboardPanelData.data.queries.length - 1
+      )
+        dashboardPanelData.layout.currentQueryIndex -= 1;
       removeQuery(index);
     };
 
     const currentQuery = computed({
       get: () => {
-        return promqlMode.value ? dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query : dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query
+        return promqlMode.value
+          ? dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].query
+          : dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].query;
       },
       set: (value) => {
         if (promqlMode.value) {
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = value
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query = value;
         } else {
-          console.log("sql mode")
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = value
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query = value;
         }
-      }
-    })
+      },
+    });
 
     // toggle show query view
     const onDropDownClick = () => {
-      dashboardPanelData.layout.showQueryBar = !dashboardPanelData.layout.showQueryBar
-    }
+      dashboardPanelData.layout.showQueryBar =
+        !dashboardPanelData.layout.showQueryBar;
+    };
 
-    watch(() => dashboardPanelData.layout.showQueryBar, () => {
-      window.dispatchEvent(new Event("resize"))
-    })
+    watch(
+      () => dashboardPanelData.layout.showQueryBar,
+      () => {
+        window.dispatchEvent(new Event("resize"));
+      }
+    );
 
     onMounted(() => {
       dashboardPanelData.meta.errors.queryErrors = [];
@@ -249,10 +330,11 @@ export default defineComponent({
             : `${weight.column}`;
           query += `, ${weightField} as ${weight.alias}`;
         }
-        query += ` FROM "${dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream
-          }" `;
+        query += ` FROM "${
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream
+        }" `;
         if (weight && weight.aggregationFunction) {
           if (latitude || longitude) {
             const aliases = [latitude?.alias, longitude?.alias]
@@ -320,10 +402,10 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].fields?.z
           ? [
-            ...dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.z,
-          ]
+              ...dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.z,
+            ]
           : []),
       ].flat();
       const filter = [
@@ -356,17 +438,19 @@ export default defineComponent({
         } else {
           selector += `${field?.column}`;
         }
-        selector += ` as "${field?.alias}"${i == fields.length - 1 ? " " : ", "
-          }`;
+        selector += ` as "${field?.alias}"${
+          i == fields.length - 1 ? " " : ", "
+        }`;
         return selector;
       });
       query += array?.join("");
 
       // now add from stream name
-      query += ` FROM "${dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields?.stream
-        }" `;
+      query += ` FROM "${
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields?.stream
+      }" `;
 
       const filterData = filter?.map((field, i) => {
         let selectFilter = "";
@@ -426,9 +510,9 @@ export default defineComponent({
         query +=
           xAxisAlias.length && yAxisAlias.length
             ? " GROUP BY " +
-            xAxisAlias.join(", ") +
-            ", " +
-            yAxisAlias.join(", ")
+              xAxisAlias.join(", ") +
+              ", " +
+              yAxisAlias.join(", ")
             : "";
       } else {
         query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
@@ -520,7 +604,6 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ].query
           );
-          console.log('parsedQuery', dashboardPanelData.meta.parsedQuery)
         } catch (e) {
           // exit as there is an invalid query
           dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax");
@@ -608,8 +691,6 @@ export default defineComponent({
       autoCompleteData.value.popup.close =
         queryEditorRef.value.disableSuggestionPopup;
       getSuggestions();
-      // console.log("autoCompleteData", autoCompleteData.value);
-      // console.log("queryEditorRef", queryEditorRef.value);
     };
 
     const onUpdateToggle = (value) => {
