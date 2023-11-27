@@ -159,6 +159,7 @@ import {
   onDeactivated,
   onActivated,
   onBeforeMount,
+  nextTick,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -187,7 +188,6 @@ import { logsErrorMessage } from "@/utils/common";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
-import { nextTick } from "vue";
 
 export default defineComponent({
   name: "PageSearch",
