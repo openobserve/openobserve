@@ -186,7 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <q-item
                         v-if="
-                          !searchObj.data.stream.selectedFields.includes(value)
+                          !searchObj.data.stream.selectedFields.includes(
+                            value.toString()
+                          )
                         "
                         clickable
                         v-close-popup="true"
@@ -194,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-include-field-btn"
-                            @click="addFieldToTable(value)"
+                            @click="addFieldToTable(value.toString())"
                             ><q-btn
                               title="Add to table"
                               size="6px"
@@ -212,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-include-field-btn"
-                            @click="addFieldToTable(value)"
+                            @click="addFieldToTable(value.toString())"
                             ><q-btn
                               title="Remove from table "
                               size="6px"
