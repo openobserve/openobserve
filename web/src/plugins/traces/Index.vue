@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-bar"
         ref="searchBarRef"
         :fieldValues="fieldValues"
-        :key="searchObj.data.stream.streamLists.length"
         :isLoading="searchObj.loading"
         @searchdata="searchData"
         @onChangeTimezone="refreshTimezone"
@@ -160,6 +159,7 @@ import {
   onDeactivated,
   onActivated,
   onBeforeMount,
+  nextTick,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -197,8 +197,13 @@ export default defineComponent({
     SearchResult,
   },
   methods: {
-    setHistogramDate(date: any) {
+    async setHistogramDate(date: any) {
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
+      await nextTick();
+      await nextTick();
+      await nextTick();
+
+      this.searchData();
     },
     searchData() {
       if (
@@ -698,7 +703,6 @@ export default defineComponent({
         if (searchObj.data.stream.selectedStream.value == "") {
           return false;
         }
-
         searchObj.data.errorMsg = "";
         if (searchObj.data.resultGrid.currentPage == 0) {
           searchObj.loading = true;
