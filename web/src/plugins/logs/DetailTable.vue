@@ -183,6 +183,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                         </q-item-section>
                       </q-item>
+
+                      <q-item
+                        v-if="
+                          !searchObj.data.stream.selectedFields.includes(value)
+                        "
+                        clickable
+                        v-close-popup="true"
+                      >
+                        <q-item-section>
+                          <q-item-label
+                            data-test="log-details-include-field-btn"
+                            @click="addFieldToTable(value)"
+                            ><q-btn
+                              title="Add to table"
+                              size="6px"
+                              round
+                              class="q-mr-sm pointer"
+                            >
+                              <q-icon
+                                color="currentColor"
+                                name="visibility" /></q-btn
+                            >{{ t("common.addFieldToTable") }}</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                      <q-item v-else clickable v-close-popup="true">
+                        <q-item-section>
+                          <q-item-label
+                            data-test="log-details-include-field-btn"
+                            @click="addFieldToTable(value)"
+                            ><q-btn
+                              title="Remove from table "
+                              size="6px"
+                              round
+                              class="q-mr-sm pointer"
+                            >
+                              <q-icon
+                                color="currentColor"
+                                name="visibility_off" /></q-btn
+                            >{{
+                              t("common.removeFieldFromTable")
+                            }}</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
                     </q-list>
                   </q-btn-dropdown>
 
@@ -275,7 +320,6 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import JsonPreview from "./JsonPreview.vue";
-import { emit } from "process";
 
 const defaultValue: any = () => {
   return {
@@ -343,7 +387,7 @@ export default defineComponent({
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
-    const searchObj = useLogs();
+    const { searchObj } = useLogs();
     const $q = useQuasar();
 
     onBeforeMount(() => {
@@ -406,6 +450,7 @@ export default defineComponent({
       toggleWrapLogDetails,
       copyContentToClipboard,
       addFieldToTable,
+      searchObj,
     };
   },
   async created() {
