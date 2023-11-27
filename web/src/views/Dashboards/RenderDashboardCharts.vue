@@ -1,16 +1,17 @@
 <!-- Copyright 2023 Zinc Labs Inc.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-     http:www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License. 
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- eslint-disable vue/v-on-event-hyphenation -->
@@ -25,18 +26,45 @@
     />
     <slot name="before_panels" />
     <div class="displayDiv">
-      <grid-layout ref="gridLayoutRef" v-if="dashboardData.panels?.length > 0" :layout.sync="getDashboardLayout(dashboardData)" :col-num="12" :row-height="30"
-        :is-draggable="!viewOnly" :is-resizable="!viewOnly" :vertical-compact="true" :autoSize="true"
-        :restore-on-drag="true" :use-css-transforms="false">
-        <grid-item class="gridBackground" v-for="item in dashboardData.panels" :key="item.id"
-          :x="getPanelLayout(item,'x')" :y="getPanelLayout(item,'y')"
-          :w="getPanelLayout(item,'w')" :h="getPanelLayout(item,'h')"
-          :i="getPanelLayout(item,'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent"
-          drag-allow-from=".drag-allow">
-          <div style="height: 100%;">
-            <PanelContainer @onDeletePanel="OnDeletePanel" :viewOnly="viewOnly" :data="item" :dashboardId="dashboardData.id"
-              :selectedTimeDate="currentTimeObj" :variablesData="variablesData"
-              :width="getPanelLayout(item,'w')" :height="getPanelLayout(item,'h')">
+      <grid-layout
+        ref="gridLayoutRef"
+        v-if="dashboardData.panels?.length > 0"
+        :layout.sync="getDashboardLayout(dashboardData)"
+        :col-num="12"
+        :row-height="30"
+        :is-draggable="!viewOnly"
+        :is-resizable="!viewOnly"
+        :vertical-compact="true"
+        :autoSize="true"
+        :restore-on-drag="true"
+        :use-css-transforms="false"
+      >
+        <grid-item
+          class="gridBackground"
+          v-for="item in dashboardData.panels"
+          :key="item.id"
+          :x="getPanelLayout(item, 'x')"
+          :y="getPanelLayout(item, 'y')"
+          :w="getPanelLayout(item, 'w')"
+          :h="getPanelLayout(item, 'h')"
+          :i="getPanelLayout(item, 'i')"
+          :minH="getMinimumHeight(item.type)"
+          :minW="getMinimumWidth(item.type)"
+          @resized="resizedEvent"
+          @moved="movedEvent"
+          drag-allow-from=".drag-allow"
+        >
+          <div style="height: 100%">
+            <PanelContainer
+              @onDeletePanel="OnDeletePanel"
+              :viewOnly="viewOnly"
+              :data="item"
+              :dashboardId="dashboardData.id"
+              :selectedTimeDate="currentTimeObj"
+              :variablesData="variablesData"
+              :width="getPanelLayout(item, 'w')"
+              :height="getPanelLayout(item, 'h')"
+            >
             </PanelContainer>
           </div>
         </grid-item>

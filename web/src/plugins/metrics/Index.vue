@@ -1,16 +1,17 @@
 <!-- Copyright 2023 Zinc Labs Inc.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-     http:www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License. 
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- eslint-disable vue/attribute-hyphenation -->
@@ -42,48 +43,48 @@
         </template>
         <template #after>
           <div class="row">
-          <div
-            class="text-left col auto q-px-sm q-py-sm flex justify-start metrics-date-time"
-          >
-            <syntax-guide-metrics class="q-mr-sm" />
-          </div>
-          <div
-            class="text-right col q-px-sm q-py-sm flex justify-end metrics-date-time"
-          >
-            <date-time
-              auto-apply
-              :default-type="searchObj.data.datetime.type"
-              :default-absolute-time="{
-                startTime: searchObj.data.datetime.startTime,
-                endTime: searchObj.data.datetime.endTime,
-              }"
-              :default-relative-time="
-                searchObj.data.datetime.relativeTimePeriod
-              "
-              data-test="logs-search-bar-date-time-dropdown"
-              @on:date-change="updateDateTime"
-            />
-            <auto-refresh-interval
-              class="q-pr-sm"
-              v-model="searchObj.meta.refreshInterval"
-              @update:model-value="onChangeRefreshInterval"
-            />
-            <q-btn
-              data-test="metrics-explorer-run-query-button"
-              data-cy="metrics-explorer-run-query-button"
-              dense
-              flat
-              :title="t('metrics.runQuery')"
-              class="q-pa-none bg-secondary search-button"
-              @click="searchData"
-              size="sm"
-              :disable="
-                searchObj.loading || searchObj.data.streamResults.length == 0
-              "
+            <div
+              class="text-left col auto q-px-sm q-py-sm flex justify-start metrics-date-time"
             >
-            {{t('metrics.runQuery')}}
-            </q-btn>
-          </div>
+              <syntax-guide-metrics class="q-mr-sm" />
+            </div>
+            <div
+              class="text-right col q-px-sm q-py-sm flex justify-end metrics-date-time"
+            >
+              <date-time
+                auto-apply
+                :default-type="searchObj.data.datetime.type"
+                :default-absolute-time="{
+                  startTime: searchObj.data.datetime.startTime,
+                  endTime: searchObj.data.datetime.endTime,
+                }"
+                :default-relative-time="
+                  searchObj.data.datetime.relativeTimePeriod
+                "
+                data-test="logs-search-bar-date-time-dropdown"
+                @on:date-change="updateDateTime"
+              />
+              <auto-refresh-interval
+                class="q-pr-sm"
+                v-model="searchObj.meta.refreshInterval"
+                @update:model-value="onChangeRefreshInterval"
+              />
+              <q-btn
+                data-test="metrics-explorer-run-query-button"
+                data-cy="metrics-explorer-run-query-button"
+                dense
+                flat
+                :title="t('metrics.runQuery')"
+                class="q-pa-none bg-secondary search-button"
+                @click="searchData"
+                size="sm"
+                :disable="
+                  searchObj.loading || searchObj.data.streamResults.length == 0
+                "
+              >
+                {{ t("metrics.runQuery") }}
+              </q-btn>
+            </div>
           </div>
           <div>
             <div class="row metrics-query-editor-container">
@@ -91,7 +92,9 @@
                 class="col q-pa-sm"
                 style="border-top: 1px solid #dbdbdb; height: 100%"
               >
-                <div class="q-pb-xs text-bold">{{t('metrics.promqlLabel')}}:</div>
+                <div class="q-pb-xs text-bold">
+                  {{ t("metrics.promqlLabel") }}:
+                </div>
                 <div
                   v-if="searchObj.data.metrics.selectedMetric?.help?.length"
                   class="q-pb-sm"
@@ -151,7 +154,7 @@
                 style="margin: 0 auto; display: block"
               />
               <span class="text-center">
-                {{t('metrics.holdMessage')}}
+                {{ t("metrics.holdMessage") }}
               </span>
             </div>
           </div>
@@ -176,7 +179,7 @@
               data-test="logs-search-no-stream-selected-text"
               class="text-center"
             >
-              {{t('metrics.noStreamSelected')}}
+              {{ t("metrics.noStreamSelected") }}
             </h5>
           </div>
           <div
@@ -198,7 +201,7 @@
                 color="primary"
                 @click="addToDashboard"
                 :title="t('metrics.addToDashboard')"
-                >{{t('metrics.addToDashboard')}}</q-btn
+                >{{ t("metrics.addToDashboard") }}</q-btn
               >
             </div>
             <div style="height: 500px">

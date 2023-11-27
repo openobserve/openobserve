@@ -1,16 +1,17 @@
 <!-- Copyright 2023 Zinc Labs Inc.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-     http:www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License. 
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
@@ -83,73 +84,73 @@ export default defineComponent({
     const chartsArray = ref([
       {
         image: "img:" + getImageURL("images/dashboard/charts/area.png"),
-        title: t('dashboard.areaLabel'),
+        title: t("dashboard.areaLabel"),
         id: "area",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/area-graph.png"),
-        title: t('dashboard.areaStackedLabel'),
+        title: t("dashboard.areaStackedLabel"),
         id: "area-stacked",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
-        title: t('dashboard.lineLabel'),
+        title: t("dashboard.lineLabel"),
         id: "line",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/bar-chart.png"),
-        title: t('dashboard.barLabel'),
+        title: t("dashboard.barLabel"),
         id: "bar",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/bar-graph.png"),
-        title: t('dashboard.horizontalLabel'),
+        title: t("dashboard.horizontalLabel"),
         id: "h-bar",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/stacked.png"),
-        title: t('dashboard.stackedLabel'),
+        title: t("dashboard.stackedLabel"),
         id: "stacked",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
-        title: t('dashboard.heatmapLabel'),
+        title: t("dashboard.heatmapLabel"),
         id: "heatmap",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/geomap.png"),
-        title: t('dashboard.geomapLabel'),
+        title: t("dashboard.geomapLabel"),
         id: "geomap",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
-        title: t('dashboard.hstackedLabel'),
+        title: t("dashboard.hstackedLabel"),
         id: "h-stacked",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/pie-chart.png"),
-        title: t('dashboard.pieLabel'),
+        title: t("dashboard.pieLabel"),
         id: "pie",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
-        title: t('dashboard.donutLabel'),
+        title: t("dashboard.donutLabel"),
         id: "donut",
       },
       {
         image:
           "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
-        title: t('dashboard.scatterLabel'),
+        title: t("dashboard.scatterLabel"),
         id: "scatter",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/table.png"),
-        title: t('dashboard.tableLabel'),
+        title: t("dashboard.tableLabel"),
         id: "table",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/123.png"),
-        title: t('dashboard.metricTextLabel'),
+        title: t("dashboard.metricTextLabel"),
         id: "metric",
       },
     ]);
