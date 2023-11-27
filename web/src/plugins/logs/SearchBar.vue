@@ -1019,9 +1019,9 @@ export default defineComponent({
 
     const handleSavedView = () => {
       if (isSavedViewAction.value == "create") {
-        if (savedViewName.value == "") {
+        if (savedViewName.value == "" || !/^[A-Za-z0-9 ]+$/.test(savedViewName.value)) {
           $q.notify({
-            message: `Please provide view name.`,
+            message: `Please provide valid view name.`,
             color: "negative",
             position: "bottom",
             timeout: 1000,
