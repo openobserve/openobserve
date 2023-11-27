@@ -28,7 +28,7 @@ use prost::Message;
 use super::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request};
 use crate::service::{
     db,
-    ingestion::{chk_schema_by_record, grpc::get_val_for_attr, write_file},
+    ingestion::{chk_schema_by_record, otlp_json::get_val_for_attr, write_file},
     schema::{set_schema_metadata, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
@@ -148,16 +148,15 @@ pub async fn metrics_json_handler(
                             SERVICE,
                             format_label_name(local_attr.get("key").unwrap().as_str().unwrap())
                         ),
-                        get_val_for_attr(local_attr.get("value").unwrap().clone()),
+                        get_val_for_attr(local_attr.get("value").unwrap()),
                     );
                 }
             }
         }
-        let scope_resources = res_metric.get("scopeMetrics");
-        let inst_resources = if let Some(v) = scope_resources {
-            v.as_array().unwrap()
+        let inst_resources = if res_metric.get("scopeMetrics").is_some() {
+            res_metric.get("scopeMetrics").unwrap().as_array().unwrap()
         } else {
-            continue;
+            res_metric.get("scope_metrics").unwrap().as_array().unwrap()
         };
         for inst_metrics in inst_resources {
             if inst_metrics.get("metrics").is_some() {
@@ -725,12 +724,13 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
     {
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
-            rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
-                get_attribute_value(v)
+            rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] = get_val_for_attr(v)
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    if data_point.get("startTimeUnixNano").is_some() {
+        rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    }
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
 
     set_data_point_value(rec, data_point);
@@ -762,11 +762,13 @@ fn process_hist_data_point(
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
             rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
-                get_attribute_value(v);
+                get_val_for_attr(v);
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    if data_point.get("startTimeUnixNano").is_some() {
+        rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    }
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -830,11 +832,13 @@ fn process_exp_hist_data_point(
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
             rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
-                get_attribute_value(v);
+                get_val_for_attr(v);
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    if data_point.get("startTimeUnixNano").is_some() {
+        rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    }
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
@@ -919,7 +923,9 @@ fn process_summary_data_point(
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
-    rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    if data_point.get("startTimeUnixNano").is_some() {
+        rec["start_time"] = get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
+    }
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {

@@ -18,17 +18,17 @@ use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
+use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
 use prost::Message;
 
+use crate::common::utils::flatten::format_key;
 use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
-    db, distinct_values, get_formatted_stream_name,
-    ingestion::{grpc::get_val_for_attr, write_file},
-    schema::stream_schema_exists,
-    usage::report_request_usage_stats,
+    db, distinct_values, get_formatted_stream_name, ingestion::write_file,
+    schema::stream_schema_exists, usage::report_request_usage_stats,
 };
 use crate::{
     common::{
@@ -47,7 +47,7 @@ use crate::{
         },
         utils::{flatten, json},
     },
-    service::ingestion::otlp_json::get_int_value,
+    service::ingestion::otlp_json::{get_int_value, get_val_for_attr},
 };
 
 use super::StreamMeta;
@@ -217,7 +217,7 @@ pub async fn logs_json_handler(
                                 SERVICE,
                                 local_attr.get("key").unwrap().as_str().unwrap()
                             ),
-                            get_val_for_attr(local_attr.get("value").unwrap().clone()),
+                            get_val_for_attr(local_attr.get("value").unwrap()),
                         );
                     }
                 }
@@ -251,9 +251,6 @@ pub async fn logs_json_handler(
 
                 let mut value: json::Value = json::to_value(log).unwrap();
 
-                //JSON Flattening
-                value = flatten::flatten(&value).unwrap();
-
                 // get json object
                 let mut local_val = value.as_object_mut().unwrap();
 
@@ -263,8 +260,8 @@ pub async fn logs_json_handler(
                         let local_attr = res_attr.as_object().unwrap();
 
                         local_val.insert(
-                            local_attr.get("key").unwrap().as_str().unwrap().to_owned(),
-                            get_val_for_attr(local_attr.get("value").unwrap().clone()),
+                            format_key(local_attr.get("key").unwrap().as_str().unwrap()),
+                            get_val_for_attr(local_attr.get("value").unwrap()),
                         );
                     }
                 }
@@ -274,14 +271,30 @@ pub async fn logs_json_handler(
                 //remove body before adding
                 local_val.remove("body_stringvalue");
 
-                
                 //process trace id
-                if log.get("trace_id").is_some() {}else{
-                    let trace_id = log.get("trace_id").unwrap();
-                }
+                let trace_id = if log.get("trace_id").is_some() {
+                    local_val.remove("trace_id");
+                    log.get("trace_id").unwrap()
+                } else {
+                    local_val.remove("traceIds");
+                    log.get("traceId").unwrap()
+                };
+                let trace_id_str = trace_id.as_str().unwrap();
+                let trace_id_bytes = hex::decode(trace_id_str).unwrap().try_into().unwrap();
+                let trace_id = TraceId::from_bytes(trace_id_bytes).to_string();
+                local_val.insert("trace_id".to_owned(), trace_id.into());
 
                 //process span id
 
+                let span_id = if log.get("span_id").is_some() {
+                    log.get("span_id").unwrap()
+                } else {
+                    log.get("spanId").unwrap()
+                };
+                let span_id_str = span_id.as_str().unwrap();
+                let span_id_bytes = hex::decode(span_id_str).unwrap().try_into().unwrap();
+                let span_id = SpanId::from_bytes(span_id_bytes).to_string();
+                local_val.insert("span_id".to_owned(), span_id.into());
 
                 if log.get("body").is_some() {
                     let body = log.get("body").unwrap().get("stringValue").unwrap();
@@ -307,6 +320,10 @@ pub async fn logs_json_handler(
                 local_val.append(&mut service_att_map.clone());
 
                 value = json::to_value(local_val).unwrap();
+
+                //JSON Flattening
+                value = flatten::flatten(&value).unwrap();
+
                 if !local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_transform(
                         &local_trans,
@@ -354,7 +371,7 @@ pub async fn logs_json_handler(
                         }
                     }
                 }
-            };
+            }
         }
     }
 
