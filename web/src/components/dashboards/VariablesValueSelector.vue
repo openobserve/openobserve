@@ -14,32 +14,68 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div v-if="variablesData.values?.length > 0" :key="variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
-    <div v-for="item in variablesData.values" :key="item.name +
-      item.value +
-      item.type +
-      item.options?.length +
-      item.isLoading
-      " class="q-mr-lg q-mt-sm">
+  <div
+    v-if="variablesData.values?.length > 0"
+    :key="variablesData.isVariablesLoading"
+    class="flex q-mt-sm q-ml-sm"
+  >
+    <div
+      v-for="item in variablesData.values"
+      :key="
+        item.name +
+        item.value +
+        item.type +
+        item.options?.length +
+        item.isLoading
+      "
+      class="q-mr-lg q-mt-sm"
+    >
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector v-model="item.value" :variableItem="item" />
       </div>
       <div v-else-if="item.type == 'constant'">
-        <q-input style="max-width: 150px !important" v-model="item.value" :label="item.label || item.name" dense outlined
-          readonly></q-input>
+        <q-input
+          style="max-width: 150px !important"
+          v-model="item.value"
+          :label="item.label || item.name"
+          dense
+          outlined
+          readonly
+        ></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
-        <q-input style="max-width: 150px !important" debounce="1000" v-model="item.value" :label="item.label || item.name"
-          dense outlined></q-input>
+        <q-input
+          style="max-width: 150px !important"
+          debounce="1000"
+          v-model="item.value"
+          :label="item.label || item.name"
+          dense
+          outlined
+        ></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
-        <q-select style="min-width: 150px" outlined dense v-model="item.value" :display-value="item.value
-          ? item.value
-          : !item.isLoading
-            ? '(No Options Available)'
-            : ''
-          " :options="item.options" map-options stack-label filled borderless :label="item.label || item.name"
-          option-value="value" option-label="label" emit-value>
+        <q-select
+          style="min-width: 150px"
+          outlined
+          dense
+          v-model="item.value"
+          :display-value="
+            item.value
+              ? item.value
+              : !item.isLoading
+              ? '(No Options Available)'
+              : ''
+          "
+          :options="item.options"
+          map-options
+          stack-label
+          filled
+          borderless
+          :label="item.label || item.name"
+          option-value="value"
+          option-label="label"
+          emit-value
+        >
           <template v-slot:no-option>
             <q-item>
               <q-item-section class="text-italic text-grey">
@@ -62,17 +98,18 @@ import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
-import VariableAdHocValueSelector from './settings/VariableAdHocValueSelector.vue';
+import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 
 export default defineComponent({
   name: "VariablesValueSelector",
   props: ["selectedTimeDate", "variablesConfig", "initialVariableValues"],
   emits: ["variablesData"],
   components: {
-    VariableQueryValueSelector, VariableAdHocValueSelector,
+    VariableQueryValueSelector,
+    VariableAdHocValueSelector,
   },
   setup(props: any, { emit }) {
-    console.log("props", props)
+    console.log("props", props);
     const store = useStore();
     // variables data derived from the variables config list
     const variablesData: any = reactive({
@@ -182,8 +219,8 @@ export default defineComponent({
                       )
                         ? oldVariableObjectSelectedValue.value
                         : obj.options.length
-                          ? obj.options[0]
-                          : "";
+                        ? obj.options[0]
+                        : "";
                     } else {
                       obj.value = obj.options[0] || "";
                     }
@@ -233,23 +270,25 @@ export default defineComponent({
               return obj;
             }
             case "textbox": {
-              let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
+              let oldVariableObjectSelectedValue = oldVariableValue.find(
+                (it2: any) => it2.name === it.name
+              );
               if (oldVariableObjectSelectedValue) {
                 obj.value = oldVariableObjectSelectedValue.value;
-              }
-              else {
+              } else {
                 obj.value = it.value;
               }
               return obj;
             }
             case "custom": {
               obj["options"] = it?.options;
-              let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
+              let oldVariableObjectSelectedValue = oldVariableValue.find(
+                (it2: any) => it2.name === it.name
+              );
               // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
               if (oldVariableObjectSelectedValue) {
                 obj.value = oldVariableObjectSelectedValue.value;
-              }
-              else {
+              } else {
                 obj.value = obj.options[0]?.value || "";
               }
               return obj;
@@ -258,20 +297,38 @@ export default defineComponent({
             case "ad-hoc-filters": {
               console.log("ad-hoc-filters");
 
-              obj.isLoading = true;  // Set loading state
+              obj.isLoading = true; // Set loading state
 
               return streamService
                 .nameList(store.state.selectedOrganization.identifier, "", true)
                 .then((res) => {
                   console.log("obj", obj);
 
-                  obj.isLoading = false;  // Reset loading state
+                  obj.isLoading = false; // Reset loading state
 
-                  console.log("res.data.list", res.data.list.filter((item: any) => !item.schema));
+                  console.log(
+                    "res.data.list",
+                    res.data.list.filter((item: any) => !item.schema)
+                  );
 
-                  const options = res.data.list.map((item: any) => item.schema || []).flat().map((it2: any) => it2.name);
+                  const options = res.data.list.map((item: any) => {
+                    const schemaNames = (item.schema || [])
+                      .flat()
+                      .map((it2: any) => it2.name);
+                    return {
+                      name: item.name,
+                      stream_type: item.stream_type,
+                      schema_names: schemaNames,
+                    };
+                  });
+                  console.log("optionssss", options);
+
                   // get unique values of the options array
-                  const uniqueOptions = [...new Set(options)];
+                  const uniqueOptions = [
+                    ...new Set(
+                      options.flatMap((option: any) => option.schema_names)
+                    ),
+                  ];
 
                   obj.options = uniqueOptions;
 
@@ -291,9 +348,18 @@ export default defineComponent({
                   // }
                   // console.log("objjj", obj.value);
 
+                  // const streams = res.data.list.map((item: any) => ({
+                  //     streamType: item.stream_type,
+                  //     streamName: item.name,
+                  // }));
+
+                  // console.log("streams", streams);
+
                   obj.value = obj.value || [];
 
-                  variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
+                  variablesData.isVariablesLoading = variablesData.values.some(
+                    (val: { isLoading: any }) => val.isLoading
+                  );
 
                   // triggers rerendering in the current component
                   variablesData.values[index] = JSON.parse(JSON.stringify(obj));
@@ -304,9 +370,11 @@ export default defineComponent({
                 .catch((error) => {
                   console.log(error, "error");
 
-                  obj.isLoading = false;  // Reset loading state
+                  obj.isLoading = false; // Reset loading state
                   // Handle error
-                  variablesData.isVariablesLoading = variablesData.values.some((val: { isLoading: any; }) => val.isLoading);
+                  variablesData.isVariablesLoading = variablesData.values.some(
+                    (val: { isLoading: any }) => val.isLoading
+                  );
 
                   // triggers rerendering in the current component
                   variablesData.values[index] = JSON.parse(JSON.stringify(obj));
@@ -341,4 +409,3 @@ export default defineComponent({
   },
 });
 </script>
- 
