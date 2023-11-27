@@ -115,7 +115,10 @@ export default defineComponent({
     onChartUpdate({ start, end }: { start: any; end: any }) {
       if (!(start && end)) return;
       this.searchObj.meta.showDetailTab = false;
-      this.$emit("update:datetime", { start, end });
+      this.$emit("update:datetime", {
+        start,
+        end,
+      });
     },
     onScroll(info: any) {
       if (
