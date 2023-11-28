@@ -59,11 +59,19 @@ use crate::service::{schema::filter_schema_null_fields, search::sql::Sql};
 use super::storage::{file_list, StorageType};
 use super::transform_udf::get_all_transform;
 
-const AGGREGATE_UDF_LIST: [&str; 6] = ["min", "max", "count", "avg", "sum", "array_agg"];
+const AGGREGATE_UDF_LIST: [&str; 7] = [
+    "min",
+    "max",
+    "count",
+    "avg",
+    "sum",
+    "array_agg",
+    "approx_percentile_cont",
+];
 
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 static RE_FIELD_FN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"a-zA-Z0-9_*]+)"#).unwrap());
+    Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"\ a-zA-Z0-9,._*]+)"#).unwrap());
 
 pub async fn sql(
     session: &SearchSession,
@@ -741,7 +749,22 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         if fn_name == "count" {
             fn_name = "sum".to_string();
         }
-        fields[i] = format!("{fn_name}(\"{}\") AS \"{}\"", schema_field, schema_field);
+        if fn_name == "approx_percentile_cont" {
+            let percentile = cap
+                .get(2)
+                .unwrap()
+                .as_str()
+                .splitn(2, ',')
+                .last()
+                .unwrap()
+                .trim();
+            fields[i] = format!(
+                "{fn_name}(\"{}\", {}) AS \"{}\"",
+                schema_field, percentile, schema_field
+            );
+        } else {
+            fields[i] = format!("{fn_name}(\"{}\") AS \"{}\"", schema_field, schema_field);
+        }
     }
 
     if need_rewrite {
