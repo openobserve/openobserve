@@ -272,9 +272,6 @@ export default defineComponent({
       let lowestStartTime: number = spanList.value[0].start_time;
       let highestEndTime: number = spanList.value[0].end_time;
 
-      const traceTreeMock: any = {};
-      const serviceColorMapping: any = {};
-
       if (!spanList.value?.length) return;
 
       spanList.value.forEach((spanData: any) => {
