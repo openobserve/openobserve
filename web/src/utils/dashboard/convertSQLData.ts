@@ -980,17 +980,24 @@ export const convertSQLData = (
         it.column == store.state.zoConfig.timestamp_column
     );
 
+    const timestampField = panelSchema.queries[0].fields?.x.find(
+      (it: any) =>
+        !it.aggregationFunction &&
+        it.column == store.state.zoConfig.timestamp_column
+    );
+
     //if x axis has time series
-    if (field) {
+    if (field || timestampField) {
       // if timezone is UTC then simply return x axis value which will be in UTC (note that need to remove Z from timezone string)
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
       options?.series?.map((seriesObj: any) => {
-        seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-          store.state.timezone != "UTC"
+        if(field) {
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            store.state.timezone != "UTC"
             ? utcToZonedTime(
-                Number.isInteger(options?.xAxis[0]?.data[index])
+              Number.isInteger(options?.xAxis[0]?.data[index])
                   ? options?.xAxis[0]?.data[index]
                   : new Date(options?.xAxis[0]?.data[index]).getTime(),
                 store.state.timezone
@@ -998,9 +1005,18 @@ export const convertSQLData = (
             : new Date(options?.xAxis[0]?.data[index])
                 .toISOString()
                 .slice(0, -1),
-          it,
-        ]);
-      });
+                it,
+              ]);
+            } else if(timestampField) {
+              seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+                utcToZonedTime(
+                  new Date(options.xAxis[0].data[index]).getTime() / 1000,
+                  store.state.timezone
+                ),
+                it,
+              ]);
+            }
+          });
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
@@ -1084,17 +1100,27 @@ export const convertSQLData = (
       Math.min(20, options.xAxis[0].data.length)
     );
 
-    if (isTimeSeries(sample)) {
+    const timeSeries = isTimeSeries(sample);
+    const timeStamp = isTimeStamp(sample);
+
+    if (timeSeries || timeStamp) {
       options?.series?.map((seriesObj: any) => {
-        seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-          store.state.timezone != "UTC"
-            ? utcToZonedTime(
-                new Date(options.xAxis[0].data[index] + "Z").getTime(),
-                store.state.timezone
-              )
-            : new Date(options.xAxis[0].data[index]).getTime(),
-          it,
-        ]);
+        if (timeSeries) {
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            store.state.timezone != "UTC"
+              ? utcToZonedTime(
+                  new Date(options.xAxis[0].data[index] + "Z").getTime(),
+                  store.state.timezone
+                )
+              : new Date(options.xAxis[0].data[index]).getTime(),
+            it,
+          ]);
+        } else if (timeStamp) {
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [ 
+            utcToZonedTime(new Date(options.xAxis[0].data[index]).getTime()/1000, store.state.timezone),
+            it,
+          ]);
+        }
       });
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
@@ -1204,6 +1230,13 @@ const isTimeSeries = (sample: any) => {
   return sample.every((value: any) => {
     return iso8601Pattern.test(value);
   });
+};
+
+const isTimeStamp = (sample: any) => {
+  const microsecondsPattern = /^\d{16}$/;
+  return sample.every((value: any) =>
+    microsecondsPattern.test(value.toString())
+  );
 };
 
 /**
