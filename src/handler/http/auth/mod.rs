@@ -293,7 +293,8 @@ pub async fn validator_rum(
         web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
             .unwrap();
 
-    match query.get("oo-api-key") {
+    let token = query.get("oo-api-key").or_else(|| query.get("o2-api-key"));
+    match token {
         Some(token) => match validate_token(token, org_id_end_point[0]).await {
             Ok(res) => {
                 if res {
