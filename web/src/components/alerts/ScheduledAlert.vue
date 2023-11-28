@@ -33,88 +33,95 @@
       />
     </template>
 
-    <div class="text-bold q-mr-sm q-mt-sm">Trigger</div>
-    <div class="flex justify-start items-center">
-      <div
-        class="flex items-center q-mr-sm"
-        style="border: 1px solid rgba(0, 0, 0, 0.05)"
-      >
+    <div class="q-mt-sm">
+      <div class="flex items-center q-mr-sm">
+        <div style="width: 180px">Period</div>
         <div
-          style="width: 80px; margin-left: 0 !important"
-          class="silence-notification-input"
+          class="flex items-center q-mr-sm"
+          style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
         >
-          <q-input
-            data-test="add-alert-delay-input"
-            v-model="triggerData.time"
-            type="number"
-            dense
-            filled
-            min="0"
-            style="background: none"
-            @update:model-value="updateTrigger"
-          />
-        </div>
-        <div
-          style="
-            min-width: 100px;
-            margin-left: 0 !important;
-            background: #f2f2f2;
-            height: 40px;
-          "
-          class="flex justify-center items-center"
-        >
-          Minutes
+          <div
+            style="width: 87px; margin-left: 0 !important"
+            class="silence-notification-input"
+          >
+            <q-input
+              data-test="add-alert-delay-input"
+              v-model="triggerData.time"
+              type="number"
+              dense
+              filled
+              min="0"
+              style="background: none"
+              @update:model-value="updateTrigger"
+            />
+          </div>
+          <div
+            style="
+              min-width: 100px;
+              margin-left: 0 !important;
+              background: #f2f2f2;
+              height: 40px;
+              font-weight: normal;
+            "
+            class="flex justify-center items-center"
+          >
+            Minutes
+          </div>
         </div>
       </div>
 
-      <div class="q-mr-sm">
-        <q-select
-          data-test="add-alert-stream-select"
-          v-model="triggerData.operator"
-          :options="triggerOperators"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-sm showLabelOnTop no-case"
-          filled
-          borderless
-          dense
-          use-input
-          hide-selected
-          fill-input
-          :rules="[(val: any) => !!val || 'Field is required!']"
-          style="width: 80px"
-          @update:model-value="updateTrigger"
-        />
-      </div>
-      <div
-        class="flex items-center"
-        style="border: 1px solid rgba(0, 0, 0, 0.05)"
-      >
-        <div
-          style="width: 80px; margin-left: 0 !important"
-          class="silence-notification-input"
-        >
-          <q-input
-            data-test="add-alert-delay-input"
-            v-model="triggerData.frequency"
-            type="number"
-            dense
+      <div class="flex justify-start items-center q-mt-sm">
+        <div style="width: 180px">Threshold</div>
+        <div class="q-mr-sm">
+          <q-select
+            data-test="add-alert-stream-select"
+            v-model="triggerData.operator"
+            :options="triggerOperators"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop no-case"
             filled
-            min="0"
-            style="background: none"
+            borderless
+            dense
+            use-input
+            hide-selected
+            fill-input
+            :rules="[(val: any) => !!val || 'Field is required!']"
+            style="width: 80px"
             @update:model-value="updateTrigger"
           />
         </div>
         <div
-          style="
-            min-width: 100px;
-            margin-left: 0 !important;
-            background: #f2f2f2;
-            height: 40px;
-          "
-          class="flex justify-center items-center"
+          class="flex items-center"
+          style="border: 1px solid rgba(0, 0, 0, 0.05)"
         >
-          Times
+          <div
+            style="width: 80px; margin-left: 0 !important"
+            class="silence-notification-input"
+          >
+            <q-input
+              data-test="add-alert-delay-input"
+              v-model="triggerData.frequency"
+              type="number"
+              dense
+              filled
+              min="0"
+              style="background: none"
+              @update:model-value="updateTrigger"
+            />
+          </div>
+          <div
+            style="
+              min-width: 100px;
+              margin-left: 0 !important;
+              background: #f2f2f2;
+              height: 40px;
+              font-weight: normal;
+            "
+            class="flex justify-center items-center"
+          >
+            Times
+          </div>
         </div>
       </div>
     </div>
@@ -127,7 +134,14 @@ import FieldsInput from "./FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import QueryEditor from "@/components/QueryEditor.vue";
 
-const props = defineProps(["columns", "conditions", "trigger", "sql"]);
+const props = defineProps([
+  "columns",
+  "conditions",
+  "period",
+  "threshold",
+  "frequency",
+  "sql",
+]);
 
 const emits = defineEmits([
   "field:add",
@@ -138,7 +152,12 @@ const emits = defineEmits([
 
 const { t } = useI18n();
 
-const triggerData = ref(props.trigger);
+const triggerData = ref({
+  time: props.period,
+  operator: ">",
+  threshold: props.threshold,
+  frequency: props.frequency,
+});
 
 const query = ref(props.sql);
 

@@ -97,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-alert-scheduled-alert-radio"
             v-bind:readonly="beingUpdated"
             v-bind:disable="beingUpdated"
-            v-model="formData.isScheduled"
-            :checked="formData.isScheduled"
+            v-model="formData.is_real_time"
+            :checked="formData.is_real_time"
             val="true"
             :label="t('alerts.scheduled')"
             class="q-ml-none"
@@ -107,23 +107,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-alert-realtime-alert-radio"
             v-bind:readonly="beingUpdated"
             v-bind:disable="beingUpdated"
-            v-model="formData.isScheduled"
-            :checked="!formData.isScheduled"
+            v-model="formData.is_real_time"
+            :checked="!formData.is_real_time"
             val="false"
             :label="t('alerts.realTime')"
             class="q-ml-none"
           />
         </div>
         <div
-          v-if="formData.isScheduled === 'true'"
+          v-if="formData.is_real_time === 'true'"
           class="q-py-sm showLabelOnTop text-bold text-h7"
           data-test="add-alert-query-input-title"
         >
           <scheduled-alert
             :columns="filteredColumns"
-            :conditions="formData.conditions"
-            v-model:trigger="formData.trigger"
-            v-model:sql="formData.sql"
+            :conditions="formData.query_condition.conditions"
+            v-model:period="formData.period"
+            v-model:threshold="formData.threshold"
+            v-model:frequency="formData.frequency"
+            v-model:sql="formData.query_condition.sql"
             @field:add="addField"
             @field:remove="removeField"
             class="q-mt-sm"
@@ -132,18 +134,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else>
           <real-time-alert
             :columns="filteredColumns"
-            :conditions="formData.conditions"
+            :conditions="formData.query_condition.conditions"
             @field:add="addField"
             @field:remove="removeField"
           />
         </div>
 
-        <div class="col-12">
+        <div class="col-12 flex justify-start items-center">
           <div
             class="q-py-sm showLabelOnTop text-bold text-h7"
             data-test="add-alert-delay-title"
+            style="width: 180px"
           >
-            {{ t("alerts.silenceNotification") }}:
+            {{ t("alerts.silenceNotification") }}
           </div>
           <div class="col-8 row justify-left align-center q-gutter-sm">
             <div
@@ -156,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-input
                   data-test="add-alert-delay-input"
-                  v-model="formData.time_between_alerts.value"
+                  v-model="formData.silence"
                   type="number"
                   dense
                   filled
@@ -164,14 +167,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="background: none"
                 />
               </div>
-              <div style="min-width: 100px; margin-left: 0 !important">
-                <q-select
-                  data-test="add-alert-delay-select"
-                  v-model="formData.time_between_alerts.unit"
-                  :options="relativePeriods"
-                  dense
-                  filled
-                />
+              <div
+                style="
+                  min-width: 100px;
+                  margin-left: 0 !important;
+                  background: #f2f2f2;
+                  height: 40px;
+                "
+                class="flex justify-center items-center"
+              >
+                Minutes
               </div>
             </div>
           </div>
@@ -199,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="text-bold">Additional Variables</div>
           <variables-input
-            :variables="formData.variables"
+            :variables="formData.context_attributes"
             @add:variable="addVariable"
             @remove:variable="removeVariable"
           />
@@ -273,51 +278,29 @@ import { getUUID } from "@/utils/zincutils";
 const defaultValue: any = () => {
   return {
     name: "",
-    sql: "",
-    isScheduled: "true",
+    stream_type: "",
     stream_name: "",
-    stream_type: "logs",
-    conditions: [
-      {
-        column: "",
-        operator: "",
-        value: "",
-        id: getUUID(),
-      },
-      {
-        column: "",
-        operator: "",
-        value: "",
-        id: getUUID(),
-      },
-    ],
-    trigger: {
-      time: 0,
-      unit: "minutes",
-      operator: "=",
-      frequency: 0,
+    is_real_time: "true",
+    query_condition: {
+      conditions: [
+        {
+          column: "",
+          operator: "",
+          ignoreCase: null,
+          value: "",
+          isNumeric: null,
+        },
+      ],
+      sql: "",
+      promql: null,
     },
-    duration: {
-      value: 0,
-      unit: "Minutes",
-    },
-    frequency: {
-      value: 0,
-      unit: "Minutes",
-    },
-    time_between_alerts: {
-      value: 0,
-      unit: "Minutes",
-    },
-    variables: [
-      {
-        name: "",
-        value: "",
-        id: getUUID(),
-      },
-    ],
-    destination: [],
-    description: "",
+    period: 10,
+    threshold: 3,
+    frequency: 1,
+    silence: 10,
+    destinations: [],
+    context_attributes: {},
+    enabled: true,
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -407,6 +390,7 @@ export default defineComponent({
     const prefixCode = ref("");
     const suffixCode = ref("");
     let parser = new Parser();
+
     onMounted(async () => {
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs",
@@ -666,10 +650,7 @@ export default defineComponent({
           return false;
         }
         let submitData = {};
-        if (
-          this.formData.isScheduled === "false" ||
-          !this.formData.isScheduled
-        ) {
+        if (!this.formData.isScheduled) {
           submitData = {
             name: this.formData.name,
             stream_name: this.formData.stream_name,
