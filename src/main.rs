@@ -13,25 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    str::FromStr,
-    sync::{
-        Arc,
-        atomic::{AtomicU16, Ordering},
-    },
-    time::Duration,
-};
-use std::io::Write;
-
-use actix_web::{App, http::KeepAlive, HttpServer, middleware, web};
+use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
 use chrono::Local;
 use log::LevelFilter;
 use opentelemetry::{
+    sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
     KeyValue,
-    sdk::{propagation::TraceContextPropagator, Resource, trace as sdktrace},
 };
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::{
@@ -43,6 +31,17 @@ use opentelemetry_proto::tonic::collector::{
 use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]
 use pyroscope_pprofrs::{pprof_backend, PprofConfig};
+use std::io::Write;
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    str::FromStr,
+    sync::{
+        atomic::{AtomicU16, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
@@ -138,8 +137,14 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         if !CONFIG.common.log_local_time_format.trim().is_empty() {
             log_builder.format(|buf, record| {
-                writeln!(buf, "[{} {} {}] {}", Local::now().format(CONFIG.common.log_local_time_format.as_str()),
-                         CONFIG.common.app_name, record.level(), record.args())
+                writeln!(
+                    buf,
+                    "[{} {} {}] {}",
+                    Local::now().format(CONFIG.common.log_local_time_format.as_str()),
+                    CONFIG.common.app_name,
+                    record.level(),
+                    record.args()
+                )
             });
         }
         log_builder.init();
@@ -526,7 +531,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                             last_name: "".to_owned(),
                         },
                     )
-                        .await?;
+                    .await?;
                 }
                 "user" => {
                     db::user::reset().await?;
