@@ -469,7 +469,7 @@ export default defineComponent({
       handleRunQuery,
       updatedLocalLogFilterField,
       getSavedViews,
-      handleQueryData,
+      getQueryData,
       getStreams,
     } = useLogs();
     const queryEditorRef = ref(null);
@@ -487,6 +487,7 @@ export default defineComponent({
     const parser = new Parser();
     const dateTimeRef = ref(null);
     const saveViewLoader = ref(false);
+    const isSavedViewApplied = ref(false);
 
     const {
       autoCompleteData,
@@ -934,6 +935,7 @@ export default defineComponent({
         )
         .then(async (res) => {
           if (res.status == 200) {
+            isSavedViewApplied.value = true;
             // const extractedObj = JSON.parse(b64DecodeUnicode(res.data.data));
             const extractedObj = res.data.data;
             // alert(JSON.stringify(searchObj.data.stream.selectedStream))
@@ -982,8 +984,10 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            setTimeout(() => {
-              handleQueryData();
+            setTimeout(async () => {
+              searchObj.loading = true;
+              await getQueryData();
+              isSavedViewApplied.value = false;
             }, 1000);
 
             // } else {
@@ -1019,7 +1023,10 @@ export default defineComponent({
 
     const handleSavedView = () => {
       if (isSavedViewAction.value == "create") {
-        if (savedViewName.value == "" || !/^[A-Za-z0-9 ]+$/.test(savedViewName.value)) {
+        if (
+          savedViewName.value == "" ||
+          !/^[A-Za-z0-9 ]+$/.test(savedViewName.value)
+        ) {
           $q.notify({
             message: `Please provide valid view name.`,
             color: "negative",
@@ -1300,6 +1307,7 @@ export default defineComponent({
       confirmDelete,
       saveViewLoader,
       savedViewDropdownModel,
+      isSavedViewApplied,
     };
   },
   computed: {
@@ -1382,7 +1390,7 @@ export default defineComponent({
       }
     },
     resetFunction(newVal) {
-      if (newVal == "") {
+      if (newVal == "" && this.isSavedViewApplied == false) {
         this.resetFunctionContent();
       }
     },
