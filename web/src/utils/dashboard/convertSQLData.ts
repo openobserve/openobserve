@@ -1100,12 +1100,12 @@ export const convertSQLData = (
       Math.min(20, options.xAxis[0].data.length)
     );
 
-    const timeSeries = isTimeSeries(sample);
-    const timeStamp = isTimeStamp(sample);
-
-    if (timeSeries || timeStamp) {
+    const isTimeSeriesData = isTimeSeries(sample);
+    const isTimeStampData = isTimeStamp(sample);
+    
+    if (isTimeSeriesData || isTimeStampData) {
       options?.series?.map((seriesObj: any) => {
-        if (timeSeries) {
+        if (isTimeSeriesData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
             store.state.timezone != "UTC"
               ? utcToZonedTime(
@@ -1115,9 +1115,12 @@ export const convertSQLData = (
               : new Date(options.xAxis[0].data[index]).getTime(),
             it,
           ]);
-        } else if (timeStamp) {
-          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [ 
-            utcToZonedTime(new Date(options.xAxis[0].data[index]).getTime()/1000, store.state.timezone),
+        } else if (isTimeStampData) {
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            utcToZonedTime(
+              new Date(options.xAxis[0].data[index]).getTime() / 1000,
+              store.state.timezone
+            ),
             it,
           ]);
         }
@@ -1232,6 +1235,7 @@ const isTimeSeries = (sample: any) => {
   });
 };
 
+//Check if the sample is timestamp
 const isTimeStamp = (sample: any) => {
   const microsecondsPattern = /^\d{16}$/;
   return sample.every((value: any) =>
