@@ -3,24 +3,28 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 
 use super::{ingest::decode_and_decompress, StreamMeta};
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
-    },
-    meta::{
-        alerts::{Alert, Trigger},
-        ingestion::{GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus},
-        stream::StreamParams,
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-};
+use crate::service::ingestion::TriggerAlertData;
 use crate::service::{
     db, distinct_values, get_formatted_stream_name, ingestion::write_file,
     usage::report_request_usage_stats,
+};
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
+        },
+        meta::{
+            alerts::Alert,
+            ingestion::{GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus},
+            stream::StreamParams,
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    },
+    service::ingestion::evaluate_trigger,
 };
 
 pub async fn process(
@@ -60,7 +64,7 @@ pub async fn process(
         },
     };
 
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     // Start Register Transforms for stream
 
@@ -77,8 +81,13 @@ pub async fn process(
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
@@ -129,7 +138,7 @@ pub async fn process(
             );
 
             // write data
-            let local_trigger = super::add_valid_record(
+            trigger = super::add_valid_record(
                 &StreamMeta {
                     org_id: org_id.to_string(),
                     stream_name: stream_name.to_string(),
@@ -141,12 +150,9 @@ pub async fn process(
                 &mut stream_status.status,
                 &mut buf,
                 local_val,
+                trigger.is_none(),
             )
             .await;
-
-            if local_trigger.is_some() {
-                trigger = Some(local_trigger.unwrap());
-            }
 
             // get distinct_value item
             for field in DISTINCT_FIELDS.iter() {
@@ -186,7 +192,7 @@ pub async fn process(
         write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, &stream_alerts_map).await;
+    evaluate_trigger(trigger).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {

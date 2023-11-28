@@ -25,27 +25,30 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use super::StreamMeta;
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
-    },
-    meta::{
-        alerts::{Alert, Trigger},
-        http::HttpResponse as MetaHttpResponse,
-        ingestion::{IngestionResponse, StreamStatus},
-        stream::StreamParams,
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-};
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
-    ingestion::{grpc::get_val, grpc::get_val_with_type_retained, write_file},
+    ingestion::{grpc::get_val, grpc::get_val_with_type_retained, write_file, TriggerAlertData},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
+};
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
+        },
+        meta::{
+            alerts::Alert,
+            http::HttpResponse as MetaHttpResponse,
+            ingestion::{IngestionResponse, StreamStatus},
+            stream::StreamParams,
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    },
+    service::ingestion::evaluate_trigger,
 };
 
 pub async fn usage_ingest(
@@ -81,7 +84,7 @@ pub async fn usage_ingest(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
 
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     let partition_det =
         crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
@@ -89,8 +92,13 @@ pub async fn usage_ingest(
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
@@ -129,7 +137,7 @@ pub async fn usage_ingest(
             json::Value::Number(timestamp.into()),
         );
 
-        let local_trigger = super::add_valid_record(
+        trigger = super::add_valid_record(
             &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
@@ -141,12 +149,9 @@ pub async fn usage_ingest(
             &mut stream_status.status,
             &mut buf,
             local_val,
+            trigger.is_none(),
         )
         .await;
-
-        if local_trigger.is_some() {
-            trigger = Some(local_trigger.unwrap());
-        }
 
         // get distinct_value item
         for field in DISTINCT_FIELDS.iter() {
@@ -184,7 +189,7 @@ pub async fn usage_ingest(
     }
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, &stream_alerts_map).await;
+    evaluate_trigger(trigger).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {
@@ -272,8 +277,13 @@ pub async fn handle_grpc_request(
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     // Start Register Transforms for stream
@@ -284,7 +294,7 @@ pub async fn handle_grpc_request(
     );
     // End Register Transforms for stream
 
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
@@ -384,7 +394,7 @@ pub async fn handle_grpc_request(
                 // get json object
                 let local_val = rec.as_object_mut().unwrap();
 
-                let local_trigger = super::add_valid_record(
+                trigger = super::add_valid_record(
                     &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
@@ -396,12 +406,9 @@ pub async fn handle_grpc_request(
                     &mut stream_status.status,
                     &mut data_buf,
                     local_val,
+                    trigger.is_none(),
                 )
                 .await;
-
-                if local_trigger.is_some() {
-                    trigger = Some(local_trigger.unwrap());
-                }
 
                 // get distinct_value item
                 for field in DISTINCT_FIELDS.iter() {
@@ -434,7 +441,7 @@ pub async fn handle_grpc_request(
     .await;
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, &stream_alerts_map).await;
+    evaluate_trigger(trigger).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {

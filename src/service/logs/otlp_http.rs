@@ -23,28 +23,28 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
-    },
-    meta::{
-        alerts::{Alert, Trigger},
-        http::HttpResponse as MetaHttpResponse,
-        ingestion::StreamStatus,
-        stream::StreamParams,
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{flatten, json},
-};
 use crate::handler::http::request::CONTENT_TYPE_JSON;
+use crate::service::ingestion::TriggerAlertData;
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
     ingestion::{grpc::get_val_for_attr, write_file},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
+};
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
+        },
+        meta::{
+            alerts::Alert, http::HttpResponse as MetaHttpResponse, ingestion::StreamStatus,
+            stream::StreamParams, usage::UsageType, StreamType,
+        },
+        utils::{flatten, json},
+    },
+    service::ingestion::evaluate_trigger,
 };
 
 use super::StreamMeta;
@@ -122,7 +122,7 @@ pub async fn logs_json_handler(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
     let mut stream_status = StreamStatus::new(stream_name);
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
@@ -133,8 +133,13 @@ pub async fn logs_json_handler(
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     // Start Register Transforms for stream
@@ -297,7 +302,7 @@ pub async fn logs_json_handler(
 
                     local_val = value.as_object_mut().unwrap();
 
-                    let local_trigger = super::add_valid_record(
+                    trigger = super::add_valid_record(
                         &StreamMeta {
                             org_id: org_id.to_string(),
                             stream_name: stream_name.to_string(),
@@ -309,12 +314,9 @@ pub async fn logs_json_handler(
                         &mut stream_status.status,
                         &mut buf,
                         local_val,
+                        trigger.is_none(),
                     )
                     .await;
-
-                    if local_trigger.is_some() {
-                        trigger = Some(local_trigger.unwrap());
-                    }
 
                     // get distinct_value item
                     for field in DISTINCT_FIELDS.iter() {
@@ -348,7 +350,7 @@ pub async fn logs_json_handler(
     .await;
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, &stream_alerts_map).await;
+    evaluate_trigger(trigger).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {

@@ -17,23 +17,32 @@ use std::sync::Arc;
 
 use crate::common::{
     infra::{config::TRIGGERS, db as infra_db},
-    meta::alerts::Trigger,
+    meta::{alerts::Trigger, StreamType},
     utils::json,
 };
 
-pub async fn get(alert_name: &str) -> Result<Option<Trigger>, anyhow::Error> {
+pub async fn get(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    alert_name: &str,
+) -> Result<Trigger, anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!("/trigger/{alert_name}");
-    Ok(db
-        .get(&key)
-        .await
-        .map(|val| json::from_slice(&val).unwrap())
-        .ok())
+    let key = format!("/trigger/{org_id}/{stream_type}/{stream_name}/{alert_name}");
+    let val = db.get(&key).await?;
+    let trigger = json::from_slice(&val)?;
+    Ok(trigger)
 }
 
-pub async fn set(alert_name: &str, trigger: &Trigger) -> Result<(), anyhow::Error> {
+pub async fn set(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    alert_name: &str,
+    trigger: &Trigger,
+) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!("/trigger/{alert_name}");
+    let key = format!("/trigger/{org_id}/{stream_type}/{stream_name}/{alert_name}");
     match db
         .put(
             &key.clone(),
@@ -51,19 +60,25 @@ pub async fn set(alert_name: &str, trigger: &Trigger) -> Result<(), anyhow::Erro
     Ok(())
 }
 
-pub async fn delete(alert_name: &str) -> Result<(), anyhow::Error> {
+pub async fn delete(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    alert_name: &str,
+) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!("/trigger/{alert_name}");
+    let key = format!("/trigger/{org_id}/{stream_type}/{stream_name}/{alert_name}");
     Ok(db.delete(&key.clone(), false, infra_db::NEED_WATCH).await?)
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/trigger/";
+    let mut cacher = TRIGGERS.write().await;
+    let db = infra_db::get_db().await;
     for (item_key, item_value) in db.list(key).await? {
         let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: Trigger = json::from_slice(&item_value).unwrap();
-        TRIGGERS.insert(item_key.to_owned(), json_val);
+        cacher.insert(item_key.to_owned(), json_val);
     }
     log::info!("Triggers Cached");
     Ok(())
@@ -87,11 +102,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Trigger = json::from_slice(&ev.value.unwrap()).unwrap();
-                TRIGGERS.insert(item_key.to_string(), item_value.clone());
+                TRIGGERS
+                    .write()
+                    .await
+                    .insert(item_key.to_string(), item_value.clone());
             }
             infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                TRIGGERS.remove(item_key);
+                TRIGGERS.write().await.remove(item_key);
             }
             infra_db::Event::Empty => {}
         }

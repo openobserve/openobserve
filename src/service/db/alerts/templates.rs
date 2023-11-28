@@ -43,9 +43,10 @@ pub async fn get(org_id: &str, name: &str) -> Result<DestinationTemplate, anyhow
 pub async fn set(
     org_id: &str,
     name: &str,
-    mut template: DestinationTemplate,
+    template: DestinationTemplate,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
+    let mut template = template;
     template.is_default = Some(org_id == DEFAULT_ORG);
     let key = format!("/templates/{org_id}/{name}");
     Ok(db
@@ -66,25 +67,25 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
 pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Error> {
     let cache = ALERTS_TEMPLATES.clone();
     if !cache.is_empty() {
-        Ok(cache
+        return Ok(cache
             .iter()
             .filter_map(|template| {
                 let k = template.key();
                 (k.starts_with(&format!("{org_id}/")) || k.starts_with(&format!("{DEFAULT_ORG}/")))
                     .then(|| template.value().clone())
             })
-            .collect())
-    } else {
-        let db = infra_db::get_db().await;
-        let key = format!("/templates/{org_id}/", org_id = org_id);
-        let ret = db.list(key.as_str()).await?;
-        let mut templates = Vec::new();
-        for (_, item_value) in ret {
-            let json_val: DestinationTemplate = json::from_slice(&item_value).unwrap();
-            templates.push(json_val);
-        }
-        Ok(templates)
+            .collect());
     }
+
+    let db = infra_db::get_db().await;
+    let key = format!("/templates/{org_id}/");
+    let ret = db.list_values(key.as_str()).await?;
+    let mut templates = Vec::new();
+    for item_value in ret {
+        let json_val: DestinationTemplate = json::from_slice(&item_value).unwrap();
+        templates.push(json_val);
+    }
+    Ok(templates)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

@@ -19,12 +19,7 @@ use datafusion::arrow::datatypes::Schema;
 
 use crate::common::{
     infra::config::CONFIG,
-    meta::{
-        alerts::{Alert, Trigger},
-        ingestion::RecordStatus,
-        stream::PartitionTimeLevel,
-        StreamType,
-    },
+    meta::{alerts::Alert, ingestion::RecordStatus, stream::PartitionTimeLevel, StreamType},
     utils::{
         self,
         hasher::get_fields_key_xxh3,
@@ -34,7 +29,7 @@ use crate::common::{
 use crate::service::schema::check_for_schema;
 
 use super::{
-    ingestion::{get_value, get_wal_time_key},
+    ingestion::{get_value, get_wal_time_key, TriggerAlertData},
     stream::unwrap_partition_time_level,
 };
 
@@ -204,14 +199,15 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Opt
     }
 }
 
-async fn add_valid_record(
-    stream_meta: &StreamMeta<'_>,
-    stream_schema_map: &mut AHashMap<String, Schema>,
-    status: &mut RecordStatus,
-    buf: &mut AHashMap<String, Vec<String>>,
-    local_val: &mut Map<String, Value>,
-) -> Option<Trigger> {
-    let trigger: Option<Trigger> = None;
+async fn add_valid_record<'a>(
+    stream_meta: &'a StreamMeta<'_>,
+    stream_schema_map: &'a mut AHashMap<String, Schema>,
+    status: &'a mut RecordStatus,
+    buf: &'a mut AHashMap<String, Vec<String>>,
+    local_val: &'a mut Map<String, Value>,
+    need_trigger: bool,
+) -> TriggerAlertData {
+    let mut trigger: Vec<(Alert, Vec<Map<String, Value>>)> = Vec::new();
     let timestamp: i64 = local_val
         .get(&CONFIG.common.column_timestamp)
         .unwrap()
@@ -274,7 +270,7 @@ async fn add_valid_record(
         };
 
         if valid_record {
-            if !stream_meta.stream_alerts_map.is_empty() {
+            if need_trigger && !stream_meta.stream_alerts_map.is_empty() {
                 // Start check for alert trigger
                 let key = format!(
                     "{}/{}/{}",
@@ -284,23 +280,8 @@ async fn add_valid_record(
                 );
                 if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
                     for alert in alerts {
-                        if alert.is_real_time {
-                            // let set_trigger = alert.condition.evaluate(local_val.clone());
-                            // if set_trigger {
-                            //     // let _ = triggers::save_trigger(alert.name.clone(), trigger).await;
-                            //     trigger = Some(Trigger {
-                            //         timestamp,
-                            //         is_valid: true,
-                            //         alert_name: alert.name.clone(),
-                            //         stream: stream_meta.stream_name.to_string(),
-                            //         org: stream_meta.org_id.to_string(),
-                            //         stream_type: StreamType::Logs,
-                            //         last_sent_at: 0,
-                            //         count: 0,
-                            //         is_ingest_time: true,
-                            //         parent_alert_deleted: false,
-                            //     });
-                            // }
+                        if let Ok(Some(v)) = alert.check_realtime(local_val).await {
+                            trigger.push((alert.clone(), v));
                         }
                     }
                 }
@@ -312,7 +293,11 @@ async fn add_valid_record(
     } else {
         status.failed += 1;
     }
-    trigger
+    if trigger.is_empty() {
+        None
+    } else {
+        Some(trigger)
+    }
 }
 
 fn set_parsing_error(parse_error: &mut String, field: &Field) {
@@ -321,28 +306,6 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
         field.name(),
         field.data_type()
     ));
-}
-
-async fn evaluate_trigger(
-    trigger: Option<Trigger>,
-    stream_alerts_map: &AHashMap<String, Vec<Alert>>,
-) {
-    if trigger.is_some() {
-        let val = trigger.unwrap();
-        let mut alerts = stream_alerts_map
-            .get(&format!("{}/{}/{}", val.org, StreamType::Logs, val.stream))
-            .unwrap()
-            .clone();
-
-        alerts.retain(|alert| alert.name.eq(&val.alert_name));
-        if !alerts.is_empty() {
-            crate::service::ingestion::send_ingest_notification(
-                val,
-                alerts.first().unwrap().clone(),
-            )
-            .await;
-        }
-    }
 }
 
 struct StreamMeta<'a> {

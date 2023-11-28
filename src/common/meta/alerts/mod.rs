@@ -47,6 +47,14 @@ pub struct Alert {
     pub enabled: bool,
 }
 
+impl PartialEq for Alert {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.stream_type == other.stream_type
+            && self.stream_name == other.stream_name
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AlertDestination {
     pub name: Option<String>,
@@ -60,7 +68,7 @@ pub struct AlertDestination {
 }
 
 impl AlertDestination {
-    pub fn to_dest_resp(&self, template: Option<DestinationTemplate>) -> AlertDestinationResponse {
+    pub fn to_dest_resp(&self, template: DestinationTemplate) -> AlertDestinationResponse {
         AlertDestinationResponse {
             url: self.url.clone(),
             method: self.method.clone(),
@@ -81,7 +89,7 @@ pub struct AlertDestinationResponse {
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
-    pub template: Option<DestinationTemplate>,
+    pub template: DestinationTemplate,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -115,66 +123,10 @@ pub struct DestinationTemplate {
     pub is_default: Option<bool>,
 }
 
-impl PartialEq for Alert {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.stream_type == other.stream_type
-            && self.stream_name == other.stream_name
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct AlertList {
-    pub list: Vec<Alert>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Trigger {
-    #[serde(default)]
-    pub timestamp: i64,
-    #[serde(default)]
-    pub is_valid: bool,
-    #[serde(default)]
-    pub alert_name: String,
-    #[serde(default)]
-    pub stream: String,
-    #[serde(default)]
-    pub org: String,
-    #[serde(default)]
-    pub last_sent_at: i64,
-    #[serde(default)]
-    pub count: i64,
-    #[serde(default)]
-    pub is_ingest_time: bool,
-    #[serde(default)]
-    pub stream_type: StreamType,
-    #[serde(default)]
-    pub parent_alert_deleted: bool,
-}
-
-impl Default for Trigger {
-    fn default() -> Self {
-        Trigger {
-            timestamp: 0,
-            is_valid: true,
-            alert_name: String::new(),
-            stream: String::new(),
-            org: String::new(),
-            last_sent_at: 0,
-            count: 0,
-            stream_type: StreamType::Logs,
-            is_ingest_time: false,
-            parent_alert_deleted: false,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TriggerTimer {
-    #[serde(default)]
-    pub updated_at: i64,
-    #[serde(default)]
-    pub expires_at: i64,
+    pub next_run_at: i64,
+    pub is_silenced: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

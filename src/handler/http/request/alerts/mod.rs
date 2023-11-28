@@ -84,7 +84,7 @@ pub async fn save_alert(
         ("stream_name" = String, Path, description = "Stream name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = AlertList),
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description="Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
@@ -102,7 +102,11 @@ async fn list_stream_alerts(
         }
     };
     match alerts::list_alert(&org_id, Some(stream_name.as_str()), stream_type).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Ok(data) => {
+            let mut mapdata = HashMap::new();
+            mapdata.insert("list", data);
+            Ok(MetaHttpResponse::json(mapdata))
+        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -119,21 +123,18 @@ async fn list_stream_alerts(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = AlertList),
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/alerts")]
-async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn list_alerts(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
+    match alerts::list_alert(&org_id, None, None).await {
+        Ok(data) => {
+            let mut mapdata = HashMap::new();
+            mapdata.insert("list", data);
+            Ok(MetaHttpResponse::json(mapdata))
         }
-    };
-    match alerts::list_alert(&org_id, None, stream_type).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }

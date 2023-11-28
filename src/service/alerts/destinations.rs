@@ -49,11 +49,10 @@ pub async fn delete_destination(
     org_id: &str,
     name: &str,
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    for alert_list in STREAM_ALERTS.iter() {
-        for alert in alert_list.value().list.clone() {
-            if alert_list.key().starts_with(org_id)
-                && alert.destinations.contains(&name.to_string())
-            {
+    let cacher = STREAM_ALERTS.read().await;
+    for (stream_key, alerts) in cacher.iter() {
+        for alert in alerts.iter() {
+            if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
                 return Err((
                     http::StatusCode::FORBIDDEN,
                     anyhow::anyhow!("Alert destination is in use for alert {}", alert.name),
@@ -61,6 +60,7 @@ pub async fn delete_destination(
             }
         }
     }
+    drop(cacher);
 
     if db::alerts::destinations::get(org_id, name).await.is_err() {
         return Err((

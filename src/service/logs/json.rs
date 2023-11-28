@@ -19,23 +19,27 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
-use crate::common::{
-    infra::{
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
-    },
-    meta::{
-        alerts::{Alert, Trigger},
-        ingestion::{IngestionResponse, StreamStatus},
-        stream::StreamParams,
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-};
+use crate::service::ingestion::TriggerAlertData;
 use crate::service::{
     distinct_values, get_formatted_stream_name, ingestion::is_ingestion_allowed,
     ingestion::write_file, usage::report_request_usage_stats,
+};
+use crate::{
+    common::{
+        infra::{
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
+        },
+        meta::{
+            alerts::Alert,
+            ingestion::{IngestionResponse, StreamStatus},
+            stream::StreamParams,
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    },
+    service::ingestion::evaluate_trigger,
 };
 
 pub async fn ingest(
@@ -61,7 +65,7 @@ pub async fn ingest(
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     // Start Register Transforms for stream
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
@@ -77,8 +81,13 @@ pub async fn ingest(
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
@@ -136,7 +145,7 @@ pub async fn ingest(
             json::Value::Number(timestamp.into()),
         );
 
-        let local_trigger = super::add_valid_record(
+        trigger = super::add_valid_record(
             &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
@@ -148,6 +157,7 @@ pub async fn ingest(
             &mut stream_status.status,
             &mut buf,
             local_val,
+            trigger.is_none(),
         )
         .await;
 
@@ -165,10 +175,6 @@ pub async fn ingest(
                     });
                 }
             }
-        }
-
-        if local_trigger.is_some() {
-            trigger = Some(local_trigger.unwrap());
         }
     }
 
@@ -188,15 +194,9 @@ pub async fn ingest(
             ));
         }
     };
-    /* if stream_file_name.is_empty() {
-        return Ok(IngestionResponse::new(
-            http::StatusCode::OK.into(),
-            vec![stream_status],
-        ));
-    } */
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, &stream_alerts_map).await;
+    evaluate_trigger(trigger).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {

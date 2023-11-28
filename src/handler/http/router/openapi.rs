@@ -154,7 +154,6 @@ use crate::handler::http::request;
             meta::saved_view::CreateViewResponse,
             meta::saved_view::UpdateViewRequest,
             meta::alerts::Alert,
-            meta::alerts::AlertList,
             meta::alerts::Condition,
             meta::alerts::AllOperator,
             meta::alerts::AlertDestination,
