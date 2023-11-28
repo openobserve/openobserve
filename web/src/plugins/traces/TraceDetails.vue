@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator vertical />
       <div v-if="isSidebarOpen && selectedSpanId" class="histogram-sidebar">
         <trace-details-sidebar
-          :span="spanMapping[selectedSpanId]"
+          :span="spanMap[selectedSpanId]"
           @close="closeSidebar"
         />
       </div>
@@ -179,7 +179,7 @@ export default defineComponent({
 
   setup() {
     const traceTree: any = ref([]);
-    const spanMapping: any = ref({});
+    const spanMap: any = ref({});
     const { searchObj } = useTraces();
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
@@ -265,7 +265,7 @@ export default defineComponent({
     async function buildTracesTree() {
       if (!spanList.value?.length) return;
 
-      spanMapping.value = {};
+      spanMap.value = {};
       traceTree.value = [];
       spanPositionList.value = [];
       collapseMapping.value = {};
@@ -276,8 +276,17 @@ export default defineComponent({
       const serviceColorMapping: any = {};
 
       if (!spanList.value?.length) return;
-      spanMapping.value[spanList.value[0].span_id] = spanList.value[0];
-      let noParentSpans = [];
+
+      spanList.value.forEach((spanData: any) => {
+        spanMap.value[spanData.span_id] = spanData;
+      });
+
+      const formattedSpanMap: any = {};
+
+      spanList.value.forEach((spanData: any) => {
+        formattedSpanMap[spanData.span_id] = getFormattedSpan(spanData);
+      });
+
       for (let i = 0; i < spanList.value.length; i++) {
         if (spanList.value[i].start_time < lowestStartTime) {
           lowestStartTime = spanList.value[i].start_time;
@@ -286,11 +295,7 @@ export default defineComponent({
           highestEndTime = spanList.value[i].end_time;
         }
 
-        spanMapping.value[spanList.value[i].span_id] = cloneDeep(
-          spanList.value[i]
-        );
-
-        const span = getFormattedSpan(spanList.value[i]);
+        const span = formattedSpanMap[spanList.value[i].span_id];
 
         span.style.color = searchObj.meta.serviceColors[span.serviceName];
 
@@ -298,30 +303,23 @@ export default defineComponent({
 
         collapseMapping.value[span.spanId] = true;
 
-        if (span.parentId && !traceTreeMock[span.parentId] && i !== 0) {
-          noParentSpans.push(span);
+        if (!span.parentId) {
+          traceTree.value.push(span);
+        } else if (!formattedSpanMap[span.parentId]) {
+          traceTree.value.push(span);
+        } else if (span.parentId && formattedSpanMap[span.parentId]) {
+          const parentSpan = formattedSpanMap[span.parentId];
+          if (!parentSpan.spans) parentSpan.spans = [];
+          parentSpan.spans.push(span);
         }
-
-        if (span.parentId && traceTreeMock[span.parentId])
-          traceTreeMock[span.parentId].push(span);
-
-        if (!traceTreeMock[span.spanId]) traceTreeMock[span.spanId] = [];
-
-        if (!span["spans"]) span["spans"] = traceTreeMock[span.spanId];
       }
 
-      traceTree.value = [];
-      traceTree.value.push(getFormattedSpan(spanList.value[0]));
-      traceTree.value[0]["index"] = 0;
       traceTree.value[0].lowestStartTime =
         converTimeFromNsToMs(lowestStartTime);
       traceTree.value[0].highestEndTime = converTimeFromNsToMs(highestEndTime);
       traceTree.value[0].style.color =
         searchObj.meta.serviceColors[traceTree.value[0].serviceName];
-      traceTree.value[0]["spans"] = cloneDeep(
-        traceTreeMock[spanList.value[0]["span_id"]] || []
-      );
-      traceTree.value.push(...noParentSpans);
+
       traceTree.value.forEach((span: any) => {
         addSpansPositions(span, 0);
       });
@@ -437,7 +435,7 @@ export default defineComponent({
         serviceName: span.service_name,
         spanKind: getSpanKind(span.span_kind.toString()),
         parentId: span.reference_parent_span_id,
-        spans: null,
+        spans: [],
         index: 0,
         style: {
           color: "",
@@ -607,7 +605,7 @@ export default defineComponent({
       spanList,
       isSidebarOpen,
       selectedSpanId,
-      spanMapping,
+      spanMap,
       closeSidebar,
       toggleSpanCollapse,
       spanPositionList,
