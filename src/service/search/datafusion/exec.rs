@@ -622,6 +622,8 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
                 if field.to_lowercase().eq("from") {
                     from_pos = i;
                     break;
+                } else if field.to_lowercase().eq("over") {
+                    continue;
                 }
                 fields.push(field);
             }
@@ -658,9 +660,15 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
             last_is_as = true;
             continue;
         }
+        if field.to_lowercase().starts_with("over") && field.contains('(') {
+            // replace previouse field with over
+            let prev_field = new_fields.pop().unwrap();
+            new_fields.push(format!("{} {}", prev_field, field));
+            continue;
+        }
         if last_is_as {
-            let orgin_field = new_fields.remove(new_fields.len() - 1);
-            new_fields.push(format!("{orgin_field} AS {field}"));
+            let prev_field = new_fields.pop().unwrap();
+            new_fields.push(format!("{prev_field} AS {field}"));
             sel_fields_name.remove(sel_fields_name.len() - 1);
             sel_fields_name.push(field.to_string().replace('"', "").replace(", ", ","));
             last_is_as = false;
@@ -740,12 +748,24 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
             continue;
         }
         need_rewrite = true;
-        let cap = RE_FIELD_FN.captures(field).unwrap();
+        let cap = match RE_FIELD_FN.captures(field) {
+            Some(caps) => caps,
+            None => {
+                fields[i] = format!("\"{}\"", schema_field);
+                continue;
+            }
+        };
         let mut fn_name = cap.get(1).unwrap().as_str().to_lowercase();
         if !AGGREGATE_UDF_LIST.contains(&fn_name.as_str()) {
             fields[i] = format!("\"{}\"", schema_field);
             continue;
         }
+
+        let over_as = if field.to_lowercase().contains("over") && field.contains('(') {
+            field[field.to_lowercase().find("over").unwrap()..].to_string()
+        } else {
+            "AS \"".to_string() + schema_field + "\""
+        };
         if fn_name == "count" {
             fn_name = "sum".to_string();
         }
@@ -759,11 +779,11 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
                 .unwrap()
                 .trim();
             fields[i] = format!(
-                "{fn_name}(\"{}\", {}) AS \"{}\"",
-                schema_field, percentile, schema_field
+                "{fn_name}(\"{}\", {}) {}",
+                schema_field, percentile, over_as
             );
         } else {
-            fields[i] = format!("{fn_name}(\"{}\") AS \"{}\"", schema_field, schema_field);
+            fields[i] = format!("{fn_name}(\"{}\") {}", schema_field, over_as);
         }
     }
 
