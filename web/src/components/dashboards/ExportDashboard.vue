@@ -1,16 +1,27 @@
 <!-- Copyright 2023 Zinc Labs Inc.
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-     http:www.apache.org/licenses/LICENSE-2.0
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License. 
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-btn class="q-ml-sm" outline padding="xs" no-caps icon="download" @click="downloadDashboard()">
+  <q-btn
+    class="q-ml-sm"
+    outline
+    padding="xs"
+    no-caps
+    icon="download"
+    @click="downloadDashboard()"
+  >
   </q-btn>
 </template>
 <script lang="ts">
@@ -26,25 +37,31 @@ export default defineComponent({
   props: ["dashboardId"],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const store = useStore()
+    const store = useStore();
     const route = useRoute();
     const downloadDashboard = async () => {
       // get the dashboard
-      const dashboard = await getDashboard(store, props.dashboardId, route.query.folder)
-      dashboard.owner = ''
+      const dashboard = await getDashboard(
+        store,
+        props.dashboardId,
+        route.query.folder
+      );
+      dashboard.owner = "";
 
       // prepare json and download via a click
-      const data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dashboard));
-      const htmlA = document.createElement('a');
+      const data =
+        "data:text/json;charset=utf-8," +
+        encodeURIComponent(JSON.stringify(dashboard));
+      const htmlA = document.createElement("a");
       htmlA.setAttribute("href", data);
-      const fileName = dashboard.title || "dashboard"
+      const fileName = dashboard.title || "dashboard";
       htmlA.setAttribute("download", fileName + ".dashboard.json");
       htmlA.click();
-    }
+    };
 
     return {
-      downloadDashboard
-    }
-  }
-})
+      downloadDashboard,
+    };
+  },
+});
 </script>

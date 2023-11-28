@@ -2,7 +2,7 @@
 
 # [OpenObserve Cloud](https://cloud.openobserve.ai) | [Docs](https://openobserve.ai/docs/) | [Slack](https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg) | [Website](https://openobserve.ai)
 
-# OpenObserve
+# OpenObserve (O2 for short)
 
 OpenObserve is a cloud native observability platform built specifically for logs, metrics, traces, analytics, RUM (Real User Monitoring - Performance, Errors, Session Replay) designed to work at petabyte scale.
 

@@ -1,19 +1,24 @@
 // Copyright 2023 Zinc Labs Inc.
-
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-
-//      http:www.apache.org/licenses/LICENSE-2.0
-
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import moment from "moment";
-import { formatDate, formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import {
+  formatDate,
+  formatUnitValue,
+  getUnitValue,
+} from "./convertDataIntoUnitValue";
 import { utcToZonedTime } from "date-fns-tz";
 
 /**
@@ -29,7 +34,6 @@ export const convertPromQLData = (
   searchQueryData: any,
   store: any
 ) => {
-  
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -69,16 +73,18 @@ export const convertPromQLData = (
       overflow: "truncate",
       rich: {
         a: {
-            fontWeight: 'bold'
+          fontWeight: "bold",
         },
         b: {
-            fontStyle: 'normal'
-        }
-      }
+          fontStyle: "normal",
+        },
+      },
     },
     formatter: (name: any) => {
-      return name == currentSeriesName ? '{a|' + name + '}': '{b|' + name + '}'
-    }
+      return name == currentSeriesName
+        ? "{a|" + name + "}"
+        : "{b|" + name + "}";
+    },
   };
 
   // Additional logic to adjust the legend position
@@ -112,7 +118,8 @@ export const convertPromQLData = (
         fontSize: 12,
       },
       enterable: true,
-      backgroundColor: store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+      backgroundColor:
+        store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
       extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       formatter: function (name: any) {
         if (name.length == 0) return "";
@@ -122,7 +129,7 @@ export const convertPromQLData = (
         // get the current series index from name
         const currentSeriesIndex = name.findIndex(
           (it: any) => it.seriesName == currentSeriesName
-        )
+        );
 
         // swap current hovered series index to top in tooltip
         const temp = name[0];
@@ -130,10 +137,9 @@ export const convertPromQLData = (
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
         let hoverText = name.map((it: any) => {
-
           // check if the series is the current series being hovered
           // if have than bold it
-          if(it?.seriesName == currentSeriesName)
+          if (it?.seriesName == currentSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -200,7 +206,7 @@ export const convertPromQLData = (
       show: !["pie", "donut", "metric"].includes(panelSchema.type),
       feature: {
         dataZoom: {
-          filterMode: 'none',
+          filterMode: "none",
           yAxisIndex: "none",
         },
       },
@@ -208,9 +214,7 @@ export const convertPromQLData = (
     series: [],
   };
 
-
   options.series = searchQueryData.map((it: any, index: number) => {
-
     switch (panelSchema.type) {
       case "bar":
       case "line":
@@ -231,7 +235,12 @@ export const convertPromQLData = (
                 // if utc then simply return the values by removing z from string
                 // else convert time from utc to zoned
                 // used slice to remove Z from isostring to pass as a utc
-                data: values.map((value: any) => [store.state.timezone != "UTC" ? utcToZonedTime(value[0] * 1000, store.state.timezone) : new Date(value[0] * 1000).toISOString().slice(0, -1), value[1]]),
+                data: values.map((value: any) => [
+                  store.state.timezone != "UTC"
+                    ? utcToZonedTime(value[0] * 1000, store.state.timezone)
+                    : new Date(value[0] * 1000).toISOString().slice(0, -1),
+                  value[1],
+                ]),
                 ...getPropsByChartTypeForSeries(panelSchema.type),
               };
             });
@@ -324,7 +333,7 @@ export const convertPromQLData = (
 
   // extras will be used to return other data to chart renderer
   // e.g. setCurrentSeriesValue to set the current series index which is hovered
-  return { options, extras: { setCurrentSeriesValue }};
+  return { options, extras: { setCurrentSeriesValue } };
 };
 
 /**
@@ -374,7 +383,6 @@ const getLegendPosition = (legendPosition: string) => {
       return "horizontal";
   }
 };
-
 
 /**
  * Returns the props object based on the given chart type.
