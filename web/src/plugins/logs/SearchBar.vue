@@ -373,7 +373,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted, nextTick, watch, toRaw } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  nextTick,
+  watch,
+  toRaw,
+  onBeforeUnmount,
+  onUnmounted,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -471,6 +480,7 @@ export default defineComponent({
       getSavedViews,
       getQueryData,
       getStreams,
+      updateUrlQueryParams,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -487,7 +497,6 @@ export default defineComponent({
     const parser = new Parser();
     const dateTimeRef = ref(null);
     const saveViewLoader = ref(false);
-    const isSavedViewApplied = ref(false);
 
     const {
       autoCompleteData,
@@ -591,6 +600,8 @@ export default defineComponent({
           ? value.relativeTimePeriod
           : searchObj.data.datetime.relativeTimePeriod,
         type: value.relativeTimePeriod ? "relative" : "absolute",
+        selectedDate: value?.selectedDate,
+        selectedTime: value?.selectedTime,
       };
 
       await nextTick();
@@ -935,7 +946,7 @@ export default defineComponent({
         )
         .then(async (res) => {
           if (res.status == 200) {
-            isSavedViewApplied.value = true;
+            store.dispatch("setSavedViewFlag", true);
             // const extractedObj = JSON.parse(b64DecodeUnicode(res.data.data));
             const extractedObj = res.data.data;
             // alert(JSON.stringify(searchObj.data.stream.selectedStream))
@@ -943,6 +954,10 @@ export default defineComponent({
             //   extractedObj.data.stream.selectedStream.value !=
             //   searchObj.data.stream.selectedStream.value
             // ) {
+            if (extractedObj.data?.timezone) {
+              store.dispatch("setTimezone", extractedObj.data.timezone);
+            }
+
             extractedObj.data.stream.streamLists =
               searchObj.data.stream.streamLists;
             extractedObj.data.transforms = searchObj.data.transforms;
@@ -970,14 +985,11 @@ export default defineComponent({
             dateTimeRef.value.setSavedDate(searchObj.data.datetime);
             if (searchObj.meta.refreshInterval != "0") {
               onRefreshIntervalUpdate();
-            }
-
-            if (searchObj.data?.timezone) {
-              store.dispatch("setTimezone", searchObj.data.timezone);
+            } else {
+              clearInterval(store.state.refreshIntervalID);
             }
             await updatedLocalLogFilterField();
             await getStreams("logs", true);
-
             $q.notify({
               message: `${item.view_name} view applied successfully.`,
               color: "positive",
@@ -987,7 +999,8 @@ export default defineComponent({
             setTimeout(async () => {
               searchObj.loading = true;
               await getQueryData();
-              isSavedViewApplied.value = false;
+              store.dispatch("setSavedViewFlag", false);
+              updateUrlQueryParams();
             }, 1000);
 
             // } else {
@@ -997,6 +1010,7 @@ export default defineComponent({
             //   handleRunQuery();
             // }
           } else {
+            store.dispatch("setSavedViewFlag", false);
             $q.notify({
               message: `Error while applying saved view. ${res.data.error_detail}`,
               color: "negative",
@@ -1006,6 +1020,7 @@ export default defineComponent({
           }
         })
         .catch((err) => {
+          store.dispatch("setSavedViewFlag", false);
           $q.notify({
             message: `Error while applying saved view.`,
             color: "negative",
@@ -1307,7 +1322,6 @@ export default defineComponent({
       confirmDelete,
       saveViewLoader,
       savedViewDropdownModel,
-      isSavedViewApplied,
     };
   },
   computed: {
@@ -1390,7 +1404,7 @@ export default defineComponent({
       }
     },
     resetFunction(newVal) {
-      if (newVal == "" && this.isSavedViewApplied == false) {
+      if (newVal == "" && store.state.savedViewFlag == false) {
         this.resetFunctionContent();
       }
     },

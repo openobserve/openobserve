@@ -31,6 +31,7 @@
     "copyToClipboard": "In die Zwischenablage kopieren",
     "includeSearchTerm": "Suchbegriff einbeziehen",
     "addFieldToTable": "Feld zur Tabelle hinzufügen",
+    "removeFieldFromTable": "Feld aus Tabelle entfernen",
     "excludeSearchTerm": "Suchbegriff ausschließen",
     "noOfRecords": "Anzahl der Aufzeichnungen:",
     "attributes": "Eigenschaften",
@@ -69,7 +70,12 @@
     "runQuery": "Abfrage ausführen",
     "syntaxGuideLabel": "Leitfaden zur Syntax",
     "logs": "Logs",
-    "enrichmentTables": "Anreicherungstabellen"
+    "enrichmentTables": "Anreicherungstabellen",
+    "savedViewsLabel": "Gespeicherte Ansichten",
+    "savedViewsNotFound": "Gespeicherte Ansicht wurde nicht gefunden!",
+    "savedViewAction": "Gespeicherte Ansicht erstellen/aktualisieren",
+    "savedViewDropdownLabel": "Gespeicherte Ansichten",
+    "savedViewName": "Namen anzeigen"
   },
   "menu": {
     "home": "Zuhause",
@@ -332,11 +338,13 @@
     "updateEnrichmentTable": "Anreicherungstabelle aktualisieren",
     "searchEnrichmentTable": "Tabelle „Suchanreicherung“",
     "uploadCSVFile": "CSV-Datei hochladen",
-    "selectFunction": "Funktion wählen"
+    "selectFunction": "Funktion wählen",
+    "appendData": "Daten an eine bestehende Anreicherungstabelle anhängen"
   },
   "confirmDialog": {
     "cancel": "Stornieren",
-    "ok": "In Ordnung"
+    "ok": "In Ordnung",
+    "loading": "Wird geladen..."
   },
   "ingestion": {
     "header": "Verschlucken",

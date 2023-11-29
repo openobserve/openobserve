@@ -31,6 +31,7 @@
     "copyToClipboard": "Copiar al portapapeles",
     "includeSearchTerm": "Incluir término de búsqueda",
     "addFieldToTable": "Agregar campo a la tabla",
+    "removeFieldFromTable": "Eliminar campo de la tabla",
     "excludeSearchTerm": "Excluir término de búsqueda",
     "noOfRecords": "Número de registros:",
     "attributes": "Atributos",
@@ -69,12 +70,17 @@
     "runQuery": "Ejecutar consulta",
     "syntaxGuideLabel": "Guía de sintaxis",
     "logs": "Registros",
-    "enrichmentTables": "Tablas de enriquecimiento"
+    "enrichmentTables": "Tablas de enriquecimiento",
+    "savedViewsLabel": "Vistas guardadas",
+    "savedViewsNotFound": "¡No se encontró la vista guardada!",
+    "savedViewAction": "Crear/actualizar la vista guardada",
+    "savedViewDropdownLabel": "Vistas guardadas",
+    "savedViewName": "Ver nombre"
   },
   "menu": {
     "home": "Inicio",
     "about": "Acerca de",
-    "user": "Usuarios",
+    "user": "usuarios",
     "index": "Transmisiones",
     "search": "Registros",
     "traces": "Huellas",
@@ -332,11 +338,13 @@
     "updateEnrichmentTable": "Actualizar tabla de enriquecimiento",
     "searchEnrichmentTable": "Tabla de enriquecimiento de búsquedas",
     "uploadCSVFile": "Cargar archivo CSV",
-    "selectFunction": "Seleccione la función"
+    "selectFunction": "Seleccione la función",
+    "appendData": "Anexar datos a la tabla de enriquecimiento existente"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
-    "ok": "Ok"
+    "ok": "Ok",
+    "loading": "Cargando..."
   },
   "ingestion": {
     "header": "Ingestión",
@@ -489,8 +497,8 @@
     "queryValues": "Valores de consulta",
     "constant": "Constante",
     "textbox": "Cuadro de texto",
-    "newFolder": "Nueva carpeta",
-    "updateFolder": "Actualizar carpeta"
+    "newFolder": "Carpeta nueva",
+    "updateFolder": "Carpeta de actualización"
   },
   "panel": {
     "header": "Panel",

@@ -31,6 +31,7 @@
     "copyToClipboard": "クリップボードにコピー",
     "includeSearchTerm": "検索語を含める",
     "addFieldToTable": "フィールドをテーブルに追加",
+    "removeFieldFromTable": "テーブルからフィールドを削除",
     "excludeSearchTerm": "検索語を除外",
     "noOfRecords": "レコード数:",
     "attributes": "[属性]",
@@ -69,7 +70,12 @@
     "runQuery": "クエリーを実行",
     "syntaxGuideLabel": "シンタックスガイド",
     "logs": "[ログ]",
-    "enrichmentTables": "エンリッチメントテーブル"
+    "enrichmentTables": "エンリッチメントテーブル",
+    "savedViewsLabel": "保存済みビュー",
+    "savedViewsNotFound": "保存されたビューが見つかりません!",
+    "savedViewAction": "保存済みビューの作成/更新",
+    "savedViewDropdownLabel": "保存済みビュー",
+    "savedViewName": "ビュー名"
   },
   "menu": {
     "home": "ホーム",
@@ -332,11 +338,13 @@
     "updateEnrichmentTable": "エンリッチメントテーブルを更新",
     "searchEnrichmentTable": "検索エンリッチメントテーブル",
     "uploadCSVFile": "CSV ファイルのアップロード",
-    "selectFunction": "機能選択"
+    "selectFunction": "機能選択",
+    "appendData": "既存のエンリッチメントテーブルにデータを追加"
   },
   "confirmDialog": {
     "cancel": "[キャンセル]",
-    "ok": "OK"
+    "ok": "OK",
+    "loading": "読み込み中..."
   },
   "ingestion": {
     "header": "インジェスト",
@@ -489,8 +497,8 @@
     "queryValues": "クエリ値",
     "constant": "コンスタント",
     "textbox": "テキストボックス",
-    "newFolder": "新しいフォルダー",
-    "updateFolder": "アップデートフォルダー"
+    "newFolder": "新規フォルダー",
+    "updateFolder": "フォルダを更新"
   },
   "panel": {
     "header": "パネル",

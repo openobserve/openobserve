@@ -602,6 +602,7 @@ export default defineComponent({
       }, 50);
     },
     runQuery() {
+      if (this.store.state.savedViewFlag == true) return;
       if (this.searchObj.runQuery == true) {
         this.runQueryFn();
       }

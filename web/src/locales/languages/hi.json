@@ -31,6 +31,7 @@
     "copyToClipboard": "क्लिपबोर्ड पर कॉपी करें",
     "includeSearchTerm": "खोज शब्द शामिल करें",
     "addFieldToTable": "तालिका में फ़ील्ड जोड़ें",
+    "removeFieldFromTable": "तालिका से फ़ील्ड निकालें",
     "excludeSearchTerm": "खोज शब्द को छोड़ दें",
     "noOfRecords": "रिकॉर्ड की संख्या:",
     "attributes": "विशेषताएँ",
@@ -69,7 +70,12 @@
     "runQuery": "क्वेरी चलाएँ",
     "syntaxGuideLabel": "सिंटेक्स गाइड",
     "logs": "लॉग्स",
-    "enrichmentTables": "संवर्धन सारणी"
+    "enrichmentTables": "संवर्धन सारणी",
+    "savedViewsLabel": "सहेजे गए दृश्य",
+    "savedViewsNotFound": "सहेजा गया दृश्य नहीं मिला!",
+    "savedViewAction": "सहेजा गया दृश्य बनाएं/अपडेट करें",
+    "savedViewDropdownLabel": "सहेजे गए दृश्य",
+    "savedViewName": "नाम देखें"
   },
   "menu": {
     "home": "होम",
@@ -332,11 +338,13 @@
     "updateEnrichmentTable": "संवर्धन तालिका अपडेट करें",
     "searchEnrichmentTable": "खोज संवर्धन तालिका",
     "uploadCSVFile": "CSV फ़ाइल अपलोड करें",
-    "selectFunction": "फ़ंक्शन का चयन करें"
+    "selectFunction": "फ़ंक्शन का चयन करें",
+    "appendData": "मौजूदा संवर्धन तालिका में डेटा जोड़ें"
   },
   "confirmDialog": {
     "cancel": "कैंसिल करें",
-    "ok": "ठीक है"
+    "ok": "ठीक है",
+    "loading": "लोड हो रहा है..."
   },
   "ingestion": {
     "header": "अंतर्ग्रहण",
@@ -489,8 +497,8 @@
     "queryValues": "क्वैरी वैल्यू",
     "constant": "स्थिरांक",
     "textbox": "टेक्स्टबॉक्स",
-    "newFolder": "नया फ़ोल्डर",
-    "updateFolder": "फ़ोल्डर अद्यतन करें"
+    "newFolder": "नया फोल्डर",
+    "updateFolder": "फोल्डर अपडेट करें"
   },
   "panel": {
     "header": "पैनल",
