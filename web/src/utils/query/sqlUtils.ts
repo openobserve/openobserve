@@ -119,3 +119,14 @@ export const addLabelToSQlQuery = (
  
   return query;
 };
+
+export const getStreamFromQuery = (query: any) => {
+  const parser = new Parser();
+  try{
+    const ast: any = parser.astify(query);
+    return ast?.from[0]?.table || '';
+  } catch(e: any) {
+    console.log(e)
+    return "";
+  }
+} 

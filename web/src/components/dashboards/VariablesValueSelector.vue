@@ -306,40 +306,70 @@ export default defineComponent({
 
                   obj.isLoading = false; // Reset loading state
 
-                  console.log(
-                    "res.data.list",
-                    res.data.list.filter((item: any) => !item.schema)
-                  );
+                  console.log("res.data.list", res.data.list);
+                  const fieldsObj = {};
 
-                  const options = res.data.list.map((item: any) => {
-                    const schemaNames = (item.schema || [])
-                      .flat()
-                      .map((it2: any) => it2.name);
-                    return {
-                      name: item.name,
-                      stream_type: item.stream_type,
-                      schema_names: schemaNames,
-                    };
+                  res.data.list.forEach((item: any) => {
+                    const name = item.name;
+                    const stream_type = item.stream_type;
+
+                    (item.schema || []).forEach((schemaItem: any) => {
+                      const fieldName = schemaItem.name;
+
+                      if (!fieldsObj[fieldName]) {
+                        fieldsObj[fieldName] = [];
+                      }
+
+                      const existingEntry = fieldsObj[fieldName].find(
+                        (entry) =>
+                          entry.name === name &&
+                          entry.stream_type === stream_type
+                      );
+
+                      if (!existingEntry) {
+                        fieldsObj[fieldName].push({
+                          name: name,
+                          stream_type: stream_type,
+                        });
+                      }
+                    });
                   });
-                  console.log("optionssss", options);
+                  const fieldsArray = Object.entries(fieldsObj).map(
+                    ([schemaName, entries]) => ({
+                      name: schemaName,
+                      streams: entries,
+                    })
+                  );
+                  console.log("object==", fieldsObj);
+                  console.log("objectArray object==", fieldsArray);
+                  obj.options = fieldsArray;
 
-                  // get unique values of the options array
-                  const uniqueOptions = [
-                    ...new Set(
-                      options.flatMap((option: any) => option.schema_names)
-                    ),
-                  ];
+                  // console.log("optionssss", options);
 
-                  obj.options = uniqueOptions;
+                  // const options = res.data.list.map((item: any) => {
+                  //     const schemaNames = (item.schema || []).flat().map((it2: any) => it2.name);
+                  //     return {
+                  //         name: item.name,
+                  //         stream_type: item.stream_type,
+                  //         schema_names: schemaNames,
+                  //     };
+                  // });
+                  // console.log("optionssss", options);
 
-                  console.log("oldVariableValue", oldVariableValue);
+                  // // get unique values of the options array
+                  // const uniqueOptions = [...new Set(options.flatMap((option: any) => option.schema_names))];
+
+                  // obj.options = uniqueOptions;
+                  // obj.schemaDetails = options;
+
+                  // console.log("oldVariableValue", oldVariableValue);
 
                   // Set value based on oldVariableValue or the first option
                   // let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
                   // if (oldVariableObjectSelectedValue) {
                   //     console.log("oldVariableObjectSelectedValue optiomms", oldVariableObjectSelectedValue);
 
-                  //     console.log("obj.optiomms", obj.options)
+                  //     console.log("obj.optiomms",obj.options)
                   //     obj.value = obj.options.includes(oldVariableObjectSelectedValue.value) ? oldVariableObjectSelectedValue.value : obj.options.length ? obj.options[0] : "";
                   //     console.log("optiomms.value", obj.value);
                   // }

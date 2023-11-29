@@ -2,9 +2,10 @@
     <div class="row items-center">
         <div class="q-mb-sm title" no-caps no-outline rounded>{{ variableItem?.name }}</div>
         <div class="row no-wrap items-center q-mb-sm" v-for="(item, index) in adhocVariables" :key="index">
-            <q-select filled outlined dense v-model="adhocVariables[index].name"
+            <q-select filled outlined dense :model-value="adhocVariables[index].name"
                 :display-value="adhocVariables[index].name ? adhocVariables[index].name : !variableItem.isLoading ? '(No Data Found)' : ''"
-                :options="fieldsFilteredOptions" input-debounce="0" behavior="menu" use-input stack-label
+                :options="fieldsFilteredOptions" input-debounce="0" behavior="menu" use-input stack-label option-label="name"
+                @update:model-value="updateModelValueOfSelect(index, $event)"
                 @filter="fieldsFilterFn" class="textbox col no-case q-ml-sm" :loading="variableItem.isLoading">
                 <template v-slot:no-option>
                     <q-item>
@@ -61,13 +62,19 @@ export default defineComponent({
             //     isSelectVisible.value = true;
             // }
             const adhocVariablesTemp = adhocVariables.value;
-            adhocVariablesTemp.push({ name: '', operator: operatorOptions[0], value: '' });
+            adhocVariablesTemp.push({ name: '', operator: operatorOptions[0], value: '', streams: [] });
             // adhocVariables.value = cloneDeep(adhocVariablesTemp);
 
             emitValue()
             // console.log("VariableAdHocValueSelector::()()", selectedField.value, selectedOperator.value, inputValue.value);
 
         };
+
+        const updateModelValueOfSelect = (index, value) => {
+            adhocVariables.value[index].name = value.name
+            adhocVariables.value[index].streams = value.streams
+            emitValue()
+        }
 
         const removeField = (index: number) => {
             const adhocVariablesTemp = adhocVariables.value;
@@ -76,7 +83,7 @@ export default defineComponent({
         };
 
         const emitValue = () => {
-            emit('update:modelValue', cloneDeep(adhocVariables.value));
+            emit('update:modelValue', JSON.parse(JSON.stringify(adhocVariables.value)));
         };
 
         // console.log("VariableAdHocValueSelector::--", selectedField.value, selectedOperator.value, inputValue.value);
@@ -98,7 +105,8 @@ export default defineComponent({
             addFields,
             operatorOptions,
             adhocVariables,
-            removeField
+            removeField,
+            updateModelValueOfSelect
             // selectedOperator,
             // inputValue
         };
