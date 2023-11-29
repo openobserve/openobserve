@@ -58,8 +58,7 @@ const accessKey = computed(() => {
 });
 
 const getCommand = computed(() => {
-  return `curl -O https://raw.githubusercontent.com/openobserve/agents/main/linux/install.sh \\      
-    && chmod +x install.sh && sudo ./install.sh ${endpoint.value.url}/api/${props.currOrgIdentifier}/ ${accessKey.value}`;
+  return `curl -O https://raw.githubusercontent.com/openobserve/agents/main/linux/install.sh && chmod +x install.sh && sudo ./install.sh ${endpoint.value.url}/api/${props.currOrgIdentifier}/ ${accessKey.value}`;
 });
 </script>
 
