@@ -29,6 +29,7 @@ import {
   timestampToTimezoneDate,
   histogramDateTimezone,
   useLocalWrapContent,
+  useLocalTimezone,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -140,6 +141,8 @@ const defaultObject = {
       endTime: 0,
       relativeTimePeriod: "15m",
       type: "relative",
+      selectedDate: <any>{},
+      selectedTime: <any>{},
     },
     searchAround: {
       indexTimestamp: 0,
@@ -165,7 +168,6 @@ const useLogs = () => {
   const router = useRouter();
   const parser = new Parser();
   const fieldValues = ref();
-  let refreshIntervalID: any = 0;
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
 
   const resetSearchObj = () => {
@@ -349,6 +351,7 @@ const useLogs = () => {
     }
 
     query["org_identifier"] = store.state.selectedOrganization.identifier;
+    query["timezone"] = store.state.timezone;
 
     router.push({ query });
   };
@@ -1032,14 +1035,15 @@ const useLogs = () => {
       searchObj.meta.refreshInterval > 0 &&
       router.currentRoute.value.name == "logs"
     ) {
-      clearInterval(refreshIntervalID);
-      refreshIntervalID = setInterval(async () => {
+      clearInterval(store.state.refreshIntervalID);
+      const refreshIntervalID = setInterval(async () => {
         // searchObj.loading = true;
         await getQueryData(true);
         generateHistogramData();
         updateGridColumns();
         searchObj.meta.histogramDirtyFlag = true;
       }, searchObj.meta.refreshInterval * 1000);
+      store.dispatch("setRefreshIntervalID", refreshIntervalID);
       $q.notify({
         message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
         color: "positive",
@@ -1047,7 +1051,7 @@ const useLogs = () => {
         timeout: 1000,
       });
     } else {
-      clearInterval(refreshIntervalID);
+      clearInterval(store.state.refreshIntervalID);
     }
   };
 
@@ -1107,6 +1111,7 @@ const useLogs = () => {
     if (queryParams.refresh) {
       searchObj.meta.refreshInterval = queryParams.refresh;
     }
+    useLocalTimezone(queryParams.timezone);
 
     router.push({
       query: {

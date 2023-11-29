@@ -61,8 +61,12 @@ export default createStore({
     theme: "",
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: {},
-    timezone: useLocalTimezone() ? useLocalTimezone() : "UTC",
+    timezone: useLocalTimezone()
+      ? useLocalTimezone()
+      : Intl.DateTimeFormat().resolvedOptions().timeZone,
     savedViewDialog: false,
+    refreshIntervalID: 0,
+    savedViewFlag: false,
   },
   mutations: {
     login(state, payload) {
@@ -153,6 +157,12 @@ export default createStore({
     setSavedViewDialog(state, payload) {
       state.savedViewDialog = payload;
     },
+    setRefreshIntervalID(state, payload) {
+      state.refreshIntervalID = payload;
+    },
+    setSavedViewFlag(state, payload) {
+      state.savedViewFlag = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -235,6 +245,12 @@ export default createStore({
     },
     setSavedViewDialog(context, payload) {
       context.commit("setSavedViewDialog", payload);
+    },
+    setRefreshIntervalID(context, payload) {
+      context.commit("setRefreshIntervalID", payload);
+    },
+    setSavedViewFlag(context, payload) {
+      context.commit("setSavedViewFlag", payload);
     },
   },
   modules: {},
