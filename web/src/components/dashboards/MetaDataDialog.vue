@@ -3,7 +3,7 @@
     <q-card style="min-width: 500px">
       <q-card-section class="q-pt-md">
         <div class="row items-center q-pb-none">
-          <h6 class="text-bold">Metadata Details</h6>
+          <h6 class="text-bold">Query Inspector</h6>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
         </div>

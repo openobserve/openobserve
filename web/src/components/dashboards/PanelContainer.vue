@@ -32,9 +32,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ props.data.title }}
         </div>
         <q-space />
-        <q-icon v-if="dependentAdHocVariable" name="info">
-          <q-tooltip>
-            Some dynamic variables are not applied. Click to check meta data
+        <q-icon
+          v-if="dependentAdHocVariable"
+          name="info"
+          style="cursor: pointer"
+          @click="showViewPanel = true"
+        >
+          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+            Some dynamic variables are not applied because the field is not
+            present in the query's stream. Open Query Inspector to see all the
+            details of the variables and queries executed to render this panel
           </q-tooltip>
         </q-icon>
         <q-btn
@@ -82,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showViewPanel = true"
             >
               <q-item-section>
-                <q-item-label class="q-pa-sm">Meta Data</q-item-label>
+                <q-item-label class="q-pa-sm">Query Inspector</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>
