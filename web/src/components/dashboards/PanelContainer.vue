@@ -32,6 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ props.data.title }}
         </div>
         <q-space />
+        <q-icon v-if="dependentAdHocVariable" name="info">
+          <q-tooltip>
+            Some dynamic variables are not applied. Click to check meta data
+          </q-tooltip>
+        </q-icon>
         <q-btn
           v-if="!viewOnly && showFullScreenBtn"
           icon="fullscreen"
@@ -102,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -217,6 +222,7 @@ export default defineComponent({
       metaDataValue,
       metaData,
       showViewPanel,
+      dependentAdHocVariable,
     };
   },
   methods: {
