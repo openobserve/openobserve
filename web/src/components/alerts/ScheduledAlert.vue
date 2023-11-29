@@ -10,7 +10,7 @@
         class="bg-white text-primary"
       >
         <q-tab name="custom" label="Custom" />
-        <q-tab name="sql" label="Custom SQL" />
+        <q-tab name="sql" label="Standard SQL" />
       </q-tabs>
     </div>
     <template v-if="tab === 'custom'">
@@ -46,7 +46,7 @@
           >
             <q-input
               data-test="add-alert-delay-input"
-              v-model="triggerData.time"
+              v-model="triggerData.period"
               type="number"
               dense
               filled
@@ -57,7 +57,7 @@
           </div>
           <div
             style="
-              min-width: 100px;
+              min-width: 90px;
               margin-left: 0 !important;
               background: #f2f2f2;
               height: 40px;
@@ -72,14 +72,14 @@
 
       <div class="flex justify-start items-center q-mt-sm">
         <div style="width: 180px">Threshold</div>
-        <div class="q-mr-sm">
+        <div class="threshould-input">
           <q-select
             data-test="add-alert-stream-select"
             v-model="triggerData.operator"
             :options="triggerOperators"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
+            class="showLabelOnTop no-case q-py-none"
             filled
             borderless
             dense
@@ -87,21 +87,21 @@
             hide-selected
             fill-input
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="width: 80px"
+            style="width: 88px; border: 1px solid rgba(0, 0, 0, 0.05)"
             @update:model-value="updateTrigger"
           />
         </div>
         <div
           class="flex items-center"
-          style="border: 1px solid rgba(0, 0, 0, 0.05)"
+          style="border: 1px solid rgba(0, 0, 0, 0.05); border-left: none"
         >
           <div
-            style="width: 80px; margin-left: 0 !important"
+            style="width: 89px; margin-left: 0 !important"
             class="silence-notification-input"
           >
             <q-input
               data-test="add-alert-delay-input"
-              v-model="triggerData.frequency"
+              v-model="triggerData.threshold"
               type="number"
               dense
               filled
@@ -112,7 +112,7 @@
           </div>
           <div
             style="
-              min-width: 100px;
+              min-width: 90px;
               margin-left: 0 !important;
               background: #f2f2f2;
               height: 40px;
@@ -134,14 +134,7 @@ import FieldsInput from "./FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import QueryEditor from "@/components/QueryEditor.vue";
 
-const props = defineProps([
-  "columns",
-  "conditions",
-  "period",
-  "threshold",
-  "frequency",
-  "sql",
-]);
+const props = defineProps(["columns", "conditions", "trigger", "sql"]);
 
 const emits = defineEmits([
   "field:add",
@@ -150,21 +143,14 @@ const emits = defineEmits([
   "update:sql",
 ]);
 
-const { t } = useI18n();
-
-const triggerData = ref({
-  time: props.period,
-  operator: ">",
-  threshold: props.threshold,
-  frequency: props.frequency,
-});
+const triggerData = ref(props.trigger);
 
 const query = ref(props.sql);
 
 const tab = ref("custom");
 
-const addField = (field: any) => {
-  emits("field:add", field);
+const addField = () => {
+  emits("field:add");
 };
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
@@ -181,12 +167,16 @@ const updateQueryValue = (value: string) => {
 const updateTrigger = () => {
   emits("update:trigger", triggerData.value);
 };
+
+defineExpose({
+  selectedTab: tab.value,
+});
 </script>
 
 <style lang="scss" scoped>
 .scheduled-alert-tabs {
   border: 1px solid $primary;
-  width: 200px;
+  width: 210px;
   border-radius: 4px;
   overflow: hidden;
 }

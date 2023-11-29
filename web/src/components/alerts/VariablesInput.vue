@@ -41,7 +41,7 @@
       <div class="col-2 q-ml-none">
         <q-btn
           :data-test="`add-destination-header-${variable['key']}-delete-btn`"
-          icon="delete"
+          :icon="outlinedDelete"
           class="q-ml-xs iconHoverBtn"
           padding="sm"
           unelevated
@@ -62,7 +62,7 @@
           round
           flat
           :title="t('alert_templates.edit')"
-          @click="addVariable()"
+          @click="addVariable"
         />
       </div>
     </div>
@@ -72,6 +72,7 @@
 <script setup lang="ts">
 import { defineProps } from "vue";
 import { useI18n } from "vue-i18n";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 const props = defineProps({
   variables: {
@@ -88,8 +89,8 @@ const removeVariable = (variable: any) => {
   emits("remove:variable", variable);
 };
 
-const addVariable = (variable: any) => {
-  emits("add:variable", variable);
+const addVariable = () => {
+  emits("add:variable");
 };
 </script>
 

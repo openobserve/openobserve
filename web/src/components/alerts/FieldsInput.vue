@@ -16,6 +16,7 @@
           class="q-py-sm showLabelOnTop"
           filled
           borderless
+          emit-value
           dense
           use-input
           hide-selected
@@ -61,7 +62,7 @@
       <div class="q-ml-none" style="margin-bottom: 12px">
         <q-btn
           :data-test="`add-destination-header-${field['key']}-delete-btn`"
-          icon="delete"
+          :icon="outlinedDelete"
           class="q-ml-xs iconHoverBtn"
           padding="sm"
           unelevated
@@ -83,7 +84,7 @@
           round
           flat
           :title="t('alert_templates.edit')"
-          @click="addApiHeader(field)"
+          @click="addApiHeader()"
           style="min-width: auto"
         />
       </div>
@@ -94,6 +95,7 @@
 <script lang="ts" setup>
 import { defineProps, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 const props = defineProps({
   fields: {
@@ -125,8 +127,8 @@ const deleteApiHeader = (field) => {
   emits("remove", field);
 };
 
-const addApiHeader = (field) => {
-  emits("add", field);
+const addApiHeader = () => {
+  emits("add");
 };
 </script>
 

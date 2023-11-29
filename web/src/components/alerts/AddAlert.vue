@@ -120,11 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-alert-query-input-title"
         >
           <scheduled-alert
+            ref="scheduledAlertRef"
             :columns="filteredColumns"
             :conditions="formData.query_condition.conditions"
-            v-model:period="formData.period"
-            v-model:threshold="formData.threshold"
-            v-model:frequency="formData.frequency"
+            v-model:trigger="formData.trigger_condition"
             v-model:sql="formData.query_condition.sql"
             @field:add="addField"
             @field:remove="removeField"
@@ -154,12 +153,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="border: 1px solid rgba(0, 0, 0, 0.05)"
             >
               <div
-                style="width: 80px; margin-left: 0 !important"
+                style="width: 87px; margin-left: 0 !important"
                 class="silence-notification-input"
               >
                 <q-input
                   data-test="add-alert-delay-input"
-                  v-model="formData.silence"
+                  v-model="formData.trigger_condition.silence"
                   type="number"
                   dense
                   filled
@@ -169,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 style="
-                  min-width: 100px;
+                  min-width: 90px;
                   margin-left: 0 !important;
                   background: #f2f2f2;
                   height: 40px;
@@ -186,11 +185,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-bold">Notification Destinations</div>
           <q-select
             data-test="add-alert-destination-select"
-            v-model="formData.destination"
+            v-model="formData.destinations"
             :options="getFormattedDestinations"
             color="input-border"
             bg-color="input-bg q-mt-sm"
-            class="showLabelOnTop no-case"
+            class="no-case"
             stack-label
             outlined
             filled
@@ -198,7 +197,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             multiple
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="width: 250px"
-          />
+          >
+            <template v-slot:option="option">
+              <q-list dense>
+                <q-item tag="label">
+                  <q-item-section avatar>
+                    <q-checkbox
+                      size="xs"
+                      dense
+                      v-model="formData.destinations"
+                      :val="option.opt"
+                    />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label class="ellipsis"
+                      >{{ option.opt }}
+                    </q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </template>
+          </q-select>
         </div>
 
         <div>
@@ -274,6 +293,7 @@ import ScheduledAlert from "./ScheduledAlert.vue";
 import RealTimeAlert from "./RealTimeAlert.vue";
 import VariablesInput from "./VariablesInput.vue";
 import { getUUID } from "@/utils/zincutils";
+import { cloneDeep } from "lodash-es";
 
 const defaultValue: any = () => {
   return {
@@ -294,12 +314,14 @@ const defaultValue: any = () => {
       sql: "",
       promql: null,
     },
-    period: 10,
-    threshold: 3,
-    frequency: 1,
-    silence: 10,
+    trigger_condition: {
+      period: 10,
+      operator: "=",
+      threshold: 3,
+      silence: 10,
+    },
     destinations: [],
-    context_attributes: {},
+    context_attributes: { alpha1: "a" },
     enabled: true,
   };
 };
@@ -346,6 +368,7 @@ export default defineComponent({
     const selectedRelativePeriod = ref("Minutes");
     const relativePeriods: any = ref(["Minutes"]);
     var triggerCols: any = ref([]);
+    const selectedDestinations = ref("slack");
     var triggerOperators: any = ref([
       "=",
       "!=",
@@ -361,6 +384,9 @@ export default defineComponent({
     const editorUpdate = (e: any) => {
       formData.value.sql = e.target.value;
     };
+
+    const scheduledAlertRef: any = ref(null);
+
     const updateCondtions = (e: any) => {
       try {
         const ast = parser.astify(e.target.value);
@@ -391,50 +417,7 @@ export default defineComponent({
     const suffixCode = ref("");
     let parser = new Parser();
 
-    onMounted(async () => {
-      monaco.editor.defineTheme("myCustomTheme", {
-        base: "vs",
-        inherit: true,
-        rules: [
-          {
-            token: "comment",
-            foreground: "ffa500",
-            background: "FFFFFF",
-            fontStyle: "italic underline",
-          },
-          {
-            token: "comment.js",
-            foreground: "008800",
-            fontStyle: "bold",
-            background: "FFFFFF",
-          },
-          { token: "comment.css", foreground: "0000ff", background: "FFFFFF" }, // will inherit fontStyle from `comment` above
-        ],
-        colors: {
-          "editor.foreground": "#000000",
-          "editor.background": "#FFFFFF",
-          "editorCursor.foreground": "#000000",
-          "editor.lineHighlightBackground": "#FFFFFF",
-          "editorLineNumber.foreground": "#000000",
-          "editor.border": "#FFFFFF",
-        },
-      });
-      editorobj = monaco.editor.create(editorRef.value, {
-        value: ``,
-        language: "sql",
-        minimap: {
-          enabled: false,
-        },
-        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
-      });
-      editorobj.onKeyUp((e: any) => {
-        if (editorobj.getValue() != "") {
-          editorData.value = editorobj.getValue();
-          formData.value.sql = editorobj.getValue();
-        }
-      });
-      editorobj.setValue(formData.value.sql);
-    });
+    onMounted(async () => {});
     const updateAlert = (stream_name: any) => {
       filteredColumns.value = schemaList.value
         .find((schema: any) => schema.name === stream_name)
@@ -442,16 +425,14 @@ export default defineComponent({
           label: column.name,
           value: column.name,
         }));
-      console.log(filteredColumns.value);
 
       updateEditorContent(stream_name);
     };
     const updateEditorContent = (stream_name: string) => {
       triggerCols.value = [];
-      if (stream_name == "") {
-        return;
-      }
-      if (editorData.value != "") {
+      if (!stream_name) return;
+
+      if (editorData.value) {
         editorData.value = editorData.value
           .replace(prefixCode.value, "")
           .trim();
@@ -464,10 +445,8 @@ export default defineComponent({
         prefixCode.value = `select * from`;
         suffixCode.value = "'" + formData.value.stream_name + "'";
         const someCode = `${prefixCode.value} ${editorData.value} ${suffixCode.value}`;
-        editorobj.setValue(someCode);
       }
 
-      formData.value.sql = editorobj.getValue();
       const selected_stream: any = schemaList.value.filter(
         (stream) => stream["name"] === stream_name
       );
@@ -532,8 +511,8 @@ export default defineComponent({
       filteredStreams.value = filterColumns(indexOptions.value, val, update);
     };
 
-    const addField = (field: any) => {
-      formData.value.conditions.push({
+    const addField = () => {
+      formData.value.query_condition.conditions.push({
         column: "",
         operator: "",
         value: "",
@@ -542,14 +521,14 @@ export default defineComponent({
     };
 
     const removeField = (field: any) => {
-      console.log(field);
-      formData.value.conditions = formData.value.conditions.filter(
-        (_field: any) => _field.id !== field.id
-      );
+      formData.value.query_condition.conditions =
+        formData.value.query_condition.conditions.filter(
+          (_field: any) => _field.id !== field.id
+        );
     };
 
     const addVariable = () => {
-      formData.value.variables.push({
+      formData.value.context_attributes.push({
         name: "",
         value: "",
         id: getUUID(),
@@ -557,9 +536,38 @@ export default defineComponent({
     };
 
     const removeVariable = (variable: any) => {
-      formData.value.variables = formData.value.variables.filter(
-        (_variable: any) => _variable.id !== variable.id
+      formData.value.context_attributes =
+        formData.value.context_attributes.filter(
+          (_variable: any) => _variable.id !== variable.id
+        );
+    };
+
+    const buildSqlFromConditions = () => {
+      let sql = `select * from '${formData.value.stream_name}'`;
+
+      if (formData.value.query_condition.conditions.length) {
+        sql += " where ";
+      }
+
+      formData.value.query_condition.conditions.forEach(
+        (condition: any, index) => {
+          if (condition.column && condition.operator && condition.value) {
+            if (condition.operator === "Contains") {
+              sql += `${condition.column} LIKE '${condition.value}'`;
+            } else if (condition.operator === "NotContains") {
+              sql += `${condition.column} NOT LIKE '${condition.value}'`;
+            } else {
+              sql += `${condition.column} ${condition.operator} '${condition.value}'`;
+            }
+
+            if (index < formData.value.query_condition.conditions.length - 1) {
+              sql += " AND ";
+            }
+          }
+        }
       );
+
+      return sql;
     };
 
     return {
@@ -599,11 +607,23 @@ export default defineComponent({
       removeField,
       removeVariable,
       addVariable,
+      selectedDestinations,
+      scheduledAlertRef,
+      buildSqlFromConditions,
     };
   },
   created() {
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...this.modelValue };
+    this.formData.context_attributes = Object.keys(
+      this.formData.context_attributes
+    ).map((attr) => {
+      return {
+        key: attr,
+        value: this.formData.context_attributes[attr],
+        id: getUUID(),
+      };
+    });
     this.beingUpdated = this.isUpdated;
     this.updateStreams(false)?.then(() => {
       this.updateEditorContent(this.formData.stream_name);
@@ -649,59 +669,32 @@ export default defineComponent({
         if (!valid) {
           return false;
         }
-        let submitData = {};
-        if (!this.formData.isScheduled) {
-          submitData = {
-            name: this.formData.name,
-            stream_name: this.formData.stream_name,
-            condition: this.formData.condition,
-            duration: Number(this.formData.duration.value),
-            frequency: Number(this.formData.frequency.value),
-            time_between_alerts: Number(
-              this.formData.time_between_alerts.value
-            ),
-            destination: this.formData.destination,
-            stream_type: this.formData.stream_type,
-          };
-        } else {
-          submitData = {
-            name: this.formData.name,
-            query: {
-              sql: this.formData.sql,
-              from: 0,
-              size: 100,
-              sql_mode: "full",
-            },
-            stream_name: this.formData.stream_name,
-            condition: this.formData.condition,
-            duration: Number(this.formData.duration.value),
-            frequency: Number(this.formData.frequency.value),
-            time_between_alerts: Number(
-              this.formData.time_between_alerts.value
-            ),
-            destination: this.formData.destination,
-            stream_type: this.formData.stream_type,
-          };
-        }
-        this.schemaList.forEach((stream: any) => {
-          if (stream.name == this.formData.stream_name) {
-            stream.schema.forEach((field: any) => {
-              if (field.name == this.formData.condition.column) {
-                if (field.type != "Utf8") {
-                  this.formData.condition.value = parseInt(
-                    this.formData.condition.value
-                  );
-                }
-              }
-            });
+
+        const payload = cloneDeep(this.formData);
+
+        payload.is_real_time = payload.query_condition.is_real_time === "true";
+
+        payload.context_attributes = this.formData.context_attributes.forEach(
+          (attr: any) => {
+            payload.context_attributes[attr.key] = attr.value;
           }
-        });
+        );
+
+        if (
+          (!payload.is_real_time &&
+            this.scheduledAlertRef?.value.tab === "custom") ||
+          payload.is_real_time
+        ) {
+          payload.query_condition.sql = this.buildSqlFromConditions();
+        }
+
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
-          this.formData.stream_name,
-          this.formData.stream_type,
-          submitData
+          payload.stream_name,
+          payload.stream_type,
+          payload
         );
+
         callAlert
           .then((res: { data: any }) => {
             const data = res.data;
@@ -773,7 +766,8 @@ export default defineComponent({
     padding: 8px 0;
   }
 }
-.silence-notification-input {
+.silence-notification-input,
+.threshould-input {
   .q-field--filled .q-field__control {
     background-color: transparent !important;
   }
