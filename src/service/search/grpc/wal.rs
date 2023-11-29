@@ -463,7 +463,7 @@ pub async fn search_arrow(
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
     // cache files
-    let work_dir = format!("{}_arrow", session_id);
+    let work_dir = session_id.to_string();
     for file in files.clone().iter() {
         let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
         match get_file_contents(&source_file) {
@@ -472,20 +472,9 @@ pub async fn search_arrow(
                 files.retain(|x| x != file);
             }
             Ok(file_data) => {
-                let mut file_data = file_data;
-                // check json file is complete
-                if !file_data.ends_with(b"\n") {
-                    if let Ok(s) = String::from_utf8(file_data.clone()) {
-                        if let Some(last_line) = s.lines().last() {
-                            if serde_json::from_str::<serde_json::Value>(last_line).is_err() {
-                                // remove last line
-                                file_data = file_data[..file_data.len() - last_line.len()].to_vec();
-                            }
-                        }
-                    }
-                }
                 scan_stats.original_size += file_data.len() as i64;
                 let file_name = format!("/{work_dir}/{}", file.key);
+                println!("file name from disk is {}", file_name);
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             }
         }
@@ -535,6 +524,7 @@ pub async fn search_arrow(
 
     // check schema version
     let files = tmpfs::list(&work_dir, FILE_EXT_ARROW).unwrap_or_default();
+
     let mut files_group: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(2);
     if !CONFIG.common.widening_schema_evolution {
         files_group.insert(
@@ -546,6 +536,7 @@ pub async fn search_arrow(
         );
     } else {
         for file in files {
+            println!("reading files from tmpfs {:?}", &file.location);
             let schema_version = get_schema_version(&file.location)?;
             let entry = files_group.entry(schema_version).or_default();
             entry.push(FileKey::from_file_name(&file.location));
@@ -597,17 +588,23 @@ pub async fn search_arrow(
                 },
             }
         } else {
-            let id = format!("{session_id}-{ver}");
-            // move data to group tmpfs
+            let id = format!("{session_id}");
+            /*     // move data to group tmpfs
             for file in files.iter() {
                 let file_data = tmpfs::get(&file.key).unwrap();
+
                 let file_name = format!(
                     "/{}/{}",
                     id,
                     file.key.strip_prefix(&format!("/{}/", work_dir)).unwrap()
                 );
+                println!(
+                    "tmpfs set file {} : file_data: {:?}",
+                    file_name,
+                    file_data.len()
+                );
                 tmpfs::set(&file_name, file_data).expect("tmpfs set success");
-            }
+            } */
             meta::search::Session {
                 id,
                 storage_type: StorageType::Tmpfs,
@@ -627,6 +624,7 @@ pub async fn search_arrow(
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
+                println!("exec sql over files: {:?}", &files);
                 exec::sql(
                     &session,
                     schema,
