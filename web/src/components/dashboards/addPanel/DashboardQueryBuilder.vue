@@ -109,18 +109,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-select>
                   </div>
                 </div>
-                <q-input
-                  dense
-                  filled
-                  data-test="dashboard-x-item-input"
-                  :label="t('common.label')"
-                  v-model="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.x[index].label
-                  "
-                  :rules="[(val) => val.length > 0 || 'Required']"
-                />
                 <!-- histogram interval if auto sql and aggregation function is histogram-->
                 <div
                   v-if="
@@ -131,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dashboardPanelData.layout.currentQueryIndex
                     ].fields.x[index].aggregationFunction === 'histogram'
                   "
+                  class="q-mb-sm"
                 >
                   <!-- histogram interval for sql queries -->
                   <q-select
@@ -155,6 +144,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                   </q-select>
                 </div>
+                <q-input
+                  dense
+                  filled
+                  data-test="dashboard-x-item-input"
+                  :label="t('common.label')"
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x[index].label
+                  "
+                  :rules="[(val) => val.length > 0 || 'Required']"
+                />
                 <div
                   v-if="
                     !dashboardPanelData.data.queries[
@@ -312,18 +313,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </div>
-                <q-input
-                  dense
-                  filled
-                  :label="t('common.label')"
-                  data-test="dashboard-y-item-input"
-                  v-model="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.y[index].label
-                  "
-                  :rules="[(val) => val.length > 0 || 'Required']"
-                />
                 <!-- histogram interval if auto sql and aggregation function is histogram-->
                 <div
                   v-if="
@@ -358,6 +347,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                   </q-select>
                 </div>
+                <q-input
+                  dense
+                  filled
+                  :label="t('common.label')"
+                  data-test="dashboard-y-item-input"
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y[index].label
+                  "
+                  :rules="[(val) => val.length > 0 || 'Required']"
+                />
                 <div
                   v-if="
                     !dashboardPanelData.data.queries[
