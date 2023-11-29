@@ -1,6 +1,6 @@
 {
   "common": {
-    "close":  "Close",
+    "close": "Close",
     "cancel": "Cancel",
     "ok": "Ok",
     "apply": "Apply",
@@ -36,7 +36,8 @@
     "noOfRecords": "No of Records:",
     "attributes": "Attributes",
     "events": "Events",
-    "goHome": "Go Home"
+    "goHome": "Go Home",
+    "name": "Name"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -70,7 +71,7 @@
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
     "logs": "Logs",
-    "enrichmentTables":  "Enrichment Tables",
+    "enrichmentTables": "Enrichment Tables",
     "savedViewsLabel": "Saved Views",
     "savedViewsNotFound": "Saved view not found!",
     "savedViewAction": "Create/Update Saved View",
@@ -561,7 +562,8 @@
     "updateTitle": "Update Alert",
     "delete": "Delete",
     "stream_type": "Stream Type",
-    "description": "Description"
+    "description": "Description",
+    "column": "Column"
   },
   "home": {
     "streams": "Streams",

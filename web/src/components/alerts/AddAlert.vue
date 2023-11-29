@@ -302,15 +302,7 @@ const defaultValue: any = () => {
     stream_name: "",
     is_real_time: "true",
     query_condition: {
-      conditions: [
-        {
-          column: "",
-          operator: "",
-          ignoreCase: null,
-          value: "",
-          isNumeric: null,
-        },
-      ],
+      conditions: [],
       sql: "",
       promql: null,
     },
@@ -321,7 +313,7 @@ const defaultValue: any = () => {
       silence: 10,
     },
     destinations: [],
-    context_attributes: { alpha1: "a" },
+    context_attributes: {},
     enabled: true,
   };
 };
@@ -514,7 +506,7 @@ export default defineComponent({
     const addField = () => {
       formData.value.query_condition.conditions.push({
         column: "",
-        operator: "",
+        operator: "=",
         value: "",
         id: getUUID(),
       });
