@@ -154,17 +154,13 @@ export default defineComponent({
         console.log("variableeee", variable);
         
         if (variable.type === 'ad-hoc-filters') {
-          // Assuming 'value' is an array in the ad-hoc variable data
           if (Array.isArray(variable.value)) {
             variable.value.forEach((filter) => {
-              // Constructing the query parameter with the name, operator, and value
               const paramName = `var-${variable.name}= ${filter.name}${filter.operator}`;
 
               if (Array.isArray(variableObj[paramName])) {
-                // If the parameter already exists in variableObj, add the new value to the array
                 variableObj[paramName].push(filter.value);
               } else {
-                // If the parameter doesn't exist, create a new array with the value
                 variableObj[paramName] = [filter.value];
               }
             });
