@@ -249,30 +249,60 @@ export default defineComponent({
       dashboardPanelData.meta.errors.queryErrors = [];
     });
 
-        let query = "";
-        // Generate the query when the fields are updated
-        watch(() => [
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x,
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y,
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z,
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter,
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery,
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude,
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude,
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight, 
-            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit 
-        ], () => {
-            // only continue if current mode is auto query generation
-            if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
-                if(dashboardPanelData.data.type == 'geomap'){
-                    query = geoMapChart()
-                }else{
-                    query = sqlchart()
-                }
-                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query = query
-            }
-        }, { deep: true })
+    let query = "";
+    // Generate the query when the fields are updated
+    watch(
+      () => [
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.latitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.longitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.weight,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit,
+      ],
+      () => {
+        // only continue if current mode is auto query generation
+        if (
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        ) {
+          if (dashboardPanelData.data.type == "geomap") {
+            query = geoMapChart();
+          } else {
+            query = sqlchart();
+          }
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query = query;
+        }
+      },
+      { deep: true }
+    );
 
     const geoMapChart = () => {
       let query = "";
@@ -314,23 +344,26 @@ export default defineComponent({
         }
       }
 
-             // array of sorting fields with followed by asc or desc
-             const orderByArr = [];
-            
-            [latitude, longitude, weight].forEach((it: any) => {
-                // ignore if None is selected or sortBy is not there
-                if (it?.sortBy && it?.sortBy != "None") {
-                    orderByArr.push(`${it.alias} ${it.sortBy}`);
-                }
-            })
-            
-            // append with query by joining array with comma
-            query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : ''
+      // array of sorting fields with followed by asc or desc
+      const orderByArr = [];
 
-            // append limit
-            // if limit is less than or equal to 0 then don't add
-            const queryLimit = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit ?? 0;            
-            query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+      [latitude, longitude, weight].forEach((it: any) => {
+        // ignore if None is selected or sortBy is not there
+        if (it?.sortBy && it?.sortBy != "None") {
+          orderByArr.push(`${it.alias} ${it.sortBy}`);
+        }
+      });
+
+      // append with query by joining array with comma
+      query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
+
+      // append limit
+      // if limit is less than or equal to 0 then don't add
+      const queryLimit =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit ?? 0;
+      query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
 
       return query;
     };
@@ -463,50 +496,73 @@ export default defineComponent({
         dashboardPanelData.layout.currentQueryIndex
       ].fields.y.map((it: any) => it.alias);
 
-            if (dashboardPanelData.data.type == "heatmap") {
-                query += xAxisAlias.length && yAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") + ", " + yAxisAlias.join(", ") : '';
-            }
-            else {
-                query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : ''
-            }
-            
-            // array of sorting fields with followed by asc or desc
-            const orderByArr = [];
-            
-            fields.forEach((it: any) => {
-                // ignore if None is selected or sortBy is not there
-                if (it?.sortBy && it?.sortBy != "None") {
-                    orderByArr.push(`${it.alias} ${it.sortBy}`);
-                }
-            })
-            
-            // append with query by joining array with comma
-            query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : ''
+      if (dashboardPanelData.data.type == "heatmap") {
+        query +=
+          xAxisAlias.length && yAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              yAxisAlias.join(", ")
+            : "";
+      } else {
+        query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
+      }
 
-            // append limit
-            // if limit is less than or equal to 0 then don't add
-            const queryLimit = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit ?? 0;            
-            query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+      // array of sorting fields with followed by asc or desc
+      const orderByArr = [];
 
-            return query
+      fields.forEach((it: any) => {
+        // ignore if None is selected or sortBy is not there
+        if (it?.sortBy && it?.sortBy != "None") {
+          orderByArr.push(`${it.alias} ${it.sortBy}`);
         }
-        
-        watch(() => [dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query, dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery, dashboardPanelData.meta.stream.selectedStreamFields], () => {
-            
-            // Only continue if the current mode is "show custom query"
-            if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery && dashboardPanelData.data.queryType == "sql") {
-                // Call the updateQueryValue function
-                updateQueryValue()
-            } else {
-                // auto query mode selected
-                // remove the custom fields from the list
-                dashboardPanelData.meta.stream.customQueryFields = []
-            }
-            // if (dashboardPanelData.data.queryType == "promql") {
-            //     updatePromQLQuery()
-            // }
-        }, { deep: true })
+      });
 
+      // append with query by joining array with comma
+      query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
+
+      // append limit
+      // if limit is less than or equal to 0 then don't add
+      const queryLimit =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit ?? 0;
+      query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
+      return query;
+    };
+
+    watch(
+      () => [
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery,
+        dashboardPanelData.meta.stream.selectedStreamFields,
+      ],
+      () => {
+        // Only continue if the current mode is "show custom query"
+        if (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery &&
+          dashboardPanelData.data.queryType == "sql"
+        ) {
+          // Call the updateQueryValue function
+          updateQueryValue();
+        } else {
+          // auto query mode selected
+          // remove the custom fields from the list
+          dashboardPanelData.meta.stream.customQueryFields = [];
+        }
+        // if (dashboardPanelData.data.queryType == "promql") {
+        //     updatePromQLQuery()
+        // }
+      },
+      { deep: true }
+    );
 
     // This function parses the custom query and generates the errors and custom fields
     const updateQueryValue = () => {

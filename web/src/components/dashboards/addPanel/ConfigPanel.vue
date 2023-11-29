@@ -257,10 +257,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- for auto sql query limit -->
     <!-- it should not be promql and custom query -->
-    <q-input v-if="(!promqlMode) && (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery)" v-model.number="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit"
+    <q-input
+      v-if="
+        !promqlMode &&
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+      "
+      v-model.number="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit
+      "
       :value="0"
       :min="0"
-      @update:model-value="(value) => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit = value ? value : 0"
+      @update:model-value="
+        (value) =>
+          (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.limit = value ? value : 0)
+      "
       label="Limit"
       color="input-border"
       bg-color="input-bg"
@@ -289,7 +305,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </q-input>
-
   </div>
 </template>
 
