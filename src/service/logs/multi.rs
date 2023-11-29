@@ -59,30 +59,6 @@ pub async fn ingest_with_keys(
     ingest_inner(org_id, in_stream_name, body, extend_json, thread_id).await
 }
 
-/// Ingest a multiline json body
-///
-/// ### Args
-/// - org_id: org id to ingest data in
-/// - in_stream_name: stream to write data in
-/// - body: incoming payload
-/// - thread_id: a unique thread-id associated with this process
-///
-pub async fn ingest(
-    org_id: &str,
-    in_stream_name: &str,
-    body: web::Bytes,
-    thread_id: usize,
-) -> Result<IngestionResponse, anyhow::Error> {
-    ingest_inner(
-        org_id,
-        in_stream_name,
-        body,
-        &AHashMap::default(),
-        thread_id,
-    )
-    .await
-}
-
 async fn ingest_inner(
     org_id: &str,
     in_stream_name: &str,

@@ -35,12 +35,9 @@ use super::request::{
     alerts::*, dashboards::folders::*, dashboards::*, enrichment_table, functions, kv, logs,
     metrics, organization, prom, rum, search, status, stream, syslog, traces, users,
 };
-use crate::{
-    common::{
-        infra::config::CONFIG,
-        meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-    },
-    service::logs::arrow,
+use crate::common::{
+    infra::config::CONFIG,
+    meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
 };
 
 use super::auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum};
@@ -289,10 +286,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(logs::ingest::multi)
             .service(logs::ingest::json)
             .service(logs::ingest::handle_kinesis_request)
-            .service(logs::ingest::handle_gcp_request)
-            .service(arrow::json_to_arrow)
-            .service(arrow::data)
-            .service(logs::ingest::json_arrow),
+            .service(logs::ingest::handle_gcp_request),
     );
 }
 

@@ -40,10 +40,7 @@ use crate::service::{
 
 pub mod arrow;
 pub mod bulk;
-pub mod gcs_pub_sub;
 pub mod ingest;
-pub mod json;
-pub mod kinesis_firehose;
 pub mod multi;
 pub mod otlp_grpc;
 pub mod otlp_http;

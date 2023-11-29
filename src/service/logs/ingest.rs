@@ -36,6 +36,8 @@ use crate::common::{
             StreamStatus,
         },
         stream::StreamParams,
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::{SchemaRecords, StreamParams},
         usage::UsageType,
         StreamType,
     },
@@ -45,6 +47,7 @@ use crate::service::{
     distinct_values, get_formatted_stream_name,
     ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
     logs::StreamMeta,
+    ingestion::{is_ingestion_allowed, write_file_arrow},
     usage::report_request_usage_stats,
 };
 
@@ -100,6 +103,12 @@ pub async fn ingest(
     let partition_time_level = partition_det.partition_time_level;
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+    // Start get stream alerts
+    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    // End get stream alert
+
+    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
     let ep: &str;
 
     let data = match in_req {
@@ -126,11 +135,11 @@ pub async fn ingest(
         }
     };
 
-    for item in data.iter() {
-        match item {
-            Ok(value) => {
+    for rec in data.iter() {
+        match rec {
+            Ok(item) => {
                 match apply_functions(
-                    &value,
+                    &item,
                     &local_trans,
                     &stream_vrl_map,
                     stream_name,
@@ -147,7 +156,7 @@ pub async fn ingest(
                                 continue;
                             }
                         }
-                        let local_trigger = super::add_valid_record(
+                        let local_trigger = super::add_valid_record_arrow(
                             &StreamMeta {
                                 org_id: org_id.to_string(),
                                 stream_name: stream_name.to_string(),
@@ -199,7 +208,7 @@ pub async fn ingest(
     // write to file
     let mut stream_file_name = "".to_string();
     let mut req_stats =
-        write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
+        write_file_arrow(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     if stream_file_name.is_empty() {
         return Ok(IngestionResponse::new(
