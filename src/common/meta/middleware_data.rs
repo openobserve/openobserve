@@ -42,6 +42,13 @@ pub struct RumExtraData {
 }
 
 impl RumExtraData {
+    fn filter_api_keys(data: &mut AHashMap<String, String>) {
+        data.retain(|k, _| {
+            (k.starts_with("oo") || k.starts_with("o2") || k.starts_with("batch_time"))
+                && !(k.eq("oo-api-key") || k.eq("o2-api-key"))
+        })
+    }
+
     pub async fn extractor(
         req: ServiceRequest,
         next: Next<impl MessageBody>,
@@ -49,9 +56,7 @@ impl RumExtraData {
         let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
         let mut data =
             web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
-        data.retain(|k, _| {
-            (k.starts_with("oo") || k.starts_with("batch_time")) && !k.eq("oo-api-key")
-        });
+        Self::filter_api_keys(&mut data);
 
         // These are the tags which come in `ootags`
         let tags: AHashMap<String, serde_json::Value> = match data.get("ootags") {
@@ -140,5 +145,34 @@ impl RumExtraData {
         };
         req.extensions_mut().insert(rum_extracted_data);
         next.call(req).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::test;
+
+    #[test]
+    async fn test_data_filtering() {
+        // Create a mock query string
+        let query_string =
+            "oo-api-key=123&o2-api-key=456&oo-param1=value1&o2-param2=value2&batch_time=123456";
+
+        // Create a mock ServiceRequest with the query string
+        let req = test::TestRequest::with_uri(&format!("/path?{}", query_string)).to_srv_request();
+
+        // Call the from_query function
+        let mut data =
+            web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+        RumExtraData::filter_api_keys(&mut data);
+
+        // Assert that the data is filtered correctly
+        assert_eq!(data.len(), 3);
+        assert!(data.contains_key("oo-param1"));
+        assert!(data.contains_key("o2-param2"));
+        assert!(data.contains_key("batch_time"));
+        assert!(!data.contains_key("oo-api-key"));
+        assert!(!data.contains_key("o2-api-key"));
     }
 }
