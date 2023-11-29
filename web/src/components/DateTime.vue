@@ -219,7 +219,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-select
           v-model="timezone"
           :options="filteredTimezone"
-          @blur="timezone = timezone == '' ? 'UTC' : timezone"
+          @blur="
+            timezone =
+              timezone == ''
+                ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                : timezone
+          "
           use-input
           @filter="timezoneFilterFn"
           input-debounce="0"
@@ -231,6 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('logStream.timezone')"
           @update:modelValue="onTimezoneChange"
           :display-value="`Timezone: ${timezone}`"
+          class="timezone-select"
         >
         </q-select>
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
@@ -306,14 +312,18 @@ export default defineComponent({
     });
     const relativePeriod = ref("m");
     const relativeValue = ref(15);
-    const currentTimezone = useLocalTimezone() || "UTC";
+    const currentTimezone =
+      useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const timezone = ref(currentTimezone);
     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
       return tz;
     });
+    const browserTime =
+      "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
     // Add the UTC option
     timezoneOptions.unshift("UTC");
+    timezoneOptions.unshift(browserTime);
 
     const filteredTimezone: any = ref([]);
 
@@ -376,8 +386,13 @@ export default defineComponent({
         selectedDate.value?.to;
       },
       () => {
-        if (props.autoApply && selectedType.value === "absolute")
+        if (
+          props.autoApply &&
+          selectedType.value === "absolute" &&
+          store.state.savedViewFlag == false
+        ) {
           saveDate("absolute");
+        }
       },
       { deep: true }
     );
@@ -386,8 +401,9 @@ export default defineComponent({
       () => props.defaultAbsoluteTime,
       (value) => {
         if (
-          value.startTime !== datePayload.value.startTime ||
-          value.endTime !== datePayload.value.endTime
+          (value.startTime !== datePayload.value.startTime ||
+            value.endTime !== datePayload.value.endTime) &&
+          store.state.savedViewFlag == false
         ) {
           selectedType.value = props.defaultType;
           setAbsoluteTime(value.startTime, value.endTime);
@@ -410,8 +426,13 @@ export default defineComponent({
     };
 
     const onTimezoneChange = async () => {
-      useLocalTimezone(timezone.value);
-      store.dispatch("setTimezone", timezone.value);
+      let selectedTimezone = timezone.value;
+      if (selectedTimezone.toLowerCase() == browserTime.toLowerCase()) {
+        selectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      }
+      //Intl.DateTimeFormat().resolvedOptions().timeZone
+      useLocalTimezone(selectedTimezone);
+      store.dispatch("setTimezone", selectedTimezone);
       await nextTick();
       if (selectedType.value == "absolute") saveDate("absolute");
       else saveDate("relative");
@@ -494,7 +515,9 @@ export default defineComponent({
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
       // date["relativeTimePeriod"] = "";
-      emit("on:date-change", date);
+      if (store.state.savedViewFlag == false) {
+        emit("on:date-change", date);
+      }
     };
 
     function formatDate(d) {
@@ -505,7 +528,7 @@ export default defineComponent({
       var minutes = ("0" + d.getMinutes()).slice(-2);
 
       return {
-        date: year + "-" + month + "-" + day,
+        date: year + "/" + month + "/" + day,
         time: hours + ":" + minutes,
       };
     }
@@ -523,7 +546,6 @@ export default defineComponent({
       selectedTime.value.endTime = endObj.time;
 
       selectedType.value = dateType;
-
       saveDate(dateType);
     };
 
@@ -604,6 +626,8 @@ export default defineComponent({
           startTime: absoluteUTCTimestamp.startUTC,
           endTime: absoluteUTCTimestamp.endUTC,
           relativeTimePeriod: null,
+          selectedDate: JSON.parse(JSON.stringify(selectedDate.value)),
+          selectedTime: JSON.parse(JSON.stringify(selectedTime.value)),
         };
         // console.log(rVal)
         return rVal;
@@ -620,15 +644,28 @@ export default defineComponent({
       return { startUTC, endUTC };
     };
 
-    const setSavedDate = (dateobj) => {
+    const setSavedDate = (dateobj: any) => {
+      timezone.value = store.state.timezone;
       selectedType.value = dateobj.type;
       if (dateobj.type === "relative") {
         setRelativeTime(dateobj.relativeTimePeriod);
       } else {
-        setCustomDate(dateobj.type, {
-          start: dateobj.startTime,
-          end: dateobj.endTime,
-        });
+        if (
+          dateobj.hasOwnProperty("selectedDate") &&
+          dateobj.hasOwnProperty("selectedTime") &&
+          dateobj.selectedDate.hasOwnProperty("from") &&
+          dateobj.selectedDate.hasOwnProperty("to") &&
+          dateobj.selectedTime.hasOwnProperty("startTime") &&
+          dateobj.selectedTime.hasOwnProperty("endTime")
+        ) {
+          selectedDate.value = dateobj.selectedDate;
+          selectedTime.value = dateobj.selectedTime;
+        } else {
+          setCustomDate(dateobj.type, {
+            start: dateobj.startTime / 1000,
+            end: dateobj.endTime / 1000,
+          });
+        }
       }
 
       displayValue.value = getDisplayValue();
@@ -916,6 +953,11 @@ export default defineComponent({
       margin-right: 1rem;
       color: $dark-page;
     }
+  }
+}
+.timezone-select {
+  .q-item:nth-child(2) {
+    border-bottom: 1px solid #dcdcdc;
   }
 }
 </style>
