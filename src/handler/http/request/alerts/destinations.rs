@@ -16,7 +16,9 @@
 use actix_web::{delete, get, http, post, web, HttpResponse};
 use std::io::Error;
 
-use crate::common::meta::{alerts::AlertDestination, http::HttpResponse as MetaHttpResponse};
+use crate::common::meta::{
+    alerts::destinations::Destination, http::HttpResponse as MetaHttpResponse,
+};
 use crate::service::alerts::destinations;
 
 /** CreateDestination */
@@ -31,7 +33,7 @@ use crate::service::alerts::destinations;
         ("org_id" = String, Path, description = "Organization name"),
         ("destination_name" = String, Path, description = "Destination name"),
       ),
-    request_body(content = AlertDestination, description = "Destination data", content_type = "application/json"),  
+    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
     responses(
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description="Error",   content_type = "application/json", body = HttpResponse),
@@ -40,7 +42,7 @@ use crate::service::alerts::destinations;
 #[post("/{org_id}/alerts/destinations/{destination_name}")]
 pub async fn save_destination(
     path: web::Path<(String, String)>,
-    dest: web::Json<AlertDestination>,
+    dest: web::Json<Destination>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     let dest = dest.into_inner();

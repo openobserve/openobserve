@@ -16,7 +16,7 @@
 use actix_web::{delete, get, http, post, web, HttpResponse};
 use std::io::Error;
 
-use crate::common::meta::{alerts::DestinationTemplate, http::HttpResponse as MetaHttpResponse};
+use crate::common::meta::{alerts::templates::Template, http::HttpResponse as MetaHttpResponse};
 use crate::service::alerts::templates;
 
 /** CreateTemplate */
@@ -31,7 +31,7 @@ use crate::service::alerts::templates;
         ("org_id" = String, Path, description = "Organization name"),
         ("template_name" = String, Path, description = "Template name"),
       ),
-    request_body(content = DestinationTemplate, description = "Template data", content_type = "application/json"),    
+    request_body(content = Template, description = "Template data", content_type = "application/json"),    
     responses(
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description="Error",   content_type = "application/json", body = HttpResponse),
@@ -40,7 +40,7 @@ use crate::service::alerts::templates;
 #[post("/{org_id}/alerts/templates/{template_name}")]
 pub async fn save_template(
     path: web::Path<(String, String)>,
-    tmpl: web::Json<DestinationTemplate>,
+    tmpl: web::Json<Template>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     let tmpl = tmpl.into_inner();

@@ -17,12 +17,12 @@ use std::sync::Arc;
 
 use crate::common::{
     infra::{config::ALERTS_DESTINATIONS, db as infra_db},
-    meta::alerts::{AlertDestination, AlertDestinationResponse},
+    meta::alerts::destinations::{Destination, Response},
     utils::json,
 };
 use crate::service::db;
 
-pub async fn get(org_id: &str, name: &str) -> Result<AlertDestinationResponse, anyhow::Error> {
+pub async fn get(org_id: &str, name: &str) -> Result<Response, anyhow::Error> {
     let map_key = format!("{org_id}/{name}");
     if let Some(val) = ALERTS_DESTINATIONS.get(&map_key) {
         let template = db::alerts::templates::get(org_id, &val.template).await?;
@@ -32,7 +32,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<AlertDestinationResponse, a
     let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/{name}");
     let val = db.get(&key).await?;
-    let dest: AlertDestination = json::from_slice(&val)?;
+    let dest: Destination = json::from_slice(&val)?;
     let template = db::alerts::templates::get(org_id, &dest.template).await?;
     Ok(dest.to_dest_resp(template))
 }
@@ -40,7 +40,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<AlertDestinationResponse, a
 pub async fn set(
     org_id: &str,
     name: &str,
-    mut destination: AlertDestination,
+    mut destination: Destination,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     destination.name = Some(name.to_owned());
@@ -60,18 +60,17 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     Ok(db.delete(&key, false, infra_db::NEED_WATCH).await?)
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<AlertDestinationResponse>, anyhow::Error> {
+pub async fn list(org_id: &str) -> Result<Vec<Response>, anyhow::Error> {
     let cache = ALERTS_DESTINATIONS.clone();
     if !cache.is_empty() {
-        let items: Vec<AlertDestination> = cache
+        let items: Vec<Destination> = cache
             .iter()
             .filter_map(|dest| {
                 let k = dest.key();
                 (k.starts_with(&format!("{org_id}/"))).then(|| dest.value().clone())
             })
             .collect();
-        let mut dest_with_tmpl_list: Vec<AlertDestinationResponse> =
-            Vec::with_capacity(items.len());
+        let mut dest_with_tmpl_list: Vec<Response> = Vec::with_capacity(items.len());
         for item in items {
             let template = db::alerts::templates::get(org_id, &item.template).await?;
             dest_with_tmpl_list.push(item.to_dest_resp(template))
@@ -81,9 +80,9 @@ pub async fn list(org_id: &str) -> Result<Vec<AlertDestinationResponse>, anyhow:
 
     let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/");
-    let mut dest_with_tmpl_list: Vec<AlertDestinationResponse> = Vec::new();
+    let mut dest_with_tmpl_list: Vec<Response> = Vec::new();
     for item_value in db.list_values(&key).await? {
-        let dest: AlertDestination = json::from_slice(&item_value)?;
+        let dest: Destination = json::from_slice(&item_value)?;
         let template = db::alerts::templates::get(org_id, &dest.template).await?;
         dest_with_tmpl_list.push(dest.to_dest_resp(template))
     }
@@ -107,7 +106,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: AlertDestination = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: Destination = json::from_slice(&ev.value.unwrap()).unwrap();
                 ALERTS_DESTINATIONS.insert(item_key.to_owned(), item_value);
             }
             infra_db::Event::Delete(ev) => {
@@ -126,7 +125,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: AlertDestination = json::from_slice(&item_value).unwrap();
+        let json_val: Destination = json::from_slice(&item_value).unwrap();
         ALERTS_DESTINATIONS.insert(item_key.to_owned(), json_val);
     }
     log::info!("Alert destinations Cached");

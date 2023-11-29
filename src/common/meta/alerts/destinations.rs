@@ -18,11 +18,13 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use utoipa::ToSchema;
 
+use super::templates::Template;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Destination {
     pub name: Option<String>,
     pub url: String,
-    pub method: DestinationHTTPType,
+    pub method: HTTPType,
     #[serde(default)]
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -31,11 +33,8 @@ pub struct Destination {
 }
 
 impl Destination {
-    pub fn to_dest_resp(
-        &self,
-        template: Option<super::templates::Template>,
-    ) -> DestinationResponse {
-        DestinationResponse {
+    pub fn to_dest_resp(&self, template: Template) -> Response {
+        Response {
             url: self.url.clone(),
             method: self.method.clone(),
             skip_tls_verify: self.skip_tls_verify,
@@ -47,19 +46,19 @@ impl Destination {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct DestinationResponse {
+pub struct Response {
     pub name: String,
     pub url: String,
-    pub method: DestinationHTTPType,
+    pub method: HTTPType,
     #[serde(default)]
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
-    pub template: Option<super::templates::Template>,
+    pub template: Template,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-pub enum DestinationHTTPType {
+pub enum HTTPType {
     #[default]
     #[serde(rename = "post")]
     POST,
@@ -69,12 +68,12 @@ pub enum DestinationHTTPType {
     GET,
 }
 
-impl fmt::Display for DestinationHTTPType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl fmt::Display for HTTPType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            DestinationHTTPType::POST => write!(f, "post"),
-            DestinationHTTPType::PUT => write!(f, "put"),
-            DestinationHTTPType::GET => write!(f, "get"),
+            HTTPType::POST => write!(f, "post"),
+            HTTPType::PUT => write!(f, "put"),
+            HTTPType::GET => write!(f, "get"),
         }
     }
 }

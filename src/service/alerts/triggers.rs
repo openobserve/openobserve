@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use super::db;
-use crate::common::meta::{alerts::Trigger, StreamType};
+use crate::common::meta::{alerts::triggers::Trigger, StreamType};
 
 pub async fn save(
     org_id: &str,

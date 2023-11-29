@@ -16,14 +16,14 @@
 use actix_web::http;
 
 use crate::common::infra::config::ALERTS_DESTINATIONS;
-use crate::common::meta::alerts::DestinationTemplate;
+use crate::common::meta::alerts::templates::Template;
 use crate::service::db;
 
 #[tracing::instrument(skip_all)]
 pub async fn save_template(
     org_id: &str,
     name: &str,
-    mut template: DestinationTemplate,
+    mut template: Template,
 ) -> Result<(), anyhow::Error> {
     if template.body.is_null() {
         return Err(anyhow::anyhow!("Alert template body empty"));
@@ -33,7 +33,7 @@ pub async fn save_template(
 }
 
 #[tracing::instrument]
-pub async fn list_templates(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Error> {
+pub async fn list_templates(org_id: &str) -> Result<Vec<Template>, anyhow::Error> {
     db::alerts::templates::list(org_id).await
 }
 
@@ -66,7 +66,7 @@ pub async fn delete_template(
 }
 
 #[tracing::instrument]
-pub async fn get_template(org_id: &str, name: &str) -> Result<DestinationTemplate, anyhow::Error> {
+pub async fn get_template(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
     db::alerts::templates::get(org_id, name)
         .await
         .map_err(|_| anyhow::anyhow!("Alert template not found"))

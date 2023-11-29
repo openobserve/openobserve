@@ -17,11 +17,11 @@ use std::sync::Arc;
 
 use crate::common::{
     infra::{config::ALERTS_TEMPLATES, db as infra_db},
-    meta::{alerts::DestinationTemplate, organization::DEFAULT_ORG},
+    meta::{alerts::templates::Template, organization::DEFAULT_ORG},
     utils::json,
 };
 
-pub async fn get(org_id: &str, name: &str) -> Result<DestinationTemplate, anyhow::Error> {
+pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
     let map_key = format!("{org_id}/{name}");
     if let Some(v) = ALERTS_TEMPLATES.get(&map_key) {
         return Ok(v.value().clone());
@@ -40,11 +40,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<DestinationTemplate, anyhow
     Ok(json::from_slice(&db.get(&key).await?).unwrap())
 }
 
-pub async fn set(
-    org_id: &str,
-    name: &str,
-    template: DestinationTemplate,
-) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, name: &str, template: Template) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let mut template = template;
     template.is_default = Some(org_id == DEFAULT_ORG);
@@ -64,7 +60,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     Ok(db.delete(&key, false, infra_db::NEED_WATCH).await?)
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Error> {
+pub async fn list(org_id: &str) -> Result<Vec<Template>, anyhow::Error> {
     let cache = ALERTS_TEMPLATES.clone();
     if !cache.is_empty() {
         return Ok(cache
@@ -82,7 +78,7 @@ pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Erro
     let ret = db.list_values(key.as_str()).await?;
     let mut templates = Vec::new();
     for item_value in ret {
-        let json_val: DestinationTemplate = json::from_slice(&item_value).unwrap();
+        let json_val: Template = json::from_slice(&item_value).unwrap();
         templates.push(json_val);
     }
     Ok(templates)
@@ -105,7 +101,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: DestinationTemplate = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: Template = json::from_slice(&ev.value.unwrap()).unwrap();
                 ALERTS_TEMPLATES.insert(item_key.to_owned(), item_value);
             }
             infra_db::Event::Delete(ev) => {
@@ -124,7 +120,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: DestinationTemplate = json::from_slice(&item_value).unwrap();
+        let json_val: Template = json::from_slice(&item_value).unwrap();
         ALERTS_TEMPLATES.insert(item_key.to_owned(), json_val);
     }
     log::info!("Alert templates Cached");

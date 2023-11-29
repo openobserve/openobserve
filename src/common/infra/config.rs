@@ -29,7 +29,7 @@ use vector_enrichment::TableRegistry;
 
 use crate::common::{
     meta::{
-        alerts::{Alert, AlertDestination, DestinationTemplate, Trigger},
+        alerts,
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
         organization::OrganizationSetting,
@@ -154,11 +154,13 @@ pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
 pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
-pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<Alert>>> = Lazy::new(Default::default);
-pub static TRIGGERS: Lazy<RwAHashMap<String, Trigger>> = Lazy::new(Default::default);
-pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, DestinationTemplate>> =
+pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<alerts::Alert>>> =
     Lazy::new(Default::default);
-pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, AlertDestination>> =
+pub static TRIGGERS: Lazy<RwAHashMap<String, alerts::triggers::Trigger>> =
+    Lazy::new(Default::default);
+pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, alerts::templates::Template>> =
+    Lazy::new(Default::default);
+pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, alerts::destinations::Destination>> =
     Lazy::new(Default::default);
 pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));

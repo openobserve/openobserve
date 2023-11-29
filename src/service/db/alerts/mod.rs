@@ -22,7 +22,7 @@ use crate::common::{
         db as infra_db,
     },
     meta::{
-        alerts::{Alert, Trigger},
+        alerts::{triggers::Trigger, Alert},
         StreamType,
     },
     utils::json,

@@ -16,14 +16,14 @@
 use actix_web::http;
 
 use crate::common::infra::config::STREAM_ALERTS;
-use crate::common::meta::alerts::{AlertDestination, AlertDestinationResponse};
+use crate::common::meta::alerts::destinations::{Destination, Response};
 use crate::service::db;
 
 #[tracing::instrument(skip(destination))]
 pub async fn save_destination(
     org_id: &str,
     name: &str,
-    destination: AlertDestination,
+    destination: Destination,
 ) -> Result<(), anyhow::Error> {
     if db::alerts::templates::get(org_id, &destination.template)
         .await
@@ -38,9 +38,7 @@ pub async fn save_destination(
 }
 
 #[tracing::instrument]
-pub async fn list_destinations(
-    org_id: &str,
-) -> Result<Vec<AlertDestinationResponse>, anyhow::Error> {
+pub async fn list_destinations(org_id: &str) -> Result<Vec<Response>, anyhow::Error> {
     db::alerts::destinations::list(org_id).await
 }
 
@@ -75,10 +73,7 @@ pub async fn delete_destination(
 }
 
 #[tracing::instrument]
-pub async fn get_destination(
-    org_id: &str,
-    name: &str,
-) -> Result<AlertDestinationResponse, anyhow::Error> {
+pub async fn get_destination(org_id: &str, name: &str) -> Result<Response, anyhow::Error> {
     db::alerts::destinations::get(org_id, name)
         .await
         .map_err(|_| anyhow::anyhow!("Alert destination not found"))

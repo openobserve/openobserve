@@ -15,7 +15,6 @@
 
 use ahash::HashMap;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use utoipa::ToSchema;
 
 use super::StreamType;
@@ -61,80 +60,6 @@ pub struct TriggerCondition {
     pub threshold: i64,     // 3 times
     pub frequency: i64,     // 1 minute
     pub silence: i64,       // silence for 10 minutes after fire an alert
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct AlertDestination {
-    pub name: Option<String>,
-    pub url: String,
-    pub method: AlertHTTPType,
-    #[serde(default)]
-    pub skip_tls_verify: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub headers: Option<HashMap<String, String>>,
-    pub template: String,
-}
-
-impl AlertDestination {
-    pub fn to_dest_resp(&self, template: DestinationTemplate) -> AlertDestinationResponse {
-        AlertDestinationResponse {
-            url: self.url.clone(),
-            method: self.method.clone(),
-            skip_tls_verify: self.skip_tls_verify,
-            headers: self.headers.clone(),
-            template,
-            name: self.name.clone().unwrap(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct AlertDestinationResponse {
-    pub name: String,
-    pub url: String,
-    pub method: AlertHTTPType,
-    #[serde(default)]
-    pub skip_tls_verify: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub headers: Option<HashMap<String, String>>,
-    pub template: DestinationTemplate,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-pub enum AlertHTTPType {
-    #[default]
-    #[serde(rename = "post")]
-    POST,
-    #[serde(rename = "put")]
-    PUT,
-    #[serde(rename = "get")]
-    GET,
-}
-
-impl fmt::Display for AlertHTTPType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AlertHTTPType::POST => write!(f, "post"),
-            AlertHTTPType::PUT => write!(f, "put"),
-            AlertHTTPType::GET => write!(f, "get"),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct DestinationTemplate {
-    pub name: Option<String>,
-    #[schema(value_type = Object)]
-    pub body: Value,
-    #[serde(rename = "isDefault")]
-    #[serde(default)]
-    pub is_default: Option<bool>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct Trigger {
-    pub next_run_at: i64,
-    pub is_silenced: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
