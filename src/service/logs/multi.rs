@@ -19,27 +19,25 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
-use crate::service::ingestion::TriggerAlertData;
-use crate::service::{
-    distinct_values, get_formatted_stream_name, ingestion::is_ingestion_allowed,
-    ingestion::write_file, logs::StreamMeta, usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alerts::Alert,
-            ingestion::{IngestionResponse, StreamStatus},
-            stream::StreamParams,
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+use crate::common::{
+    infra::{
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
     },
-    service::ingestion::evaluate_trigger,
+    meta::{
+        alerts::Alert,
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+};
+use crate::service::{
+    distinct_values, get_formatted_stream_name,
+    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
+    logs::StreamMeta,
+    usage::report_request_usage_stats,
 };
 
 /// Ingest a multiline json body but add extra keys to each json row
@@ -105,7 +103,7 @@ async fn ingest_inner(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
@@ -199,7 +197,7 @@ async fn ingest_inner(
         );
 
         // write data
-        trigger = super::add_valid_record(
+        let local_trigger = super::add_valid_record(
             &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
@@ -214,6 +212,9 @@ async fn ingest_inner(
             trigger.is_none(),
         )
         .await;
+        if local_trigger.is_some() {
+            trigger = local_trigger;
+        }
 
         // get distinct_value item
         for field in DISTINCT_FIELDS.iter() {

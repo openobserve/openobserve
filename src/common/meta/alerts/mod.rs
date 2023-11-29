@@ -19,7 +19,7 @@ use std::fmt;
 use utoipa::ToSchema;
 
 use super::StreamType;
-use crate::common::utils::json::{Map, Value};
+use crate::common::utils::json::Value;
 
 pub mod destinations;
 pub mod templates;
@@ -35,11 +35,10 @@ pub struct Alert {
     pub stream_name: String,
     #[serde(default)]
     pub is_real_time: bool,
+    #[serde(default)]
     pub query_condition: QueryCondition,
-    pub period: i64,    // 10 minutes
-    pub threshold: i64, // 3 times
-    pub frequency: i64, // 1 minute
-    pub silence: i64,   // silence for 10 minutes after fire an alert
+    #[serde(default)]
+    pub trigger_condition: TriggerCondition,
     pub destinations: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
@@ -53,6 +52,15 @@ impl PartialEq for Alert {
             && self.stream_type == other.stream_type
             && self.stream_name == other.stream_name
     }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct TriggerCondition {
+    pub period: i64,        // 10 minutes
+    pub operator: Operator, // >=
+    pub threshold: i64,     // 3 times
+    pub frequency: i64,     // 1 minute
+    pub silence: i64,       // silence for 10 minutes after fire an alert
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -129,7 +137,7 @@ pub struct Trigger {
     pub is_silenced: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct QueryCondition {
     pub conditions: Option<Vec<Condition>>,
     pub sql: Option<String>,
@@ -140,7 +148,7 @@ pub struct QueryCondition {
 #[serde(rename_all = "camelCase")]
 pub struct Condition {
     pub column: String,
-    pub operator: AllOperator,
+    pub operator: Operator,
     #[serde(default)]
     pub ignore_case: Option<bool>,
     #[schema(value_type = Object)]
@@ -148,99 +156,8 @@ pub struct Condition {
     pub is_numeric: Option<bool>,
 }
 
-impl Evaluate for Condition {
-    fn evaluate(&self, row: Map<String, Value>) -> bool {
-        if !row.contains_key(&self.column) {
-            return false;
-        };
-
-        let evaluate_numeric = if self.is_numeric.is_some() {
-            self.is_numeric.unwrap()
-        } else {
-            matches!(row.get(&self.column).unwrap(), Value::Number(_))
-        };
-
-        /* let evaluate_numeric = match row.get(&self.column).expect("column exists") {
-            Value::Number(number) => number.as_f64().unwrap() > 0.0,
-            Value::String(s) => s.is_empty(),
-            _ => false,
-        }; */
-
-        if evaluate_numeric {
-            let number = match row.get(&self.column).expect("column exists") {
-                Value::Number(number) => number,
-                _ => unreachable!("please make sure right value for is_numeric is set trigger"),
-            };
-
-            match self.operator {
-                AllOperator::EqualTo => number.as_f64().unwrap() == get_numeric_val(&self.value),
-                AllOperator::NotEqualTo => number.as_f64().unwrap() != get_numeric_val(&self.value),
-                AllOperator::GreaterThan => number.as_f64().unwrap() > get_numeric_val(&self.value),
-                AllOperator::GreaterThanEquals => {
-                    number.as_f64().unwrap() >= get_numeric_val(&self.value)
-                }
-                AllOperator::LessThan => number.as_f64().unwrap() < get_numeric_val(&self.value),
-                AllOperator::LessThanEquals => {
-                    number.as_f64().unwrap() <= get_numeric_val(&self.value)
-                }
-                _ => false,
-            }
-        } else {
-            let string = match row.get(&self.column).expect("column exists") {
-                Value::String(s) => s,
-                _ => unreachable!("please make sure right value for is_numeric is set trigger"),
-            };
-
-            if self.ignore_case.unwrap_or_default() {
-                match self.operator {
-                    AllOperator::EqualTo => {
-                        string.eq_ignore_ascii_case(self.value.as_str().unwrap())
-                    }
-                    AllOperator::NotEqualTo => {
-                        !string.eq_ignore_ascii_case(self.value.as_str().unwrap())
-                    }
-                    AllOperator::Contains => string
-                        .to_ascii_lowercase()
-                        .contains(&self.value.as_str().unwrap().to_ascii_lowercase()),
-                    AllOperator::NotContains => !string
-                        .to_ascii_lowercase()
-                        .contains(&self.value.as_str().unwrap().to_ascii_lowercase()),
-                    _ => false,
-                }
-            } else {
-                match self.operator {
-                    AllOperator::EqualTo => string.eq(self.value.as_str().unwrap()),
-                    AllOperator::NotEqualTo => !string.eq(self.value.as_str().unwrap()),
-                    AllOperator::Contains => string.contains(self.value.as_str().unwrap()),
-                    AllOperator::NotContains => !string.contains(self.value.as_str().unwrap()),
-                    _ => false,
-                }
-            }
-        }
-    }
-}
-
-fn get_numeric_val(value: &Value) -> f64 {
-    if value.is_boolean() {
-        f64::INFINITY
-    } else if value.is_f64() {
-        value.as_f64().unwrap()
-    } else if value.is_i64() {
-        value.as_i64().unwrap() as f64
-    } else if value.is_u64() {
-        value.as_u64().unwrap() as f64
-    } else if value.is_string() {
-        match value.as_str().unwrap().to_string().parse::<f64>() {
-            Ok(val) => val,
-            Err(_) => f64::INFINITY,
-        }
-    } else {
-        f64::INFINITY
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub enum AllOperator {
+pub enum Operator {
     #[serde(alias = "=")]
     EqualTo,
     #[serde(alias = "!=")]
@@ -257,31 +174,8 @@ pub enum AllOperator {
     NotContains,
 }
 
-impl Default for AllOperator {
+impl Default for Operator {
     fn default() -> Self {
         Self::EqualTo
-    }
-}
-
-pub trait Evaluate {
-    fn evaluate(&self, row: Map<String, Value>) -> bool;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::common::utils::json::json;
-
-    #[test]
-    fn test_evaluate() {
-        let condition = Condition {
-            column: "occurrence".to_owned(),
-            operator: AllOperator::GreaterThanEquals,
-            ignore_case: None,
-            value: json!("5"),
-            is_numeric: None,
-        };
-        let row = json!({"Country":"USA","occurrence": 10});
-        condition.evaluate(row.as_object().unwrap().clone());
     }
 }

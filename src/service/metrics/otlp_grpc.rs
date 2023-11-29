@@ -27,24 +27,25 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use super::{format_label_name, get_exclude_labels};
-use crate::common::meta::alerts::Alert;
-use crate::common::meta::stream::StreamParams;
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics},
     meta::{
-        alerts, http::HttpResponse as MetaHttpResponse, prom::*, stream::PartitioningDetails,
-        usage::UsageType, StreamType,
+        alerts::{self, Alert},
+        http::HttpResponse as MetaHttpResponse,
+        prom::*,
+        stream::PartitioningDetails,
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
     },
     utils::{flatten, json},
 };
-use crate::service::format_stream_name;
-use crate::service::ingestion::{evaluate_trigger, TriggerAlertData};
 use crate::service::{
-    db,
+    db, format_stream_name,
     ingestion::{
-        chk_schema_by_record,
+        chk_schema_by_record, evaluate_trigger,
         grpc::{get_exemplar_val, get_metric_val, get_val},
-        write_file,
+        write_file, TriggerAlertData,
     },
     schema::{set_schema_metadata, stream_schema_exists},
     stream::unwrap_partition_time_level,
@@ -302,7 +303,7 @@ pub async fn handle_grpc_request(
                                 Vec<json::Map<String, json::Value>>,
                             )> = Vec::new();
                             for alert in alerts {
-                                if let Ok(Some(v)) = alert.check_realtime(val_map).await {
+                                if let Ok(Some(v)) = alert.evaluate(val_map).await {
                                     trigger_alerts.push((alert.clone(), v));
                                 }
                             }

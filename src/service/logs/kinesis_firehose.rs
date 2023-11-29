@@ -18,34 +18,31 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 
 use super::{ingest::decode_and_decompress, StreamMeta};
-use crate::service::ingestion::TriggerAlertData;
-use crate::service::{
-    db, distinct_values, get_formatted_stream_name, ingestion::write_file,
-    usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alerts::Alert,
-            ingestion::{
-                AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest,
-                StreamStatus,
-            },
-            stream::StreamParams,
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{
-            flatten, json,
-            time::{parse_i64_to_timestamp_micros, parse_timestamp_micro_from_value},
-        },
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
     },
-    service::ingestion::evaluate_trigger,
+    meta::{
+        alerts::Alert,
+        ingestion::{
+            AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest,
+            StreamStatus,
+        },
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{
+        flatten, json,
+        time::{parse_i64_to_timestamp_micros, parse_timestamp_micro_from_value},
+    },
+};
+use crate::service::{
+    db, distinct_values, get_formatted_stream_name,
+    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    usage::report_request_usage_stats,
 };
 
 pub async fn process(
@@ -72,7 +69,7 @@ pub async fn process(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
@@ -218,7 +215,7 @@ pub async fn process(
                 );
 
                 // write data
-                trigger = super::add_valid_record(
+                let local_trigger = super::add_valid_record(
                     &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
@@ -233,6 +230,9 @@ pub async fn process(
                     trigger.is_none(),
                 )
                 .await;
+                if local_trigger.is_some() {
+                    trigger = local_trigger;
+                }
 
                 // get distinct_value item
                 for field in DISTINCT_FIELDS.iter() {

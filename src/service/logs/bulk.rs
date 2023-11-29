@@ -20,33 +20,30 @@ use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
 use super::StreamMeta;
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
+    meta::{
+        alerts::Alert,
+        functions::{StreamTransform, VRLResultResolver},
+        ingestion::{
+            BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
+            StreamSchemaChk,
+        },
+        stream::{PartitioningDetails, StreamParams},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+};
 use crate::service::{
     db, distinct_values,
-    ingestion::{evaluate_trigger, write_file},
+    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alerts::Alert,
-            functions::{StreamTransform, VRLResultResolver},
-            ingestion::{
-                BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
-                StreamSchemaChk,
-            },
-            stream::{PartitioningDetails, StreamParams},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    },
-    service::ingestion::TriggerAlertData,
 };
 
 pub const TRANSFORM_FAILED: &str = "document_failed_transform";
@@ -75,7 +72,7 @@ pub async fn ingest(
     };
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
@@ -260,7 +257,7 @@ pub async fn ingest(
             // only for bulk insert
             let mut status = RecordStatus::default();
             let need_trigger = !stream_trigger_map.contains_key(&stream_name);
-            let trigger = super::add_valid_record(
+            let local_trigger = super::add_valid_record(
                 &StreamMeta {
                     org_id: org_id.to_string(),
                     stream_name: stream_name.clone(),
@@ -275,8 +272,8 @@ pub async fn ingest(
                 need_trigger,
             )
             .await;
-            if trigger.is_some() {
-                stream_trigger_map.insert(stream_name.clone(), trigger);
+            if local_trigger.is_some() {
+                stream_trigger_map.insert(stream_name.clone(), local_trigger);
             }
 
             // get distinct_value item

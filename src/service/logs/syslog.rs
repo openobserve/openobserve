@@ -21,26 +21,25 @@ use std::net::SocketAddr;
 use syslog_loose::{Message, ProcId, Protocol};
 
 use super::StreamMeta;
-use crate::service::ingestion::TriggerAlertData;
-use crate::service::{db, distinct_values, get_formatted_stream_name, ingestion::write_file};
-use crate::{
-    common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS, SYSLOG_ROUTES},
-            metrics,
-        },
-        meta::{
-            alerts::Alert,
-            http::HttpResponse as MetaHttpResponse,
-            ingestion::{IngestionResponse, StreamStatus},
-            stream::StreamParams,
-            syslog::SyslogRoute,
-            StreamType,
-        },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS, SYSLOG_ROUTES},
+        metrics,
     },
-    service::ingestion::evaluate_trigger,
+    meta::{
+        alerts::Alert,
+        http::HttpResponse as MetaHttpResponse,
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::StreamParams,
+        syslog::SyslogRoute,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+};
+use crate::service::{
+    db, distinct_values, get_formatted_stream_name,
+    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
 };
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow::Error> {
@@ -159,7 +158,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
         json::Value::Number(timestamp.into()),
     );
 
-    trigger = super::add_valid_record(
+    let local_trigger = super::add_valid_record(
         &StreamMeta {
             org_id: org_id.to_string(),
             stream_name: stream_name.to_string(),
@@ -174,6 +173,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
         trigger.is_none(),
     )
     .await;
+    if local_trigger.is_some() {
+        trigger = local_trigger;
+    }
 
     // get distinct_value item
     for field in DISTINCT_FIELDS.iter() {

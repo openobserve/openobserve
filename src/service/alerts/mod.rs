@@ -15,9 +15,16 @@
 
 use actix_web::http;
 
-use crate::common::meta::{alerts::Alert, StreamType};
-use crate::common::utils::json;
-use crate::common::utils::schema_ext::SchemaExt;
+use crate::common::{
+    meta::{
+        alerts::{Alert, Condition, Operator, QueryCondition},
+        StreamType,
+    },
+    utils::{
+        json::{Map, Value},
+        schema_ext::SchemaExt,
+    },
+};
 use crate::service::db;
 
 pub mod alert_manager;
@@ -197,16 +204,94 @@ pub async fn trigger_alert(
 }
 
 impl Alert {
-    pub async fn check_realtime(
+    pub async fn evaluate(
         &self,
-        _data: &json::Map<String, json::Value>,
-    ) -> Result<Option<Vec<json::Map<String, json::Value>>>, anyhow::Error> {
-        Ok(None)
+        row: &Map<String, Value>,
+    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+        if !self.enabled {
+            return Ok(None);
+        }
+        match self.is_real_time {
+            true => self.query_condition.evaluate_realtime(row).await,
+            false => self.query_condition.evaluate_schedule(row).await,
+        }
+    }
+}
+
+impl QueryCondition {
+    pub async fn evaluate_realtime(
+        &self,
+        row: &Map<String, Value>,
+    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+        if self.conditions.is_none() {
+            return Ok(None);
+        }
+        let conditions = self.conditions.as_ref().unwrap();
+        if conditions.is_empty() {
+            return Ok(None);
+        }
+        for condition in conditions.iter() {
+            if !condition.evaluate(row).await {
+                return Ok(None);
+            }
+        }
+        Ok(Some(vec![row.to_owned()]))
     }
 
-    pub async fn check_schedule(
+    pub async fn evaluate_schedule(
         &self,
-    ) -> Result<Option<Vec<json::Map<String, json::Value>>>, anyhow::Error> {
-        Ok(None)
+        _row: &Map<String, Value>,
+    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+        todo!()
+    }
+}
+
+impl Condition {
+    pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+        let val = match row.get(&self.column) {
+            Some(val) => val,
+            None => {
+                return false;
+            }
+        };
+        match val {
+            Value::String(v) => {
+                let val = v.as_str();
+                let con_val = self.value.as_str().unwrap_or_default();
+                match self.operator {
+                    Operator::EqualTo => val == con_val,
+                    Operator::NotEqualTo => val != con_val,
+                    Operator::GreaterThan => val > con_val,
+                    Operator::GreaterThanEquals => val >= con_val,
+                    Operator::LessThan => val < con_val,
+                    Operator::LessThanEquals => val <= con_val,
+                    Operator::Contains => val.contains(con_val),
+                    Operator::NotContains => !val.contains(con_val),
+                }
+            }
+            Value::Number(_) => {
+                let val = val.as_f64().unwrap_or_default();
+                let con_val = self.value.as_f64().unwrap_or_default();
+                match self.operator {
+                    Operator::EqualTo => val == con_val,
+                    Operator::NotEqualTo => val != con_val,
+                    Operator::GreaterThan => val > con_val,
+                    Operator::GreaterThanEquals => val >= con_val,
+                    Operator::LessThan => val < con_val,
+                    Operator::LessThanEquals => val <= con_val,
+                    _ => false,
+                }
+            }
+            Value::Bool(v) => {
+                let val = v.to_owned();
+                let con_val = self.value.as_bool().unwrap_or_default();
+                match self.operator {
+                    Operator::EqualTo => val == con_val,
+                    Operator::NotEqualTo => val != con_val,
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
     }
 }

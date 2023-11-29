@@ -25,30 +25,30 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use super::StreamMeta;
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
+    meta::{
+        alerts::Alert,
+        http::HttpResponse as MetaHttpResponse,
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+};
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
-    ingestion::{grpc::get_val, grpc::get_val_with_type_retained, write_file, TriggerAlertData},
+    ingestion::{
+        evaluate_trigger, grpc::get_val, grpc::get_val_with_type_retained, write_file,
+        TriggerAlertData,
+    },
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alerts::Alert,
-            http::HttpResponse as MetaHttpResponse,
-            ingestion::{IngestionResponse, StreamStatus},
-            stream::StreamParams,
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    },
-    service::ingestion::evaluate_trigger,
 };
 
 pub async fn usage_ingest(
@@ -79,7 +79,7 @@ pub async fn usage_ingest(
     }
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
@@ -137,7 +137,7 @@ pub async fn usage_ingest(
             json::Value::Number(timestamp.into()),
         );
 
-        trigger = super::add_valid_record(
+        let local_trigger = super::add_valid_record(
             &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
@@ -152,6 +152,9 @@ pub async fn usage_ingest(
             trigger.is_none(),
         )
         .await;
+        if local_trigger.is_some() {
+            trigger = local_trigger;
+        }
 
         // get distinct_value item
         for field in DISTINCT_FIELDS.iter() {
@@ -394,7 +397,7 @@ pub async fn handle_grpc_request(
                 // get json object
                 let local_val = rec.as_object_mut().unwrap();
 
-                trigger = super::add_valid_record(
+                let local_trigger = super::add_valid_record(
                     &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
@@ -409,6 +412,9 @@ pub async fn handle_grpc_request(
                     trigger.is_none(),
                 )
                 .await;
+                if local_trigger.is_some() {
+                    trigger = local_trigger;
+                }
 
                 // get distinct_value item
                 for field in DISTINCT_FIELDS.iter() {

@@ -44,13 +44,11 @@ use crate::common::{
 };
 use crate::service::{
     db, distinct_values, format_partition_key, format_stream_name,
-    ingestion::{grpc::get_val, write_file},
+    ingestion::{evaluate_trigger, grpc::get_val, write_file, TriggerAlertData},
     schema::{add_stream_schema, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
 };
-
-use super::ingestion::{evaluate_trigger, TriggerAlertData};
 
 pub mod otlp_http;
 
@@ -143,7 +141,7 @@ pub async fn handle_trace_request(
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
     for res_span in res_spans {
@@ -300,7 +298,7 @@ pub async fn handle_trace_request(
                         let mut trigger_alerts: Vec<(Alert, Vec<json::Map<String, json::Value>>)> =
                             Vec::new();
                         for alert in alerts {
-                            if let Ok(Some(v)) = alert.check_realtime(val_map).await {
+                            if let Ok(Some(v)) = alert.evaluate(val_map).await {
                                 trigger_alerts.push((alert.clone(), v));
                             }
                         }

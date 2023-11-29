@@ -23,28 +23,24 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
+    meta::{
+        alerts::Alert, http::HttpResponse as MetaHttpResponse, ingestion::StreamStatus,
+        stream::StreamParams, usage::UsageType, StreamType,
+    },
+    utils::{flatten, json},
+};
 use crate::handler::http::request::CONTENT_TYPE_JSON;
-use crate::service::ingestion::TriggerAlertData;
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
-    ingestion::{grpc::get_val_for_attr, write_file},
+    ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file, TriggerAlertData},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alerts::Alert, http::HttpResponse as MetaHttpResponse, ingestion::StreamStatus,
-            stream::StreamParams, usage::UsageType, StreamType,
-        },
-        utils::{flatten, json},
-    },
-    service::ingestion::evaluate_trigger,
 };
 
 use super::StreamMeta;
@@ -125,7 +121,7 @@ pub async fn logs_json_handler(
     let mut trigger: TriggerAlertData = None;
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let partition_det =
         crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
@@ -302,7 +298,7 @@ pub async fn logs_json_handler(
 
                     local_val = value.as_object_mut().unwrap();
 
-                    trigger = super::add_valid_record(
+                    let local_trigger = super::add_valid_record(
                         &StreamMeta {
                             org_id: org_id.to_string(),
                             stream_name: stream_name.to_string(),
@@ -317,6 +313,9 @@ pub async fn logs_json_handler(
                         trigger.is_none(),
                     )
                     .await;
+                    if local_trigger.is_some() {
+                        trigger = local_trigger;
+                    }
 
                     // get distinct_value item
                     for field in DISTINCT_FIELDS.iter() {

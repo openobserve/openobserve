@@ -26,10 +26,9 @@ use crate::common::{
         json::{Map, Value},
     },
 };
-use crate::service::schema::check_for_schema;
-
-use super::{
+use crate::service::{
     ingestion::{get_value, get_wal_time_key, TriggerAlertData},
+    schema::check_for_schema,
     stream::unwrap_partition_time_level,
 };
 
@@ -280,7 +279,7 @@ async fn add_valid_record<'a>(
                 );
                 if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
                     for alert in alerts {
-                        if let Ok(Some(v)) = alert.check_realtime(local_val).await {
+                        if let Ok(Some(v)) = alert.evaluate(local_val).await {
                             trigger.push((alert.clone(), v));
                         }
                     }

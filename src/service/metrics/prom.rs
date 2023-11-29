@@ -21,41 +21,34 @@ use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use std::collections::HashMap;
 
-use crate::{
-    common::meta::alerts::Alert,
-    service::{
-        db,
-        ingestion::{chk_schema_by_record, evaluate_trigger, write_file, TriggerAlertData},
-        schema::{set_schema_metadata, stream_schema_exists},
-        search as search_service,
-        stream::unwrap_partition_time_level,
-        usage::report_request_usage_stats,
-    },
-};
-use crate::{
-    common::{
-        infra::{
-            cache::stats,
-            cluster::{self, LOCAL_NODE_UUID},
-            config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-            errors::{Error, Result},
-            metrics,
-        },
-        meta::{
-            alerts,
-            functions::StreamTransform,
-            prom::*,
-            search,
-            stream::{PartitioningDetails, StreamParams},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{json, time::parse_i64_to_timestamp_micros},
-    },
-    service::format_stream_name,
-};
-
 use super::format_label_name;
+use crate::common::{
+    infra::{
+        cache::stats,
+        cluster::{self, LOCAL_NODE_UUID},
+        config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+        errors::{Error, Result},
+        metrics,
+    },
+    meta::{
+        alerts::{self, Alert},
+        functions::StreamTransform,
+        prom::*,
+        search,
+        stream::{PartitioningDetails, StreamParams},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{json, time::parse_i64_to_timestamp_micros},
+};
+use crate::service::{
+    db, format_stream_name,
+    ingestion::{chk_schema_by_record, evaluate_trigger, write_file, TriggerAlertData},
+    schema::{set_schema_metadata, stream_schema_exists},
+    search as search_service,
+    stream::unwrap_partition_time_level,
+    usage::report_request_usage_stats,
+};
 
 pub(crate) mod prometheus {
     include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
@@ -76,7 +69,7 @@ pub async fn remote_write(
     }
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let dedup_enabled = CONFIG.common.metrics_dedup_enabled;
     let election_interval = CONFIG.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
@@ -318,7 +311,7 @@ pub async fn remote_write(
                     let mut trigger_alerts: Vec<(Alert, Vec<json::Map<String, json::Value>>)> =
                         Vec::new();
                     for alert in alerts {
-                        if let Ok(Some(v)) = alert.check_realtime(val_map).await {
+                        if let Ok(Some(v)) = alert.evaluate(val_map).await {
                             trigger_alerts.push((alert.clone(), v));
                         }
                     }

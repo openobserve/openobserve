@@ -26,30 +26,30 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use super::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request};
+use crate::common::{
+    infra::{cluster, config::CONFIG, metrics},
+    meta::{
+        self,
+        alerts::Alert,
+        http::HttpResponse as MetaHttpResponse,
+        prom::{self, MetricType, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+        stream::{PartitioningDetails, StreamParams},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json},
+};
+use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
-    db,
-    ingestion::{chk_schema_by_record, grpc::get_val_for_attr, write_file, TriggerAlertData},
+    db, format_stream_name,
+    ingestion::{
+        chk_schema_by_record, evaluate_trigger, grpc::get_val_for_attr, write_file,
+        TriggerAlertData,
+    },
     schema::{set_schema_metadata, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
 };
-use crate::{
-    common::{
-        infra::{cluster, config::CONFIG, metrics},
-        meta::{
-            self,
-            alerts::Alert,
-            http::HttpResponse as MetaHttpResponse,
-            prom::{self, MetricType, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, StreamParams},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json},
-    },
-    service::format_stream_name,
-};
-use crate::{handler::http::request::CONTENT_TYPE_JSON, service::ingestion::evaluate_trigger};
 
 const SERVICE: &str = "service";
 
@@ -407,7 +407,7 @@ pub async fn metrics_json_handler(
                                     Vec<json::Map<String, json::Value>>,
                                 )> = Vec::new();
                                 for alert in alerts {
-                                    if let Ok(Some(v)) = alert.check_realtime(val_map).await {
+                                    if let Ok(Some(v)) = alert.evaluate(val_map).await {
                                         trigger_alerts.push((alert.clone(), v));
                                     }
                                 }

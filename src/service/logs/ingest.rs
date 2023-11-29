@@ -23,32 +23,29 @@ use std::io::{BufRead, Read};
 use vrl::compiler::runtime::Runtime;
 
 use super::StreamMeta;
-use crate::service::ingestion::TriggerAlertData;
-use crate::service::{
-    distinct_values, get_formatted_stream_name, ingestion::is_ingestion_allowed,
-    ingestion::write_file, usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alerts::Alert,
-            functions::{StreamTransform, VRLResultResolver},
-            ingestion::{
-                AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter,
-                IngestionError, IngestionRequest, KinesisFHData, KinesisFHIngestionResponse,
-            },
-            ingestion::{IngestionResponse, StreamStatus},
-            stream::StreamParams,
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+use crate::common::{
+    infra::{
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
     },
-    service::ingestion::evaluate_trigger,
+    meta::{
+        alerts::Alert,
+        functions::{StreamTransform, VRLResultResolver},
+        ingestion::{
+            AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
+            IngestionRequest, IngestionResponse, KinesisFHData, KinesisFHIngestionResponse,
+            StreamStatus,
+        },
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+};
+use crate::service::{
+    distinct_values, get_formatted_stream_name,
+    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
+    usage::report_request_usage_stats,
 };
 
 pub async fn ingest(
@@ -60,22 +57,22 @@ pub async fn ingest(
     let start = std::time::Instant::now();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut distinct_values = Vec::with_capacity(16);
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
-
     if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
         return Err(value);
     }
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
+    let mut distinct_values = Vec::with_capacity(16);
     let mut trigger: TriggerAlertData = None;
+
     let multi_req: &Bytes;
     let reader: Vec<json::Value>;
 
@@ -87,11 +84,6 @@ pub async fn ingest(
     );
     // End Register Transforms for stream
 
-    let partition_det =
-        crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
-    let partition_keys = partition_det.partition_keys;
-    let partition_time_level = partition_det.partition_time_level;
-
     // Start get stream alerts
     crate::service::ingestion::get_stream_alerts(
         org_id,
@@ -101,6 +93,11 @@ pub async fn ingest(
     )
     .await;
     // End get stream alert
+
+    let partition_det =
+        crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
+    let partition_keys = partition_det.partition_keys;
+    let partition_time_level = partition_det.partition_time_level;
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
     let ep: &str;
@@ -150,7 +147,7 @@ pub async fn ingest(
                                 continue;
                             }
                         }
-                        trigger = super::add_valid_record(
+                        let local_trigger = super::add_valid_record(
                             &StreamMeta {
                                 org_id: org_id.to_string(),
                                 stream_name: stream_name.to_string(),
@@ -165,6 +162,9 @@ pub async fn ingest(
                             trigger.is_none(),
                         )
                         .await;
+                        if local_trigger.is_some() {
+                            trigger = local_trigger;
+                        }
 
                         // get distinct_value item
                         for field in DISTINCT_FIELDS.iter() {
@@ -208,9 +208,6 @@ pub async fn ingest(
         ));
     }
 
-    // only one trigger per request, as it updates etcd
-    evaluate_trigger(trigger).await;
-
     // send distinct_values
     if !distinct_values.is_empty() {
         if let Err(e) = distinct_values::write(org_id, distinct_values).await {
@@ -218,6 +215,10 @@ pub async fn ingest(
         }
     }
 
+    // only one trigger per request, as it updates etcd
+    evaluate_trigger(trigger).await;
+
+    // update ingestion metrics
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
@@ -239,7 +240,8 @@ pub async fn ingest(
         .inc();
 
     req_stats.response_time = start.elapsed().as_secs_f64();
-    //metric + data usage
+
+    // report data usage
     report_request_usage_stats(
         req_stats,
         org_id,
@@ -454,12 +456,6 @@ impl<'a> IngestionData<'a> {
                                     } else {
                                         local_val.insert("message".to_owned(), local_msg.into());
                                     }
-
-                                    /*  // handling of timestamp
-                                    timestamp = match event.timestamp {
-                                        Some(v) => parse_i64_to_timestamp_micros(v),
-                                        None => Utc::now().timestamp_micros(),
-                                    }; */
 
                                     local_val.insert(
                                         CONFIG.common.column_timestamp.clone(),

@@ -19,27 +19,25 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
-use crate::service::ingestion::TriggerAlertData;
-use crate::service::{
-    distinct_values, get_formatted_stream_name, ingestion::is_ingestion_allowed,
-    ingestion::write_file, usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alerts::Alert,
-            ingestion::{IngestionResponse, StreamStatus},
-            stream::StreamParams,
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+use crate::common::{
+    infra::{
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
     },
-    service::ingestion::evaluate_trigger,
+    meta::{
+        alerts::Alert,
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+};
+use crate::service::{
+    distinct_values, get_formatted_stream_name,
+    ingestion::is_ingestion_allowed,
+    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    usage::report_request_usage_stats,
 };
 
 pub async fn ingest(
@@ -59,7 +57,7 @@ pub async fn ingest(
     }
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
@@ -145,7 +143,7 @@ pub async fn ingest(
             json::Value::Number(timestamp.into()),
         );
 
-        trigger = super::add_valid_record(
+        let local_trigger = super::add_valid_record(
             &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
@@ -160,6 +158,9 @@ pub async fn ingest(
             trigger.is_none(),
         )
         .await;
+        if local_trigger.is_some() {
+            trigger = local_trigger;
+        }
 
         // get distinct_value item
         for field in DISTINCT_FIELDS.iter() {

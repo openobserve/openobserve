@@ -21,6 +21,7 @@ pub async fn send_notification(
     _alert: &Alert,
     _data: Vec<super::json::Map<String, super::json::Value>>,
 ) -> Result<(), Box<dyn StdError>> {
+    log::info!("Sending notification");
     // let alert_type = match &trigger.is_ingest_time {
     //     true => "Real time",
     //     false => "Scheduled",
