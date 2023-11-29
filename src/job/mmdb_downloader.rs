@@ -86,7 +86,7 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
 async fn run_download_files() {
     // send request and await response
     let client = reqwest::ClientBuilder::default().build().unwrap();
-    let fname = format!("{}/{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
+    let fname = format!("{}{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
 
     let download_files =
         match is_digest_different(&fname, &CONFIG.common.mmdb_geolite_citydb_sha256_url).await {
