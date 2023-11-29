@@ -463,7 +463,7 @@ pub async fn search_arrow(
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
     // cache files
-    let work_dir = format!("{}_arrow", session_id);
+    let work_dir = session_id.to_string();
     for file in files.clone().iter() {
         let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
         match get_file_contents(&source_file) {
@@ -524,6 +524,7 @@ pub async fn search_arrow(
 
     // check schema version
     let files = tmpfs::list(&work_dir, FILE_EXT_ARROW).unwrap_or_default();
+
     let mut files_group: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(2);
     if !CONFIG.common.widening_schema_evolution {
         files_group.insert(
