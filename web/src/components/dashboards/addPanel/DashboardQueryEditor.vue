@@ -421,6 +421,15 @@ export default defineComponent({
             case "count-distinct":
               selector += `count(distinct(${field.column}))`;
               break;
+            case "histogram": {
+              // if inteval is not equal to auto, then use it
+              if (field?.args?.interval && field.args.interval != "auto") {
+                selector += `${field.aggregationFunction}(${field.column}, '${field.args.interval}')`;
+              } else {
+                selector += `${field.aggregationFunction}(${field.column})`;
+              }
+              break;
+            }
             default:
               selector += `${field.aggregationFunction}(${field.column})`;
               break;
