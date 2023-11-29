@@ -132,7 +132,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ].fields.x[index].aggregationFunction === 'histogram'
                   "
                 >
-                  histogram::::
+                  <!-- histogram interval for sql queries -->
+                  <q-select
+                    v-if="!promqlMode"
+                    :model-value="
+                      getHistoramIntervalField(
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.x[index]
+                      )
+                    "
+                    @update:model-value="(newValue: any) => {dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                  ].fields.x[index].args.interval = newValue}"
+                    label="Histogram interval"
+                    :options="histogramIntervalOptions"
+                    behavior="menu"
+                    :emit-value="true"
+                    filled
+                    borderless
+                    dense
+                  >
+                  </q-select>
                 </div>
                 <div
                   v-if="
@@ -303,6 +324,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val.length > 0 || 'Required']"
                 />
+                <!-- histogram interval if auto sql and aggregation function is histogram-->
+                <div
+                  v-if="
+                    !dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery &&
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y[index].aggregationFunction === 'histogram'
+                  "
+                >
+                  <!-- histogram interval for sql queries -->
+                  <q-select
+                    v-if="!promqlMode"
+                    :model-value="
+                      getHistoramIntervalField(
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.y[index]
+                      )
+                    "
+                    @update:model-value="(newValue: any) => {dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                  ].fields.y[index].args.interval = newValue}"
+                    label="Histogram interval"
+                    :options="histogramIntervalOptions"
+                    behavior="menu"
+                    :emit-value="true"
+                    filled
+                    borderless
+                    dense
+                  >
+                  </q-select>
+                </div>
                 <div
                   v-if="
                     !dashboardPanelData.data.queries[
@@ -771,6 +826,80 @@ export default defineComponent({
       { label: t("dashboard.histogram"), value: "histogram" },
     ];
 
+    const getHistoramIntervalField = (field: any) => {
+      // check if args is there
+      if (!field.args) {
+        // else set it default
+        field.args = {
+          interval: "auto",
+        };
+      }
+      return field.args.interval;
+    };
+
+    const histogramIntervalOptions = [
+      {
+        label: "Auto",
+        value: "auto",
+      },
+      {
+        label: "1 second",
+        value: "1 second",
+      },
+      {
+        label: "5 seconds",
+        value: "5 seconds",
+      },
+      {
+        label: "10 seconds",
+        value: "10 seconds",
+      },
+      {
+        label: "30 seconds",
+        value: "30 seconds",
+      },
+      {
+        label: "1 minute",
+        value: "1 minute",
+      },
+      {
+        label: "5 minutes",
+        value: "5 minutes",
+      },
+      {
+        label: "10 minutes",
+        value: "10 minutes",
+      },
+      {
+        label: "30 minutes",
+        value: "30 minutes",
+      },
+      {
+        label: "1 hour",
+        value: "1 hour",
+      },
+      {
+        label: "6 hours",
+        value: "6 hours",
+      },
+      {
+        label: "12 hours",
+        value: "12 hours",
+      },
+      {
+        label: "1 day",
+        value: "1 day",
+      },
+      {
+        label: "7 days",
+        value: "7 days",
+      },
+      {
+        label: "30 days",
+        value: "30 days",
+      },
+    ];
+
     watch(
       () => dashboardPanelData.meta.dragAndDrop.dragging,
       (newVal: boolean, oldVal: boolean) => {
@@ -958,6 +1087,8 @@ export default defineComponent({
       xLabel,
       yLabel,
       zLabel,
+      histogramIntervalOptions,
+      getHistoramIntervalField,
     };
   },
 });
