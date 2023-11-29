@@ -30,7 +30,7 @@ use crate::common::{
         alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
         ingestion::{IngestionResponse, StreamStatus},
-        stream::StreamParams,
+        stream::{SchemaRecords, StreamParams},
         syslog::SyslogRoute,
         StreamType,
     },
@@ -41,6 +41,7 @@ use crate::service::{
     ingestion::{evaluate_trigger, write_file, TriggerAlertData},
     logs::StreamMeta,
 };
+use crate::service::{db, distinct_values, get_formatted_stream_name, ingestion::write_file_arrow};
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow::Error> {
     let start = std::time::Instant::now();
@@ -115,7 +116,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
     );
     // End Register Transforms for stream
 
-    let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
 
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
@@ -158,7 +159,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
         json::Value::Number(timestamp.into()),
     );
 
-    let local_trigger = super::add_valid_record(
+    let local_trigger = super::add_valid_record_arrow(
         &StreamMeta {
             org_id: org_id.to_string(),
             stream_name: stream_name.to_string(),
@@ -194,7 +195,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
     }
 
     let mut stream_file_name = "".to_string();
-    write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
+    write_file_arrow(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;

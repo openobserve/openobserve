@@ -22,6 +22,8 @@ use utoipa::ToSchema;
 
 use crate::common::utils::json;
 
+use super::stream::SchemaRecords;
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {
     pub successful: u32,
@@ -32,7 +34,7 @@ pub struct RecordStatus {
 }
 
 pub struct BulkStreamData {
-    pub data: HashMap<String, Vec<String>>,
+    pub data: HashMap<String, SchemaRecords>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
