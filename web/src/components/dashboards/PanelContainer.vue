@@ -145,6 +145,24 @@ export default defineComponent({
       console.log("metadata panel", metadata);
     };
 
+    const dependentAdHocVariable = computed(() => {
+      const adhocVariables = props.variablesData.values
+        ?.filter((it: any) => it.type === "ad-hoc-filters")
+        ?.map((it: any) => it?.value)
+        .flat()
+        ?.filter((it: any) => it?.operator && it?.name && it?.value);
+      console.log("adhocVariables==", adhocVariables);
+
+      const metaDataDynamic = metaData.value?.queries?.every((it: any) => {
+        const vars = it.variables?.filter(
+          (it: any) => it.type === "dynamicVariable"
+        );
+        return vars.length == adhocVariables.length;
+      });
+      console.log("metaDataDynamic====", metaDataDynamic);
+      return !metaDataDynamic;
+    });
+
     // for full screen button
     const showFullScreenBtn: any = ref(false);
 
