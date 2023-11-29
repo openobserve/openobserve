@@ -18,5 +18,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Trigger {
     pub next_run_at: i64,
+    pub is_realtime: bool,
     pub is_silenced: bool,
 }

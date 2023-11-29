@@ -57,10 +57,10 @@ pub async fn save_alert(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::save_alert(
+    match alerts::save(
         &org_id,
-        &stream_name,
         stream_type,
+        &stream_name,
         &name,
         alert.into_inner(),
     )
@@ -101,7 +101,7 @@ async fn list_stream_alerts(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::list_alert(&org_id, Some(stream_name.as_str()), stream_type).await {
+    match alerts::list(&org_id, stream_type, Some(stream_name.as_str())).await {
         Ok(data) => {
             let mut mapdata = HashMap::new();
             mapdata.insert("list", data);
@@ -129,7 +129,7 @@ async fn list_stream_alerts(
 #[get("/{org_id}/alerts")]
 async fn list_alerts(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    match alerts::list_alert(&org_id, None, None).await {
+    match alerts::list(&org_id, None, None).await {
         Ok(data) => {
             let mut mapdata = HashMap::new();
             mapdata.insert("list", data);
@@ -170,7 +170,7 @@ async fn get_alert(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::get_alert(&org_id, &stream_name, stream_type, &name).await {
+    match alerts::get(&org_id, stream_type, &stream_name, &name).await {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => Ok(MetaHttpResponse::not_found(e)),
     }
@@ -208,7 +208,7 @@ async fn delete_alert(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::delete_alert(&org_id, &stream_name, stream_type, &name).await {
+    match alerts::delete(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert deleted")),
         Err(e) => match e {
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
@@ -256,7 +256,7 @@ async fn enable_alert(
     };
     let mut resp = HashMap::new();
     resp.insert("enabled".to_string(), enable);
-    match alerts::enable_alert(&org_id, &stream_name, stream_type, &name, enable).await {
+    match alerts::enable(&org_id, stream_type, &stream_name, &name, enable).await {
         Ok(_) => Ok(MetaHttpResponse::json(resp)),
         Err(e) => match e {
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
@@ -296,7 +296,7 @@ async fn trigger_alert(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::trigger_alert(&org_id, &stream_name, stream_type, &name).await {
+    match alerts::trigger(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert triggered")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }

@@ -41,7 +41,6 @@ use crate::common::{
         flatten,
         functions::get_vrl_compiler_config,
         json::{Map, Value},
-        notification::send_notification,
         schema::infer_json_schema,
     },
 };
@@ -182,8 +181,8 @@ pub async fn evaluate_trigger(trigger: TriggerAlertData) {
         return;
     }
     let trigger = trigger.unwrap();
-    for (alert, val) in trigger {
-        if let Err(e) = send_notification(&alert, val).await {
+    for (alert, val) in trigger.iter() {
+        if let Err(e) = alert.send_notification(val).await {
             log::error!("Failed to send notification: {}", e)
         }
     }

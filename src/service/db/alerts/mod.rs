@@ -34,8 +34,8 @@ pub mod triggers;
 
 pub async fn get(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, anyhow::Error> {
     let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -58,8 +58,8 @@ pub async fn get(
 
 pub async fn set(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     name: &str,
     alert: Alert,
 ) -> Result<(), anyhow::Error> {
@@ -80,8 +80,8 @@ pub async fn set(
 
 pub async fn delete(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     name: &str,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
@@ -93,8 +93,8 @@ pub async fn delete(
 
 pub async fn list(
     org_id: &str,
-    stream_name: Option<&str>,
     stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
     let db = infra_db::get_db().await;
 
@@ -131,6 +131,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let stream_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
                 let item_value: Alert = json::from_slice(&ev.value.unwrap()).unwrap();
+                let is_realtime = item_value.is_real_time;
                 let mut cacher = STREAM_ALERTS.write().await;
                 let group = cacher.entry(stream_key.to_string()).or_default();
                 if group.contains(&item_value) {
@@ -150,6 +151,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     let alert_name = columns[3];
                     let trigger = Trigger {
                         next_run_at: chrono::Utc::now().timestamp_micros(),
+                        is_realtime,
                         is_silenced: false,
                     };
                     if let Err(e) = crate::service::alerts::triggers::save(

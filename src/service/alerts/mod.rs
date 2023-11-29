@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http;
+use chrono::{Duration, Utc};
 
 use crate::common::{
     meta::{
-        alerts::{Alert, Condition, Operator, QueryCondition},
+        alerts::{triggers::Trigger, Alert, Condition, Operator, QueryCondition},
         StreamType,
     },
     utils::{
@@ -33,14 +34,15 @@ pub mod templates;
 pub mod triggers;
 
 #[tracing::instrument(skip_all)]
-pub async fn save_alert(
+pub async fn save(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     name: &str,
     mut alert: Alert,
 ) -> Result<(), anyhow::Error> {
     alert.name = name.to_string();
+    alert.org_id = org_id.to_string();
     alert.stream_type = stream_type;
     alert.stream_name = stream_name.to_string();
 
@@ -107,24 +109,34 @@ pub async fn save_alert(
     //     }
     // }
 
-    db::alerts::set(org_id, stream_name, stream_type, name, alert).await
+    db::alerts::set(org_id, stream_type, stream_name, name, alert).await
 }
 
-pub async fn list_alert(
+#[tracing::instrument]
+pub async fn get(
     org_id: &str,
-    stream_name: Option<&str>,
-    stream_type: Option<StreamType>,
-) -> Result<Vec<Alert>, anyhow::Error> {
-    db::alerts::list(org_id, stream_name, stream_type).await
-}
-
-pub async fn delete_alert(
-    org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
+    name: &str,
+) -> Result<Option<Alert>, anyhow::Error> {
+    db::alerts::get(org_id, stream_type, stream_name, name).await
+}
+
+pub async fn list(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> Result<Vec<Alert>, anyhow::Error> {
+    db::alerts::list(org_id, stream_type, stream_name).await
+}
+
+pub async fn delete(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
     name: &str,
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    if db::alerts::get(org_id, stream_name, stream_type, name)
+    if db::alerts::get(org_id, stream_type, stream_name, name)
         .await
         .is_err()
     {
@@ -133,20 +145,20 @@ pub async fn delete_alert(
             anyhow::anyhow!("Alert not found"),
         ));
     }
-    db::alerts::delete(org_id, stream_name, stream_type, name)
+    db::alerts::delete(org_id, stream_type, stream_name, name)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
 #[tracing::instrument]
-pub async fn enable_alert(
+pub async fn enable(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     name: &str,
     value: bool,
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    let mut alert = match db::alerts::get(org_id, stream_name, stream_type, name).await {
+    let mut alert = match db::alerts::get(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
             return Err((
@@ -156,26 +168,16 @@ pub async fn enable_alert(
         }
     };
     alert.enabled = value;
-    db::alerts::set(org_id, stream_name, stream_type, name, alert)
+    db::alerts::set(org_id, stream_type, stream_name, name, alert)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
 #[tracing::instrument]
-pub async fn get_alert(
+pub async fn trigger(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
-    name: &str,
-) -> Result<Option<Alert>, anyhow::Error> {
-    db::alerts::get(org_id, stream_name, stream_type, name).await
-}
-
-#[tracing::instrument]
-pub async fn trigger_alert(
-    org_id: &str,
     stream_name: &str,
-    stream_type: StreamType,
     name: &str,
 ) -> Result<(), anyhow::Error> {
     // let result = db::alerts::get(org_id, stream_name, stream_type, name).await;
@@ -215,6 +217,38 @@ impl Alert {
             true => self.query_condition.evaluate_realtime(row).await,
             false => self.query_condition.evaluate_schedule(row).await,
         }
+    }
+
+    pub async fn send_notification(
+        &self,
+        _row: &[Map<String, Value>],
+    ) -> Result<(), anyhow::Error> {
+        // TODO send the notification
+        log::warn!("send notification for alert [{}]", self.name);
+
+        // check the silence period
+        if self.trigger_condition.silence > 0 {
+            let trigger = Trigger {
+                next_run_at: (Utc::now() + Duration::minutes(self.trigger_condition.silence))
+                    .timestamp_micros(),
+                is_realtime: self.is_real_time,
+                is_silenced: true,
+            };
+            log::warn!(
+                "alert [{}] is silenced for {} minutes",
+                self.name,
+                self.trigger_condition.silence
+            );
+            triggers::save(
+                &self.org_id,
+                self.stream_type,
+                &self.stream_name,
+                &self.name,
+                &trigger,
+            )
+            .await?;
+        }
+        Ok(())
     }
 }
 

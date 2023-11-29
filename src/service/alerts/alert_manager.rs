@@ -15,23 +15,65 @@
 
 use chrono::Utc;
 
-use crate::common::infra::config::TRIGGERS;
+use crate::common::{
+    infra::config::TRIGGERS,
+    meta::{alerts::triggers::Trigger, StreamType},
+};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let now = Utc::now().timestamp_micros();
     let cacher = TRIGGERS.read().await;
+
     for (key, trigger) in cacher.iter() {
         if trigger.next_run_at < now {
             let key = key.to_string();
-            tokio::task::spawn(async move { handle_triggers(&key).await });
+            let is_realtime = trigger.is_realtime;
+            let is_silenced = trigger.is_silenced;
+            if is_realtime && !is_silenced {
+                // realtime trigger and not silenced, no need to schedule
+                continue;
+            }
+            tokio::task::spawn(async move {
+                if let Err(e) = handle_triggers(&key, is_realtime, is_silenced).await {
+                    log::error!("[ALERT_MANAGER] Error handling trigger: {}", e);
+                }
+            });
         }
     }
     Ok(())
 }
 
-pub async fn handle_triggers(key: &str) {
+pub async fn handle_triggers(
+    key: &str,
+    is_realtime: bool,
+    is_silenced: bool,
+) -> Result<(), anyhow::Error> {
     let columns = key.split('/').collect::<Vec<&str>>();
     assert_eq!(columns.len(), 4);
+    let org_id = columns[0];
+    let stream_type: StreamType = columns[1].into();
+    let stream_name = columns[2];
+    let alert_name = columns[3];
+
+    if is_realtime && is_silenced {
+        // wakeup the trigger
+        let local_trigger = Trigger {
+            next_run_at: Utc::now().timestamp_micros(),
+            is_realtime: true,
+            is_silenced: false,
+        };
+        super::triggers::save(org_id, stream_type, stream_name, alert_name, &local_trigger).await?;
+        return Ok(());
+    }
+
+    log::warn!(
+        "handle_triggers: {}/{}/{}/{}",
+        org_id,
+        stream_name,
+        stream_type,
+        alert_name
+    );
+    Ok(())
     // let org_id = columns[0];
     // let stream_type: StreamType = columns[1].into();
     // let stream_name = columns[2];

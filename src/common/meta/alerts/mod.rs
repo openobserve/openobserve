@@ -29,6 +29,8 @@ pub struct Alert {
     #[serde(default)]
     pub name: String,
     #[serde(default)]
+    pub org_id: String,
+    #[serde(default)]
     pub stream_type: StreamType,
     #[serde(default)]
     pub stream_name: String,

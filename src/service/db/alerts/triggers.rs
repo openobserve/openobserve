@@ -41,11 +41,15 @@ pub async fn set(
     alert_name: &str,
     trigger: &Trigger,
 ) -> Result<(), anyhow::Error> {
+    // cache the trigger first
+    let cache_key = format!("{org_id}/{stream_type}/{stream_name}/{alert_name}");
+    let db_key = format!("/trigger/{cache_key}");
+    TRIGGERS.write().await.insert(cache_key, trigger.clone());
+    // save the trigger
     let db = infra_db::get_db().await;
-    let key = format!("/trigger/{org_id}/{stream_type}/{stream_name}/{alert_name}");
     match db
         .put(
-            &key.clone(),
+            &db_key,
             json::to_vec(trigger).unwrap().into(),
             infra_db::NEED_WATCH,
         )
