@@ -95,6 +95,7 @@ pub async fn sql(
         let ctx = prepare_datafusion_context(&session.search_type)?;
         let mut record_batches = Vec::<RecordBatch>::new();
         for file in files.iter() {
+            println!("file: {:?}", file.key);
             let file_data = match tmpfs::get(&file.key) {
                 Ok(data) => data,
                 Err(_) => continue,
@@ -104,9 +105,12 @@ pub async fn sql(
 
             for read_result in stream_reader {
                 let record_batch = read_result?;
-                record_batches.push(record_batch);
+                if record_batch.num_rows() > 0 {
+                    record_batches.push(record_batch);
+                }
             }
         }
+        println!("record_batches: {:?}", record_batches.len());
         let schema = if let Some(first_batch) = record_batches.first() {
             first_batch.schema()
         } else {
