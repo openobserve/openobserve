@@ -684,11 +684,14 @@ const useLogs = () => {
               } else {
                 searchObj.data.errorMsg = err.message;
               }
-              const customMessage = logsErrorMessage(err.response.data.code);
-              searchObj.data.errorCode = err.response.data.code;
+
+              const customMessage = logsErrorMessage(err?.response?.data.code);
+              searchObj.data.errorCode = err?.response?.data.code;
+
               if (customMessage != "") {
                 searchObj.data.errorMsg = t(customMessage);
               }
+
               reject(false);
             });
         } else {

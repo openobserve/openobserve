@@ -31,6 +31,7 @@
     "copyToClipboard": "Naar klembord kopiëren",
     "includeSearchTerm": "Zoekterm opnemen",
     "addFieldToTable": "Veld aan tabel toevoegen",
+    "removeFieldFromTable": "Veld uit de tabel verwijderen",
     "excludeSearchTerm": "Zoekterm uitsluiten",
     "noOfRecords": "Aantal records:",
     "attributes": "Attributen",
@@ -69,7 +70,12 @@
     "runQuery": "Query uitvoeren",
     "syntaxGuideLabel": "Handleiding voor syntaxis",
     "logs": "Logboeken",
-    "enrichmentTables": "Verrijkingstabellen"
+    "enrichmentTables": "Verrijkingstabellen",
+    "savedViewsLabel": "Opgeslagen weergaven",
+    "savedViewsNotFound": "Opgeslagen weergave niet gevonden!",
+    "savedViewAction": "Opgeslagen weergave maken/bijwerken",
+    "savedViewDropdownLabel": "Opgeslagen weergaven",
+    "savedViewName": "Naam bekijken"
   },
   "menu": {
     "home": "Home",
@@ -332,11 +338,13 @@
     "updateEnrichmentTable": "Verrijkingstabel bijwerken",
     "searchEnrichmentTable": "Zoek in de verrijkingstabel",
     "uploadCSVFile": "CSV-bestand uploaden",
-    "selectFunction": "Functie selecteren"
+    "selectFunction": "Functie selecteren",
+    "appendData": "Gegevens toevoegen aan bestaande verrijkingstabel"
   },
   "confirmDialog": {
     "cancel": "Annuleer",
-    "ok": "Oké"
+    "ok": "Oké",
+    "loading": "Bezig met laden..."
   },
   "ingestion": {
     "header": "Inslikken",
@@ -490,7 +498,7 @@
     "constant": "Constant",
     "textbox": "Tekstvak",
     "newFolder": "Nieuwe map",
-    "updateFolder": "Map bijwerken"
+    "updateFolder": "Folder bijwerken"
   },
   "panel": {
     "header": "Paneel",

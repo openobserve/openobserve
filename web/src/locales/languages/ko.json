@@ -31,6 +31,7 @@
     "copyToClipboard": "클립보드로 복사",
     "includeSearchTerm": "검색어 포함",
     "addFieldToTable": "테이블에 필드 추가",
+    "removeFieldFromTable": "테이블에서 필드 제거",
     "excludeSearchTerm": "검색어 제외",
     "noOfRecords": "레코드 수:",
     "attributes": "특성",
@@ -69,7 +70,12 @@
     "runQuery": "쿼리 실행",
     "syntaxGuideLabel": "구문 가이드",
     "logs": "로그",
-    "enrichmentTables": "인리치먼트 테이블"
+    "enrichmentTables": "인리치먼트 테이블",
+    "savedViewsLabel": "저장된 뷰",
+    "savedViewsNotFound": "저장된 뷰를 찾을 수 없습니다!",
+    "savedViewAction": "저장된 뷰 생성/업데이트",
+    "savedViewDropdownLabel": "저장된 뷰",
+    "savedViewName": "이름 보기"
   },
   "menu": {
     "home": "홈",
@@ -332,11 +338,13 @@
     "updateEnrichmentTable": "인리치먼트 테이블 업데이트",
     "searchEnrichmentTable": "검색 강화 테이블",
     "uploadCSVFile": "CSV 파일 업로드",
-    "selectFunction": "기능 선택"
+    "selectFunction": "기능 선택",
+    "appendData": "기존 보강 테이블에 데이터 추가"
   },
   "confirmDialog": {
     "cancel": "취소",
-    "ok": "확인"
+    "ok": "확인",
+    "loading": "로딩 중..."
   },
   "ingestion": {
     "header": "섭취",
