@@ -95,6 +95,7 @@ pub async fn sql(
         let ctx = prepare_datafusion_context(&session.search_type)?;
         let mut record_batches = Vec::<RecordBatch>::new();
         for file in files.iter() {
+            println!("file: {:?}", file.key);
             let file_data = match tmpfs::get(&file.key) {
                 Ok(data) => data,
                 Err(err) => {
@@ -112,7 +113,6 @@ pub async fn sql(
                 }
             }
         }
-
         let schema = if let Some(first_batch) = record_batches.first() {
             first_batch.schema()
         } else {
