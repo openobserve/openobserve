@@ -15,7 +15,7 @@
 
 use std::{
     fs::{File, Metadata},
-    io::{Read, Seek, Write},
+    io::{Read, Write},
 };
 
 #[inline(always)]
