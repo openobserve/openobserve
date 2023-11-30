@@ -115,9 +115,12 @@ pub async fn sql(
         let schema = if let Some(first_batch) = record_batches.first() {
             first_batch.schema()
         } else {
-            return Err(datafusion::error::DataFusionError::Plan(
+            log::error!("No record batches found");
+            return Ok(HashMap::new());
+
+            /* return Err(datafusion::error::DataFusionError::Plan(
                 "No record batches found".to_string(),
-            ));
+            )); */
         };
         let mem_table = Arc::new(MemTable::try_new(schema, vec![record_batches])?);
 

@@ -475,6 +475,7 @@ pub async fn search_arrow(
                 scan_stats.original_size += file_data.len() as i64;
                 let file_name = format!("/{work_dir}/{}", file.key);
                 println!("file name from disk is {}", file_name);
+                std::thread::sleep(Duration::from_millis(1000));
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             }
         }
@@ -545,7 +546,7 @@ pub async fn search_arrow(
 
     let mut tasks = Vec::new();
     let single_group = files_group.len() == 1;
-    for (ver, files) in files_group {
+    for (_ver, files) in files_group {
         // get schema of the file
         let file_data = tmpfs::get(&files.first().unwrap().key).unwrap();
         let buf_reader = Cursor::new(file_data);
@@ -621,6 +622,7 @@ pub async fn search_arrow(
             stream_name = sql.stream_name,
             stream_type = ?stream_type
         );
+
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
