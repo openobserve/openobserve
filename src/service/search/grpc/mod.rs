@@ -22,7 +22,6 @@ use ahash::AHashMap as HashMap;
 use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
-use super::datafusion;
 use crate::common::{
     infra::{
         cluster,
@@ -33,6 +32,8 @@ use crate::common::{
 };
 use crate::handler::grpc::cluster_rpc;
 use crate::service::db;
+
+use super::datafusion;
 
 mod storage;
 mod wal;

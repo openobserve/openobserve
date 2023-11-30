@@ -19,7 +19,6 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
-use super::StreamMeta;
 use crate::common::{
     infra::{
         cluster,
@@ -42,6 +41,7 @@ use crate::common::{
 use crate::service::{
     db, distinct_values,
     ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    logs::StreamMeta,
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
 };

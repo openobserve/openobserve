@@ -39,15 +39,15 @@ use crate::common::{
 use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
-    ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file, TriggerAlertData},
+    ingestion::{
+        evaluate_trigger,
+        otlp_json::{get_int_value, get_val_for_attr},
+        write_file, TriggerAlertData,
+    },
+    logs::StreamMeta,
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
-use crate::common::utils::flatten::format_key;
-use crate::{
-    service::ingestion::otlp_json::{get_int_value, get_val_for_attr},
 };
-
-use super::StreamMeta;
 
 const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";
@@ -262,7 +262,7 @@ pub async fn logs_json_handler(
                         let local_attr = res_attr.as_object().unwrap();
 
                         local_val.insert(
-                            format_key(local_attr.get("key").unwrap().as_str().unwrap()),
+                            flatten::format_key(local_attr.get("key").unwrap().as_str().unwrap()),
                             get_val_for_attr(local_attr.get("value").unwrap()),
                         );
                     }

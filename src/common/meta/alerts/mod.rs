@@ -17,8 +17,9 @@ use ahash::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::StreamType;
 use crate::common::utils::json::Value;
+
+use super::StreamType;
 
 pub mod destinations;
 pub mod templates;

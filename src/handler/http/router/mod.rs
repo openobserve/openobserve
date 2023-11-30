@@ -21,21 +21,20 @@ use actix_web::{
     web, HttpRequest, HttpResponse,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
+use actix_web_lab::middleware::from_fn;
 use futures::FutureExt;
 use std::rc::Rc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use super::auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum};
-use super::request::{
-    alerts, dashboards, enrichment_table, functions, kv, logs, metrics, organization, prom, rum,
-    search, status, stream, syslog, traces, users,
-};
 use crate::common::{
     infra::config::CONFIG,
     meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
 };
-use actix_web_lab::middleware::from_fn;
+
+use super::auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum};
+use super::request::*;
+
 pub mod openapi;
 pub mod ui;
 

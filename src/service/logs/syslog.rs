@@ -20,7 +20,6 @@ use datafusion::arrow::datatypes::Schema;
 use std::net::SocketAddr;
 use syslog_loose::{Message, ProcId, Protocol};
 
-use super::StreamMeta;
 use crate::common::{
     infra::{
         cluster,
@@ -40,6 +39,7 @@ use crate::common::{
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
     ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    logs::StreamMeta,
 };
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow::Error> {

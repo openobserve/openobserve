@@ -26,7 +26,6 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
-use super::{format_label_name, get_exclude_labels};
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics},
     meta::{
@@ -47,6 +46,7 @@ use crate::service::{
         grpc::{get_exemplar_val, get_metric_val, get_val},
         write_file, TriggerAlertData,
     },
+    metrics::{format_label_name, get_exclude_labels},
     schema::{set_schema_metadata, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,

@@ -22,7 +22,6 @@ use flate2::read::GzDecoder;
 use std::io::{BufRead, Read};
 use vrl::compiler::runtime::Runtime;
 
-use super::StreamMeta;
 use crate::common::{
     infra::{
         config::{CONFIG, DISTINCT_FIELDS},
@@ -45,6 +44,7 @@ use crate::common::{
 use crate::service::{
     distinct_values, get_formatted_stream_name,
     ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
+    logs::StreamMeta,
     usage::report_request_usage_stats,
 };
 

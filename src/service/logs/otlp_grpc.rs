@@ -24,7 +24,6 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
-use super::StreamMeta;
 use crate::common::{
     infra::{
         cluster,
@@ -47,6 +46,7 @@ use crate::service::{
         evaluate_trigger, grpc::get_val, grpc::get_val_with_type_retained, write_file,
         TriggerAlertData,
     },
+    logs::StreamMeta,
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
 };

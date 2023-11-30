@@ -18,7 +18,6 @@ use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 
-use super::StreamMeta;
 use crate::common::{
     infra::{
         config::{CONFIG, DISTINCT_FIELDS},
@@ -37,6 +36,7 @@ use crate::service::{
     distinct_values, get_formatted_stream_name,
     ingestion::is_ingestion_allowed,
     ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    logs::StreamMeta,
     usage::report_request_usage_stats,
 };
 

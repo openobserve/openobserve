@@ -17,7 +17,6 @@ use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 
-use super::{ingest::decode_and_decompress, StreamMeta};
 use crate::common::{
     infra::{
         cluster,
@@ -42,6 +41,7 @@ use crate::common::{
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
     ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    logs::{ingest::decode_and_decompress, StreamMeta},
     usage::report_request_usage_stats,
 };
 

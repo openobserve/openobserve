@@ -21,7 +21,6 @@ use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use std::collections::HashMap;
 
-use super::format_label_name;
 use crate::common::{
     infra::{
         cache::stats,
@@ -44,6 +43,7 @@ use crate::common::{
 use crate::service::{
     db, format_stream_name,
     ingestion::{chk_schema_by_record, evaluate_trigger, write_file, TriggerAlertData},
+    metrics::format_label_name,
     schema::{set_schema_metadata, stream_schema_exists},
     search as search_service,
     stream::unwrap_partition_time_level,

@@ -20,7 +20,6 @@ use actix_web::{
 use std::io::Error;
 use uuid::Uuid;
 
-use super::db;
 use crate::common::{
     infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
     meta::{
@@ -33,6 +32,7 @@ use crate::common::{
         rand::generate_random_string,
     },
 };
+use crate::service::db;
 
 pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {
     let existing_user = if is_root_user(&usr_req.email) {
