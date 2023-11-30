@@ -27,7 +27,6 @@ pub fn get_file_meta(file: &str) -> Result<Metadata, std::io::Error> {
 #[inline(always)]
 pub fn get_file_contents(file: &str) -> Result<Vec<u8>, std::io::Error> {
     let mut file = File::open(file)?;
-    file.seek(std::io::SeekFrom::Start(0))?;
     let mut contents: Vec<u8> = Vec::new();
     file.read_to_end(&mut contents)?;
     Ok(contents)
