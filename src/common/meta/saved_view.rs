@@ -59,10 +59,6 @@ pub struct ViewWithoutData {
 pub struct ViewsWithoutData {
     pub views: Vec<ViewWithoutData>,
 }
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct Views {
-    pub views: Vec<View>,
-}
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct DeleteViewResponse {
