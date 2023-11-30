@@ -92,6 +92,8 @@ pub async fn save(
         return Err(anyhow::anyhow!("Alert must have at least one condition"));
     }
 
+    // TODO calculate the frequency of the alert
+
     // test the alert
     _ = &alert.evaluate(None).await?;
 
@@ -184,13 +186,10 @@ impl Alert {
         &self,
         row: Option<&Map<String, Value>>,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
-        if !self.enabled {
-            return Ok(None);
-        }
         if self.is_real_time {
             self.query_condition.evaluate_realtime(self, row).await
         } else {
-            self.query_condition.evaluate_schedule(self).await
+            self.query_condition.evaluate_scheduled(self).await
         }
     }
 
@@ -254,7 +253,7 @@ impl QueryCondition {
         Ok(Some(vec![row.to_owned()]))
     }
 
-    pub async fn evaluate_schedule(
+    pub async fn evaluate_scheduled(
         &self,
         alert: &Alert,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {

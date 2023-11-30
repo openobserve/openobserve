@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::Utc;
+use chrono::{Duration, Utc};
 
 use crate::common::{
     infra::config::TRIGGERS,
@@ -57,12 +57,12 @@ pub async fn handle_triggers(
 
     if is_realtime && is_silenced {
         // wakeup the trigger
-        let local_trigger = Trigger {
+        let new_trigger = Trigger {
             next_run_at: Utc::now().timestamp_micros(),
             is_realtime: true,
             is_silenced: false,
         };
-        super::triggers::save(org_id, stream_type, stream_name, alert_name, &local_trigger).await?;
+        super::triggers::save(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
         return Ok(());
     }
 
@@ -86,12 +86,41 @@ pub async fn handle_triggers(
             ));
         }
     };
-    if let Some(ret) = alert.evaluate(None).await? {
-        if ret.is_empty() {
-            return Ok(());
-        }
+
+    let mut new_trigger = Trigger {
+        next_run_at: Utc::now().timestamp_micros(),
+        is_realtime: false,
+        is_silenced: false,
+    };
+
+    if !alert.enabled {
+        // update trigger, check on next week
+        new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
+        new_trigger.is_silenced = true;
+        super::triggers::save(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
+        return Ok(());
+    }
+
+    // evaluate alert
+    let ret = alert.evaluate(None).await?;
+    if ret.is_some() && alert.trigger_condition.silence > 0 {
+        new_trigger.next_run_at += Duration::minutes(alert.trigger_condition.silence)
+            .num_microseconds()
+            .unwrap();
+        new_trigger.is_silenced = true;
+    } else {
+        new_trigger.next_run_at += Duration::minutes(alert.trigger_condition.frequency)
+            .num_microseconds()
+            .unwrap();
+    }
+    
+    // send notification
+    if let Some(ret) = ret {
         alert.send_notification(&ret).await?;
     }
+
+    // update trigger
+    super::triggers::save(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
 
     Ok(())
 }
