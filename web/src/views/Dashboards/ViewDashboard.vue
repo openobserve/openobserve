@@ -154,18 +154,14 @@ export default defineComponent({
         console.log("variableeee", variable);
         
         if (variable.type === 'ad-hoc-filters') {
-          if (Array.isArray(variable.value)) {
-            variable.value.forEach((filter) => {
-              const paramName = `var-${variable.name}= ${filter.name}${filter.operator}`;
-
-              if (Array.isArray(variableObj[paramName])) {
-                variableObj[paramName].push(filter.value);
-              } else {
-                variableObj[paramName] = [filter.value];
-              }
-            });
-          }
-        } else {
+          const filters = ((variable.value) || []).filter((item: any) => item.name && item.operator && item.value);
+          const encodedFilters = filters.map((item: any) => ({
+            name: item.name,
+            operator: item.operator,
+            value: item.value
+          }))
+          variableObj[`var-${variable.name}`] = encodeURIComponent(JSON.stringify(encodedFilters))
+        }  else {
           variableObj[`var-${variable.name}`] = variable.value;
         }
       });

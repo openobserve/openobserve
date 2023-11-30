@@ -24,50 +24,132 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-form greedy ref="addVariableForm" @submit="onSubmit">
           <div class="col">
             <div>
-              <q-select class="textbox showLabelOnTop" filled stack-label input-debounce="0" outlined dense
-                v-model="variableData.type" :options="variableTypes" :label="t('dashboard.typeOfVariable')"
-                option-value="value" map-options emit-value></q-select>
+              <q-select
+                class="textbox showLabelOnTop"
+                filled
+                stack-label
+                input-debounce="0"
+                outlined
+                dense
+                v-model="variableData.type"
+                :options="variableTypes"
+                :label="t('dashboard.typeOfVariable')"
+                option-value="value"
+                map-options
+                emit-value
+              ></q-select>
             </div>
             <div class="text-body1 text-bold q-mt-lg">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
             <div class="row">
               <div class="textbox col">
-                <q-input v-model="variableData.name" class="showLabelOnTop q-mr-sm"
-                  :label="(variableData.type !== 'ad-hoc-filters' ? t('dashboard.nameOfVariable') : t('dashboard.adhoclabelOfVariable')) + ' *'"
-                  dense filled outlined stack-label
-                  :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"></q-input>
+                <q-input
+                  v-model="variableData.name"
+                  class="showLabelOnTop q-mr-sm"
+                  :label="t('dashboard.nameOfVariable') + ' *'"
+                  dense
+                  filled
+                  outlined
+                  stack-label
+                  :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                ></q-input>
               </div>
-              <div class="textbox col" v-if="variableData.type !== 'ad-hoc-filters'">
-                <q-input v-model="variableData.label" class="showLabelOnTop" :label="t('dashboard.labelOfVariable')" dense
-                  filled outlined stack-label></q-input>
+              <div class="textbox col">
+                <q-input
+                  v-model="variableData.label"
+                  class="showLabelOnTop"
+                  :label="t('dashboard.labelOfVariable')"
+                  dense
+                  filled
+                  outlined
+                  stack-label
+                ></q-input>
               </div>
             </div>
-            <div class="text-body1 text-bold q-mt-lg">
+            <div
+              class="text-body1 text-bold q-mt-lg"
+              v-if="variableData.type !== 'ad-hoc-filters'"
+            >
               {{ t("dashboard.extraOptions") }}
             </div>
             <div v-if="variableData.type == 'query_values'">
               <div class="row">
-                <q-select v-model="variableData.query_data.stream_type" :label="t('dashboard.selectStreamType') + ' *'"
-                  :options="data.streamType" input-debounce="0" behavior="menu" filled borderless dense stack-label
-                  class="textbox showLabelOnTop col no-case q-mr-sm" @update:model-value="streamTypeUpdated"
-                  :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
-                <q-select v-model="variableData.query_data.stream" :label="t('dashboard.selectIndex') + ' *'"
-                  :options="streamsFilteredOptions" input-debounce="0" behavior="menu" use-input filled borderless dense
-                  stack-label @filter="streamsFilterFn" @update:model-value="streamUpdated" option-value="name"
-                  option-label="name" emit-value class="textbox showLabelOnTop col no-case"
-                  :rules="[(val: any) => !!val || 'Field is required!']">
+                <q-select
+                  v-model="variableData.query_data.stream_type"
+                  :label="t('dashboard.selectStreamType') + ' *'"
+                  :options="data.streamType"
+                  input-debounce="0"
+                  behavior="menu"
+                  filled
+                  borderless
+                  dense
+                  stack-label
+                  class="textbox showLabelOnTop col no-case q-mr-sm"
+                  @update:model-value="streamTypeUpdated"
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                ></q-select>
+                <q-select
+                  v-model="variableData.query_data.stream"
+                  :label="t('dashboard.selectIndex') + ' *'"
+                  :options="streamsFilteredOptions"
+                  input-debounce="0"
+                  behavior="menu"
+                  use-input
+                  filled
+                  borderless
+                  dense
+                  stack-label
+                  @filter="streamsFilterFn"
+                  @update:model-value="streamUpdated"
+                  option-value="name"
+                  option-label="name"
+                  emit-value
+                  class="textbox showLabelOnTop col no-case"
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                >
                 </q-select>
               </div>
-              <q-select v-model="variableData.query_data.field" :label="t('dashboard.selectField') + ' *'" filled
-                stack-label use-input borderless dense hide-selected fill-input behavior="menu" input-debounce="0"
-                :options="fieldsFilteredOptions" @filter="fieldsFilterFn" class="textbox showLabelOnTop no-case"
-                option-value="name" option-label="name" emit-value :rules="[(val: any) => !!val || 'Field is required!']">
+              <q-select
+                v-model="variableData.query_data.field"
+                :label="t('dashboard.selectField') + ' *'"
+                filled
+                stack-label
+                use-input
+                borderless
+                dense
+                hide-selected
+                fill-input
+                behavior="menu"
+                input-debounce="0"
+                :options="fieldsFilteredOptions"
+                @filter="fieldsFilterFn"
+                class="textbox showLabelOnTop no-case"
+                option-value="name"
+                option-label="name"
+                emit-value
+                :rules="[(val: any) => !!val || 'Field is required!']"
+              >
               </q-select>
               <div>
-                <q-input class="showLabelOnTop" type="number" v-model.number="variableData.query_data.max_record_size"
-                  :label="t('dashboard.DefaultSize')" dense filled outlined stack-label>
-                  <q-btn padding="xs" round flat class="q-ml-sm" no-caps icon="info">
+                <q-input
+                  class="showLabelOnTop"
+                  type="number"
+                  v-model.number="variableData.query_data.max_record_size"
+                  :label="t('dashboard.DefaultSize')"
+                  dense
+                  filled
+                  outlined
+                  stack-label
+                >
+                  <q-btn
+                    padding="xs"
+                    round
+                    flat
+                    class="q-ml-sm"
+                    no-caps
+                    icon="info"
+                  >
                     <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
                   </q-btn>
                 </q-input>
@@ -75,36 +157,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="textbox" v-if="['constant'].includes(variableData.type)">
-            <q-input class="showLabelOnTop" v-model="variableData.value" :label="t('dashboard.ValueOfVariable') + ' *'"
-              dense filled outlined stack-label :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"></q-input>
+            <q-input
+              class="showLabelOnTop"
+              v-model="variableData.value"
+              :label="t('dashboard.ValueOfVariable') + ' *'"
+              dense
+              filled
+              outlined
+              stack-label
+              :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+            ></q-input>
           </div>
           <div class="textbox" v-if="['textbox'].includes(variableData.type)">
-            <q-input class="showLabelOnTop" v-model="variableData.value" :label="t('dashboard.DefaultValue')" dense filled
-              outlined stack-label></q-input>
+            <q-input
+              class="showLabelOnTop"
+              v-model="variableData.value"
+              :label="t('dashboard.DefaultValue')"
+              dense
+              filled
+              outlined
+              stack-label
+            ></q-input>
           </div>
           <!-- show the auto add variables for the custom fields -->
           <div v-if="variableData.type == 'custom'">
-            <div v-for="(option, index) in variableData.options" :key="index" class="row">
-              <q-input dense filled outlined stack-label :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                class="col textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].label"
-                :label="'Label ' + (index + 1) + ' *'" name="label" />
-              <q-input dense filled outlined stack-label :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                class="col textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].value"
-                :label="'Value ' + (index + 1) + ' *'" name="value" />
+            <div
+              v-for="(option, index) in variableData.options"
+              :key="index"
+              class="row"
+            >
+              <q-input
+                dense
+                filled
+                outlined
+                stack-label
+                :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                class="col textbox showLabelOnTop q-mr-sm"
+                v-model="variableData.options[index].label"
+                :label="'Label ' + (index + 1) + ' *'"
+                name="label"
+              />
+              <q-input
+                dense
+                filled
+                outlined
+                stack-label
+                :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                class="col textbox showLabelOnTop q-mr-sm"
+                v-model="variableData.options[index].value"
+                :label="'Value ' + (index + 1) + ' *'"
+                name="value"
+              />
               <div>
-                <q-btn flat style="margin-top: 33px" round @click="removeField(index)" icon="cancel" />
+                <q-btn
+                  flat
+                  style="margin-top: 33px"
+                  round
+                  @click="removeField(index)"
+                  icon="cancel"
+                />
               </div>
             </div>
             <div class="flex flex-col">
-              <q-btn no-caps icon="add" no-outline class="q-mt-md" @click="addField()">Add Option</q-btn>
+              <q-btn
+                no-caps
+                icon="add"
+                no-outline
+                class="q-mt-md"
+                @click="addField()"
+                >Add Option</q-btn
+              >
             </div>
           </div>
           <div class="flex justify-center q-mt-lg">
-            <q-btn class="q-mb-md text-bold" :label="t('dashboard.cancel')" text-color="light-text" padding="sm md"
-              no-caps @click="close" />
+            <q-btn
+              class="q-mb-md text-bold"
+              :label="t('dashboard.cancel')"
+              text-color="light-text"
+              padding="sm md"
+              no-caps
+              @click="close"
+            />
             <div>
-              <q-btn type="submit" :loading="saveVariableApiCall.isLoading.value"
-                class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl" no-caps>Save</q-btn>
+              <q-btn
+                type="submit"
+                :loading="saveVariableApiCall.isLoading.value"
+                class="q-mb-md text-bold no-border q-ml-md"
+                color="secondary"
+                padding="sm xl"
+                no-caps
+                >Save</q-btn
+              >
             </div>
           </div>
         </q-form>
@@ -181,7 +324,7 @@ export default defineComponent({
       },
       {
         label: t("dashboard.ad-hoc-variable"),
-        value: 'ad-hoc-filters'
+        value: "ad-hoc-filters",
       },
     ]);
 
