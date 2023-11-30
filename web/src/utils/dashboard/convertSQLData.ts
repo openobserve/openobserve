@@ -471,6 +471,7 @@ export const convertSQLData = (
           };
           return seriesObj;
         });
+        // scatter chart with single x and y axis(single or multiple)
       } else {
         options.tooltip.formatter = function (name: any) {
           if (name.length == 0) return "";
