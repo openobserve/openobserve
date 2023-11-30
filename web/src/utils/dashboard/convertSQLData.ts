@@ -1069,7 +1069,6 @@ export const convertSQLData = (
                   panelSchema.config?.unit_custom
                 )
               );
-            console.log("aaaaaaaaaaaa 8", params);
             return Number.isInteger(params.value)
               ? formatDate(new Date(params.value))
               : params.value;
