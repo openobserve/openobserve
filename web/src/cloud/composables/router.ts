@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import Login from "@/views/Login.vue";
-import LoginCallback from "@/enterprise/components/login/Login.vue";
+import LoginCallback from "@/cloud/components/login/Login.vue";
 import {
   useLocalUserInfo,
   useLocalToken,
@@ -23,12 +23,12 @@ import {
   getLogoutURL,
 } from "@/utils/zincutils";
 
-import Organizations from "@/enterprise/components/organizations/Organization.vue";
+import Organizations from "@/cloud/components/organizations/Organization.vue";
 
-import Billing from "@/enterprise/components/billings/Billing.vue";
-import Plans from "@/enterprise/components/billings/plans.vue";
-import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
-import Usage from "@/enterprise/components/billings/usage.vue";
+import Billing from "@/cloud/components/billings/Billing.vue";
+import Plans from "@/cloud/components/billings/plans.vue";
+import InvoiceHistory from "@/cloud/components/billings/invoiceHistory.vue";
+import Usage from "@/cloud/components/billings/usage.vue";
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 const Settings = () => import("@/components/settings/index.vue");
 
@@ -109,8 +109,7 @@ const useEnvRoutes = () => {
         {
           path: "apikeys",
           name: "apiKeys",
-          component: () =>
-            import("@/enterprise/components/settings/ApiKeys.vue"),
+          component: () => import("@/cloud/components/settings/ApiKeys.vue"),
         },
       ],
     },

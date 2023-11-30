@@ -274,7 +274,7 @@ import { setLanguage } from "../utils/cookies";
 import { getLocale } from "../locales";
 
 import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
-import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
+import MainLayoutCloudMixin from "@/cloud/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
 import Tracker from "@openreplay/tracker";

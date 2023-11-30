@@ -51,10 +51,31 @@ const enterpriseResolverPlugin = {
       const defaultPath = path.resolve(__dirname, `./src/${fileName}`);
 
       if (
-        process.env.VITE_OPENOBSERVE_CLOUD == "true" &&
+        process.env.VITE_OPENOBSERVE_ENTERPRISE == "true" &&
         (await fs.pathExists(enterprisePath))
       ) {
         return enterprisePath;
+      }
+
+      return defaultPath;
+    }
+  },
+};
+
+const cloudResolverPlugin = {
+  name: "cloud-resolver",
+  async resolveId(source) {
+    if (source.startsWith("@zo/")) {
+      const fileName = source.replace("@zo/", "");
+
+      const cloudPath = path.resolve(__dirname, `./src/cloud/${fileName}`);
+      const defaultPath = path.resolve(__dirname, `./src/${fileName}`);
+
+      if (
+        process.env.VITE_OPENOBSERVE_CLOUD == "true" &&
+        (await fs.pathExists(cloudPath))
+      ) {
+        return cloudPath;
       }
 
       return defaultPath;
@@ -103,6 +124,7 @@ export default defineConfig({
     quasar({
       sassVariables: "src/styles/quasar-variables.sass",
     }),
+    cloudResolverPlugin,
     enterpriseResolverPlugin,
     vueJsx(),
     monacoEditorPlugin({
@@ -116,6 +138,7 @@ export default defineConfig({
       "@enterprise": fileURLToPath(
         new URL("./src/enterprise", import.meta.url)
       ),
+      "@cloud": fileURLToPath(new URL("./src/cloud", import.meta.url)),
       stream: "rollup-plugin-node-polyfills/polyfills/stream",
       events: "rollup-plugin-node-polyfills/polyfills/events",
       assert: "assert",

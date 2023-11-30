@@ -23,7 +23,7 @@ import {
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 
-import userCloudRoutes from "@/enterprise/composables/router";
+import userCloudRoutes from "@/cloud/composables/router";
 import userRoutes from "@/composables/shared/router";
 import useOSRoutes from "@/composables/router";
 
