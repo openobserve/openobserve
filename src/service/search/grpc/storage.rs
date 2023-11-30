@@ -156,6 +156,7 @@ pub async fn search(
                                   scan_stats.compressed_size,
                                   cur_memory.physical_mem,
                                   CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100);
+                log::warn!("{}", err);
                 return Err(Error::Message(err.to_string()));
             }
         }
