@@ -16,7 +16,7 @@
 use crate::common::{
     infra::{db as infra_db, errors::Error},
     meta::saved_view::{
-        CreateViewRequest, UpdateViewRequest, View, ViewWithoutData, Views, ViewsWithoutData,
+        CreateViewRequest, UpdateViewRequest, View, ViewWithoutData, ViewsWithoutData,
     },
     utils::json,
 };
@@ -75,19 +75,6 @@ pub async fn get_view(org_id: &str, view_id: &str) -> Result<View, Error> {
     let ret = db.get(&key).await?;
     let view = json::from_slice(&ret).unwrap();
     Ok(view)
-}
-
-/// Return all the saved views associated with a provided org_id
-pub async fn get_views(org_id: &str) -> Result<Views, Error> {
-    let db = &infra_db::get_db().await;
-    let key = format!("{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id);
-    let ret = db.list_values(&key).await?;
-    let views: Vec<View> = ret
-        .iter()
-        .map(|view| json::from_slice(view).unwrap())
-        .collect();
-
-    Ok(Views { views })
 }
 
 /// Return all the saved views but query limited data only, associated with a provided org_id
