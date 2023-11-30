@@ -904,7 +904,7 @@ fn process_summary_data_point(
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
             rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
-                get_attribute_value(v)
+                get_attribute_value(v).into();
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
@@ -1029,23 +1029,23 @@ fn set_data_point_value(rec: &mut json::Value, data_point: &json::Map<String, js
     }
 }
 
-fn get_attribute_value(val: &json::Value) -> json::Value {
+fn get_attribute_value(val: &json::Value) -> String {
     if val.get("stringValue").is_some() {
-        val.get("stringValue").unwrap().clone()
+        val.get("stringValue").unwrap().to_string()
     } else if val.get("boolValue").is_some() {
-        val.get("boolValue").unwrap().clone()
+        val.get("boolValue").unwrap().to_string()
     } else if val.get("intValue").is_some() {
-        val.get("intValue").unwrap().clone()
+        val.get("intValue").unwrap().to_string()
     } else if val.get("doubleValue").is_some() {
-        val.get("doubleValue").unwrap().clone()
+        val.get("doubleValue").unwrap().to_string()
     } else if val.get("arrayValue").is_some() {
-        val.get("arrayValue").unwrap().clone()
+        val.get("arrayValue").unwrap().to_string()
     } else if val.get("kvlistValue").is_some() {
-        val.get("kvlistValue").unwrap().clone()
+        val.get("kvlistValue").unwrap().to_string()
     } else if val.get("bytesValue").is_some() {
-        val.get("bytesValue").unwrap().clone()
+        val.get("bytesValue").unwrap().to_string()
     } else {
-        json::Value::Null
+        "".to_string()
     }
 }
 

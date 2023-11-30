@@ -31,13 +31,13 @@ pub fn get_val_for_attr(attr_val: &json::Value) -> json::Value {
                 return json::json!(get_string_value(value));
             }
             "boolValue" | "bool_value" => {
-                return json::json!(value.as_bool().unwrap_or(false));
+                return json::json!(value.as_bool().unwrap_or(false).to_string());
             }
             "intValue" | "int_value" => {
-                return json::json!(get_int_value(value));
+                return json::json!(get_int_value(value).to_string());
             }
             "doubleValue" | "double_value" => {
-                return json::json!(get_float_value(value));
+                return json::json!(get_float_value(value).to_string());
             }
 
             "bytesValue" | "bytes_value" => {
