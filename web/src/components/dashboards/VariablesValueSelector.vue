@@ -153,12 +153,19 @@ export default defineComponent({
       // get old variable values
       let oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
       if (!oldVariableValue.length) {
+        const dynamicVariables =
+          props.variablesConfig?.list
+            ?.filter((it: any) => it.type == "ad-hoc-filters")
+            ?.map((it: any) => it.name) || [];
         oldVariableValue = Object.keys(props?.initialVariableValues ?? []).map(
           (key: any) => ({
             name: key,
-            value: props.initialVariableValues[key],
+            value: dynamicVariables.includes(key)
+              ? JSON.parse(decodeURIComponent(props.initialVariableValues[key]))
+              : props.initialVariableValues[key],
           })
         );
+        console.log("oldVariableValueeee", oldVariableValue);
       }
 
       // continue as we have variables
@@ -344,48 +351,21 @@ export default defineComponent({
                   console.log("objectArray object==", fieldsArray);
                   obj.options = fieldsArray;
 
-                  // console.log("optionssss", options);
-
-                  // const options = res.data.list.map((item: any) => {
-                  //     const schemaNames = (item.schema || []).flat().map((it2: any) => it2.name);
-                  //     return {
-                  //         name: item.name,
-                  //         stream_type: item.stream_type,
-                  //         schema_names: schemaNames,
-                  //     };
-                  // });
-                  // console.log("optionssss", options);
-
-                  // // get unique values of the options array
-                  // const uniqueOptions = [...new Set(options.flatMap((option: any) => option.schema_names))];
-
-                  // obj.options = uniqueOptions;
-                  // obj.schemaDetails = options;
-
-                  // console.log("oldVariableValue", oldVariableValue);
-
-                  // Set value based on oldVariableValue or the first option
-                  // let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name);
-                  // if (oldVariableObjectSelectedValue) {
-                  //     console.log("oldVariableObjectSelectedValue optiomms", oldVariableObjectSelectedValue);
-
-                  //     console.log("obj.optiomms",obj.options)
-                  //     obj.value = obj.options.includes(oldVariableObjectSelectedValue.value) ? oldVariableObjectSelectedValue.value : obj.options.length ? obj.options[0] : "";
-                  //     console.log("optiomms.value", obj.value);
-                  // }
-                  // else {
-                  //     obj.value = obj.options[0] || "";
-                  // }
-                  // console.log("objjj", obj.value);
-
-                  // const streams = res.data.list.map((item: any) => ({
-                  //     streamType: item.stream_type,
-                  //     streamName: item.name,
-                  // }));
-
-                  // console.log("streams", streams);
-
-                  obj.value = obj.value || [];
+                  let old = oldVariableValue.find(
+                    (it2: any) => it2.name === it.name
+                  );
+                  console.log(old, "adhocValue");
+                  if (old) {
+                    obj.value = old.value.map((it2: any) => ({
+                      ...it2,
+                      streams: fieldsArray.find(
+                        (it3: any) => it3.name === it2.name
+                      )?.streams,
+                    }));
+                    console.log(obj.value, "obj.valueee");
+                  } else {
+                    obj.value = [];
+                  }
 
                   variablesData.isVariablesLoading = variablesData.values.some(
                     (val: { isLoading: any }) => val.isLoading
