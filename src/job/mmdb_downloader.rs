@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::infra::config::{CONFIG, MAXMIND_DB_CLIENT};
+use crate::common::infra::config::{CONFIG, GEOIP_TABLE, MAXMIND_DB_CLIENT, MMDB_CITY_FILE_NAME};
 use crate::common::meta::maxmind::MaxmindClient;
+use crate::service::enrichment_table::geoip::{Geoip, GeoipConfig};
 use futures::stream::StreamExt;
 use reqwest::Client;
 use sha256::try_digest;
@@ -24,14 +25,14 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::time;
 
-pub const MMDB_FILE_NAME: &str = "GeoLite2-City.mmdb";
-
 /// Update the global maxdb client object
 pub async fn update_global_maxmind_client(fname: &str) {
     match MaxmindClient::new_with_path(fname) {
         Ok(maxminddb_client) => {
             let mut client = MAXMIND_DB_CLIENT.write().await;
             *client = Some(maxminddb_client);
+            let mut geoip = GEOIP_TABLE.write();
+            *geoip = Some(Geoip::new(GeoipConfig::default()).unwrap());
             log::info!("Successfully updated MaxmindClient");
         }
         Err(e) => log::warn!(
@@ -85,7 +86,7 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
 async fn run_download_files() {
     // send request and await response
     let client = reqwest::ClientBuilder::default().build().unwrap();
-    let fname = format!("{}/{}", &CONFIG.common.mmdb_data_dir, MMDB_FILE_NAME);
+    let fname = format!("{}{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
 
     let download_files =
         match is_digest_different(&fname, &CONFIG.common.mmdb_geolite_citydb_sha256_url).await {
@@ -115,7 +116,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     ));
 
     // Try to load the existing file, in the beginning.
-    let fname = format!("{}/{}", &CONFIG.common.mmdb_data_dir, MMDB_FILE_NAME);
+    let fname = format!("{}/{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
     update_global_maxmind_client(&fname).await;
 
     loop {
