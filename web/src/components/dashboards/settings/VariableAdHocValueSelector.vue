@@ -3,10 +3,10 @@
         <div class="q-mb-sm title" no-caps no-outline rounded>{{ variableItem?.name }}</div>
         <div class="row no-wrap items-center q-mb-sm" v-for="(item, index) in adhocVariables" :key="index">
             <q-select filled outlined dense :model-value="adhocVariables[index].name"
-                :display-value="adhocVariables[index].name ? adhocVariables[index].name : !variableItem.isLoading ? '(No Data Found)' : ''"
+                :display-value="adhocVariables[index].name ? adhocVariables[index].name : variableItem.isLoading ? '(No Data Found)' : ''"
                 :options="fieldsFilteredOptions" input-debounce="0" behavior="menu" use-input stack-label option-label="name"
                 @update:model-value="updateModelValueOfSelect(index, $event)"
-                @filter="fieldsFilterFn" class="textbox col no-case q-ml-sm" :loading="variableItem.isLoading">
+                @filter="fieldsFilterFn" placeholder="Select Field" class="textbox col no-case q-ml-sm" :loading="variableItem.isLoading">
                 <template v-slot:no-option>
                     <q-item>
                         <q-item-section class="text-italic text-grey">
@@ -18,7 +18,7 @@
             <q-select dense filled v-model="adhocVariables[index].operator"
                 :display-value="adhocVariables[index].operator ? adhocVariables[index].operator : ''"
                 :options="operatorOptions" style="width: auto" class="operator" />
-            <q-input v-model="adhocVariables[index].value" dense filled debounce="1000" style="width: 125px" class="" />
+            <q-input v-model="adhocVariables[index].value" placeholder="Enter Value" dense filled debounce="1000" style="width: 125px" class="" />
             <q-btn class="close" size="xs" padding="13px 2px" square flat dense @click="removeField(index)" icon="close" />
             <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border">AND</div>
         </div>
