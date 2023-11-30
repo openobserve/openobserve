@@ -16,15 +16,10 @@
 use actix_web::http;
 
 use crate::common::infra::config::STREAM_ALERTS;
-use crate::common::meta::alerts::destinations::{Destination, Response};
+use crate::common::meta::alerts::destinations::{Destination, DestinationWithTemplate};
 use crate::service::db;
 
-#[tracing::instrument(skip(destination))]
-pub async fn save_destination(
-    org_id: &str,
-    name: &str,
-    destination: Destination,
-) -> Result<(), anyhow::Error> {
+pub async fn save(org_id: &str, name: &str, destination: Destination) -> Result<(), anyhow::Error> {
     if db::alerts::templates::get(org_id, &destination.template)
         .await
         .is_err()
@@ -37,16 +32,26 @@ pub async fn save_destination(
     db::alerts::destinations::set(org_id, name, destination).await
 }
 
-#[tracing::instrument]
-pub async fn list_destinations(org_id: &str) -> Result<Vec<Response>, anyhow::Error> {
+pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {
+    db::alerts::destinations::get(org_id, name)
+        .await
+        .map_err(|_| anyhow::anyhow!("Alert destination not found"))
+}
+
+pub async fn get_with_template(
+    org_id: &str,
+    name: &str,
+) -> Result<DestinationWithTemplate, anyhow::Error> {
+    let dest = get(org_id, name).await?;
+    let template = db::alerts::templates::get(org_id, &dest.template).await?;
+    Ok(dest.with_template(template))
+}
+
+pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {
     db::alerts::destinations::list(org_id).await
 }
 
-#[tracing::instrument]
-pub async fn delete_destination(
-    org_id: &str,
-    name: &str,
-) -> Result<(), (http::StatusCode, anyhow::Error)> {
+pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
     let cacher = STREAM_ALERTS.read().await;
     for (stream_key, alerts) in cacher.iter() {
         for alert in alerts.iter() {
@@ -70,11 +75,4 @@ pub async fn delete_destination(
     db::alerts::destinations::delete(org_id, name)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
-}
-
-#[tracing::instrument]
-pub async fn get_destination(org_id: &str, name: &str) -> Result<Response, anyhow::Error> {
-    db::alerts::destinations::get(org_id, name)
-        .await
-        .map_err(|_| anyhow::anyhow!("Alert destination not found"))
 }

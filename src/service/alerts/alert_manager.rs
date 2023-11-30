@@ -113,7 +113,7 @@ pub async fn handle_triggers(
             .num_microseconds()
             .unwrap();
     }
-    
+
     // send notification
     if let Some(ret) = ret {
         alert.send_notification(&ret).await?;

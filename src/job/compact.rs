@@ -15,8 +15,7 @@
 
 use tokio::time;
 
-use crate::common::infra::cluster::is_compactor;
-use crate::common::infra::config::CONFIG;
+use crate::common::infra::{cluster::is_compactor, config::CONFIG};
 use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {

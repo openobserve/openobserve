@@ -22,7 +22,7 @@ use super::templates::Template;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Destination {
-    pub name: Option<String>,
+    pub name: String,
     pub url: String,
     pub method: HTTPType,
     #[serde(default)]
@@ -33,20 +33,20 @@ pub struct Destination {
 }
 
 impl Destination {
-    pub fn to_dest_resp(&self, template: Template) -> Response {
-        Response {
+    pub fn with_template(&self, template: Template) -> DestinationWithTemplate {
+        DestinationWithTemplate {
+            name: self.name.clone(),
             url: self.url.clone(),
             method: self.method.clone(),
             skip_tls_verify: self.skip_tls_verify,
             headers: self.headers.clone(),
             template,
-            name: self.name.clone().unwrap(),
         }
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct Response {
+pub struct DestinationWithTemplate {
     pub name: String,
     pub url: String,
     pub method: HTTPType,

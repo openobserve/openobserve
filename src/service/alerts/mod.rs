@@ -16,15 +16,18 @@
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Utc};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::common::{
     meta::{
-        alerts::{triggers::Trigger, Alert, Condition, Operator, QueryCondition},
+        alerts::{
+            destinations::{DestinationWithTemplate, HTTPType},
+            Alert, Condition, Operator, QueryCondition,
+        },
         search, StreamType,
     },
     utils::{
-        json::{Map, Value},
+        json::{self, Map, Value},
         schema_ext::SchemaExt,
     },
 };
@@ -195,32 +198,20 @@ impl Alert {
 
     pub async fn send_notification(
         &self,
-        _row: &[Map<String, Value>],
+        rows: &[Map<String, Value>],
     ) -> Result<(), anyhow::Error> {
-        // TODO send the notification
-        log::warn!("send notification for alert [{}]", self.name);
-
-        // check the silence period
-        if self.trigger_condition.silence > 0 {
-            let trigger = Trigger {
-                next_run_at: (Utc::now() + Duration::minutes(self.trigger_condition.silence))
-                    .timestamp_micros(),
-                is_realtime: self.is_real_time,
-                is_silenced: true,
-            };
-            log::warn!(
-                "alert [{}] is silenced for {} minutes",
-                self.name,
-                self.trigger_condition.silence
-            );
-            triggers::save(
-                &self.org_id,
-                self.stream_type,
-                &self.stream_name,
-                &self.name,
-                &trigger,
-            )
-            .await?;
+        for dest in self.destinations.iter() {
+            let dest = destinations::get_with_template(&self.org_id, dest).await?;
+            if let Err(e) = send_notification(self, &dest, rows).await {
+                log::error!(
+                    "Error sending notification for {}/{}/{}/{} err: {}",
+                    self.org_id,
+                    self.stream_type,
+                    self.stream_name,
+                    self.name,
+                    e
+                );
+            }
         }
         Ok(())
     }
@@ -266,9 +257,8 @@ impl QueryCondition {
             }
             build_sql(alert, conditions).await?
         };
-        // fire the query
-        log::warn!("evaluate schedule query: {}", sql);
 
+        // fire the query
         let now = Utc::now().timestamp_micros();
         let req = search::Request {
             query: search::Query {
@@ -519,4 +509,98 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
         wheres.join(" AND ")
     );
     Ok(sql)
+}
+
+pub async fn send_notification(
+    alert: &Alert,
+    dest: &DestinationWithTemplate,
+    rows: &[Map<String, Value>],
+) -> Result<(), anyhow::Error> {
+    // format values
+    let mut vars = HashMap::with_capacity(rows.len());
+    for row in rows.iter() {
+        for (key, value) in row.iter() {
+            let value = if value.is_string() {
+                value.as_str().unwrap_or_default().to_string()
+            } else {
+                value.to_string()
+            };
+            let entry = vars.entry(key.to_string()).or_insert_with(HashSet::new);
+            entry.insert(value);
+        }
+    }
+
+    let alert_type = if alert.is_real_time {
+        "realtime"
+    } else {
+        "scheduled"
+    };
+    let resp = json::to_string(&dest.template.body)?;
+    let mut resp = resp
+        .replace("{alert_name}", &alert.name)
+        .replace("{alert_type}", alert_type)
+        .replace("{org_name}", &alert.org_id)
+        .replace("{stream_type}", &alert.stream_type.to_string())
+        .replace("{stream_name}", &alert.stream_name);
+    for (key, value) in vars.iter() {
+        let val = value.iter().cloned().collect::<Vec<_>>();
+        resp = resp.replace(&format!("{{{key}}}"), &val.join(","));
+    }
+
+    // Replace contextual information with values if any from alert
+    if let Some(attrs) = &alert.context_attributes {
+        for (key, value) in attrs.iter() {
+            resp = resp.replace(&format!("{{{key}}}"), value)
+        }
+    }
+
+    let msg: Value = json::from_str(&resp).unwrap();
+    let msg: Value = match &msg {
+        Value::String(obj) => match json::from_str(obj) {
+            Ok(obj) => obj,
+            Err(_) => msg,
+        },
+        _ => msg,
+    };
+    let client = if dest.skip_tls_verify {
+        reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()?
+    } else {
+        reqwest::Client::new()
+    };
+    match url::Url::parse(&dest.url) {
+        Ok(url) => {
+            let mut req = match dest.method {
+                HTTPType::POST => client.post(url),
+                HTTPType::PUT => client.put(url),
+                HTTPType::GET => client.get(url),
+            }
+            .header("Content-type", "application/json");
+
+            // Add additional headers if any from destination description
+            if let Some(headers) = &dest.headers {
+                for (key, value) in headers.iter() {
+                    if !key.is_empty() && !value.is_empty() {
+                        req = req.header(key, value);
+                    }
+                }
+            };
+
+            let resp = req.json(&msg).send().await;
+            match resp {
+                Ok(resp) => {
+                    if !resp.status().is_success() {
+                        log::error!("Alert Notification sent error: {:?}", resp.bytes().await);
+                    }
+                }
+                Err(err) => log::error!("Alert Notification sending error {:?}", err),
+            }
+        }
+        Err(err) => {
+            log::error!("Alert Notification sending error {:?}", err);
+        }
+    }
+
+    Ok(())
 }

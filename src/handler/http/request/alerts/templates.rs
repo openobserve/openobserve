@@ -44,33 +44,8 @@ pub async fn save_template(
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     let tmpl = tmpl.into_inner();
-    match templates::save_template(&org_id, &name, tmpl).await {
+    match templates::save(&org_id, &name, tmpl).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert template saved")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-    }
-}
-
-/** ListTemplates */
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Alerts",
-    operation_id = "ListTemplates",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-      ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<DestinationTemplate>),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
-    )
-)]
-#[get("/{org_id}/alerts/templates")]
-async fn list_templates(path: web::Path<String>) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    match templates::list_templates(&org_id).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -95,9 +70,34 @@ async fn list_templates(path: web::Path<String>) -> Result<HttpResponse, Error> 
 #[get("/{org_id}/alerts/templates/{template_name}")]
 async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    match templates::get_template(&org_id, &name).await {
+    match templates::get(&org_id, &name).await {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => Ok(MetaHttpResponse::not_found(e)),
+    }
+}
+
+/** ListTemplates */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListTemplates",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<DestinationTemplate>),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/alerts/templates")]
+async fn list_templates(path: web::Path<String>) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    match templates::list(&org_id).await {
+        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
 
@@ -123,7 +123,7 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
 #[delete("/{org_id}/alerts/templates/{template_name}")]
 async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    match templates::delete_template(&org_id, &name).await {
+    match templates::delete(&org_id, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert template deleted")),
         Err(e) => match e {
             (http::StatusCode::FORBIDDEN, e) => Ok(MetaHttpResponse::forbidden(e)),

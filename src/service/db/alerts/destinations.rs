@@ -17,24 +17,21 @@ use std::sync::Arc;
 
 use crate::common::{
     infra::{config::ALERTS_DESTINATIONS, db as infra_db},
-    meta::alerts::destinations::{Destination, Response},
+    meta::alerts::destinations::Destination,
     utils::json,
 };
-use crate::service::db;
 
-pub async fn get(org_id: &str, name: &str) -> Result<Response, anyhow::Error> {
+pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {
     let map_key = format!("{org_id}/{name}");
     if let Some(val) = ALERTS_DESTINATIONS.get(&map_key) {
-        let template = db::alerts::templates::get(org_id, &val.template).await?;
-        return Ok(val.to_dest_resp(template));
+        return Ok(val.value().clone());
     }
 
     let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/{name}");
     let val = db.get(&key).await?;
     let dest: Destination = json::from_slice(&val)?;
-    let template = db::alerts::templates::get(org_id, &dest.template).await?;
-    Ok(dest.to_dest_resp(template))
+    Ok(dest)
 }
 
 pub async fn set(
@@ -43,7 +40,7 @@ pub async fn set(
     mut destination: Destination,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    destination.name = Some(name.to_owned());
+    destination.name = name.to_owned();
     let key = format!("/destinations/{org_id}/{name}");
     Ok(db
         .put(
@@ -60,7 +57,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     Ok(db.delete(&key, false, infra_db::NEED_WATCH).await?)
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Response>, anyhow::Error> {
+pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {
     let cache = ALERTS_DESTINATIONS.clone();
     if !cache.is_empty() {
         let items: Vec<Destination> = cache
@@ -70,23 +67,17 @@ pub async fn list(org_id: &str) -> Result<Vec<Response>, anyhow::Error> {
                 (k.starts_with(&format!("{org_id}/"))).then(|| dest.value().clone())
             })
             .collect();
-        let mut dest_with_tmpl_list: Vec<Response> = Vec::with_capacity(items.len());
-        for item in items {
-            let template = db::alerts::templates::get(org_id, &item.template).await?;
-            dest_with_tmpl_list.push(item.to_dest_resp(template))
-        }
-        return Ok(dest_with_tmpl_list);
+        return Ok(items);
     }
 
     let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/");
-    let mut dest_with_tmpl_list: Vec<Response> = Vec::new();
+    let mut items: Vec<Destination> = Vec::new();
     for item_value in db.list_values(&key).await? {
         let dest: Destination = json::from_slice(&item_value)?;
-        let template = db::alerts::templates::get(org_id, &dest.template).await?;
-        dest_with_tmpl_list.push(dest.to_dest_resp(template))
+        items.push(dest)
     }
-    Ok(dest_with_tmpl_list)
+    Ok(items)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

@@ -159,7 +159,7 @@ use crate::handler::http::request;
             meta::alerts::Operator,
             meta::alerts::TriggerCondition,
             meta::alerts::destinations::Destination,
-            meta::alerts::destinations::Response,
+            meta::alerts::destinations::DestinationWithTemplate,
             meta::alerts::destinations::HTTPType,
             meta::alerts::templates::Template,
             meta::functions::Transform,
