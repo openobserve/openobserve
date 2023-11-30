@@ -520,9 +520,7 @@ export const convertSQLData = (
               )?.color || "#5960b2",
             opacity: 0.8,
             ...getPropsByChartTypeForSeries(panelSchema.type),
-            data: getAxisDataFromKey(key).map((it: any, i: number) => {
-              return [options?.xAxis[0]?.data[i], it];
-            }),
+            data: getAxisDataFromKey(key),
           };
           return seriesObj;
         });
@@ -1071,7 +1069,10 @@ export const convertSQLData = (
                   panelSchema.config?.unit_custom
                 )
               );
-            return formatDate(new Date(params.value)).toString();
+            console.log("aaaaaaaaaaaa 8", params);
+            return Number.isInteger(params.value)
+              ? formatDate(new Date(params.value))
+              : params.value;
           },
         },
         formatter: function (params: any) {
