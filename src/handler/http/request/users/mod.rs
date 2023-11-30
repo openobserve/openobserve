@@ -36,7 +36,7 @@ use crate::service::users;
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = UserList),
     )
 )]
 #[get("/{org_id}/users")]
@@ -58,7 +58,7 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     ),
     request_body(content = UserRequest, description = "User data", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/users")]
@@ -85,7 +85,7 @@ pub async fn save(
     ),
     request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/users/{email_id}")]
@@ -123,7 +123,7 @@ pub async fn update(
     ),
     request_body(content = UserOrgRole, description = "User role", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/users/{email_id}")]
@@ -151,8 +151,8 @@ pub async fn add_user_to_org(
         ("email_id" = String, Path, description = "User name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[delete("/{org_id}/users/{email_id}")]
@@ -168,7 +168,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     operation_id = "UserLoginCheck",
     request_body(content = SignInUser, description = "User login", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = SignInResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = SignInResponse),
     )
 )]
 #[post("/login")]

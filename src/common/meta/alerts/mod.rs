@@ -76,11 +76,10 @@ pub struct QueryCondition {
 pub struct Condition {
     pub column: String,
     pub operator: Operator,
-    #[serde(default)]
-    pub ignore_case: Option<bool>,
     #[schema(value_type = Object)]
     pub value: Value,
-    pub is_numeric: Option<bool>,
+    #[serde(default)]
+    pub ignore_case: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

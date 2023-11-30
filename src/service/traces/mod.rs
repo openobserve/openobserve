@@ -298,7 +298,7 @@ pub async fn handle_trace_request(
                         let mut trigger_alerts: Vec<(Alert, Vec<json::Map<String, json::Value>>)> =
                             Vec::new();
                         for alert in alerts {
-                            if let Ok(Some(v)) = alert.evaluate(val_map).await {
+                            if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
                                 trigger_alerts.push((alert.clone(), v));
                             }
                         }

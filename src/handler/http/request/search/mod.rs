@@ -58,7 +58,7 @@ use crate::service::{search as SearchService, usage::report_request_usage_stats}
         }
     })),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -95,8 +95,8 @@ use crate::service::{search as SearchService, usage::report_request_usage_stats}
             "size": 1,
             "scan_size": 28943
         })),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/_search")]
@@ -240,7 +240,7 @@ pub async fn search(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -265,7 +265,7 @@ pub async fn search(
             "size": 10,
             "scan_size": 28943
         })),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/{stream_name}/_around")]
@@ -510,7 +510,7 @@ pub async fn around(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
             "took": 155,
             "values": [
                 {
@@ -519,8 +519,8 @@ pub async fn around(
                 }
             ]
         })),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/{stream_name}/_values")]

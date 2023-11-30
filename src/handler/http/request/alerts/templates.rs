@@ -33,8 +33,8 @@ use crate::service::alerts::templates;
       ),
     request_body(content = Template, description = "Template data", content_type = "application/json"),    
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/alerts/templates/{template_name}")]
@@ -62,8 +62,8 @@ pub async fn save_template(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = Vec<DestinationTemplate>),
-        (status = 400, description="Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<DestinationTemplate>),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/alerts/templates")]
@@ -88,8 +88,8 @@ async fn list_templates(path: web::Path<String>) -> Result<HttpResponse, Error> 
         ("template_name" = String, Path, description = "Template name"),
       ),
     responses(
-        (status = 200, description="Success",  content_type = "application/json", body = DestinationTemplate),
-        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = DestinationTemplate),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/alerts/templates/{template_name}")]
@@ -117,7 +117,7 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
         (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = HttpResponse),
         (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Error",     content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
     )
 )]
 #[delete("/{org_id}/alerts/templates/{template_name}")]

@@ -41,8 +41,8 @@ use std::io::Error as StdErr;
     ),
     request_body(content = OrganizationSetting, description = "Organization settings", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/settings")]
@@ -75,8 +75,8 @@ async fn create(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/settings")]

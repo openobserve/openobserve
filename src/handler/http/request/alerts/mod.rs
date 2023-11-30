@@ -39,8 +39,8 @@ pub mod templates;
       ),
     request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -84,8 +84,8 @@ pub async fn save_alert(
         ("stream_name" = String, Path, description = "Stream name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts")]
@@ -123,7 +123,7 @@ async fn list_stream_alerts(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/alerts")]
@@ -153,8 +153,8 @@ async fn list_alerts(path: web::Path<String>) -> Result<HttpResponse, Error> {
         ("alert_name" = String, Path, description = "Alert name"),
       ),
     responses(
-        (status = 200, description="Success",  content_type = "application/json", body = Alert),
-        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = Alert),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -190,9 +190,9 @@ async fn get_alert(
         ("alert_name" = String, Path, description = "Alert name"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Error",     content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
 #[delete("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -232,9 +232,9 @@ async fn delete_alert(
         ("value" = bool, Query, description = "Enable or disable alert"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Error",     content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}/enable")]
@@ -279,8 +279,9 @@ async fn enable_alert(
         ("alert_name" = String, Path, description = "Alert name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}/trigger")]
@@ -298,6 +299,9 @@ async fn trigger_alert(
     };
     match alerts::trigger(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert triggered")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => match e {
+            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
+            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+        },
     }
 }

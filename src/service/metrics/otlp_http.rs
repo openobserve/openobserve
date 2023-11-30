@@ -407,7 +407,7 @@ pub async fn metrics_json_handler(
                                     Vec<json::Map<String, json::Value>>,
                                 )> = Vec::new();
                                 for alert in alerts {
-                                    if let Ok(Some(v)) = alert.evaluate(val_map).await {
+                                    if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
                                         trigger_alerts.push((alert.clone(), v));
                                     }
                                 }

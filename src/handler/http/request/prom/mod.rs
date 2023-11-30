@@ -37,8 +37,8 @@ use crate::{
     ),
     request_body(content = String, description = "prometheus WriteRequest", content_type = "application/x-protobuf"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/prometheus/api/v1/write")]
@@ -84,7 +84,7 @@ pub async fn remote_write(
         ("timeout" = Option<String>, Query, description = "Evaluation timeout"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
             "status" : "success",
             "data" : {
                "resultType" : "vector",
@@ -108,7 +108,7 @@ pub async fn remote_write(
                ]
             }
         })),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query")]
@@ -212,7 +212,7 @@ async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpRespon
         ("timeout" = Option<String>, Query, description = "Evaluation timeout"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
             "status" : "success",
             "data" : {
                "resultType" : "matrix",
@@ -244,7 +244,7 @@ async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpRespon
                ]
             }
         })),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query_range")]
@@ -382,7 +382,7 @@ async fn query_range(
         ("metric" = Option<String>, Query, description = "A metric name to filter metadata for. All metric metadata is retrieved if left empty"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
             "status": "success",
             "data": {
               "cortex_ring_tokens": [
@@ -406,7 +406,7 @@ async fn query_range(
               ]
             }
         })),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/metadata")]
@@ -442,7 +442,7 @@ pub async fn metadata(
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
             "status" : "success",
             "data" : [
                {
@@ -462,7 +462,7 @@ pub async fn metadata(
                }
             ]
         })),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/series")]
@@ -529,7 +529,7 @@ async fn series(org_id: &str, req: meta::prom::RequestSeries) -> Result<HttpResp
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
             "status": "success",
             "data": [
                 "__name__",
@@ -555,7 +555,7 @@ async fn series(org_id: &str, req: meta::prom::RequestSeries) -> Result<HttpResp
                 "version"
             ]
         })),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/labels")]
@@ -623,14 +623,14 @@ async fn labels(org_id: &str, req: meta::prom::RequestLabels) -> Result<HttpResp
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
             "status" : "success",
             "data" : [
                "node",
                "prometheus"
             ]
         })),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
@@ -731,11 +731,11 @@ fn validate_metadata_params(
         ("query" = String, Query, description = "Prometheus expression query string."),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
             "status" : "success",
             "data" : "foo / bar"
         })),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/format_query")]

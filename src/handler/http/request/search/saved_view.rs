@@ -53,14 +53,14 @@ use crate::service::db::saved_view;
         ("view_id" = String, Path, description = "The view_id which was stored"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = View, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = View, example = json!({
             "org_id": "some-org-id",
             "view_id": "some-uuid-v4",
             "view_name": "view-name",
             "payload": "base64-encoded-object-as-sent-by-frontend"
         })),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/savedviews/{view_id}")]
@@ -88,14 +88,14 @@ pub async fn get_view(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = Views, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = Views, example = json!([{
                 "org_id": "some-org-id",
                 "view_name": "view-name",
                 "view_id": "view-id",
                 "payload": "base-64-encoded-versioned-payload"
         }])),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/savedviews")]
@@ -121,12 +121,12 @@ pub async fn get_views(path: web::Path<String>, _req: HttpRequest) -> Result<Htt
         ("view_id" = String, Path, description = "The view_id to delete"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = ResponseDeleteView, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = ResponseDeleteView, example = json!([{
             "org_id": "some-org-id",
             "view_id": "view_id",
         }])),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[delete("/{org_id}/savedviews/{view_id}")]
@@ -157,12 +157,12 @@ pub async fn delete_view(
     ),
     request_body(content = RequestCreateView, description = "Create view data", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = ResponseCreateView, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = ResponseCreateView, example = json!([{
             "org_id": "some-org-id",
             "view_id": "view_id",
         }])),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/savedviews")]
@@ -199,14 +199,14 @@ pub async fn create_view(
     ),
     request_body(content = RequestUpdateView, description = "Update view data", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = View, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = View, example = json!([{
             "org_id": "some-org-id",
             "view_name": "view-name",
             "view_id": "view-id",
             "payload": "base-64-encoded-versioned-payload"
         }])),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/savedviews/{view_id}")]

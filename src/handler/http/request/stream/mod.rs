@@ -39,8 +39,8 @@ use crate::service::stream;
         ("stream_name" = String, Path, description = "Stream name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = Stream),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Stream),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/{stream_name}/schema")]
@@ -79,8 +79,8 @@ async fn schema(
     ),
     request_body(content = StreamSettings, description = "Stream settings", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/{stream_name}/settings")]
@@ -134,8 +134,8 @@ async fn settings(
     ),
     request_body(content = StreamDeleteFields, description = "Stream delete fields", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/{stream_name}/delete_fields")]
@@ -189,8 +189,8 @@ async fn delete_fields(
         ("stream_name" = String, Path, description = "Stream name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[delete("/{org_id}/{stream_name}")]
@@ -227,8 +227,8 @@ async fn delete(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = ListStream),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = ListStream),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/streams")]

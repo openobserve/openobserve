@@ -279,7 +279,7 @@ async fn add_valid_record<'a>(
                 );
                 if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
                     for alert in alerts {
-                        if let Ok(Some(v)) = alert.evaluate(local_val).await {
+                        if let Ok(Some(v)) = alert.evaluate(Some(local_val)).await {
                             trigger.push((alert.clone(), v));
                         }
                     }

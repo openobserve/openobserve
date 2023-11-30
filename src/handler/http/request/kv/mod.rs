@@ -33,8 +33,8 @@ use crate::service::kv;
         ("key" = String, Path, description = "Key name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "text/plain", body = String),
-        (status = 404, description="NotFound", content_type = "text/plain", body = String),
+        (status = 200, description = "Success",  content_type = "text/plain", body = String),
+        (status = 404, description = "NotFound", content_type = "text/plain", body = String),
     )
 )]
 #[get("/{org_id}/kv/{key}")]
@@ -64,8 +64,8 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
       ),
     request_body(content = String, description = "Value of the key", content_type = "text/plain"),
     responses(
-        (status = 200, description="Success", content_type = "text/plain", body = String),
-        (status = 500, description="Error", content_type = "text/plain", body = String),
+        (status = 200, description = "Success", content_type = "text/plain", body = String),
+        (status = 500, description = "Failure", content_type = "text/plain", body = String),
     )
 )]
 #[post("/{org_id}/kv/{key}")]
@@ -100,8 +100,8 @@ pub async fn set(
         ("key" = String, Path, description = "Key name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "text/plain", body = String),
-        (status = 404, description="NotFound", content_type = "text/plain", body = String),
+        (status = 200, description = "Success",  content_type = "text/plain", body = String),
+        (status = 404, description = "NotFound", content_type = "text/plain", body = String),
     )
 )]
 #[delete("/{org_id}/kv/{key}")]
@@ -130,7 +130,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("prefix" = Option<String>, Query, description = "Key prefix"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
     )
 )]
 #[get("/{org_id}/kv")]
