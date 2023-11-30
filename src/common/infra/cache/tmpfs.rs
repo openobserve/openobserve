@@ -112,7 +112,6 @@ pub fn get(path: &str) -> Result<Bytes> {
 pub fn set(path: &str, data: Bytes) -> Result<()> {
     let path = format_key(path);
     let size = data.len();
-    println!("set: {} {}", path, size);
     DATA.write().insert(path.clone(), data);
     FILES.write().insert(
         path.clone(),

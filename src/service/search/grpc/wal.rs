@@ -482,7 +482,6 @@ pub async fn search_arrow(
             Ok(file_data) => {
                 scan_stats.original_size += file_data.len() as i64;
                 let file_name = format!("/{work_dir}/{}", file.key);
-                println!("file name from disk is {}", file_name);
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             }
         }
