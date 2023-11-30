@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ahash::AHashMap as HashMap;
-use arrow::ipc::reader::StreamReader;
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
@@ -41,7 +40,7 @@ use datafusion::{
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
-use std::{io::Cursor, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use crate::common::{
     infra::{
@@ -81,6 +80,7 @@ pub async fn sql(
     rules: &HashMap<String, DataType>,
     sql: &Arc<Sql>,
     files: &[FileKey],
+    in_records_batches: Option<Vec<RecordBatch>>,
     file_type: FileType,
 ) -> Result<HashMap<String, Vec<RecordBatch>>> {
     if files.is_empty() {
@@ -93,7 +93,7 @@ pub async fn sql(
         register_table(session, schema.clone(), "tbl", files, file_type.clone()).await?
     } else {
         let ctx = prepare_datafusion_context(&session.search_type)?;
-        let mut record_batches = Vec::<RecordBatch>::new();
+        /* let mut record_batches = Vec::<RecordBatch>::new();
         for file in files.iter() {
             let file_data = match tmpfs::get(&file.key) {
                 Ok(data) => data,
@@ -111,7 +111,8 @@ pub async fn sql(
                     record_batches.push(record_batch);
                 }
             }
-        }
+        } */
+        let record_batches = in_records_batches.unwrap();
         let schema = if let Some(first_batch) = record_batches.first() {
             first_batch.schema()
         } else {

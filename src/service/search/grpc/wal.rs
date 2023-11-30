@@ -261,14 +261,22 @@ pub async fn search(
             stream_name = sql.stream_name,
             stream_type = ?stream_type
         );
-        let task =
-            tokio::time::timeout(
-                Duration::from_secs(timeout),
-                async move {
-                    exec::sql(&session, schema, &diff_fields, &sql, &files, FileType::JSON).await
-                }
-                .instrument(datafusion_span),
-            );
+        let task = tokio::time::timeout(
+            Duration::from_secs(timeout),
+            async move {
+                exec::sql(
+                    &session,
+                    schema,
+                    &diff_fields,
+                    &sql,
+                    &files,
+                    None,
+                    FileType::JSON,
+                )
+                .await
+            }
+            .instrument(datafusion_span),
+        );
         tasks.push(task);
     }
 
@@ -475,7 +483,6 @@ pub async fn search_arrow(
                 scan_stats.original_size += file_data.len() as i64;
                 let file_name = format!("/{work_dir}/{}", file.key);
                 println!("file name from disk is {}", file_name);
-                std::thread::sleep(Duration::from_millis(1000));
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             }
         }
@@ -524,20 +531,19 @@ pub async fn search_arrow(
     );
 
     // check schema version
-    let files = tmpfs::list(&work_dir, FILE_EXT_ARROW).unwrap_or_default();
+    let tmpfs_files = tmpfs::list(&work_dir, FILE_EXT_ARROW).unwrap_or_default();
 
     let mut files_group: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(2);
     if !CONFIG.common.widening_schema_evolution {
         files_group.insert(
             "latest".to_string(),
-            files
+            tmpfs_files
                 .iter()
                 .map(|f| FileKey::from_file_name(&f.location))
                 .collect(),
         );
     } else {
-        for file in files {
-            println!("reading files from tmpfs {:?}", &file.location);
+        for file in tmpfs_files {
             let schema_version = get_schema_version(&file.location)?;
             let entry = files_group.entry(schema_version).or_default();
             entry.push(FileKey::from_file_name(&file.location));
@@ -545,16 +551,37 @@ pub async fn search_arrow(
     }
 
     let mut tasks = Vec::new();
-    let single_group = files_group.len() == 1;
-    for (_ver, files) in files_group {
+    for (_ver, local_files) in files_group {
         // get schema of the file
-        let file_data = tmpfs::get(&files.first().unwrap().key).unwrap();
-        let buf_reader = Cursor::new(file_data);
-
-        let schema_reader = StreamReader::try_new(buf_reader, None)?;
         let meta = std::collections::HashMap::new();
-        let mut inferred_schema: Schema =
-            schema_reader.schema().as_ref().clone().with_metadata(meta);
+        let mut inferred_schema: Schema = Schema::empty();
+
+        let mut record_batches = Vec::<RecordBatch>::new();
+        for file in local_files.iter() {
+            let file_data = match tmpfs::get(&file.key) {
+                Ok(data) => data,
+                Err(err) => {
+                    log::error!("Error reading file {} from tmpfs: {:?}", file.key, err);
+                    continue;
+                }
+            };
+            let buf_reader = Cursor::new(file_data);
+            let stream_reader = StreamReader::try_new(buf_reader, None)?;
+            for read_result in stream_reader {
+                let record_batch = read_result?;
+                if record_batch.num_rows() > 0 {
+                    if inferred_schema.fields().is_empty() {
+                        inferred_schema = record_batch
+                            .schema()
+                            .as_ref()
+                            .clone()
+                            .with_metadata(meta.clone());
+                    }
+                    record_batches.push(record_batch);
+                }
+            }
+        }
+
         // calulate schema diff
         let mut diff_fields = HashMap::new();
         let group_fields = inferred_schema.fields();
@@ -578,43 +605,14 @@ pub async fn search_arrow(
         }
         let schema = Arc::new(inferred_schema);
         let sql = sql.clone();
-        let session = if single_group {
-            meta::search::Session {
-                id: session_id.to_string(),
-                storage_type: StorageType::Tmpfs,
-                search_type: if !sql.meta.group_by.is_empty() {
-                    SearchType::Aggregation
-                } else {
-                    SearchType::Normal
-                },
-            }
-        } else {
-            let id = format!("{session_id}");
-            /*     // move data to group tmpfs
-            for file in files.iter() {
-                let file_data = tmpfs::get(&file.key).unwrap();
-
-                let file_name = format!(
-                    "/{}/{}",
-                    id,
-                    file.key.strip_prefix(&format!("/{}/", work_dir)).unwrap()
-                );
-                println!(
-                    "tmpfs set file {} : file_data: {:?}",
-                    file_name,
-                    file_data.len()
-                );
-                tmpfs::set(&file_name, file_data).expect("tmpfs set success");
-            } */
-            meta::search::Session {
-                id,
-                storage_type: StorageType::Tmpfs,
-                search_type: if !sql.meta.group_by.is_empty() {
-                    SearchType::Aggregation
-                } else {
-                    SearchType::Normal
-                },
-            }
+        let session = meta::search::Session {
+            id: session_id.to_string(),
+            storage_type: StorageType::Tmpfs,
+            search_type: if !sql.meta.group_by.is_empty() {
+                SearchType::Aggregation
+            } else {
+                SearchType::Normal
+            },
         };
         let datafusion_span = info_span!(
             "service:search:grpc:wal:datafusion",
@@ -626,13 +624,14 @@ pub async fn search_arrow(
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
-                println!("exec sql over files: {:?}", &files);
+                println!("exec sql over files: {:?}", &local_files);
                 exec::sql(
                     &session,
                     schema,
                     &diff_fields,
                     &sql,
-                    &files,
+                    &local_files,
+                    Some(record_batches),
                     FileType::ARROW,
                 )
                 .await

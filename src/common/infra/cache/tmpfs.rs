@@ -13,16 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 use uuid::Uuid;
 
-use crate::common::infra::config::RwHashMap;
 use crate::common::infra::errors::*;
 
-static FILES: Lazy<RwHashMap<String, File>> = Lazy::new(Default::default);
-static DATA: Lazy<RwHashMap<String, Bytes>> = Lazy::new(Default::default);
+static FILES: Lazy<RwLock<AHashMap<String, File>>> = Lazy::new(Default::default);
+static DATA: Lazy<RwLock<AHashMap<String, Bytes>>> = Lazy::new(Default::default);
 
 const STRING_SIZE: usize = std::mem::size_of::<String>();
 const BYTES_SIZE: usize = std::mem::size_of::<bytes::Bytes>();
@@ -71,20 +72,22 @@ pub fn list(path: &str, extension: &str) -> Result<Vec<File>> {
 
     match extension {
         ".json" | ".arrow" => Ok(FILES
+            .read()
             .iter()
             .filter_map(|x| {
-                if x.key().starts_with(&path) && x.key().ends_with(extension) {
-                    Some(x.value().clone())
+                if x.0.starts_with(&path) && x.0.ends_with(extension) {
+                    Some(x.1.clone())
                 } else {
                     None
                 }
             })
             .collect::<Vec<File>>()),
         _ => Ok(FILES
+            .read()
             .iter()
             .filter_map(|x| {
-                if x.key().starts_with(&path) {
-                    Some(x.value().clone())
+                if x.0.starts_with(&path) {
+                    Some(x.1.clone())
                 } else {
                     None
                 }
@@ -95,13 +98,13 @@ pub fn list(path: &str, extension: &str) -> Result<Vec<File>> {
 
 pub fn empty(path: &str) -> bool {
     let path = format_key(path);
-    FILES.iter().all(|x| x.key().starts_with(&path))
+    FILES.read().iter().all(|x| x.0.starts_with(&path))
 }
 
 pub fn get(path: &str) -> Result<Bytes> {
     let path = format_key(path);
-    match DATA.get(&path) {
-        Some(data) => Ok(data.to_owned()),
+    match DATA.read().get(&path) {
+        Some(data) => Ok(data.clone()),
         None => Err(Error::from(DbError::KeyNotExists(path.to_string()))),
     }
 }
@@ -109,8 +112,9 @@ pub fn get(path: &str) -> Result<Bytes> {
 pub fn set(path: &str, data: Bytes) -> Result<()> {
     let path = format_key(path);
     let size = data.len();
-    DATA.insert(path.clone(), data);
-    FILES.insert(
+    println!("set: {} {}", path, size);
+    DATA.write().insert(path.clone(), data);
+    FILES.write().insert(
         path.clone(),
         File {
             location: path,
@@ -124,27 +128,27 @@ pub fn set(path: &str, data: Bytes) -> Result<()> {
 pub fn delete(path: &str, prefix: bool) -> Result<()> {
     let path = format_key(path);
     if !prefix {
-        FILES.remove(&path);
-        DATA.remove(&path);
+        FILES.write().remove(&path);
+        DATA.write().remove(&path);
     } else {
         let files = list(&path, "all")?;
         for f in files {
-            FILES.remove(&f.location);
-            DATA.remove(&f.location);
+            FILES.write().remove(&f.location);
+            DATA.write().remove(&f.location);
         }
     }
-    FILES.shrink_to_fit();
-    DATA.shrink_to_fit();
+    FILES.write().shrink_to_fit();
+    DATA.write().shrink_to_fit();
     Ok(())
 }
 
 pub fn stats() -> Result<usize> {
     let mut size = 0;
-    FILES.iter().for_each(|x| {
-        size += x.key().len() + x.value().location.len() + STRING_SIZE + FILE_SIZE;
+    FILES.read().iter().for_each(|x| {
+        size += x.0.len() + x.1.location.len() + STRING_SIZE + FILE_SIZE;
     });
-    DATA.iter().for_each(|x| {
-        size += x.key().len() + x.value().len() + STRING_SIZE + BYTES_SIZE;
+    DATA.read().iter().for_each(|x| {
+        size += x.0.len() + x.1.len() + STRING_SIZE + BYTES_SIZE;
     });
     Ok(size)
 }
