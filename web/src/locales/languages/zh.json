@@ -31,6 +31,7 @@
     "copyToClipboard": "复制到剪贴板",
     "includeSearchTerm": "包含搜索字段",
     "addFieldToTable": "向表中添加字段",
+    "removeFieldFromTable": "從表格中刪除字段",
     "excludeSearchTerm": "排除搜索字段",
     "noOfRecords": "记录数：",
     "attributes": "属性",
@@ -69,7 +70,12 @@
     "runQuery": "查询",
     "syntaxGuideLabel": "语法提示",
     "logs": "日志",
-    "enrichmentTables": "扩充表"
+    "enrichmentTables": "扩充表",
+    "savedViewsLabel": "已儲存的視圖",
+    "savedViewsNotFound": "未找到已儲存的視圖！",
+    "savedViewAction": "建立/更新已儲存的視圖",
+    "savedViewDropdownLabel": "已儲存的視圖",
+    "savedViewName": "查看名稱"
   },
   "menu": {
     "home": "主页",
@@ -332,11 +338,13 @@
     "updateEnrichmentTable": "更新扩充表",
     "searchEnrichmentTable": "搜索扩充表",
     "uploadCSVFile": "上传 CSV 文件",
-    "selectFunction": "选择函数"
+    "selectFunction": "选择函数",
+    "appendData": "將數據附加到現有的豐富表"
   },
   "confirmDialog": {
     "cancel": "取消",
-    "ok": "确定"
+    "ok": "确定",
+    "loading": "收費..."
   },
   "ingestion": {
     "header": "采集",

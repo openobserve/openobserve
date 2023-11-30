@@ -13,27 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Copyright 2023 Zinc Labs Inc.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpResponse};
 use std::io::Error;
 
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
-    saved_view::{CreateViewRequest, CreateViewResponse, DeleteViewResponse, UpdateViewRequest},
+    saved_view::{
+        CreateViewRequest, CreateViewResponse, DeleteViewResponse, UpdateViewRequest, View,
+    },
 };
 use crate::service::db::saved_view;
 
@@ -64,13 +51,15 @@ use crate::service::db::saved_view;
     )
 )]
 #[get("/{org_id}/savedviews/{view_id}")]
-pub async fn get_view(
-    path: web::Path<(String, String)>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, view_id) = path.into_inner();
-    let view = saved_view::get_view(&org_id, &view_id).await.unwrap();
-    Ok(MetaHttpResponse::json(view))
+    match saved_view::get_view(&org_id, &view_id).await {
+        Ok(view) => {
+            let view: View = view;
+            Ok(MetaHttpResponse::json(view))
+        }
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
 }
 
 // ListSavedViews
@@ -88,7 +77,7 @@ pub async fn get_view(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Views, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = ViewsWithoutData, example = json!([{
                 "org_id": "some-org-id",
                 "view_name": "view-name",
                 "view_id": "view-id",
@@ -99,10 +88,12 @@ pub async fn get_view(
     )
 )]
 #[get("/{org_id}/savedviews")]
-pub async fn get_views(path: web::Path<String>, _req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let views = saved_view::get_views_list_only(&org_id).await.unwrap();
-    Ok(MetaHttpResponse::json(views))
+    match saved_view::get_views_list_only(&org_id).await {
+        Ok(views) => Ok(MetaHttpResponse::json(views)),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
 }
 
 // DeleteSavedViews
@@ -121,7 +112,7 @@ pub async fn get_views(path: web::Path<String>, _req: HttpRequest) -> Result<Htt
         ("view_id" = String, Path, description = "The view_id to delete"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ResponseDeleteView, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = DeleteViewResponse, example = json!([{
             "org_id": "some-org-id",
             "view_id": "view_id",
         }])),
@@ -130,15 +121,15 @@ pub async fn get_views(path: web::Path<String>, _req: HttpRequest) -> Result<Htt
     )
 )]
 #[delete("/{org_id}/savedviews/{view_id}")]
-pub async fn delete_view(
-    path: web::Path<(String, String)>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, view_id) = path.into_inner();
-    saved_view::delete_view(&org_id, &view_id).await.unwrap();
-
-    let resp = DeleteViewResponse { org_id, view_id };
-    Ok(MetaHttpResponse::json(resp))
+    match saved_view::delete_view(&org_id, &view_id).await {
+        Ok(_) => Ok(MetaHttpResponse::json(DeleteViewResponse {
+            org_id,
+            view_id,
+        })),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
 }
 
 // CreateSavedViews
@@ -155,9 +146,9 @@ pub async fn delete_view(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = RequestCreateView, description = "Create view data", content_type = "application/json"),
+    request_body(content = CreateViewRequest, description = "Create view data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ResponseCreateView, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = CreateViewResponse, example = json!([{
             "org_id": "some-org-id",
             "view_id": "view_id",
         }])),
@@ -169,17 +160,17 @@ pub async fn delete_view(
 pub async fn create_view(
     path: web::Path<String>,
     view: web::Json<CreateViewRequest>,
-    _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
-    let created_view = saved_view::set_view(&org_id, &view).await.unwrap();
-    let resp = CreateViewResponse {
-        org_id,
-        view_id: created_view.view_id,
-        view_name: view.view_name.clone(),
-    };
-    Ok(MetaHttpResponse::json(resp))
+    match saved_view::set_view(&org_id, &view).await {
+        Ok(created_view) => Ok(MetaHttpResponse::json(CreateViewResponse {
+            org_id,
+            view_id: created_view.view_id,
+            view_name: view.view_name.clone(),
+        })),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
 }
 
 // UpdateSavedViews
@@ -197,7 +188,7 @@ pub async fn create_view(
         ("org_id" = String, Path, description = "Organization name"),
         ("view_id" = String, Path, description = "View id to be updated"),
     ),
-    request_body(content = RequestUpdateView, description = "Update view data", content_type = "application/json"),
+    request_body(content = UpdateViewRequest, description = "Update view data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = View, example = json!([{
             "org_id": "some-org-id",
@@ -213,14 +204,13 @@ pub async fn create_view(
 pub async fn update_view(
     path: web::Path<(String, String)>,
     view: web::Json<UpdateViewRequest>,
-    _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, view_id) = path.into_inner();
 
-    let updated_view = saved_view::update_view(&org_id, &view_id, &view)
-        .await
-        .unwrap();
-    Ok(MetaHttpResponse::json(updated_view))
+    match saved_view::update_view(&org_id, &view_id, &view).await {
+        Ok(updated_view) => Ok(MetaHttpResponse::json(updated_view)),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
 }
 
 #[cfg(test)]

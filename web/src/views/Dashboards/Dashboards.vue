@@ -1,64 +1,73 @@
 <!-- Copyright 2023 Zinc Labs Inc.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-     http:www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" :key="store.state.selectedOrganization.identifier">
-     <!-- searchBar at top -->
-     <div class="q-table__top" style="display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
-        <div class="q-table__title">{{ t("dashboard.header") }}</div>
-        <q-input
-          v-model="filterQuery"
-          filled
-          dense
-          class="q-ml-auto"
-          :placeholder="t('dashboard.search')"
-        >
-          <template #prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
-        <q-btn
-          class="q-ml-md text-bold"
-          padding="sm lg"
-          outline
-          no-caps
-          :label="t(`dashboard.import`)"
-          @click="importDashboard"
-        />
-        <!-- add dashboard button -->
-        <q-btn
-          class="q-ml-md text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          data-test="dashboard-add"
-          :label="t(`dashboard.add`)"
-          @click="addDashboard"
-        />
-      </div>
+    <!-- searchBar at top -->
+    <div
+      class="q-table__top"
+      style="
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      "
+    >
+      <div class="q-table__title">{{ t("dashboard.header") }}</div>
+      <q-input
+        v-model="filterQuery"
+        filled
+        dense
+        class="q-ml-auto"
+        :placeholder="t('dashboard.search')"
+      >
+        <template #prepend>
+          <q-icon name="search" />
+        </template>
+      </q-input>
+      <q-btn
+        class="q-ml-md text-bold"
+        padding="sm lg"
+        outline
+        no-caps
+        :label="t(`dashboard.import`)"
+        @click="importDashboard"
+      />
+      <!-- add dashboard button -->
+      <q-btn
+        class="q-ml-md text-bold no-border"
+        padding="sm lg"
+        color="secondary"
+        no-caps
+        data-test="dashboard-add"
+        :label="t(`dashboard.add`)"
+        @click="addDashboard"
+      />
+    </div>
     <q-splitter
       v-model="splitterModel"
       unit="px"
       :limits="[200, 500]"
-      style="height: calc(100vh - 122px);"
+      style="height: calc(100vh - 122px)"
     >
       <template v-slot:before>
         <div class="text-bold q-px-md q-pt-sm">
-          {{t('dashboard.folderLabel')}}
+          {{ t("dashboard.folderLabel") }}
         </div>
         <div class="dashboards-tabs">
           <q-tabs
@@ -67,187 +76,216 @@
             vertical
             v-model="activeFolderId"
           >
-          <q-tab
-          v-for="(tab, index) in store.state.organizationData.folders"
+            <q-tab
+              v-for="(tab, index) in store.state.organizationData.folders"
               :key="tab.folderId"
               :name="tab.folderId"
               content-class="tab_content full-width"
-              >
+            >
               <div class="full-width row justify-between no-wrap">
-                <span style="white-space: nowrap;  overflow: hidden;  text-overflow: ellipsis;" :title="tab.name">{{ tab.name }}</span>
+                <span
+                  style="
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                  "
+                  :title="tab.name"
+                  >{{ tab.name }}</span
+                >
                 <div>
                   <q-icon
                     v-if="index"
                     :name="outlinedEdit"
                     class="q-ml-sm"
                     @click.stop="editFolder(tab.folderId)"
-                    style="cursor: pointer; justify-self: end;"
+                    style="cursor: pointer; justify-self: end"
                   />
                   <q-icon
                     v-if="index"
                     :name="outlinedDelete"
                     class="q-ml-sm"
                     @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                    style="cursor: pointer; justify-self: end;"
+                    style="cursor: pointer; justify-self: end"
                   />
                 </div>
               </div>
             </q-tab>
           </q-tabs>
-          <div class="row justify-center full-width q-px-xs q-pb-xs" style="position: sticky; bottom: 0px;">
-              <q-btn
+          <div
+            class="row justify-center full-width q-px-xs q-pb-xs"
+            style="position: sticky; bottom: 0px"
+          >
+            <q-btn
               class="text-bold no-border full-width"
               padding="sm lg"
               color="secondary"
               no-caps
               :label="t('dashboard.newFolderBtnLabel')"
               @click.stop="addFolder"
-              />
+            />
           </div>
         </div>
       </template>
-    <template v-slot:after>
-    <!-- add dashboard table -->
-    <q-table
-      ref="qTable"
-      :rows="dashboards"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :filter="filterQuery"
-      :filter-method="filterData"
-      :loading="loading"
-      @row-click="onRowClick"
-      data-test="dashboard-table"
-    >
-      <!-- if data not available show nodata component -->
-      <template #no-data>
-        <NoData />
-      </template>
-      <!-- add delete icon in actions column -->
-      <template #body-cell-actions="props">
-        <q-td :props="props">
-          <q-btn
-              v-if="props.row.actions == 'true'"
-              :icon="outlinedDriveFileMove"
-              :title="t('dashboard.move_to_another_folder')"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="showMoveDashboardPanel(props.row.id)"
-            ></q-btn>
-           <q-btn
-              v-if="props.row.actions == 'true'"
-              icon="content_copy"
-              :title="t('dashboard.duplicate')"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="duplicateDashboard(props.row.id)"
-            ></q-btn>
-          <q-btn
-            v-if="props.row.actions == 'true'"
-            :icon="outlinedDelete"
-            :title="t('dashboard.delete')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            data-test="dashboard-delete"
-            flat
-            @click.stop="showDeleteDialogFn(props)"
-          ></q-btn>
-        </q-td>
-      </template>
-      <!-- searchBar at top -->
-      <template #top="scope">
-        <!-- table pagination -->
-        <QTablePagination
-          :scope="scope"
-          :pageTitle="t('dashboard.header')"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
+      <template v-slot:after>
+        <!-- add dashboard table -->
+        <q-table
+          ref="qTable"
+          :rows="dashboards"
+          :columns="columns"
+          row-key="id"
+          :pagination="pagination"
+          :filter="filterQuery"
+          :filter-method="filterData"
+          :loading="loading"
+          @row-click="onRowClick"
+          data-test="dashboard-table"
+        >
+          <!-- if data not available show nodata component -->
+          <template #no-data>
+            <NoData />
+          </template>
+          <!-- add delete icon in actions column -->
+          <template #body-cell-actions="props">
+            <q-td :props="props">
+              <q-btn
+                v-if="props.row.actions == 'true'"
+                :icon="outlinedDriveFileMove"
+                :title="t('dashboard.move_to_another_folder')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                @click.stop="showMoveDashboardPanel(props.row.id)"
+              ></q-btn>
+              <q-btn
+                v-if="props.row.actions == 'true'"
+                icon="content_copy"
+                :title="t('dashboard.duplicate')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                @click.stop="duplicateDashboard(props.row.id)"
+              ></q-btn>
+              <q-btn
+                v-if="props.row.actions == 'true'"
+                :icon="outlinedDelete"
+                :title="t('dashboard.delete')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                data-test="dashboard-delete"
+                flat
+                @click.stop="showDeleteDialogFn(props)"
+              ></q-btn>
+            </q-td>
+          </template>
+          <!-- searchBar at top -->
+          <template #top="scope">
+            <!-- table pagination -->
+            <QTablePagination
+              :scope="scope"
+              :pageTitle="t('dashboard.header')"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              position="top"
+              @update:changeRecordPerPage="changePagination"
+            />
+          </template>
+
+          <template #bottom="scope">
+            <QTablePagination
+              :scope="scope"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              :maxRecordToReturn="maxRecordToReturn"
+              position="bottom"
+              @update:changeRecordPerPage="changePagination"
+              @update:maxRecordToReturn="changeMaxRecordToReturn"
+            />
+          </template>
+        </q-table>
+
+        <!-- add dashboard -->
+        <q-dialog
+          v-model="showAddDashboardDialog"
+          position="right"
+          full-height
+          maximized
+        >
+          <AddDashboard
+            @updated="updateDashboardList"
+            :activeFolderId="activeFolderId"
+          />
+        </q-dialog>
+
+        <!-- add/edit folder -->
+        <q-dialog
+          v-model="showAddFolderDialog"
+          position="right"
+          full-height
+          maximized
+        >
+          <AddFolder
+            @update:modelValue="updateFolderList"
+            :edit-mode="isFolderEditMode"
+            :folder-id="selectedFolderToEdit ?? 'default'"
+          />
+        </q-dialog>
+
+        <!-- move dashboard to another folder -->
+        <q-dialog
+          v-model="showMoveDashboardDialog"
+          position="right"
+          full-height
+          maximized
+        >
+          <MoveDashboardToAnotherFolder
+            @updated="handleDashboardMoved"
+            :dashboard-id="selectedDashboardIdToMove"
+            :activeFolderId="activeFolderId"
+          />
+        </q-dialog>
+
+        <!-- delete dashboard dialog -->
+        <ConfirmDialog
+          title="Delete dashboard"
+          data-test="dashboard-confirm-dialog"
+          message="Are you sure you want to delete the dashboard?"
+          @update:ok="deleteDashboard"
+          @update:cancel="confirmDeleteDialog = false"
+          v-model="confirmDeleteDialog"
+        />
+
+        <!-- delete folder dialog -->
+        <ConfirmDialog
+          title="Delete Folder"
+          message="Are you sure you want to delete this Folder?"
+          @update:ok="deleteFolder"
+          @update:cancel="confirmDeleteFolderDialog = false"
+          v-model="confirmDeleteFolderDialog"
         />
       </template>
-
-      <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          :maxRecordToReturn="maxRecordToReturn"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-          @update:maxRecordToReturn="changeMaxRecordToReturn"
-        />
-      </template>
-    </q-table>
-
-    <!-- add dashboard -->
-    <q-dialog
-      v-model="showAddDashboardDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <AddDashboard @updated="updateDashboardList" :activeFolderId="activeFolderId"/>
-    </q-dialog>
-
-    <!-- add/edit folder -->
-    <q-dialog
-      v-model="showAddFolderDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <AddFolder @update:modelValue="updateFolderList" :edit-mode="isFolderEditMode" :folder-id="selectedFolderToEdit ?? 'default'"/>
-    </q-dialog>
-    
-    <!-- move dashboard to another folder -->
-    <q-dialog
-      v-model="showMoveDashboardDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <MoveDashboardToAnotherFolder @updated="handleDashboardMoved" :dashboard-id="selectedDashboardIdToMove" :activeFolderId="activeFolderId"/>
-    </q-dialog>
-
-    <!-- delete dashboard dialog -->
-    <ConfirmDialog
-      title="Delete dashboard"
-      data-test="dashboard-confirm-dialog"
-      message="Are you sure you want to delete the dashboard?"
-      @update:ok="deleteDashboard"
-      @update:cancel="confirmDeleteDialog = false"
-      v-model="confirmDeleteDialog"
-    />
-
-    <!-- delete folder dialog -->
-    <ConfirmDialog
-      title="Delete Folder"
-      message="Are you sure you want to delete this Folder?"
-      @update:ok="deleteFolder"
-      @update:cancel="confirmDeleteFolderDialog = false"
-      v-model="confirmDeleteFolderDialog"
-    />
-    </template>
     </q-splitter>
   </q-page>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onActivated, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  defineComponent,
+  onActivated,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -260,8 +298,19 @@ import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
-import { deleteDashboardById, deleteFolderById, getAllDashboards, getAllDashboardsByFolderId, getDashboard, getFoldersList } from "../../utils/commons.ts";
-import { outlinedDelete, outlinedDriveFileMove, outlinedEdit } from '@quasar/extras/material-icons-outlined'
+import {
+  deleteDashboardById,
+  deleteFolderById,
+  getAllDashboards,
+  getAllDashboardsByFolderId,
+  getDashboard,
+  getFoldersList,
+} from "../../utils/commons.ts";
+import {
+  outlinedDelete,
+  outlinedDriveFileMove,
+  outlinedEdit,
+} from "@quasar/extras/material-icons-outlined";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import MoveDashboardToAnotherFolder from "@/components/dashboards/MoveDashboardToAnotherFolder.vue";
 
@@ -273,8 +322,8 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     AddFolder,
-    MoveDashboardToAnotherFolder
-},
+    MoveDashboardToAnotherFolder,
+  },
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -360,7 +409,7 @@ export default defineComponent({
       rowsPerPage: 20,
     });
 
-    onMounted(async() => {      
+    onMounted(async () => {
       //get folders list
       await getFoldersList(store);
 
@@ -369,95 +418,107 @@ export default defineComponent({
       // else default as a folder
 
       activeFolderId.value = null;
-      if((route.query.folder && store.state.organizationData.folders.find((it:any) => it.folderId === route.query.folder))){
+      if (
+        route.query.folder &&
+        store.state.organizationData.folders.find(
+          (it: any) => it.folderId === route.query.folder
+        )
+      ) {
         activeFolderId.value = route.query.folder;
       } else {
         activeFolderId.value = "default";
       }
     });
 
-    watch(activeFolderId, async()=>{
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait while loading dashboards...",
-      });
-      await getAllDashboardsByFolderId(store, activeFolderId.value);
-      dismiss();
-      router.push({
-        path: "/dashboards",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          folder: activeFolderId.value
-        },
-      });
-    },{deep: true});
+    watch(
+      activeFolderId,
+      async () => {
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait while loading dashboards...",
+        });
+        await getAllDashboardsByFolderId(store, activeFolderId.value);
+        dismiss();
+        router.push({
+          path: "/dashboards",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            folder: activeFolderId.value,
+          },
+        });
+      },
+      { deep: true }
+    );
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
-    const changeMaxRecordToReturn = async(val: any) => {
+    const changeMaxRecordToReturn = async (val: any) => {
       maxRecordToReturn.value = val;
       await getDashboards();
     };
     const addDashboard = () => {
       showAddDashboardDialog.value = true;
     };
-    const addFolder = () => {      
-      isFolderEditMode.value = false;     
+    const addFolder = () => {
+      isFolderEditMode.value = false;
       showAddFolderDialog.value = true;
     };
     const importDashboard = () => {
       router.push({
         path: "/dashboards/import",
-        query:{
+        query: {
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value || "default",
-        }
+        },
       });
     };
 
     const duplicateDashboard = async (dashboardId: any) => {
-
-    const dismiss = $q.notify({
-      spinner: true,
-      message: "Please wait...",
-      timeout: 2000,
-    });
-
-    try {
-      // Get the dashboard
-      const dashboard = await getDashboard(store, dashboardId, activeFolderId.value ?? "default");
-
-      // Duplicate the dashboard
-      const data = JSON.parse(JSON.stringify(dashboard));
-
-      //change title owner name and created date
-      data.title=`${data.title} - Copy`;
-      data.owner= store.state.userInfo.name
-      data.created= new Date().toISOString()
-
-      await dashboardService.create(
-        store.state.selectedOrganization.identifier,
-        data,
-        activeFolderId.value || "default"
-      );
-
-      await getDashboards();
-
-      $q.notify({
-        type: "positive",
-        message: `Dashboard Duplicated Successfully`,
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
       });
-    } catch (err) {
-      $q.notify({
-        type: "negative",
-        message: err?.response?.data["error"]
-          ? JSON.stringify(err?.response?.data["error"])
-          : 'Dashboard duplication failed',
-      });
-    }
+
+      try {
+        // Get the dashboard
+        const dashboard = await getDashboard(
+          store,
+          dashboardId,
+          activeFolderId.value ?? "default"
+        );
+
+        // Duplicate the dashboard
+        const data = JSON.parse(JSON.stringify(dashboard));
+
+        //change title owner name and created date
+        data.title = `${data.title} - Copy`;
+        data.owner = store.state.userInfo.name;
+        data.created = new Date().toISOString();
+
+        await dashboardService.create(
+          store.state.selectedOrganization.identifier,
+          data,
+          activeFolderId.value || "default"
+        );
+
+        await getDashboards();
+
+        $q.notify({
+          type: "positive",
+          message: `Dashboard Duplicated Successfully`,
+        });
+      } catch (err) {
+        $q.notify({
+          type: "negative",
+          message: err?.response?.data["error"]
+            ? JSON.stringify(err?.response?.data["error"])
+            : "Dashboard duplication failed",
+        });
+      }
 
       dismiss();
     };
@@ -468,7 +529,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.identifier,
-          folder: activeFolderId.value || "default"
+          folder: activeFolderId.value || "default",
         },
       });
     };
@@ -481,7 +542,10 @@ export default defineComponent({
       dismiss();
     };
     const dashboards = computed(function () {
-      const dashboardList = toRaw(store.state.organizationData?.allDashboardList[activeFolderId.value] ?? []);
+      const dashboardList = toRaw(
+        store.state.organizationData?.allDashboardList[activeFolderId.value] ??
+          []
+      );
       return dashboardList.map((board: any, index) => {
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
@@ -497,14 +561,21 @@ export default defineComponent({
     });
 
     const resultTotal = computed(function () {
-      return store.state.organizationData?.allDashboardList[activeFolderId.value]?.length || 0;
-    })
+      return (
+        store.state.organizationData?.allDashboardList[activeFolderId.value]
+          ?.length || 0
+      );
+    });
 
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
         try {
           //delete dashboard by id and folder id
-          await deleteDashboardById(store, selectedDelete.value.id, activeFolderId.value ?? "default")
+          await deleteDashboardById(
+            store,
+            selectedDelete.value.id,
+            activeFolderId.value ?? "default"
+          );
           $q.notify({
             type: "positive",
             message: "Dashboard deleted successfully.",
@@ -529,44 +600,43 @@ export default defineComponent({
     const updateFolderList = async (it: any) => {
       showAddFolderDialog.value = false;
       isFolderEditMode.value = false;
-    }
+    };
 
-    const editFolder = (folderId : any) => {      
-      selectedFolderToEdit.value = folderId;      
+    const editFolder = (folderId: any) => {
+      selectedFolderToEdit.value = folderId;
       isFolderEditMode.value = true;
       showAddFolderDialog.value = true;
-    }
+    };
 
     const showDeleteFolderDialogFn = (folderId: any) => {
       selectedFolderDelete.value = folderId;
       confirmDeleteFolderDialog.value = true;
     };
 
-    const showMoveDashboardPanel = (dashboardId: any) => {      
+    const showMoveDashboardPanel = (dashboardId: any) => {
       selectedDashboardIdToMove.value = dashboardId;
       showMoveDashboardDialog.value = true;
     };
 
-    const handleDashboardMoved = async() => {
+    const handleDashboardMoved = async () => {
       showMoveDashboardDialog.value = false;
-    }
+    };
 
-    const deleteFolder = async() => {
-      if(selectedFolderDelete.value){
+    const deleteFolder = async () => {
+      if (selectedFolderDelete.value) {
         try {
-          
           //delete folder
           await deleteFolderById(store, selectedFolderDelete.value);
-          
+
           //check activeFolderId to be deleted
-          if(activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
-    
+          if (activeFolderId.value === selectedFolderDelete.value)
+            activeFolderId.value = "default";
+
           $q.notify({
             type: "positive",
             message: `Folder deleted successfully.`,
             timeout: 2000,
           });
-  
         } catch (err) {
           $q.notify({
             type: "negative",
@@ -577,8 +647,7 @@ export default defineComponent({
           confirmDeleteFolderDialog.value = false;
         }
       }
-
-    }
+    };
 
     return {
       t,
@@ -651,7 +720,11 @@ export default defineComponent({
 
       this.$router.push({
         path: "/dashboards/view/",
-        query: { org_identifier: this.store.state.selectedOrganization.identifier, dashboard: dashboardId, folder: folderId },
+        query: {
+          org_identifier: this.store.state.selectedOrganization.identifier,
+          dashboard: dashboardId,
+          folder: folderId,
+        },
       });
     },
     onRowClick(evt, row) {

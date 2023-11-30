@@ -31,6 +31,7 @@
     "copyToClipboard": "Panoya kopyala",
     "includeSearchTerm": "Arama Terimi Ekle",
     "addFieldToTable": "Tabloya alan ekle",
+    "removeFieldFromTable": "Alanı tablodan kaldır",
     "excludeSearchTerm": "Arama Terimini Hariç Tutma",
     "noOfRecords": "Kayıt Sayısı:",
     "attributes": "Öznitellikler",
@@ -69,7 +70,12 @@
     "runQuery": "Sorgu çalıştır",
     "syntaxGuideLabel": "Sözdizimi Kılavuzu",
     "logs": "Günlükler",
-    "enrichmentTables": "Zenginleştirme Tabloları"
+    "enrichmentTables": "Zenginleştirme Tabloları",
+    "savedViewsLabel": "Kayıtlı Görünümler",
+    "savedViewsNotFound": "Kaydedilen görünüm bulunamadı!",
+    "savedViewAction": "Kayıtlı Görünümü Oluştur/Güncelle",
+    "savedViewDropdownLabel": "Kayıtlı Görünümler",
+    "savedViewName": "Adını Görüntüle"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -332,11 +338,13 @@
     "updateEnrichmentTable": "Zenginleştirme Tablolarını Güncelle",
     "searchEnrichmentTable": "Arama Zenginleştirme Tablosu",
     "uploadCSVFile": "CSV Dosyasını Yükle",
-    "selectFunction": "İşlev Seçin"
+    "selectFunction": "İşlev Seçin",
+    "appendData": "Mevcut Zenginleştirme Tablosuna veri ekleme"
   },
   "confirmDialog": {
     "cancel": "İptal",
-    "ok": "Tamam."
+    "ok": "Tamam.",
+    "loading": "Yükleniyor..."
   },
   "ingestion": {
     "header": "Yutma",
@@ -489,7 +497,7 @@
     "queryValues": "Sorgu Değerleri",
     "constant": "Sabit",
     "textbox": "Metin Kutusu",
-    "newFolder": "Yeni dosya",
+    "newFolder": "Yeni Klasör",
     "updateFolder": "Klasörü Güncelle"
   },
   "panel": {

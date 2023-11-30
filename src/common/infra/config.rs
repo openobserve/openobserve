@@ -40,6 +40,7 @@ use crate::common::{
     utils::{cgroup, file::get_file_meta},
 };
 use crate::service::enrichment::StreamTable;
+use crate::service::enrichment_table::geoip::Geoip;
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
@@ -51,6 +52,9 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<AHashSet<K>>;
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
+
+pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
+pub const GEO_IP_ENRICHMENT_TABLE: &str = "geoip";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
@@ -173,6 +177,9 @@ pub static LOCAL_SCHEMA_LOCKER: Lazy<Arc<RwAHashMap<String, tokio::sync::RwLock<
 pub static MAXMIND_DB_CLIENT: Lazy<Arc<TRwLock<Option<MaxmindClient>>>> =
     Lazy::new(|| Arc::new(TRwLock::new(None)));
 
+pub static GEOIP_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
+    Lazy::new(|| Arc::new(RwLock::new(None)));
+
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
@@ -256,6 +263,8 @@ pub struct Route {
 
 #[derive(EnvConfig)]
 pub struct Common {
+    #[env_config(name = "ZO_APP_NAME", default = "openobserve")]
+    pub app_name: String,
     #[env_config(name = "ZO_LOCAL_MODE", default = true)]
     pub local_mode: bool,
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
@@ -374,6 +383,9 @@ pub struct Common {
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
+    // logger timestamp local setup
+    #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
+    pub log_local_time_format: String,
 }
 
 #[derive(EnvConfig)]

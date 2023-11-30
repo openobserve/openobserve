@@ -31,6 +31,7 @@
     "copyToClipboard": "Copiar para a prancheta",
     "includeSearchTerm": "Incluir termo de pesquisa",
     "addFieldToTable": "Adicionar campo à tabela",
+    "removeFieldFromTable": "Remover campo da tabela",
     "excludeSearchTerm": "Excluir termo de pesquisa",
     "noOfRecords": "Nº de registros:",
     "attributes": "Atributos",
@@ -69,7 +70,12 @@
     "runQuery": "Executar consulta",
     "syntaxGuideLabel": "Guia de sintaxe",
     "logs": "Registros",
-    "enrichmentTables": "Tabelas de enriquecimento"
+    "enrichmentTables": "Tabelas de enriquecimento",
+    "savedViewsLabel": "Visualizações salvas",
+    "savedViewsNotFound": "A visualização salva não foi encontrada!",
+    "savedViewAction": "Criar/atualizar a visualização salva",
+    "savedViewDropdownLabel": "Visualizações salvas",
+    "savedViewName": "Exibir nome"
   },
   "menu": {
     "home": "Início",
@@ -332,11 +338,13 @@
     "updateEnrichmentTable": "Atualizar tabela de enriquecimento",
     "searchEnrichmentTable": "Tabela de enriquecimento de pesquisa",
     "uploadCSVFile": "Carregar arquivo CSV",
-    "selectFunction": "Selecione a função"
+    "selectFunction": "Selecione a função",
+    "appendData": "Anexar dados à tabela de enriquecimento existente"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
-    "ok": "Ok"
+    "ok": "Ok",
+    "loading": "Carregando..."
   },
   "ingestion": {
     "header": "Ingestão",

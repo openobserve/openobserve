@@ -1,16 +1,17 @@
 // Copyright 2023 Zinc Labs Inc.
-
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-
-//      http:www.apache.org/licenses/LICENSE-2.0
-
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
  * Converts Map data into a format suitable for rendering a chart.
@@ -20,8 +21,7 @@
  * @return {Object} - the option object for rendering the map chart
  */
 export const convertMapData = (panelSchema: any, mapData: any) => {
-
-  //if no latitude and longitude than return it 
+  //if no latitude and longitude than return it
   if (
     !panelSchema.queries[0]?.fields?.latitude ||
     !panelSchema.queries[0]?.fields?.longitude ||
@@ -54,7 +54,10 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     lmap: {
       // See https://leafletjs.com/reference.html#map-option for details
       // NOTE: note that this order is reversed from Leaflet's [lat, lng]!
-      center: [panelSchema.config.map_view.lng, panelSchema.config.map_view.lat], // [lng, lat]
+      center: [
+        panelSchema.config.map_view.lng,
+        panelSchema.config.map_view.lat,
+      ], // [lng, lat]
       zoom: panelSchema.config.map_view.zoom,
       roam: true,
       resizeEnable: true, // automatically handles browser window resize.
@@ -125,7 +128,6 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
   };
 
   options.series = panelSchema.queries.map((query: any, index: any) => {
-
     return {
       name: `Layer ${index + 1}`,
       type: query.config.layer_type,
@@ -137,7 +139,6 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       },
       data: mapData[index]?.map((item: any) => {
         if (query.customQuery) {
-          
           // For custom queries
           return [
             item[query.fields.longitude.alias],
@@ -168,16 +169,16 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
   });
 
   const seriesData = options.series.flatMap((series: any) => series.data);
-   if (seriesData.length > 0) {
-     const minValue = Math.min(...seriesData.map((item: any) => item[2]));
-     const maxValue = Math.max(...seriesData.map((item: any) => item[2]));
+  if (seriesData.length > 0) {
+    const minValue = Math.min(...seriesData.map((item: any) => item[2]));
+    const maxValue = Math.max(...seriesData.map((item: any) => item[2]));
 
-     options.visualMap.min = minValue;
-     options.visualMap.max = maxValue;
-   } else {
-     options.visualMap = [];
-     options.series = [];
-   }
+    options.visualMap.min = minValue;
+    options.visualMap.max = maxValue;
+  } else {
+    options.visualMap = [];
+    options.series = [];
+  }
 
   return { options };
 };

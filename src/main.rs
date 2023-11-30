@@ -15,6 +15,7 @@
 
 use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
+use chrono::Local;
 use log::LevelFilter;
 use opentelemetry::{
     sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
@@ -30,6 +31,7 @@ use opentelemetry_proto::tonic::collector::{
 use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]
 use pyroscope_pprofrs::{pprof_backend, PprofConfig};
+use std::io::Write;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -132,6 +134,18 @@ async fn main() -> Result<(), anyhow::Error> {
                 .open(&CONFIG.log.file)
                 .unwrap_or_else(|_| panic!("open log file [{}] error", CONFIG.log.file));
             log_builder.target(env_logger::Target::Pipe(Box::new(target)));
+        }
+        if !CONFIG.common.log_local_time_format.trim().is_empty() {
+            log_builder.format(|buf, record| {
+                writeln!(
+                    buf,
+                    "[{} {} {}] {}",
+                    Local::now().format(CONFIG.common.log_local_time_format.as_str()),
+                    CONFIG.common.app_name,
+                    record.level(),
+                    record.args()
+                )
+            });
         }
         log_builder.init();
     }

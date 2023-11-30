@@ -1,16 +1,17 @@
 // Copyright 2023 Zinc Labs Inc.
-
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-
-//      http:www.apache.org/licenses/LICENSE-2.0
-
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //Dashboard Manipulation Functions
 
@@ -108,7 +109,7 @@ export function getConsumableDateTime(dateObj: any) {
 //save to store
 export const getAllDashboards = async (store: any, folderId: any) => {
   //call only if we have folderId
-  if(!folderId)return;
+  if (!folderId) return;
   // api call
   return await dashboardService
     .list(
@@ -122,33 +123,37 @@ export const getAllDashboards = async (store: any, folderId: any) => {
     )
     .then((res) => {
       //dashboard version migration
-      res.data.dashboards = res.data.dashboards.map((dashboard: any) => convertDashboardSchemaVersion(dashboard["v"+dashboard.version]));
-      // save to store
-      store.dispatch(
-        "setAllDashboardList",
-        {
-          ...store.state.organizationData.allDashboardList,
-          [folderId]: res.data.dashboards.sort((a: any, b: any) => b.created.localeCompare(a.created))
-        }
+      res.data.dashboards = res.data.dashboards.map((dashboard: any) =>
+        convertDashboardSchemaVersion(dashboard["v" + dashboard.version])
       );
+      // save to store
+      store.dispatch("setAllDashboardList", {
+        ...store.state.organizationData.allDashboardList,
+        [folderId]: res.data.dashboards.sort((a: any, b: any) =>
+          b.created.localeCompare(a.created)
+        ),
+      });
     })
-    .catch((error) => {
-    });
+    .catch((error) => {});
 };
 
 //get all dashboards by folderId if not there then call api else return from store
 export const getAllDashboardsByFolderId = async (store: any, folderId: any) => {
-  if(!store.state.organizationData.allDashboardList[folderId]){
+  if (!store.state.organizationData.allDashboardList[folderId]) {
     await getAllDashboards(store, folderId);
   }
   return store.state.organizationData.allDashboardList[folderId];
-}
+};
 
 function findDashboard(dashboardId: string, store: any, folderId: any) {
   const dashboards = store.state.organizationData.allDashboardList[folderId];
-  const dashboard = dashboards.find((it: any) => it.dashboardId === dashboardId);
+  const dashboard = dashboards.find(
+    (it: any) => it.dashboardId === dashboardId
+  );
   // return the deep cody of the dashboard object to prevent it from being modified
-  return  dashboard && typeof dashboard === 'object' ? JSON.parse(JSON.stringify(dashboard)) : {};
+  return dashboard && typeof dashboard === "object"
+    ? JSON.parse(JSON.stringify(dashboard))
+    : {};
 }
 
 export const addPanel = async (
@@ -172,13 +177,13 @@ export const addPanel = async (
     currentDashboard.panels = [];
   }
 
-  let maxI=0;
-  let maxY=0;
-  
+  let maxI = 0;
+  let maxY = 0;
+
   currentDashboard.panels.map((it: any) => {
-    maxI = Math.max(it.layout?.i||0,maxI);
-    maxY = Math.max(it.layout?.y||0,maxY);    
-  })
+    maxI = Math.max(it.layout?.i || 0, maxI);
+    maxY = Math.max(it.layout?.y || 0, maxY);
+  });
 
   // maxI =
   //   currentDashboard.layouts?.length > 0
@@ -197,7 +202,7 @@ export const addPanel = async (
     i: maxI + 1,
     panelId: panelData.id,
     static: false,
-  };  
+  };
 
   // if (!currentDashboard.layouts) {
   //   currentDashboard.layouts = [];
@@ -223,17 +228,15 @@ export const addVariable = async (
   variableData: any,
   folderId: any
 ) => {
-
   if (
     !store.state.organizationData.allDashboardList[folderId] ||
     store.state.organizationData.allDashboardList[folderId].length == 0
   ) {
-    await getAllDashboards(store,folderId);
+    await getAllDashboards(store, folderId);
   }
 
   const currentDashboard = findDashboard(dashboardId, store, folderId);
   if (!currentDashboard.variables) {
-
     currentDashboard.variables = {};
     currentDashboard.variables.list = [];
   }
@@ -243,7 +246,6 @@ export const addVariable = async (
   );
 
   if (variableExists.length) {
-    
     throw new Error("Variable with same name already exists");
   }
 
@@ -337,13 +339,13 @@ export const updateVariable = async (
   );
   //if name already exists
   const variableExists = currentDashboard.variables.list.filter(
-  (it: any) => it.name == variableData.name
+    (it: any) => it.name == variableData.name
   );
 
   if (variableName != variableData.name && variableExists.length) {
-  throw new Error("Variable with same name already exists");
+    throw new Error("Variable with same name already exists");
   }
-  
+
   // Update the variable data in the list
   currentDashboard.variables.list[variableIndex] = variableData;
   // Update the dashboard in the store
@@ -395,12 +397,17 @@ export const updateDashboard = async (
     .then(async (res) => {
       // update dashboardList
       await getAllDashboards(store, folderId);
-    }).catch((error) => {
-      return error
+    })
+    .catch((error) => {
+      return error;
     });
 };
 
-export const getDashboard = async (store: any, dashboardId: any, folderId: any) => {
+export const getDashboard = async (
+  store: any,
+  dashboardId: any,
+  folderId: any
+) => {
   if (
     !store.state.organizationData.allDashboardList[folderId] ||
     store.state.organizationData.allDashboardList[folderId].length == 0
@@ -410,20 +417,39 @@ export const getDashboard = async (store: any, dashboardId: any, folderId: any) 
   return findDashboard(dashboardId, store, folderId);
 };
 
-export const deleteDashboardById = async (store: any, dashboardId: any, folderId: any) => {
-// Delete the dashboard using the dashboardService
-await dashboardService.delete(store.state.selectedOrganization.identifier, dashboardId, folderId)
+export const deleteDashboardById = async (
+  store: any,
+  dashboardId: any,
+  folderId: any
+) => {
+  // Delete the dashboard using the dashboardService
+  await dashboardService.delete(
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    folderId
+  );
 
-// Get list of all dashboard of all folders
-const allDashboardList = store.state.organizationData.allDashboardList;
+  // Get list of all dashboard of all folders
+  const allDashboardList = store.state.organizationData.allDashboardList;
 
-// Filter out the deleted dashboard from the list
-const newDashboards = allDashboardList[folderId].filter((dashboard: any) => dashboard.dashboardId != dashboardId);
+  // Filter out the deleted dashboard from the list
+  const newDashboards = allDashboardList[folderId].filter(
+    (dashboard: any) => dashboard.dashboardId != dashboardId
+  );
 
-// Update the allDashboardList in the store with the new list
-store.dispatch("setAllDashboardList", {...allDashboardList, [folderId]: newDashboards});}
+  // Update the allDashboardList in the store with the new list
+  store.dispatch("setAllDashboardList", {
+    ...allDashboardList,
+    [folderId]: newDashboards,
+  });
+};
 
-export const getPanel = async (store: any, dashboardId: any, panelId: any, folderId: any) => {
+export const getPanel = async (
+  store: any,
+  dashboardId: any,
+  panelId: any,
+  folderId: any
+) => {
   if (
     !store.state.organizationData.allDashboardList[folderId] ||
     store.state.organizationData.allDashboardList[folderId].length == 0
@@ -431,8 +457,10 @@ export const getPanel = async (store: any, dashboardId: any, panelId: any, folde
     await getAllDashboards(store, folderId);
   }
   const currentDashboard = findDashboard(dashboardId, store, folderId);
-  
-  const paneldata = currentDashboard.panels?.find((it: any) => it.id == panelId);
+
+  const paneldata = currentDashboard.panels?.find(
+    (it: any) => it.id == panelId
+  );
   return paneldata;
 };
 
@@ -440,58 +468,76 @@ export const getPanelId = () => {
   return "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 };
 
-
 export const getFoldersList = async (store: any) => {
-  let folders = (await dashboardService.list_Folders(store.state.selectedOrganization.identifier)).data.list;
+  let folders = (
+    await dashboardService.list_Folders(
+      store.state.selectedOrganization.identifier
+    )
+  ).data.list;
 
   // get default folder and append it to top
   let defaultFolder = folders.find((it: any) => it.folderId == "default");
-  folders = folders.filter((it: any) => it.folderId != "default");  
+  folders = folders.filter((it: any) => it.folderId != "default");
 
-  if(!defaultFolder){
+  if (!defaultFolder) {
     defaultFolder = {
       name: "default",
       folderId: "default",
-      decription: "default"
-    }
+      decription: "default",
+    };
   }
-  
-  store.dispatch(
-    "setFolders",
-    [defaultFolder, ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name))]
-  );
+
+  store.dispatch("setFolders", [
+    defaultFolder,
+    ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
+  ]);
 
   return store.state.organizationData.folders;
-}
+};
 
 export const deleteFolderById = async (store: any, folderId: any) => {
-  await dashboardService.delete_Folder(store.state.selectedOrganization.identifier, folderId);
+  await dashboardService.delete_Folder(
+    store.state.selectedOrganization.identifier,
+    folderId
+  );
   await getFoldersList(store);
-}
+};
 
 export const createFolder = async (store: any, data: any) => {
-  const newFolder = await dashboardService.new_Folder(store.state.selectedOrganization.identifier, data);
+  const newFolder = await dashboardService.new_Folder(
+    store.state.selectedOrganization.identifier,
+    data
+  );
   await getFoldersList(store);
   return newFolder;
-}
+};
 
 export const updateFolder = async (store: any, folderId: any, data: any) => {
-  await dashboardService.edit_Folder(store.state.selectedOrganization.identifier, folderId, data);
+  await dashboardService.edit_Folder(
+    store.state.selectedOrganization.identifier,
+    folderId,
+    data
+  );
   await getFoldersList(store);
-}
+};
 
-
-export const moveDashboardToAnotherFolder = async (store: any, dashboardId: any, from: any, to:any) => {
+export const moveDashboardToAnotherFolder = async (
+  store: any,
+  dashboardId: any,
+  from: any,
+  to: any
+) => {
   //move dashboard
   await dashboardService.move_Dashboard(
     store.state.selectedOrganization.identifier,
     dashboardId,
     {
       from: from,
-      to: to
-    });
+      to: to,
+    }
+  );
 
   //update both folders dashboard
   await getAllDashboards(store, to);
   await getAllDashboards(store, from);
-}
+};

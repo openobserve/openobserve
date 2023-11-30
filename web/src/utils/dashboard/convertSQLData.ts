@@ -1,15 +1,17 @@
 // Copyright 2023 Zinc Labs Inc.
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-
-//      http:www.apache.org/licenses/LICENSE-2.0
-
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
  * Converts SQL data into a format suitable for rendering a chart.
@@ -64,12 +66,13 @@ export const convertSQLData = (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    const data = searchQueryData[0]?.filter((item: any) => {
-      return (
-        xAxisKeys.every((key: any) => item[key] != null) &&
-        yAxisKeys.every((key: any) => item[key] != null)
-      );
-    }) || [];
+    const data =
+      searchQueryData[0]?.filter((item: any) => {
+        return (
+          xAxisKeys.every((key: any) => item[key] != null) &&
+          yAxisKeys.every((key: any) => item[key] != null)
+        );
+      }) || [];
 
     // if data is not there use {} as a default value
     const keys = Object.keys((data.length && data[0]) || {}); // Assuming there's at least one object
@@ -468,6 +471,7 @@ export const convertSQLData = (
           };
           return seriesObj;
         });
+        // scatter chart with single x and y axis(single or multiple)
       } else {
         options.tooltip.formatter = function (name: any) {
           if (name.length == 0) return "";
@@ -517,9 +521,7 @@ export const convertSQLData = (
               )?.color || "#5960b2",
             opacity: 0.8,
             ...getPropsByChartTypeForSeries(panelSchema.type),
-            data: getAxisDataFromKey(key).map((it: any, i: number) => {
-              return [options?.xAxis[0]?.data[i], it];
-            }),
+            data: getAxisDataFromKey(key),
           };
           return seriesObj;
         });
@@ -810,39 +812,43 @@ export const convertSQLData = (
             fontsize: 12,
           },
         });
-        // if auto sql
-        if(panelSchema?.queries[0]?.customQuery == false){        
-        // check if x axis has histogram or not 
+      // if auto sql
+      if (panelSchema?.queries[0]?.customQuery == false) {
+        // check if x axis has histogram or not
         // for heatmap we only have one field in x axis event we have used find fn
-        
+
         const field = panelSchema.queries[0].fields?.x.find(
           (it: any) =>
-          it.aggregationFunction == "histogram" &&
-          it.column == store.state.zoConfig.timestamp_column
-          );
-          // if histogram
-          if(field){
+            it.aggregationFunction == "histogram" &&
+            it.column == store.state.zoConfig.timestamp_column
+        );
+        // if histogram
+        if (field) {
           // convert time string to selected timezone
-          xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map((it: any) => {
-            return formatDate(utcToZonedTime(it + "Z", store.state.timezone));
-          }); 
+          xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
+            (it: any) => {
+              return formatDate(utcToZonedTime(it + "Z", store.state.timezone));
+            }
+          );
         }
         // else custom sql
-      }else{
+      } else {
         // sampling data to know whether data is timeseries or not
         const sample = xAxisZerothPositionUniqueValue.slice(
           0,
           Math.min(20, xAxisZerothPositionUniqueValue.length)
         );
         // if timeseries
-        if(isTimeSeries(sample)){
+        if (isTimeSeries(sample)) {
           // convert time string to selected timezone
-          xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map((it: any) => {
-            return formatDate(utcToZonedTime(it + "Z", store.state.timezone));
-          });
+          xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
+            (it: any) => {
+              return formatDate(utcToZonedTime(it + "Z", store.state.timezone));
+            }
+          );
         }
       }
-      
+
       options.grid.bottom = 60;
       (options.xAxis = [
         {
@@ -973,25 +979,43 @@ export const convertSQLData = (
         it.column == store.state.zoConfig.timestamp_column
     );
 
+    const timestampField = panelSchema.queries[0].fields?.x.find(
+      (it: any) =>
+        !it.aggregationFunction &&
+        it.column == store.state.zoConfig.timestamp_column
+    );
+
     //if x axis has time series
-    if (field) {
+    if (field || timestampField) {
       // if timezone is UTC then simply return x axis value which will be in UTC (note that need to remove Z from timezone string)
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
       options?.series?.map((seriesObj: any) => {
-        seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-          store.state.timezone != "UTC"
+        if(field) {
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            store.state.timezone != "UTC"
             ? utcToZonedTime(
-                Number.isInteger(options?.xAxis[0]?.data[index])
+              Number.isInteger(options?.xAxis[0]?.data[index])
                   ? options?.xAxis[0]?.data[index]
                   : new Date(options?.xAxis[0]?.data[index]).getTime(),
                 store.state.timezone
               )
-            : new Date(options?.xAxis[0]?.data[index]).toISOString().slice(0, -1),
-          it,
-        ]);
-      });
+            : new Date(options?.xAxis[0]?.data[index])
+                .toISOString()
+                .slice(0, -1),
+                it,
+              ]);
+            } else if(timestampField) {
+              seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+                utcToZonedTime(
+                  new Date(options.xAxis[0].data[index]).getTime() / 1000,
+                  store.state.timezone
+                ),
+                it,
+              ]);
+            }
+          });
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
@@ -1046,7 +1070,9 @@ export const convertSQLData = (
                   panelSchema.config?.unit_custom
                 )
               );
-            return formatDate(new Date(params.value)).toString();
+            return Number.isInteger(params.value)
+              ? formatDate(new Date(params.value))
+              : params.value;
           },
         },
         formatter: function (params: any) {
@@ -1075,17 +1101,30 @@ export const convertSQLData = (
       Math.min(20, options.xAxis[0].data.length)
     );
 
-    if (isTimeSeries(sample)) {
+    const isTimeSeriesData = isTimeSeries(sample);
+    const isTimeStampData = isTimeStamp(sample);
+    
+    if (isTimeSeriesData || isTimeStampData) {
       options?.series?.map((seriesObj: any) => {
-        seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-          store.state.timezone != "UTC"
-            ? utcToZonedTime(
-                new Date(options.xAxis[0].data[index] + "Z").getTime(),
-                store.state.timezone
-              )
-            : new Date(options.xAxis[0].data[index]).getTime(),
-          it,
-        ]);
+        if (isTimeSeriesData) {
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            store.state.timezone != "UTC"
+              ? utcToZonedTime(
+                  new Date(options.xAxis[0].data[index] + "Z").getTime(),
+                  store.state.timezone
+                )
+              : new Date(options.xAxis[0].data[index]).getTime(),
+            it,
+          ]);
+        } else if (isTimeStampData) {
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            utcToZonedTime(
+              new Date(options.xAxis[0].data[index]).getTime() / 1000,
+              store.state.timezone
+            ),
+            it,
+          ]);
+        }
       });
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
@@ -1190,12 +1229,20 @@ const getLegendPosition = (legendPosition: string) => {
   }
 };
 
-const isTimeSeries = (sample: any) =>{
+const isTimeSeries = (sample: any) => {
   const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
   return sample.every((value: any) => {
     return iso8601Pattern.test(value);
   });
-}
+};
+
+//Check if the sample is timestamp
+const isTimeStamp = (sample: any) => {
+  const microsecondsPattern = /^\d{16}$/;
+  return sample.every((value: any) =>
+    microsecondsPattern.test(value.toString())
+  );
+};
 
 /**
  * Calculates the width of a given text.

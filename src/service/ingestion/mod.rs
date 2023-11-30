@@ -49,6 +49,7 @@ use crate::service::{
 };
 
 pub mod grpc;
+pub mod otlp_json;
 
 pub type TriggerAlertData = Option<Vec<(Alert, Vec<Map<String, Value>>)>>;
 
@@ -370,7 +371,7 @@ pub fn get_value(value: &Value) -> String {
     } else if value.is_string() {
         value.as_str().unwrap().to_string()
     } else {
-        "".to_string()
+        value.to_string()
     }
 }
 
