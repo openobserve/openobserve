@@ -296,6 +296,9 @@ export default defineComponent({
             } else if (data.query_condition.sql) {
               conditions = data.query_condition.sql;
             }
+            if (conditions.length > 50) {
+              conditions = conditions.substring(0, 32) + "...";
+            }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
