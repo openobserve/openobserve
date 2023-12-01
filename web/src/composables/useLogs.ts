@@ -530,6 +530,7 @@ const useLogs = () => {
         searchObj.meta.showHistogram === false
       ) {
         delete req.aggs;
+        req.query.track_total_hits = true;
 
         if (searchObj.meta.showHistogram === false) {
           // delete searchObj.data.histogram;
