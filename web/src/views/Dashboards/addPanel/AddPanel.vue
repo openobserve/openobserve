@@ -34,12 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="flex q-gutter-sm">
-        <q-icon
-          name="info"
-          style="cursor: pointer"
-          class="q-mt-lg"
+        <q-btn
+          outline
+          padding="sm"
+          class="q-mr-sm"
+          no-caps
+          icon="info_outline"
           @click="showViewPanel = true"
-        ></q-icon>
+        >
+          <q-tooltip anchor="center left" self="center right"
+            >Query Inspector
+          </q-tooltip>
+        </q-btn>
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"

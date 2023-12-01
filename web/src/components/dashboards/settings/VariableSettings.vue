@@ -168,6 +168,29 @@ export default defineComponent({
       },
     ]);
 
+    const variableTypes = ref([
+      {
+        label: t("dashboard.queryValues"),
+        value: 'query_values'
+      },
+      {
+        label: t("dashboard.constant"),
+        value: 'constant'
+      },
+      {
+        label: t("dashboard.textbox"),
+        value: 'textbox'
+      },
+      {
+        label: t("dashboard.custom"),
+        value: 'custom'
+      },
+      {
+        label: t("dashboard.ad-hoc-variable"),
+        value: 'dynamic_filters'
+      }
+    ])
+
     onMounted(async () => {
       await getDashboardData();
     });
@@ -188,13 +211,12 @@ export default defineComponent({
       )?.variables?.list;
       console.log("data", data);
 
-      dashboardVariableData.data = (data || []).map(
-        (it: any, index: number) => {
-          return {
-            "#": index < 9 ? `0${index + 1}` : index + 1,
-            name: it.name,
-            type: it.type,
-          };
+      dashboardVariableData.data = (data || []).map((it:any, index:number) => {
+
+        return {
+          "#": index < 9 ? `0${index + 1}` : index + 1,
+          name: it.name,
+          type: variableTypes.value.find((type: any) => type.value === it.type)?.label,
         }
       );
     };
@@ -262,6 +284,7 @@ export default defineComponent({
       editVariableFn,
       selectedVariable,
       handleSaveVariable,
+      variableTypes
     };
   },
 });

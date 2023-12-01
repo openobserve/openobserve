@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-space />
         <q-icon
           v-if="dependentAdHocVariable"
-          name="info"
+          name="info_outline"
           style="cursor: pointer"
           @click="showViewPanel = true"
         >
