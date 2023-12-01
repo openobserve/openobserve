@@ -23,7 +23,7 @@ use crate::common::{
     meta::{
         alerts::{
             destinations::{DestinationWithTemplate, HTTPType},
-            Alert, Condition, Operator, QueryCondition,
+            Alert, Condition, Operator, QueryCondition, QueryType,
         },
         search, StreamType,
     },
@@ -69,31 +69,38 @@ pub async fn save(
         return Err(anyhow::anyhow!("Stream {stream_name} not found"));
     }
 
-    if alert.is_real_time
-        && (alert.query_condition.conditions.is_none()
-            || alert
-                .query_condition
-                .conditions
-                .as_ref()
-                .unwrap()
-                .is_empty())
-    {
+    if alert.query_condition.query_type.is_none() {
+        alert.query_condition.query_type = Some(QueryType::Custom);
+    }
+
+    if alert.is_real_time && alert.query_condition.query_type != Some(QueryType::Custom) {
         return Err(anyhow::anyhow!(
-            "Realtime alert must have at least one condition"
+            "Realtime alert should use Custom query type"
         ));
     }
 
-    if (alert.query_condition.sql.is_none()
-        || alert.query_condition.sql.as_ref().unwrap().is_empty())
-        && (alert.query_condition.conditions.is_none()
-            || alert
-                .query_condition
-                .conditions
-                .as_ref()
-                .unwrap()
-                .is_empty())
-    {
-        return Err(anyhow::anyhow!("Alert must have at least one condition"));
+    match alert.query_condition.query_type.as_ref().unwrap() {
+        QueryType::Custom => {
+            if alert.query_condition.sql.is_none()
+                || alert.query_condition.sql.as_ref().unwrap().is_empty()
+            {
+                return Err(anyhow::anyhow!("Alert should have conditions"));
+            }
+        }
+        QueryType::SQL => {
+            if alert.query_condition.sql.is_none()
+                || alert.query_condition.sql.as_ref().unwrap().is_empty()
+            {
+                return Err(anyhow::anyhow!("Alert should have a SQL"));
+            }
+        }
+        QueryType::PromQL => {
+            if alert.query_condition.promql.is_none()
+                || alert.query_condition.promql.as_ref().unwrap().is_empty()
+            {
+                return Err(anyhow::anyhow!("Alert should have a PromQL"));
+            }
+        }
     }
 
     // test the alert
@@ -253,18 +260,32 @@ impl QueryCondition {
         &self,
         alert: &Alert,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
-        let sql = if self.sql.is_some() {
-            self.sql.as_ref().unwrap().to_string()
-        } else {
-            let conditions = if let Some(v) = self.conditions.as_ref() {
-                if v.is_empty() {
+        let sql = match self.query_type.as_ref().unwrap() {
+            QueryType::Custom => {
+                if let Some(v) = self.conditions.as_ref() {
+                    if v.is_empty() {
+                        return Ok(None);
+                    } else {
+                        build_sql(alert, v).await?
+                    }
+                } else {
                     return Ok(None);
                 }
-                v
-            } else {
-                return Ok(None);
-            };
-            build_sql(alert, conditions).await?
+            }
+            QueryType::SQL => {
+                if let Some(v) = self.sql.as_ref() {
+                    if v.is_empty() {
+                        return Ok(None);
+                    } else {
+                        v.to_string()
+                    }
+                } else {
+                    return Ok(None);
+                }
+            }
+            QueryType::PromQL => {
+                return Err(anyhow::anyhow!("PromQL is not supported yet"));
+            }
         };
 
         // fire the query

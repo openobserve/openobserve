@@ -89,6 +89,39 @@ pub struct QueryCondition {
     pub conditions: Option<Vec<Condition>>,
     pub sql: Option<String>,
     pub promql: Option<String>,
+    pub query_type: Option<QueryType>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub enum QueryType {
+    #[default]
+    #[serde(rename = "custom")]
+    Custom,
+    #[serde(rename = "sql")]
+    SQL,
+    #[serde(rename = "promql")]
+    PromQL,
+}
+
+impl ToString for QueryType {
+    fn to_string(&self) -> String {
+        match self {
+            QueryType::Custom => "custom".to_string(),
+            QueryType::SQL => "sql".to_string(),
+            QueryType::PromQL => "promql".to_string(),
+        }
+    }
+}
+
+impl From<&str> for QueryType {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "custom" => QueryType::Custom,
+            "sql" => QueryType::SQL,
+            "promql" => QueryType::PromQL,
+            _ => QueryType::Custom,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
