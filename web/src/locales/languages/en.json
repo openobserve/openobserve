@@ -1,5 +1,7 @@
 {
   "common": {
+    "save": "Save",
+    "update": "Update",
     "close": "Close",
     "cancel": "Cancel",
     "ok": "Ok",
@@ -36,7 +38,8 @@
     "noOfRecords": "No of Records:",
     "attributes": "Attributes",
     "events": "Events",
-    "goHome": "Go Home"
+    "goHome": "Go Home",
+    "formValidationFailed": "Form validation failed"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -686,6 +689,33 @@
     "generalLabel": "General",
     "apikeyLabel": "API Keys",
     "generalPageTitle": "General Settings",
-    "scrapintervalLabel": "Scrape Interval (In Seconds) *"
+    "scrapintervalLabel": "Scrape Interval (In Seconds) *",
+    "authSourceLabel": "Authentication Sources"
+  },
+  "authenticationSources": {
+    "name": "Authentication Name",
+    "type": "Authentication Type",
+    "protocol": "Security Protocol",
+    "host": "Host",
+    "port": "Port",
+    "bindDN": "Bind DN",
+    "bindPassword": "Bind Password",
+    "userSearchBase": "User Search Base",
+    "userFilter": "User Filter",
+    "adminFilter": "Admin Filter",
+    "restrictedFilter": "Restricted Filter",
+    "usernameAttribute": "Username Attribute",
+    "firstnameAttribute": "First Name Attribute",
+    "surnameAttribute": "Surname Attribute",
+    "emailAttribute": "Email Attribute",
+    "sshKeyAttribute": "Public SSH Key Attribute",
+    "avatarAttribute": "Avatar Attribute",
+    "enableLDAPGroup": "Enable LDAP Group",
+    "groupSearchBaseDN": "Group Search Base DN",
+    "groupAttributeUserList": "Group Attribute Containing List Of Users",
+    "userListedInGroup": "User Attribute Listed In Group",
+    "verifyGroupMembership": "Verify group membership in LDAP (leave the filter empty to skip)",
+    "mapLDAPGroup": "Map LDAP Groups to Organization Teams (leave the empty to skip)",
+    "removeUserLDAPGroup": "Remove users from synchronized teams if user does not belong to corresponding LDAP group"
   }
 }

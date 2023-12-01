@@ -20,6 +20,12 @@ const auth = {
   sign_in_user: (payload: any) => {
     return http().post(`/auth/login`, payload);
   },
+  getAuthSource: () => {
+    return http().get(`/auth/authentication_source`);
+  },
+  postAuthSource: (payload: any) => {
+    return http().post(`/auth/authentication_source`, payload);
+  }
 };
 
 export default auth;

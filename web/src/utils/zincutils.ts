@@ -314,6 +314,10 @@ export const routeGuardPendingSubscriptions = (
   // }
 };
 
+export const routeGuardEnterpriseLicense = (to: any, from: any, next: any) => {
+  next();
+};
+
 export const convertToTitleCase = (str: string) => {
   return str
     .split("-")

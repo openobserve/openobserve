@@ -56,7 +56,10 @@ const ErrorsDashboard = () =>
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
 
-import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
+import {
+  routeGuardPendingSubscriptions,
+  routeGuardEnterpriseLicense,
+} from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
 const useRoutes = () => {
   const parentRoutes: never[] = [];
@@ -220,6 +223,14 @@ const useRoutes = () => {
           path: "general",
           name: "general",
           component: () => import("@/components/settings/General.vue"),
+        },
+        {
+          path: "authentication_sources",
+          name: "authentication_sources",
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuardEnterpriseLicense(to, from, next);
+          },
+          component: () => import("@/components/settings/AuthenticationSources.vue"),
         },
       ],
     },

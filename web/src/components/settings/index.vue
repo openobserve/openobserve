@@ -52,6 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('settings.apikeyLabel')"
             content-class="tab_content"
           />
+          <q-route-tab
+            exact
+            default
+            name="authentication_sources"
+            :to="'/settings/authentication_sources'"
+            icon="source"
+            :label="t('settings.authSourceLabel')"
+            content-class="tab_content"
+          />
         </q-tabs>
       </template>
 
@@ -119,7 +128,7 @@ export default defineComponent({
       router,
       config,
       settingsTab,
-      splitterModel: ref(200),
+      splitterModel: ref(250),
       outlinedSettings,
     };
   },
