@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-bind:disable="beingUpdated"
             v-model="formData.is_real_time"
             :checked="formData.is_real_time"
-            val="true"
+            val="false"
             :label="t('alerts.scheduled')"
             class="q-ml-none"
           />
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-bind:disable="beingUpdated"
             v-model="formData.is_real_time"
             :checked="!formData.is_real_time"
-            val="false"
+            val="true"
             :label="t('alerts.realTime')"
             class="q-ml-none"
           />
@@ -119,6 +119,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-py-sm showLabelOnTop text-bold text-h7"
           data-test="add-alert-query-input-title"
         >
+          <real-time-alert
+            :columns="filteredColumns"
+            :conditions="formData.query_condition.conditions"
+            @field:add="addField"
+            @field:remove="removeField"
+          />
+        </div>
+        <div v-else>
           <scheduled-alert
             ref="scheduledAlertRef"
             :columns="filteredColumns"
@@ -128,14 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @field:add="addField"
             @field:remove="removeField"
             class="q-mt-sm"
-          />
-        </div>
-        <div v-else>
-          <real-time-alert
-            :columns="filteredColumns"
-            :conditions="formData.query_condition.conditions"
-            @field:add="addField"
-            @field:remove="removeField"
           />
         </div>
 
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 class="flex justify-center items-center"
               >
-              {{ t("alerts.minutes") }}
+                {{ t("alerts.minutes") }}
               </div>
             </div>
           </div>
@@ -636,7 +636,9 @@ export default defineComponent({
   },
   computed: {
     getFormattedDestinations: function () {
-      return ["Slack", "Email"];
+      return this.destinations.map((destination: any) => {
+        return destination.name;
+      });
     },
   },
   methods: {
@@ -677,7 +679,7 @@ export default defineComponent({
 
         if (
           (!payload.is_real_time &&
-            this.scheduledAlertRef?.value.tab === "custom") ||
+            this.scheduledAlertRef?.selectedTab === "custom") ||
           payload.is_real_time
         ) {
           payload.query_condition.sql = this.buildSqlFromConditions();
