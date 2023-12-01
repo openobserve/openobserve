@@ -169,7 +169,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
-import type { AlertData, Alert } from "@/ts/interfaces/index";
+import type { Alert, AlertListItem } from "@/ts/interfaces/index";
 import {
   outlinedDelete,
   outlinedPause,
@@ -191,8 +191,8 @@ export default defineComponent({
     const $q = useQuasar();
     const router = useRouter();
     const alerts: Ref<Alert[]> = ref([]);
-    const alertsRows: Ref<Alert[]> = ref([]);
-    const formData: Ref<AlertData | {}> = ref({});
+    const alertsRows: Ref<AlertListItem[]> = ref([]);
+    const formData: Ref<Alert | {}> = ref({});
     const showAddAlertDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
@@ -303,15 +303,8 @@ export default defineComponent({
               name: data.name,
               stream_name: data.stream_name ? data.stream_name : "--",
               stream_type: data.stream_type,
-              silence: {
-                value: data.trigger_condition.silence,
-                unit: "Minutes",
-              },
-              conditions: conditions,
-              destinations: data.destinations.join(", "),
               enabled: data.enabled,
               alert_type: data.is_real_time ? "Real Time" : "Scheduled",
-              state: data.enabled ? "Running" : "Paused",
               description: data.description,
             };
           });
@@ -394,7 +387,7 @@ export default defineComponent({
     const showAddUpdateFn = (props: any) => {
       formData.value = alerts.value.find(
         (alert: any) => alert.name === props.row?.name
-      );
+      ) as Alert;
       let action;
       if (!props.row) {
         isUpdated.value = false;

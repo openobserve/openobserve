@@ -1,6 +1,3 @@
-import { A, n } from "msw/lib/SetupApi-8ab693f7";
-import type { Query } from "./query";
-
 export interface Condition {
   column: string;
   ignore_case: null | boolean;
@@ -38,10 +35,14 @@ export interface Alert {
 }
 
 // Alert object which is modified in frontend to display in table and form
-export interface AlertData extends Alert {
-  "#"?: number | string;
-  condition_str?: string;
-  actions?: string;
+export interface AlertListItem {
+  "#": number | string;
+  name: string;
+  stream_name: string;
+  stream_type: string;
+  enabled: boolean;
+  alert_type: string;
+  description: string;
 }
 
 // Template payload which is sent to backend
