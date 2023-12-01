@@ -15,6 +15,7 @@ export default [
       ],
       sql: "select * from 'default' where kubernetes_container_image = 'abc'",
       promql: null,
+      type: "sql",
     },
     trigger_condition: {
       period: 10,
@@ -28,7 +29,7 @@ export default [
     context_attributes: {},
   },
   {
-    name: "alert1",
+    name: "alert2",
     stream_type: "logs",
     stream_name: "default",
     is_real_time: false,
@@ -43,6 +44,7 @@ export default [
       ],
       sql: "select * from 'default' where kubernetes_container_image = 'abc'",
       promql: null,
+      type: "custom",
     },
     trigger_condition: {
       period: 10,

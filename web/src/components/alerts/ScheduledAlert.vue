@@ -135,7 +135,13 @@ import FieldsInput from "./FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import QueryEditor from "@/components/QueryEditor.vue";
 
-const props = defineProps(["columns", "conditions", "trigger", "sql"]);
+const props = defineProps([
+  "columns",
+  "conditions",
+  "trigger",
+  "sql",
+  "query_type",
+]);
 
 const emits = defineEmits([
   "field:add",
@@ -151,7 +157,7 @@ const triggerData = ref(props.trigger);
 
 const query = ref(props.sql);
 
-const tab = ref("custom");
+const tab = ref(props.query_type || "custom");
 
 const addField = () => {
   emits("field:add");
