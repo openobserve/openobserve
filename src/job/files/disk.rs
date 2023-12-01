@@ -54,9 +54,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
             break;
         }
         interval.tick().await;
-        if let Err(e) = move_files_to_storage().await {
+        /* if let Err(e) = move_files_to_storage().await {
             log::error!("Error moving disk files to remote: {}", e);
-        }
+        } */
 
         if let Err(e) = metrics_json_to_arrow().await {
             log::error!("Error converting metrics json to arrow : {}", e);
