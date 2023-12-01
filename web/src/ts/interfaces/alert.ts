@@ -1,9 +1,6 @@
-import type { Query } from "./query";
-
 export interface Condition {
   column: string;
-  ignoreCase: null | boolean;
-  isNumeric: boolean;
+  ignore_case: null | boolean;
   operator: string;
   value: string;
 }
@@ -15,22 +12,37 @@ interface TimingFunction {
 
 // Alert payload which is sent to backend
 export interface Alert {
-  condition: Condition;
-  destination: string;
-  duration: number | TimingFunction;
-  frequency: number | TimingFunction;
   name: string;
   stream_name: string;
-  time_between_alerts: number | TimingFunction;
-  query?: Query | string;
+  stream_type: string;
+  query_condition: {
+    conditions: Array<Condition>;
+    sql: string | null;
+    promql: string | null;
+    type: "sql" | "promql" | "custom";
+  };
+  destination: Array<string | Destination>;
+  trigger_condition: {
+    period: number;
+    operator: "=" | ">" | "<" | ">=" | "<=" | "!=" | "Contains" | "NotContains";
+    threshold: number;
+    silence: number;
+  };
+  is_real_time: boolean;
+  enabled: boolean;
+  context_attributes: { [key: string]: string };
+  description: string;
 }
 
 // Alert object which is modified in frontend to display in table and form
-export interface AlertData extends Alert {
-  "#"?: number | string;
-  condition_str: string;
-  actions: string;
-  isScheduled: boolean;
+export interface AlertListItem {
+  "#": number | string;
+  name: string;
+  stream_name: string;
+  stream_type: string;
+  enabled: boolean;
+  alert_type: string;
+  description: string;
 }
 
 // Template payload which is sent to backend

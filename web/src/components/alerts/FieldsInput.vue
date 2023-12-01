@@ -27,7 +27,7 @@
           <q-select
             v-model="field.column"
             :options="streamFields"
-            :popup-content-style="{ textTransform: 'capitalize' }"
+            :popup-content-style="{ textTransform: 'lowercase' }"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop"
@@ -89,6 +89,7 @@
             round
             flat
             :title="t('alert_templates.edit')"
+            :disable="fields.length === 1"
             @click="deleteApiHeader(field)"
             style="min-width: auto"
           />

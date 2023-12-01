@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::Engine;
-use crate::service::promql::common::quantile as calculate_quantile;
-use crate::service::promql::value::Labels;
-use crate::service::promql::value::{InstantValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::Expr as PromExpr;
 use rayon::prelude::*;
+
+use crate::service::promql::{
+    common::quantile as calculate_quantile,
+    value::{InstantValue, Labels, Sample, Value},
+    Engine,
+};
 
 pub async fn quantile(
     ctx: &mut Engine,

@@ -17,7 +17,6 @@ use once_cell::sync::Lazy;
 use reqwest::Client;
 use std::{collections::HashMap, sync::Arc};
 
-use super::ingestion_service;
 use crate::common::{
     infra::{
         cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
@@ -33,6 +32,8 @@ use crate::common::{
 };
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, search as SearchService};
+
+use super::ingestion_service;
 
 pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 

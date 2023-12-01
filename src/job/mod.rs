@@ -108,9 +108,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::templates::watch().await });
     tokio::task::spawn(async move { db::alerts::destinations::watch().await });
     tokio::task::spawn(async move { db::alerts::watch().await });
-    tokio::task::spawn(async move { db::triggers::watch().await });
+    tokio::task::spawn(async move { db::alerts::triggers::watch().await });
     tokio::task::spawn(async move { db::organization::watch().await });
-    tokio::task::spawn(async move { db::metrics::openobserve_info().await });
     tokio::task::yield_now().await; // yield let other tasks run
 
     // cache core metadata
@@ -133,7 +132,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("alerts destinations cache failed");
     db::alerts::cache().await.expect("alerts cache failed");
-    db::triggers::cache()
+    db::alerts::triggers::cache()
         .await
         .expect("alerts triggers cache failed");
     db::syslog::cache().await.expect("syslog cache failed");

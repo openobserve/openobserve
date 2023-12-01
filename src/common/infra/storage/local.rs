@@ -23,8 +23,11 @@ use object_store::{
 use std::ops::Range;
 use tokio::io::AsyncWrite;
 
-use super::{format_key, CONCURRENT_REQUESTS};
-use crate::common::infra::{config::CONFIG, metrics};
+use crate::common::infra::{
+    config::CONFIG,
+    metrics,
+    storage::{format_key, CONCURRENT_REQUESTS},
+};
 
 pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,

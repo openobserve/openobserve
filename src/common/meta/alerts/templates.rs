@@ -13,20 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod asynchronism;
-pub mod auth;
-pub mod base64;
-pub mod cgroup;
-pub mod file;
-pub mod flatten;
-pub mod functions;
-pub mod hasher;
-pub mod http;
-pub mod json;
-pub mod rand;
-pub mod schema;
-pub mod schema_ext;
-pub mod str;
-pub mod stream;
-pub mod time;
-pub mod zo_logger;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+use crate::common::utils::json::Value;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct Template {
+    #[serde(default)]
+    pub name: String,
+    #[schema(value_type = Object)]
+    pub body: Value,
+    #[serde(rename = "isDefault")]
+    #[serde(default)]
+    pub is_default: Option<bool>,
+}

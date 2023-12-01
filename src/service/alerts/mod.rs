@@ -13,304 +13,687 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{http, HttpResponse};
+use actix_web::http;
 use arrow_schema::DataType;
-use chrono::Utc;
-use std::collections::HashMap;
-use std::io::Error;
+use chrono::{Duration, Local, TimeZone, Utc};
+use std::collections::{HashMap, HashSet};
 
-use super::search::sql::Sql;
-use super::{db, triggers};
-use crate::common::meta::alert::{Alert, AlertList, Trigger};
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::common::meta::search::Query;
-use crate::common::meta::{self, StreamType};
-use crate::common::utils::notification::send_notification;
-use crate::common::utils::schema_ext::SchemaExt;
-use crate::handler::grpc::cluster_rpc;
+use crate::common::{
+    infra::config::CONFIG,
+    meta::{
+        alerts::{
+            destinations::{DestinationWithTemplate, HTTPType},
+            Alert, Condition, Operator, QueryCondition, QueryType,
+        },
+        search, StreamType,
+    },
+    utils::{
+        json::{self, Map, Value},
+        schema_ext::SchemaExt,
+    },
+};
+use crate::service::{db, search as SearchService};
 
+pub mod alert_manager;
 pub mod destinations;
 pub mod templates;
+pub mod triggers;
 
-#[tracing::instrument(skip_all)]
-pub async fn save_alert(
+pub async fn save(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     name: &str,
     mut alert: Alert,
-) -> Result<HttpResponse, Error> {
-    alert.stream = stream_name.to_string();
+) -> Result<(), anyhow::Error> {
     alert.name = name.to_string();
-    alert.stream_type = Some(stream_type);
-    let in_dest = alert.clone().destination;
+    alert.org_id = org_id.to_string();
+    alert.stream_type = stream_type;
+    alert.stream_name = stream_name.to_string();
+
+    if alert.name.is_empty() {
+        return Err(anyhow::anyhow!("Alert name is required"));
+    }
 
     // before saving alert check alert destination
-    if db::alerts::destinations::get(org_id, &in_dest)
-        .await
-        .is_err()
-    {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            format!("Destination with name {in_dest} not found"),
-        )));
-    };
+    for dest in alert.destinations.iter() {
+        if db::alerts::destinations::get(org_id, dest).await.is_err() {
+            return Err(anyhow::anyhow!("Alert destination {dest} not found"));
+        };
+    }
 
     // before saving alert check column type to decide numeric condition
-    let schema = db::schema::get(org_id, stream_name, stream_type)
-        .await
-        .unwrap();
+    let schema = db::schema::get(org_id, stream_name, stream_type).await?;
     let fields = schema.to_cloned_fields();
-    if fields.is_empty() {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            format!("Stream with name {stream_name} not found"),
-        )));
+    if stream_name.is_empty() || fields.is_empty() {
+        return Err(anyhow::anyhow!("Stream {stream_name} not found"));
     }
 
-    if alert.query.is_none() {
-        alert.query = Some(Query {
-            sql: format!("select * from {stream_name}"),
-            start_time: 0,
-            end_time: 0,
-            sort_by: None,
-            sql_mode: "full".to_owned(),
-            query_type: "".to_owned(),
-            track_total_hits: false,
-            from: 0,
-            size: 0,
-            query_context: None,
-            uses_zo_fn: false,
-            query_fn: None,
-        });
-        alert.is_real_time = true;
-
-        let mut local_fields = fields.clone();
-        local_fields.retain(|field| field.name().eq(&alert.condition.column));
-
-        if local_fields.is_empty() {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!(
-                    "Column named {} not found on stream {stream_name}",
-                    &alert.condition.column
-                ),
-            )));
-        }
-        alert.condition.is_numeric = Some(!matches!(
-            local_fields[0].data_type(),
-            DataType::Boolean | DataType::Utf8
+    if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
+        return Err(anyhow::anyhow!(
+            "Realtime alert should use Custom query type"
         ));
-    } else {
-        let meta_req = meta::search::Request {
-            query: alert.clone().query.unwrap(),
-            aggs: HashMap::new(),
-            encoding: meta::search::RequestEncoding::Empty,
-            timeout: 0,
-        };
-        let req: cluster_rpc::SearchRequest = meta_req.into();
-        let sql = Sql::new(&req).await;
+    }
 
-        if sql.is_err() {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("Invalid query : {:?} ", sql.err()),
-            )));
+    match alert.query_condition.query_type {
+        QueryType::Custom => {
+            if alert.query_condition.conditions.is_none()
+                || alert
+                    .query_condition
+                    .conditions
+                    .as_ref()
+                    .unwrap()
+                    .is_empty()
+            {
+                return Err(anyhow::anyhow!("Alert should have conditions"));
+            }
+        }
+        QueryType::SQL => {
+            if alert.query_condition.sql.is_none()
+                || alert.query_condition.sql.as_ref().unwrap().is_empty()
+            {
+                return Err(anyhow::anyhow!("Alert should have a SQL"));
+            }
+        }
+        QueryType::PromQL => {
+            if alert.query_condition.promql.is_none()
+                || alert.query_condition.promql.as_ref().unwrap().is_empty()
+            {
+                return Err(anyhow::anyhow!("Alert should have a PromQL"));
+            }
         }
     }
 
-    db::alerts::set(org_id, stream_name, stream_type, name, alert.clone())
-        .await
-        .unwrap();
-    // For non-ingest alert set trigger immediately
-    if !alert.is_real_time {
-        let trigger = Trigger {
-            timestamp: Utc::now().timestamp_micros(),
-            is_valid: true,
-            alert_name: alert.name,
-            stream: stream_name.to_string(),
-            stream_type,
-            org: org_id.to_string(),
-            last_sent_at: 0,
-            count: 0,
-            is_ingest_time: false,
-            parent_alert_deleted: false,
-        };
-        let _ = triggers::save_trigger(&trigger.alert_name, &trigger).await;
-    }
+    // test the alert
+    _ = &alert.evaluate(None).await?;
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK.into(),
-        "Alert saved".to_string(),
-    )))
+    // calulate the trigger frequency
+    alert.trigger_condition.frequency = std::cmp::max(
+        1,
+        alert.trigger_condition.period / alert.trigger_condition.threshold,
+    );
+
+    // save the alert
+    db::alerts::set(org_id, stream_type, stream_name, name, alert).await
 }
 
-#[tracing::instrument]
-pub async fn list_alert(
+pub async fn get(
     org_id: &str,
-    stream_name: Option<&str>,
-    stream_type: Option<StreamType>,
-) -> Result<HttpResponse, Error> {
-    let alerts_list = db::alerts::list(org_id, stream_name, stream_type)
-        .await
-        .unwrap();
-    Ok(HttpResponse::Ok().json(AlertList { list: alerts_list }))
-}
-
-#[tracing::instrument]
-pub async fn delete_alert(
-    org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     name: &str,
-) -> Result<HttpResponse, Error> {
-    if db::alerts::get(org_id, stream_name, stream_type, name)
+) -> Result<Option<Alert>, anyhow::Error> {
+    db::alerts::get(org_id, stream_type, stream_name, name).await
+}
+
+pub async fn list(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> Result<Vec<Alert>, anyhow::Error> {
+    db::alerts::list(org_id, stream_type, stream_name).await
+}
+
+pub async fn delete(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    name: &str,
+) -> Result<(), (http::StatusCode, anyhow::Error)> {
+    if db::alerts::get(org_id, stream_type, stream_name, name)
         .await
         .is_err()
     {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "Alert not found".to_string(),
-        )));
+        return Err((
+            http::StatusCode::NOT_FOUND,
+            anyhow::anyhow!("Alert not found"),
+        ));
     }
-    match db::alerts::delete(org_id, stream_name, stream_type, name).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Alert deleted ".to_string(),
-        ))),
-        Err(e) => Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                e.to_string(),
-            )),
-        ),
-    }
+    db::alerts::delete(org_id, stream_type, stream_name, name)
+        .await
+        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
-#[tracing::instrument]
-pub async fn get_alert(
+pub async fn enable(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
-    name: &str,
-) -> Result<HttpResponse, Error> {
-    let result = db::alerts::get(org_id, stream_name, stream_type, name).await;
-    match result {
-        Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
-        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "alert not found".to_string(),
-        ))),
-    }
-}
-
-#[tracing::instrument]
-pub async fn trigger_alert(
-    org_id: &str,
     stream_name: &str,
-    stream_type: StreamType,
     name: &str,
-) -> Result<HttpResponse, Error> {
-    let result = db::alerts::get(org_id, stream_name, stream_type, name).await;
-
-    match result {
-        Ok(Some(alert)) => {
-            let trigger = Trigger {
-                timestamp: Utc::now().timestamp_micros(),
-                is_valid: false,
-                alert_name: name.to_string(),
-                stream: stream_name.to_string(),
-                org: org_id.to_string(),
-                last_sent_at: 0,
-                count: 0,
-                is_ingest_time: alert.is_real_time,
-                stream_type,
-                parent_alert_deleted: false,
-            };
-            let _ = send_notification(&alert, &trigger).await;
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "Alert successfully triggered ".to_string(),
-            )))
+    value: bool,
+) -> Result<(), (http::StatusCode, anyhow::Error)> {
+    let mut alert = match db::alerts::get(org_id, stream_type, stream_name, name).await {
+        Ok(Some(alert)) => alert,
+        _ => {
+            return Err((
+                http::StatusCode::NOT_FOUND,
+                anyhow::anyhow!("Alert not found"),
+            ));
         }
-        _ => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "Alert not found".to_string(),
-        ))),
+    };
+    alert.enabled = value;
+    db::alerts::set(org_id, stream_type, stream_name, name, alert)
+        .await
+        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+pub async fn trigger(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    name: &str,
+) -> Result<(), (http::StatusCode, anyhow::Error)> {
+    let alert = match db::alerts::get(org_id, stream_type, stream_name, name).await {
+        Ok(Some(alert)) => alert,
+        _ => {
+            return Err((
+                http::StatusCode::NOT_FOUND,
+                anyhow::anyhow!("Alert not found"),
+            ));
+        }
+    };
+    alert
+        .send_notification(&[])
+        .await
+        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+impl Alert {
+    pub async fn evaluate(
+        &self,
+        row: Option<&Map<String, Value>>,
+    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+        if self.is_real_time {
+            self.query_condition.evaluate_realtime(row).await
+        } else {
+            self.query_condition.evaluate_scheduled(self).await
+        }
+    }
+
+    pub async fn send_notification(
+        &self,
+        rows: &[Map<String, Value>],
+    ) -> Result<(), anyhow::Error> {
+        for dest in self.destinations.iter() {
+            let dest = destinations::get_with_template(&self.org_id, dest).await?;
+            if let Err(e) = send_notification(self, &dest, rows).await {
+                log::error!(
+                    "Error sending notification for {}/{}/{}/{} err: {}",
+                    self.org_id,
+                    self.stream_type,
+                    self.stream_name,
+                    self.name,
+                    e
+                );
+            }
+        }
+        Ok(())
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::common::meta::alert::{AllOperator, Condition};
-    use crate::common::utils::json;
+impl QueryCondition {
+    pub async fn evaluate_realtime(
+        &self,
+        row: Option<&Map<String, Value>>,
+    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+        let row = match row {
+            Some(row) => row,
+            None => {
+                return Ok(None);
+            }
+        };
+        if self.conditions.is_none() {
+            return Ok(None);
+        }
+        let conditions = self.conditions.as_ref().unwrap();
+        if conditions.is_empty() {
+            return Ok(None);
+        }
+        for condition in conditions.iter() {
+            if !condition.evaluate(row).await {
+                return Ok(None);
+            }
+        }
+        Ok(Some(vec![row.to_owned()]))
+    }
 
-    fn prepare_test_alert_object(name: &str, stream: &str) -> Alert {
-        Alert {
-            name: name.to_string(),
-            stream: stream.to_string(),
-            stream_type: Some(StreamType::Logs),
-            query: Some(Query {
-                sql: ("select count(*) as occurrence from olympics").to_string(),
-                start_time: 0,
-                end_time: 0,
-                sort_by: None,
-                sql_mode: "full".to_owned(),
-                query_type: "".to_owned(),
-                track_total_hits: false,
+    pub async fn evaluate_scheduled(
+        &self,
+        alert: &Alert,
+    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+        let sql = match self.query_type {
+            QueryType::Custom => {
+                if let Some(v) = self.conditions.as_ref() {
+                    if v.is_empty() {
+                        return Ok(None);
+                    } else {
+                        build_sql(alert, v).await?
+                    }
+                } else {
+                    return Ok(None);
+                }
+            }
+            QueryType::SQL => {
+                if let Some(v) = self.sql.as_ref() {
+                    if v.is_empty() {
+                        return Ok(None);
+                    } else {
+                        v.to_string()
+                    }
+                } else {
+                    return Ok(None);
+                }
+            }
+            QueryType::PromQL => {
+                return Err(anyhow::anyhow!("PromQL is not supported yet"));
+            }
+        };
+
+        // fire the query
+        let now = Utc::now().timestamp_micros();
+        let req = search::Request {
+            query: search::Query {
+                sql: sql.clone(),
                 from: 0,
-                size: 0,
-                query_context: None,
+                size: 100,
+                start_time: now
+                    - Duration::minutes(alert.trigger_condition.period)
+                        .num_microseconds()
+                        .unwrap(),
+                end_time: now,
+                sort_by: None,
+                sql_mode: "full".to_string(),
+                query_type: "".to_string(),
+                track_total_hits: false,
                 uses_zo_fn: false,
+                query_context: None,
                 query_fn: None,
-            }),
-            condition: Condition {
-                column: "occurrence".to_owned(),
-                operator: AllOperator::GreaterThanEquals,
-                ignore_case: None,
-                value: json::json!("5"),
-                is_numeric: None,
             },
-            duration: 1,
-            frequency: 1,
-            time_between_alerts: 10,
-            destination: "test".to_string(),
-            is_real_time: false,
-            context_attributes: None,
+            aggs: HashMap::new(),
+            encoding: search::RequestEncoding::Empty,
+            timeout: 0,
+        };
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let resp =
+            SearchService::search(&session_id, &alert.org_id, alert.stream_type, &req).await?;
+        if resp.total < alert.trigger_condition.threshold as usize {
+            Ok(None)
+        } else {
+            Ok(Some(
+                resp.hits
+                    .iter()
+                    .map(|hit| hit.as_object().unwrap().clone())
+                    .collect(),
+            ))
+        }
+    }
+}
+
+impl Condition {
+    pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+        let val = match row.get(&self.column) {
+            Some(val) => val,
+            None => {
+                return false;
+            }
+        };
+        match val {
+            Value::String(v) => {
+                let val = v.as_str();
+                let con_val = self.value.as_str().unwrap_or_default();
+                match self.operator {
+                    Operator::EqualTo => val == con_val,
+                    Operator::NotEqualTo => val != con_val,
+                    Operator::GreaterThan => val > con_val,
+                    Operator::GreaterThanEquals => val >= con_val,
+                    Operator::LessThan => val < con_val,
+                    Operator::LessThanEquals => val <= con_val,
+                    Operator::Contains => val.contains(con_val),
+                    Operator::NotContains => !val.contains(con_val),
+                }
+            }
+            Value::Number(_) => {
+                let val = val.as_f64().unwrap_or_default();
+                let con_val = if self.value.is_number() {
+                    self.value.as_f64().unwrap_or_default()
+                } else {
+                    self.value
+                        .as_str()
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default()
+                };
+                match self.operator {
+                    Operator::EqualTo => val == con_val,
+                    Operator::NotEqualTo => val != con_val,
+                    Operator::GreaterThan => val > con_val,
+                    Operator::GreaterThanEquals => val >= con_val,
+                    Operator::LessThan => val < con_val,
+                    Operator::LessThanEquals => val <= con_val,
+                    _ => false,
+                }
+            }
+            Value::Bool(v) => {
+                let val = v.to_owned();
+                let con_val = if self.value.is_boolean() {
+                    self.value.as_bool().unwrap_or_default()
+                } else {
+                    self.value
+                        .as_str()
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default()
+                };
+                match self.operator {
+                    Operator::EqualTo => val == con_val,
+                    Operator::NotEqualTo => val != con_val,
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+}
+
+async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, anyhow::Error> {
+    let schema = db::schema::get(&alert.org_id, &alert.stream_name, alert.stream_type).await?;
+    let mut wheres = Vec::with_capacity(conditions.len());
+    for cond in conditions.iter() {
+        let data_type = match schema.field_with_name(&cond.column) {
+            Ok(field) => field.data_type(),
+            Err(_) => {
+                return Err(anyhow::anyhow!(
+                    "Column {} not found on stream {}",
+                    &cond.column,
+                    &alert.stream_name
+                ))
+            }
+        };
+        let cond = match data_type {
+            DataType::Utf8 => {
+                let val = if cond.value.is_string() {
+                    cond.value.as_str().unwrap_or_default().to_string()
+                } else {
+                    cond.value.to_string()
+                };
+                match cond.operator {
+                    Operator::EqualTo => format!("\"{}\" {} '{}'", cond.column, "=", val),
+                    Operator::NotEqualTo => format!("\"{}\" {} '{}'", cond.column, "!=", val),
+                    Operator::GreaterThan => format!("\"{}\" {} '{}'", cond.column, ">", val),
+                    Operator::GreaterThanEquals => {
+                        format!("\"{}\" {} '{}'", cond.column, ">=", val)
+                    }
+                    Operator::LessThan => format!("\"{}\" {} '{}'", cond.column, "<", val),
+                    Operator::LessThanEquals => format!("\"{}\" {} '{}'", cond.column, "<=", val),
+                    Operator::Contains => format!("\"{}\" {} '%{}%'", cond.column, "LIKE", val),
+                    Operator::NotContains => {
+                        format!("\"{}\" {} '%{}%'", cond.column, "NOT LIKE", val)
+                    }
+                }
+            }
+            DataType::Int16 | DataType::Int32 | DataType::Int64 => {
+                let val = if cond.value.is_number() {
+                    cond.value.as_i64().unwrap_or_default()
+                } else {
+                    cond.value
+                        .as_str()
+                        .unwrap_or_default()
+                        .parse()
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Column [{}] dataType is [{}] but value is [{}], err: {}",
+                                cond.column,
+                                data_type,
+                                cond.value,
+                                e
+                            )
+                        })?
+                };
+                match cond.operator {
+                    Operator::EqualTo => format!("\"{}\" {} {}", cond.column, "=", val),
+                    Operator::NotEqualTo => format!("\"{}\" {} {}", cond.column, "!=", val),
+                    Operator::GreaterThan => format!("\"{}\" {} {}", cond.column, ">", val),
+                    Operator::GreaterThanEquals => {
+                        format!("\"{}\" {} {}", cond.column, ">=", val)
+                    }
+                    Operator::LessThan => format!("\"{}\" {} {}", cond.column, "<", val),
+                    Operator::LessThanEquals => {
+                        format!("\"{}\" {} {}", cond.column, "<=", val)
+                    }
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "Column {} has data_type [{}] and it does not supported operator [{:?}]",
+                            cond.column,
+                            data_type,
+                            cond.operator
+                        ));
+                    }
+                }
+            }
+            DataType::Float32 | DataType::Float64 => {
+                let val = if cond.value.is_number() {
+                    cond.value.as_f64().unwrap_or_default()
+                } else {
+                    cond.value
+                        .as_str()
+                        .unwrap_or_default()
+                        .parse()
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Column [{}] dataType is [{}] but value is [{}], err: {}",
+                                cond.column,
+                                data_type,
+                                cond.value,
+                                e
+                            )
+                        })?
+                };
+                match cond.operator {
+                    Operator::EqualTo => format!("\"{}\" {} {}", cond.column, "=", val),
+                    Operator::NotEqualTo => format!("\"{}\" {} {}", cond.column, "!=", val),
+                    Operator::GreaterThan => format!("\"{}\" {} {}", cond.column, ">", val),
+                    Operator::GreaterThanEquals => {
+                        format!("\"{}\" {} {}", cond.column, ">=", val)
+                    }
+                    Operator::LessThan => format!("\"{}\" {} {}", cond.column, "<", val),
+                    Operator::LessThanEquals => {
+                        format!("\"{}\" {} {}", cond.column, "<=", val)
+                    }
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "Column {} has data_type [{}] and it does not supported operator [{:?}]",
+                            cond.column,
+                            data_type,
+                            cond.operator
+                        ));
+                    }
+                }
+            }
+            DataType::Boolean => {
+                let val = if cond.value.is_boolean() {
+                    cond.value.as_bool().unwrap_or_default()
+                } else {
+                    cond.value
+                        .as_str()
+                        .unwrap_or_default()
+                        .parse()
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Column [{}] dataType is [{}] but value is [{}], err: {}",
+                                cond.column,
+                                data_type,
+                                cond.value,
+                                e
+                            )
+                        })?
+                };
+                match cond.operator {
+                    Operator::EqualTo => format!("\"{}\" {} {}", cond.column, "=", val),
+                    Operator::NotEqualTo => format!("\"{}\" {} {}", cond.column, "!=", val),
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                        "Column {} has data_type [{}] and it does not supported operator [{:?}]",
+                        cond.column,
+                        data_type,
+                        cond.operator
+                    ));
+                    }
+                }
+            }
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Column {} has data_type [{}] and it does not supported by alert, if you think this is a bug please report it to us",
+                    cond.column,
+                    data_type
+                ));
+            }
+        };
+        wheres.push(cond);
+    }
+    let sql = format!(
+        "SELECT * FROM \"{}\" WHERE {}",
+        alert.stream_name,
+        wheres.join(" AND ")
+    );
+    Ok(sql)
+}
+
+pub async fn send_notification(
+    alert: &Alert,
+    dest: &DestinationWithTemplate,
+    rows: &[Map<String, Value>],
+) -> Result<(), anyhow::Error> {
+    // format values
+    let alert_count = rows.len();
+    let mut vars = HashMap::with_capacity(rows.len());
+    for row in rows.iter() {
+        for (key, value) in row.iter() {
+            let value = if value.is_string() {
+                value.as_str().unwrap_or_default().to_string()
+            } else {
+                value.to_string()
+            };
+            let entry = vars.entry(key.to_string()).or_insert_with(HashSet::new);
+            entry.insert(value);
         }
     }
 
-    #[actix_web::test]
-    async fn test_alerts() {
-        let alert_name = "500error";
-        let alert_stream: &str = "olympics";
-        let alert = prepare_test_alert_object(alert_name, alert_stream);
-        let res = save_alert("nexus", "olympics", StreamType::Logs, "500error", alert).await;
-        assert!(res.is_ok());
+    // calculate start and end time
+    let mut alert_start_time = 0;
+    let mut alert_end_time = 0;
+    if let Some(values) = vars.get(&CONFIG.common.column_timestamp) {
+        for val in values {
+            let val = val.parse::<i64>().unwrap_or_default();
+            if alert_start_time == 0 || val < alert_start_time {
+                alert_start_time = val;
+            }
+            if alert_end_time == 0 || val > alert_end_time {
+                alert_end_time = val;
+            }
+        }
+    }
+    let alert_start_time = if alert_start_time > 0 {
+        Local
+            .timestamp_nanos(alert_start_time * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    };
+    let alert_end_time = if alert_end_time > 0 {
+        Local
+            .timestamp_nanos(alert_end_time * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    };
 
-        let list_res = list_alert("nexus", Some("olympics"), Some(StreamType::Logs)).await;
-        assert!(list_res.is_ok());
-
-        let list_res = list_alert("nexus", None, None).await;
-        assert!(list_res.is_ok());
-
-        let get_res = get_alert("nexus", "olympics", StreamType::Logs, "500error").await;
-        assert!(get_res.is_ok());
-
-        let del_res = delete_alert("nexus", "olympics", StreamType::Logs, "500error").await;
-        assert!(del_res.is_ok());
+    let alert_type = if alert.is_real_time {
+        "realtime"
+    } else {
+        "scheduled"
+    };
+    let resp = json::to_string(&dest.template.body)?;
+    let mut resp = resp
+        .replace("{org_name}", &alert.org_id)
+        .replace("{stream_type}", &alert.stream_type.to_string())
+        .replace("{stream_name}", &alert.stream_name)
+        .replace("{alert_name}", &alert.name)
+        .replace("{alert_type}", alert_type)
+        .replace(
+            "{alert_period}",
+            &alert.trigger_condition.period.to_string(),
+        )
+        .replace(
+            "{alert_operator}",
+            &alert.trigger_condition.operator.to_string(),
+        )
+        .replace(
+            "{alert_threshold}",
+            &alert.trigger_condition.threshold.to_string(),
+        )
+        .replace("{alert_count}", &alert_count.to_string())
+        .replace("{alert_start_time}", &alert_start_time)
+        .replace("{alert_end_time}", &alert_end_time);
+    for (key, value) in vars.iter() {
+        if resp.contains(&format!("{{{key}}}")) {
+            let val = value.iter().cloned().collect::<Vec<_>>();
+            resp = resp.replace(&format!("{{{key}}}"), &val.join(","));
+        }
+    }
+    if let Some(attrs) = &alert.context_attributes {
+        for (key, value) in attrs.iter() {
+            resp = resp.replace(&format!("{{{key}}}"), value)
+        }
     }
 
-    #[actix_web::test]
-    async fn test_trigger_alert() {
-        let alert_name = "500error";
-        let alert_stream: &str = "olympics";
-        let alert = prepare_test_alert_object(alert_name, alert_stream);
-        let res = save_alert("nexus", "olympics", StreamType::Logs, "500error", alert).await;
-        assert!(res.is_ok());
+    let msg: Value = json::from_str(&resp).unwrap();
+    let msg: Value = match &msg {
+        Value::String(obj) => match json::from_str(obj) {
+            Ok(obj) => obj,
+            Err(_) => msg,
+        },
+        _ => msg,
+    };
+    let client = if dest.skip_tls_verify {
+        reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()?
+    } else {
+        reqwest::Client::new()
+    };
+    match url::Url::parse(&dest.url) {
+        Ok(url) => {
+            let mut req = match dest.method {
+                HTTPType::POST => client.post(url),
+                HTTPType::PUT => client.put(url),
+                HTTPType::GET => client.get(url),
+            }
+            .header("Content-type", "application/json");
 
-        let del_res = trigger_alert("nexus", "olympics", StreamType::Logs, "500error").await;
-        assert!(del_res.is_ok());
+            // Add additional headers if any from destination description
+            if let Some(headers) = &dest.headers {
+                for (key, value) in headers.iter() {
+                    if !key.is_empty() && !value.is_empty() {
+                        req = req.header(key, value);
+                    }
+                }
+            };
+
+            let resp = req.json(&msg).send().await;
+            match resp {
+                Ok(resp) => {
+                    if !resp.status().is_success() {
+                        log::error!("Alert Notification sent error: {:?}", resp.bytes().await);
+                    }
+                }
+                Err(err) => log::error!("Alert Notification sending error {:?}", err),
+            }
+        }
+        Err(err) => {
+            log::error!("Alert Notification sending error {:?}", err);
+        }
     }
+
+    Ok(())
 }

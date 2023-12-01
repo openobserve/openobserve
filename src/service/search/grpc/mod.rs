@@ -22,7 +22,6 @@ use ahash::AHashMap as HashMap;
 use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
-use super::datafusion;
 use crate::common::{
     infra::{
         cluster,
@@ -33,6 +32,8 @@ use crate::common::{
 };
 use crate::handler::grpc::cluster_rpc;
 use crate::service::db;
+
+use super::datafusion;
 
 mod storage;
 mod wal;
@@ -277,4 +278,25 @@ fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
         return Some(err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string());
     }
     None
+}
+
+fn check_memory_circuit_breaker(scan_stats: &ScanStats) -> Result<(), Error> {
+    let scan_size = if scan_stats.compressed_size > 0 {
+        scan_stats.compressed_size
+    } else {
+        scan_stats.original_size
+    };
+    if let Some(cur_memory) = memory_stats::memory_stats() {
+        if cur_memory.physical_mem as i64 + scan_size
+            > (CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100) as i64
+        {
+            let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, larger than limit of [{} bytes] ",
+                              scan_size,
+                              cur_memory.physical_mem,
+                              CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100);
+            log::warn!("{}", err);
+            return Err(Error::Message(err.to_string()));
+        }
+    }
+    Ok(())
 }

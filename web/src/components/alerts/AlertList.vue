@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-table
         data-test="alert-list-table"
         ref="qTable"
-        :rows="alerts"
+        :rows="alertsRows"
         :columns="columns"
         row-key="id"
         :pagination="pagination"
@@ -39,6 +39,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
+            <q-btn
+              :data-test="`alert-list-${props.row.name}-udpate-alert`"
+              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
+              class="q-ml-xs material-symbols-outlined"
+              padding="sm"
+              unelevated
+              size="sm"
+              :color="props.row.enabled ? 'negative' : 'positive'"
+              round
+              flat
+              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
+              @click="toggleAlertState(props.row)"
+            ></q-btn>
             <q-btn
               :data-test="`alert-list-${props.row.name}-udpate-alert`"
               icon="edit"
@@ -141,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, onActivated } from "vue";
+import { defineComponent, ref, onBeforeMount, onActivated, watch } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -156,9 +169,13 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
-import type { AlertData } from "@/ts/interfaces/index";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-import { cloneDeep } from "lodash-es";
+import type { Alert, AlertListItem } from "@/ts/interfaces/index";
+import {
+  outlinedDelete,
+  outlinedPause,
+  outlinedPlayArrow,
+} from "@quasar/extras/material-icons-outlined";
+// import alertList from "./alerts";
 
 export default defineComponent({
   name: "AlertList",
@@ -173,8 +190,9 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const router = useRouter();
-    const alerts: Ref<AlertData[]> = ref([]);
-    const formData: Ref<AlertData | {}> = ref({});
+    const alerts: Ref<Alert[]> = ref([]);
+    const alertsRows: Ref<AlertListItem[]> = ref([]);
+    const formData: Ref<Alert | {}> = ref({});
     const showAddAlertDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
@@ -204,9 +222,16 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "alert_type",
+        field: "alert_type",
+        label: t("alerts.alertType"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "stream_type",
         field: "stream_type",
-        label: t("alerts.stream_type"),
+        label: t("alerts.streamType"),
         align: "left",
         sortable: true,
       },
@@ -218,27 +243,18 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "sql",
-        field: "sql",
-        label: t("alerts.sql"),
-        align: "left",
-        sortable: true,
-        style: "width: 30vw;word-break: break-all;",
-      },
-      {
-        name: "sql",
-        field: "condition_str",
+        name: "conditions",
+        field: "conditions",
         label: t("alerts.condition"),
         align: "left",
-        sortable: true,
-        style: "width: 10vw;word-break: break-all;",
+        sortable: false,
       },
       {
-        name: "destination",
-        field: "destination",
-        label: t("alerts.destination"),
-        align: "left",
-        sortable: true,
+        name: "description",
+        field: "description",
+        label: t("alerts.description"),
+        align: "center",
+        sortable: false,
       },
       {
         name: "actions",
@@ -258,7 +274,7 @@ export default defineComponent({
       alertsService
         .list(
           1,
-          100000,
+          1000,
           "name",
           false,
           "",
@@ -267,38 +283,29 @@ export default defineComponent({
         .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
-          alerts.value = res.data.list.map((data: any) => {
-            if (data.is_real_time) {
-              data.query.sql = "--";
+          alerts.value = res.data.list;
+          alertsRows.value = alerts.value.map((data: any) => {
+            let conditions = "--";
+            if (data.query_condition.conditions) {
+              conditions = data.query_condition.conditions
+                .map((condition: any) => {
+                  return `${condition.column} ${condition.operator} ${condition.value}`;
+                })
+                .join(" AND ");
+            } else if (data.query_condition.sql) {
+              conditions = data.query_condition.sql;
+            }
+            if (conditions.length > 50) {
+              conditions = conditions.substring(0, 32) + "...";
             }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
-              sql: data.query.sql,
-              stream_name: data.stream ? data.stream : "--",
+              stream_name: data.stream_name ? data.stream_name : "--",
               stream_type: data.stream_type,
-              condition_str:
-                data.condition.column +
-                " " +
-                data.condition.operator +
-                " " +
-                data.condition.value,
-              actions: "",
-              duration: {
-                value: data.duration,
-                unit: "Minutes",
-              },
-              frequency: {
-                value: data.frequency,
-                unit: "Minutes",
-              },
-              time_between_alerts: {
-                value: data.time_between_alerts,
-                unit: "Minutes",
-              },
-              destination: data.destination,
-              condition: data.condition,
-              isScheduled: (!data.is_real_time).toString(),
+              enabled: data.enabled,
+              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
+              description: data.description,
             };
           });
           if (router.currentRoute.value.query.action == "add") {
@@ -312,7 +319,8 @@ export default defineComponent({
           }
           dismiss();
         })
-        .catch(() => {
+        .catch((e) => {
+          console.error(e);
           dismiss();
           $q.notify({
             type: "negative",
@@ -329,6 +337,12 @@ export default defineComponent({
     }
     onBeforeMount(() => getDestinations());
     onActivated(() => getDestinations());
+    watch(
+      () => router.currentRoute.value.query.action,
+      (action) => {
+        if (!action) showAddAlertDialog.value = false;
+      }
+    );
     const getDestinations = () => {
       destinationService
         .list({
@@ -371,7 +385,9 @@ export default defineComponent({
       showAddAlertDialog.value = true;
     };
     const showAddUpdateFn = (props: any) => {
-      formData.value = cloneDeep(props.row);
+      formData.value = alerts.value.find(
+        (alert: any) => alert.name === props.row?.name
+      ) as Alert;
       let action;
       if (!props.row) {
         isUpdated.value = false;
@@ -463,6 +479,25 @@ export default defineComponent({
       selectedDelete.value = props.row;
       confirmDelete.value = true;
     };
+
+    const toggleAlertState = (row: any) => {
+      const alert: Alert = alerts.value.find(
+        (alert) => alert.name === row.name
+      ) as Alert;
+      alertsService
+        .toggleState(
+          store.state.selectedOrganization.identifier,
+          alert.stream_name,
+          alert.name,
+          !alert?.enabled
+        )
+        .then(() => {
+          alert.enabled = !alert.enabled;
+          alertsRows.value.forEach((alert) => {
+            alert.name === row.name ? (alert.enabled = !alert.enabled) : null;
+          });
+        });
+    };
     return {
       t,
       qTable,
@@ -507,6 +542,10 @@ export default defineComponent({
       verifyOrganizationStatus,
       folders,
       splitterModel,
+      outlinedPause,
+      outlinedPlayArrow,
+      alertsRows,
+      toggleAlertState,
     };
   },
 });

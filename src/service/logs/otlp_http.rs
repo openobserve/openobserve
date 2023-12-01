@@ -24,33 +24,30 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
-use crate::common::utils::flatten::format_key;
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, DISTINCT_FIELDS},
+        metrics,
+    },
+    meta::{
+        alerts::Alert, http::HttpResponse as MetaHttpResponse, ingestion::StreamStatus,
+        stream::StreamParams, usage::UsageType, StreamType,
+    },
+    utils::{flatten, json},
+};
 use crate::handler::http::request::CONTENT_TYPE_JSON;
 use crate::service::{
-    db, distinct_values, get_formatted_stream_name, ingestion::write_file,
-    schema::stream_schema_exists, usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alert::{Alert, Trigger},
-            http::HttpResponse as MetaHttpResponse,
-            ingestion::StreamStatus,
-            stream::StreamParams,
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json},
+    db, distinct_values, get_formatted_stream_name,
+    ingestion::{
+        evaluate_trigger,
+        otlp_json::{get_int_value, get_val_for_attr},
+        write_file, TriggerAlertData,
     },
-    service::ingestion::otlp_json::{get_int_value, get_val_for_attr},
+    logs::StreamMeta,
+    schema::stream_schema_exists,
+    usage::report_request_usage_stats,
 };
-
-use super::StreamMeta;
 
 const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";
@@ -126,10 +123,10 @@ pub async fn logs_json_handler(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
     let mut stream_status = StreamStatus::new(stream_name);
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let partition_det =
         crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
@@ -137,8 +134,13 @@ pub async fn logs_json_handler(
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     // Start Register Transforms for stream
@@ -260,7 +262,7 @@ pub async fn logs_json_handler(
                         let local_attr = res_attr.as_object().unwrap();
 
                         local_val.insert(
-                            format_key(local_attr.get("key").unwrap().as_str().unwrap()),
+                            flatten::format_key(local_attr.get("key").unwrap().as_str().unwrap()),
                             get_val_for_attr(local_attr.get("value").unwrap()),
                         );
                     }
@@ -349,11 +351,12 @@ pub async fn logs_json_handler(
                     &mut stream_status.status,
                     &mut buf,
                     local_val,
+                    trigger.is_none(),
                 )
                 .await;
 
                 if local_trigger.is_some() {
-                    trigger = Some(local_trigger.unwrap());
+                    trigger = local_trigger;
                 }
 
                 // get distinct_value item
@@ -387,7 +390,7 @@ pub async fn logs_json_handler(
     .await;
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, &stream_alerts_map).await;
+    evaluate_trigger(trigger).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {

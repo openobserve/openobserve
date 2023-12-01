@@ -27,7 +27,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        let ret = service::alert_manager::run().await;
+        let ret = service::alerts::alert_manager::run().await;
         if ret.is_err() {
             log::error!("[ALERT MANAGER] run error: {}", ret.err().unwrap());
         }

@@ -26,24 +26,27 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
-use super::{format_label_name, get_exclude_labels};
-use crate::common::meta::stream::StreamParams;
 use crate::common::{
     infra::{cluster, config::CONFIG, metrics},
     meta::{
-        alert, http::HttpResponse as MetaHttpResponse, prom::*, stream::PartitioningDetails,
-        usage::UsageType, StreamType,
+        alerts::{self, Alert},
+        http::HttpResponse as MetaHttpResponse,
+        prom::*,
+        stream::PartitioningDetails,
+        stream::StreamParams,
+        usage::UsageType,
+        StreamType,
     },
     utils::{flatten, json},
 };
-use crate::service::format_stream_name;
 use crate::service::{
-    db,
+    db, format_stream_name,
     ingestion::{
-        chk_schema_by_record,
+        chk_schema_by_record, evaluate_trigger,
         grpc::{get_exemplar_val, get_metric_val, get_val},
-        write_file,
+        write_file, TriggerAlertData,
     },
+    metrics::{format_label_name, get_exclude_labels},
     schema::{set_schema_metadata, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
@@ -74,8 +77,8 @@ pub async fn handle_grpc_request(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<alert::Alert>> = AHashMap::new();
-    let mut stream_trigger_map: AHashMap<String, alert::Trigger> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<alerts::Alert>> = AHashMap::new();
+    let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     for resource_metric in &request.resource_metrics {
@@ -109,8 +112,13 @@ pub async fn handle_grpc_request(
                 );
 
                 // Start get stream alerts
-                let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
-                crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+                crate::service::ingestion::get_stream_alerts(
+                    org_id,
+                    StreamType::Metrics,
+                    metric_name,
+                    &mut stream_alerts_map,
+                )
+                .await;
                 // End get stream alert
 
                 // Start Register Transforms for stream
@@ -215,10 +223,13 @@ pub async fn handle_grpc_request(
                         );
 
                         // Start get stream alerts
-                        let key =
-                            format!("{}/{}/{}", &org_id, StreamType::Metrics, local_metric_name);
-                        crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map)
-                            .await;
+                        crate::service::ingestion::get_stream_alerts(
+                            org_id,
+                            StreamType::Metrics,
+                            local_metric_name,
+                            &mut stream_alerts_map,
+                        )
+                        .await;
                         // End get stream alert
 
                         // Start Register Transforms for stream
@@ -277,7 +288,8 @@ pub async fn handle_grpc_request(
                     hour_buf.push(value_str);
 
                     // real time alert
-                    if !stream_alerts_map.is_empty() {
+                    let need_trigger = !stream_trigger_map.contains_key(local_metric_name);
+                    if need_trigger && !stream_alerts_map.is_empty() {
                         // Start check for alert trigger
                         let key = format!(
                             "{}/{}/{}",
@@ -286,31 +298,17 @@ pub async fn handle_grpc_request(
                             local_metric_name.clone()
                         );
                         if let Some(alerts) = stream_alerts_map.get(&key) {
+                            let mut trigger_alerts: Vec<(
+                                Alert,
+                                Vec<json::Map<String, json::Value>>,
+                            )> = Vec::new();
                             for alert in alerts {
-                                if alert.is_real_time {
-                                    let set_trigger = alert::Evaluate::evaluate(
-                                        &alert.condition,
-                                        val_map.clone(),
-                                    );
-                                    if set_trigger {
-                                        stream_trigger_map.insert(
-                                            local_metric_name.to_owned(),
-                                            alert::Trigger {
-                                                timestamp,
-                                                is_valid: true,
-                                                alert_name: alert.name.clone(),
-                                                stream: local_metric_name.to_owned(),
-                                                org: org_id.to_string(),
-                                                stream_type: StreamType::Metrics,
-                                                last_sent_at: 0,
-                                                count: 0,
-                                                is_ingest_time: true,
-                                                parent_alert_deleted: false,
-                                            },
-                                        );
-                                    }
+                                if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
+                                    trigger_alerts.push((alert.clone(), v));
                                 }
                             }
+                            stream_trigger_map
+                                .insert(local_metric_name.clone(), Some(trigger_alerts));
                         }
                         // End check for alert trigger
                     }
@@ -394,25 +392,8 @@ pub async fn handle_grpc_request(
     }
 
     // only one trigger per request, as it updates etcd
-    for (_, entry) in &stream_trigger_map {
-        let mut alerts = stream_alerts_map
-            .get(&format!(
-                "{}/{}/{}",
-                entry.org,
-                StreamType::Metrics,
-                entry.stream
-            ))
-            .unwrap()
-            .clone();
-
-        alerts.retain(|alert| alert.name.eq(&entry.alert_name));
-        if !alerts.is_empty() {
-            crate::service::ingestion::send_ingest_notification(
-                entry.clone(),
-                alerts.first().unwrap().clone(),
-            )
-            .await;
-        }
+    for (_, entry) in stream_trigger_map {
+        evaluate_trigger(entry).await;
     }
 
     let res = ExportMetricsServiceResponse {

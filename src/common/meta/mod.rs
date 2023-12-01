@@ -15,7 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-pub mod alert;
+pub mod alerts;
 pub mod common;
 pub mod dashboards;
 pub mod functions;

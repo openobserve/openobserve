@@ -28,9 +28,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::{mpsc, OnceCell};
 
-use super::Event;
-use super::Stats;
-use crate::common::infra::{config::CONFIG, errors::*};
+use crate::common::infra::{
+    config::CONFIG,
+    db::{Event, Stats},
+    errors::*,
+};
 
 static DB: OnceCell<DynamoDb> = OnceCell::const_new();
 static DB_CLIENT: OnceCell<Client> = OnceCell::const_new();

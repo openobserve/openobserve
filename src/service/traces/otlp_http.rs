@@ -28,7 +28,7 @@ use crate::common::{
         metrics,
     },
     meta::{
-        alert::{Alert, Evaluate, Trigger},
+        alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
         stream::{PartitionTimeLevel, StreamParams},
         traces::{Event, Span, SpanRefType},
@@ -39,7 +39,7 @@ use crate::common::{
 };
 use crate::service::{
     db, distinct_values, format_partition_key, format_stream_name,
-    ingestion::{grpc::get_val_for_attr, write_file},
+    ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file, TriggerAlertData},
     schema::{add_stream_schema, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
@@ -99,7 +99,7 @@ pub async fn traces_json(
     let mut distinct_values = Vec::with_capacity(16);
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
     let stream_schema = stream_schema_exists(
@@ -125,8 +125,13 @@ pub async fn traces_json(
     }
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Traces, traces_stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Traces,
+        traces_stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     // Start Register Transforms for stream
@@ -137,7 +142,7 @@ pub async fn traces_json(
     );
     // End Register Transforms for stream
 
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     let mut service_name: String = traces_stream_name.to_string();
     //let export_req: ExportTraceServiceRequest = json::from_slice(body.as_ref()).unwrap();
@@ -343,37 +348,25 @@ pub async fn traces_json(
                         timestamp.try_into().unwrap(),
                         &partition_keys,
                         partition_time_level,
-                        value.as_object().unwrap(),
+                        val_map,
                         None,
                     );
 
-                    if !stream_alerts_map.is_empty() {
+                    if trigger.is_none() && !stream_alerts_map.is_empty() {
                         // Start check for alert trigger
                         let key =
                             format!("{}/{}/{}", &org_id, StreamType::Traces, traces_stream_name);
                         if let Some(alerts) = stream_alerts_map.get(&key) {
+                            let mut trigger_alerts: Vec<(
+                                Alert,
+                                Vec<json::Map<String, json::Value>>,
+                            )> = Vec::new();
                             for alert in alerts {
-                                if alert.is_real_time {
-                                    let set_trigger = Evaluate::evaluate(
-                                        &alert.condition,
-                                        value.as_object().unwrap().clone(),
-                                    );
-                                    if set_trigger {
-                                        trigger = Some(Trigger {
-                                            timestamp: timestamp.try_into().unwrap(),
-                                            is_valid: true,
-                                            alert_name: alert.name.clone(),
-                                            stream: traces_stream_name.to_string(),
-                                            org: org_id.to_string(),
-                                            stream_type: StreamType::Traces,
-                                            last_sent_at: 0,
-                                            count: 0,
-                                            is_ingest_time: true,
-                                            parent_alert_deleted: false,
-                                        });
-                                    }
+                                if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
+                                    trigger_alerts.push((alert.clone(), v));
                                 }
                             }
+                            trigger = Some(trigger_alerts);
                         }
                         // End check for alert trigger
                     }
@@ -471,27 +464,7 @@ pub async fn traces_json(
     }
 
     // only one trigger per request, as it updates etcd
-    if trigger.is_some() {
-        let val = trigger.unwrap();
-        let mut alerts = stream_alerts_map
-            .get(&format!(
-                "{}/{}/{}",
-                val.org,
-                StreamType::Traces,
-                val.stream
-            ))
-            .unwrap()
-            .clone();
-
-        alerts.retain(|alert| alert.name.eq(&val.alert_name));
-        if !alerts.is_empty() {
-            crate::service::ingestion::send_ingest_notification(
-                val,
-                alerts.first().unwrap().clone(),
-            )
-            .await;
-        }
-    }
+    evaluate_trigger(trigger).await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),

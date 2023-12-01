@@ -19,9 +19,11 @@ use itertools::Itertools;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use std::sync::Arc;
 
-use super::Engine;
 use crate::common::meta::prom::NAME_LABEL;
-use crate::service::promql::value::{Label, Labels, LabelsExt, Signature, Value};
+use crate::service::promql::{
+    value::{Label, Labels, LabelsExt, Signature, Value},
+    Engine,
+};
 
 mod avg;
 mod bottomk;

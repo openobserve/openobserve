@@ -27,7 +27,6 @@ pub mod organization;
 pub mod saved_view;
 pub mod schema;
 pub mod syslog;
-pub mod triggers;
 pub mod user;
 pub mod version;
 

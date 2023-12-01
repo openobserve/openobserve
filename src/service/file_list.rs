@@ -223,7 +223,7 @@ pub async fn query(
                 let err = ErrorCodes::from_json(err.message())?;
                 return Err(anyhow::anyhow!(Error::ErrorCode(err).to_string()));
             }
-            return Err(anyhow::anyhow!("search node error".to_string(),));
+            return Err(anyhow::anyhow!("search node error".to_string()));
         }
     };
     let files = response.items.iter().map(FileKey::from).collect::<Vec<_>>();

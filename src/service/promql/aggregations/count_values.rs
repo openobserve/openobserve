@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::Engine;
-use crate::service::promql::value::{InstantValue, Label, Sample, Value};
-use datafusion::error::DataFusionError;
-use datafusion::error::Result;
-use promql_parser::parser::Expr as PromExpr;
-use promql_parser::parser::LabelModifier;
+use datafusion::error::{DataFusionError, Result};
+use promql_parser::parser::{Expr as PromExpr, LabelModifier};
+
+use crate::service::promql::{
+    value::{InstantValue, Label, Sample, Value},
+    Engine,
+};
 
 pub async fn count_values(
     ctx: &mut Engine,

@@ -18,9 +18,8 @@ export default {
           condition: {
             column: "code",
             operator: "EqualTo",
-            ignoreCase: null,
+            ignore_case: null,
             value: 500,
-            isNumeric: true,
           },
           duration: 0,
           frequency: 0,
@@ -45,9 +44,8 @@ export default {
           condition: {
             column: "code",
             operator: "EqualTo",
-            ignoreCase: null,
+            ignore_case: null,
             value: 500,
-            isNumeric: null,
           },
           duration: 1,
           frequency: 2,

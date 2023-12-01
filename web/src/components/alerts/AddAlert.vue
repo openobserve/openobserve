@@ -17,7 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="full-width">
     <div class="row items-center no-wrap q-mx-lg q-my-sm">
-      <div class="col" data-test="add-alert-title">
+      <div class="flex items-center" data-test="add-alert-title">
+        <div
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="router.back()"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
         <div v-if="beingUpdated" class="text-h6">
           {{ t("alerts.updateTitle") }}
         </div>
@@ -55,11 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-select
               v-model="formData.stream_type"
               :options="streamTypes"
-              :label="t('alerts.stream_type')"
-              :popup-content-style="{ textTransform: 'capitalize' }"
+              :label="t('alerts.streamType')"
+              :popup-content-style="{ textTransform: 'lowercase' }"
               color="input-border"
               bg-color="input-bg"
-              class="q-py-sm showLabelOnTop"
+              class="q-py-sm showLabelOnTop no-case"
               stack-label
               outlined
               filled
@@ -79,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="input-border"
               bg-color="input-bg"
               class="q-py-sm showLabelOnTop no-case"
+              :popup-content-style="{ textTransform: 'lowercase' }"
               filled
               borderless
               dense
@@ -99,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-bind:disable="beingUpdated"
             v-model="formData.is_real_time"
             :checked="formData.is_real_time"
-            val="true"
+            val="false"
             :label="t('alerts.scheduled')"
             class="q-ml-none"
           />
@@ -109,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-bind:disable="beingUpdated"
             v-model="formData.is_real_time"
             :checked="!formData.is_real_time"
-            val="false"
+            val="true"
             :label="t('alerts.realTime')"
             class="q-ml-none"
           />
@@ -119,18 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-py-sm showLabelOnTop text-bold text-h7"
           data-test="add-alert-query-input-title"
         >
-          <scheduled-alert
-            ref="scheduledAlertRef"
-            :columns="filteredColumns"
-            :conditions="formData.query_condition.conditions"
-            v-model:trigger="formData.trigger_condition"
-            v-model:sql="formData.query_condition.sql"
-            @field:add="addField"
-            @field:remove="removeField"
-            class="q-mt-sm"
-          />
-        </div>
-        <div v-else>
           <real-time-alert
             :columns="filteredColumns"
             :conditions="formData.query_condition.conditions"
@@ -138,8 +140,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @field:remove="removeField"
           />
         </div>
+        <div v-else>
+          <scheduled-alert
+            ref="scheduledAlertRef"
+            :columns="filteredColumns"
+            :conditions="formData.query_condition.conditions"
+            v-model:trigger="formData.trigger_condition"
+            v-model:sql="formData.query_condition.sql"
+            v-model:query_type="formData.query_condition.type"
+            @field:add="addField"
+            @field:remove="removeField"
+            class="q-mt-sm"
+          />
+        </div>
 
-        <div class="col-12 flex justify-start items-center">
+        <div class="col-12 flex justify-start items-center q-mt-sm">
           <div
             class="q-py-sm showLabelOnTop text-bold text-h7"
             data-test="add-alert-delay-title"
@@ -175,14 +190,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 class="flex justify-center items-center"
               >
-                Minutes
+                {{ t("alerts.minutes") }}
               </div>
             </div>
           </div>
         </div>
 
         <div class="q-mt-lg">
-          <div class="text-bold">Notification Destinations</div>
+          <div class="text-bold">{{ t("alerts.destination") }}</div>
           <q-select
             data-test="add-alert-destination-select"
             v-model="formData.destinations"
@@ -221,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div>
-          <div class="text-bold">Additional Variables</div>
+          <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
           <variables-input
             :variables="formData.context_attributes"
             @add:variable="addVariable"
@@ -241,8 +256,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outlined
             filled
             dense
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
             tabindex="0"
             style="width: 550px"
           />
@@ -280,7 +293,6 @@ import { defineComponent, ref, onMounted, watch, type Ref } from "vue";
 import "monaco-editor/esm/vs/editor/editor.all.js";
 import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
 import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
@@ -294,21 +306,30 @@ import RealTimeAlert from "./RealTimeAlert.vue";
 import VariablesInput from "./VariablesInput.vue";
 import { getUUID } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
+import { useRouter } from "vue-router";
 
 const defaultValue: any = () => {
   return {
     name: "",
     stream_type: "",
     stream_name: "",
-    is_real_time: "true",
+    is_real_time: "false",
     query_condition: {
-      conditions: [],
+      conditions: [
+        {
+          column: "",
+          operator: "=",
+          value: "",
+          id: getUUID(),
+        },
+      ],
       sql: "",
       promql: null,
+      type: "custom",
     },
     trigger_condition: {
       period: 10,
-      operator: "=",
+      operator: ">=",
       threshold: 3,
       silence: 10,
     },
@@ -377,6 +398,7 @@ export default defineComponent({
       formData.value.sql = e.target.value;
     };
 
+    const router = useRouter();
     const scheduledAlertRef: any = ref(null);
 
     const updateCondtions = (e: any) => {
@@ -516,6 +538,8 @@ export default defineComponent({
     };
 
     const removeField = (field: any) => {
+      if (formData.value.query_condition.conditions.length === 1) return;
+
       formData.value.query_condition.conditions =
         formData.value.query_condition.conditions.filter(
           (_field: any) => _field.id !== field.id
@@ -535,34 +559,6 @@ export default defineComponent({
         formData.value.context_attributes.filter(
           (_variable: any) => _variable.id !== variable.id
         );
-    };
-
-    const buildSqlFromConditions = () => {
-      let sql = `select * from '${formData.value.stream_name}'`;
-
-      if (formData.value.query_condition.conditions.length) {
-        sql += " where ";
-      }
-
-      formData.value.query_condition.conditions.forEach(
-        (condition: any, index: number) => {
-          if (condition.column && condition.operator && condition.value) {
-            if (condition.operator === "Contains") {
-              sql += `${condition.column} LIKE '${condition.value}'`;
-            } else if (condition.operator === "NotContains") {
-              sql += `${condition.column} NOT LIKE '${condition.value}'`;
-            } else {
-              sql += `${condition.column} ${condition.operator} '${condition.value}'`;
-            }
-
-            if (index < formData.value.query_condition.conditions.length - 1) {
-              sql += " AND ";
-            }
-          }
-        }
-      );
-
-      return sql;
     };
 
     return {
@@ -604,21 +600,13 @@ export default defineComponent({
       addVariable,
       selectedDestinations,
       scheduledAlertRef,
-      buildSqlFromConditions,
+      router,
     };
   },
   created() {
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...this.modelValue };
-    this.formData.context_attributes = Object.keys(
-      this.formData.context_attributes
-    ).map((attr) => {
-      return {
-        key: attr,
-        value: this.formData.context_attributes[attr],
-        id: getUUID(),
-      };
-    });
+    this.formData.is_real_time = this.formData.is_real_time.toString();
     this.beingUpdated = this.isUpdated;
     this.updateStreams(false)?.then(() => {
       this.updateEditorContent(this.formData.stream_name);
@@ -631,12 +619,24 @@ export default defineComponent({
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
-      this.formData.destination = this.modelValue.destination;
     }
+
+    this.formData.is_real_time = this.formData.is_real_time.toString();
+    this.formData.context_attributes = Object.keys(
+      this.formData.context_attributes
+    ).map((attr) => {
+      return {
+        key: attr,
+        value: this.formData.context_attributes[attr],
+        id: getUUID(),
+      };
+    });
   },
   computed: {
     getFormattedDestinations: function () {
-      return ["Slack", "Email"];
+      return this.destinations.map((destination: any) => {
+        return destination.name;
+      });
     },
   },
   methods: {
@@ -667,21 +667,22 @@ export default defineComponent({
 
         const payload = cloneDeep(this.formData);
 
-        payload.is_real_time = payload.query_condition.is_real_time === "true";
+        payload.is_real_time = payload.is_real_time === "true";
 
-        payload.context_attributes = this.formData.context_attributes.forEach(
-          (attr: any) => {
-            payload.context_attributes[attr.key] = attr.value;
-          }
+        payload.context_attributes = {};
+
+        payload.query_condition.type = payload.is_real_time
+          ? "custom"
+          : this.formData.query_condition.type;
+
+        this.formData.context_attributes.forEach((attr: any) => {
+          payload.context_attributes[attr.key] = attr.value;
+        });
+
+        console.log(
+          cloneDeep(this.formData.context_attributes),
+          payload.context_attributes
         );
-
-        if (
-          (!payload.is_real_time &&
-            this.scheduledAlertRef?.value.tab === "custom") ||
-          payload.is_real_time
-        ) {
-          payload.query_condition.sql = this.buildSqlFromConditions();
-        }
 
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
@@ -692,7 +693,6 @@ export default defineComponent({
 
         callAlert
           .then((res: { data: any }) => {
-            const data = res.data;
             this.formData = { ...defaultValue };
             this.$emit("update:list");
             this.addAlertForm.resetValidation();
@@ -742,6 +742,10 @@ export default defineComponent({
 </style>
 <style lang="scss">
 .no-case .q-field__native span {
+  text-transform: none !important;
+}
+
+.no-case .q-field__input {
   text-transform: none !important;
 }
 .add-alert-form {

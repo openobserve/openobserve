@@ -24,7 +24,6 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
-use super::StreamMeta;
 use crate::common::{
     infra::{
         cluster,
@@ -32,7 +31,7 @@ use crate::common::{
         metrics,
     },
     meta::{
-        alert::{Alert, Trigger},
+        alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
         ingestion::{IngestionResponse, StreamStatus},
         stream::StreamParams,
@@ -43,7 +42,11 @@ use crate::common::{
 };
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
-    ingestion::{grpc::get_val, grpc::get_val_with_type_retained, write_file},
+    ingestion::{
+        evaluate_trigger, grpc::get_val, grpc::get_val_with_type_retained, write_file,
+        TriggerAlertData,
+    },
+    logs::StreamMeta,
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
 };
@@ -76,12 +79,12 @@ pub async fn usage_ingest(
     }
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
 
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     let partition_det =
         crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
@@ -89,8 +92,13 @@ pub async fn usage_ingest(
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
@@ -141,11 +149,11 @@ pub async fn usage_ingest(
             &mut stream_status.status,
             &mut buf,
             local_val,
+            trigger.is_none(),
         )
         .await;
-
         if local_trigger.is_some() {
-            trigger = Some(local_trigger.unwrap());
+            trigger = local_trigger;
         }
 
         // get distinct_value item
@@ -184,7 +192,7 @@ pub async fn usage_ingest(
     }
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, &stream_alerts_map).await;
+    evaluate_trigger(trigger).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {
@@ -272,8 +280,13 @@ pub async fn handle_grpc_request(
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     // Start Register Transforms for stream
@@ -284,7 +297,7 @@ pub async fn handle_grpc_request(
     );
     // End Register Transforms for stream
 
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
@@ -396,11 +409,11 @@ pub async fn handle_grpc_request(
                     &mut stream_status.status,
                     &mut data_buf,
                     local_val,
+                    trigger.is_none(),
                 )
                 .await;
-
                 if local_trigger.is_some() {
-                    trigger = Some(local_trigger.unwrap());
+                    trigger = local_trigger;
                 }
 
                 // get distinct_value item
@@ -434,7 +447,7 @@ pub async fn handle_grpc_request(
     .await;
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, &stream_alerts_map).await;
+    evaluate_trigger(trigger).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {
