@@ -93,7 +93,7 @@ pub(crate) async fn create_context(
         } else if file.name.ends_with(FILE_EXT_ARROW) {
             num_arrow_files += 1;
 
-            let buf_reader = Cursor::new(file.body);
+            let buf_reader = Cursor::new(file.body.clone());
             let stream_reader = StreamReader::try_new(buf_reader, None)?;
             for read_result in stream_reader {
                 let record_batch = read_result?;
@@ -108,7 +108,7 @@ pub(crate) async fn create_context(
                     record_batches.push(record_batch);
                 }
             }
-            //arrow_scan_stats.original_size += file.body.len() as i64;
+            arrow_scan_stats.original_size += file.body.len() as i64;
         }
     }
 
@@ -133,7 +133,6 @@ pub(crate) async fn create_context(
         })?;
 
     if !record_batches.is_empty() {
-        println!("record_batches: {:?}", record_batches.len());
         let ctx = prepare_datafusion_context(&SearchType::Normal)?;
         // calulate schema diff
         let mut diff_fields = HashMap::new();
