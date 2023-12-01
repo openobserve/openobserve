@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page
+  <div
     data-test="alert-list-page"
-    class="q-pa-none"
-    style="min-height: inherit"
+    class="q-pa-none flex"
+    style="height: calc(100vh - 57px)"
   >
-    <div v-if="!showAddAlertDialog">
+    <div v-if="!showAddAlertDialog" class="full-width">
       <q-table
         data-test="alert-list-table"
         ref="qTable"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
     </div>
-    <div v-else>
+    <template v-else>
       <AddAlert
         v-model="formData"
         :isUpdated="isUpdated"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:list="refreshList"
         @cancel:hideform="hideForm"
       />
-    </div>
+    </template>
     <ConfirmDialog
       title="Delete Alert"
       message="Are you sure you want to delete alert?"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -180,6 +180,15 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const splitterModel = ref(220);
+    const folders = ref([
+      {
+        name: "folder1",
+      },
+      {
+        name: "folder2",
+      },
+    ]);
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -496,6 +505,8 @@ export default defineComponent({
       activeTab,
       destinations,
       verifyOrganizationStatus,
+      folders,
+      splitterModel,
     };
   },
 });
