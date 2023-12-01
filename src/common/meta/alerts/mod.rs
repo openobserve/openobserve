@@ -106,3 +106,18 @@ impl Default for Operator {
         Self::EqualTo
     }
 }
+
+impl ToString for Operator {
+    fn to_string(&self) -> String {
+        match self {
+            Operator::EqualTo => "=".to_string(),
+            Operator::NotEqualTo => "!=".to_string(),
+            Operator::GreaterThan => ">".to_string(),
+            Operator::GreaterThanEquals => ">=".to_string(),
+            Operator::LessThan => "<".to_string(),
+            Operator::LessThanEquals => "<=".to_string(),
+            Operator::Contains => "contains".to_string(),
+            Operator::NotContains => "not contains".to_string(),
+        }
+    }
+}

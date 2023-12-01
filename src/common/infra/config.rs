@@ -383,7 +383,7 @@ pub struct Common {
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
-    // logger timestamp local setup
+    // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%S
     #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
     pub log_local_time_format: String,
 }

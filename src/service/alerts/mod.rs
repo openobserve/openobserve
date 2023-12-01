@@ -15,10 +15,11 @@
 
 use actix_web::http;
 use arrow_schema::DataType;
-use chrono::{Duration, Utc};
+use chrono::{Duration, Local, TimeZone, Utc};
 use std::collections::{HashMap, HashSet};
 
 use crate::common::{
+    infra::config::CONFIG,
     meta::{
         alerts::{
             destinations::{DestinationWithTemplate, HTTPType},
@@ -95,10 +96,14 @@ pub async fn save(
         return Err(anyhow::anyhow!("Alert must have at least one condition"));
     }
 
-    // TODO calculate the frequency of the alert
-
     // test the alert
     _ = &alert.evaluate(None).await?;
+
+    // calulate the trigger frequency
+    alert.trigger_condition.frequency = std::cmp::max(
+        1,
+        alert.trigger_condition.period / alert.trigger_condition.threshold,
+    );
 
     // save the alert
     db::alerts::set(org_id, stream_type, stream_name, name, alert).await
@@ -517,6 +522,7 @@ pub async fn send_notification(
     rows: &[Map<String, Value>],
 ) -> Result<(), anyhow::Error> {
     // format values
+    let alert_count = rows.len();
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
@@ -530,6 +536,37 @@ pub async fn send_notification(
         }
     }
 
+    // calculate start and end time
+    let mut alert_start_time = 0;
+    let mut alert_end_time = 0;
+    if let Some(values) = vars.get(&CONFIG.common.column_timestamp) {
+        for val in values {
+            let val = val.parse::<i64>().unwrap_or_default();
+            if alert_start_time == 0 || val < alert_start_time {
+                alert_start_time = val;
+            }
+            if alert_end_time == 0 || val > alert_end_time {
+                alert_end_time = val;
+            }
+        }
+    }
+    let alert_start_time = if alert_start_time > 0 {
+        Local
+            .timestamp_nanos(alert_start_time * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    };
+    let alert_end_time = if alert_end_time > 0 {
+        Local
+            .timestamp_nanos(alert_end_time * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    };
+
     let alert_type = if alert.is_real_time {
         "realtime"
     } else {
@@ -537,17 +574,32 @@ pub async fn send_notification(
     };
     let resp = json::to_string(&dest.template.body)?;
     let mut resp = resp
-        .replace("{alert_name}", &alert.name)
-        .replace("{alert_type}", alert_type)
         .replace("{org_name}", &alert.org_id)
         .replace("{stream_type}", &alert.stream_type.to_string())
-        .replace("{stream_name}", &alert.stream_name);
+        .replace("{stream_name}", &alert.stream_name)
+        .replace("{alert_name}", &alert.name)
+        .replace("{alert_type}", alert_type)
+        .replace(
+            "{alert_period}",
+            &alert.trigger_condition.period.to_string(),
+        )
+        .replace(
+            "{alert_operator}",
+            &alert.trigger_condition.operator.to_string(),
+        )
+        .replace(
+            "{alert_threshold}",
+            &alert.trigger_condition.threshold.to_string(),
+        )
+        .replace("{alert_count}", &alert_count.to_string())
+        .replace("{alert_start_time}", &alert_start_time)
+        .replace("{alert_end_time}", &alert_end_time);
     for (key, value) in vars.iter() {
-        let val = value.iter().cloned().collect::<Vec<_>>();
-        resp = resp.replace(&format!("{{{key}}}"), &val.join(","));
+        if resp.contains(&format!("{{{key}}}")) {
+            let val = value.iter().cloned().collect::<Vec<_>>();
+            resp = resp.replace(&format!("{{{key}}}"), &val.join(","));
+        }
     }
-
-    // Replace contextual information with values if any from alert
     if let Some(attrs) = &alert.context_attributes {
         for (key, value) in attrs.iter() {
             resp = resp.replace(&format!("{{{key}}}"), value)
