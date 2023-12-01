@@ -2,12 +2,12 @@
   <q-dialog>
     <q-card style="min-width: 700px">
       <q-card-section class="q-pt-md">
-        <div class="row items-center q-pb-none">
-          <h6 class="text-bold">Query Inspector</h6>
+        <div class="row items-center">
+          <div class="text-bold text-h6 q-pb-lg">Query Inspector</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <q-btn icon="close" class="q-mb-lg" flat round dense v-close-popup />
         </div>
-        <div class="text-bold q-pb-sm">{{ dataTitle }}</div>
+        <div class="text-bold q-pb-sm">Panel : {{ dataTitle }}</div>
         <div class="text-bold">Total Query(s) Executed: {{ totalQueries }}</div>
         <div v-for="(query, index) in metaData.queries" :key="query.originalQuery">
           <div class="text-bold q-py-sm">Query: {{ index + 1 }}</div>
