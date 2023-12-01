@@ -222,7 +222,7 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
 
 async fn update_memory_usage() -> Result<(), anyhow::Error> {
     if let Some(cur_memory) = memory_stats::memory_stats() {
-        metrics::MEM_USAGE
+        metrics::MEMORY_USAGE
             .with_label_values(&[])
             .set(cur_memory.physical_mem as i64);
     }

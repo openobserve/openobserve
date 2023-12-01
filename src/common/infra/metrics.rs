@@ -493,9 +493,9 @@ pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static MEM_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
-        Opts::new("mem_usage", "Process memory usage")
+        Opts::new("memory_usage", "Process memory usage")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &[],
@@ -631,7 +631,7 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(META_NUM_DASHBOARDS.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(MEM_USAGE.clone()))
+        .register(Box::new(MEMORY_USAGE.clone()))
         .expect("Metric registered");
 }
 
