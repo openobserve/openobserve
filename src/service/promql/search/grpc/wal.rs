@@ -13,37 +13,45 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
 use datafusion::{
     arrow::datatypes::Schema,
     common::FileType,
+    datasource::MemTable,
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
 use futures::future::try_join_all;
-use std::sync::Arc;
+use std::{collections::HashMap, io::Cursor, sync::Arc};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::{
-    infra::{
-        cache::tmpfs,
-        cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
-        config::CONFIG,
-    },
-    meta::{
-        search::{SearchType, Session as SearchSession},
-        stream::ScanStats,
-        StreamType,
-    },
-};
-use crate::handler::grpc::cluster_rpc;
 use crate::service::{
     db,
     search::{
-        datafusion::{exec::register_table, storage::StorageType},
+        datafusion::{
+            exec::{prepare_datafusion_context, register_table},
+            storage::StorageType,
+        },
         MetadataMap,
     },
+};
+use crate::{common::infra::config::FILE_EXT_ARROW, handler::grpc::cluster_rpc};
+use crate::{
+    common::{
+        infra::{
+            cache::tmpfs,
+            cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
+            config::{CONFIG, FILE_EXT_JSON},
+        },
+        meta::{
+            search::{SearchType, Session as SearchSession},
+            stream::ScanStats,
+            StreamType,
+        },
+    },
+    handler::grpc::cluster_rpc::MetricsWalFile,
 };
 
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip_all)]
@@ -53,30 +61,66 @@ pub(crate) async fn create_context(
     stream_name: &str,
     time_range: (i64, i64),
     _filters: &[(&str, Vec<&str>)],
-) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
+) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
+    let mut resp = vec![];
     // get file list
     let files = get_file_list(session_id, org_id, stream_name, time_range).await?;
     if files.is_empty() {
-        return Ok((
+        return Ok(vec![(
             SessionContext::new(),
             Arc::new(Schema::empty()),
             ScanStats::default(),
-        ));
+        )]);
     }
+
+    let mut json_files: Vec<MetricsWalFile> = Vec::new();
+    let mut arrow_scan_stats = ScanStats::new();
+    let mut json_scan_stats = ScanStats::new();
+    let mut num_arrow_files = 0;
+    let meta = std::collections::HashMap::new();
+    let mut arrow_inferred_schema: Schema = Schema::empty();
+    let mut record_batches = Vec::<RecordBatch>::new();
 
     let work_dir = session_id.to_string();
-    let mut scan_stats = ScanStats::new();
-    scan_stats.files = files.len() as i64;
+
     for file in files {
-        scan_stats.original_size += file.body.len() as i64;
         let file_name = format!("/{work_dir}/{}", file.name);
-        tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
+
+        if file.name.ends_with(FILE_EXT_JSON) {
+            json_scan_stats.original_size += file.body.len() as i64;
+            tmpfs::set(&file_name, file.clone().body.into()).expect("tmpfs set success");
+            json_files.push(file);
+        } else if file.name.ends_with(FILE_EXT_ARROW) {
+            num_arrow_files += 1;
+
+            let buf_reader = Cursor::new(file.body);
+            let stream_reader = StreamReader::try_new(buf_reader, None)?;
+            for read_result in stream_reader {
+                let record_batch = read_result?;
+                if record_batch.num_rows() > 0 {
+                    if arrow_inferred_schema.fields().is_empty() {
+                        arrow_inferred_schema = record_batch
+                            .schema()
+                            .as_ref()
+                            .clone()
+                            .with_metadata(meta.clone());
+                    }
+                    record_batches.push(record_batch);
+                }
+            }
+            //arrow_scan_stats.original_size += file.body.len() as i64;
+        }
     }
 
+    arrow_scan_stats.files = num_arrow_files;
+    json_scan_stats.files = json_files.len() as i64;
+
     log::info!(
-        "promql->wal->search: load files {}, scan_size {}",
-        scan_stats.files,
-        scan_stats.original_size
+        "promql->wal->search: load files json :{} , scan_size {} , arrow :{} , scan_size {}",
+        json_scan_stats.files,
+        json_scan_stats.original_size,
+        arrow_scan_stats.files,
+        arrow_scan_stats.original_size
     );
 
     // fetch all schema versions, get latest schema
@@ -87,6 +131,43 @@ pub(crate) async fn create_context(
             log::error!("get schema error: {}", err);
             DataFusionError::Execution(err.to_string())
         })?;
+
+    if !record_batches.is_empty() {
+        println!("record_batches: {:?}", record_batches.len());
+        let ctx = prepare_datafusion_context(&SearchType::Normal)?;
+        // calulate schema diff
+        let mut diff_fields = HashMap::new();
+        let group_fields = arrow_inferred_schema.fields();
+        for field in group_fields {
+            if let Ok(v) = schema.field_with_name(field.name()) {
+                if v.data_type() != field.data_type() {
+                    diff_fields.insert(v.name().clone(), v.data_type().clone());
+                }
+            }
+        }
+        // add not exists field for wal infered schema
+        let mut new_fields = Vec::new();
+        for field in schema.fields() {
+            if arrow_inferred_schema.field_with_name(field.name()).is_err() {
+                new_fields.push(field.clone());
+            }
+        }
+        if !new_fields.is_empty() {
+            let new_schema = Schema::new(new_fields);
+            arrow_inferred_schema = Schema::try_merge(vec![arrow_inferred_schema, new_schema])?;
+        }
+        let arrow_schema = Arc::new(arrow_inferred_schema);
+
+        let schema = if let Some(first_batch) = record_batches.first() {
+            first_batch.schema()
+        } else {
+            arrow_schema
+        };
+        let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
+        ctx.register_table(stream_name, mem_table)?;
+        resp.push((ctx, schema, arrow_scan_stats));
+    }
+
     let schema = Arc::new(
         schema
             .to_owned()
@@ -99,7 +180,8 @@ pub(crate) async fn create_context(
     };
 
     let ctx = register_table(&session, schema.clone(), stream_name, &[], FileType::JSON).await?;
-    Ok((ctx, schema, scan_stats))
+    resp.push((ctx, schema, json_scan_stats));
+    Ok(resp)
 }
 
 /// get file list from local cache, no need match_source, each file will be searched
