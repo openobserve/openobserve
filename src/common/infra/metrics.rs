@@ -493,6 +493,16 @@ pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static OO_MEM_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("mem_usage", "Openobserve memory usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -619,6 +629,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(META_NUM_DASHBOARDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(OO_MEM_USAGE.clone()))
         .expect("Metric registered");
 }
 

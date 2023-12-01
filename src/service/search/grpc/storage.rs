@@ -16,6 +16,7 @@
 use ahash::AHashMap as HashMap;
 use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
 use futures::future::try_join_all;
+use memory_stats::memory_stats;
 use std::sync::Arc;
 use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
@@ -145,6 +146,21 @@ pub async fn search(
         scan_stats.original_size,
         scan_stats.compressed_size
     );
+
+    if CONFIG.common.memory_circuit_breaker_enable {
+        if let Some(cur_memory) = memory_stats() {
+            if cur_memory.physical_mem as i64 + scan_stats.compressed_size
+                > (CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100) as i64
+            {
+                let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, larger than limit of [{} bytes] ",
+                                  scan_stats.compressed_size,
+                                  cur_memory.physical_mem,
+                                  CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100);
+                log::warn!("{}", err);
+                return Err(Error::Message(err.to_string()));
+            }
+        }
+    }
 
     // load files to local cache
     let (cache_type, deleted_files) = cache_parquet_files(session_id, &files, &scan_stats).await?;
