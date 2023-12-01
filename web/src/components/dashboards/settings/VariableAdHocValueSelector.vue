@@ -6,7 +6,7 @@
                 :display-value="adhocVariables[index].name ? adhocVariables[index].name : variableItem.isLoading ? '(No Data Found)' : ''"
                 :options="fieldsFilteredOptions" input-debounce="0" behavior="menu" use-input stack-label option-label="name"
                 @update:model-value="updateModelValueOfSelect(index, $event)"
-                @filter="fieldsFilterFn" placeholder="Select Field" class="textbox col no-case q-ml-sm" :loading="variableItem.isLoading">
+                @filter="fieldsFilterFn" :placeholder="adhocVariables[index].name ? '' : 'Select Field'" class="textbox col no-case q-ml-sm" :loading="variableItem.isLoading">
                 <template v-slot:no-option>
                     <q-item>
                         <q-item-section class="text-italic text-grey">

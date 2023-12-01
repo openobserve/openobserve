@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-select>
       </div>
-      <div v-if="item.type == 'dynamicFilters'">
+      <div v-if="item.type == 'dynamic_filters'">
         <VariableAdHocValueSelector v-model="item.value" :variableItem="item" />
       </div>
     </div>
@@ -155,7 +155,7 @@ export default defineComponent({
       if (!oldVariableValue.length) {
         const dynamicVariables =
           props.variablesConfig?.list
-            ?.filter((it: any) => it.type == "dynamicFilters")
+            ?.filter((it: any) => it.type == "dynamic_filters")
             ?.map((it: any) => it.name) || [];
         oldVariableValue = Object.keys(props?.initialVariableValues ?? []).map(
           (key: any) => ({
@@ -301,8 +301,8 @@ export default defineComponent({
               return obj;
               // break;
             }
-            case "dynamicFilters": {
-              console.log("dynamicFilters");
+            case "dynamic_filters": {
+              console.log("dynamic_filters");
 
               obj.isLoading = true; // Set loading state
 

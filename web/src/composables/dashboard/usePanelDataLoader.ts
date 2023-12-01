@@ -258,7 +258,7 @@ export const usePanelDataLoader = (
           .then((res) => {
             // Set searchQueryData.data to the API response data
             state.errorDetail = "";
-            return {result: res.data.data, metadata: metadata};
+            return { result: res.data.data, metadata: metadata };
           })
           .catch((error) => {
             // Process API error for "promql"
@@ -283,24 +283,23 @@ export const usePanelDataLoader = (
         async (it: any) => {
           console.log("sqlqueryPromise", it);
 
-          const {query: query1, metadata: metadata1} = replaceQueryValue(
-              it.query,
-              startISOTimestamp,
-              endISOTimestamp,
-              panelSchema.value.queryType
-            )
+          const { query: query1, metadata: metadata1 } = replaceQueryValue(
+            it.query,
+            startISOTimestamp,
+            endISOTimestamp,
+            panelSchema.value.queryType
+          );
 
-            console.log('query1', query1);
-            
+          console.log("query1", query1);
 
-          const {query: query2, metadata: metadata2} = applyAdhocVariables(
+          const { query: query2, metadata: metadata2 } = applyAdhocVariables(
             query1,
             panelSchema.value.queryType
           );
 
-          const query = query2
+          const query = query2;
           console.log("query2", query2);
-          
+
           const metadata = {
             originalQuery: it.query,
             query: query,
@@ -328,7 +327,7 @@ export const usePanelDataLoader = (
               // Set searchQueryData.data to the API response hits
               // state.data = res.data.hits;
               state.errorDetail = "";
-              return {result: res.data.hits, metadata: metadata};
+              return { result: res.data.hits, metadata: metadata };
             })
             .catch((error) => {
               // Process API error for "sql"
@@ -371,7 +370,7 @@ export const usePanelDataLoader = (
    */
   const isQueryDependentOnTheVariables = () => {
     const dependentVariables = variablesData.value?.values
-      ?.filter((it: any) => it.type != 'dynamicFilters') // ad hoc filters are not considered as dependent filters as they are globally applied
+      ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
       ?.filter((it: any) =>
         panelSchema?.value?.queries
           ?.map((q: any) => q?.query?.includes(`$${it.name}`)) // check if the query includes the variable
@@ -387,7 +386,7 @@ export const usePanelDataLoader = (
    */
   const canRunQueryBasedOnVariables = () => {
     const dependentVariables = variablesData.value?.values
-      ?.filter((it: any) => it.type != 'dynamicFilters') // ad hoc filters are not considered as dependent filters as they are globally applied
+      ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
       ?.filter((it: any) =>
         panelSchema?.value?.queries
           ?.map((q: any) => {
@@ -419,24 +418,35 @@ export const usePanelDataLoader = (
    * @return {any} The modified query with replaced values.
    */
   const replaceQueryValue = (
+    
     query: any,
+   
     startISOTimestamp: any,
+   
     endISOTimestamp: any,
+   
     queryType: any
+  
   ) => {
     console.log(
+      
       "replaceQueryValue",
+     
       query,
+     
       startISOTimestamp,
+     
       endISOTimestamp,
+     
       queryType
+    
 
-    const metadata: any[] = []
-    );
+    const metadata: any[] = [];);
 
     //fixed variables value calculations
     //scrape interval by default 15 seconds
     let scrapeInterval =
+     
       store.state.organizationData.organizationSettings.scrape_interval ?? 15;
 
     // timestamp in seconds / chart panel width
@@ -503,40 +513,41 @@ export const usePanelDataLoader = (
         "currentDependentVariablesData",
         currentDependentVariablesData
       );
+
       currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
         const variableValue = variable.value;
-        if(query.includes(variableName)) {
+        if (query.includes(variableName)) {
           metadata.push({
-            type: 'variable',
+            type: "variable",
             name: variable.name,
-            value: variable.value
-          })
+            value: variable.value,
+          });
         }
         query = query.replaceAll(variableName, variableValue);
       });
 
-      return {query, metadata};
+      return { query, metadata };
     } else {
-      return {query, metadata};
+      return { query, metadata };
     }
   };
 
   console.log("currentDependentVariablesData", currentDependentVariablesData);
 
-  console.log("currentDependentVariablesData", currentDependentVariablesData);
-
   const applyAdhocVariables = (query: any, queryType: any) => {
     console.log("checking for ad hoc variables");
+
     console.log("variablesData(())", variablesData.value?.values);
-    const metadata : any[] = []
+    const metadata: any[] = [];
 
     const adHocVariables = variablesData.value?.values
-      ?.filter((it: any) => it.type === "dynamicFilters")
-      ?.map((it: any) => it?.value).flat()
-      ?.filter((it: any) => it?.operator && it?.name && it?.value)
-      
-      console.log("adHocVariables(())", adHocVariables);
+      ?.filter((it: any) => it.type === "dynamic_filters")
+      ?.map((it: any) => it?.value)
+      .flat()
+      ?.filter((it: any) => it?.operator && it?.name && it?.value);
+
+    console.log("adHocVariables(())", adHocVariables);
 
     if (!adHocVariables.length) {
       return { query, metadata };
@@ -557,11 +568,11 @@ export const usePanelDataLoader = (
 
       adHocVariables.forEach((variable: any) => {
         metadata.push({
-          type: 'dynamicVariable',
+          type: "dynamicVariable",
           name: variable.name,
           value: variable.value,
-          operator: variable.operator
-        })
+          operator: variable.operator,
+        });
         query = addLabelToPromQlQuery(
           query,
           variable.name,
@@ -584,10 +595,10 @@ export const usePanelDataLoader = (
       // ];
 
       const queryStream = getStreamFromQuery(query);
-       
+
       const applicableAdHocVariables = adHocVariables.filter((it: any) => {
-        return it?.streams?.find((it: any) => it.name == queryStream)
-      })
+        return it?.streams?.find((it: any) => it.name == queryStream);
+      });
 
       applicableAdHocVariables.forEach((variable: any) => {
         metadata.push({
@@ -598,11 +609,11 @@ export const usePanelDataLoader = (
         });
       });
       query = addLabelsToSQlQuery(query, applicableAdHocVariables);
-      
+
       console.log("querySQL", query);
     }
 
-    return {query, metadata};
+    return { query, metadata };
   };
 
   /**
@@ -677,12 +688,11 @@ export const usePanelDataLoader = (
       const shouldITriggerTheQueryForOtherVariables = (() => {
         // 1. get the dependent variables list
         const newDependentVariablesData = variablesData.value?.values
-          ?.filter((it: any) => it.type != 'dynamicFilters') // ad hoc filters are not considered as dependent filters as they are globally applied
-          ?.filter(
-            (it: any) =>
-              panelSchema.value.queries
-                ?.map((q: any) => q?.query?.includes(`$${it.name}`))
-                ?.includes(true)
+          ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
+          ?.filter((it: any) =>
+            panelSchema.value.queries
+              ?.map((q: any) => q?.query?.includes(`$${it.name}`))
+              ?.includes(true)
           );
 
         // if no variables, no need to rerun the query
@@ -710,15 +720,23 @@ export const usePanelDataLoader = (
 
       // let's check for the ad-hoc variables
       const shouldITriggerTheQueryForAdHocVariables = (() => {
-        const sqlQueryStreams = panelSchema.value.queryType == 'sql' ? 
-          panelSchema.value.queries.map((q: any) => getStreamFromQuery(q.query))
-          : []
+        const sqlQueryStreams =
+          panelSchema.value.queryType == "sql"
+            ? panelSchema.value.queries.map((q: any) =>
+                getStreamFromQuery(q.query)
+              )
+            : [];
 
         const adHocVariables = variablesData.value?.values
-          ?.filter((it: any) => it.type === "dynamicFilters")
-          ?.map((it: any) => it?.value).flat()
+          ?.filter((it: any) => it.type === "dynamic_filters")
+          ?.map((it: any) => it?.value)
+          .flat()
           ?.filter((it: any) => it?.operator && it?.name && it?.value)
-          ?.filter((it: any) => panelSchema.value.queryType == 'sql' ? it.streams.find((it: any) => sqlQueryStreams.includes(it?.name)) : true)
+          ?.filter((it: any) =>
+            panelSchema.value.queryType == "sql"
+              ? it.streams.find((it: any) => sqlQueryStreams.includes(it?.name))
+              : true
+          );
 
         // if number of adHocVariables have changed, fire the query
         if (adHocVariables.length !== currentAdHocVariablesData.length) {

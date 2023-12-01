@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               class="text-body1 text-bold q-mt-lg"
-              v-if="variableData.type !== 'dynamicFilters'"
+              v-if="variableData.type !== 'dynamic_filters'"
             >
               {{ t("dashboard.extraOptions") }}
             </div>
@@ -324,7 +324,7 @@ export default defineComponent({
       },
       {
         label: t("dashboard.ad-hoc-variable"),
-        value: "dynamicFilters",
+        value: "dynamic_filters",
       },
     ]);
 

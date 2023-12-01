@@ -152,16 +152,20 @@ export default defineComponent({
       const variableObj = {};
       data.values.forEach((variable) => {
         console.log("variableeee", variable);
-        
-        if (variable.type === 'dynamicFilters') {
-          const filters = ((variable.value) || []).filter((item: any) => item.name && item.operator && item.value);
+
+        if (variable.type === "dynamic_filters") {
+          const filters = (variable.value || []).filter(
+            (item: any) => item.name && item.operator && item.value
+          );
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
             operator: item.operator,
-            value: item.value
-          }))
-          variableObj[`var-${variable.name}`] = encodeURIComponent(JSON.stringify(encodedFilters))
-        }  else {
+            value: item.value,
+          }));
+          variableObj[`var-${variable.name}`] = encodeURIComponent(
+            JSON.stringify(encodedFilters)
+          );
+        } else {
           variableObj[`var-${variable.name}`] = variable.value;
         }
       });

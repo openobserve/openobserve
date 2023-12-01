@@ -139,7 +139,7 @@ export default defineComponent({
   ],
   components: {
     PanelSchemaRenderer,
-    MetaDataDialog,
+    MetaDataDialog
   },
   setup(props) {
     const store = useStore();
@@ -151,14 +151,14 @@ export default defineComponent({
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
       console.log("metadata panel", metadata);
+
     };
 
     const dependentAdHocVariable = computed(() => {
       const adhocVariables = props.variablesData.values
-        ?.filter((it: any) => it.type === "dynamicFilters")
-        ?.map((it: any) => it?.value)
-        .flat()
-        ?.filter((it: any) => it?.operator && it?.name && it?.value);
+        ?.filter((it: any) => it.type === "dynamic_filters")
+        ?.map((it: any) => it?.value).flat()
+        ?.filter((it: any) => it?.operator && it?.name && it?.value)
       console.log("adhocVariables==", adhocVariables);
 
       const metaDataDynamic = metaData.value?.queries?.every((it: any) => {
@@ -175,7 +175,7 @@ export default defineComponent({
     const showFullScreenBtn: any = ref(false);
 
     //for edit panel
-    const onEditPanel = (data: any) => {
+    const onEditPanel = (data:  any) => {
       return router.push({
         path: "/dashboards/add_panel",
         query: {
@@ -187,6 +187,7 @@ export default defineComponent({
     };
     //create a duplicate panel
     const onDuplicatePanel = async (data: any): Promise<void> => {
+
       // Show a loading spinner notification.
       const dismiss = $q.notify({
         spinner: true,
@@ -194,28 +195,25 @@ export default defineComponent({
         timeout: 2000,
       });
 
+
       // Generate a unique panel ID.
-      const panelId =
-        "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
+      const panelId = "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 
       // Duplicate the panel data with the new ID.
       const panelData = JSON.parse(JSON.stringify(data));
       panelData.id = panelId;
 
+
       try {
         // Add the duplicated panel to the dashboard.
-        await addPanel(
-          store,
-          route.query.dashboard,
-          panelData,
-          route.query.folder ?? "default"
-        );
+        await addPanel(store, route.query.dashboard, panelData, route.query.folder ?? "default");
 
         // Show a success notification.
         $q.notify({
           type: "positive",
           message: `Panel Duplicated Successfully`,
         });
+
 
         // Navigate to the new panel.
         router.push({
@@ -227,6 +225,7 @@ export default defineComponent({
           },
         });
         return;
+      } catch (err: any) {
       } catch (err: any) {
         // Show an error notification.
         $q.notify({
@@ -253,11 +252,11 @@ export default defineComponent({
   },
   methods: {
     onPanelModifyClick(evt: any) {
-      if (evt == "ViewPanel") {
+      if  (evt == "ViewPanel") {
         this.$emit("onViewPanel", this.props.data.id);
-      } else if (evt == "EditPanel") {
+      } else if (evt == "EditPanel")  {
         this.onEditPanel(this.props.data);
-      } else if (evt == "DeletePanel") {
+      } else if  (evt == "DeletePanel") {
         this.$emit("onDeletePanel", this.props.data.id);
       } else if (evt == "DuplicatePanel") {
         this.onDuplicatePanel(this.props.data);
