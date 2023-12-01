@@ -301,7 +301,14 @@ const defaultValue: any = () => {
     stream_name: "",
     is_real_time: "false",
     query_condition: {
-      conditions: [],
+      conditions: [
+        {
+          column: "",
+          operator: "=",
+          value: "",
+          id: getUUID(),
+        },
+      ],
       sql: "",
       promql: null,
       type: "custom",
@@ -516,6 +523,8 @@ export default defineComponent({
     };
 
     const removeField = (field: any) => {
+      if (formData.value.query_condition.conditions.length === 1) return;
+
       formData.value.query_condition.conditions =
         formData.value.query_condition.conditions.filter(
           (_field: any) => _field.id !== field.id

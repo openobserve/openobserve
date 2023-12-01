@@ -89,6 +89,7 @@
             round
             flat
             :title="t('alert_templates.edit')"
+            :disable="fields.length === 1"
             @click="deleteApiHeader(field)"
             style="min-width: auto"
           />
