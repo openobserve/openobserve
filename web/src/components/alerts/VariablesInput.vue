@@ -17,7 +17,7 @@
     </template>
     <template v-else>
       <div
-        v-for="(variable, index) in variables"
+        v-for="(variable, index) in (variables as any)"
         :key="variable.uuid"
         class="q-col-gutter-sm q-pb-sm flex items-center"
       >

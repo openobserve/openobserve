@@ -19,7 +19,7 @@
     </template>
     <template v-else>
       <div
-        v-for="(field, index) in fields"
+        v-for="(field, index) in (fields as any)"
         :key="field.uuid"
         class="flex justify-start items-end q-col-gutter-sm q-pb-sm"
       >
@@ -143,7 +143,7 @@ const emits = defineEmits(["add", "remove"]);
 
 const { t } = useI18n();
 
-const deleteApiHeader = (field) => {
+const deleteApiHeader = (field: any) => {
   emits("remove", field);
 };
 

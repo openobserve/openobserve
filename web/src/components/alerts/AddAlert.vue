@@ -411,12 +411,15 @@ export default defineComponent({
 
     onMounted(async () => {});
     const updateAlert = (stream_name: any) => {
-      filteredColumns.value = schemaList.value
-        .find((schema: any) => schema.name === stream_name)
-        ?.schema.map((column: any) => ({
+      const column: any = schemaList.value.find(
+        (schema: any) => schema.name === stream_name
+      );
+      if (column && Array.isArray(column?.schema)) {
+        filteredColumns.value = column.schema.map((column: any) => ({
           label: column.name,
           value: column.name,
         }));
+      }
 
       updateEditorContent(stream_name);
     };
@@ -542,7 +545,7 @@ export default defineComponent({
       }
 
       formData.value.query_condition.conditions.forEach(
-        (condition: any, index) => {
+        (condition: any, index: number) => {
           if (condition.column && condition.operator && condition.value) {
             if (condition.operator === "Contains") {
               sql += `${condition.column} LIKE '${condition.value}'`;
