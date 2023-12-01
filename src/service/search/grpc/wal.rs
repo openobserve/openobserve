@@ -19,6 +19,7 @@ use datafusion::{
     common::FileType,
 };
 use futures::future::try_join_all;
+use memory_stats::memory_stats;
 use std::{io::BufReader, path::Path, sync::Arc, time::UNIX_EPOCH};
 use tokio::time::Duration;
 use tracing::{info_span, Instrument};
@@ -114,6 +115,21 @@ pub async fn search(
         scan_stats.files,
         scan_stats.original_size
     );
+
+    if CONFIG.common.memory_circuit_breaker_enable {
+        if let Some(cur_memory) = memory_stats() {
+            if cur_memory.physical_mem as i64 + scan_stats.original_size
+                > (CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100) as i64
+            {
+                let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, larger than limit of [{} bytes] ",
+                                  scan_stats.original_size,
+                                  cur_memory.physical_mem,
+                                  CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100);
+                log::warn!("{}", err);
+                return Err(Error::Message(err.to_string()));
+            }
+        }
+    }
 
     // fetch all schema versions, get latest schema
     let schema_latest = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
