@@ -633,7 +633,9 @@
     "slack": "Slack",
     "prom_am": "Alert manager",
     "addTitle": "Add Alert",
-    "updateTitle": "Update Alert"
+    "updateTitle": "Update Alert",
+    "play": "Play",
+    "pause": "Pause"
   },
   "alert_templates": {
     "header": "Templates",

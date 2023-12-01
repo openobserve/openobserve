@@ -46,9 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               padding="sm"
               unelevated
               size="sm"
+              :color="props.row.enabled ? 'negative' : 'positive'"
               round
               flat
-              :title="t('alerts.edit')"
+              :title="props.row.enabled ? t('alerts.pause') : t('alerts.play')"
+              @click="toggleAlertState(props.row)"
             ></q-btn>
             <q-btn
               :data-test="`alert-list-${props.row.name}-udpate-alert`"
@@ -464,6 +466,25 @@ export default defineComponent({
       selectedDelete.value = props.row;
       confirmDelete.value = true;
     };
+
+    const toggleAlertState = (row: any) => {
+      const alert: Alert = alerts.value.find(
+        (alert) => alert.name === row.name
+      ) as Alert;
+      alertsService
+        .toggleState(
+          store.state.selectedOrganization.identifier,
+          alert.stream_name,
+          alert.name,
+          !alert?.enabled
+        )
+        .then(() => {
+          alert.enabled = !alert.enabled;
+          alertsRows.value.forEach((alert) => {
+            alert.name === row.name ? (alert.enabled = !alert.enabled) : null;
+          });
+        });
+    };
     return {
       t,
       qTable,
@@ -511,6 +532,7 @@ export default defineComponent({
       outlinedPause,
       outlinedPlayArrow,
       alertsRows,
+      toggleAlertState,
     };
   },
 });

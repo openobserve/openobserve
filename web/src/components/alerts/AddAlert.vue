@@ -298,7 +298,7 @@ const defaultValue: any = () => {
     name: "",
     stream_type: "",
     stream_name: "",
-    is_real_time: "true",
+    is_real_time: "false",
     query_condition: {
       conditions: [],
       sql: "",
