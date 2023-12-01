@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!--  <q-select v-if="formData.ingest" v-model="formData.stream_type" :options="streamTypes"
-                                :label="t('alerts.stream_type')" :popup-content-style="{ textTransform: 'capitalize' }" color="input-border"
+                                :label="t('alerts.streamType')" :popup-content-style="{ textTransform: 'capitalize' }" color="input-border"
                                 bg-color="input-bg" class="col-4 q-py-sm showLabelOnTop" stack-label outlined filled dense
                                 @update:model-value="updateStreams" :rules="[(val: any) => !!val || 'Field is required!']" />
 

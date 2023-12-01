@@ -50,7 +50,7 @@
             <q-select
               v-model="formData.stream_type"
               :options="streamTypes"
-              :label="t('alerts.stream_type')"
+              :label="t('alerts.streamType')"
               :popup-content-style="{ textTransform: 'capitalize' }"
               color="input-border"
               bg-color="input-bg"

@@ -22,6 +22,7 @@ use super::templates::Template;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Destination {
+    #[serde(default)]
     pub name: String,
     pub url: String,
     pub method: HTTPType,

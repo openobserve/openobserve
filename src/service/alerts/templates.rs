@@ -23,7 +23,7 @@ pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<()
     if template.body.is_null() {
         return Err(anyhow::anyhow!("Alert template body empty"));
     }
-    template.name = Some(name.to_string());
+    template.name = name.to_string();
     db::alerts::templates::set(org_id, name, template.clone()).await
 }
 

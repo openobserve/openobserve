@@ -20,7 +20,8 @@ use crate::common::utils::json::Value;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Template {
-    pub name: Option<String>,
+    #[serde(default)]
+    pub name: String,
     #[schema(value_type = Object)]
     pub body: Value,
     #[serde(rename = "isDefault")]

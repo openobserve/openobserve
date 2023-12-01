@@ -34,13 +34,8 @@ pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error>
     Ok(dest)
 }
 
-pub async fn set(
-    org_id: &str,
-    name: &str,
-    mut destination: Destination,
-) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, name: &str, destination: Destination) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    destination.name = name.to_owned();
     let key = format!("/destinations/{org_id}/{name}");
     Ok(db
         .put(
@@ -77,6 +72,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {
         let dest: Destination = json::from_slice(&item_value)?;
         items.push(dest)
     }
+    items.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(items)
 }
 

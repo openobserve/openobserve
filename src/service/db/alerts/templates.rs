@@ -76,12 +76,13 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("/templates/{org_id}/");
     let ret = db.list_values(key.as_str()).await?;
-    let mut templates = Vec::new();
+    let mut items = Vec::new();
     for item_value in ret {
         let json_val: Template = json::from_slice(&item_value).unwrap();
-        templates.push(json_val);
+        items.push(json_val);
     }
-    Ok(templates)
+    items.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(items)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

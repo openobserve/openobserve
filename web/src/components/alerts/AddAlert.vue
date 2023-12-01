@@ -55,11 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-select
               v-model="formData.stream_type"
               :options="streamTypes"
-              :label="t('alerts.stream_type')"
+              :label="t('alerts.streamType')"
               :popup-content-style="{ textTransform: 'capitalize' }"
               color="input-border"
               bg-color="input-bg"
-              class="q-py-sm showLabelOnTop"
+              class="q-py-sm showLabelOnTop no-case"
               stack-label
               outlined
               filled
@@ -175,14 +175,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 class="flex justify-center items-center"
               >
-                Minutes
+              {{ t("alerts.minutes") }}
               </div>
             </div>
           </div>
         </div>
 
         <div class="q-mt-lg">
-          <div class="text-bold">Notification Destinations</div>
+          <div class="text-bold">{{ t("alerts.destination") }}</div>
           <q-select
             data-test="add-alert-destination-select"
             v-model="formData.destinations"
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div>
-          <div class="text-bold">Additional Variables</div>
+          <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
           <variables-input
             :variables="formData.context_attributes"
             @add:variable="addVariable"

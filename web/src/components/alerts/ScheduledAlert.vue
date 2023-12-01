@@ -9,8 +9,8 @@
         mobile-arrows
         class="bg-white text-primary"
       >
-        <q-tab name="custom" label="Custom" />
-        <q-tab name="sql" label="Standard SQL" />
+        <q-tab name="custom" :label="t('alerts.custom')" />
+        <q-tab name="sql" :label="t('alerts.sql')" />
       </q-tabs>
     </div>
     <template v-if="tab === 'custom'">
@@ -35,7 +35,7 @@
 
     <div class="q-mt-sm">
       <div class="flex items-center q-mr-sm">
-        <div style="width: 180px">Period</div>
+        <div style="width: 180px">{{ t("alerts.period") }}</div>
         <div
           class="flex items-center q-mr-sm"
           style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
@@ -65,13 +65,13 @@
             "
             class="flex justify-center items-center"
           >
-            Minutes
+          {{ t("alerts.minutes") }}
           </div>
         </div>
       </div>
 
       <div class="flex justify-start items-center q-mt-sm">
-        <div style="width: 180px">Threshold</div>
+        <div style="width: 180px">{{ t("alerts.threshold") }}</div>
         <div class="threshould-input">
           <q-select
             data-test="add-alert-stream-select"
@@ -120,7 +120,7 @@
             "
             class="flex justify-center items-center"
           >
-            Times
+          {{ t("alerts.times") }}
           </div>
         </div>
       </div>
@@ -142,6 +142,8 @@ const emits = defineEmits([
   "update:trigger",
   "update:sql",
 ]);
+
+const { t } = useI18n();
 
 const triggerData = ref(props.trigger);
 

@@ -56,6 +56,23 @@ impl PartialEq for Alert {
     }
 }
 
+impl Default for Alert {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            org_id: "".to_string(),
+            stream_type: StreamType::default(),
+            stream_name: "".to_string(),
+            is_real_time: false,
+            query_condition: QueryCondition::default(),
+            trigger_condition: TriggerCondition::default(),
+            destinations: vec![],
+            context_attributes: None,
+            enabled: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct TriggerCondition {
     pub period: i64,        // 10 minutes
@@ -85,17 +102,17 @@ pub struct Condition {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum Operator {
-    #[serde(alias = "=")]
+    #[serde(rename = "=")]
     EqualTo,
-    #[serde(alias = "!=")]
+    #[serde(rename = "!=")]
     NotEqualTo,
-    #[serde(alias = ">")]
+    #[serde(rename = ">")]
     GreaterThan,
-    #[serde(alias = ">=")]
+    #[serde(rename = ">=")]
     GreaterThanEquals,
-    #[serde(alias = "<")]
+    #[serde(rename = "<")]
     LessThan,
-    #[serde(alias = "<=")]
+    #[serde(rename = "<=")]
     LessThanEquals,
     Contains,
     NotContains,

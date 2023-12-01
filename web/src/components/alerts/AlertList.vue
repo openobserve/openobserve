@@ -204,9 +204,16 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "alert_type",
+        field: "alert_type",
+        label: t("alerts.alertType"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "stream_type",
         field: "stream_type",
-        label: t("alerts.stream_type"),
+        label: t("alerts.streamType"),
         align: "left",
         sortable: true,
       },
@@ -218,25 +225,32 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "sql",
-        field: "sql",
-        label: t("alerts.sql"),
+        name: "conditions",
+        field: "conditions",
+        label: t("alerts.condition"),
         align: "left",
         sortable: true,
         style: "width: 30vw;word-break: break-all;",
       },
       {
-        name: "sql",
-        field: "condition_str",
-        label: t("alerts.condition"),
+        name: "trigger",
+        field: "trigger",
+        label: t("alerts.trigger"),
         align: "left",
         sortable: true,
         style: "width: 10vw;word-break: break-all;",
       },
       {
-        name: "destination",
-        field: "destination",
+        name: "destinations",
+        field: "destinations",
         label: t("alerts.destination"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "state",
+        field: "state",
+        label: t("alerts.state"),
         align: "left",
         sortable: true,
       },
@@ -258,7 +272,7 @@ export default defineComponent({
       alertsService
         .list(
           1,
-          100000,
+          1000,
           "name",
           false,
           "",
@@ -267,38 +281,44 @@ export default defineComponent({
         .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
+          console.log(res.data.list);
           alerts.value = res.data.list.map((data: any) => {
-            if (data.is_real_time) {
-              data.query.sql = "--";
+            let conditions = "--";
+            if (data.query_condition.conditions) {
+              conditions = data.query_condition.conditions
+                .map((condition: any) => {
+                  return `${condition.column} ${condition.operator} ${condition.value}`;
+                })
+                .join(" AND ");
+            } else if (data.query_condition.sql) {
+              conditions = data.query_condition.sql;
             }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
-              sql: data.query.sql,
-              stream_name: data.stream ? data.stream : "--",
+              stream_name: data.stream_name ? data.stream_name : "--",
               stream_type: data.stream_type,
-              condition_str:
-                data.condition.column +
+              conditions: conditions,
+              trigger:
+                "in " +
+                data.trigger_condition.period +
+                " minutes " +
+                data.trigger_condition.operator +
                 " " +
-                data.condition.operator +
-                " " +
-                data.condition.value,
-              actions: "",
-              duration: {
-                value: data.duration,
-                unit: "Minutes",
-              },
+                data.trigger_condition.threshold +
+                " times",
               frequency: {
-                value: data.frequency,
+                value: data.trigger_condition.frequency,
                 unit: "Minutes",
               },
-              time_between_alerts: {
-                value: data.time_between_alerts,
+              silence: {
+                value: data.trigger_condition.silence,
                 unit: "Minutes",
               },
-              destination: data.destination,
-              condition: data.condition,
-              isScheduled: (!data.is_real_time).toString(),
+              destinations: data.destinations.join(", "),
+              state: data.enabled ? "Running" : "Stopped",
+              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
+              actions: "",
             };
           });
           if (router.currentRoute.value.query.action == "add") {
@@ -312,7 +332,8 @@ export default defineComponent({
           }
           dismiss();
         })
-        .catch(() => {
+        .catch((e) => {
+          console.error(e);
           dismiss();
           $q.notify({
             type: "negative",

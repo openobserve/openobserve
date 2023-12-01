@@ -104,12 +104,13 @@ pub async fn list(
         None => format!("/alerts/{org_id}/"),
     };
     let ret = db.list_values(&key).await?;
-    let mut alerts_list: Vec<Alert> = Vec::with_capacity(ret.len());
+    let mut items: Vec<Alert> = Vec::with_capacity(ret.len());
     for item_value in ret {
         let json_val = json::from_slice(&item_value)?;
-        alerts_list.push(json_val)
+        items.push(json_val)
     }
-    Ok(alerts_list)
+    items.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(items)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -205,7 +206,21 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: Alert = json::from_slice(&item_value).unwrap();
+        let json_val: Alert = match json::from_slice(&item_value) {
+            Ok(v) => v,
+            Err(_) => {
+                let data:json::Value = json::from_slice(&item_value).unwrap();
+                let data = data.as_object().unwrap();
+                let mut alert = Alert::default();
+                alert.name = data.get("name").unwrap().as_str().unwrap().to_string();
+                alert.stream_type = data.get("stream_type").unwrap().as_str().unwrap().into();
+                alert.stream_name = match data.get("steram") {
+                    Some(v) => v.as_str().unwrap().to_string(),
+                    None => data.get("stream_name").unwrap().as_str().unwrap().to_string(),
+                }; 
+                alert
+            }
+        };
         let stream_key = &item_key[0..item_key.rfind('/').unwrap()];
 
         let mut cacher = STREAM_ALERTS.write().await;

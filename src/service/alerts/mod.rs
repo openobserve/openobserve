@@ -256,10 +256,14 @@ impl QueryCondition {
         let sql = if self.sql.is_some() {
             self.sql.as_ref().unwrap().to_string()
         } else {
-            let conditions = self.conditions.as_ref().unwrap();
-            if conditions.is_empty() {
+            let conditions = if let Some(v) = self.conditions.as_ref() {
+                if v.is_empty() {
+                    return Ok(None);
+                }
+                v
+            } else {
                 return Ok(None);
-            }
+            };
             build_sql(alert, conditions).await?
         };
 
