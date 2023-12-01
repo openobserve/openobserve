@@ -65,6 +65,8 @@ export default defineComponent({
       setHoveredSeriesValue,
       setSeriesId,
       resetHoveredSeriesState,
+      setIndex,
+      setPanelId,
     } = usehoveredSeriesState();
 
     const mouseHoverEffectFn = (params: any) => {
@@ -81,6 +83,10 @@ export default defineComponent({
       setOffset(params?.event?.offsetX ?? 0, params?.event?.offsetY ?? 0);
       setSeriesId(params?.seriesId);
 
+      // for timeseries hover
+      setIndex(params.dataIndex, params.seriesIndex)
+      setPanelId(props?.data?.extras?.panelId);
+
       // scroll legend upto current series index
       const legendOption = chart?.getOption()?.legend[0];
 
@@ -92,6 +98,7 @@ export default defineComponent({
 
     const mouseOutEffectFn = () => {
       resetHoveredSeriesState();
+      setPanelId(props.data?.extras?.panelId);
     };
 
     const legendSelectChangedFn = (params: any) => {
@@ -138,6 +145,11 @@ export default defineComponent({
         // console.log(JSON.parse(JSON.stringify(hoveredSeriesState)), "hoveredSeriesState");
 
         chart?.dispatchAction({
+          type: "showTip",
+          seriesIndex: hoveredSeriesState?.seriesIndex,
+          dataIndex: hoveredSeriesState?.dataIndex,
+        });
+        chart?.dispatchAction({
           type: "highlight",
           seriesName: hoveredSeriesState?.hoveredSeriesName,
         });
@@ -176,6 +188,7 @@ export default defineComponent({
         chart?.on("mouseout", mouseOutEffectFn);
         chart?.on("globalout", () => {
           mouseHoverEffectFn({});
+          setPanelId(-1);
         });
         chart?.on("legendselectchanged", legendSelectChangedFn);
 
