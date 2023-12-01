@@ -386,6 +386,10 @@ pub struct Common {
     // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%S
     #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
     pub log_local_time_format: String,
+    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLE", default = false)]
+    pub memory_circuit_breaker_enable: bool,
+    #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 100)]
+    pub memory_circuit_breaker_ratio: usize,
 }
 
 #[derive(EnvConfig)]
