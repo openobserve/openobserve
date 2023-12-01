@@ -17,6 +17,7 @@ import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
 import moment from "moment-timezone";
+import { v4 as uuidv4 } from "uuid";
 
 const useLocalStorage = (
   key: string,
@@ -528,3 +529,7 @@ export const mergeDeep = (target: any, source: any) => {
   }
   return target;
 };
+
+export function getUUID() {
+  return uuidv4();
+}
