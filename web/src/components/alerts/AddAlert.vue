@@ -17,7 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="full-width">
     <div class="row items-center no-wrap q-mx-lg q-my-sm">
-      <div class="col" data-test="add-alert-title">
+      <div class="flex items-center" data-test="add-alert-title">
+        <div
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="router.back()"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
         <div v-if="beingUpdated" class="text-h6">
           {{ t("alerts.updateTitle") }}
         </div>
@@ -293,6 +306,7 @@ import RealTimeAlert from "./RealTimeAlert.vue";
 import VariablesInput from "./VariablesInput.vue";
 import { getUUID } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
+import { useRouter } from "vue-router";
 
 const defaultValue: any = () => {
   return {
@@ -384,6 +398,7 @@ export default defineComponent({
       formData.value.sql = e.target.value;
     };
 
+    const router = useRouter();
     const scheduledAlertRef: any = ref(null);
 
     const updateCondtions = (e: any) => {
@@ -585,6 +600,7 @@ export default defineComponent({
       addVariable,
       selectedDestinations,
       scheduledAlertRef,
+      router,
     };
   },
   created() {

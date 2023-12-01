@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, onActivated } from "vue";
+import { defineComponent, ref, onBeforeMount, onActivated, watch } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -330,6 +330,12 @@ export default defineComponent({
     }
     onBeforeMount(() => getDestinations());
     onActivated(() => getDestinations());
+    watch(
+      () => router.currentRoute.value.query.action,
+      (action) => {
+        if (!action) showAddAlertDialog.value = false;
+      }
+    );
     const getDestinations = () => {
       destinationService
         .list({
