@@ -333,7 +333,7 @@ impl RwFile {
 
         let time_now: DateTime<Utc> = Utc::now();
         let level_duration = partition_time_level.unwrap_or_default().duration();
-        let ttl = if level_duration > 0 {
+        let ttl = if !CONFIG.limit.ignore_file_retention_by_stream && level_duration > 0 {
             let time_end_day = Utc
                 .with_ymd_and_hms(
                     time_now.year(),
