@@ -634,7 +634,7 @@
     "prom_am": "Alert manager",
     "addTitle": "Add Alert",
     "updateTitle": "Update Alert",
-    "play": "Play",
+    "start": "start",
     "pause": "Pause"
   },
   "alert_templates": {

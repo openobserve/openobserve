@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :color="props.row.enabled ? 'negative' : 'positive'"
               round
               flat
-              :title="props.row.enabled ? t('alerts.pause') : t('alerts.play')"
+              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
               @click="toggleAlertState(props.row)"
             ></q-btn>
             <q-btn
@@ -243,11 +243,11 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "destinations",
-        field: "destinations",
-        label: t("alerts.destination"),
+        name: "conditions",
+        field: "conditions",
+        label: t("alerts.condition"),
         align: "left",
-        sortable: true,
+        sortable: false,
       },
       {
         name: "description",
@@ -286,6 +286,16 @@ export default defineComponent({
           console.log(res.data.list);
           alerts.value = res.data.list;
           alertsRows.value = alerts.value.map((data: any) => {
+            let conditions = "--";
+            if (data.query_condition.conditions) {
+              conditions = data.query_condition.conditions
+                .map((condition: any) => {
+                  return `${condition.column} ${condition.operator} ${condition.value}`;
+                })
+                .join(" AND ");
+            } else if (data.query_condition.sql) {
+              conditions = data.query_condition.sql;
+            }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
@@ -295,9 +305,11 @@ export default defineComponent({
                 value: data.trigger_condition.silence,
                 unit: "Minutes",
               },
+              conditions: conditions,
               destinations: data.destinations.join(", "),
               enabled: data.enabled,
               alert_type: data.is_real_time ? "Real Time" : "Scheduled",
+              state: data.enabled ? "Running" : "Paused",
               description: data.description,
             };
           });

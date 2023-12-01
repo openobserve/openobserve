@@ -329,7 +329,7 @@ const defaultValue: any = () => {
     },
     trigger_condition: {
       period: 10,
-      operator: "=",
+      operator: ">=",
       threshold: 3,
       silence: 10,
     },

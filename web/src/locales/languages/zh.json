@@ -632,7 +632,9 @@
     "slack": "Slack",
     "prom_am": "Alert Manager",
     "addTitle": "添加告警",
-    "updateTitle": "更新告警"
+    "updateTitle": "更新告警",
+    "start": "启用",
+    "pause": "停用"
   },
   "alert_templates": {
     "header": "模板",
