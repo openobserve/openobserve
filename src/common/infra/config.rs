@@ -417,6 +417,8 @@ pub struct Limit {
     pub query_timeout: u64,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
+    #[env_config(name = "ZO_IGNORE_FILE_RETENTION_BY_STREAM", default = false)]
+    pub ignore_file_retention_by_stream: bool,
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
     pub logs_file_retention: String,
     #[env_config(name = "ZO_TRACES_FILE_RETENTION", default = "hourly")]
