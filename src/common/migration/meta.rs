@@ -1,3 +1,18 @@
+// Copyright 2023 Zinc Labs Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use chrono::Utc;
 
 use crate::common::{
@@ -5,8 +20,7 @@ use crate::common::{
         config::CONFIG,
         db::{self, Db},
     },
-    meta::alert::Trigger,
-    utils::{file::get_file_meta, json},
+    utils::file::get_file_meta,
 };
 
 const ITEM_PREFIXES: [&str; 13] = [
@@ -53,14 +67,14 @@ pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
         );
 
         for (key, value) in res.iter() {
-            let final_key;
-            let key = if key.starts_with("/trigger") {
-                let local_val: Trigger = json::from_slice(value).unwrap();
-                final_key = format!("/trigger/{}/{}", local_val.org, local_val.alert_name);
-                &final_key
-            } else {
-                key
-            };
+            // let final_key;
+            // let key = if key.starts_with("/trigger") {
+            //     let local_val: Trigger = json::from_slice(value).unwrap();
+            //     final_key = format!("/trigger/{}/{}", local_val.org, local_val.alert_name);
+            //     &final_key
+            // } else {
+            //     key
+            // };
             match dest.put(key, value.clone(), false).await {
                 Ok(_) => {}
                 Err(e) => {
@@ -99,14 +113,14 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
         );
         let mut count = 0;
         for (key, value) in res.iter() {
-            let final_key;
-            let key = if key.starts_with("/trigger") {
-                let local_val: Trigger = json::from_slice(value).unwrap();
-                final_key = format!("/trigger/{}/{}", local_val.org, local_val.alert_name);
-                &final_key
-            } else {
-                key
-            };
+            // let final_key;
+            // let key = if key.starts_with("/trigger") {
+            //     let local_val: Trigger = json::from_slice(value).unwrap();
+            //     final_key = format!("/trigger/{}/{}", local_val.org, local_val.alert_name);
+            //     &final_key
+            // } else {
+            //     key
+            // };
             match dest.put(key, value.clone(), false).await {
                 Ok(_) => {
                     count += 1;

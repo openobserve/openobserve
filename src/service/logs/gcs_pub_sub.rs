@@ -1,8 +1,22 @@
+// Copyright 2023 Zinc Labs Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 
-use super::{ingest::decode_and_decompress, StreamMeta};
 use crate::common::{
     infra::{
         cluster,
@@ -10,7 +24,7 @@ use crate::common::{
         metrics,
     },
     meta::{
-        alert::{Alert, Trigger},
+        alerts::Alert,
         ingestion::{GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus},
         stream::StreamParams,
         usage::UsageType,
@@ -19,7 +33,9 @@ use crate::common::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
 use crate::service::{
-    db, distinct_values, get_formatted_stream_name, ingestion::write_file,
+    db, distinct_values, get_formatted_stream_name,
+    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    logs::{ingest::decode_and_decompress, StreamMeta},
     usage::report_request_usage_stats,
 };
 
@@ -60,7 +76,7 @@ pub async fn process(
         },
     };
 
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     // Start Register Transforms for stream
 
@@ -77,8 +93,13 @@ pub async fn process(
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
@@ -141,11 +162,11 @@ pub async fn process(
                 &mut stream_status.status,
                 &mut buf,
                 local_val,
+                trigger.is_none(),
             )
             .await;
-
             if local_trigger.is_some() {
-                trigger = Some(local_trigger.unwrap());
+                trigger = local_trigger;
             }
 
             // get distinct_value item
@@ -186,7 +207,7 @@ pub async fn process(
         write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, &stream_alerts_map).await;
+    evaluate_trigger(trigger).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {

@@ -16,9 +16,13 @@
 use std::sync::Arc;
 
 use crate::common::{
-    infra::{config::STREAM_ALERTS, db as infra_db},
+    infra::{
+        cluster::{is_alert_manager, LOCAL_NODE_ROLE},
+        config::STREAM_ALERTS,
+        db as infra_db,
+    },
     meta::{
-        alert::{Alert, AlertList},
+        alerts::{triggers::Trigger, Alert},
         StreamType,
     },
     utils::json,
@@ -26,23 +30,22 @@ use crate::common::{
 
 pub mod destinations;
 pub mod templates;
+pub mod triggers;
 
 pub async fn get(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, anyhow::Error> {
-    let map_key = format!("{org_id}/{stream_type}/{stream_name}");
-    let value: Option<Alert> = if STREAM_ALERTS.contains_key(&map_key) {
-        let mut val = STREAM_ALERTS.get(&map_key).unwrap().clone();
-        val.list.retain(|alert| alert.name.eq(name));
-        val.list.first().cloned()
+    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+    let value: Option<Alert> = if let Some(v) = STREAM_ALERTS.read().await.get(&stream_key) {
+        v.iter().find(|x| x.name.eq(name)).cloned()
     } else {
         let db = infra_db::get_db().await;
         let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
         match db.get(&key).await {
-            Ok(val) => json::from_slice(&val).unwrap(),
+            Ok(val) => json::from_slice(&val)?,
             Err(_) => None,
         }
     };
@@ -55,14 +58,14 @@ pub async fn get(
 
 pub async fn set(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     name: &str,
     alert: Alert,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
-    match db
+    if let Err(e) = db
         .put(
             &key,
             json::to_vec(&alert).unwrap().into(),
@@ -70,19 +73,15 @@ pub async fn set(
         )
         .await
     {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("Error putting schema: {}", e);
-            return Err(anyhow::anyhow!("Error putting schema: {}", e));
-        }
+        return Err(anyhow::anyhow!("Error save alert: {}", e));
     }
     Ok(())
 }
 
 pub async fn delete(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     name: &str,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
@@ -94,23 +93,24 @@ pub async fn delete(
 
 pub async fn list(
     org_id: &str,
-    stream_name: Option<&str>,
     stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
     let db = infra_db::get_db().await;
 
     let loc_stream_type = stream_type.unwrap_or_default();
     let key = match stream_name {
         Some(stream_name) => format!("/alerts/{org_id}/{loc_stream_type}/{stream_name}"),
-        None => format!("/alerts/{org_id}"),
+        None => format!("/alerts/{org_id}/"),
     };
     let ret = db.list_values(&key).await?;
-    let mut alerts_list: Vec<Alert> = Vec::new();
+    let mut items: Vec<Alert> = Vec::with_capacity(ret.len());
     for item_value in ret {
-        let json_val = json::from_slice(&item_value).unwrap();
-        alerts_list.push(json_val)
+        let json_val = json::from_slice(&item_value)?;
+        items.push(json_val)
     }
-    Ok(alerts_list)
+    items.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(items)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -130,38 +130,68 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let alert_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
+                let stream_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
                 let item_value: Alert = json::from_slice(&ev.value.unwrap()).unwrap();
-                let mut group = STREAM_ALERTS
-                    .entry(alert_key.to_string())
-                    .or_insert(AlertList { list: vec![] });
-                if group.list.contains(&item_value) {
-                    let stream_name = group.list.iter().position(|x| x.eq(&item_value)).unwrap();
-                    let _ = std::mem::replace(&mut group.list[stream_name], item_value);
+                let is_realtime = item_value.is_real_time;
+                let mut cacher = STREAM_ALERTS.write().await;
+                let group = cacher.entry(stream_key.to_string()).or_default();
+                if group.contains(&item_value) {
+                    let idx = group.iter().position(|x| x.eq(&item_value)).unwrap();
+                    let _ = std::mem::replace(&mut group[idx], item_value);
                 } else {
-                    group.list.push(item_value);
+                    group.push(item_value);
+                }
+                drop(cacher);
+
+                // add to triggers
+                if is_alert_manager(&LOCAL_NODE_ROLE) {
+                    let columns = item_key.split('/').collect::<Vec<&str>>();
+                    let org_id = columns[0];
+                    let stream_type: StreamType = columns[1].into();
+                    let stream_name = columns[2];
+                    let alert_name = columns[3];
+                    let trigger = Trigger {
+                        next_run_at: chrono::Utc::now().timestamp_micros(),
+                        is_realtime,
+                        is_silenced: false,
+                    };
+                    if let Err(e) = crate::service::alerts::triggers::save(
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        alert_name,
+                        &trigger,
+                    )
+                    .await
+                    {
+                        log::error!("Failed to save trigger: {}", e);
+                    }
                 }
             }
             infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let alert_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
-                let item_name = item_key[item_key.rfind('/').unwrap() + 1..].to_string();
-                let org_name = item_key[0..item_key.find('/').unwrap()].to_string();
-                if alert_key.contains('/') {
-                    let mut group = match STREAM_ALERTS.get(&alert_key) {
+                let stream_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
+                let alert_name = item_key[item_key.rfind('/').unwrap() + 1..].to_string();
+                let mut cacher = STREAM_ALERTS.write().await;
+                if stream_key.contains('/') {
+                    let mut group = match cacher.get(&stream_key) {
                         Some(v) => v.clone(),
                         None => continue,
                     };
-                    group.list.retain(|trans| !trans.name.eq(&item_name));
-                    STREAM_ALERTS.insert(alert_key.to_string(), group);
+                    group.retain(|v| !v.name.eq(&alert_name));
                 } else {
-                    STREAM_ALERTS.remove(item_key);
+                    cacher.remove(&stream_key);
                 }
-                let trigger_key = format!("{org_name}/{item_name}");
-                if let Ok(Some(mut trigger)) = crate::service::db::triggers::get(&trigger_key).await
-                {
-                    trigger.parent_alert_deleted = true;
-                    let _ = crate::service::db::triggers::set(&trigger_key, &trigger).await;
+                drop(cacher);
+
+                // delete from triggers
+                if is_alert_manager(&LOCAL_NODE_ROLE) {
+                    let columns = item_key.split('/').collect::<Vec<&str>>();
+                    let org_id = columns[0];
+                    let stream_type: StreamType = columns[1].into();
+                    let stream_name = columns[2];
+                    let alert_name = columns[3];
+                    _ = triggers::delete(org_id, stream_type, stream_name, alert_name).await;
                 }
             }
             infra_db::Event::Empty => {}
@@ -175,14 +205,48 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/alerts/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
-        let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: Alert = json::from_slice(&item_value).unwrap();
-        let stream_key = &item_key[0..item_key.rfind('/').unwrap()];
+        let new_key = item_key.strip_prefix(key).unwrap();
+        let json_val: Alert = match json::from_slice(&item_value) {
+            Ok(v) => v,
+            Err(_) => {
+                // HACK: for old version, write it back to up
+                let data: json::Value = json::from_slice(&item_value).unwrap();
+                let data = data.as_object().unwrap();
+                let destinations = if let Some(dest) = data.get("destination") {
+                    vec![dest.as_str().unwrap().to_string()]
+                } else {
+                    vec![]
+                };
+                let alert = Alert {
+                    name: data.get("name").unwrap().as_str().unwrap().to_string(),
+                    stream_type: data.get("stream_type").unwrap().as_str().unwrap().into(),
+                    stream_name: match data.get("stream") {
+                        Some(v) => v.as_str().unwrap().to_string(),
+                        None => data
+                            .get("stream_name")
+                            .unwrap()
+                            .as_str()
+                            .unwrap()
+                            .to_string(),
+                    },
+                    destinations,
+                    ..Default::default()
+                };
+                _ = db
+                    .put(
+                        &item_key,
+                        json::to_vec(&alert).unwrap().into(),
+                        infra_db::NO_NEED_WATCH,
+                    )
+                    .await;
+                alert
+            }
+        };
+        let stream_key = &new_key[0..new_key.rfind('/').unwrap()];
 
-        let mut group = STREAM_ALERTS
-            .entry(stream_key.to_string())
-            .or_insert(AlertList { list: vec![] });
-        group.list.push(json_val);
+        let mut cacher = STREAM_ALERTS.write().await;
+        let group = cacher.entry(stream_key.to_string()).or_default();
+        group.push(json_val);
     }
     log::info!("Alerts Cached");
     Ok(())

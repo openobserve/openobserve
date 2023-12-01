@@ -18,7 +18,7 @@ use utoipa::ToSchema;
 
 use crate::common::infra::config::CONFIG;
 
-use super::{alert::Alert, functions::Transform, stream::Stream};
+use super::{alerts::Alert, functions::Transform, stream::Stream};
 
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";

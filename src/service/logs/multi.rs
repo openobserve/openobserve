@@ -25,7 +25,7 @@ use crate::common::{
         metrics,
     },
     meta::{
-        alert::{Alert, Trigger},
+        alerts::Alert,
         ingestion::{IngestionResponse, StreamStatus},
         stream::StreamParams,
         usage::UsageType,
@@ -34,8 +34,10 @@ use crate::common::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
 use crate::service::{
-    distinct_values, get_formatted_stream_name, ingestion::is_ingestion_allowed,
-    ingestion::write_file, logs::StreamMeta, usage::report_request_usage_stats,
+    distinct_values, get_formatted_stream_name,
+    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
+    logs::StreamMeta,
+    usage::report_request_usage_stats,
 };
 
 /// Ingest a multiline json body but add extra keys to each json row
@@ -101,11 +103,11 @@ async fn ingest_inner(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
-    let mut trigger: Option<Trigger> = None;
+    let mut trigger: TriggerAlertData = None;
 
     // Start Register Transforms for stream
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
@@ -121,8 +123,13 @@ async fn ingest_inner(
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    crate::service::ingestion::get_stream_alerts(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+        &mut stream_alerts_map,
+    )
+    .await;
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
@@ -202,8 +209,12 @@ async fn ingest_inner(
             &mut stream_status.status,
             &mut buf,
             local_val,
+            trigger.is_none(),
         )
         .await;
+        if local_trigger.is_some() {
+            trigger = local_trigger;
+        }
 
         // get distinct_value item
         for field in DISTINCT_FIELDS.iter() {
@@ -219,10 +230,6 @@ async fn ingest_inner(
                     });
                 }
             }
-        }
-
-        if local_trigger.is_some() {
-            trigger = Some(local_trigger.unwrap());
         }
     }
 
@@ -246,7 +253,7 @@ async fn ingest_inner(
     }
 
     // only one trigger per request, as it updates etcd
-    super::evaluate_trigger(trigger, &stream_alerts_map).await;
+    evaluate_trigger(trigger).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {

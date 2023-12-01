@@ -27,11 +27,11 @@ use vrl::{
 use crate::common::{
     infra::{
         cluster,
-        config::{CONFIG, SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS},
+        config::{CONFIG, SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
         wal::get_or_create,
     },
     meta::{
-        alert::{Alert, Trigger},
+        alerts::Alert,
         functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
         stream::{PartitionTimeLevel, PartitioningDetails, StreamParams},
         usage::RequestStats,
@@ -41,16 +41,17 @@ use crate::common::{
         flatten,
         functions::get_vrl_compiler_config,
         json::{Map, Value},
-        notification::send_notification,
         schema::infer_json_schema,
     },
 };
 use crate::service::{
-    db, format_partition_key, schema::filter_schema_null_fields, stream::stream_settings, triggers,
+    db, format_partition_key, schema::filter_schema_null_fields, stream::stream_settings,
 };
 
 pub mod grpc;
 pub mod otlp_json;
+
+pub type TriggerAlertData = Option<Vec<(Alert, Vec<Map<String, Value>>)>>;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
@@ -142,20 +143,50 @@ pub async fn get_stream_partition_keys(
     }
 }
 
-pub async fn get_stream_alerts<'a>(
-    key: String,
+pub async fn get_stream_alerts(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
     stream_alerts_map: &mut AHashMap<String, Vec<Alert>>,
 ) {
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     if stream_alerts_map.contains_key(&key) {
         return;
     }
-    let alerts_list = STREAM_ALERTS.get(&key);
+
+    let alerts_cacher = STREAM_ALERTS.read().await;
+    let alerts_list = alerts_cacher.get(&key);
     if alerts_list.is_none() {
         return;
     }
-    let mut alerts = alerts_list.unwrap().list.clone();
-    alerts.retain(|alert| alert.is_real_time);
+    let triggers_cacher = TRIGGERS.read().await;
+    let alerts = alerts_list
+        .unwrap()
+        .iter()
+        .filter(|alert| alert.enabled && alert.is_real_time)
+        .filter(|alert| {
+            let key = format!("{}/{}", key, alert.name);
+            match triggers_cacher.get(&key) {
+                Some(v) => !v.is_silenced,
+                None => true,
+            }
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+
     stream_alerts_map.insert(key, alerts);
+}
+
+pub async fn evaluate_trigger(trigger: TriggerAlertData) {
+    if trigger.is_none() {
+        return;
+    }
+    let trigger = trigger.unwrap();
+    for (alert, val) in trigger.iter() {
+        if let Err(e) = alert.send_notification(val).await {
+            log::error!("Failed to send notification: {}", e)
+        }
+    }
 }
 
 pub fn get_wal_time_key(
@@ -195,21 +226,6 @@ pub fn get_wal_time_key(
         };
     }
     time_key
-}
-
-pub async fn send_ingest_notification(trigger: Trigger, alert: Alert) {
-    log::info!(
-        "Sending notification for alert {} {}",
-        alert.name,
-        alert.stream
-    );
-    let _ = send_notification(&alert, &trigger).await;
-    let trigger_to_save = Trigger {
-        last_sent_at: Utc::now().timestamp_micros(),
-        count: trigger.count + 1,
-        ..trigger
-    };
-    let _ = triggers::save_trigger(&trigger_to_save.alert_name, &trigger_to_save).await;
 }
 
 pub fn register_stream_transforms(

@@ -60,6 +60,15 @@ const alerts = {
     }
     return http().delete(url);
   },
+  toggleState: (
+    org_identifier: string,
+    stream_name: string,
+    alert_name: string,
+    enable: boolean
+  ) => {
+    const url = `/api/${org_identifier}/${stream_name}/alerts/${alert_name}/enable?value=${enable}`;
+    return http().put(url);
+  },
 };
 
 export default alerts;

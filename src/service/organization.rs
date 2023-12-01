@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::stream::get_streams;
 use crate::common::{
     infra::config::USERS_RUM_TOKEN,
     meta::{
@@ -24,7 +23,7 @@ use crate::common::{
     },
     utils::{auth::is_root_user, rand::generate_random_string},
 };
-use crate::service::db;
+use crate::service::{db, stream::get_streams};
 
 #[tracing::instrument]
 pub async fn get_summary(org_id: &str) -> OrgSummary {

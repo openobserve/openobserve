@@ -14,10 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use bytes::Bytes;
-use memory_stats::memory_stats;
 use std::sync::Arc;
 
-use crate::common::infra::metrics;
 use crate::common::{
     infra::{cluster::LOCAL_NODE_UUID, config::METRIC_CLUSTER_LEADER, db as infra_db},
     meta::prom::ClusterLeader,
@@ -108,16 +106,4 @@ pub async fn cache_prom_cluster_leader() -> Result<(), anyhow::Error> {
     }
     log::info!("Prometheus cluster leaders Cached");
     Ok(())
-}
-
-pub async fn openobserve_info() -> Result<(), anyhow::Error> {
-    log::info!("Start openobserve self metrics watcher");
-    loop {
-        if let Some(cur_memory) = memory_stats() {
-            metrics::OO_MEM_USAGE
-                .with_label_values(&["default"])
-                .set(cur_memory.physical_mem as i64);
-        }
-        tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-    }
 }

@@ -35,8 +35,8 @@ use crate::common::utils::http::get_stream_type_from_request;
     ),
     request_body(content = Transform, description = "Function data", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/functions")]
@@ -61,7 +61,7 @@ pub async fn save_function(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = FunctionList),
+        (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
     )
 )]
 #[get("/{org_id}/functions")]
@@ -82,8 +82,8 @@ async fn list_functions(org_id: web::Path<String>) -> Result<HttpResponse, Error
         ("name" = String, Path, description = "Function name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[delete("/{org_id}/functions/{name}")]
@@ -106,8 +106,8 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
     ),
     request_body(content = Transform, description = "Function data", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/functions/{name}")]
@@ -133,7 +133,7 @@ pub async fn update_function(
         ("stream_name" = String, Path, description = "Stream name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = StreamFunctionsList),
+        (status = 200, description = "Success", content_type = "application/json", body = StreamFunctionsList),
     )
 )]
 #[get("/{org_id}/{stream_name}/functions")]
@@ -171,8 +171,8 @@ async fn list_stream_functions(
         ("name" = String, Path, description = "Function name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[delete("/{org_id}/{stream_name}/functions/{name}")]
@@ -212,8 +212,8 @@ async fn delete_stream_function(
     ),
     request_body(content = StreamOrder, description = "Function data", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/{stream_name}/functions/{name}")]

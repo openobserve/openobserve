@@ -4404,7 +4404,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openobserve"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "actix-cors",
  "actix-multipart",

@@ -32,8 +32,12 @@ use tokio::{
     time,
 };
 
-use super::{Event, EventData};
-use crate::common::infra::{cluster, config::CONFIG, errors::*};
+use crate::common::infra::{
+    cluster,
+    config::CONFIG,
+    db::{Event, EventData},
+    errors::*,
+};
 
 static ETCD_CLIENT: OnceCell<etcd_client::Client> = OnceCell::const_new();
 

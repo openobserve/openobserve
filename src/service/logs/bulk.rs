@@ -19,7 +19,6 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
-use super::StreamMeta;
 use crate::common::{
     infra::{
         cluster,
@@ -27,7 +26,7 @@ use crate::common::{
         metrics,
     },
     meta::{
-        alert::{Alert, Trigger},
+        alerts::Alert,
         functions::{StreamTransform, VRLResultResolver},
         ingestion::{
             BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
@@ -40,7 +39,10 @@ use crate::common::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
 use crate::service::{
-    db, distinct_values, ingestion::write_file, schema::stream_schema_exists,
+    db, distinct_values,
+    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    logs::StreamMeta,
+    schema::stream_schema_exists,
     usage::report_request_usage_stats,
 };
 
@@ -70,7 +72,7 @@ pub async fn ingest(
     };
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
@@ -87,7 +89,7 @@ pub async fn ingest(
     let mut action = String::from("");
     let mut stream_name = String::from("");
     let mut doc_id = String::from("");
-    let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
+    let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
 
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
@@ -121,8 +123,13 @@ pub async fn ingest(
             // End Register Transfoms for index
 
             // Start get stream alerts
-            let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-            crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+            crate::service::ingestion::get_stream_alerts(
+                org_id,
+                StreamType::Logs,
+                &stream_name,
+                &mut stream_alerts_map,
+            )
+            .await;
             // End get stream alert
 
             if !stream_partition_keys_map.contains_key(&stream_name.clone()) {
@@ -249,6 +256,7 @@ pub async fn ingest(
 
             // only for bulk insert
             let mut status = RecordStatus::default();
+            let need_trigger = !stream_trigger_map.contains_key(&stream_name);
             let local_trigger = super::add_valid_record(
                 &StreamMeta {
                     org_id: org_id.to_string(),
@@ -261,10 +269,11 @@ pub async fn ingest(
                 &mut status,
                 buf,
                 local_val,
+                need_trigger,
             )
             .await;
-            if let Some(trigger) = local_trigger {
-                stream_trigger_map.insert(stream_name.clone(), trigger);
+            if local_trigger.is_some() {
+                stream_trigger_map.insert(stream_name.clone(), local_trigger);
             }
 
             // get distinct_value item
@@ -342,8 +351,8 @@ pub async fn ingest(
     }
 
     // only one trigger per request, as it updates etcd
-    for (_, entry) in &stream_trigger_map {
-        super::evaluate_trigger(Some(entry.clone()), &stream_alerts_map).await;
+    for (_, entry) in stream_trigger_map {
+        evaluate_trigger(entry).await;
     }
 
     // send distinct_values

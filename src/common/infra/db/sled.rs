@@ -20,8 +20,12 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::{sync::mpsc, task::JoinHandle};
 
-use super::{Event, EventData};
-use crate::common::infra::{cluster, config::CONFIG, errors::*};
+use crate::common::infra::{
+    cluster,
+    config::CONFIG,
+    db::{Event, EventData},
+    errors::*,
+};
 
 pub static SLED_CLIENT: Lazy<Option<::sled::Db>> = Lazy::new(connect_sled);
 

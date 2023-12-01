@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, http, post, web, HttpResponse, Responder};
+use actix_web::{delete, get, http, post, web, HttpResponse};
 use std::io::Error;
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::service::db;
-use crate::{common::meta::alert::AlertDestination, service::alerts::destinations};
+use crate::common::meta::{
+    alerts::destinations::Destination, http::HttpResponse as MetaHttpResponse,
+};
+use crate::service::alerts::destinations;
 
 /** CreateDestination */
 #[utoipa::path(
@@ -32,51 +33,23 @@ use crate::{common::meta::alert::AlertDestination, service::alerts::destinations
         ("org_id" = String, Path, description = "Organization name"),
         ("destination_name" = String, Path, description = "Destination name"),
       ),
-    request_body(content = AlertDestination, description = "Destination data", content_type = "application/json"),  
+    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/alerts/destinations/{destination_name}")]
 pub async fn save_destination(
     path: web::Path<(String, String)>,
-    dest: web::Json<AlertDestination>,
+    dest: web::Json<Destination>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-
     let dest = dest.into_inner();
-
-    if db::alerts::templates::get(org_id.as_str(), &dest.template)
-        .await
-        .is_err()
-    {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Please specify valid template".to_string(),
-        )));
+    match destinations::save(&org_id, &name, dest).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
-    destinations::save_destination(org_id, name, dest).await
-}
-
-/** ListDestinations */
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Alerts",
-    operation_id = "ListDestinations",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-      ),
-    responses(
-        (status = 200, description="Success", content_type = "application/json", body = Vec<AlertDestinationResponse>),
-    )
-)]
-#[get("/{org_id}/alerts/destinations")]
-async fn list_destinations(path: web::Path<String>) -> impl Responder {
-    let org_id = path.into_inner();
-    destinations::list_destinations(org_id).await
 }
 
 /** GetDestination */
@@ -92,14 +65,42 @@ async fn list_destinations(path: web::Path<String>) -> impl Responder {
         ("destination_name" = String, Path, description = "Destination name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = AlertDestinationResponse),
-        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = Destination),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse), 
     )
 )]
 #[get("/{org_id}/alerts/destinations/{destination_name}")]
-async fn get_destination(path: web::Path<(String, String)>) -> impl Responder {
+async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    destinations::get_destination(org_id, name).await
+    match destinations::get(&org_id, &name).await {
+        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Err(e) => Ok(MetaHttpResponse::not_found(e)),
+    }
+}
+
+/** ListDestinations */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListDestinations",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<Destination>),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/alerts/destinations")]
+async fn list_destinations(path: web::Path<String>) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    match destinations::list(&org_id).await {
+        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
 }
 
 /** DeleteDestination */
@@ -115,13 +116,21 @@ async fn get_destination(path: web::Path<(String, String)>) -> impl Responder {
         ("destination_name" = String, Path, description = "Destination name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Error", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
     )
 )]
 #[delete("/{org_id}/alerts/destinations/{destination_name}")]
-async fn delete_destination(path: web::Path<(String, String)>) -> impl Responder {
+async fn delete_destination(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    destinations::delete_destination(org_id, name).await
+    match destinations::delete(&org_id, &name).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Alert destination deleted")),
+        Err(e) => match e {
+            (http::StatusCode::FORBIDDEN, e) => Ok(MetaHttpResponse::forbidden(e)),
+            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
+            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+        },
+    }
 }

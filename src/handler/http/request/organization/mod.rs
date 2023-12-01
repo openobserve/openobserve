@@ -42,7 +42,7 @@ pub mod settings;
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = OrganizationResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = OrganizationResponse),
     )
 )]
 #[get("/{org_id}/organizations")]
@@ -137,7 +137,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = OrgSummary),
+        (status = 200, description = "Success", content_type = "application/json", body = OrgSummary),
     )
 )]
 #[get("/{org_id}/summary")]
@@ -159,7 +159,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = PasscodeResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
     )
 )]
 #[get("/{org_id}/organizations/passcode")]
@@ -189,7 +189,7 @@ async fn get_user_passcode(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = PasscodeResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
     )
 )]
 #[put("/{org_id}/organizations/passcode")]
@@ -219,7 +219,7 @@ async fn update_user_passcode(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
     )
 )]
 #[get("/{org_id}/organizations/rumtoken")]
@@ -249,7 +249,7 @@ async fn get_user_rumtoken(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
     )
 )]
 #[put("/{org_id}/organizations/rumtoken")]
@@ -279,7 +279,7 @@ async fn update_user_rumtoken(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
     )
 )]
 #[post("/{org_id}/organizations/rumtoken")]

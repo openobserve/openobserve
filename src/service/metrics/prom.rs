@@ -21,38 +21,34 @@ use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use std::collections::HashMap;
 
+use crate::common::{
+    infra::{
+        cache::stats,
+        cluster::{self, LOCAL_NODE_UUID},
+        config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+        errors::{Error, Result},
+        metrics,
+    },
+    meta::{
+        alerts::{self, Alert},
+        functions::StreamTransform,
+        prom::*,
+        search,
+        stream::{PartitioningDetails, StreamParams},
+        usage::UsageType,
+        StreamType,
+    },
+    utils::{json, time::parse_i64_to_timestamp_micros},
+};
 use crate::service::{
-    db,
-    ingestion::{chk_schema_by_record, write_file},
+    db, format_stream_name,
+    ingestion::{chk_schema_by_record, evaluate_trigger, write_file, TriggerAlertData},
+    metrics::format_label_name,
     schema::{set_schema_metadata, stream_schema_exists},
     search as search_service,
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
 };
-use crate::{
-    common::{
-        infra::{
-            cache::stats,
-            cluster::{self, LOCAL_NODE_UUID},
-            config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-            errors::{Error, Result},
-            metrics,
-        },
-        meta::{
-            alert,
-            functions::StreamTransform,
-            prom::*,
-            search,
-            stream::{PartitioningDetails, StreamParams},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{json, time::parse_i64_to_timestamp_micros},
-    },
-    service::format_stream_name,
-};
-
-use super::format_label_name;
 
 pub(crate) mod prometheus {
     include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
@@ -73,7 +69,7 @@ pub async fn remote_write(
     }
 
     let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let dedup_enabled = CONFIG.common.metrics_dedup_enabled;
     let election_interval = CONFIG.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
@@ -82,8 +78,8 @@ pub async fn remote_write(
     let mut cluster_name = String::new();
     let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<alert::Alert>> = AHashMap::new();
-    let mut stream_trigger_map: AHashMap<String, alert::Trigger> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<alerts::Alert>> = AHashMap::new();
+    let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
     let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
@@ -235,8 +231,13 @@ pub async fn remote_write(
             );
 
             // Start get stream alerts
-            let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
-            crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+            crate::service::ingestion::get_stream_alerts(
+                org_id,
+                StreamType::Metrics,
+                &metric_name,
+                &mut stream_alerts_map,
+            )
+            .await;
             // End get stream alert
 
             let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -297,7 +298,8 @@ pub async fn remote_write(
             hour_buf.push(value_str);
 
             // real time alert
-            if !stream_alerts_map.is_empty() {
+            let need_trigger = !stream_trigger_map.contains_key(&metric_name);
+            if need_trigger && !stream_alerts_map.is_empty() {
                 // Start check for alert trigger
                 let key = format!(
                     "{}/{}/{}",
@@ -306,31 +308,14 @@ pub async fn remote_write(
                     metric_name.clone()
                 );
                 if let Some(alerts) = stream_alerts_map.get(&key) {
+                    let mut trigger_alerts: Vec<(Alert, Vec<json::Map<String, json::Value>>)> =
+                        Vec::new();
                     for alert in alerts {
-                        if alert.is_real_time {
-                            let set_trigger = alert::Evaluate::evaluate(
-                                &alert.condition,
-                                value.as_object().unwrap().clone(),
-                            );
-                            if set_trigger {
-                                stream_trigger_map.insert(
-                                    metric_name.clone(),
-                                    alert::Trigger {
-                                        timestamp,
-                                        is_valid: true,
-                                        alert_name: alert.name.clone(),
-                                        stream: metric_name.clone(),
-                                        org: org_id.to_string(),
-                                        stream_type: StreamType::Metrics,
-                                        last_sent_at: 0,
-                                        count: 0,
-                                        is_ingest_time: true,
-                                        parent_alert_deleted: false,
-                                    },
-                                );
-                            }
+                        if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
+                            trigger_alerts.push((alert.clone(), v));
                         }
                     }
+                    stream_trigger_map.insert(metric_name.clone(), Some(trigger_alerts));
                 }
                 // End check for alert trigger
             }
@@ -387,25 +372,8 @@ pub async fn remote_write(
     }
 
     // only one trigger per request, as it updates etcd
-    for (_, entry) in &stream_trigger_map {
-        let mut alerts = stream_alerts_map
-            .get(&format!(
-                "{}/{}/{}",
-                entry.org,
-                StreamType::Metrics,
-                entry.stream
-            ))
-            .unwrap()
-            .clone();
-
-        alerts.retain(|alert| alert.name.eq(&entry.alert_name));
-        if !alerts.is_empty() {
-            crate::service::ingestion::send_ingest_notification(
-                entry.clone(),
-                alerts.first().unwrap().clone(),
-            )
-            .await;
-        }
+    for (_, entry) in stream_trigger_map {
+        evaluate_trigger(entry).await;
     }
 
     metrics::HTTP_RESPONSE_TIME

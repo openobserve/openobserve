@@ -34,8 +34,8 @@ use crate::service::metrics::{self};
     ),
     request_body(content = String, description = "Ingest data (json array)", content_type = "application/json", example = json!([{"__name__":"metrics stream name","__type__":"counter / gauge / histogram / summary","label_name1":"label_value1","label_name2":"label_value2", "_timestamp":1687175143,"value":1.2}])),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200,"status": [{"name": "up","successful": 3,"failed": 0}]})),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200,"status": [{"name": "up","successful": 3,"failed": 0}]})),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/ingest/metrics/_json")]
@@ -66,8 +66,8 @@ pub async fn json(
     operation_id = "PostMetrics",
     request_body(content = String, description = "ExportMetricsServiceRequest", content_type = "application/x-protobuf"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/v1/metrics")]

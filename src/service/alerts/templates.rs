@@ -13,89 +13,50 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{http, HttpResponse};
+use actix_web::http;
 
 use crate::common::infra::config::ALERTS_DESTINATIONS;
-use crate::common::meta::{alert::DestinationTemplate, http::HttpResponse as MetaHttpResponse};
+use crate::common::meta::alerts::templates::Template;
 use crate::service::db;
 
-#[tracing::instrument(skip_all)]
-pub async fn save_template(
-    org_id: String,
-    name: String,
-    mut template: DestinationTemplate,
-) -> Result<HttpResponse, Error> {
+pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<(), anyhow::Error> {
     if template.body.is_null() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Alert template body empty".to_string(),
-        )));
+        return Err(anyhow::anyhow!("Alert template body empty"));
     }
+    template.name = name.to_string();
+    db::alerts::templates::set(org_id, name, template.clone()).await
+}
 
-    template.name = Some(name.clone());
-    db::alerts::templates::set(org_id.as_str(), name.as_str(), template.clone())
+pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
+    db::alerts::templates::get(org_id, name)
         .await
-        .unwrap();
-
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK.into(),
-        "Alert template saved".to_string(),
-    )))
+        .map_err(|_| anyhow::anyhow!("Alert template not found"))
 }
 
-#[tracing::instrument]
-pub async fn list_templates(org_id: String) -> Result<HttpResponse, Error> {
-    let list = db::alerts::templates::list(org_id.as_str()).await.unwrap();
-    Ok(HttpResponse::Ok().json(list))
+pub async fn list(org_id: &str) -> Result<Vec<Template>, anyhow::Error> {
+    db::alerts::templates::list(org_id).await
 }
 
-#[tracing::instrument]
-pub async fn delete_template(org_id: String, name: String) -> Result<HttpResponse, Error> {
+pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
     for dest in ALERTS_DESTINATIONS.iter() {
-        if dest.key().starts_with(&org_id) && dest.value().template.eq(&name) {
-            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                http::StatusCode::FORBIDDEN.into(),
-                format!(
-                    "Template is in use for destination {}",
-                    &dest.value().clone().name.unwrap()
+        if dest.key().starts_with(org_id) && dest.value().template.eq(&name) {
+            return Err((
+                http::StatusCode::FORBIDDEN,
+                anyhow::anyhow!(
+                    "Alert template is in use for destination {}",
+                    &dest.value().name.clone()
                 ),
-            )));
+            ));
         }
     }
 
-    if db::alerts::templates::get(org_id.as_str(), name.as_str())
+    if db::alerts::templates::get(org_id, name).await.is_err() {
+        return Err((
+            http::StatusCode::NOT_FOUND,
+            anyhow::anyhow!("Alert template not found {}", name),
+        ));
+    }
+    db::alerts::templates::delete(org_id, name)
         .await
-        .is_err()
-    {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "Alert template not found".to_string(),
-        )));
-    }
-    match db::alerts::templates::delete(org_id.as_str(), name.as_str()).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Alert template deleted".to_string(),
-        ))),
-        Err(e) => Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                e.to_string(),
-            )),
-        ),
-    }
-}
-
-#[tracing::instrument]
-pub async fn get_template(org_id: String, name: String) -> Result<HttpResponse, Error> {
-    let result = db::alerts::templates::get(org_id.as_str(), name.as_str()).await;
-    match result {
-        Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
-        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "Alert template not found".to_string(),
-        ))),
-    }
+        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }

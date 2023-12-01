@@ -29,7 +29,7 @@ use vector_enrichment::TableRegistry;
 
 use crate::common::{
     meta::{
-        alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer},
+        alerts,
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
         organization::OrganizationSetting,
@@ -158,12 +158,13 @@ pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
 pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
-pub static STREAM_ALERTS: Lazy<RwHashMap<String, AlertList>> = Lazy::new(DashMap::default);
-pub static TRIGGERS: Lazy<RwHashMap<String, Trigger>> = Lazy::new(DashMap::default);
-pub static TRIGGERS_IN_PROCESS: Lazy<RwHashMap<String, TriggerTimer>> = Lazy::new(DashMap::default);
-pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, DestinationTemplate>> =
+pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<alerts::Alert>>> =
     Lazy::new(Default::default);
-pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, AlertDestination>> =
+pub static TRIGGERS: Lazy<RwAHashMap<String, alerts::triggers::Trigger>> =
+    Lazy::new(Default::default);
+pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, alerts::templates::Template>> =
+    Lazy::new(Default::default);
+pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, alerts::destinations::Destination>> =
     Lazy::new(Default::default);
 pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
@@ -382,7 +383,7 @@ pub struct Common {
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
-    // logger timestamp local setup
+    // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%S
     #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
     pub log_local_time_format: String,
     #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLE", default = false)]
@@ -416,6 +417,8 @@ pub struct Limit {
     pub query_timeout: u64,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
+    #[env_config(name = "ZO_IGNORE_FILE_RETENTION_BY_STREAM", default = false)]
+    pub ignore_file_retention_by_stream: bool,
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
     pub logs_file_retention: String,
     #[env_config(name = "ZO_TRACES_FILE_RETENTION", default = "hourly")]

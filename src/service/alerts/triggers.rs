@@ -13,20 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod asynchronism;
-pub mod auth;
-pub mod base64;
-pub mod cgroup;
-pub mod file;
-pub mod flatten;
-pub mod functions;
-pub mod hasher;
-pub mod http;
-pub mod json;
-pub mod rand;
-pub mod schema;
-pub mod schema_ext;
-pub mod str;
-pub mod stream;
-pub mod time;
-pub mod zo_logger;
+use super::db;
+use crate::common::meta::{alerts::triggers::Trigger, StreamType};
+
+pub async fn save(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    alert_name: &str,
+    trigger: &Trigger,
+) -> Result<(), anyhow::Error> {
+    db::alerts::triggers::set(org_id, stream_type, stream_name, alert_name, trigger).await
+}
+
+pub async fn delete(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    alert_name: &str,
+) -> Result<(), anyhow::Error> {
+    db::alerts::triggers::delete(org_id, stream_type, stream_name, alert_name).await
+}
