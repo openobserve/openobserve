@@ -130,14 +130,13 @@ impl From<&str> for QueryType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct Condition {
     pub column: String,
     pub operator: Operator,
     #[schema(value_type = Object)]
     pub value: Value,
     #[serde(default)]
-    pub ignore_case: Option<bool>,
+    pub ignore_case: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

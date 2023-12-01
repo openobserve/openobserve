@@ -153,9 +153,8 @@ describe("Alert List", async () => {
                     condition: {
                       column: "code",
                       operator: "EqualTo",
-                      ignoreCase: null,
+                      ignore_case: null,
                       value: 500,
-                      isNumeric: null,
                     },
                     duration: 1,
                     frequency: 2,

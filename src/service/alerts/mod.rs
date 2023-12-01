@@ -203,7 +203,7 @@ impl Alert {
         row: Option<&Map<String, Value>>,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
         if self.is_real_time {
-            self.query_condition.evaluate_realtime(self, row).await
+            self.query_condition.evaluate_realtime(row).await
         } else {
             self.query_condition.evaluate_scheduled(self).await
         }
@@ -233,7 +233,6 @@ impl Alert {
 impl QueryCondition {
     pub async fn evaluate_realtime(
         &self,
-        _alert: &Alert,
         row: Option<&Map<String, Value>>,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
         let row = match row {
@@ -354,7 +353,15 @@ impl Condition {
             }
             Value::Number(_) => {
                 let val = val.as_f64().unwrap_or_default();
-                let con_val = self.value.as_f64().unwrap_or_default();
+                let con_val = if self.value.is_number() {
+                    self.value.as_f64().unwrap_or_default()
+                } else {
+                    self.value
+                        .as_str()
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default()
+                };
                 match self.operator {
                     Operator::EqualTo => val == con_val,
                     Operator::NotEqualTo => val != con_val,
@@ -367,7 +374,15 @@ impl Condition {
             }
             Value::Bool(v) => {
                 let val = v.to_owned();
-                let con_val = self.value.as_bool().unwrap_or_default();
+                let con_val = if self.value.is_boolean() {
+                    self.value.as_bool().unwrap_or_default()
+                } else {
+                    self.value
+                        .as_str()
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default()
+                };
                 match self.operator {
                     Operator::EqualTo => val == con_val,
                     Operator::NotEqualTo => val != con_val,

@@ -102,11 +102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <q-separator style="width: 100%" />
           <div class="q-py-md q-px-xs">
-            <div>stream_name</div>
-            <div>org_name</div>
-            <div>alert_name</div>
-            <div>alert_type</div>
-            <div>timestamp</div>
+            <div>org_name, stream_type, stream_name</div>
+            <div>alert_name, alert_type</div>
+            <div>alert_period, alert_operator, alert_threshold</div>
+            <div>alert_count, alert_start_time, alert_end_time</div>
+            <div><b>All of the stream fields are variables.</b></div>
           </div>
           <div class="q-pb-md q-px-xs">
             <div class="text-bold text-body-1 q-pb-sm">

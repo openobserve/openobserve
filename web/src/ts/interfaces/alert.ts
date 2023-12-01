@@ -3,8 +3,7 @@ import type { Query } from "./query";
 
 export interface Condition {
   column: string;
-  ignoreCase: null | boolean;
-  isNumeric: boolean;
+  ignore_case: null | boolean;
   operator: string;
   value: string;
 }
