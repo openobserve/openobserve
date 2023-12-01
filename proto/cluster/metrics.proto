@@ -69,4 +69,5 @@ message MetricsWalFileResponse {
 message MetricsWalFile {
     string name = 1;
     bytes  body = 2;
+    string schema = 3;
 }

@@ -210,10 +210,17 @@ impl Metrics for Querier {
                     body
                 };
 
-                let name = file.split('/').last().unwrap_or_default();
+                let columns = file.split('/').collect::<Vec<&str>>();
+
+                let len = columns.len();
+
+                let name = columns[len - 1];
+                let schema = columns[len - 2];
+
                 resp.files.push(MetricsWalFile {
                     name: name.to_string(),
                     body: data,
+                    schema: schema.to_string(),
                 });
             }
         }
@@ -225,7 +232,11 @@ impl Metrics for Querier {
                     .await
                     .unwrap_or_default();
             for (name, body) in mem_files {
-                resp.files.push(MetricsWalFile { name, body });
+                resp.files.push(MetricsWalFile {
+                    name,
+                    body,
+                    schema: "".to_string(), // TODO set schema rather than blank value
+                });
             }
         }
 

@@ -77,9 +77,8 @@ pub(crate) async fn create_context(
     let mut arrow_scan_stats = ScanStats::new();
     let mut json_scan_stats = ScanStats::new();
     let mut num_arrow_files = 0;
-    let meta = std::collections::HashMap::new();
-    let mut arrow_inferred_schema: Schema = Schema::empty();
-    let mut record_batches = Vec::<RecordBatch>::new();
+    let metadata = HashMap::new();
+    let mut record_batches_meta: HashMap<String, (Schema, Vec<RecordBatch>)> = HashMap::new();
 
     let work_dir = session_id.to_string();
 
@@ -93,19 +92,23 @@ pub(crate) async fn create_context(
         } else if file.name.ends_with(FILE_EXT_ARROW) {
             num_arrow_files += 1;
 
+            let record_batch_meta = record_batches_meta
+                .entry(file.schema)
+                .or_insert_with(|| (Schema::empty().with_metadata(metadata.clone()), Vec::new()));
+
             let buf_reader = Cursor::new(file.body.clone());
             let stream_reader = StreamReader::try_new(buf_reader, None)?;
             for read_result in stream_reader {
                 let record_batch = read_result?;
                 if record_batch.num_rows() > 0 {
-                    if arrow_inferred_schema.fields().is_empty() {
-                        arrow_inferred_schema = record_batch
+                    if record_batch_meta.0.fields().is_empty() {
+                        record_batch_meta.0 = record_batch
                             .schema()
                             .as_ref()
                             .clone()
-                            .with_metadata(meta.clone());
+                            .with_metadata(metadata.clone());
                     }
-                    record_batches.push(record_batch);
+                    record_batch_meta.1.push(record_batch);
                 }
             }
             arrow_scan_stats.original_size += file.body.len() as i64;
@@ -131,40 +134,41 @@ pub(crate) async fn create_context(
             log::error!("get schema error: {}", err);
             DataFusionError::Execution(err.to_string())
         })?;
-
-    if !record_batches.is_empty() {
-        let ctx = prepare_datafusion_context(&SearchType::Normal)?;
-        // calulate schema diff
-        let mut diff_fields = HashMap::new();
-        let group_fields = arrow_inferred_schema.fields();
-        for field in group_fields {
-            if let Ok(v) = schema.field_with_name(field.name()) {
-                if v.data_type() != field.data_type() {
-                    diff_fields.insert(v.name().clone(), v.data_type().clone());
+    for (_, (mut arrow_schema, record_batches)) in record_batches_meta {
+        if !record_batches.is_empty() {
+            let ctx = prepare_datafusion_context(&SearchType::Normal)?;
+            // calulate schema diff
+            let mut diff_fields = HashMap::new();
+            let group_fields = arrow_schema.fields();
+            for field in group_fields {
+                if let Ok(v) = schema.field_with_name(field.name()) {
+                    if v.data_type() != field.data_type() {
+                        diff_fields.insert(v.name().clone(), v.data_type().clone());
+                    }
                 }
             }
-        }
-        // add not exists field for wal infered schema
-        let mut new_fields = Vec::new();
-        for field in schema.fields() {
-            if arrow_inferred_schema.field_with_name(field.name()).is_err() {
-                new_fields.push(field.clone());
+            // add not exists field for wal infered schema
+            let mut new_fields = Vec::new();
+            for field in schema.fields() {
+                if arrow_schema.field_with_name(field.name()).is_err() {
+                    new_fields.push(field.clone());
+                }
             }
-        }
-        if !new_fields.is_empty() {
-            let new_schema = Schema::new(new_fields);
-            arrow_inferred_schema = Schema::try_merge(vec![arrow_inferred_schema, new_schema])?;
-        }
-        let arrow_schema = Arc::new(arrow_inferred_schema);
+            if !new_fields.is_empty() {
+                let new_schema = Schema::new(new_fields);
+                arrow_schema = Schema::try_merge(vec![arrow_schema, new_schema])?;
+            }
+            let arrow_schema = Arc::new(arrow_schema);
 
-        let schema = if let Some(first_batch) = record_batches.first() {
-            first_batch.schema()
-        } else {
-            arrow_schema
-        };
-        let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
-        ctx.register_table(stream_name, mem_table)?;
-        resp.push((ctx, schema, arrow_scan_stats));
+            let schema = if let Some(first_batch) = record_batches.first() {
+                first_batch.schema()
+            } else {
+                arrow_schema
+            };
+            let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
+            ctx.register_table(stream_name, mem_table)?;
+            resp.push((ctx, schema, arrow_scan_stats));
+        }
     }
 
     let schema = Arc::new(
