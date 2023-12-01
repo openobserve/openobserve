@@ -21,6 +21,13 @@ use datafusion::{
 };
 use futures::future::try_join_all;
 use std::{io::BufReader, path::Path, sync::Arc, time::UNIX_EPOCH};
+use memory_stats::memory_stats;
+use std::{
+    io::{BufReader, Cursor},
+    path::Path,
+    sync::Arc,
+    time::UNIX_EPOCH,
+};
 use tokio::time::Duration;
 
 use tracing::{info_span, Instrument};
