@@ -110,7 +110,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::watch().await });
     tokio::task::spawn(async move { db::alerts::triggers::watch().await });
     tokio::task::spawn(async move { db::organization::watch().await });
-    tokio::task::spawn(async move { db::metrics::openobserve_info().await });
     tokio::task::yield_now().await; // yield let other tasks run
 
     // cache core metadata

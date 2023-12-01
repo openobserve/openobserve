@@ -212,21 +212,26 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 // HACK: for old version, write it back to up
                 let data: json::Value = json::from_slice(&item_value).unwrap();
                 let data = data.as_object().unwrap();
-                let mut alert = Alert::default();
-                alert.name = data.get("name").unwrap().as_str().unwrap().to_string();
-                alert.stream_type = data.get("stream_type").unwrap().as_str().unwrap().into();
-                alert.stream_name = match data.get("stream") {
-                    Some(v) => v.as_str().unwrap().to_string(),
-                    None => data
-                        .get("stream_name")
-                        .unwrap()
-                        .as_str()
-                        .unwrap()
-                        .to_string(),
+                let destinations = if let Some(dest) = data.get("destination") {
+                    vec![dest.as_str().unwrap().to_string()]
+                } else {
+                    vec![]
                 };
-                if let Some(dest) = data.get("destination") {
-                    alert.destinations = vec![dest.as_str().unwrap().to_string()];
-                }
+                let alert = Alert {
+                    name: data.get("name").unwrap().as_str().unwrap().to_string(),
+                    stream_type: data.get("stream_type").unwrap().as_str().unwrap().into(),
+                    stream_name: match data.get("stream") {
+                        Some(v) => v.as_str().unwrap().to_string(),
+                        None => data
+                            .get("stream_name")
+                            .unwrap()
+                            .as_str()
+                            .unwrap()
+                            .to_string(),
+                    },
+                    destinations,
+                    ..Default::default()
+                };
                 _ = db
                     .put(
                         &item_key,

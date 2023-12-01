@@ -19,7 +19,11 @@ use crate::common::infra::config::STREAM_ALERTS;
 use crate::common::meta::alerts::destinations::{Destination, DestinationWithTemplate};
 use crate::service::db;
 
-pub async fn save(org_id: &str, name: &str, mut destination:  Destination) -> Result<(), anyhow::Error> {
+pub async fn save(
+    org_id: &str,
+    name: &str,
+    mut destination: Destination,
+) -> Result<(), anyhow::Error> {
     if db::alerts::templates::get(org_id, &destination.template)
         .await
         .is_err()
