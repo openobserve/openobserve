@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc, time::Duration};
-
 use ahash::{AHashMap, AHashSet};
 use dashmap::{DashMap, DashSet};
 use datafusion::arrow::datatypes::Schema;
@@ -24,6 +22,7 @@ use itertools::chain;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use reqwest::Client;
+use std::{path::Path, sync::Arc, time::Duration};
 use sysinfo::{DiskExt, SystemExt};
 use tokio::sync::RwLock as TRwLock;
 use vector_enrichment::TableRegistry;
@@ -41,6 +40,7 @@ use crate::common::{
     utils::{cgroup, file::get_file_meta},
 };
 use crate::service::enrichment::StreamTable;
+use crate::service::enrichment_table::geoip::Geoip;
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
@@ -52,6 +52,9 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<AHashSet<K>>;
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
+
+pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
+pub const GEO_IP_ENRICHMENT_TABLE: &str = "geoip";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
@@ -172,6 +175,9 @@ pub static LOCAL_SCHEMA_LOCKER: Lazy<Arc<RwAHashMap<String, tokio::sync::RwLock<
 
 pub static MAXMIND_DB_CLIENT: Lazy<Arc<TRwLock<Option<MaxmindClient>>>> =
     Lazy::new(|| Arc::new(TRwLock::new(None)));
+
+pub static GEOIP_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
+    Lazy::new(|| Arc::new(RwLock::new(None)));
 
 #[derive(EnvConfig)]
 pub struct Config {

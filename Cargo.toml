@@ -168,7 +168,7 @@ utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "66667dd291482a440c5eb2032ef3cbfb7377b53b" }
-vrl = { version = "0.8.1", features = ["value", "compiler"] }
+vrl = { version = "0.8.1", features = ["value", "compiler","test"] }
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"

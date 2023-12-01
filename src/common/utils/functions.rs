@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use vector_enrichment::{Table, TableRegistry};
 
 use crate::common::{
-    infra::config::ENRICHMENT_TABLES,
+    infra::config::{ENRICHMENT_TABLES, GEOIP_TABLE, GEO_IP_ENRICHMENT_TABLE},
     meta::{functions::VRLCompilerConfig, organization::DEFAULT_ORG},
 };
 
@@ -52,6 +52,12 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
                 Box::new(table.value().clone()),
             );
         }
+    }
+    if GEOIP_TABLE.read().is_some() {
+        tables.insert(
+            GEO_IP_ENRICHMENT_TABLE.to_owned(),
+            Box::new(GEOIP_TABLE.read().as_ref().unwrap().clone()),
+        );
     }
     registry.load(tables);
     let mut config = vrl::compiler::CompileConfig::default();

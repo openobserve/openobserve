@@ -48,6 +48,8 @@ use crate::service::{
     usage::report_request_usage_stats,
 };
 
+pub mod geoip;
+
 pub async fn save_enrichment_data(
     org_id: &str,
     table_name: &str,

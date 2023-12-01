@@ -303,12 +303,12 @@ async fn exec_query(
         let batches = df.collect().await?;
         let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
         match handle_query_fn(sql.query_fn.clone().unwrap(), &batches_ref, &sql.org_id) {
-            None => {
-                return Err(datafusion::error::DataFusionError::Execution(
-                    "Error applying query function".to_string(),
-                ));
+            Err(err) => {
+                return Err(datafusion::error::DataFusionError::Execution(format!(
+                    "Error applying query function: {err} "
+                )));
             }
-            Some(resp) => {
+            Ok(resp) => {
                 if !resp.is_empty() {
                     let mem_table = datafusion::datasource::MemTable::try_new(
                         resp.first().unwrap().schema(),
@@ -1127,10 +1127,13 @@ fn handle_query_fn(
     query_fn: String,
     batches: &[&RecordBatch],
     org_id: &str,
-) -> Option<Vec<RecordBatch>> {
+) -> Result<Vec<RecordBatch>> {
     match datafusion::arrow::json::writer::record_batches_to_json_rows(batches) {
-        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id).unwrap_or(None),
-        Err(_) => None,
+        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id),
+        Err(err) => Err(DataFusionError::Execution(format!(
+            "Error converting record batches to json rows: {}",
+            err
+        ))),
     }
 }
 
@@ -1138,7 +1141,7 @@ fn apply_query_fn(
     query_fn_src: String,
     in_batch: Vec<json::Map<String, json::Value>>,
     org_id: &str,
-) -> Result<Option<Vec<RecordBatch>>> {
+) -> Result<Vec<RecordBatch>> {
     use vector_enrichment::TableRegistry;
 
     let mut resp = vec![];
@@ -1176,9 +1179,12 @@ fn apply_query_fn(
                     .unwrap();
                 resp.push(decoder.flush()?.unwrap());
             }
-            Ok(Some(resp))
+            Ok(resp)
         }
-        Err(_) => Ok(None),
+        Err(err) => Err(DataFusionError::Execution(format!(
+            "Error compiling VRL function: {}",
+            err
+        ))),
     }
 }
 
