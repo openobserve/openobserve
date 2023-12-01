@@ -1,24 +1,22 @@
 <template>
-  <q-dialog>
-    <q-card style="min-width: 700px">
-      <q-card-section class="q-pt-md">
-        <div class="row items-center">
-          <div class="text-bold text-h6 q-pb-lg">Query Inspector</div>
-          <q-space />
-          <q-btn icon="close" class="q-mb-lg" flat round dense v-close-popup />
-        </div>
-        <div class="text-bold q-pb-sm">Panel : {{ dataTitle }}</div>
-        <div class="text-bold">Total Query(s) Executed: {{ totalQueries }}</div>
-        <div v-for="(query, index) in metaData.queries" :key="query.originalQuery">
-          <div class="text-bold q-py-sm">Query: {{ index + 1 }}</div>
-              <q-table class="my-sticky-virtscroll-table" virtual-scroll  v-model:pagination="pagination"
-                :rows-per-page-options="[0]" :virtual-scroll-sticky-size-start="48" dense :rows="getRows(query)"
-                hide-bottom hide-header row-key="index" wrap-cells>
-              </q-table>
-        </div>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+  <q-card style="min-width: 700px">
+    <q-card-section class="q-pt-md">
+      <div class="row items-center">
+        <div class="text-bold text-h6 q-pb-lg">Query Inspector</div>
+        <q-space />
+        <q-btn icon="close" class="q-mb-lg" flat round dense v-close-popup />
+      </div>
+      <div class="text-bold q-pb-sm">Panel : {{ dataTitle }}</div>
+      <div class="text-bold">Total Query(s) Executed: {{ totalQueries }}</div>
+      <div v-for="(query, index) in (metaData?.queries || [])" :key="query.originalQuery">
+        <div class="text-bold q-py-sm">Query: {{ index + 1 }}</div>
+            <q-table class="my-sticky-virtscroll-table" virtual-scroll  v-model:pagination="pagination"
+              :rows-per-page-options="[0]" :virtual-scroll-sticky-size-start="48" dense :rows="getRows(query)"
+              hide-bottom hide-header row-key="index" wrap-cells>
+            </q-table>
+      </div>
+    </q-card-section>
+  </q-card>
 </template>
 
 <script lang="ts">
@@ -28,7 +26,7 @@ export default defineComponent({
   name: "MetaDataDialog",
   props: {
     metaData: {
-      type: Object,
+      type: Object || null || undefined,
       required: true
     },
     data: {
@@ -37,8 +35,8 @@ export default defineComponent({
     }
   },
   setup(props) {
-    const queryData = props.metaData.queries;
-    console.log("queryData", props.data.title);
+    const queryData = props.metaData?.queries || [] ;
+    console.log("queryData", props.data?.title);
     
     const getRows = (query: any) => {
       const timestampOfStartTime = query.startTime;

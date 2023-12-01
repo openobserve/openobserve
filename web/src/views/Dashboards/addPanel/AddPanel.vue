@@ -191,12 +191,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :width="6"
                           @error="handleChartApiError"
                         />
-                        <MetaDataDialog
-                          :metaData="metaData"
-                          :data="panelTitle"
-                          v-if="metaData"
-                          v-model="showViewPanel"
-                        ></MetaDataDialog>
+                        <q-dialog v-model="showViewPanel">
+                          <MetaDataDialog
+                            :metaData="metaData"
+                            :data="panelTitle"
+                          ></MetaDataDialog>
+                        </q-dialog>
                       </div>
                       <DashboardErrorsComponent :errors="errorData" />
                     </div>
