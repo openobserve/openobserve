@@ -70,14 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-mx-md q-my-sm">
-          <RouterView
-            :templates="templates"
-            :destinations="destinations"
-            @get:destinations="getDestinations"
-            @get:templates="getTemplates"
-          />
-        </div>
+        <RouterView
+          :templates="templates"
+          :destinations="destinations"
+          @get:destinations="getDestinations"
+          @get:templates="getTemplates"
+        />
       </template>
     </q-splitter>
   </q-page>

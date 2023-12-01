@@ -36,7 +36,8 @@
     "noOfRecords": "No of Records:",
     "attributes": "Attributes",
     "events": "Events",
-    "goHome": "Go Home"
+    "goHome": "Go Home",
+    "name": "Name"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -550,7 +551,7 @@
     "duration": "Duration for which alert is evaluated",
     "condition": "Condition",
     "interval": "Frequency at which alert is evaluated",
-    "delayNotificationUntil": "Delay notification until, after one notification",
+    "silenceNotification": "Silence notification after",
     "destination": "Destination",
     "stream_name": "Stream Name",
     "actions": "Actions",
@@ -560,7 +561,9 @@
     "addTitle": "Add Alert",
     "updateTitle": "Update Alert",
     "delete": "Delete",
-    "stream_type": "Stream Type"
+    "stream_type": "Stream Type",
+    "description": "Description",
+    "column": "Column"
   },
   "home": {
     "streams": "Streams",
