@@ -789,16 +789,16 @@ pub async fn set_schema_metadata(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    extra_metadata: AHashMap<String, String>,
+    extra_metadata: &AHashMap<String, String>,
 ) -> Result<(), anyhow::Error> {
     let schema = db::schema::get(org_id, stream_name, stream_type).await?;
     let mut metadata = schema.metadata().clone();
     let mut updated = false;
     for (key, value) in extra_metadata {
-        if metadata.contains_key(&key) {
+        if metadata.contains_key(key) {
             continue;
         }
-        metadata.insert(key, value);
+        metadata.insert(key.to_owned(), value.to_owned());
         updated = true;
     }
     if !updated {

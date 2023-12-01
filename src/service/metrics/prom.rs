@@ -103,7 +103,7 @@ pub async fn remote_write(
             METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),
         );
-        set_schema_metadata(org_id, &metric_name, StreamType::Metrics, extra_metadata)
+        set_schema_metadata(org_id, &metric_name, StreamType::Metrics, &extra_metadata)
             .await
             .unwrap();
     }
