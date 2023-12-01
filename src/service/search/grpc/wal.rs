@@ -630,7 +630,6 @@ pub async fn search_arrow(
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
-                println!("exec sql over files: {:?}", &local_files);
                 exec::sql(
                     &session,
                     schema,
