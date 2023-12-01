@@ -44,12 +44,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="row">
             <div
-              class="text-left col auto q-px-sm q-py-sm flex justify-start metrics-date-time"
+              class="text-left col auto q-px-sm q-py-xs flex justify-start metrics-date-time"
             >
               <syntax-guide-metrics class="q-mr-sm" />
             </div>
             <div
-              class="text-right col q-px-sm q-py-sm flex justify-end metrics-date-time"
+              class="text-right col q-px-sm q-py-xs flex justify-end metrics-date-time"
             >
               <date-time
                 auto-apply
@@ -957,7 +957,7 @@ export default defineComponent({
   }
 
   .metrics-date-time {
-    height: 45px;
+    height: 40px;
     .date-time-button {
       height: 30px;
       padding: 0 8px;
