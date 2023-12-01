@@ -283,7 +283,6 @@ export default defineComponent({
         .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
-          console.log(res.data.list);
           alerts.value = res.data.list;
           alertsRows.value = alerts.value.map((data: any) => {
             let conditions = "--";
