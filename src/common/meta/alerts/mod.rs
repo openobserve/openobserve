@@ -78,7 +78,9 @@ pub struct TriggerCondition {
     pub period: i64,        // 10 minutes
     pub operator: Operator, // >=
     pub threshold: i64,     // 3 times
+    #[serde(default)]
     pub frequency: i64,     // 1 minute
+    #[serde(default)]
     pub silence: i64,       // silence for 10 minutes after fire an alert
 }
 

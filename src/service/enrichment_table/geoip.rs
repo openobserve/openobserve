@@ -91,7 +91,7 @@ fn default_locale() -> String {
 impl Default for GeoipConfig {
     fn default() -> self::GeoipConfig {
         GeoipConfig {
-            path: format!("{}/{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME),
+            path: format!("{}{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME),
             locale: default_locale(),
         }
     }

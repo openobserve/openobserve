@@ -80,9 +80,13 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let mut cacher = TRIGGERS.write().await;
     let db = infra_db::get_db().await;
     for (item_key, item_value) in db.list(key).await? {
-        let item_key = item_key.strip_prefix(key).unwrap();
+        let new_key = item_key.strip_prefix(key).unwrap();
+        if new_key.to_string().split('/').count() < 4 {
+            _ = db.delete(&item_key, false, infra_db::NO_NEED_WATCH).await;
+            continue;
+        }
         let json_val: Trigger = json::from_slice(&item_value).unwrap();
-        cacher.insert(item_key.to_owned(), json_val);
+        cacher.insert(new_key.to_owned(), json_val);
     }
     log::info!("Triggers Cached");
     Ok(())

@@ -205,23 +205,39 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/alerts/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
-        let item_key = item_key.strip_prefix(key).unwrap();
+        let new_key = item_key.strip_prefix(key).unwrap();
         let json_val: Alert = match json::from_slice(&item_value) {
             Ok(v) => v,
             Err(_) => {
-                let data:json::Value = json::from_slice(&item_value).unwrap();
+                // HACK: for old version, write it back to up
+                let data: json::Value = json::from_slice(&item_value).unwrap();
                 let data = data.as_object().unwrap();
                 let mut alert = Alert::default();
                 alert.name = data.get("name").unwrap().as_str().unwrap().to_string();
                 alert.stream_type = data.get("stream_type").unwrap().as_str().unwrap().into();
-                alert.stream_name = match data.get("steram") {
+                alert.stream_name = match data.get("stream") {
                     Some(v) => v.as_str().unwrap().to_string(),
-                    None => data.get("stream_name").unwrap().as_str().unwrap().to_string(),
-                }; 
+                    None => data
+                        .get("stream_name")
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .to_string(),
+                };
+                if let Some(dest) = data.get("destination") {
+                    alert.destinations = vec![dest.as_str().unwrap().to_string()];
+                }
+                _ = db
+                    .put(
+                        &item_key,
+                        json::to_vec(&alert).unwrap().into(),
+                        infra_db::NO_NEED_WATCH,
+                    )
+                    .await;
                 alert
             }
         };
-        let stream_key = &item_key[0..item_key.rfind('/').unwrap()];
+        let stream_key = &new_key[0..new_key.rfind('/').unwrap()];
 
         let mut cacher = STREAM_ALERTS.write().await;
         let group = cacher.entry(stream_key.to_string()).or_default();

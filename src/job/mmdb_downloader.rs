@@ -25,6 +25,43 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::time;
 
+pub async fn run() -> Result<(), anyhow::Error> {
+    std::fs::create_dir_all(&CONFIG.common.mmdb_data_dir)?;
+    // should run it every 24 hours
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.common.mmdb_update_duration,
+    ));
+
+    loop {
+        interval.tick().await;
+        run_download_files().await;
+    }
+}
+
+async fn run_download_files() {
+    // send request and await response
+    let client = reqwest::ClientBuilder::default().build().unwrap();
+    let fname = format!("{}{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
+
+    let download_files =
+        match is_digest_different(&fname, &CONFIG.common.mmdb_geolite_citydb_sha256_url).await {
+            Ok(is_different) => is_different,
+            Err(e) => {
+                log::error!("Well something broke. {e}");
+                false
+            }
+        };
+
+    if download_files {
+        match download_file(&client, &CONFIG.common.mmdb_geolite_citydb_url, &fname).await {
+            Ok(()) => {
+                update_global_maxmind_client(&fname).await;
+            }
+            Err(e) => log::error!("failed to download the files {}", e),
+        }
+    }
+}
+
 /// Update the global maxdb client object
 pub async fn update_global_maxmind_client(fname: &str) {
     match MaxmindClient::new_with_path(fname) {
@@ -82,56 +119,3 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
 
     Ok(())
 }
-
-async fn run_download_files() {
-    // send request and await response
-    let client = reqwest::ClientBuilder::default().build().unwrap();
-    let fname = format!("{}{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
-
-    let download_files =
-        match is_digest_different(&fname, &CONFIG.common.mmdb_geolite_citydb_sha256_url).await {
-            Ok(is_different) => is_different,
-            Err(e) => {
-                log::error!("Well something broke. {e}");
-                false
-            }
-        };
-
-    if download_files {
-        match download_file(&client, &CONFIG.common.mmdb_geolite_citydb_url, &fname).await {
-            Ok(()) => {
-                update_global_maxmind_client(&fname).await;
-            }
-            Err(e) => log::error!("failed to download the files {}", e),
-        }
-    }
-}
-
-pub async fn run() -> Result<(), anyhow::Error> {
-    log::info!("spawned");
-    std::fs::create_dir_all(&CONFIG.common.mmdb_data_dir)?;
-    // should run it every 24 hours
-    let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.common.mmdb_update_duration,
-    ));
-
-    // Try to load the existing file, in the beginning.
-    let fname = format!("{}/{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
-    update_global_maxmind_client(&fname).await;
-
-    loop {
-        interval.tick().await;
-        run_download_files().await;
-    }
-}
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[tokio::test]
-//     async fn test_run() {
-//         run().await.unwrap();
-//         assert!(true);
-//     }
-// }
