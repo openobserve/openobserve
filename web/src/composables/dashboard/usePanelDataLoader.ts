@@ -371,7 +371,7 @@ export const usePanelDataLoader = (
    */
   const isQueryDependentOnTheVariables = () => {
     const dependentVariables = variablesData.value?.values
-      ?.filter((it: any) => it.type != "ad-hoc-filters") // ad hoc filters are not considered as dependent filters as they are globally applied
+      ?.filter((it: any) => it.type != 'dynamicFilters') // ad hoc filters are not considered as dependent filters as they are globally applied
       ?.filter((it: any) =>
         panelSchema?.value?.queries
           ?.map((q: any) => q?.query?.includes(`$${it.name}`)) // check if the query includes the variable
@@ -387,7 +387,7 @@ export const usePanelDataLoader = (
    */
   const canRunQueryBasedOnVariables = () => {
     const dependentVariables = variablesData.value?.values
-      ?.filter((it: any) => it.type != "ad-hoc-filters") // ad hoc filters are not considered as dependent filters as they are globally applied
+      ?.filter((it: any) => it.type != 'dynamicFilters') // ad hoc filters are not considered as dependent filters as they are globally applied
       ?.filter((it: any) =>
         panelSchema?.value?.queries
           ?.map((q: any) => {
@@ -532,12 +532,11 @@ export const usePanelDataLoader = (
     const metadata : any[] = []
 
     const adHocVariables = variablesData.value?.values
-      ?.filter((it: any) => it.type === "ad-hoc-filters")
-      ?.map((it: any) => it?.value)
-      .flat()
-      ?.filter((it: any) => it?.operator && it?.name && it?.value);
-
-    console.log("adHocVariables(())", adHocVariables);
+      ?.filter((it: any) => it.type === "dynamicFilters")
+      ?.map((it: any) => it?.value).flat()
+      ?.filter((it: any) => it?.operator && it?.name && it?.value)
+      
+      console.log("adHocVariables(())", adHocVariables);
 
     if (!adHocVariables.length) {
       return { query, metadata };
@@ -678,11 +677,12 @@ export const usePanelDataLoader = (
       const shouldITriggerTheQueryForOtherVariables = (() => {
         // 1. get the dependent variables list
         const newDependentVariablesData = variablesData.value?.values
-          ?.filter((it: any) => it.type != "ad-hoc-filters") // ad hoc filters are not considered as dependent filters as they are globally applied
-          ?.filter((it: any) =>
-            panelSchema.value.queries
-              ?.map((q: any) => q?.query?.includes(`$${it.name}`))
-              ?.includes(true)
+          ?.filter((it: any) => it.type != 'dynamicFilters') // ad hoc filters are not considered as dependent filters as they are globally applied
+          ?.filter(
+            (it: any) =>
+              panelSchema.value.queries
+                ?.map((q: any) => q?.query?.includes(`$${it.name}`))
+                ?.includes(true)
           );
 
         // if no variables, no need to rerun the query
@@ -715,10 +715,9 @@ export const usePanelDataLoader = (
           : []
 
         const adHocVariables = variablesData.value?.values
-          ?.filter((it: any) => it.type === "ad-hoc-filters")
-          ?.map((it: any) => it?.value)
-          .flat()
-          ?.filter((it: any) => it?.operator && it?.name && it?.value);
+          ?.filter((it: any) => it.type === "dynamicFilters")
+          ?.map((it: any) => it?.value).flat()
+          ?.filter((it: any) => it?.operator && it?.name && it?.value)
           ?.filter((it: any) => panelSchema.value.queryType == 'sql' ? it.streams.find((it: any) => sqlQueryStreams.includes(it?.name)) : true)
 
         // if number of adHocVariables have changed, fire the query

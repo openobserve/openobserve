@@ -152,6 +152,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "type",
+        field: "type",
+        label: t("dashboard.type"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "actions",
         field: "actions",
         label: t("dashboard.actions"),
@@ -179,11 +186,14 @@ export default defineComponent({
           )
         )
       )?.variables?.list;
+      console.log("data", data);
+
       dashboardVariableData.data = (data || []).map(
         (it: any, index: number) => {
           return {
             "#": index < 9 ? `0${index + 1}` : index + 1,
             name: it.name,
+            type: it.type,
           };
         }
       );

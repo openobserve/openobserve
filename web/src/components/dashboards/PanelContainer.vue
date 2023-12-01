@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ></PanelSchemaRenderer>
     <MetaDataDialog
       :metaData="metaData"
+      :data="props.data"
       v-if="metaData"
       v-model="showViewPanel"
     ></MetaDataDialog>
@@ -154,7 +155,7 @@ export default defineComponent({
 
     const dependentAdHocVariable = computed(() => {
       const adhocVariables = props.variablesData.values
-        ?.filter((it: any) => it.type === "ad-hoc-filters")
+        ?.filter((it: any) => it.type === "dynamicFilters")
         ?.map((it: any) => it?.value)
         .flat()
         ?.filter((it: any) => it?.operator && it?.name && it?.value);

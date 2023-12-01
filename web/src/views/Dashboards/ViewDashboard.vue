@@ -153,7 +153,7 @@ export default defineComponent({
       data.values.forEach((variable) => {
         console.log("variableeee", variable);
         
-        if (variable.type === 'ad-hoc-filters') {
+        if (variable.type === 'dynamicFilters') {
           const filters = ((variable.value) || []).filter((item: any) => item.name && item.operator && item.value);
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,

@@ -1,23 +1,20 @@
 <template>
   <q-dialog>
-    <q-card style="min-width: 500px">
+    <q-card style="min-width: 700px">
       <q-card-section class="q-pt-md">
         <div class="row items-center q-pb-none">
           <h6 class="text-bold">Query Inspector</h6>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
         </div>
+        <div class="text-bold q-pb-sm">{{ dataTitle }}</div>
         <div class="text-bold">Total Query(s) Executed: {{ totalQueries }}</div>
         <div v-for="(query, index) in metaData.queries" :key="query.originalQuery">
           <div class="text-bold q-py-sm">Query: {{ index + 1 }}</div>
-          <q-card>
-            <q-card-section>
               <q-table class="my-sticky-virtscroll-table" virtual-scroll  v-model:pagination="pagination"
                 :rows-per-page-options="[0]" :virtual-scroll-sticky-size-start="48" dense :rows="getRows(query)"
-                :columns="tableColumns" row-key="index">
+                hide-bottom hide-header row-key="index" wrap-cells>
               </q-table>
-            </q-card-section>
-          </q-card>
         </div>
       </q-card-section>
     </q-card>
@@ -33,41 +30,65 @@ export default defineComponent({
     metaData: {
       type: Object,
       required: true
+    },
+    data: {
+      type: Object,
+      required: true
     }
   },
   setup(props) {
     const queryData = props.metaData.queries;
-
+    console.log("queryData", props.data.title);
+    
     const getRows = (query: any) => {
+      const timestampOfStartTime = query.startTime;
+      const formattedStartTime = new Date(timestampOfStartTime / 1000);
+      const startTimeEntry = `${timestampOfStartTime} (${formattedStartTime})`;
+
+      const timestampOfEndTime = query.endTime;
+      const formattedEndTime = new Date(timestampOfEndTime / 1000);
+      const endTimeEntry = `${timestampOfEndTime} (${formattedEndTime})`;
+
       const rows: any[] = [
         ["Original Query", query.originalQuery],
         ["Query", query.query],
-        ["Start Time", new Date(query.startTime / 1000).toLocaleString()],
-        ["End Time", new Date(query.endTime / 1000).toLocaleString()],
+        ["Start Time", startTimeEntry],
+        ["End Time", endTimeEntry],
         ["Query Type", query.queryType],
-        ["Variables", ],
+        ["Variable", ],
+        ["Fixed Variable",],
+        ["Dynamic Variable",],
       ];
 
-      const variableRows = query.variables.map((variable: any, variableIndex: number) => [
-        variable.type === 'variable' ? `${variable.type} -> ${variable.name}: ${variable.value}` : `${variable.type} -> ${variable.name} ${variable.operator} ${variable.value}`,
-        '',
-      ]);
+      const variableRows = [];
+      const fixedVariableRows = [];
+      const dynamicVariableRows = [];
 
-        rows.push(...variableRows);
+      query.variables.forEach((variable: any) => {
+        if (variable.type === 'variable') {
+          variableRows.push(`${variable.name}: ${variable.value}`);
+        } else if (variable.type === 'fixed') {
+          fixedVariableRows.push(`${variable.name}: ${variable.value}`);
+        } else if (variable.type === 'dynamicVariable') {
+          dynamicVariableRows.push(`${variable.name} ${variable.operator} ${variable.value}`);
+        }
+      });
+
+      rows[5][1] = variableRows.join(', ');
+      rows[6][1] = fixedVariableRows.join(', ');
+      rows[7][1] = dynamicVariableRows.join(', ');
+
 
       return rows;
     };
     const totalQueries = computed(() => queryData.length);
-    const tableColumns = [
-      { name: "key", label: "Name", align: "left", field: 0, sortable: true },
-      { name: "value", label: "Value", align: "left", field: 1, sortable: true },
-    ];
+    const dataTitle = computed(() => props.data.title);
 
     return {
       queryData,
-      tableColumns,
       getRows,
       totalQueries,
+      dataTitle,
       pagination: ref({
         rowsPerPage: 0,
       }),
