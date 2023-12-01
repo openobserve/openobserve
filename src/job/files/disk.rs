@@ -25,7 +25,7 @@ use std::{
 };
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::infra::config::FILE_EXT_ARROW;
+use crate::common::infra::config::{FILE_EXT_ARROW, FILE_EXT_JSON};
 use crate::common::meta::prom::NAME_LABEL;
 use crate::common::meta::stream::PartitionTimeLevel;
 use crate::common::utils::hasher::get_schema_key_xxh3;
@@ -561,6 +561,10 @@ pub async fn metrics_json_to_arrow() -> Result<(), anyhow::Error> {
         let stream_name = columns[3].to_string();
         let mut file_name = columns[4].to_string();
 
+        if stream_type != StreamType::Metrics || !file_name.ends_with(FILE_EXT_JSON) {
+            continue;
+        }
+
         // Hack: compatible for <= 0.5.1
         if !file_name.contains('/') && file_name.contains('_') {
             file_name = file_name.replace('_', "/");
@@ -598,7 +602,7 @@ pub async fn metrics_json_to_arrow() -> Result<(), anyhow::Error> {
         }
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
-            if stream_type.eq(&StreamType::Metrics) && file_name.ends_with(".json") {
+            if stream_type.eq(&StreamType::Metrics) && file_name.ends_with(FILE_EXT_JSON) {
                 let ret = handle_metrics(&org_id, stream_type, &local_file).await;
                 if let Err(e) = ret {
                     log::error!("[JOB] Error while converting json file to arrow {}", e);
