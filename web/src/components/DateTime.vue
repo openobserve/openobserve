@@ -136,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="absolute-calendar"
                   range
                   :locale="dateLocale"
+                  :options="optionsFn"
                 />
               </div>
               <div class="notePara">* You can choose multiple date</div>
@@ -271,6 +272,7 @@ import {
   getImageURL,
   useLocalTimezone,
   convertToUtcTimestamp,
+  timestampToTimezoneDate,
 } from "../utils/zincutils";
 import { date } from "quasar";
 import { useStore } from "vuex";
@@ -712,6 +714,15 @@ export default defineComponent({
       return filteredOptions;
     };
 
+    const optionsFn = (date) => {
+      const formattedDate = timestampToTimezoneDate(
+        new Date().getTime(),
+        store.state.timezone,
+        "yyyy/MM/dd"
+      );
+      return date >= "1999/01/01" && date <= formattedDate;
+    };
+
     return {
       t,
       datetimeBtn,
@@ -738,6 +749,7 @@ export default defineComponent({
       timezoneFilterFn,
       setCustomDate,
       setSavedDate,
+      optionsFn,
     };
   },
 });
