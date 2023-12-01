@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-table
         data-test="alert-list-table"
         ref="qTable"
-        :rows="alerts"
+        :rows="alertsRows"
         :columns="columns"
         row-key="id"
         :pagination="pagination"
@@ -39,6 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
+            <q-btn
+              :data-test="`alert-list-${props.row.name}-udpate-alert`"
+              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
+              class="q-ml-xs material-symbols-outlined"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alerts.edit')"
+            ></q-btn>
             <q-btn
               :data-test="`alert-list-${props.row.name}-udpate-alert`"
               icon="edit"
@@ -156,9 +167,12 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
-import type { AlertData } from "@/ts/interfaces/index";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-import { cloneDeep } from "lodash-es";
+import type { AlertData, Alert } from "@/ts/interfaces/index";
+import {
+  outlinedDelete,
+  outlinedPause,
+  outlinedPlayArrow,
+} from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "AlertList",
@@ -173,7 +187,8 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const router = useRouter();
-    const alerts: Ref<AlertData[]> = ref([]);
+    const alerts: Ref<Alert[]> = ref([]);
+    const alertsRows: Ref<Alert[]> = ref([]);
     const formData: Ref<AlertData | {}> = ref({});
     const showAddAlertDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
@@ -225,22 +240,6 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "conditions",
-        field: "conditions",
-        label: t("alerts.condition"),
-        align: "left",
-        sortable: true,
-        style: "width: 30vw;word-break: break-all;",
-      },
-      {
-        name: "trigger",
-        field: "trigger",
-        label: t("alerts.trigger"),
-        align: "left",
-        sortable: true,
-        style: "width: 10vw;word-break: break-all;",
-      },
-      {
         name: "destinations",
         field: "destinations",
         label: t("alerts.destination"),
@@ -248,11 +247,11 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "state",
-        field: "state",
-        label: t("alerts.state"),
-        align: "left",
-        sortable: true,
+        name: "description",
+        field: "description",
+        label: t("alerts.description"),
+        align: "center",
+        sortable: false,
       },
       {
         name: "actions",
@@ -282,43 +281,21 @@ export default defineComponent({
           var counter = 1;
           resultTotal.value = res.data.list.length;
           console.log(res.data.list);
-          alerts.value = res.data.list.map((data: any) => {
-            let conditions = "--";
-            if (data.query_condition.conditions) {
-              conditions = data.query_condition.conditions
-                .map((condition: any) => {
-                  return `${condition.column} ${condition.operator} ${condition.value}`;
-                })
-                .join(" AND ");
-            } else if (data.query_condition.sql) {
-              conditions = data.query_condition.sql;
-            }
+          alerts.value = res.data.list;
+          alertsRows.value = alerts.value.map((data: any) => {
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
               stream_name: data.stream_name ? data.stream_name : "--",
               stream_type: data.stream_type,
-              conditions: conditions,
-              trigger:
-                "in " +
-                data.trigger_condition.period +
-                " minutes " +
-                data.trigger_condition.operator +
-                " " +
-                data.trigger_condition.threshold +
-                " times",
-              frequency: {
-                value: data.trigger_condition.frequency,
-                unit: "Minutes",
-              },
               silence: {
                 value: data.trigger_condition.silence,
                 unit: "Minutes",
               },
               destinations: data.destinations.join(", "),
-              state: data.enabled ? "Running" : "Stopped",
+              enabled: data.enabled,
               alert_type: data.is_real_time ? "Real Time" : "Scheduled",
-              actions: "",
+              description: data.description,
             };
           });
           if (router.currentRoute.value.query.action == "add") {
@@ -392,7 +369,9 @@ export default defineComponent({
       showAddAlertDialog.value = true;
     };
     const showAddUpdateFn = (props: any) => {
-      formData.value = cloneDeep(props.row);
+      formData.value = alerts.value.find(
+        (alert: any) => alert.name === props.row?.name
+      );
       let action;
       if (!props.row) {
         isUpdated.value = false;
@@ -528,6 +507,9 @@ export default defineComponent({
       verifyOrganizationStatus,
       folders,
       splitterModel,
+      outlinedPause,
+      outlinedPlayArrow,
+      alertsRows,
     };
   },
 });

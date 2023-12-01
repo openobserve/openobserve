@@ -8,6 +8,7 @@
         size="sm"
         mobile-arrows
         class="bg-white text-primary"
+        @update:model-value="updateTab"
       >
         <q-tab name="custom" :label="t('alerts.custom')" />
         <q-tab name="sql" :label="t('alerts.sql')" />
@@ -65,7 +66,7 @@
             "
             class="flex justify-center items-center"
           >
-          {{ t("alerts.minutes") }}
+            {{ t("alerts.minutes") }}
           </div>
         </div>
       </div>
@@ -120,7 +121,7 @@
             "
             class="flex justify-center items-center"
           >
-          {{ t("alerts.times") }}
+            {{ t("alerts.times") }}
           </div>
         </div>
       </div>
@@ -140,6 +141,7 @@ const emits = defineEmits([
   "field:add",
   "field:remove",
   "update:trigger",
+  "update:query_type",
   "update:sql",
 ]);
 
@@ -168,6 +170,10 @@ const updateQueryValue = (value: string) => {
 
 const updateTrigger = () => {
   emits("update:trigger", triggerData.value);
+};
+
+const updateTab = () => {
+  emits("update:query_type", tab.value);
 };
 
 defineExpose({

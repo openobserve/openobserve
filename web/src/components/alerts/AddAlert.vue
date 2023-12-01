@@ -133,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :conditions="formData.query_condition.conditions"
             v-model:trigger="formData.trigger_condition"
             v-model:sql="formData.query_condition.sql"
+            v-model:query_type="formData.query_condition.type"
             @field:add="addField"
             @field:remove="removeField"
             class="q-mt-sm"
@@ -241,8 +242,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outlined
             filled
             dense
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
             tabindex="0"
             style="width: 550px"
           />
@@ -280,7 +279,6 @@ import { defineComponent, ref, onMounted, watch, type Ref } from "vue";
 import "monaco-editor/esm/vs/editor/editor.all.js";
 import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
 import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
@@ -305,6 +303,7 @@ const defaultValue: any = () => {
       conditions: [],
       sql: "",
       promql: null,
+      type: "custom",
     },
     trigger_condition: {
       period: 10,
@@ -537,34 +536,6 @@ export default defineComponent({
         );
     };
 
-    const buildSqlFromConditions = () => {
-      let sql = `select * from '${formData.value.stream_name}'`;
-
-      if (formData.value.query_condition.conditions.length) {
-        sql += " where ";
-      }
-
-      formData.value.query_condition.conditions.forEach(
-        (condition: any, index: number) => {
-          if (condition.column && condition.operator && condition.value) {
-            if (condition.operator === "Contains") {
-              sql += `${condition.column} LIKE '${condition.value}'`;
-            } else if (condition.operator === "NotContains") {
-              sql += `${condition.column} NOT LIKE '${condition.value}'`;
-            } else {
-              sql += `${condition.column} ${condition.operator} '${condition.value}'`;
-            }
-
-            if (index < formData.value.query_condition.conditions.length - 1) {
-              sql += " AND ";
-            }
-          }
-        }
-      );
-
-      return sql;
-    };
-
     return {
       t,
       q,
@@ -604,21 +575,12 @@ export default defineComponent({
       addVariable,
       selectedDestinations,
       scheduledAlertRef,
-      buildSqlFromConditions,
     };
   },
   created() {
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...this.modelValue };
-    this.formData.context_attributes = Object.keys(
-      this.formData.context_attributes
-    ).map((attr) => {
-      return {
-        key: attr,
-        value: this.formData.context_attributes[attr],
-        id: getUUID(),
-      };
-    });
+    this.formData.is_real_time = this.formData.is_real_time.toString();
     this.beingUpdated = this.isUpdated;
     this.updateStreams(false)?.then(() => {
       this.updateEditorContent(this.formData.stream_name);
@@ -631,8 +593,18 @@ export default defineComponent({
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
-      this.formData.destination = this.modelValue.destination;
     }
+
+    this.formData.is_real_time = this.formData.is_real_time.toString();
+    this.formData.context_attributes = Object.keys(
+      this.formData.context_attributes
+    ).map((attr) => {
+      return {
+        key: attr,
+        value: this.formData.context_attributes[attr],
+        id: getUUID(),
+      };
+    });
   },
   computed: {
     getFormattedDestinations: function () {
@@ -669,21 +641,22 @@ export default defineComponent({
 
         const payload = cloneDeep(this.formData);
 
-        payload.is_real_time = payload.query_condition.is_real_time === "true";
+        payload.is_real_time = payload.is_real_time === "true";
 
-        payload.context_attributes = this.formData.context_attributes.forEach(
-          (attr: any) => {
-            payload.context_attributes[attr.key] = attr.value;
-          }
+        payload.context_attributes = {};
+
+        payload.query_condition.type = payload.is_real_time
+          ? "custom"
+          : this.formData.query_condition.type;
+
+        this.formData.context_attributes.forEach((attr: any) => {
+          payload.context_attributes[attr.key] = attr.value;
+        });
+
+        console.log(
+          cloneDeep(this.formData.context_attributes),
+          payload.context_attributes
         );
-
-        if (
-          (!payload.is_real_time &&
-            this.scheduledAlertRef?.selectedTab === "custom") ||
-          payload.is_real_time
-        ) {
-          payload.query_condition.sql = this.buildSqlFromConditions();
-        }
 
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
@@ -694,7 +667,6 @@ export default defineComponent({
 
         callAlert
           .then((res: { data: any }) => {
-            const data = res.data;
             this.formData = { ...defaultValue };
             this.$emit("update:list");
             this.addAlertForm.resetValidation();
