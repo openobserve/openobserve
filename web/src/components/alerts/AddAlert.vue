@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.stream_type"
               :options="streamTypes"
               :label="t('alerts.streamType')"
-              :popup-content-style="{ textTransform: 'capitalize' }"
+              :popup-content-style="{ textTransform: 'lowercase' }"
               color="input-border"
               bg-color="input-bg"
               class="q-py-sm showLabelOnTop no-case"
@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="input-border"
               bg-color="input-bg"
               class="q-py-sm showLabelOnTop no-case"
+              :popup-content-style="{ textTransform: 'lowercase' }"
               filled
               borderless
               dense
@@ -140,11 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="col-12 flex justify-start items-center">
+        <div class="col-12 flex justify-start items-center q-mt-sm">
           <div
             class="q-py-sm showLabelOnTop text-bold text-h7"
             data-test="add-alert-delay-title"
-            style="width: 160px"
+            style="width: 180px"
           >
             {{ t("alerts.silenceNotification") }}
           </div>
@@ -716,6 +717,10 @@ export default defineComponent({
 </style>
 <style lang="scss">
 .no-case .q-field__native span {
+  text-transform: none !important;
+}
+
+.no-case .q-field__input {
   text-transform: none !important;
 }
 .add-alert-form {
