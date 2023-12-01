@@ -69,20 +69,21 @@ pub async fn save(
         return Err(anyhow::anyhow!("Stream {stream_name} not found"));
     }
 
-    if alert.query_condition.query_type.is_none() {
-        alert.query_condition.query_type = Some(QueryType::Custom);
-    }
-
-    if alert.is_real_time && alert.query_condition.query_type != Some(QueryType::Custom) {
+    if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
         return Err(anyhow::anyhow!(
             "Realtime alert should use Custom query type"
         ));
     }
 
-    match alert.query_condition.query_type.as_ref().unwrap() {
+    match alert.query_condition.query_type {
         QueryType::Custom => {
-            if alert.query_condition.sql.is_none()
-                || alert.query_condition.sql.as_ref().unwrap().is_empty()
+            if alert.query_condition.conditions.is_none()
+                || alert
+                    .query_condition
+                    .conditions
+                    .as_ref()
+                    .unwrap()
+                    .is_empty()
             {
                 return Err(anyhow::anyhow!("Alert should have conditions"));
             }
@@ -260,7 +261,7 @@ impl QueryCondition {
         &self,
         alert: &Alert,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
-        let sql = match self.query_type.as_ref().unwrap() {
+        let sql = match self.query_type {
             QueryType::Custom => {
                 if let Some(v) = self.conditions.as_ref() {
                     if v.is_empty() {

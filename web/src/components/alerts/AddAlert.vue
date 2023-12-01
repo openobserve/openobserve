@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="q-py-sm showLabelOnTop text-bold text-h7"
             data-test="add-alert-delay-title"
-            style="width: 180px"
+            style="width: 160px"
           >
             {{ t("alerts.silenceNotification") }}
           </div>

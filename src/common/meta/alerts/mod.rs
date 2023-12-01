@@ -45,6 +45,8 @@ pub struct Alert {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
     #[serde(default)]
+    pub description: String,
+    #[serde(default)]
     pub enabled: bool,
 }
 
@@ -68,6 +70,7 @@ impl Default for Alert {
             trigger_condition: TriggerCondition::default(),
             destinations: vec![],
             context_attributes: None,
+            description: "".to_string(),
             enabled: false,
         }
     }
@@ -89,7 +92,9 @@ pub struct QueryCondition {
     pub conditions: Option<Vec<Condition>>,
     pub sql: Option<String>,
     pub promql: Option<String>,
-    pub query_type: Option<QueryType>,
+    #[serde(default)]
+    #[serde(rename = "type")]
+    pub query_type: QueryType,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]

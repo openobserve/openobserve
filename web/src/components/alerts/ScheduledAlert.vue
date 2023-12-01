@@ -36,7 +36,7 @@
 
     <div class="q-mt-sm">
       <div class="flex items-center q-mr-sm">
-        <div style="width: 180px">{{ t("alerts.period") }}</div>
+        <div style="width: 160px">{{ t("alerts.period") }}</div>
         <div
           class="flex items-center q-mr-sm"
           style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
@@ -72,7 +72,7 @@
       </div>
 
       <div class="flex justify-start items-center q-mt-sm">
-        <div style="width: 180px">{{ t("alerts.threshold") }}</div>
+        <div style="width: 160px">{{ t("alerts.threshold") }}</div>
         <div class="threshould-input">
           <q-select
             data-test="add-alert-stream-select"
