@@ -23,7 +23,7 @@
 import { computed, defineComponent, ref } from "vue";
 
 export default defineComponent({
-  name: "MetaDataDialog",
+  name: "QueryInspector",
   props: {
     metaData: {
       type: Object || null || undefined,

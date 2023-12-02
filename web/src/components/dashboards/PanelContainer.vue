@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
-      <MetaDataDialog :metaData="metaData" :data="props.data"></MetaDataDialog>
+      <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
     </q-dialog>
   </div>
 </template>
@@ -118,7 +118,7 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
-import MetaDataDialog from "@/components/dashboards/MetaDataDialog.vue";
+import QueryInspector from "@/components/dashboards/QueryInspector.vue";
 import { ref } from "vue";
 
 export default defineComponent({
@@ -136,7 +136,7 @@ export default defineComponent({
   ],
   components: {
     PanelSchemaRenderer,
-    MetaDataDialog
+    QueryInspector
   },
   setup(props) {
     const store = useStore();

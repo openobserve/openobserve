@@ -192,10 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @error="handleChartApiError"
                         />
                         <q-dialog v-model="showViewPanel">
-                          <MetaDataDialog
+                          <QueryInspector
                             :metaData="metaData"
                             :data="panelTitle"
-                          ></MetaDataDialog>
+                          ></QueryInspector>
                         </q-dialog>
                       </div>
                       <DashboardErrorsComponent :errors="errorData" />
@@ -274,7 +274,7 @@ import VariablesValueSelector from "../../../components/dashboards/VariablesValu
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import { useLoading } from "@/composables/useLoading";
 import _ from "lodash-es";
-import MetaDataDialog from "@/components/dashboards/MetaDataDialog.vue";
+import QueryInspector from "@/components/dashboards/QueryInspector.vue";
 
 export default defineComponent({
   name: "AddPanel",
@@ -291,7 +291,7 @@ export default defineComponent({
     VariablesValueSelector,
     PanelSchemaRenderer,
     DashboardQueryEditor,
-    MetaDataDialog,
+    QueryInspector,
   },
   setup(props) {
     // This will be used to copy the chart data to the chart renderer component
