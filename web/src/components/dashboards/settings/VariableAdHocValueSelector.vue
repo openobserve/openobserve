@@ -38,13 +38,8 @@ export default defineComponent({
     emits: ['update:modelValue'],
     setup(props: any, { emit }) {
 
-        // const selectedField = ref(String(props.variableItem?.value?.name));
         const operatorOptions = ['=', '!=', '<', '>', '<=', '>='];
-        // const selectedOperator = ref(operatorOptions[0]);
         const options = toRef(props.variableItem, 'options');
-        // const isSelectVisible = ref(false);
-        // const inputValue = ref('');
-        // const adhocVariables: Ref<Array<any>> = ref([]);
         const { modelValue: adhocVariables } = toRefs(props)
         const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } = useSelectAutoComplete(options, 'name');
 
