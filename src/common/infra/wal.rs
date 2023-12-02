@@ -96,7 +96,6 @@ pub async fn get_or_create(
             partition_time_level,
             key,
             use_cache,
-            false,
             None,
         )
         .await
@@ -117,7 +116,6 @@ pub async fn get_or_create_arrow(
             partition_time_level,
             key,
             use_cache,
-            true,
             schema,
         )
         .await
@@ -236,7 +234,6 @@ impl Manager {
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
-        use_arrow: bool,
         schema: Option<Schema>,
     ) -> Arc<RwFile> {
         let stream_type = stream.stream_type;
@@ -255,7 +252,6 @@ impl Manager {
                 partition_time_level,
                 key,
                 use_cache,
-                use_arrow,
                 schema,
             )
             .await,
@@ -273,7 +269,6 @@ impl Manager {
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
-        use_arrow: bool,
         schema: Option<Schema>,
     ) -> Arc<RwFile> {
         if let Some(file) = self.get(thread_id, stream.clone(), key).await {
@@ -285,7 +280,6 @@ impl Manager {
                 partition_time_level,
                 key,
                 use_cache,
-                use_arrow,
                 schema,
             )
             .await
@@ -369,7 +363,6 @@ impl RwFile {
         partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
-        use_arrow: bool,
         schema: Option<Schema>,
     ) -> RwFile {
         let mut dir_path = format!(
@@ -391,6 +384,8 @@ impl RwFile {
         create_dir_all(Path::new(&file_path).parent().unwrap())
             .await
             .unwrap();
+
+        let use_arrow = schema.is_some();
 
         let (file, cache, arrow_file) = if use_cache {
             (
@@ -522,7 +517,7 @@ impl RwFile {
                         .freeze(),
                 )
                 .await;
-        } else if !self.use_arrow {       
+        } else if !self.use_arrow {
             self.file
                 .as_ref()
                 .unwrap()
@@ -664,7 +659,7 @@ mod tests {
         let stream = StreamParams::new(org_id, stream_name, stream_type);
         let key = "test_key";
         let use_cache = false;
-        let file = RwFile::new(thread_id, stream, None, key, use_cache, false, None).await;
+        let file = RwFile::new(thread_id, stream, None, key, use_cache, None).await;
         let data = "test_data".to_string().into_bytes();
         file.write(&data).await;
         assert_eq!(file.read().await.unwrap(), data);
