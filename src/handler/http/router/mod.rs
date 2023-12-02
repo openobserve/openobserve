@@ -27,20 +27,16 @@ use std::rc::Rc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::common::{
-    infra::config::CONFIG,
-    meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
 use super::auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum};
 use super::request::{
-    alerts::*, dashboards::folders::*, dashboards::*, enrichment_table, functions, kv, logs,
-    metrics, organization, prom, rum, search, status, stream, syslog, traces, users,
+    dashboards::folders::*, dashboards::*, enrichment_table, functions, kv, logs, metrics,
+    organization, prom, rum, search, status, stream, syslog, traces, users,
 };
 use crate::common::{
     infra::config::CONFIG,
     meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
 };
 
-use super::auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum};
 use super::request::*;
 
 pub mod openapi;
@@ -270,7 +266,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(syslog::create_route)
             .service(syslog::delete_route)
             .service(syslog::update_route)
-            .service(syslog::toggle_state),
             .service(syslog::toggle_state)
             .service(enrichment_table::save_enrichment_table)
             .service(metrics::ingest::otlp_metrics_write)

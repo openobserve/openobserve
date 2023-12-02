@@ -31,7 +31,7 @@ use crate::common::{
         self,
         alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
-        prom::{self, MetricType, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+        prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
         stream::{PartitioningDetails, StreamParams},
         usage::UsageType,
         StreamType,
@@ -50,26 +50,6 @@ use crate::service::{
     schema::{set_schema_metadata, stream_schema_exists},
     stream::unwrap_partition_time_level,
     usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{cluster, config::CONFIG, metrics},
-        meta::{
-            self,
-            alert::{Alert, Trigger},
-            http::HttpResponse as MetaHttpResponse,
-            prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, StreamParams},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json},
-    },
-    service::format_stream_name,
-};
-use crate::{
-    handler::http::request::CONTENT_TYPE_JSON,
-    service::ingestion::otlp_json::{get_float_value, get_int_value, get_string_value},
 };
 
 const SERVICE: &str = "service";

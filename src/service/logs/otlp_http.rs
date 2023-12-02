@@ -24,6 +24,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
+use crate::common::meta::stream::SchemaRecords;
 use crate::common::{
     infra::{
         cluster,
@@ -37,40 +38,18 @@ use crate::common::{
     utils::{flatten, json},
 };
 use crate::handler::http::request::CONTENT_TYPE_JSON;
+use crate::service::schema::stream_schema_exists;
+use crate::service::usage::report_request_usage_stats;
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
     ingestion::{
         evaluate_trigger,
         otlp_json::{get_int_value, get_val_for_attr},
-        write_file, TriggerAlertData,
-use crate::common::meta::stream::SchemaRecords;
-use crate::common::utils::flatten::format_key;
-use crate::handler::http::request::CONTENT_TYPE_JSON;
-use crate::service::{
-    db, distinct_values, get_formatted_stream_name, ingestion::write_file_arrow,
-    schema::stream_schema_exists, usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alert::{Alert, Trigger},
-            http::HttpResponse as MetaHttpResponse,
-            ingestion::StreamStatus,
-            stream::StreamParams,
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json},
+        write_file_arrow, TriggerAlertData,
     },
-    logs::StreamMeta,
-    schema::stream_schema_exists,
-    usage::report_request_usage_stats,
 };
+
+use super::StreamMeta;
 
 const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";

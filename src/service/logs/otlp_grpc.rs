@@ -24,6 +24,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
+use super::StreamMeta;
 use crate::common::{
     infra::{
         cluster,
@@ -34,41 +35,20 @@ use crate::common::{
         alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
         ingestion::{IngestionResponse, StreamStatus},
-        stream::StreamParams,
+        stream::{SchemaRecords, StreamParams},
         usage::UsageType,
         StreamType,
     },
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
-use super::StreamMeta;
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
     ingestion::{
-        evaluate_trigger, grpc::get_val, grpc::get_val_with_type_retained, write_file,
+        evaluate_trigger, grpc::get_val, grpc::get_val_with_type_retained, write_file_arrow,
         TriggerAlertData,
     },
-    logs::StreamMeta,
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alert::{Alert, Trigger},
-            http::HttpResponse as MetaHttpResponse,
-            ingestion::{IngestionResponse, StreamStatus},
-            stream::{SchemaRecords, StreamParams},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    },
-    service::ingestion::write_file_arrow,
 };
 
 pub async fn usage_ingest(
@@ -121,7 +101,7 @@ pub async fn usage_ingest(
     .await;
     // End get stream alert
 
-    let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for item in reader.iter() {
         //JSON Flattening
@@ -157,7 +137,7 @@ pub async fn usage_ingest(
             json::Value::Number(timestamp.into()),
         );
 
-        let local_trigger = super::add_valid_record(
+        let local_trigger = super::add_valid_record_arrow(
             &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
@@ -195,7 +175,7 @@ pub async fn usage_ingest(
 
     // write to file
     let mut stream_file_name = "".to_string();
-    let _ = write_file(
+    let _ = write_file_arrow(
         &buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::Logs),

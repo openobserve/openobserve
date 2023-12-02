@@ -29,8 +29,6 @@ use crate::common::{
     infra::{
         cluster,
         config::{CONFIG, SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
-        wal::get_or_create,
-        config::{CONFIG, SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS},
         wal::{get_or_create, get_or_create_arrow},
     },
     meta::{
@@ -43,9 +41,7 @@ use crate::common::{
     utils::{
         flatten,
         functions::get_vrl_compiler_config,
-        json::{Map, Value},
         json::{self, Map, Value},
-        notification::send_notification,
         schema::infer_json_schema,
     },
 };

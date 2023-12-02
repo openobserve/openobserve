@@ -35,8 +35,6 @@ use crate::common::{
             IngestionRequest, IngestionResponse, KinesisFHData, KinesisFHIngestionResponse,
             StreamStatus,
         },
-        stream::StreamParams,
-        ingestion::{IngestionResponse, StreamStatus},
         stream::{SchemaRecords, StreamParams},
         usage::UsageType,
         StreamType,
@@ -45,9 +43,8 @@ use crate::common::{
 };
 use crate::service::{
     distinct_values, get_formatted_stream_name,
-    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
+    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file_arrow, TriggerAlertData},
     logs::StreamMeta,
-    ingestion::{is_ingestion_allowed, write_file_arrow},
     usage::report_request_usage_stats,
 };
 
@@ -102,13 +99,8 @@ pub async fn ingest(
     let partition_keys = partition_det.partition_keys;
     let partition_time_level = partition_det.partition_time_level;
 
-    let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    // Start get stream alerts
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
-    // End get stream alert
-
     let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+
     let ep: &str;
 
     let data = match in_req {

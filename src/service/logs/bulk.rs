@@ -19,6 +19,7 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
+use super::StreamMeta;
 use crate::common::{
     infra::{
         cluster,
@@ -40,37 +41,9 @@ use crate::common::{
 };
 use crate::service::{
     db, distinct_values,
-    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-    logs::StreamMeta,
+    ingestion::{evaluate_trigger, write_file_arrow, TriggerAlertData},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
-use super::StreamMeta;
-use crate::service::{
-use super::StreamMeta;
-use crate::service::{
-    db, distinct_values, schema::stream_schema_exists, usage::report_request_usage_stats,
-};
-use crate::{
-    common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
-        meta::{
-            alert::{Alert, Trigger},
-            functions::{StreamTransform, VRLResultResolver},
-            ingestion::{
-                BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
-                StreamSchemaChk,
-            },
-            stream::{PartitioningDetails, StreamParams},
-            usage::UsageType,
-            StreamType,
-        },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    },
-    service::ingestion::write_file_arrow,
 };
 
 pub const TRANSFORM_FAILED: &str = "document_failed_transform";
@@ -284,7 +257,7 @@ pub async fn ingest(
             // only for bulk insert
             let mut status = RecordStatus::default();
             let need_trigger = !stream_trigger_map.contains_key(&stream_name);
-     
+
             let local_trigger = super::add_valid_record_arrow(
                 &StreamMeta {
                     org_id: org_id.to_string(),

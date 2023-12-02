@@ -20,28 +20,28 @@ use datafusion::arrow::datatypes::Schema;
 use std::net::SocketAddr;
 use syslog_loose::{Message, ProcId, Protocol};
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, DISTINCT_FIELDS, SYSLOG_ROUTES},
-        metrics,
-    },
-    meta::{
-        alerts::Alert,
-        http::HttpResponse as MetaHttpResponse,
-        ingestion::{IngestionResponse, StreamStatus},
-        stream::{SchemaRecords, StreamParams},
-        syslog::SyslogRoute,
-        StreamType,
-    },
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-};
-use crate::service::{
-    db, distinct_values, get_formatted_stream_name,
-    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-    logs::StreamMeta,
-};
 use crate::service::{db, distinct_values, get_formatted_stream_name, ingestion::write_file_arrow};
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, DISTINCT_FIELDS, SYSLOG_ROUTES},
+            metrics,
+        },
+        meta::{
+            alerts::Alert,
+            http::HttpResponse as MetaHttpResponse,
+            ingestion::{IngestionResponse, StreamStatus},
+            stream::{SchemaRecords, StreamParams},
+            syslog::SyslogRoute,
+            StreamType,
+        },
+        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    },
+    service::ingestion::{evaluate_trigger, TriggerAlertData},
+};
+
+use super::StreamMeta;
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow::Error> {
     let start = std::time::Instant::now();
