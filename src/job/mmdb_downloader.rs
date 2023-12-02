@@ -17,6 +17,7 @@ use crate::common::infra::config::{CONFIG, GEOIP_TABLE, MAXMIND_DB_CLIENT, MMDB_
 use crate::common::meta::maxmind::MaxmindClient;
 use crate::service::enrichment_table::geoip::{Geoip, GeoipConfig};
 use futures::stream::StreamExt;
+use once_cell::sync::Lazy;
 use reqwest::Client;
 use sha256::try_digest;
 use std::cmp::min;
@@ -24,6 +25,8 @@ use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::time;
+
+static CLIENT_INITIALIZED: Lazy<bool> = Lazy::new(|| true);
 
 pub async fn run() -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&CONFIG.common.mmdb_data_dir)?;
@@ -40,25 +43,26 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 async fn run_download_files() {
     // send request and await response
-    let client = reqwest::ClientBuilder::default().build().unwrap();
+    let client = reqwest::Client::new();
     let fname = format!("{}{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
 
-    let download_files =
-        match is_digest_different(&fname, &CONFIG.common.mmdb_geolite_citydb_sha256_url).await {
-            Ok(is_different) => is_different,
-            Err(e) => {
-                log::error!("Well something broke. {e}");
-                false
-            }
-        };
+    let download_files = is_digest_different(&fname, &CONFIG.common.mmdb_geolite_citydb_sha256_url)
+        .await
+        .unwrap_or_else(|e| {
+            log::error!("Error checking digest difference: {e}");
+            false
+        });
 
     if download_files {
         match download_file(&client, &CONFIG.common.mmdb_geolite_citydb_url, &fname).await {
-            Ok(()) => {
-                update_global_maxmind_client(&fname).await;
-            }
+            Ok(()) => {}
             Err(e) => log::error!("failed to download the files {}", e),
         }
+    }
+
+    if Lazy::get(&CLIENT_INITIALIZED).is_none() || download_files {
+        update_global_maxmind_client(&fname).await;
+        Lazy::force(&CLIENT_INITIALIZED);
     }
 }
 
