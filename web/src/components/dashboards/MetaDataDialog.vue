@@ -52,9 +52,9 @@ export default defineComponent({
         ["Start Time", startTimeEntry],
         ["End Time", endTimeEntry],
         ["Query Type", query.queryType],
-        ["Variable", ],
-        ["Fixed Variable",],
-        ["Dynamic Variable",],
+        ["Variable(s)", ],
+        ["Fixed Variable(s)",],
+        ["Dynamic Variable(s)",],
       ];
 
       const variableRows = [];
