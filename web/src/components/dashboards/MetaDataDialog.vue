@@ -72,9 +72,9 @@ export default defineComponent({
         }
       });
 
-      rows[5][1] = variableRows.join(', ');
-      rows[6][1] = fixedVariableRows.join(', ');
-      rows[7][1] = dynamicVariableRows.join(', ');
+      rows[5][1] = variableRows.length > 0 ? variableRows.join(', ') : '-';
+      rows[6][1] = fixedVariableRows.length > 0 ? fixedVariableRows.join(', ') : '-';
+      rows[7][1] = dynamicVariableRows.length > 0 ? dynamicVariableRows.join(', ') : '-';
 
 
       return rows;
