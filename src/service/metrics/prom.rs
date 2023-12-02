@@ -103,7 +103,7 @@ pub async fn remote_write(
             METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),
         );
-        set_schema_metadata(org_id, &metric_name, StreamType::Metrics, extra_metadata)
+        set_schema_metadata(org_id, &metric_name, StreamType::Metrics, &extra_metadata)
             .await
             .unwrap();
     }
@@ -352,7 +352,7 @@ pub async fn remote_write(
         let mut req_stats = write_file(
             &stream_data,
             thread_id,
-            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
+            &StreamParams::new(org_id, org_id, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
         )

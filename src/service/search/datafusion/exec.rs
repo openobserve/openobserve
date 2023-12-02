@@ -25,6 +25,7 @@ use datafusion::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
+        MemTable,
     },
     error::{DataFusionError, Result},
     execution::{
@@ -79,6 +80,7 @@ pub async fn sql(
     rules: &HashMap<String, DataType>,
     sql: &Arc<Sql>,
     files: &[FileKey],
+    in_records_batches: Option<Vec<RecordBatch>>,
     file_type: FileType,
 ) -> Result<HashMap<String, Vec<RecordBatch>>> {
     if files.is_empty() {
@@ -87,7 +89,46 @@ pub async fn sql(
 
     let start = std::time::Instant::now();
     let session_id = session.id.clone();
-    let mut ctx = register_table(session, schema.clone(), "tbl", files, file_type.clone()).await?;
+    let mut ctx = if !file_type.eq(&FileType::ARROW) {
+        register_table(session, schema.clone(), "tbl", files, file_type.clone()).await?
+    } else {
+        let ctx = prepare_datafusion_context(&session.search_type)?;
+        /* let mut record_batches = Vec::<RecordBatch>::new();
+        for file in files.iter() {
+            let file_data = match tmpfs::get(&file.key) {
+                Ok(data) => data,
+                Err(err) => {
+                    log::error!("Error reading file {} from tmpfs: {:?}", file.key, err);
+                    continue;
+                }
+            };
+            let buf_reader = Cursor::new(file_data);
+            let stream_reader = StreamReader::try_new(buf_reader, None)?;
+
+            for read_result in stream_reader {
+                let record_batch = read_result?;
+                if record_batch.num_rows() > 0 {
+                    record_batches.push(record_batch);
+                }
+            }
+        } */
+        let record_batches = in_records_batches.unwrap();
+        let schema = if let Some(first_batch) = record_batches.first() {
+            first_batch.schema()
+        } else {
+            log::error!("No record batches found");
+            return Ok(HashMap::new());
+
+            /* return Err(datafusion::error::DataFusionError::Plan(
+                "No record batches found".to_string(),
+            )); */
+        };
+        let mem_table = Arc::new(MemTable::try_new(schema, vec![record_batches])?);
+
+        // Register the MemTable as a table in the DataFusion context
+        ctx.register_table("tbl", mem_table)?;
+        ctx
+    };
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;

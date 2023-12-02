@@ -181,11 +181,6 @@ pub async fn handle_grpc_request(
                     },
                     None => vec![],
                 };
-                if !schema_exists.has_metadata {
-                    set_schema_metadata(org_id, metric_name, StreamType::Metrics, prom_meta)
-                        .await
-                        .unwrap();
-                }
 
                 for mut rec in records {
                     // flattening
@@ -193,6 +188,17 @@ pub async fn handle_grpc_request(
 
                     let local_metric_name =
                         &format_stream_name(rec.get(NAME_LABEL).unwrap().as_str().unwrap());
+
+                    if !schema_exists.has_metadata {
+                        set_schema_metadata(
+                            org_id,
+                            local_metric_name,
+                            StreamType::Metrics,
+                            &prom_meta,
+                        )
+                        .await
+                        .unwrap();
+                    }
 
                     if local_metric_name != metric_name {
                         // check for schema
@@ -347,7 +353,7 @@ pub async fn handle_grpc_request(
         let mut req_stats = write_file(
             &stream_data,
             thread_id,
-            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
+            &StreamParams::new(org_id, org_id, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
         )

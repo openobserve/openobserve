@@ -22,6 +22,8 @@ use utoipa::ToSchema;
 
 use crate::common::utils::json;
 
+use super::stream::SchemaRecords;
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {
     pub successful: u32,
@@ -32,7 +34,7 @@ pub struct RecordStatus {
 }
 
 pub struct BulkStreamData {
-    pub data: HashMap<String, Vec<String>>,
+    pub data: HashMap<String, SchemaRecords>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -78,7 +80,7 @@ pub struct StreamSchemaChk {
     pub has_metadata: bool,
 }
 
-pub const INGESTION_EP: [&str; 13] = [
+pub const INGESTION_EP: [&str; 14] = [
     "_bulk",
     "_json",
     "_multi",
@@ -92,6 +94,7 @@ pub const INGESTION_EP: [&str; 13] = [
     "_sub",
     "logs",
     "metrics",
+    "_json_arrow",
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

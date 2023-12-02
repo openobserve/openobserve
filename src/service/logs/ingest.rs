@@ -35,7 +35,7 @@ use crate::common::{
             IngestionRequest, IngestionResponse, KinesisFHData, KinesisFHIngestionResponse,
             StreamStatus,
         },
-        stream::StreamParams,
+        stream::{SchemaRecords, StreamParams},
         usage::UsageType,
         StreamType,
     },
@@ -43,7 +43,7 @@ use crate::common::{
 };
 use crate::service::{
     distinct_values, get_formatted_stream_name,
-    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
+    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file_arrow, TriggerAlertData},
     logs::StreamMeta,
     usage::report_request_usage_stats,
 };
@@ -99,7 +99,8 @@ pub async fn ingest(
     let partition_keys = partition_det.partition_keys;
     let partition_time_level = partition_det.partition_time_level;
 
-    let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+
     let ep: &str;
 
     let data = match in_req {
@@ -126,11 +127,11 @@ pub async fn ingest(
         }
     };
 
-    for item in data.iter() {
-        match item {
-            Ok(value) => {
+    for rec in data.iter() {
+        match rec {
+            Ok(item) => {
                 match apply_functions(
-                    &value,
+                    &item,
                     &local_trans,
                     &stream_vrl_map,
                     stream_name,
@@ -147,7 +148,7 @@ pub async fn ingest(
                                 continue;
                             }
                         }
-                        let local_trigger = super::add_valid_record(
+                        let local_trigger = super::add_valid_record_arrow(
                             &StreamMeta {
                                 org_id: org_id.to_string(),
                                 stream_name: stream_name.to_string(),
@@ -199,7 +200,7 @@ pub async fn ingest(
     // write to file
     let mut stream_file_name = "".to_string();
     let mut req_stats =
-        write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
+        write_file_arrow(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     if stream_file_name.is_empty() {
         return Ok(IngestionResponse::new(
@@ -265,7 +266,7 @@ pub async fn ingest(
     ))
 }
 
-fn apply_functions<'a>(
+pub fn apply_functions<'a>(
     item: &'a json::Value,
     local_trans: &Vec<StreamTransform>,
     stream_vrl_map: &'a AHashMap<String, VRLResultResolver>,
@@ -291,7 +292,7 @@ fn apply_functions<'a>(
     }
 }
 
-fn handle_ts(
+pub fn handle_ts(
     local_val: &mut json::Map<String, json::Value>,
     mut min_ts: i64,
 ) -> Result<i64, anyhow::Error> {

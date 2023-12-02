@@ -18,6 +18,7 @@ use std::time::UNIX_EPOCH;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+use crate::common::infra::config::{FILE_EXT_ARROW, FILE_EXT_JSON};
 use crate::common::infra::{config::CONFIG, errors, metrics, wal};
 use crate::common::meta;
 use crate::common::utils::file::{get_file_contents, get_file_meta, scan_files};
@@ -99,8 +100,22 @@ impl Metrics for Querier {
             }
         };
 
-        let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/");
-        let files = scan_files(&pattern);
+        let pattern = format!("{wal_dir}/files/{org_id}/metrics/{org_id}/",);
+        let json_files = scan_files(&pattern);
+
+        let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/",);
+        let arrow_files = scan_files(&pattern);
+
+        let mut eligible_arrow_files = vec![];
+
+        for file in arrow_files {
+            if file.as_str().ends_with(FILE_EXT_ARROW) && !wal::should_exclude_file(&file).await {
+                eligible_arrow_files.push(file);
+            }
+        }
+
+        let mut files = json_files;
+        files.extend(eligible_arrow_files);
         if files.is_empty() {
             return Ok(Response::new(resp));
         }
@@ -160,10 +175,52 @@ impl Metrics for Querier {
                 }
             }
             if let Ok(body) = get_file_contents(&source_file) {
-                let name = file.split('/').last().unwrap_or_default();
+                let data = if file.ends_with(FILE_EXT_JSON) {
+                    let mut file_data = body;
+                    // check json file is complete
+                    if !file_data.ends_with(b"\n") {
+                        if let Ok(s) = String::from_utf8(file_data.clone()) {
+                            if let Some(last_line) = s.lines().last() {
+                                if serde_json::from_str::<serde_json::Value>(last_line).is_err() {
+                                    // remove last line
+                                    // filter by stream name if data is for metrics
+                                    file_data =
+                                        file_data[..file_data.len() - last_line.len()].to_vec();
+                                }
+                            }
+                        }
+                    }
+
+                    let metric_key = format!("\"{}\":\"{}\"", meta::prom::NAME_LABEL, &stream_name);
+                    if let Ok(s) = String::from_utf8(file_data.clone()) {
+                        let filtered_lines: Vec<&str> = s
+                            .lines()
+                            .filter(|line| line.contains(&metric_key))
+                            .collect();
+
+                        // Convert the filtered lines back to a single String
+                        let filtered_content = filtered_lines.join("\n");
+
+                        // Convert the String back to a Vec<u8>
+                        filtered_content.into_bytes()
+                    } else {
+                        continue;
+                    }
+                } else {
+                    body
+                };
+
+                let columns = file.split('/').collect::<Vec<&str>>();
+
+                let len = columns.len();
+
+                let name = columns[len - 1];
+                let schema = columns[len - 2];
+
                 resp.files.push(MetricsWalFile {
                     name: name.to_string(),
-                    body,
+                    body: data,
+                    schema: schema.to_string(),
                 });
             }
         }
@@ -175,7 +232,11 @@ impl Metrics for Querier {
                     .await
                     .unwrap_or_default();
             for (name, body) in mem_files {
-                resp.files.push(MetricsWalFile { name, body });
+                resp.files.push(MetricsWalFile {
+                    name,
+                    body,
+                    schema: "".to_string(), // TODO set schema rather than blank value
+                });
             }
         }
 
