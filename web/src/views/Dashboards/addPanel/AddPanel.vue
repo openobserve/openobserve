@@ -319,7 +319,6 @@ export default defineComponent({
     const showViewPanel = ref(false);
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
-      console.log("metadata panel", metadata);
     };
 
     const variablesDataUpdated = (data: any) => {

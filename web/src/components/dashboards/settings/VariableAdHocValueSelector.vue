@@ -37,7 +37,6 @@ export default defineComponent({
     props: ['modelValue', 'variableItem'],
     emits: ['update:modelValue'],
     setup(props: any, { emit }) {
-        console.log('VariableAdHocValueSelector');
 
         // const selectedField = ref(String(props.variableItem?.value?.name));
         const operatorOptions = ['=', '!=', '<', '>', '<=', '>='];
@@ -50,24 +49,15 @@ export default defineComponent({
         const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } = useSelectAutoComplete(options, 'name');
 
         watch(props.variableItem, () => {
-            console.log("props.variableItem", props.variableItem.value);
 
             options.value = props.variableItem?.options;
 
         });
 
         const addFields = () => {
-            // if (!isSelectVisible.value) {
-            //     console.log('Setting isSelectVisible to true');
-            //     isSelectVisible.value = true;
-            // }
             const adhocVariablesTemp = adhocVariables.value;
             adhocVariablesTemp.push({ name: '', operator: operatorOptions[0], value: '', streams: [] });
-            // adhocVariables.value = cloneDeep(adhocVariablesTemp);
-
             emitValue()
-            // console.log("VariableAdHocValueSelector::()()", selectedField.value, selectedOperator.value, inputValue.value);
-
         };
 
         const updateModelValueOfSelect = (index, value) => {
@@ -86,29 +76,14 @@ export default defineComponent({
             emit('update:modelValue', JSON.parse(JSON.stringify(adhocVariables.value)));
         };
 
-        // console.log("VariableAdHocValueSelector::--", selectedField.value, selectedOperator.value, inputValue.value);
-        // watch([selectedField, selectedOperator, inputValue], () => {
-        //     // Emit both selected value and selected operator
-        //     adhocVariables.value = [
-        //         { name: selectedField.value, operator: selectedOperator.value, value: inputValue.value }
-        //     ];
-        //     console.log("VariableAdHocValueSelector::==", adhocVariables.value);
-        //     console.log("VariableAdHocValueSelector::", selectedField.value, selectedOperator.value, inputValue.value);
-        //     emit('update:modelValue', adhocVariables.value);
-        // });
-
         return {
-            // selectedField,
             fieldsFilterFn,
             fieldsFilteredOptions,
-            // isSelectVisible,
             addFields,
             operatorOptions,
             adhocVariables,
             removeField,
             updateModelValueOfSelect
-            // selectedOperator,
-            // inputValue
         };
     },
 });

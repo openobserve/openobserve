@@ -126,7 +126,6 @@ export const getStreamFromQuery = (query: any) => {
     const ast: any = parser.astify(query);
     return ast?.from[0]?.table || '';
   } catch(e: any) {
-    console.log(e)
     return "";
   }
 } 

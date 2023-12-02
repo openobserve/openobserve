@@ -223,8 +223,6 @@ export const usePanelDataLoader = (
     if (panelSchema.value.queryType == "promql") {
       // Iterate through each query in the panel schema
       const queryPromises = panelSchema.value.queries?.map(async (it: any) => {
-        console.log("queryPromises", it);
-
         const { query: query1, metadata: metadata1 } = replaceQueryValue(
           it.query,
           startISOTimestamp,
@@ -281,8 +279,6 @@ export const usePanelDataLoader = (
 
       const sqlqueryPromise = panelSchema.value.queries?.map(
         async (it: any) => {
-          console.log("sqlqueryPromise", it);
-
           const { query: query1, metadata: metadata1 } = replaceQueryValue(
             it.query,
             startISOTimestamp,
@@ -290,15 +286,12 @@ export const usePanelDataLoader = (
             panelSchema.value.queryType
           );
 
-          console.log("query1", query1);
-
           const { query: query2, metadata: metadata2 } = applyAdhocVariables(
             query1,
             panelSchema.value.queryType
           );
 
           const query = query2;
-          console.log("query2", query2);
 
           const metadata = {
             originalQuery: it.query,
@@ -418,35 +411,19 @@ export const usePanelDataLoader = (
    * @return {any} The modified query with replaced values.
    */
   const replaceQueryValue = (
-    
     query: any,
-   
-    startISOTimestamp: any,
-   
-    endISOTimestamp: any,
-   
-    queryType: any
-  
-  ) => {
-    console.log(
-      
-      "replaceQueryValue",
-     
-      query,
-     
-      startISOTimestamp,
-     
-      endISOTimestamp,
-     
-      queryType
-    
 
-    const metadata: any[] = [];);
+    startISOTimestamp: any,
+
+    endISOTimestamp: any,
+
+    queryType: any
+  ) => {
+    const metadata: any[] = [];
 
     //fixed variables value calculations
     //scrape interval by default 15 seconds
     let scrapeInterval =
-     
       store.state.organizationData.organizationSettings.scrape_interval ?? 15;
 
     // timestamp in seconds / chart panel width
@@ -509,11 +486,6 @@ export const usePanelDataLoader = (
     });
 
     if (currentDependentVariablesData?.length) {
-      console.log(
-        "currentDependentVariablesData",
-        currentDependentVariablesData
-      );
-
       currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
         const variableValue = variable.value;
@@ -533,12 +505,7 @@ export const usePanelDataLoader = (
     }
   };
 
-  console.log("currentDependentVariablesData", currentDependentVariablesData);
-
   const applyAdhocVariables = (query: any, queryType: any) => {
-    console.log("checking for ad hoc variables");
-
-    console.log("variablesData(())", variablesData.value?.values);
     const metadata: any[] = [];
 
     const adHocVariables = variablesData.value?.values
@@ -547,25 +514,12 @@ export const usePanelDataLoader = (
       .flat()
       ?.filter((it: any) => it?.operator && it?.name && it?.value);
 
-    console.log("adHocVariables(())", adHocVariables);
-
     if (!adHocVariables.length) {
       return { query, metadata };
     }
 
-    console.log("ad hoc variables found");
-
     // continue if there are any adhoc queries
     if (queryType === "promql") {
-      console.log("inside promql");
-      // const adHocVariables = [
-      //   {
-      //     name: "_timestamp",
-      //     value: startISOTimestamp,
-      //     operator: "=",,
-      //   },
-      // ];
-
       adHocVariables.forEach((variable: any) => {
         metadata.push({
           type: "dynamicVariable",
@@ -580,20 +534,9 @@ export const usePanelDataLoader = (
           variable.operator
         );
       });
-      console.log("query", query);
     }
 
     if (queryType === "sql") {
-      console.log("inside sql");
-
-      // const adHocSQLVariables = [
-      //   {
-      //     name: "kubernetes_namespace_name",
-      //     value: "ziox-alpha1",
-      //     operator: "=",
-      //   },
-      // ];
-
       const queryStream = getStreamFromQuery(query);
 
       const applicableAdHocVariables = adHocVariables.filter((it: any) => {
@@ -609,8 +552,6 @@ export const usePanelDataLoader = (
         });
       });
       query = addLabelsToSQlQuery(query, applicableAdHocVariables);
-
-      console.log("querySQL", query);
     }
 
     return { query, metadata };
@@ -676,8 +617,6 @@ export const usePanelDataLoader = (
   watch(
     () => variablesData.value?.values,
     () => {
-      console.log("variables values changed");
-
       // ensure the query is there
       if (!panelSchema.value.queries?.length) {
         return;
@@ -768,12 +707,6 @@ export const usePanelDataLoader = (
         return false;
       })();
 
-      console.log(
-        "triggerCheck",
-        shouldITriggerTheQueryForOtherVariables,
-        shouldITriggerTheQueryForAdHocVariables
-      );
-
       if (
         shouldITriggerTheQueryForOtherVariables ||
         shouldITriggerTheQueryForAdHocVariables
@@ -807,7 +740,6 @@ export const usePanelDataLoader = (
       observer.disconnect();
     }
   });
-  console.log("panelDataLoader state", toRefs(state));
 
   return {
     ...toRefs(state),

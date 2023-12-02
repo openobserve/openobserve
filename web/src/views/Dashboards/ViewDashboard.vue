@@ -147,11 +147,9 @@ export default defineComponent({
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
-      console.log("variablesDataUpdated", data);
       Object.assign(variablesData, data);
       const variableObj = {};
       data.values.forEach((variable) => {
-        console.log("variableeee", variable);
 
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(

@@ -36,7 +36,6 @@ export default defineComponent({
   },
   setup(props) {
     const queryData = props.metaData?.queries || [] ;
-    console.log("queryData", props.data?.title);
     
     const getRows = (query: any) => {
       const timestampOfStartTime = query.startTime;
