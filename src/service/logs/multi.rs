@@ -27,7 +27,7 @@ use crate::common::{
     meta::{
         alerts::Alert,
         ingestion::{IngestionResponse, StreamStatus},
-        stream::StreamParams,
+        stream::{SchemaRecords, StreamParams},
         usage::UsageType,
         StreamType,
     },
@@ -35,7 +35,7 @@ use crate::common::{
 };
 use crate::service::{
     distinct_values, get_formatted_stream_name,
-    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
+    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file_arrow, TriggerAlertData},
     logs::StreamMeta,
     usage::report_request_usage_stats,
 };
@@ -57,30 +57,6 @@ pub async fn ingest_with_keys(
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     ingest_inner(org_id, in_stream_name, body, extend_json, thread_id).await
-}
-
-/// Ingest a multiline json body
-///
-/// ### Args
-/// - org_id: org id to ingest data in
-/// - in_stream_name: stream to write data in
-/// - body: incoming payload
-/// - thread_id: a unique thread-id associated with this process
-///
-pub async fn ingest(
-    org_id: &str,
-    in_stream_name: &str,
-    body: web::Bytes,
-    thread_id: usize,
-) -> Result<IngestionResponse, anyhow::Error> {
-    ingest_inner(
-        org_id,
-        in_stream_name,
-        body,
-        &AHashMap::default(),
-        thread_id,
-    )
-    .await
 }
 
 async fn ingest_inner(
@@ -132,7 +108,7 @@ async fn ingest_inner(
     .await;
     // End get stream alert
 
-    let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
     let reader = BufReader::new(body.as_ref());
     for line in reader.lines() {
         let line = line?;
@@ -197,7 +173,7 @@ async fn ingest_inner(
         );
 
         // write data
-        let local_trigger = super::add_valid_record(
+        let local_trigger = super::add_valid_record_arrow(
             &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
@@ -236,7 +212,7 @@ async fn ingest_inner(
     // write to file
     let mut stream_file_name = "".to_string();
 
-    let mut req_stats = write_file(
+    let mut req_stats = write_file_arrow(
         &buf,
         thread_id,
         &stream_params,

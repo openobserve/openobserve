@@ -47,6 +47,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let sql = Arc::new(super::sql::Sql::new(req).await?);
     let stream_type = StreamType::from(req.stream_type.as_str());
+
     let session_id = Arc::new(req.job.as_ref().unwrap().session_id.to_string());
     let timeout = if req.timeout > 0 {
         req.timeout as u64
@@ -66,7 +67,7 @@ pub async fn search(
     let mut results = HashMap::new();
     let mut scan_stats = ScanStats::new();
 
-    // search in WAL
+    // search in WAL json
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
     let wal_span = info_span!("service:search:grpc:in_wal", session_id = ?session_id1, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
@@ -98,6 +99,21 @@ pub async fn search(
         .instrument(storage_span),
     );
 
+    // search in WAL arrow
+    let session_id3 = session_id.clone();
+    let sql3 = sql.clone();
+    let wal_span = info_span!("service:search:grpc:in_wal", org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+    let task3 = tokio::task::spawn(
+        async move {
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+                wal::search_arrow(&session_id3, sql3, stream_type, timeout).await
+            } else {
+                Ok((HashMap::new(), ScanStats::default()))
+            }
+        }
+        .instrument(wal_span),
+    );
+
     // merge data from local WAL
     let (batches1, scan_stats1) = match task1.await {
         Ok(result) => result?,
@@ -107,7 +123,6 @@ pub async fn search(
             )))
         }
     };
-
     if !batches1.is_empty() {
         for (key, batch) in batches1 {
             if !batch.is_empty() {
@@ -116,6 +131,7 @@ pub async fn search(
             }
         }
     }
+
     scan_stats.add(&scan_stats1);
 
     // merge data from object storage search
@@ -127,7 +143,6 @@ pub async fn search(
             )))
         }
     };
-
     if !batches2.is_empty() {
         for (key, batch) in batches2 {
             if !batch.is_empty() {
@@ -136,7 +151,29 @@ pub async fn search(
             }
         }
     }
+
     scan_stats.add(&scan_stats2);
+
+    // merge data from local WAL arrow
+    let (batches3, scan_stats3) = match task3.await {
+        Ok(result) => result?,
+        Err(err) => {
+            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                err.to_string(),
+            )))
+        }
+    };
+
+    if !batches3.is_empty() {
+        for (key, batch) in batches3 {
+            if !batch.is_empty() {
+                let value = results.entry(key).or_insert_with(Vec::new);
+                value.push(batch);
+            }
+        }
+    }
+
+    scan_stats.add(&scan_stats3);
 
     // merge all batches
     let (offset, limit) = (0, sql.meta.offset + sql.meta.limit);

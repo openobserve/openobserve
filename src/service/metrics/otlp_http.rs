@@ -31,7 +31,7 @@ use crate::common::{
         self,
         alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
-        prom::{self, MetricType, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+        prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
         stream::{PartitioningDetails, StreamParams},
         usage::UsageType,
         StreamType,
@@ -275,21 +275,6 @@ pub async fn metrics_json_handler(
                         continue;
                     };
 
-                    let mut extra_metadata: AHashMap<String, String> = AHashMap::new();
-                    extra_metadata.insert(
-                        METADATA_LABEL.to_string(),
-                        json::to_string(&metadata).unwrap(),
-                    );
-                    set_schema_metadata(org_id, metric_name, StreamType::Metrics, extra_metadata)
-                        .await
-                        .unwrap();
-
-                    if !schema_exists.has_metadata {
-                        set_schema_metadata(org_id, metric_name, StreamType::Metrics, prom_meta)
-                            .await
-                            .unwrap();
-                    }
-
                     for mut rec in records {
                         // flattening
                         rec = flatten::flatten(&rec).expect("failed to flatten");
@@ -297,6 +282,17 @@ pub async fn metrics_json_handler(
 
                         let local_metric_name =
                             &format_stream_name(rec.get(NAME_LABEL).unwrap().as_str().unwrap());
+
+                        if !schema_exists.has_metadata {
+                            set_schema_metadata(
+                                org_id,
+                                local_metric_name,
+                                StreamType::Metrics,
+                                &prom_meta,
+                            )
+                            .await
+                            .unwrap();
+                        }
 
                         if local_metric_name != metric_name {
                             // check for schema
@@ -452,7 +448,7 @@ pub async fn metrics_json_handler(
         let mut req_stats = write_file(
             &stream_data,
             thread_id,
-            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
+            &StreamParams::new(org_id, org_id, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
         )
@@ -535,12 +531,17 @@ fn process_sum(
     .unwrap()
     .to_string()
     .into();
-    for data_point in sum.get("dataPoints").unwrap().as_array().unwrap_or(
-        sum.get("data_points")
-            .unwrap()
-            .as_array()
-            .unwrap_or(&vec![]),
-    ) {
+
+    let empty_dp = Vec::new();
+    let dp = if sum.get("dataPoints").unwrap().as_array().is_some() {
+        sum.get("dataPoints").unwrap().as_array().unwrap()
+    } else if sum.get("data_points").unwrap().as_array().is_some() {
+        sum.get("data_points").unwrap().as_array().unwrap()
+    } else {
+        &empty_dp
+    };
+
+    for data_point in dp {
         let dp = data_point.as_object().unwrap();
         let mut dp_rec = rec.clone();
         process_data_point(&mut dp_rec, dp);
@@ -573,12 +574,10 @@ fn process_histogram(
             .as_u64()
             .unwrap(),
     );
-    for data_point in hist
-        .get("dataPoints")
-        .unwrap()
-        .as_array()
-        .unwrap_or(&vec![])
-    {
+
+    let dp = get_data_points(hist);
+
+    for data_point in dp.unwrap_or(&vec![]) {
         let dp = data_point.as_object().unwrap();
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_hist_data_point(&mut dp_rec, dp) {
@@ -605,13 +604,10 @@ fn process_summary(
     );
 
     let mut records = vec![];
-    for data_point in summary.get("dataPoints").unwrap().as_array().unwrap_or(
-        summary
-            .get("data_points")
-            .unwrap()
-            .as_array()
-            .unwrap_or(&vec![]),
-    ) {
+
+    let dp = get_data_points(summary);
+
+    for data_point in dp.unwrap_or(&vec![]) {
         let dp = data_point.as_object().unwrap();
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, dp) {
@@ -639,13 +635,9 @@ fn process_gauge(
         json::to_string(&metadata).unwrap(),
     );
 
-    for data_point in gauge.get("dataPoints").unwrap().as_array().unwrap_or(
-        gauge
-            .get("data_points")
-            .unwrap()
-            .as_array()
-            .unwrap_or(&vec![]),
-    ) {
+    let dp = get_data_points(gauge);
+
+    for data_point in dp.unwrap_or(&vec![]) {
         let dp = data_point.as_object().unwrap();
         process_data_point(rec, dp);
         let val_map = rec.as_object_mut().unwrap();
@@ -676,12 +668,10 @@ fn process_exponential_histogram(
             .as_u64()
             .unwrap(),
     );
-    for data_point in hist.get("dataPoints").unwrap().as_array().unwrap_or(
-        hist.get("data_points")
-            .unwrap()
-            .as_array()
-            .unwrap_or(&vec![]),
-    ) {
+
+    let dp = get_data_points(hist);
+
+    for data_point in dp.unwrap_or(&vec![]) {
         let mut dp_rec = rec.clone();
         let dp = data_point.as_object().unwrap();
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, dp) {
@@ -692,6 +682,18 @@ fn process_exponential_histogram(
         }
     }
     records
+}
+
+fn get_data_points(
+    metric: &serde_json::Map<String, serde_json::Value>,
+) -> Option<&Vec<serde_json::Value>> {
+    if metric.get("dataPoints").unwrap().as_array().is_some() {
+        metric.get("dataPoints").unwrap().as_array()
+    } else if metric.get("data_points").unwrap().as_array().is_some() {
+        metric.get("data_points").unwrap().as_array()
+    } else {
+        None
+    }
 }
 
 fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json::Value>) {
@@ -898,7 +900,7 @@ fn process_summary_data_point(
         let attr = attr.as_object().unwrap();
         if let Some(v) = attr.get("value") {
             rec[format_label_name(attr.get("key").unwrap().as_str().unwrap())] =
-                get_attribute_value(v)
+                get_attribute_value(v).into();
         }
     }
     let ts = get_int_value(data_point.get("timeUnixNano").unwrap());
@@ -1023,23 +1025,23 @@ fn set_data_point_value(rec: &mut json::Value, data_point: &json::Map<String, js
     }
 }
 
-fn get_attribute_value(val: &json::Value) -> json::Value {
+fn get_attribute_value(val: &json::Value) -> String {
     if val.get("stringValue").is_some() {
-        val.get("stringValue").unwrap().clone()
+        val.get("stringValue").unwrap().to_string()
     } else if val.get("boolValue").is_some() {
-        val.get("boolValue").unwrap().clone()
+        val.get("boolValue").unwrap().to_string()
     } else if val.get("intValue").is_some() {
-        val.get("intValue").unwrap().clone()
+        val.get("intValue").unwrap().to_string()
     } else if val.get("doubleValue").is_some() {
-        val.get("doubleValue").unwrap().clone()
+        val.get("doubleValue").unwrap().to_string()
     } else if val.get("arrayValue").is_some() {
-        val.get("arrayValue").unwrap().clone()
+        val.get("arrayValue").unwrap().to_string()
     } else if val.get("kvlistValue").is_some() {
-        val.get("kvlistValue").unwrap().clone()
+        val.get("kvlistValue").unwrap().to_string()
     } else if val.get("bytesValue").is_some() {
-        val.get("bytesValue").unwrap().clone()
+        val.get("bytesValue").unwrap().to_string()
     } else {
-        json::Value::Null
+        "".to_string()
     }
 }
 

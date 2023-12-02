@@ -210,6 +210,7 @@ pub async fn search(
                     &diff_fields,
                     &sql,
                     &files,
+                    None,
                     FileType::PARQUET,
                 )
                 .await

@@ -24,6 +24,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
+use crate::common::meta::stream::SchemaRecords;
 use crate::common::{
     infra::{
         cluster,
@@ -37,17 +38,18 @@ use crate::common::{
     utils::{flatten, json},
 };
 use crate::handler::http::request::CONTENT_TYPE_JSON;
+use crate::service::schema::stream_schema_exists;
+use crate::service::usage::report_request_usage_stats;
 use crate::service::{
     db, distinct_values, get_formatted_stream_name,
     ingestion::{
         evaluate_trigger,
         otlp_json::{get_int_value, get_val_for_attr},
-        write_file, TriggerAlertData,
+        write_file_arrow, TriggerAlertData,
     },
-    logs::StreamMeta,
-    schema::stream_schema_exists,
-    usage::report_request_usage_stats,
 };
+
+use super::StreamMeta;
 
 const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";
@@ -151,7 +153,7 @@ pub async fn logs_json_handler(
     );
     // End Register Transforms for stream
 
-    let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
 
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
@@ -339,7 +341,7 @@ pub async fn logs_json_handler(
 
                 local_val = value.as_object_mut().unwrap();
 
-                let local_trigger = super::add_valid_record(
+                let local_trigger = super::add_valid_record_arrow(
                     &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
@@ -380,7 +382,7 @@ pub async fn logs_json_handler(
 
     // write to file
     let mut stream_file_name = "".to_string();
-    let mut req_stats = write_file(
+    let mut req_stats = write_file_arrow(
         &buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::Logs),

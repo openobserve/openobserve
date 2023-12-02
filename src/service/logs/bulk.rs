@@ -19,6 +19,7 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
+use super::StreamMeta;
 use crate::common::{
     infra::{
         cluster,
@@ -40,8 +41,7 @@ use crate::common::{
 };
 use crate::service::{
     db, distinct_values,
-    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-    logs::StreamMeta,
+    ingestion::{evaluate_trigger, write_file_arrow, TriggerAlertData},
     schema::stream_schema_exists,
     usage::report_request_usage_stats,
 };
@@ -257,7 +257,8 @@ pub async fn ingest(
             // only for bulk insert
             let mut status = RecordStatus::default();
             let need_trigger = !stream_trigger_map.contains_key(&stream_name);
-            let local_trigger = super::add_valid_record(
+
+            let local_trigger = super::add_valid_record_arrow(
                 &StreamMeta {
                     org_id: org_id.to_string(),
                     stream_name: stream_name.clone(),
@@ -328,7 +329,7 @@ pub async fn ingest(
         // write to file
         let mut stream_file_name = "".to_string();
 
-        let mut req_stats = write_file(
+        let mut req_stats = write_file_arrow(
             &stream_data.data,
             thread_id,
             &StreamParams::new(org_id, &stream_name, StreamType::Logs),

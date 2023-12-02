@@ -56,10 +56,12 @@ impl TableProvider for StorageProvider {
         resp.push(ctx);
         // register Wal table
         if self.need_wal {
-            let ctx =
+            let wal_ctx_list =
                 wal::create_context(&self.session_id, org_id, stream_name, time_range, filters)
                     .await?;
-            resp.push(ctx);
+            for ctx in wal_ctx_list {
+                resp.push(ctx);
+            }
         }
         Ok(resp)
     }

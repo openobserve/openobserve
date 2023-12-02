@@ -13,13 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use arrow::ipc::reader::StreamReader;
 use bytes::Bytes;
 use datafusion::arrow::json::ReaderBuilder;
-use std::{io::BufReader, sync::Arc};
+use std::{
+    io::{BufReader, Cursor},
+    sync::Arc,
+};
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::{
-    infra::{cluster, config::CONFIG, metrics, storage, wal},
+    infra::{
+        cluster,
+        config::{CONFIG, FILE_EXT_ARROW},
+        metrics, storage, wal,
+    },
     meta::{common::FileMeta, StreamType},
     utils::{
         json,
@@ -28,9 +36,7 @@ use crate::common::{
     },
 };
 use crate::service::{
-    db,
-    schema::{filter_schema_null_fields, schema_evolution},
-    search::datafusion::new_parquet_writer,
+    db, schema::schema_evolution, search::datafusion::new_parquet_writer,
     usage::report_compression_stats,
 };
 
@@ -176,71 +182,84 @@ async fn upload_file(
     metrics::INGEST_WAL_READ_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(file_size);
+    let is_arrow = file_name.ends_with(FILE_EXT_ARROW);
 
-    let mut res_records: Vec<json::Value> = vec![];
-    let mut schema_reader = BufReader::new(buf.as_ref());
-    let inferred_schema = match infer_json_schema(&mut schema_reader, None, stream_type) {
-        Ok(mut inferred_schema) => {
-            drop(schema_reader);
-            filter_schema_null_fields(&mut inferred_schema);
-            inferred_schema
-        }
-        Err(err) => {
-            // Buf has some corrupt json data....ignore such data & move rest of the records
-            log::error!(
-                "[JOB] Failed to infer schema from file: {}, error: {}",
-                path_str,
-                err.to_string()
-            );
+    let arrow_schema;
+    let mut batches = vec![];
+    if !is_arrow {
+        let mut res_records: Vec<json::Value> = vec![];
+        let mut schema_reader = BufReader::new(buf.as_ref());
+        let inferred_schema = match infer_json_schema(&mut schema_reader, None, stream_type) {
+            Ok(inferred_schema) => {
+                drop(schema_reader);
+                inferred_schema
+            }
+            Err(err) => {
+                // Buf has some corrupt json data....ignore such data & move rest of the records
+                log::error!(
+                    "[JOB] Failed to infer schema from file: {}, error: {}",
+                    path_str,
+                    err.to_string()
+                );
 
-            drop(schema_reader);
-            let mut json_reader = BufReader::new(buf.as_ref());
-            let value_reader = arrow::json::reader::ValueIter::new(&mut json_reader, None);
-            for value in value_reader {
-                match value {
-                    Ok(val) => {
-                        res_records.push(val);
-                    }
-                    Err(err) => {
-                        log::error!("[JOB] Failed to parse record: error: {}", err.to_string())
+                drop(schema_reader);
+                let mut json_reader = BufReader::new(buf.as_ref());
+                let value_reader = arrow::json::reader::ValueIter::new(&mut json_reader, None);
+                for value in value_reader {
+                    match value {
+                        Ok(val) => {
+                            res_records.push(val);
+                        }
+                        Err(err) => {
+                            log::error!("[JOB] Failed to parse record: error: {}", err.to_string())
+                        }
                     }
                 }
+                if res_records.is_empty() {
+                    return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
+                }
+                let value_iter = res_records.iter().map(Ok);
+                infer_json_schema_from_iterator(value_iter, stream_type).unwrap()
             }
-            if res_records.is_empty() {
-                return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
-            }
-            let value_iter = res_records.iter().map(Ok);
-            let mut inferred_schema =
-                infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
-            filter_schema_null_fields(&mut inferred_schema);
-            inferred_schema
-        }
-    };
-    let arrow_schema = Arc::new(inferred_schema);
+        };
+        arrow_schema = Arc::new(inferred_schema);
 
-    let mut batches = vec![];
-    if res_records.is_empty() {
-        let json_reader = BufReader::new(buf.as_ref());
-        let json = ReaderBuilder::new(arrow_schema.clone())
-            .build(json_reader)
-            .unwrap();
-        for batch in json {
-            let batch_write = batch.unwrap();
-            batches.push(batch_write);
-        }
-    } else {
-        let mut json = vec![];
-        let mut decoder = ReaderBuilder::new(arrow_schema.clone()).build_decoder()?;
-        for value in res_records {
-            decoder
-                .decode(json::to_string(&value).unwrap().as_bytes())
+        if res_records.is_empty() {
+            let json_reader = BufReader::new(buf.as_ref());
+            let json = ReaderBuilder::new(arrow_schema.clone())
+                .build(json_reader)
                 .unwrap();
-            json.push(decoder.flush()?.unwrap());
+            for batch in json {
+                let batch_write = batch.unwrap();
+                batches.push(batch_write);
+            }
+        } else {
+            let mut json = vec![];
+            let mut decoder = ReaderBuilder::new(arrow_schema.clone()).build_decoder()?;
+            for value in res_records {
+                decoder
+                    .decode(json::to_string(&value).unwrap().as_bytes())
+                    .unwrap();
+                json.push(decoder.flush()?.unwrap());
+            }
+            for batch in json {
+                batches.push(batch);
+            }
+        };
+    } else {
+        let buf_reader = Cursor::new(buf);
+        let stream_reader = StreamReader::try_new(buf_reader, None)?;
+        for read_result in stream_reader {
+            let record_batch = read_result?;
+            batches.push(record_batch);
         }
-        for batch in json {
-            batches.push(batch);
-        }
-    };
+        let schema = if let Some(first_batch) = batches.first() {
+            first_batch.schema()
+        } else {
+            return Err(anyhow::anyhow!("No record batches found".to_string(),));
+        };
+        arrow_schema = schema
+    }
 
     // write metadata
     let mut file_meta = FileMeta {
