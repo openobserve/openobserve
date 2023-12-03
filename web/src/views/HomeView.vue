@@ -117,15 +117,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
       </q-card>
     </div>
-    <div class="row justify-center items-center">
-      <video width="400" height="225" controls>
-        <source
-          src="https://videos.openobserve.ai/OpenObserve_Introduction.mp4"
-          type="video/mp4"
-        />
-        Your browser does not support the video tag.
-      </video>
-    </div>
   </q-page>
 </template>
 
