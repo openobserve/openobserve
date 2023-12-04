@@ -39,3 +39,4 @@ RUN apt-get install -y bpfcc-tools libbpfcc libbpfcc-dev linux-headers-$(uname -
 COPY --from=builder /app/target/release/openobserve /
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
 CMD ["/openobserve"]
+
