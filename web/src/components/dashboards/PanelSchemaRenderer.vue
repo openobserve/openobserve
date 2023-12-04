@@ -156,6 +156,7 @@ export default defineComponent({
       { deep: true }
     );
 
+    // when we get the new metadata from the apis, emit the metadata update
     watch(metadata, () => {
       emit("metadata-update", metadata.value);
     });

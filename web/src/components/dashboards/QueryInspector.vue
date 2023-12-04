@@ -8,7 +8,7 @@
       </div>
       <div class="text-bold q-pb-sm">Panel : {{ dataTitle }}</div>
       <div class="text-bold">Total Query(s) Executed: {{ totalQueries }}</div>
-      <div v-for="(query, index) in (metaData?.queries || [])" :key="query.originalQuery">
+      <div v-for="(query, index) in (metaData?.queries || [])" :key="query?.originalQuery">
         <div class="text-bold q-py-sm">Query: {{ index + 1 }}</div>
             <q-table class="my-sticky-virtscroll-table" virtual-scroll  v-model:pagination="pagination"
               :rows-per-page-options="[0]" :virtual-scroll-sticky-size-start="48" dense :rows="getRows(query)"
