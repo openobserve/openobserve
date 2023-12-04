@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[
                 (val) => !!val.trim() || 'This field is required',
                 (val) =>
-                  /^[A-Za-z0-9 ]+$/.test(val) || 'Input must be alphanumeric',
+                  /^[-A-Za-z0-9 /@/_]+$/.test(val) || 'Input must be alphanumeric',
               ]"
               tabindex="0"
             />
