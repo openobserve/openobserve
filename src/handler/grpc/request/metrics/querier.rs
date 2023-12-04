@@ -192,7 +192,7 @@ impl Metrics for Querier {
                     }
 
                     let metric_key = format!("\"{}\":\"{}\"", meta::prom::NAME_LABEL, &stream_name);
-                    if let Ok(s) = String::from_utf8(file_data.clone()) {
+                    if let Ok(s) = String::from_utf8(file_data) {
                         let filtered_lines: Vec<&str> = s
                             .lines()
                             .filter(|line| line.contains(&metric_key))
