@@ -758,9 +758,24 @@ const useLogs = () => {
         });
 
         if (searchObj.data.queryResults.hits.length > 0) {
-          const firstRecord = searchObj.data.queryResults.hits[0];
+          // Find the index of the record with max attributes
+          const maxAttributesIndex = searchObj.data.queryResults.hits.reduce(
+            (
+              maxIndex: string | number,
+              obj: {},
+              currentIndex: any,
+              array: { [x: string]: {} }
+            ) => {
+              const numAttributes = Object.keys(obj).length;
+              const maxNumAttributes = Object.keys(array[maxIndex]).length;
+              return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
+            },
+            0
+          );
+          const recordwithMaxAttribute =
+            searchObj.data.queryResults.hits[maxAttributesIndex];
 
-          Object.keys(firstRecord).forEach((key) => {
+          Object.keys(recordwithMaxAttribute).forEach((key) => {
             if (!tempFieldsName.includes(key)) {
               queryResult.push({ name: key, type: "Utf8" });
             }
