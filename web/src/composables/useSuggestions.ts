@@ -186,8 +186,6 @@ const useSqlSuggestions = () => {
   };
 
   const updateAutoComplete = () => {
-    autoCompleteSuggestions.value = [];
-    autoCompleteKeywords.value = [];
     autoCompleteKeywords.value.push(...functionKeywords.value);
     autoCompleteKeywords.value.push(...fieldKeywords.value);
     autoCompleteKeywords.value.push(...defaultKeywords);
