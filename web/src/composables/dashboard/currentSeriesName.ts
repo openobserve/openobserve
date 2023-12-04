@@ -3,12 +3,12 @@ import { reactive } from "vue";
 // It is used to keep track of the current series name in tooltip to bold the series name
 const getDefaultHoveredSeries: any = () => {
   return {
-    hoveredSeriesName: "",
-    hoveredSeriesValue: null,
-    offsetX: 0,
-    offsetY: 0,
-    seriesId: "",
-    panelId: -1,
+    hoveredSeriesName: "",    // in use
+    hoveredSeriesValue: null, // in use
+    offsetX: 0,  // not in use
+    offsetY: 0,  // not in use
+    seriesId: "",  // in use
+    panelId: -1,   // in use
   };
 };
 
@@ -42,9 +42,11 @@ const usehoveredSeriesState = () => {
     hoveredSeriesState.offsetY = offsetY;
   };
 
-  const setIndex = (dataIndex: number, seriesIndex: number) => {
+  const setIndex = (dataIndex: number, seriesIndex: number, panelId: any) => {
+    console.log('setting index: ', dataIndex, seriesIndex);
     hoveredSeriesState.dataIndex = dataIndex;
     hoveredSeriesState.seriesIndex = seriesIndex;
+    hoveredSeriesState.panelId = panelId;
   };
 
   const setPanelId = (panelId: number) => {

@@ -475,7 +475,7 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  return { options, extras: { panelId: panelSchema.id } };
+  return { options, extras: { panelId: panelSchema.id, title: panelSchema.title } };
 };
 
 /**

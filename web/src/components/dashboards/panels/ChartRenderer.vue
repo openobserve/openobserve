@@ -85,7 +85,6 @@ export default defineComponent({
       // set current hovered series name in state
       setHoveredSeriesName(params?.seriesName);
       setHoveredSeriesValue(params?.value);
-      setOffset(params?.event?.offsetX ?? 0, params?.event?.offsetY ?? 0);
       setSeriesId(params?.seriesId);
 
       // for timeseries hover
@@ -136,18 +135,13 @@ export default defineComponent({
 
     // dispatch tooltip action for all charts
     watch(
-      hoveredSeriesState,
+      () => [hoveredSeriesState.seriesIndex, hoveredSeriesState.dataIndex],
       () => {
-        // console.log(hoveredSeriesState?.hoveredSeriesValue, "hoveredSeriesState");
-        // console.log(hoveredSeriesState?.hoveredSeriesValue[0].getTime(), hoveredSeriesState.seriesId ,chart?.convertToPixel({ seriesId: hoveredSeriesState?.seriesId }, [hoveredSeriesState?.hoveredSeriesValue[0], null]), "hoveredSeriesState");
-
-        // chart?.dispatchAction({ type: 'showTip', x: hoveredSeriesState?.offsetX, y: hoveredSeriesState?.offsetY });
-        // chart?.dispatchAction({
-        //   type: 'showAxisPointer',
-        //   tooltip: false,
-        // });
-
-        // console.log(JSON.parse(JSON.stringify(hoveredSeriesState)), "hoveredSeriesState");
+        console.log(
+          props?.data?.extras?.panelId + ": ",
+          hoveredSeriesState?.hoveredSeriesValue,
+          "hoveredSeriesState"
+        );
 
         // what if interval is different for two different charts?
         // we need to provide series index, what if at that series index there is no data?
@@ -174,16 +168,7 @@ export default defineComponent({
           type: "highlight",
           seriesName: hoveredSeriesState?.hoveredSeriesName,
         });
-        // console.log(hoveredSeriesState?.offsetX, "---");
-
-        // chart?.dispatchAction({type: "downplay", seriesId: hoveredSeriesState?.hoveredSeriesName});
-
-        // console.log(chart?.getOption(), "hoveredSeriesValue");
-        // const hoveredSeries = chart?.getOption()?.series?.find((series: any) => series?.name === hoveredSeriesState?.hoveredSeriesName);
-
-        // hoveredSeriesValue && Array.isArray(hoveredSeriesValue) && chart?.dispatchAction({ type: 'showTip', seriesIndex: 0, dataIndex: hoveredSeries.findIndex((series: any) => series.value[0] === hoveredSeriesValue[0]) });
-      },
-      { deep: true }
+      }
     );
 
     watch(
@@ -247,6 +232,7 @@ export default defineComponent({
       chart?.on("globalout", () => {
         mouseHoverEffectFn({});
       });
+
       chart?.on("legendselectchanged", legendSelectChangedFn);
       // chart?.on("click", (e: any) => {
       //   console.log(e, "click");
