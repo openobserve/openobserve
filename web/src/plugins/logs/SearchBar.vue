@@ -1605,7 +1605,7 @@ export default defineComponent({
 }
 
 .query-editor-container {
-  height: calc(100% - 37px) !important;
+  height: calc(100% - 30px) !important;
 }
 
 .logs-auto-refresh-interval {
