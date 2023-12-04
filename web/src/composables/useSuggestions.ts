@@ -186,6 +186,8 @@ const useSqlSuggestions = () => {
   };
 
   const updateAutoComplete = () => {
+    autoCompleteSuggestions.value = [];
+    autoCompleteKeywords.value = [];
     autoCompleteKeywords.value.push(...functionKeywords.value);
     autoCompleteKeywords.value.push(...fieldKeywords.value);
     autoCompleteKeywords.value.push(...defaultKeywords);
@@ -194,6 +196,7 @@ const useSqlSuggestions = () => {
 
   const updateFieldKeywords = (fields: any[]) => {
     autoCompleteKeywords.value = [];
+    fieldKeywords.value = [];
     fields.forEach((field: any) => {
       if (field.name == store.state.zoConfig.timestamp_column) {
         return;
@@ -210,6 +213,7 @@ const useSqlSuggestions = () => {
   };
 
   const updateFunctionKeywords = (functions: any[]) => {
+    functionKeywords.value = [];
     functions.forEach((field: any) => {
       const itemObj = {
         label: field.name,
