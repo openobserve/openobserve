@@ -89,20 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardData="currentDashboardData.data"
       :currentTimeObj="currentTimeObj"
       @onDeletePanel="onDeletePanel"
-      @onViewPanel="onViewPanel"
     />
-
-    <!-- view panel dialog -->
-    <q-dialog v-model="showViewPanel">
-      <q-card style="min-width: 95vw; min-height: 90vh;">
-        <ViewPanel
-        :panelId="viewPanelId"
-        :selectedDate="selectedDate"
-        :initialVariableValues="initialVariableValues"
-        @close-panel="() => (showViewPanel = false)" :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-      />
-      </q-card>
-    </q-dialog>
 
     <q-dialog
       v-model="showDashboardSettingsDialog"
@@ -133,18 +120,16 @@ import ExportDashboard from "../../components/dashboards/ExportDashboard.vue";
 import DashboardSettings from "./DashboardSettings.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
-import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 
 export default defineComponent({
   name: "ViewDashboard",
-  emits: ["onDeletePanel", "onViewPanel"],
+  emits: ["onDeletePanel"],
   components: {
     DateTimePickerDashboard,
     AutoRefreshInterval,
     ExportDashboard,
     DashboardSettings,
     RenderDashboardCharts,
-    ViewPanel
   },
   setup() {
     const { t } = useI18n();
@@ -243,11 +228,6 @@ export default defineComponent({
     // refresh interval v-model
     const refreshInterval = ref(0);
 
-    const showViewPanel = ref(false);
-    // holds the view panel id
-    const viewPanelId = ref("");
-
-
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
       currentTimeObj.value = {
@@ -340,11 +320,6 @@ export default defineComponent({
       await loadDashboard();
     };
 
-    const onViewPanel = (panelId: any) => {
-      viewPanelId.value = panelId;
-      showViewPanel.value = true;
-    };
-
     return {
       currentDashboardData,
       goBackToDashboardList,
@@ -360,7 +335,6 @@ export default defineComponent({
       // ----------------
       refreshData,
       onDeletePanel,
-      onViewPanel,
       variablesData,
       variablesDataUpdated,
       showDashboardSettingsDialog,
@@ -368,8 +342,6 @@ export default defineComponent({
       loadDashboard,
       initialVariableValues,
       getQueryParamsForDuration,
-      viewPanelId,
-      showViewPanel,
     };
   },
 });

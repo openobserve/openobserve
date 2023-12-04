@@ -71,6 +71,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </grid-item>
       </grid-layout>
     </div>
+
+    <!-- view panel dialog -->
+    <q-dialog v-model="showViewPanel">
+      <q-card style="min-width: 95vw; min-height: 90vh">
+        <ViewPanel
+          :panelId="viewPanelId"
+          :currentTimeObj="currentTimeObj"
+          :initialVariableValues="initialVariableValues"
+          @close-panel="() => (showViewPanel = false)"
+          :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+        />
+      </q-card>
+    </q-dialog>
     <div v-if="!dashboardData.panels?.length">
       <!-- if data not available show nodata component -->
       <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
@@ -92,6 +105,7 @@ import { useRoute } from "vue-router";
 import { updateDashboard } from "../../utils/commons";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
+import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -108,6 +122,7 @@ export default defineComponent({
     PanelContainer,
     NoPanel,
     VariablesValueSelector,
+    ViewPanel,
   },
   setup(props: any, { emit }) {
     const { t } = useI18n();
@@ -116,6 +131,10 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
     const gridLayoutRef = ref(null);
+
+    const showViewPanel = ref(false);
+    // holds the view panel id
+    const viewPanelId = ref("");
 
     // variables data
     const variablesData = reactive({});
@@ -220,6 +239,7 @@ export default defineComponent({
     };
 
     return {
+      store,
       addPanelData,
       t,
       movedEvent,
@@ -232,6 +252,8 @@ export default defineComponent({
       getDashboardLayout,
       gridLayoutRef,
       layoutUpdate,
+      showViewPanel,
+      viewPanelId,
     };
   },
   methods: {
@@ -239,7 +261,8 @@ export default defineComponent({
       this.$emit("onDeletePanel", panelId);
     },
     onViewPanel(panelId) {
-      this.$emit("onViewPanel", panelId);
+      this.viewPanelId = panelId;
+      this.showViewPanel = true;
     },
   },
 });
