@@ -354,7 +354,7 @@ export default defineComponent({
     });
 
     onActivated(async () => {
-      if (!searchObj.loading) updateStreams();
+      // if (!searchObj.loading) updateStreams();
       if (
         searchObj.organizationIdetifier !=
         store.state.selectedOrganization.identifier
