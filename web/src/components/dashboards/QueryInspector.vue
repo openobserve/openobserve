@@ -34,7 +34,7 @@ export default defineComponent({
       required: true
     }
   },
-  setup(props) {
+  setup(props: any) {
     const queryData = props.metaData?.queries || [] ;
     
     const getRows = (query: any) => {
