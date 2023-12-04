@@ -51,7 +51,7 @@ log {
       >
     </div>
     <div style="margin-left: 20px;" >
-      Check further documnentation at
+      Check further documentation at
       <a target="_blank"
         href="https://axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve/"
         >https://axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve/</a
