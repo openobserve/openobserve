@@ -31,7 +31,7 @@ use crate::common::{
     infra::{
         cache::tmpfs,
         cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
-        config::{CONFIG, FILE_EXT_JSON},
+        config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
     },
     meta::{
         search::{SearchType, Session as SearchSession},
@@ -39,6 +39,7 @@ use crate::common::{
         StreamType,
     },
 };
+use crate::handler::grpc::cluster_rpc;
 use crate::service::{
     db,
     search::{
@@ -49,7 +50,6 @@ use crate::service::{
         MetadataMap,
     },
 };
-use crate::{common::infra::config::FILE_EXT_ARROW, handler::grpc::cluster_rpc};
 
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip_all)]
 pub(crate) async fn create_context(
