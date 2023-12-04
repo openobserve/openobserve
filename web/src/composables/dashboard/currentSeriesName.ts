@@ -8,13 +8,16 @@ const getDefaultHoveredSeries: any = () => {
     offsetX: 0,
     offsetY: 0,
     seriesId: "",
-    dataIndex: -1,
-    seriesIndex: -1,
     panelId: -1,
   };
 };
 
-const hoveredSeriesState: any = reactive({ ...getDefaultHoveredSeries() });
+const hoveredSeriesState: any = reactive({
+  ...getDefaultHoveredSeries(),
+  flag: true,
+  dataIndex: -1,
+  seriesIndex: -1,
+});
 
 const usehoveredSeriesState = () => {
   // set the current series name (will be set at chartrenderer on mouseover)
@@ -42,11 +45,11 @@ const usehoveredSeriesState = () => {
   const setIndex = (dataIndex: number, seriesIndex: number) => {
     hoveredSeriesState.dataIndex = dataIndex;
     hoveredSeriesState.seriesIndex = seriesIndex;
-  }
+  };
 
-  const setPanelId = (panelId: number) => {    
+  const setPanelId = (panelId: number) => {
     panelId && (hoveredSeriesState.panelId = panelId);
-  }
+  };
 
   return {
     hoveredSeriesState,
@@ -56,7 +59,7 @@ const usehoveredSeriesState = () => {
     setSeriesId,
     resetHoveredSeriesState,
     setIndex,
-    setPanelId
+    setPanelId,
   };
 };
 

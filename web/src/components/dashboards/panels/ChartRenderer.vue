@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="chart-renderer"
     ref="chartRef"
     id="chart1"
+    @mouseenter="() => (hoveredSeriesState.panelId = data?.extras?.panelId)"
+    @mouseleave="hoveredSeriesState.panelId = -1"
     style="height: 100%; width: 100%"
   ></div>
 </template>
@@ -36,6 +38,9 @@ import {
 import * as echarts from "echarts";
 import { useStore } from "vuex";
 import usehoveredSeriesState from "../../../composables/dashboard/currentSeriesName";
+import { throttle } from "lodash-es";
+
+let flag = true;
 
 export default defineComponent({
   name: "ChartRenderer",
@@ -84,8 +89,8 @@ export default defineComponent({
       setSeriesId(params?.seriesId);
 
       // for timeseries hover
-      setIndex(params.dataIndex, params.seriesIndex)
-      setPanelId(props?.data?.extras?.panelId);
+      // setIndex(params.dataIndex, params.seriesIndex);
+      // setPanelId(props?.data?.extras?.panelId);
 
       // scroll legend upto current series index
       const legendOption = chart?.getOption()?.legend[0];
@@ -98,7 +103,7 @@ export default defineComponent({
 
     const mouseOutEffectFn = () => {
       resetHoveredSeriesState();
-      setPanelId(props.data?.extras?.panelId);
+      // setPanelId(props.data?.extras?.panelId);
     };
 
     const legendSelectChangedFn = (params: any) => {
@@ -144,11 +149,27 @@ export default defineComponent({
 
         // console.log(JSON.parse(JSON.stringify(hoveredSeriesState)), "hoveredSeriesState");
 
-        chart?.dispatchAction({
-          type: "showTip",
-          seriesIndex: hoveredSeriesState?.seriesIndex,
-          dataIndex: hoveredSeriesState?.dataIndex,
-        });
+        // what if interval is different for two different charts?
+        // we need to provide series index, what if at that series index there is no data?
+        // console.log(props.data.extras.panelId,hoveredSeriesState.panelId, "panelId");
+
+        if (
+          props?.data?.extras?.panelId &&
+          props?.data?.extras?.panelId != hoveredSeriesState?.panelId &&
+          hoveredSeriesState?.panelId != -1
+        ) {
+          // console.log("watcher inside");
+          console.log(
+            hoveredSeriesState?.seriesIndex,
+            hoveredSeriesState?.dataIndex,
+            "called"
+          );
+          chart?.dispatchAction({
+            type: "showTip",
+            seriesIndex: hoveredSeriesState?.seriesIndex,
+            dataIndex: hoveredSeriesState?.dataIndex,
+          });
+        }
         chart?.dispatchAction({
           type: "highlight",
           seriesName: hoveredSeriesState?.hoveredSeriesName,
@@ -188,7 +209,7 @@ export default defineComponent({
         chart?.on("mouseout", mouseOutEffectFn);
         chart?.on("globalout", () => {
           mouseHoverEffectFn({});
-          setPanelId(-1);
+          // setPanelId(-1);
         });
         chart?.on("legendselectchanged", legendSelectChangedFn);
 
@@ -200,6 +221,13 @@ export default defineComponent({
         });
       }
     );
+
+    const fn = throttle((params) => {
+      // console.log(params);
+      // for timeseries hover
+      // setIndex(params.batch[0].dataIndex, params.batch[0].seriesIndex);
+      // setPanelId(props?.data?.extras?.panelId);
+    }, 100);
 
     onMounted(async () => {
       await nextTick();
@@ -220,9 +248,52 @@ export default defineComponent({
         mouseHoverEffectFn({});
       });
       chart?.on("legendselectchanged", legendSelectChangedFn);
-      // chart?.on("mousemove", (e: any) => { console.log(e, "mousemove") });
-      // chart?.on("mouseover", (e: any) => { console.log(e, "mouseover") });
-      // chart?.on("downplay", (e: any) => { console.log(e, "mousemove") });
+      // chart?.on("click", (e: any) => {
+      //   console.log(e, "click");
+      // });
+      // chart?.on("dblclick", (e: any) => {
+      //   console.log(e, "dblclick");
+      // });
+      // chart?.on("mousedown", (e: any) => {
+      //   console.log(e, "mousedown");
+      // });
+      // chart?.on("mousemove", (e: any) => {
+      //   console.log(e, "mousemove");
+      // });
+      // chart?.on("mouseup", (e: any) => {
+      //   console.log(e, "mousedown");
+      // });
+      // chart?.on("mouseover", (e: any) => {
+      //   console.log(e, "mouseover");
+      // });
+      // chart?.on("mouseout", (e: any) => {
+      //   console.log(e, "mouseout");
+      // });
+      // chart?.on("downplay", (params: any) => {
+      //   fn(params);
+      // });
+      chart?.on("downplay", (params: any) => {
+        // console.log(params, "Called");
+
+        // setPanelId(props.data.extras.panelId);
+        // if(flag){
+        //   // console.log("calleddddddddddddd");
+        //   setPanelId(props?.data?.extras?.panelId);
+        //   flag=false;
+        // }
+        // console.log( props.data.extras.panelId, hoveredSeriesState.panelId ,"downplay");
+        // console.log(props?.data?.extras?.panelId, hoveredSeriesState?.panelId, "downplay");
+        // if(props.data.extras.panelId != hoveredSeriesState.panelId && hoveredSeriesState.panelId != -1){
+
+        // setIndex(-1, -1);
+        // console.log(params);
+
+        setIndex(params?.batch[0]?.dataIndex, params?.batch[0]?.seriesIndex);
+        // }
+      });
+      chart?.on("contextmenu", (e: any) => {
+        console.log(e, "contextmenu");
+      });
 
       emit("updated:chart", {
         start: chart?.getOption()?.dataZoom[0]?.startValue || 0,
@@ -293,7 +364,7 @@ export default defineComponent({
       },
       { deep: true }
     );
-    return { chartRef };
+    return { chartRef, hoveredSeriesState };
   },
 });
 </script>
