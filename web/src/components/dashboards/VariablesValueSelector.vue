@@ -303,7 +303,7 @@ export default defineComponent({
                 .then((res) => {
                   obj.isLoading = false; // Reset loading state
 
-                  const fieldsObj = {};
+                  const fieldsObj: any = {};
 
                   res.data.list.forEach((item: any) => {
                     const name = item.name;
@@ -317,7 +317,7 @@ export default defineComponent({
                       }
 
                       const existingEntry = fieldsObj[fieldName].find(
-                        (entry) =>
+                        (entry: any) =>
                           entry.name === name &&
                           entry.stream_type === stream_type
                       );

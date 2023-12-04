@@ -57,9 +57,9 @@ export default defineComponent({
         ["Dynamic Variable(s)",],
       ];
 
-      const variableRows = [];
-      const fixedVariableRows = [];
-      const dynamicVariableRows = [];
+      const variableRows: any[] = [];
+      const fixedVariableRows: any[] = [];
+      const dynamicVariableRows: any[] = [];
 
       query.variables.forEach((variable: any) => {
         if (variable.type === 'variable') {

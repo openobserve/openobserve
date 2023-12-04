@@ -55,7 +55,7 @@ export default defineComponent({
             emitValue()
         };
 
-        const updateModelValueOfSelect = (index, value) => {
+        const updateModelValueOfSelect = (index: number, value: any) => {
             adhocVariables.value[index].name = value.name
             adhocVariables.value[index].streams = value.streams
             emitValue()
