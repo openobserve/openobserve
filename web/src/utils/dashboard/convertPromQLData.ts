@@ -125,7 +125,8 @@ export const convertPromQLData = (
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
       extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       formatter: function (name: any) {
-        if(hoveredSeriesState.panelId != panelSchema.id) return "";
+        // show tooltip for hovered panel only for other we only need axis so just return empty string
+        if (hoveredSeriesState.panelId != panelSchema.id) return "";
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
@@ -171,7 +172,6 @@ export const convertPromQLData = (
           fontSize: 12,
           show: true,
           formatter: function (name: any) {
-        // if(hoveredSeriesState.panelId != panelSchema.id) return "";
             if (name.axisDimension == "y")
               return formatUnitValue(
                 getUnitValue(
@@ -475,7 +475,7 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  return { options, extras: { panelId: panelSchema.id, title: panelSchema.title } };
+  return { options, extras: { panelId: panelSchema.id } };
 };
 
 /**

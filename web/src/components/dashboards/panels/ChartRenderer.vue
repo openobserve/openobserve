@@ -38,9 +38,6 @@ import {
 import * as echarts from "echarts";
 import { useStore } from "vuex";
 import usehoveredSeriesState from "../../../composables/dashboard/currentSeriesName";
-import { throttle } from "lodash-es";
-
-let flag = true;
 
 export default defineComponent({
   name: "ChartRenderer",
@@ -63,16 +60,8 @@ export default defineComponent({
     };
 
     // currently hovered series state
-    const {
-      hoveredSeriesState,
-      setHoveredSeriesName,
-      setOffset,
-      setHoveredSeriesValue,
-      setSeriesId,
-      resetHoveredSeriesState,
-      setIndex,
-      setPanelId,
-    } = usehoveredSeriesState();
+    const { hoveredSeriesState, setHoveredSeriesName, setIndex } =
+      usehoveredSeriesState();
 
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
@@ -84,12 +73,6 @@ export default defineComponent({
 
       // set current hovered series name in state
       setHoveredSeriesName(params?.seriesName);
-      setHoveredSeriesValue(params?.value);
-      setSeriesId(params?.seriesId);
-
-      // for timeseries hover
-      // setIndex(params.dataIndex, params.seriesIndex);
-      // setPanelId(props?.data?.extras?.panelId);
 
       // scroll legend upto current series index
       const legendOption = chart?.getOption()?.legend[0];
@@ -101,8 +84,8 @@ export default defineComponent({
     };
 
     const mouseOutEffectFn = () => {
-      resetHoveredSeriesState();
-      // setPanelId(props.data?.extras?.panelId);
+      // reset current hovered series name in state
+      setHoveredSeriesName("");
     };
 
     const legendSelectChangedFn = (params: any) => {
@@ -137,33 +120,23 @@ export default defineComponent({
     watch(
       () => [hoveredSeriesState.seriesIndex, hoveredSeriesState.dataIndex],
       () => {
-        console.log(
-          props?.data?.extras?.panelId + ": ",
-          hoveredSeriesState?.hoveredSeriesValue,
-          "hoveredSeriesState"
-        );
-
-        // what if interval is different for two different charts?
-        // we need to provide series index, what if at that series index there is no data?
-        // console.log(props.data.extras.panelId,hoveredSeriesState.panelId, "panelId");
-
         if (
           props?.data?.extras?.panelId &&
           props?.data?.extras?.panelId != hoveredSeriesState?.panelId &&
           hoveredSeriesState?.panelId != -1
         ) {
-          // console.log("watcher inside");
-          console.log(
-            hoveredSeriesState?.seriesIndex,
-            hoveredSeriesState?.dataIndex,
-            "called"
-          );
           chart?.dispatchAction({
             type: "showTip",
             seriesIndex: hoveredSeriesState?.seriesIndex,
             dataIndex: hoveredSeriesState?.dataIndex,
           });
         }
+      }
+    );
+
+    watch(
+      () => hoveredSeriesState?.hoveredSeriesName,
+      () => {
         chart?.dispatchAction({
           type: "highlight",
           seriesName: hoveredSeriesState?.hoveredSeriesName,
@@ -194,7 +167,8 @@ export default defineComponent({
         chart?.on("mouseout", mouseOutEffectFn);
         chart?.on("globalout", () => {
           mouseHoverEffectFn({});
-          // setPanelId(-1);
+          setIndex(-1, -1, -1);
+          setHoveredSeriesName("");
         });
         chart?.on("legendselectchanged", legendSelectChangedFn);
 
@@ -231,6 +205,8 @@ export default defineComponent({
       chart?.on("mouseout", mouseOutEffectFn);
       chart?.on("globalout", () => {
         mouseHoverEffectFn({});
+        setIndex(-1, -1, -1);
+        setHoveredSeriesName("");
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
@@ -259,28 +235,15 @@ export default defineComponent({
       //   fn(params);
       // });
       chart?.on("downplay", (params: any) => {
-        // console.log(params, "Called");
-
-        // setPanelId(props.data.extras.panelId);
-        // if(flag){
-        //   // console.log("calleddddddddddddd");
-        //   setPanelId(props?.data?.extras?.panelId);
-        //   flag=false;
-        // }
-        // console.log( props.data.extras.panelId, hoveredSeriesState.panelId ,"downplay");
-        // console.log(props?.data?.extras?.panelId, hoveredSeriesState?.panelId, "downplay");
-        // if(props.data.extras.panelId != hoveredSeriesState.panelId && hoveredSeriesState.panelId != -1){
-
-        // setIndex(-1, -1);
-        // console.log(params);
-
-        setIndex(params?.batch[0]?.dataIndex, params?.batch[0]?.seriesIndex);
-        // }
+        // downplay event will only called by currently hovered panel else it will go into infinite loop
+        if (props.data.extras?.panelId == hoveredSeriesState?.panelId) {
+          setIndex(
+            params?.batch?.[0]?.dataIndex,
+            params?.batch?.[0]?.seriesIndex,
+            props?.data?.extras?.panelId || -1
+          );
+        }
       });
-      chart?.on("contextmenu", (e: any) => {
-        console.log(e, "contextmenu");
-      });
-
       emit("updated:chart", {
         start: chart?.getOption()?.dataZoom[0]?.startValue || 0,
         end: chart?.getOption()?.dataZoom[0]?.endValue || 0,
