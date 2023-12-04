@@ -631,6 +631,13 @@ export default defineComponent({
         id: getUUID(),
       };
     });
+    this.formData.query_condition.conditions =
+      this.formData.query_condition.conditions.map((condition: any) => {
+        return {
+          ...condition,
+          id: getUUID(),
+        };
+      });
   },
   computed: {
     getFormattedDestinations: function () {
