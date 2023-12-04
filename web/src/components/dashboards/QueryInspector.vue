@@ -4,7 +4,7 @@
       <div class="row items-center">
         <div class="text-bold text-h6 q-pb-lg">Query Inspector</div>
         <q-space />
-        <q-btn icon="close" class="q-mb-lg" flat round dense v-close-popup />
+        <q-btn icon="close" class="q-mb-lg" flat round dense v-close-popup = "true"/>
       </div>
       <div class="text-bold q-pb-sm">Panel : {{ dataTitle }}</div>
       <div class="text-bold">Total Query(s) Executed: {{ totalQueries }}</div>
