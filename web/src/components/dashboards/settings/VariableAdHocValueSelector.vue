@@ -1,6 +1,6 @@
 <template>
     <div class="row items-center">
-        <div class="q-mb-sm title" no-caps no-outline rounded>{{ variableItem?.name }}</div>
+        <div class="q-mb-sm title" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'" no-caps no-outline rounded>{{ variableItem?.name }}</div>
         <div class="row no-wrap items-center q-mb-sm" v-for="(item, index) in adhocVariables" :key="index">
             <q-select filled outlined dense :model-value="adhocVariables[index].name"
                 :display-value="adhocVariables[index].name ? adhocVariables[index].name : variableItem.isLoading ? '(No Data Found)' : ''"
@@ -19,8 +19,8 @@
                 :display-value="adhocVariables[index].operator ? adhocVariables[index].operator : ''"
                 :options="operatorOptions" style="width: auto" class="operator" />
             <q-input v-model="adhocVariables[index].value" placeholder="Enter Value" dense filled debounce="1000" style="width: 125px" class="" />
-            <q-btn class="close" size="xs" padding="13px 2px" square flat dense @click="removeField(index)" icon="close" />
-            <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border">AND</div>
+            <q-btn class="close" size="xs" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'" padding="13px 2px" square flat dense @click="removeField(index)" icon="close" />
+            <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div>
         </div>
         <q-btn class="text-bold no-border q-ml-xs q-mb-sm" no-caps no-outline rounded icon="add" padding="xs"
             @click="addFields" />
@@ -30,14 +30,14 @@
 <script lang="ts">
 import { defineComponent, ref, toRef, watch, type Ref, toRefs } from 'vue';
 import { useSelectAutoComplete } from '../../../composables/useSelectAutocomplete';
-import { cloneDeep } from 'lodash-es';
+import { useStore } from "vuex";
 
 export default defineComponent({
     name: 'VariableAdHocValueSelector',
     props: ['modelValue', 'variableItem'],
     emits: ['update:modelValue'],
     setup(props: any, { emit }) {
-
+        const store = useStore();
         const operatorOptions = ['=', '!=', '<', '>', '<=', '>='];
         const options = toRef(props.variableItem, 'options');
         const { modelValue: adhocVariables } = toRefs(props)
@@ -78,7 +78,8 @@ export default defineComponent({
             operatorOptions,
             adhocVariables,
             removeField,
-            updateModelValueOfSelect
+            updateModelValueOfSelect,
+            store
         };
     },
 });
@@ -88,14 +89,14 @@ export default defineComponent({
 .and-border {
     padding: 4px 6px;
     border-radius: 4px;
-    background-color: $grey-4;
+    // background-color: $grey-4;
     font-size: smaller;
 }
 
 .title {
     padding: 10px 8px;
     border-radius: 4px;
-    background-color: $grey-4;
+    // background-color: $grey-4;
     font-size: small;
     font-weight: bold;
 }
@@ -110,7 +111,7 @@ export default defineComponent({
     // border-top: 1px solid $grey-4;
     border-left: 1px solid $grey-4;
     // border-bottom: 1px solid $grey-4;
-    background-color: $grey-3;
+    // background-color: $grey-3;
     border-radius: 0 !important;
 }
 </style>
