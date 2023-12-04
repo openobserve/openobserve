@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width">
-    <div class="row items-center no-wrap q-mx-lg q-my-sm">
+    <div class="row items-center no-wrap q-mx-md q-my-sm">
       <div class="flex items-center" data-test="add-alert-title">
         <div
           class="flex justify-center items-center q-mr-md cursor-pointer"
