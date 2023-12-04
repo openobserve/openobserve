@@ -27,6 +27,19 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Chan
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+use crate::common::{
+    infra::{
+        cache::tmpfs,
+        cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
+        config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
+    },
+    meta::{
+        search::{SearchType, Session as SearchSession},
+        stream::ScanStats,
+        StreamType,
+    },
+};
+use crate::handler::grpc::cluster_rpc;
 use crate::service::{
     db,
     search::{
@@ -36,22 +49,6 @@ use crate::service::{
         },
         MetadataMap,
     },
-};
-use crate::{common::infra::config::FILE_EXT_ARROW, handler::grpc::cluster_rpc};
-use crate::{
-    common::{
-        infra::{
-            cache::tmpfs,
-            cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
-            config::{CONFIG, FILE_EXT_JSON},
-        },
-        meta::{
-            search::{SearchType, Session as SearchSession},
-            stream::ScanStats,
-            StreamType,
-        },
-    },
-    handler::grpc::cluster_rpc::MetricsWalFile,
 };
 
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip_all)]
@@ -73,10 +70,11 @@ pub(crate) async fn create_context(
         )]);
     }
 
-    let mut json_files: Vec<MetricsWalFile> = Vec::new();
+    let mut num_arrow_files = 0;
+    let mut num_json_files = 0;
     let mut arrow_scan_stats = ScanStats::new();
     let mut json_scan_stats = ScanStats::new();
-    let mut num_arrow_files = 0;
+
     let metadata = HashMap::new();
     let mut record_batches_meta: HashMap<String, (Schema, Vec<RecordBatch>)> = HashMap::new();
 
@@ -86,12 +84,11 @@ pub(crate) async fn create_context(
         let file_name = format!("/{work_dir}/{}", file.name);
 
         if file.name.ends_with(FILE_EXT_JSON) {
+            num_json_files += 1;
             json_scan_stats.original_size += file.body.len() as i64;
-            tmpfs::set(&file_name, file.clone().body.into()).expect("tmpfs set success");
-            json_files.push(file);
+            tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
         } else if file.name.ends_with(FILE_EXT_ARROW) {
             num_arrow_files += 1;
-
             let record_batch_meta = record_batches_meta
                 .entry(file.schema)
                 .or_insert_with(|| (Schema::empty().with_metadata(metadata.clone()), Vec::new()));
@@ -116,7 +113,7 @@ pub(crate) async fn create_context(
     }
 
     arrow_scan_stats.files = num_arrow_files;
-    json_scan_stats.files = json_files.len() as i64;
+    json_scan_stats.files = num_json_files;
 
     log::info!(
         "promql->wal->search: load files json :{} , scan_size {} , arrow :{} , scan_size {}",
