@@ -28,6 +28,7 @@ use crate::common::{
     utils::json,
 };
 
+pub mod alert_manager;
 pub mod destinations;
 pub mod templates;
 pub mod triggers;
