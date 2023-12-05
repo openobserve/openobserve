@@ -281,6 +281,7 @@ const useLogs = () => {
 
         let selectedStream = { label: "", value: "" };
 
+        searchObj.data.stream.streamLists = [];
         searchObj.data.streamResults.list.forEach((item: any) => {
           const itemObj: {
             label: string;
