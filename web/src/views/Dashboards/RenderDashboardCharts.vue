@@ -149,19 +149,20 @@ export default defineComponent({
       panelId: -1,
       dataIndex: -1,
       seriesIndex: -1,
+      hoveredTime: null,
       setHoveredSeriesName: function (name: string) {
-        console.log("Called");
-        
         hoveredSeriesState.value.hoveredSeriesName = name ?? "";
       },
       setIndex: function (
         dataIndex: number,
         seriesIndex: number,
-        panelId: any
+        panelId: any,
+        hoveredTime?: any
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
         hoveredSeriesState.value.panelId = panelId ?? -1;
+        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
       },
     });
 

@@ -116,7 +116,7 @@ export default defineComponent({
 
   // hovered series state
   // used to show tooltip axis for all charts
-  const hoveredSeriesState: any = inject("hoveredSeriesState");
+  const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(

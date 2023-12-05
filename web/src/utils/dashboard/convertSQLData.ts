@@ -46,6 +46,9 @@ export const convertSQLData = (
     return { options: null };
   }
 
+  // flag to check if the data is time series
+  let isTimeSeriesFlag = false;
+
   // get the x axis key
   const getXAxisKeys = () => {
     return panelSchema?.queries[0]?.fields?.x?.length
@@ -231,6 +234,8 @@ export const convertSQLData = (
         },
       },
       formatter: function (name: any) {
+        // show tooltip for hovered panel only for other we only need axis so just return empty string
+        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
         if (name.length == 0) return "";
 
         // get the current series index from name
@@ -474,6 +479,8 @@ export const convertSQLData = (
         // scatter chart with single x and y axis(single or multiple)
       } else {
         options.tooltip.formatter = function (name: any) {
+          // show tooltip for hovered panel only for other we only need axis so just return empty string
+          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
           if (name.length == 0) return "";
 
           // get the current series index from name
@@ -594,6 +601,8 @@ export const convertSQLData = (
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
         formatter: function (name: any) {
+          // show tooltip for hovered panel only for other we only need axis so just return empty string
+          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
               name.value,
@@ -636,6 +645,8 @@ export const convertSQLData = (
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
         formatter: function (name: any) {
+          // show tooltip for hovered panel only for other we only need axis so just return empty string
+          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
               name.value,
@@ -797,6 +808,8 @@ export const convertSQLData = (
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
         formatter: (params: any) => {
+          // show tooltip for hovered panel only for other we only need axis so just return empty string
+          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
           // we have value[1] which return yaxis index
           // it is used to get y axis data
           return `${
@@ -1113,6 +1126,9 @@ export const convertSQLData = (
 
     //if x axis has time series
     if (field || timestampField) {
+      // set timeseries flag as a true
+      isTimeSeriesFlag = true;
+
       // if timezone is UTC then simply return x axis value which will be in UTC (note that need to remove Z from timezone string)
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
@@ -1145,6 +1161,8 @@ export const convertSQLData = (
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
+        // show tooltip for hovered panel only for other we only need axis so just return empty string
+        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
@@ -1232,6 +1250,9 @@ export const convertSQLData = (
     const isTimeStampData = isTimeStamp(sample);
 
     if (isTimeSeriesData || isTimeStampData) {
+      // set timeseries flag as a true
+      isTimeSeriesFlag = true;
+
       options?.series?.map((seriesObj: any) => {
         if (isTimeSeriesData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
@@ -1256,6 +1277,8 @@ export const convertSQLData = (
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
+        // show tooltip for hovered panel only for other we only need axis so just return empty string
+        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
@@ -1330,7 +1353,10 @@ export const convertSQLData = (
     }
   }
 
-  return { options };
+  return {
+    options,
+    extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
+  };
 };
 
 /**

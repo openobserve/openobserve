@@ -35,7 +35,7 @@ export const convertPromQLData = (
   searchQueryData: any,
   store: any,
   chartPanelRef: any,
-  hoveredSeriesState?: any
+  hoveredSeriesState: any
 ) => {
   // if no data than return it
   if (
@@ -472,7 +472,8 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  return { options, extras: { panelId: panelSchema.id } };
+  // promql query will be always timeseries
+  return { options, extras: { panelId: panelSchema?.id, isTimeSeries: true } };
 };
 
 /**

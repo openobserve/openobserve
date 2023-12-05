@@ -19,13 +19,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="chart-renderer"
     ref="chartRef"
     id="chart1"
-    @mouseenter="() => (hoveredSeriesState.panelId = data?.extras?.panelId)"
-    @mouseleave="hoveredSeriesState.panelId = -1"
+    @mouseenter="
+      () => {
+        // if hoveredSeriesState is not null then set panelId
+        if (hoveredSeriesState)
+          hoveredSeriesState.panelId = data?.extras?.panelId;
+      }
+    "
+    @mouseleave="
+      () => {
+        // if hoveredSeriesState is not null then set -1
+        if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
+      }
+    "
     style="height: 100%; width: 100%"
   ></div>
 </template>
 
 <script lang="ts">
+// Find the index of the nearest value in a sorted array
+// used in timeseries hovering across all charts to find nearest dataindex
+function findNearestIndex(sortedArray: any, target: any) {
+  let left = 0;
+  let right = sortedArray.length - 1;
+  let nearestIndex = -1;
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+
+    if (sortedArray[mid][0] === target) {
+      return mid; // Found the target at index mid
+    }
+
+    if (
+      nearestIndex === -1 ||
+      Math.abs(sortedArray[mid][0] - target) <
+        Math.abs(sortedArray[nearestIndex][0] - target)
+    ) {
+      nearestIndex = mid; // Update nearestIndex if current element is closer to the target
+    }
+
+    if (sortedArray[mid][0] < target) {
+      left = mid + 1; // Target is in the right half
+    } else {
+      right = mid - 1; // Target is in the left half
+    }
+  }
+
+  return nearestIndex; // Return the index of the nearest value
+}
+
 import {
   defineComponent,
   ref,
@@ -60,7 +103,7 @@ export default defineComponent({
     };
 
     // currently hovered series state
-    const hoveredSeriesState: any = inject("hoveredSeriesState");
+    const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
@@ -118,19 +161,60 @@ export default defineComponent({
     // dispatch tooltip action for all charts
     watch(
       () => [
-        hoveredSeriesState?.value.seriesIndex,
+        hoveredSeriesState?.value?.seriesIndex,
         hoveredSeriesState?.value?.dataIndex,
+        hoveredSeriesState?.value?.panelId,
       ],
       () => {
+        // if hovered series is not same as currently hovered series
+        // and hovered series is not -1
+        // and chart is time series
         if (
           props?.data?.extras?.panelId &&
           props?.data?.extras?.panelId != hoveredSeriesState?.value?.panelId &&
-          hoveredSeriesState?.value?.panelId != -1
+          hoveredSeriesState?.value?.panelId != -1 &&
+          props?.data?.extras?.isTimeSeries === true
         ) {
+          // need to check index should not be greater than series length
+          const hoveredSeriesIndex =
+            chart?.getOption()?.series.length >
+            hoveredSeriesState?.value?.seriesIndex
+              ? hoveredSeriesState?.value?.seriesIndex
+              : 0;
+          let hoveredSeriesDataIndex = hoveredSeriesState?.value?.dataIndex;
+
+          // if hovered series dataindex is not there
+          // or check hovered time is not at the same index in the current chart (ie if at same index then not need to find nearest index)
+          if (
+            !chart?.getOption()?.series[hoveredSeriesIndex]?.data[
+              hoveredSeriesDataIndex
+            ] ||
+            chart?.getOption()?.series[hoveredSeriesIndex]?.data[
+              hoveredSeriesDataIndex
+            ][0] != hoveredSeriesState.value?.hoveredTime
+          ) {
+            hoveredSeriesDataIndex = findNearestIndex(
+              chart?.getOption()?.series[hoveredSeriesIndex]?.data ?? [],
+              hoveredSeriesState?.value?.hoveredTime
+            );
+          }
+
           chart?.dispatchAction({
             type: "showTip",
-            seriesIndex: hoveredSeriesState?.value?.seriesIndex,
-            dataIndex: hoveredSeriesState?.value?.dataIndex,
+            seriesIndex: hoveredSeriesIndex,
+            dataIndex: hoveredSeriesDataIndex,
+          });
+        }
+
+        // if state is -1 then restore chart
+        if (
+          hoveredSeriesState.value?.dataIndex == -1 &&
+          hoveredSeriesState.value?.seriesIndex == -1 &&
+          hoveredSeriesState.value?.panelId == -1 &&
+          hoveredSeriesState.value?.hoveredTime == null
+        ) {
+          chart?.dispatchAction({
+            type: "restore",
           });
         }
       }
@@ -169,7 +253,7 @@ export default defineComponent({
         chart?.on("mouseout", mouseOutEffectFn);
         chart?.on("globalout", () => {
           mouseHoverEffectFn({});
-          hoveredSeriesState?.value?.setIndex(-1, -1, -1);
+          hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
           hoveredSeriesState?.value?.setHoveredSeriesName("");
         });
         chart?.on("legendselectchanged", legendSelectChangedFn);
@@ -207,7 +291,7 @@ export default defineComponent({
       chart?.on("mouseout", mouseOutEffectFn);
       chart?.on("globalout", () => {
         mouseHoverEffectFn({});
-        hoveredSeriesState?.value?.setIndex(-1, -1, -1);
+        hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
         hoveredSeriesState?.value?.setHoveredSeriesName("");
       });
 
@@ -238,11 +322,19 @@ export default defineComponent({
       // });
       chart?.on("downplay", (params: any) => {
         // downplay event will only called by currently hovered panel else it will go into infinite loop
-        if (props.data.extras?.panelId == hoveredSeriesState?.value?.panelId) {
+        // and chart must be timeseries chart
+        if (
+          props.data.extras?.panelId == hoveredSeriesState?.value?.panelId &&
+          props?.data?.extras?.isTimeSeries === true
+        ) {
+          const seriesIndex = params?.batch?.[0]?.seriesIndex;
+          const dataIndex = Math.max(params?.batch?.[0]?.dataIndex, 0);
+
           hoveredSeriesState?.value?.setIndex(
-            params?.batch?.[0]?.dataIndex,
-            params?.batch?.[0]?.seriesIndex,
-            props?.data?.extras?.panelId || -1
+            dataIndex,
+            seriesIndex,
+            props?.data?.extras?.panelId || -1,
+            chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0]
           );
         }
       });
