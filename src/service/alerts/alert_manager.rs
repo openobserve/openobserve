@@ -97,14 +97,6 @@ pub async fn handle_triggers(
         return Ok(());
     }
 
-    log::warn!(
-        "[ALERT_MANAGER] handle_triggers: {}/{}/{}/{}",
-        org_id,
-        stream_name,
-        stream_type,
-        alert_name
-    );
-
     let alert = match super::get(org_id, stream_type, stream_name, alert_name).await? {
         Some(alert) => alert,
         None => {
