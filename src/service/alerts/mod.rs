@@ -55,6 +55,10 @@ pub async fn save(
         return Err(anyhow::anyhow!("Alert name is required"));
     }
 
+    if alert.destinations.is_empty() {
+        return Err(anyhow::anyhow!("Alert destinations is required"));
+    }
+
     // before saving alert check alert destination
     for dest in alert.destinations.iter() {
         if db::alerts::destinations::get(org_id, dest).await.is_err() {
