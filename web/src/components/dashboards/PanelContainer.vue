@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="panelcontainer">
+  <div
+    class="panelcontainer"
+    @mouseover="() => (showFullScreenBtn = true)"
+    @mouseleave="() => (showFullScreenBtn = false)"
+  >
     <div class="drag-allow">
       <q-bar
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
@@ -28,6 +32,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ props.data.title }}
         </div>
         <q-space />
+        <q-btn
+          v-if="!viewOnly && showFullScreenBtn"
+          icon="fullscreen"
+          flat
+          size="md"
+          padding="none"
+          @click="onPanelModifyClick('ViewPanel')"
+          title="Full screen"
+        />
         <q-btn-dropdown dense flat label="" no-caps v-if="!viewOnly">
           <q-list dense>
             <q-item
@@ -71,17 +84,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 
-<script  lang="ts">
+<script lang="ts">
 import { defineComponent } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
+import { ref } from "vue";
 
 export default defineComponent({
   name: "PanelContainer",
-  emits: ["onDeletePanel"],
+  emits: ["onDeletePanel", "onViewPanel"],
   props: [
     "data",
     "selectedTimeDate",
@@ -99,6 +113,9 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const $q = useQuasar();
+    // for full screen button
+    const showFullScreenBtn: any = ref(false);
+
     //for edit panel
     const onEditPanel = (data: any) => {
       return router.push({
@@ -168,12 +185,15 @@ export default defineComponent({
       props,
       onEditPanel,
       onDuplicatePanel,
+      showFullScreenBtn,
       store,
     };
   },
   methods: {
     onPanelModifyClick(evt: any) {
-      if (evt == "EditPanel") {
+      if (evt == "ViewPanel") {
+        this.$emit("onViewPanel", this.props.data.id);
+      } else if (evt == "EditPanel") {
         this.onEditPanel(this.props.data);
       } else if (evt == "DeletePanel") {
         this.$emit("onDeletePanel", this.props.data.id);

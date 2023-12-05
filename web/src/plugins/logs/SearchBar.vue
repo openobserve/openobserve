@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></syntax-guide>
         <q-btn-group class="q-ml-sm no-outline q-pa-none no-border">
           <q-btn-dropdown
+            data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
             auto-close
             size="12px"
