@@ -317,10 +317,11 @@ export default defineComponent({
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
+              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
               stream_name: data.stream_name ? data.stream_name : "--",
               stream_type: data.stream_type,
               enabled: data.enabled,
-              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
+              conditions: conditions,
               description: data.description,
             };
           });
