@@ -39,7 +39,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
+            <div
+              v-if="alertStateLoadingMap[props.row.name]"
+              style="display: inline-block; width: 33.14px; height: auto"
+              class="flex justify-center items-center q-ml-xs"
+              :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+            >
+              <q-circular-progress
+                indeterminate
+                rounded
+                size="16px"
+                :value="1"
+                color="primary"
+              />
+            </div>
             <q-btn
+              v-else
               :data-test="`alert-list-${props.row.name}-udpate-alert`"
               :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
               class="q-ml-xs material-symbols-outlined"
@@ -51,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
               @click="toggleAlertState(props.row)"
-            ></q-btn>
+            />
             <q-btn
               :data-test="`alert-list-${props.row.name}-udpate-alert`"
               icon="edit"
@@ -199,6 +214,7 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const splitterModel = ref(220);
+    const alertStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
     const folders = ref([
       {
         name: "folder1",
@@ -301,12 +317,16 @@ export default defineComponent({
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
+              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
               stream_name: data.stream_name ? data.stream_name : "--",
               stream_type: data.stream_type,
               enabled: data.enabled,
-              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
+              conditions: conditions,
               description: data.description,
             };
+          });
+          alertsRows.value.forEach((alert: AlertListItem) => {
+            alertStateLoadingMap.value[alert.name] = false;
           });
           if (router.currentRoute.value.query.action == "add") {
             showAddUpdateFn({ row: undefined });
@@ -481,6 +501,7 @@ export default defineComponent({
     };
 
     const toggleAlertState = (row: any) => {
+      alertStateLoadingMap.value[row.name] = true;
       const alert: Alert = alerts.value.find(
         (alert) => alert.name === row.name
       ) as Alert;
@@ -496,6 +517,9 @@ export default defineComponent({
           alertsRows.value.forEach((alert) => {
             alert.name === row.name ? (alert.enabled = !alert.enabled) : null;
           });
+        })
+        .finally(() => {
+          alertStateLoadingMap.value[row.name] = false;
         });
     };
     return {
@@ -546,6 +570,7 @@ export default defineComponent({
       outlinedPlayArrow,
       alertsRows,
       toggleAlertState,
+      alertStateLoadingMap,
     };
   },
 });

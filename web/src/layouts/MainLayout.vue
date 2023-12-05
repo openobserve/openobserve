@@ -421,7 +421,7 @@ export default defineComponent({
       {
         title: t("menu.alerts"),
         icon: outlinedReportProblem,
-        link: "/alerts",
+        link: "/alerts/alerts",
       },
       {
         title: t("menu.ingestion"),
