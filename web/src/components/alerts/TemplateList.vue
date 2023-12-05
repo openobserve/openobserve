@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, onActivated, onMounted } from "vue";
+import { ref, onActivated, onMounted, watch } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableProps } from "quasar";
@@ -165,6 +165,14 @@ onActivated(() => {
 onMounted(() => {
   getTemplates();
 });
+
+watch(
+  () => router.currentRoute.value.query.action,
+  (action) => {
+    if (!action) showTemplateEditor.value = false;
+  }
+);
+
 const getTemplates = () => {
   const dismiss = q.notify({
     spinner: true,

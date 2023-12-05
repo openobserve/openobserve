@@ -125,13 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts">
-import {
-  ref,
-  onBeforeMount,
-  onActivated,
-  onMounted,
-  defineComponent,
-} from "vue";
+import { ref, onBeforeMount, onActivated, watch, defineComponent } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableProps } from "quasar";
@@ -229,6 +223,14 @@ export default defineComponent({
       getDestinations();
       getTemplates();
     });
+
+    watch(
+      () => router.currentRoute.value.query.action,
+      (action) => {
+        if (!action) showDestinationEditor.value = false;
+      }
+    );
+
     const getDestinations = () => {
       const dismiss = q.notify({
         spinner: true,

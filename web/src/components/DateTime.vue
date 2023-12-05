@@ -218,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tab-panel>
         </q-tab-panels>
         <q-select
+          data-test="datetime-timezone-select"
           v-model="timezone"
           :options="filteredTimezone"
           @blur="

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width">
-    <div class="row items-center no-wrap q-mx-lg q-my-sm">
+    <div class="row items-center no-wrap q-mx-md q-my-sm">
       <div class="flex items-center" data-test="add-alert-title">
         <div
           class="flex justify-center items-center q-mr-md cursor-pointer"
@@ -99,8 +99,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               use-input
               hide-selected
               fill-input
+              :input-debounce="400"
               @filter="filterStreams"
-              @update:model-value="updateAlert(formData.stream_name)"
+              @update:model-value="updateStreamFields(formData.stream_name)"
               :rules="[(val: any) => !!val || 'Field is required!']"
               style="min-width: 250px"
             />
@@ -382,6 +383,7 @@ export default defineComponent({
     const relativePeriods: any = ref(["Minutes"]);
     var triggerCols: any = ref([]);
     const selectedDestinations = ref("slack");
+    const originalStreamFields: any = ref([]);
     var triggerOperators: any = ref([
       "=",
       "!=",
@@ -432,19 +434,7 @@ export default defineComponent({
     let parser = new Parser();
 
     onMounted(async () => {});
-    const updateAlert = (stream_name: any) => {
-      const column: any = schemaList.value.find(
-        (schema: any) => schema.name === stream_name
-      );
-      if (column && Array.isArray(column?.schema)) {
-        filteredColumns.value = column.schema.map((column: any) => ({
-          label: column.name,
-          value: column.name,
-        }));
-      }
 
-      updateEditorContent(stream_name);
-    };
     const updateEditorContent = (stream_name: string) => {
       triggerCols.value = [];
       if (!stream_name) return;
@@ -471,6 +461,24 @@ export default defineComponent({
         triggerCols.value.push(item.name);
       });
     };
+
+    const updateStreamFields = (stream_name: any) => {
+      let streamCols: any = [];
+      const column: any = schemaList.value.find(
+        (schema: any) => schema.name === stream_name
+      );
+
+      if (column && Array.isArray(column?.schema)) {
+        streamCols = column.schema.map((column: any) => ({
+          label: column.name,
+          value: column.name,
+        }));
+      }
+
+      originalStreamFields.value = [...streamCols];
+      filteredColumns.value = [...streamCols];
+    };
+
     watch(
       triggerCols.value,
       () => {
@@ -518,6 +526,9 @@ export default defineComponent({
           indexOptions.value = res.data.list.map((data: any) => {
             return data.name;
           });
+
+          if (formData.value.stream_name)
+            updateStreamFields(formData.value.stream_name);
           return Promise.resolve();
         })
         .catch(() => Promise.reject())
@@ -580,9 +591,8 @@ export default defineComponent({
       relativePeriods,
       editorUpdate,
       updateCondtions,
-      updateAlert,
+      updateStreamFields,
       updateEditorContent,
-      filterColumns,
       triggerCols,
       triggerOperators,
       sqlAST,
@@ -631,7 +641,15 @@ export default defineComponent({
         id: getUUID(),
       };
     });
+    this.formData.query_condition.conditions =
+      this.formData.query_condition.conditions.map((condition: any) => {
+        return {
+          ...condition,
+          id: getUUID(),
+        };
+      });
   },
+
   computed: {
     getFormattedDestinations: function () {
       return this.destinations.map((destination: any) => {
@@ -679,9 +697,16 @@ export default defineComponent({
           payload.context_attributes[attr.key] = attr.value;
         });
 
-        console.log(
-          cloneDeep(this.formData.context_attributes),
-          payload.context_attributes
+        this.formData.trigger_condition.threshold = parseInt(
+          this.formData.trigger_condition.threshold
+        );
+
+        this.formData.trigger_condition.period = parseInt(
+          this.formData.trigger_condition.period
+        );
+
+        this.formData.trigger_condition.silence = parseInt(
+          this.formData.trigger_condition.silence
         );
 
         callAlert = alertsService.create(
