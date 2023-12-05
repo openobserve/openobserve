@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent, provide, ref } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -143,6 +143,31 @@ export default defineComponent({
       Object.assign(variablesData, data);
       emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
     };
+
+    const hoveredSeriesState = ref({
+      hoveredSeriesName: "",
+      panelId: -1,
+      dataIndex: -1,
+      seriesIndex: -1,
+      setHoveredSeriesName: function (name: string) {
+        console.log("Called");
+        
+        hoveredSeriesState.value.hoveredSeriesName = name ?? "";
+      },
+      setIndex: function (
+        dataIndex: number,
+        seriesIndex: number,
+        panelId: any
+      ) {
+        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
+        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
+        hoveredSeriesState.value.panelId = panelId ?? -1;
+      },
+    });
+
+    // used provide and inject to share data between components
+    // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
+    provide("hoveredSeriesState", hoveredSeriesState);
 
     // save the dashboard value
     const saveDashboard = async () => {

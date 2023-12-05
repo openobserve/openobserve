@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, watch, ref, toRefs, computed } from "vue";
+import { defineComponent, watch, ref, toRefs, computed, inject } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
@@ -114,6 +114,10 @@ export default defineComponent({
       chartPanelRef
     );
 
+  // hovered series state
+  // used to show tooltip axis for all charts
+  const hoveredSeriesState: any = inject("hoveredSeriesState");
+
     // when we get the new data from the apis, convert the data to render the panel
     watch(
       [data, store?.state],
@@ -126,7 +130,8 @@ export default defineComponent({
               panelSchema.value,
               data.value,
               store,
-              chartPanelRef
+              chartPanelRef,
+              hoveredSeriesState
             );
             errorDetail.value = "";
           } catch (error: any) {

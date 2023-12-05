@@ -34,10 +34,10 @@ import {
   onUnmounted,
   nextTick,
   onActivated,
+  inject,
 } from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
-import usehoveredSeriesState from "../../../composables/dashboard/currentSeriesName";
 
 export default defineComponent({
   name: "ChartRenderer",
@@ -60,8 +60,7 @@ export default defineComponent({
     };
 
     // currently hovered series state
-    const { hoveredSeriesState, setHoveredSeriesName, setIndex } =
-      usehoveredSeriesState();
+    const hoveredSeriesState: any = inject("hoveredSeriesState");
 
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
@@ -72,7 +71,7 @@ export default defineComponent({
       }
 
       // set current hovered series name in state
-      setHoveredSeriesName(params?.seriesName);
+      hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName);
 
       // scroll legend upto current series index
       const legendOption = chart?.getOption()?.legend[0];
@@ -85,7 +84,7 @@ export default defineComponent({
 
     const mouseOutEffectFn = () => {
       // reset current hovered series name in state
-      setHoveredSeriesName("");
+      hoveredSeriesState?.value?.setHoveredSeriesName("");
     };
 
     const legendSelectChangedFn = (params: any) => {
@@ -118,28 +117,31 @@ export default defineComponent({
 
     // dispatch tooltip action for all charts
     watch(
-      () => [hoveredSeriesState.seriesIndex, hoveredSeriesState.dataIndex],
+      () => [
+        hoveredSeriesState?.value.seriesIndex,
+        hoveredSeriesState?.value?.dataIndex,
+      ],
       () => {
         if (
           props?.data?.extras?.panelId &&
-          props?.data?.extras?.panelId != hoveredSeriesState?.panelId &&
-          hoveredSeriesState?.panelId != -1
+          props?.data?.extras?.panelId != hoveredSeriesState?.value?.panelId &&
+          hoveredSeriesState?.value?.panelId != -1
         ) {
           chart?.dispatchAction({
             type: "showTip",
-            seriesIndex: hoveredSeriesState?.seriesIndex,
-            dataIndex: hoveredSeriesState?.dataIndex,
+            seriesIndex: hoveredSeriesState?.value?.seriesIndex,
+            dataIndex: hoveredSeriesState?.value?.dataIndex,
           });
         }
       }
     );
 
     watch(
-      () => hoveredSeriesState?.hoveredSeriesName,
+      () => hoveredSeriesState?.value?.hoveredSeriesName,
       () => {
         chart?.dispatchAction({
           type: "highlight",
-          seriesName: hoveredSeriesState?.hoveredSeriesName,
+          seriesName: hoveredSeriesState?.value?.hoveredSeriesName,
         });
       }
     );
@@ -167,8 +169,8 @@ export default defineComponent({
         chart?.on("mouseout", mouseOutEffectFn);
         chart?.on("globalout", () => {
           mouseHoverEffectFn({});
-          setIndex(-1, -1, -1);
-          setHoveredSeriesName("");
+          hoveredSeriesState?.value?.setIndex(-1, -1, -1);
+          hoveredSeriesState?.value?.setHoveredSeriesName("");
         });
         chart?.on("legendselectchanged", legendSelectChangedFn);
 
@@ -205,8 +207,8 @@ export default defineComponent({
       chart?.on("mouseout", mouseOutEffectFn);
       chart?.on("globalout", () => {
         mouseHoverEffectFn({});
-        setIndex(-1, -1, -1);
-        setHoveredSeriesName("");
+        hoveredSeriesState?.value?.setIndex(-1, -1, -1);
+        hoveredSeriesState?.value?.setHoveredSeriesName("");
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
@@ -236,8 +238,8 @@ export default defineComponent({
       // });
       chart?.on("downplay", (params: any) => {
         // downplay event will only called by currently hovered panel else it will go into infinite loop
-        if (props.data.extras?.panelId == hoveredSeriesState?.panelId) {
-          setIndex(
+        if (props.data.extras?.panelId == hoveredSeriesState?.value?.panelId) {
+          hoveredSeriesState?.value?.setIndex(
             params?.batch?.[0]?.dataIndex,
             params?.batch?.[0]?.seriesIndex,
             props?.data?.extras?.panelId || -1
