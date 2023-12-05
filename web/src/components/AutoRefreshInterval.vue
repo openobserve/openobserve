@@ -198,7 +198,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .refresh-interval-dropdown {
   min-width: 36px;
-  height: 30px;
+  height: 100%;
   min-height: 30px;
   line-height: 30px;
   padding: 0px 5px;

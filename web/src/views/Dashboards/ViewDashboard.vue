@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :currentTimeObj="currentTimeObj"
       @onDeletePanel="onDeletePanel"
     />
+
     <q-dialog
       v-model="showDashboardSettingsDialog"
       position="right"
