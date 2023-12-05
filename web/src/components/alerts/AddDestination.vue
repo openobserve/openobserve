@@ -277,8 +277,7 @@ const setupDestinationData = () => {
     formData.value.url = props.destination.url;
     formData.value.method = props.destination.method;
     formData.value.skip_tls_verify = props.destination.skip_tls_verify;
-    const template = props.destination.template as Template;
-    formData.value.template = template.name;
+    formData.value.template = props.destination.template;
     formData.value.headers = props.destination.headers;
     if (Object.keys(formData.value.headers).length) {
       apiHeaders.value = [];
