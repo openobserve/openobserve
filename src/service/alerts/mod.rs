@@ -46,24 +46,35 @@ pub async fn save(
     name: &str,
     mut alert: Alert,
 ) -> Result<(), anyhow::Error> {
-    alert.name = name.to_string();
-    alert.org_id = org_id.to_string();
+    alert.name = name.trim().to_string();
+    alert.org_id = org_id.trim().to_string();
     alert.stream_type = stream_type;
-    alert.stream_name = stream_name.to_string();
+    alert.stream_name = stream_name.trim().to_string();
 
-    if alert.name.is_empty() {
+    if alert.name.is_empty() || alert.stream_name.is_empty() {
         return Err(anyhow::anyhow!("Alert name is required"));
     }
 
+    // before saving alert check alert destination
     if alert.destinations.is_empty() {
         return Err(anyhow::anyhow!("Alert destinations is required"));
     }
-
-    // before saving alert check alert destination
     for dest in alert.destinations.iter() {
         if db::alerts::destinations::get(org_id, dest).await.is_err() {
             return Err(anyhow::anyhow!("Alert destination {dest} not found"));
         };
+    }
+
+    // before saving alert check alert context attributes
+    if alert.context_attributes.is_some() {
+        let attrs = alert.context_attributes.as_ref().unwrap();
+        let mut new_attrs = HashMap::with_capacity(attrs.len());
+        for key in attrs.keys() {
+            let new_key = key.trim().to_string();
+            if !new_key.is_empty() {
+                new_attrs.insert(new_key, attrs.get(key).unwrap().to_string());
+            }
+        }
     }
 
     // before saving alert check column type to decide numeric condition
