@@ -41,11 +41,17 @@ async fn run_merge() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
+        if CONFIG.common.print_key_event {
+            log::info!("[COMPACTOR] start merge interval");
+        }
         let locker = service::compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
         let ret = service::compact::run_merge().await;
         if ret.is_err() {
             log::error!("[COMPACTOR] run data merge error: {}", ret.err().unwrap());
+        }
+        if CONFIG.common.print_key_event {
+            log::info!("[COMPACTOR] done merge interval");
         }
         drop(locker);
     }
@@ -57,11 +63,17 @@ async fn run_delete() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
+        if CONFIG.common.print_key_event {
+            log::info!("[COMPACTOR] start delete interval");
+        }
         let locker = service::compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
         let ret = service::compact::run_delete().await;
         if ret.is_err() {
             log::error!("[COMPACTOR] run data delete error: {}", ret.err().unwrap());
+        }
+        if CONFIG.common.print_key_event {
+            log::info!("[COMPACTOR] done delete interval");
         }
         drop(locker);
     }
@@ -75,11 +87,17 @@ async fn run_delete_files() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
+        if CONFIG.common.print_key_event {
+            log::info!("[COMPACTOR] start delete file_list_deleted interval");
+        }
         let locker = service::compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
         let ret = service::compact::run_delete_files().await;
         if ret.is_err() {
             log::error!("[COMPACTOR] run files delete error: {}", ret.err().unwrap());
+        }
+        if CONFIG.common.print_key_event {
+            log::info!("[COMPACTOR] done delete file_list_deleted interval");
         }
         drop(locker);
     }
