@@ -54,6 +54,10 @@ pub async fn merge_by_stream(
     let (mut offset, _node) =
         db::compact::files::get_offset(org_id, stream_name, stream_type).await;
 
+    if CONFIG.common.print_key_event {
+        log::info!("[COMPACTOR] processing merge for {org_id}/{stream_type}/{stream_name}, offset: {offset}");
+    }
+
     // get schema
     let mut schema = db::schema::get(org_id, stream_name, stream_type).await?;
     let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
@@ -113,6 +117,9 @@ pub async fn merge_by_stream(
                         .unwrap()
                         * 3))
     {
+        if CONFIG.common.print_key_event {
+            log::info!("[COMPACTOR] processing merge for {org_id}/{stream_type}/{stream_name}, offset: {offset}, the time is future, just wait");
+        }
         return Ok(()); // the time is future, just wait
     }
 
@@ -135,6 +142,9 @@ pub async fn merge_by_stream(
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     if files.is_empty() {
+        if CONFIG.common.print_key_event {
+            log::info!("[COMPACTOR] processing merge for {org_id}/{stream_type}/{stream_name}, offset: {offset}, file_list is empty, just skip");
+        }
         // this hour is no data, and check if pass allowed_upto, then just write new offset
         // if offset > 0 && offset_time_hour + Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() < time_now_hour {
         // -- no check it

@@ -55,7 +55,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             // get the working node for the organization
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
             if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-                log::error!("[COMPACT] organization {org_id} is merging by {node}");
+                log::warn!("[COMPACT] organization {org_id} is merging by {node}");
                 continue;
             }
 
@@ -65,7 +65,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             // check the working node for the organization again, maybe other node locked it first
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
             if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-                log::error!("[COMPACT] organization {org_id} is merging by {node}");
+                log::warn!("[COMPACT] organization {org_id} is merging by {node}");
                 dist_lock::unlock(&locker).await?;
                 continue;
             }
@@ -174,11 +174,15 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         StreamType::EnrichmentTables,
         StreamType::Metadata,
     ];
+
     for org_id in orgs {
+        if CONFIG.common.print_key_event {
+            log::info!("[COMPACTOR] start merge for {org_id}");
+        }
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::error!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is merging by {node}");
             continue;
         }
 
@@ -188,7 +192,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         // check the working node for the organization again, maybe other node locked it first
         let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::error!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is merging by {node}");
             dist_lock::unlock(&locker).await?;
             continue;
         }
@@ -209,6 +213,9 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type);
             let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
+                if CONFIG.common.print_key_event {
+                    log::info!("[COMPACTOR] start merge for {org_id}/{stream_type}/{stream_name}");
+                }
                 // check if we are allowed to merge or just skip
                 if db::compact::retention::is_deleting_stream(
                     &org_id,
@@ -216,7 +223,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                     stream_type,
                     None,
                 ) {
-                    log::info!(
+                    log::warn!(
                         "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
                         &org_id,
                         stream_type,
@@ -281,7 +288,7 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::error!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is merging by {node}");
             continue;
         }
 
@@ -292,7 +299,7 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         let (offset, node) =
             db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::error!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is merging by {node}");
             dist_lock::unlock(&locker).await?;
             continue;
         }
