@@ -15,20 +15,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none q-pa-md" style="min-height: inherit">
+  <q-page class="q-pa-none" style="min-height: inherit">
     <div>
-      <div class="col-12 items-center no-wrap">
-        <div class="col" data-test="add-destination-title">
-          <div v-if="destination" class="text-h6">
-            {{ t("alert_destinations.updateTitle") }}
+      <div class="row items-center no-wrap q-mx-md q-my-sm">
+        <div class="flex items-center">
+          <div
+            class="flex justify-center items-center q-mr-md cursor-pointer"
+            style="
+              border: 1.5px solid;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+            "
+            title="Go Back"
+            @click="router.back()"
+          >
+            <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
-          <div v-else class="text-h6">
-            {{ t("alert_destinations.addTitle") }}
+          <div class="col" data-test="add-destination-title">
+            <div v-if="destination" class="text-h6">
+              {{ t("alert_destinations.updateTitle") }}
+            </div>
+            <div v-else class="text-h6">
+              {{ t("alert_destinations.addTitle") }}
+            </div>
           </div>
         </div>
       </div>
       <q-separator />
-      <div class="row q-col-gutter-sm q-pt-lg">
+      <div class="row q-col-gutter-sm q-pt-lg q-px-lg q-my-md">
         <div class="col-6 q-py-xs">
           <q-input
             data-test="add-destination-name-input"
@@ -216,6 +231,7 @@ import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import type { Template, DestinationData, Headers } from "@/ts/interfaces";
+import { useRouter } from "vue-router";
 const props = defineProps<{
   templates: Template[] | [];
   destination: DestinationData | null;
@@ -234,6 +250,8 @@ const formData: Ref<DestinationData> = ref({
   headers: {},
 });
 const isUpdatingDestination = ref(false);
+
+const router = useRouter();
 
 // TODO OK: Use UUID package instead of this and move this method in utils
 const getUUID = () => {
@@ -259,8 +277,7 @@ const setupDestinationData = () => {
     formData.value.url = props.destination.url;
     formData.value.method = props.destination.method;
     formData.value.skip_tls_verify = props.destination.skip_tls_verify;
-    const template = props.destination.template as Template;
-    formData.value.template = template.name;
+    formData.value.template = props.destination.template;
     formData.value.headers = props.destination.headers;
     if (Object.keys(formData.value.headers).length) {
       apiHeaders.value = [];
