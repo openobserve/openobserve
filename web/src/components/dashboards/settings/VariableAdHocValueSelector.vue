@@ -50,9 +50,16 @@ export default defineComponent({
         });
 
         const addFields = () => {
+            console.log('Inside addFields function');
+            
             const adhocVariablesTemp = adhocVariables.value;
             adhocVariablesTemp.push({ name: '', operator: operatorOptions[0], value: '', streams: [] });
-            emitValue()
+            
+            console.log('After pushing new object to adhocVariablesTemp:', adhocVariablesTemp);
+            
+            emitValue();
+            
+            console.log('After calling emitValue function');
         };
 
         const updateModelValueOfSelect = (index: number, value: any) => {

@@ -177,15 +177,28 @@ export const usePanelDataLoader = (
   // is panel currently visible or not
   const isVisible: any = ref(false);
 
+  
   // currently dependent variables data
   let currentDependentVariablesData = variablesData.value?.values
-    ? JSON.parse(JSON.stringify(variablesData.value?.values))
-    : [];
-
+  ? JSON.parse(JSON.stringify(variablesData.value?.values))
+  : [];
+  
+  console.log("variablesData currentAdHocVariablesData", variablesData);
+  console.log(
+    "variablesData.value?.values currentAdHocVariablesData",
+    JSON.stringify(variablesData.value?.values, null, 2)
+  );
+  
   let currentAdHocVariablesData = variablesData.value?.values
-    ? JSON.parse(JSON.stringify(variablesData.value?.values))
-    : [];
-
+    ? JSON.parse(JSON.stringify(variablesData.value?.values
+          ?.filter((it: any) => it.type === "dynamic_filters")
+          ?.map((it: any) => it?.value)
+          .flat()
+          ?.filter((it: any) => it?.operator && it?.name && it?.value)
+          ))
+    : []
+  console.log("currentAdHocVariablesData", currentAdHocVariablesData);
+  
   const store = useStore();
   let controller: AbortController | null = null;
 
@@ -229,7 +242,8 @@ export const usePanelDataLoader = (
           endISOTimestamp,
           panelSchema.value.queryType
         );
-
+        console.log("Calling queryPromises", query1);
+        
         const { query: query2, metadata: metadata2 } = applyAdhocVariables(
           query1,
           panelSchema.value.queryType
@@ -244,8 +258,7 @@ export const usePanelDataLoader = (
           queryType: panelSchema.value.queryType,
           variables: [...(metadata1 || []), ...(metadata2 || [])],
         };
-
-        // Call the metrics_query_range API
+        console.log("Calling metrics_query_range API");
         return queryService
           .metrics_query_range({
             org_identifier: store.state.selectedOrganization.identifier,
@@ -254,8 +267,8 @@ export const usePanelDataLoader = (
             end_time: endISOTimestamp,
           })
           .then((res) => {
-            // Set searchQueryData.data to the API response data
             state.errorDetail = "";
+            console.log("API response received");
             return { result: res.data.data, metadata: metadata };
           })
           .catch((error) => {
@@ -301,7 +314,7 @@ export const usePanelDataLoader = (
             queryType: panelSchema.value.queryType,
             variables: [...(metadata1 || []), ...(metadata2 || [])],
           };
-
+          console.log("Calling search API", query, metadata);
           return await queryService
             .search({
               org_identifier: store.state.selectedOrganization.identifier,
@@ -320,9 +333,13 @@ export const usePanelDataLoader = (
               // Set searchQueryData.data to the API response hits
               // state.data = res.data.hits;
               state.errorDetail = "";
+              console.log("API response received");
+              
               return { result: res.data.hits, metadata: metadata };
             })
             .catch((error) => {
+              console.log("API error received", error);
+              
               // Process API error for "sql"
               processApiError(error, "sql");
             });
@@ -335,6 +352,9 @@ export const usePanelDataLoader = (
       state.metadata = {
         queries: sqlqueryResults.map((it) => it?.metadata),
       };
+      console.log("state.data", state.data);
+      console.log("state.metadata", state.metadata);
+      
     }
   };
 
@@ -507,14 +527,18 @@ export const usePanelDataLoader = (
 
   const applyAdhocVariables = (query: any, queryType: any) => {
     const metadata: any[] = [];
-
+    console.log("variablesData", variablesData.value);
+    
     const adHocVariables = variablesData.value?.values
       ?.filter((it: any) => it.type === "dynamic_filters")
       ?.map((it: any) => it?.value)
       .flat()
       ?.filter((it: any) => it?.operator && it?.name && it?.value);
+      console.log("adHocVariables", adHocVariables);
+      
 
     if (!adHocVariables.length) {
+    console.log("No adhoc variables found");
       return { query, metadata };
     }
 
@@ -527,6 +551,7 @@ export const usePanelDataLoader = (
           value: variable.value,
           operator: variable.operator,
         });
+      console.log(`Adding label to PromQL query: ${variable.name}`);
         query = addLabelToPromQlQuery(
           query,
           variable.name,
@@ -551,6 +576,7 @@ export const usePanelDataLoader = (
           operator: variable.operator,
         });
       });
+    console.log("Adding labels to SQL query");
       query = addLabelsToSQlQuery(query, applicableAdHocVariables);
     }
 
@@ -665,6 +691,10 @@ export const usePanelDataLoader = (
                 getStreamFromQuery(q.query)
               )
             : [];
+      console.log(
+        "sqlQueryStreams shouldITriggerTheQueryForAdHocVariables",
+        sqlQueryStreams
+      );
 
         const adHocVariables = variablesData.value?.values
           ?.filter((it: any) => it.type === "dynamic_filters")
@@ -676,16 +706,32 @@ export const usePanelDataLoader = (
               ? it.streams.find((it: any) => sqlQueryStreams.includes(it?.name))
               : true
           );
-
+        console.log("adHocVariables shouldITriggerTheQueryForAdHocVariables", adHocVariables);
+        console.log(
+          "adHocVariables shouldITriggerTheQueryForAdHocVariables : currentAdHocVariablesData.length",
+          currentAdHocVariablesData.length
+        );
+        
         // if number of adHocVariables have changed, fire the query
         if (adHocVariables.length !== currentAdHocVariablesData.length) {
           currentAdHocVariablesData = JSON.parse(
             JSON.stringify(adHocVariables)
           );
+          console.log(
+            "currentAdHocVariablesData shouldITriggerTheQueryForAdHocVariables",
+            currentAdHocVariablesData
+          );
+          
           return true;
         }
 
+
         if (!adHocVariables.length) {
+          console.log(
+            "adHocVariables length shouldITriggerTheQueryForAdHocVariables",
+            adHocVariables
+          );
+          
           return false;
         }
 
@@ -711,6 +757,12 @@ export const usePanelDataLoader = (
         shouldITriggerTheQueryForOtherVariables ||
         shouldITriggerTheQueryForAdHocVariables
       ) {
+        console.log(
+          "shouldITriggerTheQueryForOtherVariables shouldITriggerTheQueryForAdHocVariables",
+          shouldITriggerTheQueryForOtherVariables,
+          shouldITriggerTheQueryForAdHocVariables
+        );
+        
         isDirty.value = true;
         if (isVisible.value) {
           loadData();
