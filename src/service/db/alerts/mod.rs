@@ -175,8 +175,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let alert_name = item_key[item_key.rfind('/').unwrap() + 1..].to_string();
                 let mut cacher = STREAM_ALERTS.write().await;
                 if stream_key.contains('/') {
-                    let mut group = match cacher.get(&stream_key) {
-                        Some(v) => v.clone(),
+                    let group = match cacher.get_mut(&stream_key) {
+                        Some(v) => v,
                         None => continue,
                     };
                     group.retain(|v| !v.name.eq(&alert_name));
