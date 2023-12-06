@@ -827,10 +827,11 @@ export default defineComponent({
       { label: t("dashboard.histogram"), value: "histogram" },
     ];
 
+    // v-model for histogram interval
+    // if no args object in the field, set it with object with interval = auto
     const getHistoramIntervalField = (field: any) => {
-      // check if args is there
+      // if no interval is set, set it to auto
       if (!field.args) {
-        // else set it default
         field.args = {
           interval: "auto",
         };
