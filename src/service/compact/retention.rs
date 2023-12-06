@@ -54,6 +54,17 @@ pub async fn delete_by_stream(
         return Ok(()); // created_at is after lifecycle_end, just skip
     }
 
+    // Hack for 1970-01-01
+    if lifecycle_start.le("1970-01-01") {
+        return db::compact::retention::delete_stream(
+            org_id,
+            stream_name,
+            stream_type,
+            Some((lifecycle_start, lifecycle_start)),
+        )
+        .await;
+    }
+
     // delete files
     db::compact::retention::delete_stream(
         org_id,
