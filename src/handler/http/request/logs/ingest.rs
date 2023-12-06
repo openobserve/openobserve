@@ -262,10 +262,10 @@ pub async fn otlp_logs_write(
         .get(&CONFIG.grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
-        log::info!("otlp::logs_proto_handler");
+        // log::info!("otlp::logs_proto_handler");
         logs_proto_handler(&org_id, **thread_id, body, in_stream_name).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        log::info!("otlp::logs_json_handler");
+        // log::info!("otlp::logs_json_handler");
         logs_json_handler(&org_id, **thread_id, body, in_stream_name).await
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(

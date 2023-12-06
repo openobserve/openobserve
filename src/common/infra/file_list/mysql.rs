@@ -329,6 +329,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
     FROM file_list 
+    FORCE INDEX (file_list_stream_ts_idx) 
     WHERE stream = ? AND min_ts <= ? AND max_ts >= ?;
             "#,
         )
