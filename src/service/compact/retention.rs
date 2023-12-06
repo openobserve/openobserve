@@ -31,7 +31,7 @@ use crate::common::{
         stream::{PartitionTimeLevel, StreamStats},
         StreamType,
     },
-    utils::json,
+    utils::{json, time::BASE_TIME},
 };
 use crate::service::{db, file_list};
 
@@ -86,7 +86,9 @@ pub async fn delete_all(
     let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
     let node = db::compact::retention::get_stream(org_id, stream_name, stream_type, None).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-        log::error!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
+        log::error!(
+            "[COMPACT:RETENTION] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}"
+        );
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }
@@ -113,7 +115,7 @@ pub async fn delete_all(
         if path.exists() {
             tokio::fs::remove_dir_all(path).await?;
         }
-        log::info!("deleted all files: {:?}", path);
+        log::info!("[COMPACT:RETENTION] deleted all files: {:?}", path);
     } else {
         // delete files from s3
         // first fetch file list from local cache
@@ -130,7 +132,7 @@ pub async fn delete_all(
         match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
-                log::error!("[COMPACT] delete file failed: {}", e);
+                log::error!("[COMPACT:RETENTION] delete file failed: {}", e);
             }
         }
 
@@ -144,7 +146,7 @@ pub async fn delete_all(
             match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("[COMPACT] delete file failed: {}", e);
+                    log::error!("[COMPACT:RETENTION] delete file failed: {}", e);
                 }
             }
             tokio::task::yield_now().await; // yield to other tasks
@@ -154,7 +156,7 @@ pub async fn delete_all(
     // delete from file list
     delete_from_file_list(org_id, stream_name, stream_type, (0, 0)).await?;
     log::info!(
-        "deleted file list for: {}/{}/{}",
+        "deleted file list for: {}/{}/{}/all",
         org_id,
         stream_type,
         stream_name
@@ -185,7 +187,7 @@ pub async fn delete_by_date(
             .await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
         log::error!(
-            "[COMPACT] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
+            "[COMPACT:RETENTION] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
             date_range
         );
         dist_lock::unlock(&locker).await?;
@@ -204,6 +206,14 @@ pub async fn delete_by_date(
     // already bind to this node, we can unlock now
     dist_lock::unlock(&locker).await?;
     drop(locker);
+
+    log::info!(
+        "[COMPACT:RETENTION] start deleting files for: {}/{}/{}/{:?}",
+        org_id,
+        stream_type,
+        stream_name,
+        date_range,
+    );
 
     let mut date_start =
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc);
@@ -240,7 +250,7 @@ pub async fn delete_by_date(
         match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
-                log::error!("[COMPACT] delete file failed: {}", e);
+                log::error!("[COMPACT:RETENTION] delete file failed: {}", e);
             }
         }
 
@@ -250,6 +260,7 @@ pub async fn delete_by_date(
                 "files/{org_id}/{stream_type}/{stream_name}/{}/",
                 date_start.format("%Y/%m/%d")
             );
+            log::info!("[COMPACT:RETENTION] satrt deleting files for: {}", prefix);
             loop {
                 let files = storage::list(&prefix).await?;
                 if files.is_empty() {
@@ -258,7 +269,7 @@ pub async fn delete_by_date(
                 match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
                     Ok(_) => {}
                     Err(e) => {
-                        log::error!("[COMPACT] delete file failed: {}", e);
+                        log::error!("[COMPACT:RETENTION] delete file failed: {}", e);
                     }
                 }
                 tokio::task::yield_now().await; // yield to other tasks
@@ -268,15 +279,45 @@ pub async fn delete_by_date(
     }
 
     // delete from file list
+    log::info!(
+        "[COMPACT:RETENTION] start deleting file_list for: {}/{}/{}/{:?}",
+        org_id,
+        stream_type,
+        stream_name,
+        date_range,
+    );
     delete_from_file_list(org_id, stream_name, stream_type, time_range).await?;
+    log::info!(
+        "deleted file_list for: {}/{}/{}/{:?}",
+        org_id,
+        stream_type,
+        stream_name,
+        date_range,
+    );
 
     // update stream stats retention time
+    let mut stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
+    let mut min_ts = if time_range.1 > BASE_TIME.timestamp_micros() {
+        time_range.1
+    } else {
+        infra_file_list::get_min_ts(org_id, stream_type, stream_name)
+            .await
+            .unwrap_or_default()
+    };
+    if min_ts == 0 {
+        min_ts = stats.doc_time_min;
+    };
     infra_file_list::reset_stream_stats_min_ts(
         org_id,
         format!("{org_id}/{stream_type}/{stream_name}").as_str(),
-        time_range.1,
+        min_ts,
     )
     .await?;
+    // update stream stats in cache
+    if min_ts > stats.doc_time_min {
+        stats.doc_time_min = min_ts;
+        cache::stats::set_stream_stats(org_id, stream_name, stream_type, stats);
+    }
 
     // mark delete done
     db::compact::retention::delete_stream_done(org_id, stream_name, stream_type, Some(date_range))
@@ -374,13 +415,16 @@ async fn write_file_list_db_only(
         let mut success = false;
         for _ in 0..5 {
             if let Err(e) = infra_file_list::batch_add(&put_items).await {
-                log::error!("[COMPACT] batch_add to external db failed, retrying: {}", e);
+                log::error!(
+                    "[COMPACT:RETENTION] batch_add to external db failed, retrying: {}",
+                    e
+                );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
             if let Err(e) = infra_file_list::batch_remove(&del_items).await {
                 log::error!(
-                    "[COMPACT] batch_delete to external db failed, retrying: {}",
+                    "[COMPACT:RETENTION] batch_delete to external db failed, retrying: {}",
                     e
                 );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -391,7 +435,7 @@ async fn write_file_list_db_only(
         }
         if !success {
             return Err(anyhow::anyhow!(
-                "[COMPACT] batch_write to external db failed"
+                "[COMPACT:RETENTION] batch_write to external db failed"
             ));
         }
     }
@@ -426,7 +470,7 @@ async fn write_file_list_s3(
                 {
                     cache_success = false;
                     log::error!(
-                        "[COMPACT] delete_from_file_list set local cache failed, retrying: {}",
+                        "[COMPACT:RETENTION] delete_from_file_list set local cache failed, retrying: {}",
                         e
                     );
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -439,7 +483,7 @@ async fn write_file_list_s3(
             // send broadcast to other nodes
             if let Err(e) = db::file_list::broadcast::send(&events, None).await {
                 log::error!(
-                    "[COMPACT] delete_from_file_list send broadcast failed, retrying: {}",
+                    "[COMPACT:RETENTION] delete_from_file_list send broadcast failed, retrying: {}",
                     e
                 );
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;

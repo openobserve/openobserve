@@ -169,9 +169,9 @@ async fn get_file_list(
     {
         Ok(results) => results,
         Err(err) => {
-            log::error!("[session_id {session_id}] get file list error: {}", err);
+            log::error!("[session_id {session_id}] get file_list error: {}", err);
             return Err(DataFusionError::Execution(
-                "get file list error".to_string(),
+                "get file_list error".to_string(),
             ));
         }
     };

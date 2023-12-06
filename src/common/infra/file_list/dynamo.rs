@@ -374,6 +374,15 @@ impl super::FileList for DynamoFileList {
         Ok(resp)
     }
 
+    async fn get_min_ts(
+        &self,
+        _org_id: &str,
+        _stream_type: StreamType,
+        _stream_name: &str,
+    ) -> Result<i64> {
+        Ok(0) // TODO
+    }
+
     async fn get_max_pk_value(&self) -> Result<i64> {
         // we subtract 10 minutes to avoid the case that the last file insert at the same time
         Ok(Utc::now().timestamp_micros() - Duration::minutes(10).num_microseconds().unwrap())
