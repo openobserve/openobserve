@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     @update:model-value="(newValue: any) => {dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                  ].fields.x[index].args.interval = newValue}"
+                  ].fields.x[index].args[0].value = newValue}"
                     label="Histogram interval"
                     :options="histogramIntervalOptions"
                     behavior="menu"
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     @update:model-value="(newValue: any) => {dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                  ].fields.y[index].args.interval = newValue}"
+                  ].fields.y[index].args[0].value = newValue}"
                     label="Histogram interval"
                     :options="histogramIntervalOptions"
                     behavior="menu"
@@ -833,11 +833,17 @@ export default defineComponent({
     const getHistoramIntervalField = (field: any) => {
       // if no interval is set, set it to auto
       if (!field.args) {
-        field.args = {
-          interval: "auto",
-        };
+        field.args = [
+          {
+            value: "auto",
+          },
+        ];
+      } else if (field?.args?.length === 0) {
+        field?.args?.push({
+          value: "auto",
+        });
       }
-      return field.args.interval;
+      return field?.args[0]?.value;
     };
 
     const histogramIntervalOptions = [
