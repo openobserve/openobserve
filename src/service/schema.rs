@@ -321,7 +321,7 @@ pub async fn check_for_schema(
         }
     };
 
-    let (field_datatype_delta, is_schema_changed, final_fields,record_schema) =
+    let (field_datatype_delta, is_schema_changed, final_fields, record_schema) =
         get_schema_changes(&schema, &inferred_schema, is_arrow);
 
     if is_schema_changed {

@@ -131,7 +131,7 @@ export default defineConfig({
       plugins: [
         nodePolyfills(),
         visualizer({
-          open: true,
+          open: false,
           gzipSize: true,
           brotliSize: true,
         }),

@@ -20,10 +20,13 @@ use crate::common::meta::alerts::templates::Template;
 use crate::service::db;
 
 pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<(), anyhow::Error> {
-    if template.body.is_null() {
+    if template.body.is_null() || template.body.as_str().unwrap_or_default().is_empty() {
         return Err(anyhow::anyhow!("Alert template body empty"));
     }
-    template.name = name.to_string();
+    template.name = name.trim().to_string();
+    if template.name.is_empty() {
+        return Err(anyhow::anyhow!("Alert template name is required"));
+    }
     db::alerts::templates::set(org_id, name, template.clone()).await
 }
 
