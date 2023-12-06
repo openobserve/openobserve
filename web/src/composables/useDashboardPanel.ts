@@ -74,6 +74,7 @@ const getDefaultDashboardPanelData: any = () => ({
           promql_legend: "",
           layer_type: "scatter",
           weight_fixed: 1,
+          limit: 0,
         },
       },
     ],
