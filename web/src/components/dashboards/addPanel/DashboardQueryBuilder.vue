@@ -121,6 +121,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val.length > 0 || 'Required']"
                 />
+                <div
+                  v-if="
+                    !dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                  "
+                >
+                  <SortByBtnGrp
+                    :fieldObj="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.x[index]
+                    "
+                  />
+                </div>
               </div>
             </q-menu>
           </q-btn>
@@ -275,6 +290,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val.length > 0 || 'Required']"
                 />
+                <div
+                  v-if="
+                    !dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                  "
+                >
+                  <SortByBtnGrp
+                    :fieldObj="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.y[index]
+                    "
+                  />
+                </div>
               </div>
             </q-menu>
           </q-btn>
@@ -398,6 +428,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :rules="[(val) => val.length > 0 || 'Required']"
                   />
+                  <div
+                    v-if="
+                      !dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery &&
+                      dashboardPanelData.data.queryType == 'sql'
+                    "
+                  >
+                    <SortByBtnGrp
+                      :fieldObj="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.z[index]
+                      "
+                    />
+                  </div>
                 </div>
               </q-menu>
             </q-btn>
@@ -669,10 +715,11 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
+import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
-  components: { DashboardMapQueryBuilder },
+  components: { DashboardMapQueryBuilder, SortByBtnGrp },
   setup() {
     const showXAxis = ref(true);
     const panelName = ref("");
