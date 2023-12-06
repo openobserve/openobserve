@@ -141,10 +141,10 @@ pub async fn merge_by_stream(
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
+    if CONFIG.common.print_key_event {
+        log::info!("[COMPACTOR] processing merge for {org_id}/{stream_type}/{stream_name}, offset: {offset}, file_list is {}", files.len());
+    }
     if files.is_empty() {
-        if CONFIG.common.print_key_event {
-            log::info!("[COMPACTOR] processing merge for {org_id}/{stream_type}/{stream_name}, offset: {offset}, file_list is empty, just skip");
-        }
         // this hour is no data, and check if pass allowed_upto, then just write new offset
         // if offset > 0 && offset_time_hour + Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() < time_now_hour {
         // -- no check it
@@ -188,7 +188,17 @@ pub async fn merge_by_stream(
             )
             .await?;
             if new_file_name.is_empty() {
-                break; // no file need to merge
+                if CONFIG.common.print_key_event {
+                    log::info!("[COMPACTOR] processing merge for {org_id}/{stream_type}/{stream_name}, new merge file is empty, new_file_list is {}", new_file_list.len());
+                }
+                if new_file_list.is_empty() {
+                    // no file need to merge
+                    break;
+                } else {
+                    // delete files from file_list and continue
+                    files_with_size.retain(|f| !&new_file_list.contains(f));
+                    continue;
+                }
             }
 
             // delete small files keys & write big files keys, use transaction
@@ -291,6 +301,7 @@ async fn merge_files(
     if new_file_list.len() <= 1 {
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
+    let retain_file_list = new_file_list.clone();
 
     // write parquet files into tmpfs
     let tmp_dir = cache::tmpfs::Directory::default();
@@ -319,7 +330,7 @@ async fn merge_files(
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
     if new_file_list.len() <= 1 {
-        return Ok((String::from(""), FileMeta::default(), Vec::new()));
+        return Ok((String::from(""), FileMeta::default(), retain_file_list));
     }
 
     // convert the file to the latest version of schema
@@ -410,7 +421,7 @@ async fn merge_files(
 
     // upload file
     match storage::put(&new_file_key, buf.into()).await {
-        Ok(_) => Ok((new_file_key, new_file_meta, new_file_list)),
+        Ok(_) => Ok((new_file_key, new_file_meta, retain_file_list)),
         Err(e) => Err(e),
     }
 }
