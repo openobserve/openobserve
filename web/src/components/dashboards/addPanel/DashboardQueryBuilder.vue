@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <SortByBtnGrp
                     :fieldObj="
-                      dashboardPanelData.data.queries[0].fields.x[index]
+                      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x[index]
                     "
                   />
                 </div>
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <SortByBtnGrp
                     :fieldObj="
-                      dashboardPanelData.data.queries[0].fields.y[index]
+                      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y[index]
                     "
                   />
                 </div>
@@ -434,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <SortByBtnGrp
                       :fieldObj="
-                        dashboardPanelData.data.queries[0].fields.z[index]
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z[index]
                       "
                     />
                   </div>
