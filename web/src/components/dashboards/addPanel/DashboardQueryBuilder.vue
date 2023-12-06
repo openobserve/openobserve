@@ -131,46 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )
                   "
                 >
-                  Sort By:
-                  <q-btn-group class="q-mr-sm">
-                    <q-btn
-                      :class="
-                        !dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.x[index].sortBy ||
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.x[index].sortBy === 'None'
-                          ? 'selected'
-                          : ''
-                      "
-                      @click="updateSortOption(index, 'x', 'None')"
-                      icon="block"
-                      size="sm"
-                    />
-                    <q-btn
-                      :class="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.x[index].sortBy === 'ASC'
-                          ? 'selected'
-                          : ''
-                      "
-                      @click="updateSortOption(index, 'x', 'ASC')"
-                      ><AscSort
-                    /></q-btn>
-                    <q-btn
-                      :class="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.x[index].sortBy === 'DESC'
-                          ? 'selected'
-                          : ''
-                      "
-                      @click="updateSortOption(index, 'x', 'DESC')"
-                      ><DescSort
-                    /></q-btn>
-                  </q-btn-group>
+                  <SortByBtnGrp
+                    :fieldObj="
+                      dashboardPanelData.data.queries[0].fields.x[index]
+                    "
+                  />
                 </div>
               </div>
             </q-menu>
@@ -336,46 +301,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )
                   "
                 >
-                  Sort By:
-                  <q-btn-group class="q-mr-sm">
-                    <q-btn
-                      :class="
-                        !dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.y[index].sortBy ||
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.y[index].sortBy === 'None'
-                          ? 'selected'
-                          : ''
-                      "
-                      @click="updateSortOption(index, 'y', 'None')"
-                      icon="block"
-                      size="sm"
-                    />
-                    <q-btn
-                      :class="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.y[index].sortBy === 'ASC'
-                          ? 'selected'
-                          : ''
-                      "
-                      @click="updateSortOption(index, 'y', 'ASC')"
-                      ><AscSort
-                    /></q-btn>
-                    <q-btn
-                      :class="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.y[index].sortBy === 'DESC'
-                          ? 'selected'
-                          : ''
-                      "
-                      @click="updateSortOption(index, 'y', 'DESC')"
-                      ><DescSort
-                    /></q-btn>
-                  </q-btn-group>
+                  <SortByBtnGrp
+                    :fieldObj="
+                      dashboardPanelData.data.queries[0].fields.y[index]
+                    "
+                  />
                 </div>
               </div>
             </q-menu>
@@ -510,46 +440,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                   >
-                    Sort By:
-                    <q-btn-group class="q-mr-sm">
-                      <q-btn
-                        :class="
-                          !dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.z[index].sortBy ||
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.z[index].sortBy === 'None'
-                            ? 'selected'
-                            : ''
-                        "
-                        @click="updateSortOption(index, 'z', 'None')"
-                        icon="block"
-                        size="sm"
-                      />
-                      <q-btn
-                        :class="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.z[index].sortBy === 'ASC'
-                            ? 'selected'
-                            : ''
-                        "
-                        @click="updateSortOption(index, 'z', 'ASC')"
-                        ><AscSort
-                      /></q-btn>
-                      <q-btn
-                        :class="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.z[index].sortBy === 'DESC'
-                            ? 'selected'
-                            : ''
-                        "
-                        @click="updateSortOption(index, 'z', 'DESC')"
-                        ><DescSort
-                      /></q-btn>
-                    </q-btn-group>
+                    <SortByBtnGrp
+                      :fieldObj="
+                        dashboardPanelData.data.queries[0].fields.z[index]
+                      "
+                    />
                   </div>
                 </div>
               </q-menu>
@@ -822,12 +717,11 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
-import AscSort from "@/components/icons/AscSort.vue";
-import DescSort from "@/components/icons/DescSort.vue";
+import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
-  components: { DashboardMapQueryBuilder, AscSort, DescSort },
+  components: { DashboardMapQueryBuilder, SortByBtnGrp },
   setup() {
     const showXAxis = ref(true);
     const panelName = ref("");
@@ -1007,12 +901,6 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
-    const updateSortOption = (index: any, field: any, value: any) => {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields[field][index].sortBy = value;
-    };
-
     return {
       showXAxis,
       t,
@@ -1059,7 +947,6 @@ export default defineComponent({
       xLabel,
       yLabel,
       zLabel,
-      updateSortOption,
     };
   },
 });
@@ -1311,10 +1198,5 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
-}
-.selected {
-  background-color: var(--q-primary) !important;
-  font-weight: bold;
-  color: white;
 }
 </style>
