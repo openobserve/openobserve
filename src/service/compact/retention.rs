@@ -56,11 +56,13 @@ pub async fn delete_by_stream(
 
     // Hack for 1970-01-01
     if lifecycle_start.le("1970-01-01") {
+        let lifecycle_end = created_at + Duration::days(1);
+        let lifecycle_end = lifecycle_end.format("%Y-%m-%d").to_string();
         return db::compact::retention::delete_stream(
             org_id,
             stream_name,
             stream_type,
-            Some((lifecycle_start, lifecycle_start)),
+            Some((lifecycle_start, lifecycle_end.as_str())),
         )
         .await;
     }
