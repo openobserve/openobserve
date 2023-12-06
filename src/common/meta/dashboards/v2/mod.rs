@@ -107,12 +107,12 @@ pub struct AxisItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub args: Option<AxisArgs>,
+    pub args: Option<Vec<AxisArg>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct AxisArgs {
-    interval: Option<String>,
+pub struct AxisArg {
+    value: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ToSchema)]
