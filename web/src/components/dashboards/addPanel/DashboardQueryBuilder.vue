@@ -323,6 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dashboardPanelData.layout.currentQueryIndex
                     ].fields.y[index].aggregationFunction === 'histogram'
                   "
+                  class="q-mb-sm"
                 >
                   <!-- histogram interval for sql queries -->
                   <q-select
