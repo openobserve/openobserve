@@ -46,20 +46,35 @@ pub async fn save(
     name: &str,
     mut alert: Alert,
 ) -> Result<(), anyhow::Error> {
-    alert.name = name.to_string();
-    alert.org_id = org_id.to_string();
+    alert.name = name.trim().to_string();
+    alert.org_id = org_id.trim().to_string();
     alert.stream_type = stream_type;
-    alert.stream_name = stream_name.to_string();
+    alert.stream_name = stream_name.trim().to_string();
 
-    if alert.name.is_empty() {
+    if alert.name.is_empty() || alert.stream_name.is_empty() {
         return Err(anyhow::anyhow!("Alert name is required"));
     }
 
     // before saving alert check alert destination
+    if alert.destinations.is_empty() {
+        return Err(anyhow::anyhow!("Alert destinations is required"));
+    }
     for dest in alert.destinations.iter() {
         if db::alerts::destinations::get(org_id, dest).await.is_err() {
             return Err(anyhow::anyhow!("Alert destination {dest} not found"));
         };
+    }
+
+    // before saving alert check alert context attributes
+    if alert.context_attributes.is_some() {
+        let attrs = alert.context_attributes.as_ref().unwrap();
+        let mut new_attrs = HashMap::with_capacity(attrs.len());
+        for key in attrs.keys() {
+            let new_key = key.trim().to_string();
+            if !new_key.is_empty() {
+                new_attrs.insert(new_key, attrs.get(key).unwrap().to_string());
+            }
+        }
     }
 
     // before saving alert check column type to decide numeric condition
@@ -638,16 +653,19 @@ pub async fn send_notification(
     for (key, value) in vars.iter() {
         if resp.contains(&format!("{{{key}}}")) {
             let val = value.iter().cloned().collect::<Vec<_>>();
-            resp = resp.replace(&format!("{{{key}}}"), &val.join(","));
+            resp = resp.replace(
+                &format!("{{{key}}}"),
+                &format_variable_value(&val.join(",")),
+            );
         }
     }
     if let Some(attrs) = &alert.context_attributes {
         for (key, value) in attrs.iter() {
-            resp = resp.replace(&format!("{{{key}}}"), value)
+            resp = resp.replace(&format!("{{{key}}}"), &format_variable_value(value));
         }
     }
 
-    let msg: Value = json::from_str(&resp).unwrap();
+    let msg: Value = json::from_str(&resp)?;
     let msg: Value = match &msg {
         Value::String(obj) => match json::from_str(obj) {
             Ok(obj) => obj,
@@ -662,38 +680,33 @@ pub async fn send_notification(
     } else {
         reqwest::Client::new()
     };
-    match url::Url::parse(&dest.url) {
-        Ok(url) => {
-            let mut req = match dest.method {
-                HTTPType::POST => client.post(url),
-                HTTPType::PUT => client.put(url),
-                HTTPType::GET => client.get(url),
-            }
-            .header("Content-type", "application/json");
+    let url = url::Url::parse(&dest.url)?;
+    let mut req = match dest.method {
+        HTTPType::POST => client.post(url),
+        HTTPType::PUT => client.put(url),
+        HTTPType::GET => client.get(url),
+    }
+    .header("Content-type", "application/json");
 
-            // Add additional headers if any from destination description
-            if let Some(headers) = &dest.headers {
-                for (key, value) in headers.iter() {
-                    if !key.is_empty() && !value.is_empty() {
-                        req = req.header(key, value);
-                    }
-                }
-            };
-
-            let resp = req.json(&msg).send().await;
-            match resp {
-                Ok(resp) => {
-                    if !resp.status().is_success() {
-                        log::error!("Alert Notification sent error: {:?}", resp.bytes().await);
-                    }
-                }
-                Err(err) => log::error!("Alert Notification sending error {:?}", err),
+    // Add additional headers if any from destination description
+    if let Some(headers) = &dest.headers {
+        for (key, value) in headers.iter() {
+            if !key.is_empty() && !value.is_empty() {
+                req = req.header(key, value);
             }
         }
-        Err(err) => {
-            log::error!("Alert Notification sending error {:?}", err);
-        }
+    };
+
+    let resp = req.json(&msg).send().await?;
+    if !resp.status().is_success() {
+        return Err(anyhow::anyhow!("sent error: {:?}", resp.bytes().await));
     }
 
     Ok(())
+}
+
+fn format_variable_value(val: &str) -> String {
+    val.replace('\n', "\\\\n")
+        .replace('\r', "\\\\r")
+        .replace('\"', "\\\\\\\"")
 }

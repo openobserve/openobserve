@@ -80,10 +80,10 @@ pub async fn otlp_metrics_write(
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type.eq(CONTENT_TYPE_PROTO) {
-        log::info!("otlp::metrics_proto_handler");
+        // log::info!("otlp::metrics_proto_handler");
         metrics_proto_handler(&org_id, **thread_id, body).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        log::info!("otlp::metrics_json_handler");
+        // log::info!("otlp::metrics_json_handler");
         metrics_json_handler(&org_id, **thread_id, body).await
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
