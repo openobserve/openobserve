@@ -344,6 +344,15 @@ async fn delete_from_file_list(
         return Ok(());
     }
 
+    log::info!(
+        "[COMPACT:RETENTION] deleting file_list for: {}/{}/{}/{:?}, get files: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        time_range,
+        files.len(),
+    );
+
     // collect stream stats
     let mut stream_stats = StreamStats::default();
 
@@ -410,6 +419,14 @@ async fn write_file_list_db_only(
             .filter(|v| v.deleted)
             .map(|v| v.key.clone())
             .collect::<Vec<_>>();
+
+        log::info!(
+            "[COMPACT:RETENTION] deleting file_list from db, key: {}, need delete {}, put {}",
+            _key,
+            put_items.len(),
+            del_items.len()
+        );
+
         // set to external db
         // retry 5 times
         let mut success = false;
