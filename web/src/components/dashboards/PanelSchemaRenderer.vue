@@ -171,8 +171,8 @@ export default defineComponent({
           // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
           return (
             data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => data.value[0][0][x]) &&
-              yAlias.every((y: any) => data.value[0][0][y]))
+            (xAlias.every((x: any) => data.value[0][0][x] != null) &&
+              yAlias.every((y: any) => data.value[0][0][y]) != null)
           );
         }
         case "metric": {
@@ -187,16 +187,16 @@ export default defineComponent({
         case "heatmap": {
           return (
             data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => data.value[0][0][x]) &&
-              yAlias.every((y: any) => data.value[0][0][y]) &&
-              zAlias.every((z: any) => data.value[0][0][z]))
+            (xAlias.every((x: any) => data.value[0][0][x] != null) &&
+              yAlias.every((y: any) => data.value[0][0][y] != null) &&
+              zAlias.every((z: any) => data.value[0][0][z]) != null)
           );
         }
         case "pie":
         case "donut": {
           return (
             data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => data.value[0][0][y])
+            yAlias.every((y: any) => data.value[0][0][y] != null)
           );
         }
         default:

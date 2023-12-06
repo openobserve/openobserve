@@ -175,6 +175,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- </q-input> -->
     <div class="space"></div>
 
+    
+    <!-- for auto sql query limit -->
+    <!-- it should not be promql and custom query -->
+    <q-input
+      v-if="
+        !promqlMode &&
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+      "
+      v-model.number="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit
+      "
+      :value="0"
+      :min="0"
+      @update:model-value="
+        (value) =>
+          (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.limit = value ? value : 0)
+      "
+      label="Limit"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-sm showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      placeholder="0"
+      :type="'number'"
+    >
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">
+          Query Limit
+          <div>
+            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+            >
+              Limit for the query result
+            </q-tooltip>
+          </div>
+        </div>
+      </template>
+    </q-input>
+
     <q-input
       v-if="promqlMode"
       v-model="
