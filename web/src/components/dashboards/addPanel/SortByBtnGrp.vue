@@ -2,8 +2,8 @@
   Sort By:
   <q-btn-group class="q-mr-sm">
     <q-btn
-      :class="!fieldObj.sortBy || fieldObj.sortBy === 'None' ? 'selected' : ''"
-      @click="updateSortOption('None')"
+      :class="!fieldObj.sortBy ? 'selected' : ''"
+      @click="updateSortOption(null)"
       icon="block"
       size="sm"
     />

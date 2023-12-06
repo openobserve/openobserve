@@ -98,7 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <SortByBtnGrp
                     :fieldObj="
-                      dashboardPanelData.data.queries[0].fields.latitude
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.latitude
                     "
                   />
                 </div>
@@ -214,7 +216,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <SortByBtnGrp
                     :fieldObj="
-                      dashboardPanelData.data.queries[0].fields.longitude
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.longitude
                     "
                   />
                 </div>

@@ -349,7 +349,7 @@ export default defineComponent({
 
       [latitude, longitude, weight].forEach((it: any) => {
         // ignore if None is selected or sortBy is not there
-        if (it?.sortBy && it?.sortBy != "None") {
+        if (it?.sortBy) {
           orderByArr.push(`${it.alias} ${it.sortBy}`);
         }
       });
@@ -513,7 +513,7 @@ export default defineComponent({
 
       fields.forEach((it: any) => {
         // ignore if None is selected or sortBy is not there
-        if (it?.sortBy && it?.sortBy != "None") {
+        if (it?.sortBy) {
           orderByArr.push(`${it.alias} ${it.sortBy}`);
         }
       });
