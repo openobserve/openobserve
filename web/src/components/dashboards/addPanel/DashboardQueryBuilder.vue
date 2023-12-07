@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mb-sm"
                 >
                   <!-- histogram interval for sql queries -->
-                  <q-select
+                  <HistogramIntervalDropDown
                     v-if="!promqlMode"
                     :model-value="
                       getHistoramIntervalField(
@@ -131,18 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].fields.x[index]
                       )
                     "
-                    @update:model-value="(newValue: any) => {dashboardPanelData.data.queries[
+                    @update:modelValue="(newValue: any) => {dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                  ].fields.x[index].args[0].value = newValue}"
-                    label="Histogram interval"
-                    :options="histogramIntervalOptions"
-                    behavior="menu"
-                    :emit-value="true"
-                    filled
-                    borderless
-                    dense
-                  >
-                  </q-select>
+                    ].fields.x[index].args[0].value = newValue.value}"
+                  />
                 </div>
                 <q-input
                   dense
@@ -326,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mb-sm"
                 >
                   <!-- histogram interval for sql queries -->
-                  <q-select
+                  <HistogramIntervalDropDown
                     v-if="!promqlMode"
                     :model-value="
                       getHistoramIntervalField(
@@ -335,18 +327,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].fields.y[index]
                       )
                     "
-                    @update:model-value="(newValue: any) => {dashboardPanelData.data.queries[
+                    @update:modelValue="(newValue: any) => {dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                  ].fields.y[index].args[0].value = newValue}"
-                    label="Histogram interval"
-                    :options="histogramIntervalOptions"
-                    behavior="menu"
-                    :emit-value="true"
-                    filled
-                    borderless
-                    dense
-                  >
-                  </q-select>
+                    ].fields.y[index].args[0].value = newValue.value}"
+                  />
                 </div>
                 <q-input
                   dense
@@ -786,10 +770,15 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
+import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
-  components: { DashboardMapQueryBuilder, SortByBtnGrp },
+  components: {
+    DashboardMapQueryBuilder,
+    SortByBtnGrp,
+    HistogramIntervalDropDown,
+  },
   setup() {
     const showXAxis = ref(true);
     const panelName = ref("");
@@ -843,7 +832,7 @@ export default defineComponent({
           value: "auto",
         });
       }
-      return field?.args[0]?.value;
+      return { value: field?.args[0]?.value, label: field?.args[0]?.value };
     };
 
     const histogramIntervalOptions = [

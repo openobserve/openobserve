@@ -24,19 +24,13 @@
       </div>
       <div class="flex q-gutter-sm items-center">
         <!-- histogram interval for sql queries -->
-        <q-select
-          v-if="!promqlMode"
+        <HistogramIntervalDropDown
+          v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          label="Histogram interval"
-          :options="histogramIntervalOptions"
-          behavior="menu"
-          filled
-          borderless
-          dense
           class="q-ml-sm"
           style="width: 150px"
-        >
-        </q-select>
+        />
+
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
@@ -121,6 +115,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { onActivated } from "vue";
 import { parseDuration } from "@/utils/date";
 import { Parser } from "node-sql-parser/build/mysql";
+import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 
 export default defineComponent({
   name: "ViewPanel",
@@ -130,6 +125,7 @@ export default defineComponent({
     VariablesValueSelector,
     PanelSchemaRenderer,
     AutoRefreshInterval,
+    HistogramIntervalDropDown,
   },
   props: {
     panelId: {
@@ -176,70 +172,13 @@ export default defineComponent({
     const refreshInterval = ref(0);
 
     // histogram interval
-    const histogramInterval: any = ref("auto");
+    const histogramInterval: any = ref({
+      value: "auto",
+      label: "Auto",
+    });
 
-    const histogramIntervalOptions = [
-      {
-        label: "Auto",
-        value: "auto",
-      },
-      {
-        label: "1 second",
-        value: "1 second",
-      },
-      {
-        label: "5 seconds",
-        value: "5 seconds",
-      },
-      {
-        label: "10 seconds",
-        value: "10 seconds",
-      },
-      {
-        label: "30 seconds",
-        value: "30 seconds",
-      },
-      {
-        label: "1 minute",
-        value: "1 minute",
-      },
-      {
-        label: "5 minutes",
-        value: "5 minutes",
-      },
-      {
-        label: "10 minutes",
-        value: "10 minutes",
-      },
-      {
-        label: "30 minutes",
-        value: "30 minutes",
-      },
-      {
-        label: "1 hour",
-        value: "1 hour",
-      },
-      {
-        label: "6 hours",
-        value: "6 hours",
-      },
-      {
-        label: "12 hours",
-        value: "12 hours",
-      },
-      {
-        label: "1 day",
-        value: "1 day",
-      },
-      {
-        label: "7 days",
-        value: "7 days",
-      },
-      {
-        label: "30 days",
-        value: "30 days",
-      },
-    ];
+    // array of histogram fields
+    let histogramFields: any = ref([]);
 
     watch(
       () => histogramInterval.value,
@@ -324,6 +263,35 @@ export default defineComponent({
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       }
+
+      //if sql, get histogram fields from all queries
+      histogramFields.value =
+        dashboardPanelData.data.queryType != "sql"
+          ? []
+          : dashboardPanelData.data.queries
+              .map((q: any) =>
+                [...q.fields.x, ...q.fields.y, ...q.fields.z].find(
+                  (f: any) => f.aggregationFunction == "histogram"
+                )
+              )
+              .filter((field: any) => field != undefined);
+
+      // if there is at least 1 histogram field
+      // then set the default histogram interval
+      if (histogramFields.value.length > 0) {
+        for (let i = 0; i < histogramFields.value.length; i++) {
+          if (
+            histogramFields.value[i]?.args &&
+            histogramFields.value[i]?.args[0]?.value
+          ) {
+            histogramInterval.value = {
+              value: histogramFields.value[i]?.args[0]?.value,
+              label: histogramFields.value[i]?.args[0]?.value,
+            };
+            break;
+          }
+        }
+      }
       await nextTick();
       loadDashboard();
     });
@@ -403,7 +371,7 @@ export default defineComponent({
       refreshData,
       promqlMode,
       histogramInterval,
-      histogramIntervalOptions,
+      histogramFields,
     };
   },
 });
