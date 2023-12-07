@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-py-xs"
+        class="axis-container droppable scroll q-pt-xs"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-x-layout"
       >
         <q-btn-group
-          class="q-mr-sm"
+          class="q-mr-sm q-mb-sm"
           v-for="(itemX, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.x"
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-py-xs"
+        class="axis-container droppable scroll q-pt-xs"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <q-btn-group
-          class="q-mr-sm"
+          class="q-mr-sm q-mb-sm"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.y"
@@ -399,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <span class="layout-separator">:</span>
         <div
-          class="axis-container droppable scroll q-py-xs"
+          class="axis-container droppable scroll q-pt-xs"
           :class="{
             'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
             'drop-entered':
@@ -413,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-mutation="handler2"
         >
           <q-btn-group
-            class="q-mr-sm"
+            class="q-mr-sm q-mb-sm"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.z"
@@ -538,7 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="layout-name">{{ t("panel.filters") }}</div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-py-xs"
+        class="axis-container droppable scroll q-pt-xs"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -553,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-filter-layout"
       >
         <q-btn-group
-          class="q-mr-sm"
+          class="q-mr-sm q-mb-sm"
           v-for="(filteredItem, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.filter"
@@ -1034,7 +1034,7 @@ export default defineComponent({
 .axis-container {
   flex: 1;
   width: 100%;
-  white-space: nowrap;
+  // white-space: nowrap;
   overflow-x: auto;
 }
 .layout-separator {

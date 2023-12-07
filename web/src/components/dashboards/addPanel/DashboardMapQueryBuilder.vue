@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-py-xs"
+        class="axis-container droppable scroll q-pt-xs"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-x-layout"
       >
         <q-btn-group
-          class="q-mr-sm"
+          class="q-mr-sm q-mb-sm"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-py-xs"
+        class="axis-container droppable scroll q-pt-xs"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <q-btn-group
-          class="q-mr-sm"
+          class="q-mr-sm q-mb-sm"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-py-xs"
+        class="axis-container droppable scroll q-pt-xs"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <q-btn-group
-          class="q-mr-sm"
+          class="q-mr-sm q-mb-sm"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -571,7 +571,7 @@ export default defineComponent({
 .axis-container {
   flex: 1;
   width: 100%;
-  white-space: nowrap;
+  // white-space: nowrap;
   overflow-x: auto;
 }
 
