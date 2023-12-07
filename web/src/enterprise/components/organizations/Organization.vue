@@ -158,6 +158,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -364,8 +365,7 @@ export default defineComponent({
             role: convertToTitleCase(role),
             status: convertToTitleCase(data.status),
             plan_type:
-              data.CustomerBillingObj.subscription_type ==
-                "Free-Plan-USD-Monthly" ||
+              data.CustomerBillingObj.subscription_type == config.freePlan ||
               data.CustomerBillingObj.subscription_type == ""
                 ? "Developer"
                 : "Pro",

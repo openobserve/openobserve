@@ -35,7 +35,6 @@ class="absolute beta-text"
         </div>
 
         <q-toolbar-title></q-toolbar-title>
-        <ThemeSwitcher></ThemeSwitcher>
         <div
           class="headerMenu float-left"
           v-if="store.state.organizationData.quotaThresholdMsg"
@@ -63,6 +62,7 @@ class="warning" />{{
             >Upgrade to PRO Plan</q-btn
           >
         </div>
+        <ThemeSwitcher></ThemeSwitcher>
         <template v-if="config.isCloud !== 'true'">
           <q-btn
             class="q-ml-xs no-border"
