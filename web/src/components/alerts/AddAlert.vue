@@ -77,6 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
+              v-bind:readonly="beingUpdated"
+              v-bind:disable="beingUpdated"
               @update:model-value="updateStreams()"
               :rules="[(val: any) => !!val || 'Field is required!']"
               style="min-width: 150px"
@@ -99,6 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               use-input
               hide-selected
               fill-input
+              v-bind:readonly="beingUpdated"
+              v-bind:disable="beingUpdated"
               :input-debounce="400"
               @filter="filterStreams"
               @update:model-value="updateStreamFields(formData.stream_name)"
@@ -178,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   dense
                   filled
-                  min="0"
+                  min="1"
                   style="background: none"
                 />
               </div>
