@@ -15,8 +15,10 @@
 
 use datafusion::error::{DataFusionError, Result};
 
-use crate::service::promql::common::linear_regression;
-use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
+use crate::service::promql::{
+    common::linear_regression,
+    value::{InstantValue, LabelsExt, Sample, Value},
+};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#predict_linear
 pub(crate) fn predict_linear(data: &Value, duration: f64) -> Result<Value> {
@@ -31,7 +33,7 @@ fn exec(data: &Value, duration: f64) -> Result<Value> {
             return Err(DataFusionError::Plan(format!(
                 "predict_linear: matrix argument expected, got {}",
                 v.get_type()
-            )))
+            )));
         }
     };
 

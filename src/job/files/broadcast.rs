@@ -15,8 +15,10 @@
 
 use tokio::time;
 
-use crate::common::infra::cluster;
-use crate::service::db::file_list::{broadcast, local::BROADCAST_QUEUE};
+use crate::{
+    common::infra::cluster,
+    service::db::file_list::{broadcast, local::BROADCAST_QUEUE},
+};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     loop {

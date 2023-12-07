@@ -15,12 +15,14 @@
 
 use tokio::time;
 
-use crate::common::infra::{
-    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-    config::CONFIG,
-    dist_lock, file_list as infra_file_list,
+use crate::{
+    common::infra::{
+        cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+        config::CONFIG,
+        dist_lock, file_list as infra_file_list,
+    },
+    service::db,
 };
-use crate::service::db;
 
 pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     // waiting for file list remote inited
@@ -70,7 +72,8 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
 async fn update_stats_lock_node() -> Result<i64, anyhow::Error> {
     let lock_key = "compact/stream_stats/offset".to_string();
     let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
-    // check the working node for the organization again, maybe other node locked it first
+    // check the working node for the organization again, maybe other node locked it
+    // first
     let (offset, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
         dist_lock::unlock(&locker).await?;

@@ -19,37 +19,37 @@ use bytes::BytesMut;
 use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
-use opentelemetry_proto::tonic::metrics::v1::metric::Data;
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
-    metrics::v1::*,
+    metrics::v1::{metric::Data, *},
 };
 use prost::Message;
 
-use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
-    meta::{
-        alerts::{self, Alert},
-        http::HttpResponse as MetaHttpResponse,
-        prom::*,
-        stream::PartitioningDetails,
-        stream::StreamParams,
-        usage::UsageType,
-        StreamType,
+use crate::{
+    common::{
+        infra::{cluster, config::CONFIG, metrics},
+        meta::{
+            alerts::{self, Alert},
+            http::HttpResponse as MetaHttpResponse,
+            prom::*,
+            stream::{PartitioningDetails, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json},
     },
-    utils::{flatten, json},
-};
-use crate::service::{
-    db, format_stream_name,
-    ingestion::{
-        chk_schema_by_record, evaluate_trigger,
-        grpc::{get_exemplar_val, get_metric_val, get_val},
-        write_file, TriggerAlertData,
+    service::{
+        db, format_stream_name,
+        ingestion::{
+            chk_schema_by_record, evaluate_trigger,
+            grpc::{get_exemplar_val, get_metric_val, get_val},
+            write_file, TriggerAlertData,
+        },
+        metrics::{format_label_name, get_exclude_labels},
+        schema::{set_schema_metadata, stream_schema_exists},
+        stream::unwrap_partition_time_level,
+        usage::report_request_usage_stats,
     },
-    metrics::{format_label_name, get_exclude_labels},
-    schema::{set_schema_metadata, stream_schema_exists},
-    stream::unwrap_partition_time_level,
-    usage::report_request_usage_stats,
 };
 
 pub async fn handle_grpc_request(
@@ -151,7 +151,7 @@ pub async fn handle_grpc_request(
                 }
                 rec[NAME_LABEL] = metric_name.to_owned().into();
 
-                //metadata handling
+                // metadata handling
                 let mut metadata = Metadata {
                     metric_family_name: rec[NAME_LABEL].to_string(),
                     metric_type: MetricType::Unknown,

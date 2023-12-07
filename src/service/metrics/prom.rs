@@ -13,41 +13,44 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
-use std::collections::HashMap;
 
-use crate::common::{
-    infra::{
-        cache::stats,
-        cluster::{self, LOCAL_NODE_UUID},
-        config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        errors::{Error, Result},
-        metrics,
+use crate::{
+    common::{
+        infra::{
+            cache::stats,
+            cluster::{self, LOCAL_NODE_UUID},
+            config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+            errors::{Error, Result},
+            metrics,
+        },
+        meta::{
+            alerts::{self, Alert},
+            functions::StreamTransform,
+            prom::*,
+            search,
+            stream::{PartitioningDetails, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{json, time::parse_i64_to_timestamp_micros},
     },
-    meta::{
-        alerts::{self, Alert},
-        functions::StreamTransform,
-        prom::*,
-        search,
-        stream::{PartitioningDetails, StreamParams},
-        usage::UsageType,
-        StreamType,
+    service::{
+        db, format_stream_name,
+        ingestion::{chk_schema_by_record, evaluate_trigger, write_file, TriggerAlertData},
+        metrics::format_label_name,
+        schema::{set_schema_metadata, stream_schema_exists},
+        search as search_service,
+        stream::unwrap_partition_time_level,
+        usage::report_request_usage_stats,
     },
-    utils::{json, time::parse_i64_to_timestamp_micros},
-};
-use crate::service::{
-    db, format_stream_name,
-    ingestion::{chk_schema_by_record, evaluate_trigger, write_file, TriggerAlertData},
-    metrics::format_label_name,
-    schema::{set_schema_metadata, stream_schema_exists},
-    search as search_service,
-    stream::unwrap_partition_time_level,
-    usage::report_request_usage_stats,
 };
 
 pub(crate) mod prometheus {
@@ -201,7 +204,7 @@ pub async fn remote_write(
                 accept_record = true
             }
             if !accept_record {
-                //do not accept any entries for request
+                // do not accept any entries for request
                 return Ok(());
             }
 
@@ -466,7 +469,8 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
 }
 
 // HACK: the implementation returns at most one metadata object per metric.
-// This differs from Prometheus, which [supports] multiple metadata objects per metric.
+// This differs from Prometheus, which [supports] multiple metadata objects per
+// metric.
 //
 // [supports]: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
@@ -761,9 +765,10 @@ async fn prom_ha_handler(
         if replica_label.eq(&leader.name) {
             _accept_record = true;
             leader.last_received = curr_ts;
-            // log::info!(  "Updating last received data for {} to {}", &leader.name, Utc.timestamp_nanos(last_received * 1000));
+            // log::info!(  "Updating last received data for {} to {}",
+            // &leader.name, Utc.timestamp_nanos(last_received * 1000));
         } else if curr_ts - last_received > election_interval {
-            //elect new leader as didnt receive data for last 30 secs
+            // elect new leader as didnt receive data for last 30 secs
             log::info!(
                 "Electing {} new leader for {} as last received data from {} at {} ",
                 replica_label,

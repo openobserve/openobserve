@@ -19,8 +19,8 @@ use utoipa::ToSchema;
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct CreateViewRequest {
     /// Base64 encoded string, containing all the data for a given view.
-    /// This data is expected to be versioned so that the frontend can deserialize
-    /// as required.
+    /// This data is expected to be versioned so that the frontend can
+    /// deserialize as required.
     pub data: serde_json::Value,
 
     /// User-readable name of the view, doesn't need to be unique.
@@ -30,8 +30,8 @@ pub struct CreateViewRequest {
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct UpdateViewRequest {
     /// Base64 encoded string, containing all the data for a given view.
-    /// This data is expected to be versioned so that the frontend can deserialize
-    /// as required.
+    /// This data is expected to be versioned so that the frontend can
+    /// deserialize as required.
     pub data: serde_json::Value,
 
     /// User-readable name of the view, doesn't need to be unique.
@@ -64,7 +64,7 @@ pub struct ViewsWithoutData {
 pub struct DeleteViewResponse {
     pub org_id: String,
     pub view_id: String,
-    //TODO(ansrivas): Check if we have access to view_name
+    // TODO(ansrivas): Check if we have access to view_name
     // pub view_name: String,
 }
 

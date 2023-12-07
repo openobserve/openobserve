@@ -15,14 +15,16 @@
 
 use tokio::time;
 
-use crate::common::infra::{
-    cluster::{is_compactor, is_querier},
-    config::CONFIG,
+use crate::{
+    common::infra::{
+        cluster::{is_compactor, is_querier},
+        config::CONFIG,
+    },
+    service::{compact::stats::update_stats_from_file_list, db, usage},
 };
-use crate::service::{compact::stats::update_stats_from_file_list, db, usage};
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    //tokio::task::spawn(async move { usage_report_stats().await });
+    // tokio::task::spawn(async move { usage_report_stats().await });
     tokio::task::spawn(async move { file_list_update_stats().await });
     tokio::task::spawn(async move { cache_stream_stats().await });
     Ok(())

@@ -13,20 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{cmp::max, collections::HashMap};
+
 use arrow_schema::Field;
 use chrono::Duration;
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
-use std::{cmp::max, collections::HashMap};
 use utoipa::ToSchema;
 
+use super::prom::Metadata;
 use crate::common::{
     infra::config::CONFIG,
     meta::{common::FileMeta, usage::Stats, StreamType},
     utils::json,
 };
-
-use super::prom::Metadata;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
@@ -66,7 +66,8 @@ pub struct StreamStats {
 }
 
 impl StreamStats {
-    /// Returns true iff [start, end] time range intersects with the stream's time range.
+    /// Returns true iff [start, end] time range intersects with the stream's
+    /// time range.
     pub(crate) fn time_range_intersects(&self, start: i64, end: i64) -> bool {
         assert!(start <= end);
         let (min, max) = self.time_range();

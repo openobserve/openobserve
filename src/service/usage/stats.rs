@@ -13,27 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use once_cell::sync::Lazy;
-use reqwest::Client;
 use std::{collections::HashMap, sync::Arc};
 
-use crate::common::{
-    infra::{
-        cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-        config::CONFIG,
-        db as infra_db, dist_lock,
-    },
-    meta::{
-        self,
-        search::Request,
-        usage::{Stats, UsageEvent, STATS_STREAM, USAGE_STREAM},
-    },
-    utils::json,
-};
-use crate::handler::grpc::cluster_rpc;
-use crate::service::{db, search as SearchService};
+use once_cell::sync::Lazy;
+use reqwest::Client;
 
 use super::ingestion_service;
+use crate::{
+    common::{
+        infra::{
+            cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+            config::CONFIG,
+            db as infra_db, dist_lock,
+        },
+        meta::{
+            self,
+            search::Request,
+            usage::{Stats, UsageEvent, STATS_STREAM, USAGE_STREAM},
+        },
+        utils::json,
+    },
+    handler::grpc::cluster_rpc,
+    service::{db, search as SearchService},
+};
 
 pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
@@ -63,9 +65,17 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         let current_ts = chrono::Utc::now().timestamp_micros();
 
         let sql = if CONFIG.common.usage_report_compressed_size {
-            format!("SELECT sum(num_records) as records ,sum(size) as original_size, org_id , stream_type  ,stream_name ,min(min_ts) as min_ts , max(max_ts) as max_ts, sum(compressed_size) as compressed_size  FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' and org_id = \'{}\' group by  org_id , stream_type ,stream_name",UsageEvent::Ingestion, org_id)
+            format!(
+                "SELECT sum(num_records) as records ,sum(size) as original_size, org_id , stream_type  ,stream_name ,min(min_ts) as min_ts , max(max_ts) as max_ts, sum(compressed_size) as compressed_size  FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' and org_id = \'{}\' group by  org_id , stream_type ,stream_name",
+                UsageEvent::Ingestion,
+                org_id
+            )
         } else {
-            format!("SELECT sum(num_records) as records ,sum(size) as original_size, org_id , stream_type  ,stream_name FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' and org_id = \'{}\' group by  org_id , stream_type ,stream_name",UsageEvent::Ingestion, org_id)
+            format!(
+                "SELECT sum(num_records) as records ,sum(size) as original_size, org_id , stream_type  ,stream_name FROM \"{USAGE_STREAM}\" where _timestamp between {last_query_ts} and {current_ts} and event = \'{}\' and org_id = \'{}\' group by  org_id , stream_type ,stream_name",
+                UsageEvent::Ingestion,
+                org_id
+            )
         };
 
         let query = meta::search::Query {
@@ -116,13 +126,13 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         }
     }
     // set cache expiry
-    /*  let expiry_ts = chrono::Utc::now()
-        + chrono::Duration::minutes(
-            (CONFIG.limit.calculate_stats_interval - 2)
-                .try_into()
-                .unwrap(),
-        );
-    set_cache_expiry(expiry_ts.timestamp_micros()).await; */
+    //  let expiry_ts = chrono::Utc::now()
+    // + chrono::Duration::minutes(
+    // (CONFIG.limit.calculate_stats_interval - 2)
+    // .try_into()
+    // .unwrap(),
+    // );
+    // set_cache_expiry(expiry_ts.timestamp_micros()).await;
     Ok(())
 }
 
@@ -131,9 +141,13 @@ async fn get_last_stats(
     stats_ts: i64,
 ) -> std::result::Result<Vec<json::Value>, anyhow::Error> {
     let sql = if CONFIG.common.usage_report_compressed_size {
-        format!("SELECT records ,original_size, org_id , stream_type ,stream_name ,min_ts , max_ts, compressed_size FROM \"{STATS_STREAM}\" where _timestamp ={stats_ts} and org_id = \'{org_id}\'")
+        format!(
+            "SELECT records ,original_size, org_id , stream_type ,stream_name ,min_ts , max_ts, compressed_size FROM \"{STATS_STREAM}\" where _timestamp ={stats_ts} and org_id = \'{org_id}\'"
+        )
     } else {
-        format!("SELECT records ,original_size, org_id , stream_type ,stream_name ,min_ts , max_ts FROM \"{STATS_STREAM}\" where _timestamp ={stats_ts} and org_id = \'{org_id}\'")
+        format!(
+            "SELECT records ,original_size, org_id , stream_type ,stream_name ,min_ts , max_ts FROM \"{STATS_STREAM}\" where _timestamp ={stats_ts} and org_id = \'{org_id}\'"
+        )
     };
 
     let query = meta::search::Query {
@@ -166,7 +180,7 @@ async fn report_stats(
     last_query_ts: i64,
     curr_ts: i64,
 ) -> Result<(), anyhow::Error> {
-    //get existing stats
+    // get existing stats
     let existing_stats = get_last_stats(org_id, last_query_ts).await?;
 
     let mut report_data_map = to_map(report_data);

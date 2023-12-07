@@ -13,32 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{cmp::min, io::Cursor, sync::Arc};
+
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
 use once_cell::sync::Lazy;
-use std::{cmp::min, io::Cursor, sync::Arc};
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::CONFIG,
-        dist_lock,
-        errors::{Error, ErrorCodes},
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::CONFIG,
+            dist_lock,
+            errors::{Error, ErrorCodes},
+        },
+        meta::{
+            common::FileKey,
+            search,
+            stream::{PartitionTimeLevel, ScanStats, StreamParams},
+            StreamType,
+        },
+        utils::{flatten, json, str::find},
     },
-    meta::{
-        common::FileKey,
-        search,
-        stream::{PartitionTimeLevel, ScanStats, StreamParams},
-        StreamType,
-    },
-    utils::{flatten, json, str::find},
+    handler::grpc::cluster_rpc,
+    service::{db, file_list, format_partition_key, stream},
 };
-use crate::handler::grpc::cluster_rpc;
-use crate::service::{db, file_list, format_partition_key, stream};
 
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
@@ -157,7 +160,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         n => n,
     };
 
-    // partition request, here plus 1 second, because division is integer, maybe lose some precision
+    // partition request, here plus 1 second, because division is integer, maybe
+    // lose some precision
     let job = cluster_rpc::Job {
         session_id: session_id.clone(),
         job: session_id[0..6].to_string(), // take the frist 6 characters as job id
@@ -372,7 +376,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             Err(err) => {
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     err.to_string(),
-                )))
+                )));
             }
         };
         let mut sources: Vec<json::Value> = json_rows
@@ -597,7 +601,8 @@ fn filter_source_by_partition_key(source: &str, filters: &[(&str, Vec<&str>)]) -
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
 impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
-    /// Set a key and value in the MetadataMap.  Does nothing if the key or value are not valid inputs
+    /// Set a key and value in the MetadataMap.  Does nothing if the key or
+    /// value are not valid inputs
     fn set(&mut self, key: &str, value: String) {
         if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes()) {
             if let Ok(val) = tonic::metadata::MetadataValue::try_from(&value) {
@@ -689,23 +694,74 @@ mod tests {
             ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1'", true),
             ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2'", false),
             ("SELECT * FROM tbl WHERE some_other_key = 'no-matter'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' AND kubernetesnamespacename='ziox-dev'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' AND kubernetesnamespacename='abcdefg'", false),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' AND kubernetesnamespacename='ziox-dev'", false),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' AND kubernetesnamespacename='abcdefg'", false),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kubernetesnamespacename='ziox-dev'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kubernetesnamespacename='abcdefg'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' OR kubernetesnamespacename='ziox-dev'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' OR kubernetesnamespacename='abcdefg'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kuberneteshost='gke-dev2'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1')", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev2')", false),
-            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2')", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') AND kubernetesnamespacename='ziox-dev'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') AND kubernetesnamespacename='abcdefg'", false),
-            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR kubernetesnamespacename='ziox-dev'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR kubernetesnamespacename='abcdefg'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR some_other_key='abcdefg'", true),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' AND kubernetesnamespacename='ziox-dev'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' AND kubernetesnamespacename='abcdefg'",
+                false,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' AND kubernetesnamespacename='ziox-dev'",
+                false,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' AND kubernetesnamespacename='abcdefg'",
+                false,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kubernetesnamespacename='ziox-dev'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kubernetesnamespacename='abcdefg'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' OR kubernetesnamespacename='ziox-dev'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' OR kubernetesnamespacename='abcdefg'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kuberneteshost='gke-dev2'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1')",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev2')",
+                false,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2')",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') AND kubernetesnamespacename='ziox-dev'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') AND kubernetesnamespacename='abcdefg'",
+                false,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR kubernetesnamespacename='ziox-dev'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR kubernetesnamespacename='abcdefg'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR some_other_key='abcdefg'",
+                true,
+            ),
         ];
         for (tsql, expected) in sqls {
             let meta = sql::Sql::new(tsql).unwrap();

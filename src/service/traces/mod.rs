@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Error;
+
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
@@ -24,30 +26,31 @@ use opentelemetry_proto::tonic::{
     trace::v1::{status::StatusCode, Status},
 };
 use prost::Message;
-use std::io::Error;
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
+        },
+        meta::{
+            alerts::Alert,
+            http::HttpResponse as MetaHttpResponse,
+            stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
+            traces::{Event, Span, SpanRefType},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{self, flatten, hasher::get_fields_key_xxh3, json},
     },
-    meta::{
-        alerts::Alert,
-        http::HttpResponse as MetaHttpResponse,
-        stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
-        traces::{Event, Span, SpanRefType},
-        usage::UsageType,
-        StreamType,
+    service::{
+        db, distinct_values, format_partition_key, format_stream_name,
+        ingestion::{evaluate_trigger, grpc::get_val, write_file_arrow, TriggerAlertData},
+        schema::{check_for_schema, stream_schema_exists},
+        stream::unwrap_partition_time_level,
+        usage::report_request_usage_stats,
     },
-    utils::{self, flatten, hasher::get_fields_key_xxh3, json},
-};
-use crate::service::{
-    db, distinct_values, format_partition_key, format_stream_name,
-    ingestion::{evaluate_trigger, grpc::get_val, write_file_arrow, TriggerAlertData},
-    schema::{check_for_schema, stream_schema_exists},
-    stream::unwrap_partition_time_level,
-    usage::report_request_usage_stats,
 };
 
 pub mod otlp_http;
@@ -228,14 +231,14 @@ pub async fn handle_trace_request(
                     service_name: service_name.clone(),
                     attributes: span_att_map,
                     service: service_att_map.clone(),
-                    flags: 1, //TODO add appropriate value
+                    flags: 1, // TODO add appropriate value
                     //_timestamp: timestamp,
                     events: json::to_string(&events).unwrap(),
                 };
 
                 let value: json::Value = json::to_value(local_val).unwrap();
 
-                //JSON Flattening
+                // JSON Flattening
                 let mut value = flatten::flatten(&value).unwrap();
 
                 if !local_trans.is_empty() {
@@ -386,7 +389,7 @@ pub async fn handle_trace_request(
         ])
         .inc();
 
-    //metric + data usage
+    // metric + data usage
     report_request_usage_stats(
         req_stats,
         org_id,

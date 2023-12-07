@@ -13,18 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Error;
+
 use actix_multipart::Multipart;
 use actix_web::{post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
-use std::io::Error;
 
-use crate::common::{
-    infra::config::{CONFIG, SIZE_IN_MB},
-    meta::http::HttpResponse as MetaHttpResponse,
+use crate::{
+    common::{
+        infra::config::{CONFIG, SIZE_IN_MB},
+        meta::http::HttpResponse as MetaHttpResponse,
+    },
+    service::enrichment_table::save_enrichment_data,
 };
-use crate::service::enrichment_table::save_enrichment_data;
 
-/** CreateEnrichmentTable */
+/// CreateEnrichmentTable
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",

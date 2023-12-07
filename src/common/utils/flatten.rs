@@ -13,27 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use serde_json::value::Map;
-use serde_json::value::Value;
+use serde_json::value::{Map, Value};
 
 const KEY_SEPARATOR: &str = "_";
 const FORMAT_KEY_ENABLED: bool = true;
 
 /// Flattens the provided JSON object (`current`).
 ///
-/// It will return an error if flattening the object would make two keys to be the same,
-/// overwriting a value. It will alre return an error if the JSON value passed it's not an object.
+/// It will return an error if flattening the object would make two keys to be
+/// the same, overwriting a value. It will alre return an error if the JSON
+/// value passed it's not an object.
 ///
 /// # Errors
-/// Will return `Err` if `to_flatten` it's not an object, or if flattening the object would
-/// result in two or more keys colliding.
+/// Will return `Err` if `to_flatten` it's not an object, or if flattening the
+/// object would result in two or more keys colliding.
 pub fn flatten(to_flatten: &Value) -> Result<Value, anyhow::Error> {
     let mut flat = Map::<String, Value>::new();
     flatten_value(to_flatten, "".to_owned(), 0, &mut flat).map(|_x| Value::Object(flat))
 }
 
-/// Flattens the passed JSON value (`current`), whose path is `parent_key` and its 0-based
-/// depth is `depth`.  The result is stored in the JSON object `flattened`.
+/// Flattens the passed JSON value (`current`), whose path is `parent_key` and
+/// its 0-based depth is `depth`.  The result is stored in the JSON object
+/// `flattened`.
 fn flatten_value(
     current: &Value,
     parent_key: String,
@@ -58,20 +59,22 @@ fn flatten_value(
     } else {
         if flattened.contains_key(&parent_key) {
             // log::error!(
-            //     "flatten will be overwritten current: {:?}, new key: {}, val: {}, ",
-            //     flattened,
+            //     "flatten will be overwritten current: {:?}, new key: {}, val:
+            // {}, ",     flattened,
             //     parent_key,
             //     current.clone(),
             // );
-            // return Err(anyhow::anyhow!( "flatten will be overwritten a key {}", parent_key));
+            // return Err(anyhow::anyhow!( "flatten will be overwritten a key
+            // {}", parent_key));
         }
         flattened.insert(parent_key, current.clone());
     }
     Ok(())
 }
 
-/// Flattens the passed object (`current`), whose path is `parent_key` and its 0-based depth
-/// is `depth`.  The result is stored in the JSON object `flattened`.
+/// Flattens the passed object (`current`), whose path is `parent_key` and its
+/// 0-based depth is `depth`.  The result is stored in the JSON object
+/// `flattened`.
 fn flatten_object(
     current: &Map<String, Value>,
     parent_key: &str,
@@ -94,8 +97,9 @@ fn flatten_object(
     Ok(())
 }
 
-/// Flattens the passed array (`current`), whose path is `parent_key` and its 0-based depth
-/// is `depth`.  The result is stored in the JSON object `flattened`.
+/// Flattens the passed array (`current`), whose path is `parent_key` and its
+/// 0-based depth is `depth`.  The result is stored in the JSON object
+/// `flattened`.
 fn flatten_array(
     current: &[Value],
     parent_key: &str,
@@ -114,7 +118,8 @@ fn flatten_array(
     Ok(())
 }
 
-/// We need every character in the key to be lowercase alphanumeric or underscore
+/// We need every character in the key to be lowercase alphanumeric or
+/// underscore
 pub fn format_key(key: &str) -> String {
     if key
         .chars()
@@ -137,8 +142,9 @@ pub fn format_key(key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     #[test]
     fn object_with_plain_values() {
@@ -146,8 +152,8 @@ mod tests {
         assert_eq!(obj, flatten(&obj).unwrap());
     }
 
-    /// Ensures that when using `ArrayFormatting::Plain` both arrays and objects are formatted
-    /// properly.
+    /// Ensures that when using `ArrayFormatting::Plain` both arrays and objects
+    /// are formatted properly.
     #[test]
     fn array_formatting_plain() {
         let obj = json!({"s": {"a": [1, 2.0, "b", null, true]}});
@@ -228,8 +234,8 @@ mod tests {
         assert_eq!(flatten(&obj).unwrap(), json!({}));
     }
 
-    /// Ensure that if all the end values of the JSON object are either `[]` or `{}` the flattened
-    /// resulting object it's empty.
+    /// Ensure that if all the end values of the JSON object are either `[]` or
+    /// `{}` the flattened resulting object it's empty.
     #[test]
     fn empty_complex_object() {
         let obj = json!({"key": {"key2": {}, "key3": [[], {}, {"k": {}, "q": []}]}});
@@ -263,8 +269,8 @@ mod tests {
         assert_eq!(flatten(&obj).unwrap(), json!({"key___": "a"}));
     }
 
-    /// Flattening only makes sense for objects. Passing something else must return an informative
-    /// error.
+    /// Flattening only makes sense for objects. Passing something else must
+    /// return an informative error.
     #[test]
     fn first_level_must_be_an_object() {
         let integer = json!(3);

@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::{
-    infra::{config::CONFIG, file_list as infra_file_list},
-    meta::{common::FileKey, stream::PartitionTimeLevel, StreamType},
-    utils::{file::get_file_meta, time::BASE_TIME},
+use crate::{
+    common::{
+        infra::{config::CONFIG, file_list as infra_file_list},
+        meta::{common::FileKey, stream::PartitionTimeLevel, StreamType},
+        utils::{file::get_file_meta, time::BASE_TIME},
+    },
+    job::{file_list, files},
+    service::{compact::stats::update_stats_from_file_list, db},
 };
-use crate::job::{file_list, files};
-use crate::service::{compact::stats::update_stats_from_file_list, db};
 
 pub async fn run(prefix: &str) -> Result<(), anyhow::Error> {
     if get_file_meta(&CONFIG.common.data_wal_dir).is_err() {
@@ -53,7 +55,8 @@ pub async fn run(prefix: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Run the file list migration for DynamoDB to add new fields `created_at` and `org`.
+/// Run the file list migration for DynamoDB to add new fields `created_at` and
+/// `org`.
 pub async fn run_for_dynamo() -> Result<(), anyhow::Error> {
     // load stream list
     db::schema::cache().await?;

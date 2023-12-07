@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{str::FromStr, sync::Arc};
+
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -21,7 +23,6 @@ use sqlx::{
     mysql::{MySqlConnectOptions, MySqlPoolOptions},
     ConnectOptions, MySql, Pool,
 };
-use std::{str::FromStr, sync::Arc};
 use tokio::sync::mpsc;
 
 use crate::common::infra::{config::CONFIG, errors::*};

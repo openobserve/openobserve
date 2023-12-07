@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{str::FromStr, sync::Arc};
+
 use datafusion::arrow::datatypes::Schema;
 use parquet::{
     arrow::ArrowWriter,
@@ -21,7 +23,6 @@ use parquet::{
     format::SortingColumn,
     schema::types::ColumnPath,
 };
-use std::{str::FromStr, sync::Arc};
 
 use crate::common::{
     infra::config::{
@@ -134,7 +135,8 @@ pub fn new_parquet_writer<'a>(
         writer_props = writer_props
             .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
     }
-    // Bloom filter stored by row_group, so if the num_rows can limit to PARQUET_MAX_ROW_GROUP_SIZE,
+    // Bloom filter stored by row_group, so if the num_rows can limit to
+    // PARQUET_MAX_ROW_GROUP_SIZE,
     let num_rows = metadata.records as u64;
     let num_rows = if num_rows > PARQUET_MAX_ROW_GROUP_SIZE as u64 {
         PARQUET_MAX_ROW_GROUP_SIZE as u64

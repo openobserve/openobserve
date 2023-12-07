@@ -13,36 +13,45 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use arrow::ipc::reader::StreamReader;
-use datafusion::arrow::json::ReaderBuilder;
-use std::collections::HashMap;
-use std::io::BufRead;
 use std::{
+    collections::HashMap,
     fs,
-    io::{BufReader, Seek, SeekFrom},
+    io::{BufRead, BufReader, Seek, SeekFrom},
     path::Path,
     sync::Arc,
 };
+
+use arrow::ipc::reader::StreamReader;
+use datafusion::arrow::json::ReaderBuilder;
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::infra::config::{FILE_EXT_ARROW, FILE_EXT_JSON};
-use crate::common::meta::prom::NAME_LABEL;
-use crate::common::meta::stream::PartitionTimeLevel;
-use crate::common::utils::hasher::get_schema_key_xxh3;
-use crate::common::utils::schema::infer_json_schema;
-use crate::common::{
-    infra::{cluster, config::CONFIG, metrics, storage, wal},
-    meta::{common::FileMeta, stream::StreamParams, StreamType},
-    utils::{
-        file::scan_files,
-        json,
-        schema::{infer_json_schema_from_iterator, infer_json_schema_from_seekable},
-        stream::populate_file_meta,
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
+            metrics, storage, wal,
+        },
+        meta::{
+            common::FileMeta,
+            prom::NAME_LABEL,
+            stream::{PartitionTimeLevel, StreamParams},
+            StreamType,
+        },
+        utils::{
+            file::scan_files,
+            hasher::get_schema_key_xxh3,
+            json,
+            schema::{
+                infer_json_schema, infer_json_schema_from_iterator, infer_json_schema_from_seekable,
+            },
+            stream::populate_file_meta,
+        },
     },
-};
-use crate::service::{
-    db, schema::schema_evolution, search::datafusion::new_parquet_writer,
-    usage::report_compression_stats,
+    service::{
+        db, schema::schema_evolution, search::datafusion::new_parquet_writer,
+        usage::report_compression_stats,
+    },
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -67,9 +76,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/*
- * upload compressed files to storage & delete moved files from local
- */
+// upload compressed files to storage & delete moved files from local
 pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
@@ -92,8 +99,9 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             .replace('\\', "/");
         let columns = file_path.splitn(5, '/').collect::<Vec<&str>>();
 
-        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
-        // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
+        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
+        // 7099303408192061440f3XQ2p.json eg: files/default/traces/default/0/
+        // 2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
         // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);
@@ -254,7 +262,8 @@ async fn upload_file(
                     inferred_schema
                 }
                 Err(err) => {
-                    // File has some corrupt json data....ignore such data & move rest of the records
+                    // File has some corrupt json data....ignore such data & move rest of the
+                    // records
                     log::error!(
                         "[JOB] Failed to infer schema from file: {}, error: {}",
                         path_str,
@@ -435,12 +444,12 @@ async fn handle_metrics(
         let metric_meta: Vec<&str> = metric_key.split("#_#").collect();
         let metric_name = metric_meta[1].to_owned();
         let schema_key = metric_meta[0].to_owned();
-        //let dest_stream_name = metric_name.clone();
+        // let dest_stream_name = metric_name.clone();
         let value_iter = value.iter().map(Ok);
         let metrics_schema = infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
 
         let local_org_id = org_id.to_owned();
-        //let metrics_schema = value.first().unwrap().schema();
+        // let metrics_schema = value.first().unwrap().schema();
         // write metadata
         let mut file_meta = FileMeta {
             min_ts: 0,
@@ -528,9 +537,8 @@ async fn handle_metrics(
     Ok(arrow_files)
 }
 
-/*
- * converts single metrics json file to per stream arrow file & delete moved files from local
- */
+// converts single metrics json file to per stream arrow file & delete moved
+// files from local
 pub async fn metrics_json_to_arrow() -> Result<(), anyhow::Error> {
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
@@ -553,8 +561,9 @@ pub async fn metrics_json_to_arrow() -> Result<(), anyhow::Error> {
             .replace('\\', "/");
         let columns = file_path.splitn(5, '/').collect::<Vec<&str>>();
 
-        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
-        // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
+        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
+        // 7099303408192061440f3XQ2p.json eg: files/default/traces/default/0/
+        // 2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
         // let _= columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);

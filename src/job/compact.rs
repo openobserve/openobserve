@@ -15,8 +15,10 @@
 
 use tokio::time;
 
-use crate::common::infra::{cluster::is_compactor, config::CONFIG};
-use crate::service;
+use crate::{
+    common::infra::{cluster::is_compactor, config::CONFIG},
+    service,
+};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) {

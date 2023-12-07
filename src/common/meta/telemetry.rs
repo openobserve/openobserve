@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use segment::{message::Track, Client, Message};
 use std::collections::HashMap;
+
+use segment::{message::Track, Client, Message};
 use sysinfo::SystemExt;
 
-use crate::common::infra::db;
-use crate::common::infra::{cache::stats, config::*};
-use crate::common::utils::json;
+use crate::common::{
+    infra::{cache::stats, config::*, db},
+    utils::json,
+};
 
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {

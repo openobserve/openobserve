@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use base64::Engine;
 use std::io::{Error, ErrorKind};
+
+use base64::Engine;
 
 #[inline(always)]
 pub(crate) fn decode(s: &str) -> Result<String, Error> {
@@ -24,7 +25,7 @@ pub(crate) fn decode(s: &str) -> Result<String, Error> {
             return Err(Error::new(
                 ErrorKind::InvalidData,
                 format!("base64 decode error: {e}"),
-            ))
+            ));
         }
     };
     let s = match String::from_utf8(ns) {
@@ -33,7 +34,7 @@ pub(crate) fn decode(s: &str) -> Result<String, Error> {
             return Err(Error::new(
                 ErrorKind::InvalidData,
                 format!("base64 decode error: {e}"),
-            ))
+            ));
         }
     };
 

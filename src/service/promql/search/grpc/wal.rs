@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::HashMap, io::Cursor, sync::Arc};
+
 use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
 use datafusion::{
     arrow::datatypes::Schema,
@@ -22,32 +24,33 @@ use datafusion::{
     prelude::SessionContext,
 };
 use futures::future::try_join_all;
-use std::{collections::HashMap, io::Cursor, sync::Arc};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::{
-    infra::{
-        cache::tmpfs,
-        cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
-        config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
-    },
-    meta::{
-        search::{SearchType, Session as SearchSession},
-        stream::ScanStats,
-        StreamType,
-    },
-};
-use crate::handler::grpc::cluster_rpc;
-use crate::service::{
-    db,
-    search::{
-        datafusion::{
-            exec::{prepare_datafusion_context, register_table},
-            storage::StorageType,
+use crate::{
+    common::{
+        infra::{
+            cache::tmpfs,
+            cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
+            config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
         },
-        MetadataMap,
+        meta::{
+            search::{SearchType, Session as SearchSession},
+            stream::ScanStats,
+            StreamType,
+        },
+    },
+    handler::grpc::cluster_rpc,
+    service::{
+        db,
+        search::{
+            datafusion::{
+                exec::{prepare_datafusion_context, register_table},
+                storage::StorageType,
+            },
+            MetadataMap,
+        },
     },
 };
 
@@ -184,7 +187,8 @@ pub(crate) async fn create_context(
     Ok(resp)
 }
 
-/// get file list from local cache, no need match_source, each file will be searched
+/// get file list from local cache, no need match_source, each file will be
+/// searched
 #[tracing::instrument(name = "promql:search:grpc:wal:get_file_list")]
 async fn get_file_list(
     session_id: &str,

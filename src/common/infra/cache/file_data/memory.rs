@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use bytes::Bytes;
-use hashlink::lru_cache::LruCache;
-use once_cell::sync::Lazy;
 use std::{
     cmp::{max, min},
     ops::Range,
 };
+
+use bytes::Bytes;
+use hashlink::lru_cache::LruCache;
+use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use crate::common::infra::{
@@ -91,7 +92,9 @@ impl FileData {
             loop {
                 let item = self.data.remove_lru();
                 if item.is_none() {
-                    log::error!("[session_id {session_id}] File memory cache is corrupt, it shouldn't be none");
+                    log::error!(
+                        "[session_id {session_id}] File memory cache is corrupt, it shouldn't be none"
+                    );
                     break;
                 }
                 let (key, data_size) = item.unwrap();

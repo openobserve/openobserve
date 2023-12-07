@@ -13,18 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
-use promql_parser::parser;
 use std::io::Error;
 
+use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
+use promql_parser::parser;
+
 use crate::{
-    common::infra::errors,
-    common::meta::{self, http::HttpResponse as MetaHttpResponse},
-    common::utils::time::{parse_milliseconds, parse_str_to_timestamp_micros},
+    common::{
+        infra::errors,
+        meta::{self, http::HttpResponse as MetaHttpResponse},
+        utils::time::{parse_milliseconds, parse_str_to_timestamp_micros},
+    },
     service::{metrics, promql},
 };
 
-/** prometheus remote-write endpoint for metrics */
+/// prometheus remote-write endpoint for metrics
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
@@ -68,7 +71,7 @@ pub async fn remote_write(
     }
 }
 
-/** prometheus instant queries */
+/// prometheus instant queries
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 #[utoipa::path(
     context_path = "/api",
@@ -194,7 +197,7 @@ async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpRespon
     }
 }
 
-/** prometheus range queries */
+/// prometheus range queries
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 #[utoipa::path(
     context_path = "/api",
@@ -367,7 +370,7 @@ async fn query_range(
     }
 }
 
-/** prometheus query metric metadata */
+/// prometheus query metric metadata
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
     context_path = "/api",
@@ -426,7 +429,7 @@ pub async fn metadata(
     )
 }
 
-/** prometheus finding series by label matchers */
+/// prometheus finding series by label matchers
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 #[utoipa::path(
     context_path = "/api",
@@ -498,7 +501,7 @@ async fn series(org_id: &str, req: meta::prom::RequestSeries) -> Result<HttpResp
         Err(e) => {
             return Ok(
                 HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
-            )
+            );
         }
     };
     Ok(
@@ -513,7 +516,7 @@ async fn series(org_id: &str, req: meta::prom::RequestSeries) -> Result<HttpResp
     )
 }
 
-/** prometheus getting label names */
+/// prometheus getting label names
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
 #[utoipa::path(
     context_path = "/api",
@@ -591,7 +594,7 @@ async fn labels(org_id: &str, req: meta::prom::RequestLabels) -> Result<HttpResp
         Err(e) => {
             return Ok(
                 HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
-            )
+            );
         }
     };
     Ok(
@@ -606,7 +609,7 @@ async fn labels(org_id: &str, req: meta::prom::RequestLabels) -> Result<HttpResp
     )
 }
 
-/** prometheus query label values */
+/// prometheus query label values
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
 #[utoipa::path(
     context_path = "/api",
@@ -649,7 +652,7 @@ pub async fn label_values(
         Err(e) => {
             return Ok(
                 HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
-            )
+            );
         }
     };
     Ok(
@@ -718,7 +721,7 @@ fn validate_metadata_params(
     Ok((selector, start, end))
 }
 
-/** prometheus formatting query expressions */
+/// prometheus formatting query expressions
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
 #[utoipa::path(
     context_path = "/api",

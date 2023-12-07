@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use crate::common::utils::json;
 
@@ -60,18 +61,18 @@ pub struct Event {
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub attributes: AHashMap<String, json::Value>,
 }
-/* #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct SpanReference {
-    pub parent_trace_id: String,
-    pub parent_span_id: String,
-    pub ref_type: SpanRefType,
-}
-
-//Service which has generated the trace id - span id ...in distributed tracing there can be multiple services using same trace id
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Service {
-    pub name: String,
-    #[serde(flatten)]
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub attributes: AHashMap<String, Value>,
-} */
+// #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+// pub struct SpanReference {
+// pub parent_trace_id: String,
+// pub parent_span_id: String,
+// pub ref_type: SpanRefType,
+// }
+//
+// Service which has generated the trace id - span id ...in distributed tracing
+// there can be multiple services using same trace id #[derive(Clone, Debug,
+// PartialEq, Serialize, Deserialize)] pub struct Service {
+// pub name: String,
+// #[serde(flatten)]
+// #[serde(skip_serializing_if = "HashMap::is_empty")]
+// pub attributes: AHashMap<String, Value>,
+// }

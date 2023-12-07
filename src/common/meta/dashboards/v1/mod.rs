@@ -166,9 +166,10 @@ pub struct CustomFieldsOption {
 
 #[cfg(test)]
 mod tests {
+    use expect_test::expect;
+
     use super::*;
     use crate::common::utils::json;
-    use expect_test::expect;
 
     #[test]
     fn test_dashboard1() {

@@ -80,7 +80,8 @@ fn read_cpu_cgroup_v2() -> usize {
     }
 }
 
-/// Get memory limit by cgroup v2: if there is no limit, default is: 9223372036854775807
+/// Get memory limit by cgroup v2: if there is no limit, default is:
+/// 9223372036854775807
 fn read_memory_cgroup_v2() -> usize {
     if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory/memory.limit_in_bytes") {
         val.trim_end().parse::<usize>().unwrap_or_default()

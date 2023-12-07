@@ -13,23 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::AHashMap;
-use bytes::Buf;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::{
     io::{BufRead, BufReader, Write},
     sync::Arc,
 };
+
+use ahash::AHashMap;
+use bytes::Buf;
+use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use tokio::sync::{RwLock, Semaphore};
 
-use crate::common::infra::{
-    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-    config::{CONFIG, STREAM_SCHEMAS},
-    dist_lock, ider, storage,
+use crate::{
+    common::{
+        infra::{
+            cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+            config::{CONFIG, STREAM_SCHEMAS},
+            dist_lock, ider, storage,
+        },
+        meta::common::FileKey,
+        utils::json,
+    },
+    service::db,
 };
-use crate::common::meta::common::FileKey;
-use crate::common::utils::json;
-use crate::service::db;
 
 pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
     run_merge(offset).await?;
@@ -38,8 +43,8 @@ pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
 }
 
 /// check all streams done compact in this hour
-/// merge all small file list keys in this hour to a single file and upload to storage
-/// delete all small file list keys in this hour from storage
+/// merge all small file list keys in this hour to a single file and upload to
+/// storage delete all small file list keys in this hour from storage
 /// node should load new file list from storage
 pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     let time_now: DateTime<Utc> = Utc::now();
@@ -104,7 +109,8 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     if offsets.is_empty() {
         return Ok(()); // no stream
     }
-    // compact offset already is next hour, we need fix it, get the latest compact offset
+    // compact offset already is next hour, we need fix it, get the latest compact
+    // offset
     let mut is_waiting_streams = false;
     for (key, val) in offsets {
         if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {
@@ -122,7 +128,8 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
             .timestamp_micros();
         merge_file_list(time_zero_hour).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        // compact last hour, because it just done compaction that generated a lot of small file_list files
+        // compact last hour, because it just done compaction that generated a lot of
+        // small file_list files
         let time_last_hour = time_now - Duration::hours(1);
         let time_last_hour = Utc
             .with_ymd_and_hms(

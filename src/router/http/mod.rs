@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::http::Error;
-use actix_web::{route, web, HttpRequest, HttpResponse};
 use std::time::Duration;
 
-use crate::common::infra::cluster;
-use crate::common::infra::config::CONFIG;
-use crate::common::utils::rand::get_rand_element;
+use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
+
+use crate::common::{
+    infra::{cluster, config::CONFIG},
+    utils::rand::get_rand_element,
+};
 
 const QUERIER_ROUTES: [&str; 13] = [
     "/summary",
