@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             v-bind:readonly="isUpdatingDestination"
             v-bind:disable="isUpdatingDestination"
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             tabindex="0"
           />
         </div>

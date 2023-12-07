@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               v-bind:readonly="beingUpdated"
               v-bind:disable="beingUpdated"
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
               style="min-width: 250px"
             />
@@ -341,6 +341,7 @@ const defaultValue: any = () => {
     destinations: [],
     context_attributes: {},
     enabled: true,
+    description: "",
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -701,17 +702,19 @@ export default defineComponent({
           payload.context_attributes[attr.key] = attr.value;
         });
 
-        this.formData.trigger_condition.threshold = parseInt(
+        payload.trigger_condition.threshold = parseInt(
           this.formData.trigger_condition.threshold
         );
 
-        this.formData.trigger_condition.period = parseInt(
+        payload.trigger_condition.period = parseInt(
           this.formData.trigger_condition.period
         );
 
-        this.formData.trigger_condition.silence = parseInt(
+        payload.trigger_condition.silence = parseInt(
           this.formData.trigger_condition.silence
         );
+
+        payload.description = this.formData.description.trim();
 
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
