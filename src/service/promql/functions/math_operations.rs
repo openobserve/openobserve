@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
 use strum::EnumIter;
+
+use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
 
 #[derive(Debug, EnumIter)]
 pub enum MathOperationsType {

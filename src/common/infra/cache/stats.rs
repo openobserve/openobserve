@@ -15,10 +15,10 @@
 
 use once_cell::sync::Lazy;
 
-use crate::common::infra::config::RwHashMap;
-use crate::common::meta::common::FileMeta;
-use crate::common::meta::stream::StreamStats;
-use crate::common::meta::StreamType;
+use crate::common::{
+    infra::config::RwHashMap,
+    meta::{common::FileMeta, stream::StreamStats, StreamType},
+};
 
 static STATS: Lazy<RwHashMap<String, StreamStats>> = Lazy::new(Default::default);
 

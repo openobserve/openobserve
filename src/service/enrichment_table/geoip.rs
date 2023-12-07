@@ -27,9 +27,9 @@ use vrl::value::Value;
 
 use crate::common::infra::config::{CONFIG, MMDB_CITY_FILE_NAME};
 
-// MaxMind GeoIP database files have a type field we can use to recognize specific
-// products. If we encounter one of these two types, we look for ASN/ISP information;
-// otherwise we expect to be working with a City database.
+// MaxMind GeoIP database files have a type field we can use to recognize
+// specific products. If we encounter one of these two types, we look for
+// ASN/ISP information; otherwise we expect to be working with a City database.
 #[derive(Copy, Clone, Debug)]
 #[allow(missing_docs)]
 pub enum DatabaseKind {
@@ -53,8 +53,8 @@ impl From<&str> for DatabaseKind {
 /// Configuration for the `geoip` enrichment table.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GeoipConfig {
-    /// Path to the [MaxMind GeoIP2][geoip2] or [GeoLite2 binary city database file][geolite2]
-    /// (**GeoLite2-City.mmdb**).
+    /// Path to the [MaxMind GeoIP2][geoip2] or [GeoLite2 binary city database
+    /// file][geolite2] (**GeoLite2-City.mmdb**).
     ///
     /// Other databases, such as the country database, are not supported.
     ///
@@ -64,12 +64,13 @@ pub struct GeoipConfig {
 
     /// The locale to use when querying the database.
     ///
-    /// MaxMind includes localized versions of some of the fields within their database, such as
-    /// country name. This setting can control which of those localized versions are returned by the
-    /// transform.
+    /// MaxMind includes localized versions of some of the fields within their
+    /// database, such as country name. This setting can control which of
+    /// those localized versions are returned by the transform.
     ///
-    /// More information on which portions of the geolocation data are localized, and what languages
-    /// are available, can be found [here][locale_docs].
+    /// More information on which portions of the geolocation data are
+    /// localized, and what languages are available, can be found
+    /// [here][locale_docs].
     ///
     /// [locale_docs]: https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q
     #[serde(default = "default_locale")]
@@ -77,14 +78,15 @@ pub struct GeoipConfig {
 }
 
 fn default_locale() -> String {
-    // Valid locales at the time of writing are: "de”, "en", “es”, “fr”, “ja”, “pt-BR”, “ru”, and
-    // “zh-CN”.
+    // Valid locales at the time of writing are: "de”, "en", “es”, “fr”, “ja”,
+    // “pt-BR”, “ru”, and “zh-CN”.
     //
     // More information, including the up-to-date list of locales, can be found at
     // https://dev.maxmind.com/geoip/docs/databases/city-and-country?lang=en.
 
-    // TODO: could we detect the system locale and use that as the default locale if it matches one
-    // of the available locales in the dataset, and then fallback to "en" otherwise?
+    // TODO: could we detect the system locale and use that as the default locale if
+    // it matches one of the available locales in the dataset, and then fallback
+    // to "en" otherwise?
     "en".to_string()
 }
 
@@ -98,7 +100,8 @@ impl Default for GeoipConfig {
 }
 
 #[derive(Clone)]
-/// A struct that implements [enrichment::Table] to handle loading enrichment data from a GeoIP database.
+/// A struct that implements [enrichment::Table] to handle loading enrichment
+/// data from a GeoIP database.
 pub struct Geoip {
     config: GeoipConfig,
     dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
@@ -270,8 +273,8 @@ impl Table for Geoip {
         }
     }
 
-    /// Hints to the enrichment table what data is going to be searched to allow it to index the
-    /// data in advance.
+    /// Hints to the enrichment table what data is going to be searched to allow
+    /// it to index the data in advance.
     ///
     /// # Errors
     /// Errors if the fields are not in the table.
@@ -288,7 +291,8 @@ impl Table for Geoip {
         Vec::new()
     }
 
-    /// Returns true if the underlying data has changed and the table needs reloading.
+    /// Returns true if the underlying data has changed and the table needs
+    /// reloading.
     fn needs_reload(&self) -> bool {
         matches!(fs::metadata(&self.config.path)
             .and_then(|metadata| metadata.modified()),

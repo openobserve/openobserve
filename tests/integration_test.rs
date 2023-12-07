@@ -15,18 +15,21 @@
 
 #[cfg(test)]
 mod tests {
+    use core::time;
+    use std::{env, fs, str, sync::Once, thread};
+
     use actix_web::{http::header::ContentType, test, web, App};
     use bytes::{Bytes, BytesMut};
     use chrono::Utc;
-    use core::time;
     use openobserve::{
-        common::infra::config::CONFIG,
-        common::meta::dashboards::{Dashboard, Dashboards},
-        common::{meta::dashboards::v1, utils::json},
+        common::{
+            infra::config::CONFIG,
+            meta::dashboards::{v1, Dashboard, Dashboards},
+            utils::json,
+        },
         handler::http::router::*,
     };
     use prost::Message;
-    use std::{env, fs, str, sync::Once, thread};
 
     static START: Once = Once::new();
 
@@ -62,7 +65,7 @@ mod tests {
 
     #[test]
     async fn e2e_test() {
-        //make sure data dir is deleted before we run integ tests
+        // make sure data dir is deleted before we run integ tests
         fs::remove_dir_all("./data")
             .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
 
@@ -79,7 +82,7 @@ mod tests {
         e2e_post_multi().await;
         e2e_post_trace().await;
         e2e_post_metrics().await;
-        //e2e_post_kinesis_data().await;
+        // e2e_post_kinesis_data().await;
 
         // streams
         e2e_get_stream().await;
@@ -97,13 +100,12 @@ mod tests {
         e2e_remove_stream_function().await;
         e2e_delete_function().await;
 
-        /* FIXME: Revise and restore the e2e tests for search API calls.
-         * They have been broken by https://github.com/openobserve/openobserve/pull/570
-         *
-         * // search
-         * e2e_search().await;
-         * e2e_search_around().await;
-         */
+        // FIXME: Revise and restore the e2e tests for search API calls.
+        // They have been broken by https://github.com/openobserve/openobserve/pull/570
+        //
+        // // search
+        // e2e_search().await;
+        // e2e_search_around().await;
 
         // users
         e2e_post_user().await;

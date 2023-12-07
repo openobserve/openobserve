@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use actix_web_prometheus::{PrometheusMetrics, PrometheusMetricsBuilder};
 use once_cell::sync::Lazy;
 use prometheus::{
     CounterVec, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
 };
-use std::collections::HashMap;
 
 use super::config::CONFIG;
 

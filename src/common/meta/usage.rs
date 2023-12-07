@@ -15,9 +15,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::common::infra::config::SIZE_IN_MB;
-
 use super::{common::FileMeta, StreamType};
+use crate::common::infra::config::SIZE_IN_MB;
 
 pub const USAGE_STREAM: &str = "usage";
 pub const STATS_STREAM: &str = "stats";

@@ -13,26 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::{HashMap, HashSet};
+
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
-use std::collections::{HashMap, HashSet};
 
-use crate::common::{
-    infra::config::CONFIG,
-    meta::{
-        alerts::{
-            destinations::{DestinationWithTemplate, HTTPType},
-            Alert, Condition, Operator, QueryCondition, QueryType,
+use crate::{
+    common::{
+        infra::config::CONFIG,
+        meta::{
+            alerts::{
+                destinations::{DestinationWithTemplate, HTTPType},
+                Alert, Condition, Operator, QueryCondition, QueryType,
+            },
+            search, StreamType,
         },
-        search, StreamType,
+        utils::{
+            json::{self, Map, Value},
+            schema_ext::SchemaExt,
+        },
     },
-    utils::{
-        json::{self, Map, Value},
-        schema_ext::SchemaExt,
-    },
+    service::{db, search as SearchService},
 };
-use crate::service::{db, search as SearchService};
 
 pub mod alert_manager;
 pub mod destinations;
@@ -420,7 +423,7 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
                     "Column {} not found on stream {}",
                     &cond.column,
                     &alert.stream_name
-                ))
+                ));
             }
         };
         let cond = match data_type {
@@ -546,11 +549,11 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
                     Operator::NotEqualTo => format!("\"{}\" {} {}", cond.column, "!=", val),
                     _ => {
                         return Err(anyhow::anyhow!(
-                        "Column {} has data_type [{}] and it does not supported operator [{:?}]",
-                        cond.column,
-                        data_type,
-                        cond.operator
-                    ));
+                            "Column {} has data_type [{}] and it does not supported operator [{:?}]",
+                            cond.column,
+                            data_type,
+                            cond.operator
+                        ));
                     }
                 }
             }

@@ -13,31 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::{BufRead, BufReader};
+
 use actix_web::{http, web};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::io::{BufRead, BufReader};
 
-use crate::common::{
-    infra::{
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
+use crate::{
+    common::{
+        infra::{
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
+        },
+        meta::{
+            alerts::Alert,
+            ingestion::{IngestionResponse, StreamStatus},
+            stream::{SchemaRecords, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
-    meta::{
-        alerts::Alert,
-        ingestion::{IngestionResponse, StreamStatus},
-        stream::{SchemaRecords, StreamParams},
-        usage::UsageType,
-        StreamType,
+    service::{
+        distinct_values, get_formatted_stream_name,
+        ingestion::{evaluate_trigger, is_ingestion_allowed, write_file_arrow, TriggerAlertData},
+        logs::StreamMeta,
+        usage::report_request_usage_stats,
     },
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-};
-use crate::service::{
-    distinct_values, get_formatted_stream_name,
-    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file_arrow, TriggerAlertData},
-    logs::StreamMeta,
-    usage::report_request_usage_stats,
 };
 
 /// Ingest a multiline json body but add extra keys to each json row
@@ -46,9 +49,9 @@ use crate::service::{
 /// - org_id: org id to ingest data in
 /// - in_stream_name: stream to write data in
 /// - body: incoming payload
-/// - extend_json: a hashmap of string -> string values which should be extended in each json row
+/// - extend_json: a hashmap of string -> string values which should be extended
+///   in each json row
 /// - thread_id: a unique thread-id associated with this process
-///
 pub async fn ingest_with_keys(
     org_id: &str,
     in_stream_name: &str,
@@ -239,7 +242,7 @@ async fn ingest_inner(
     }
 
     req_stats.response_time = start.elapsed().as_secs_f64();
-    //metric + data usage
+    // metric + data usage
     report_request_usage_stats(
         req_stats,
         org_id,

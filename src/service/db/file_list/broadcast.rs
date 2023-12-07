@@ -13,16 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use once_cell::sync::Lazy;
 use std::sync::Arc;
+
+use once_cell::sync::Lazy;
 use tokio::sync::{mpsc, RwLock};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
-use crate::common::{
-    infra::{cluster, config::CONFIG},
-    meta::common::FileKey,
+use crate::{
+    common::{
+        infra::{cluster, config::CONFIG},
+        meta::common::FileKey,
+    },
+    handler::grpc::cluster_rpc,
 };
-use crate::handler::grpc::cluster_rpc;
 
 static EVENTS: Lazy<RwLock<ahash::AHashMap<String, EventChannel>>> =
     Lazy::new(|| RwLock::new(ahash::AHashMap::new()));

@@ -115,7 +115,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
         let chunks = files.chunks(100);
         for files in chunks {
             let mut tx = pool.begin().await?;
-            let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
+            let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+                "INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)",
+            );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
                     super::parse_file_key_columns(&item.key).expect("parse file key failed");
@@ -179,7 +181,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             let mut tx = pool.begin().await?;
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                let sql = format!("DELETE FROM file_list WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
+                let sql = format!(
+                    "DELETE FROM file_list WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';"
+                );
                 match sqlx::query(&sql).execute(&mut *tx).await {
                     Ok(_) => {}
                     Err(e) => {
@@ -250,7 +254,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             let mut tx = pool.begin().await?;
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                let sql = format!("DELETE FROM file_list_deleted WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
+                let sql = format!(
+                    "DELETE FROM file_list_deleted WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';"
+                );
                 match sqlx::query(&sql).execute(&mut *tx).await {
                     Ok(_) => {}
                     Err(e) => {
@@ -648,16 +654,17 @@ pub async fn create_table_index() -> Result<()> {
     let pool = CLIENT.clone();
     let sqls = vec![
         (
-            "file_list", 
-            "CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);"),
+            "file_list",
+            "CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);",
+        ),
         (
             "file_list",
             "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
         ),
         // (
         //     "file_list",
-        //     "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);",
-        // ),
+        //     "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream,
+        // date, file);", ),
         (
             "file_list_deleted",
             "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_idx on file_list_deleted (stream);",

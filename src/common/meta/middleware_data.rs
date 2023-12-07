@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::infra::config::MAXMIND_DB_CLIENT;
+use std::net::IpAddr;
+
 use actix_web::{
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
@@ -23,8 +24,9 @@ use actix_web_lab::middleware::Next;
 use ahash::AHashMap;
 use maxminddb::geoip2::city::Location;
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
 use uaparser::{Parser, UserAgentParser};
+
+use crate::common::infra::config::MAXMIND_DB_CLIENT;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct GeoInfoData<'a> {
@@ -150,8 +152,9 @@ impl RumExtraData {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use actix_web::test;
+
+    use super::*;
 
     #[test]
     async fn test_data_filtering() {

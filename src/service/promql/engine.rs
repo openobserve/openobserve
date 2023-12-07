@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
+
 use ahash::AHashMap as HashMap;
 use async_recursion::async_recursion;
 use datafusion::{
@@ -33,11 +35,14 @@ use promql_parser::{
     },
 };
 use rayon::prelude::*;
-use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
-use crate::common::meta::prom::{HASH_LABEL, VALUE_LABEL};
-use crate::common::{infra::config::CONFIG, meta::prom::NAME_LABEL};
-use crate::service::promql::{aggregations, binaries, functions, micros, value::*};
+use crate::{
+    common::{
+        infra::config::CONFIG,
+        meta::prom::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    },
+    service::promql::{aggregations, binaries, functions, micros, value::*},
+};
 
 pub struct Engine {
     ctx: Arc<super::exec::Query>,
@@ -111,8 +116,9 @@ impl Engine {
                 let return_bool = expr.return_bool();
                 let op = expr.op.is_comparison_operator();
 
-                // This is a very special case, as we treat the float also a `Value::Vector(vec![element])`
-                // therefore, better convert it back to its representation.
+                // This is a very special case, as we treat the float also a
+                // `Value::Vector(vec![element])` therefore, better convert it
+                // back to its representation.
                 let rhs = match rhs {
                     Value::Vector(v) if v.len() == 1 => Value::Float(v[0].sample.value),
                     _ => rhs,
@@ -149,43 +155,39 @@ impl Engine {
             PromExpr::Subquery(expr) => {
                 let val = self.exec_expr(&expr.expr).await?;
                 let time_window = Some(TimeWindow::new(self.time, expr.range));
-                let matrix = match val{
-                    Value::Vector(v) => {
-                        v.iter()
-                        .map(|v| {
-                            RangeValue{
-                                labels: v.labels.to_owned(),
-                                samples: vec![v.sample],
-                                time_window: time_window.clone()
-                            }
-                        }
-                        )
-                        .collect()
-                    },
-                    Value::Instant(v) => {
-                        vec![RangeValue{
+                let matrix = match val {
+                    Value::Vector(v) => v
+                        .iter()
+                        .map(|v| RangeValue {
                             labels: v.labels.to_owned(),
                             samples: vec![v.sample],
-                            time_window
+                            time_window: time_window.clone(),
+                        })
+                        .collect(),
+                    Value::Instant(v) => {
+                        vec![RangeValue {
+                            labels: v.labels.to_owned(),
+                            samples: vec![v.sample],
+                            time_window,
                         }]
-                    },
+                    }
                     Value::Range(v) => vec![v],
                     Value::Matrix(vs) => vs,
-                    Value::Sample(s) => vec![RangeValue{
+                    Value::Sample(s) => vec![RangeValue {
                         labels: Labels::default(),
                         samples: vec![s],
-                        time_window
+                        time_window,
                     }],
-                    Value::Float(val) => vec![RangeValue{
+                    Value::Float(val) => vec![RangeValue {
                         labels: Labels::default(),
                         samples: vec![Sample::new(self.time, val)],
-                        time_window
+                        time_window,
                     }],
                     v => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported subquery, the return value should have been a matrix but got {:?}",
                             v.get_type()
-                        )))
+                        )));
                     }
                 };
 
@@ -228,7 +230,8 @@ impl Engine {
         })
     }
 
-    /// Instant vector selector --- select a single sample at each evaluation timestamp.
+    /// Instant vector selector --- select a single sample at each evaluation
+    /// timestamp.
     ///
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
     async fn eval_vector_selector(
@@ -301,11 +304,13 @@ impl Engine {
         Ok(values)
     }
 
-    /// Range vector selector --- select a whole time range at each evaluation timestamp.
+    /// Range vector selector --- select a whole time range at each evaluation
+    /// timestamp.
     ///
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
     ///
-    /// MatrixSelector is a special case of VectorSelector that returns a matrix of samples.
+    /// MatrixSelector is a special case of VectorSelector that returns a matrix
+    /// of samples.
     async fn eval_matrix_selector(
         &mut self,
         selector: &VectorSelector,
@@ -615,7 +620,7 @@ impl Engine {
                 _ => {
                     return Err(DataFusionError::NotImplemented(
                         "Invalid args passed to the function".into(),
-                    ))
+                    ));
                 }
             },
             false => {
@@ -720,7 +725,7 @@ impl Engine {
                             return Err(DataFusionError::Plan(format!(
                                 "{}: the first argument must be a number",
                                 func.name
-                            )))
+                            )));
                         }
                     }
                 };
@@ -829,7 +834,7 @@ impl Engine {
                     _ => {
                         return Err(DataFusionError::Plan(
                             "[quantile] param must be a NumberLiteral".into(),
-                        ))
+                        ));
                     }
                 };
                 let input = self.call_expr_second_arg(args).await?;
@@ -883,7 +888,7 @@ impl Engine {
                     return Err(DataFusionError::NotImplemented(format!(
                         "Unexpected input to timestamp function: {:?}",
                         &input
-                    )))
+                    )));
                 }
             },
             Func::Vector => functions::vector(&input, self.time)?,

@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use once_cell::sync::Lazy;
 use std::io::{BufRead, BufReader};
+
+use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use crate::common::{

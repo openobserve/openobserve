@@ -13,25 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::HashMap, io::Write, sync::Arc};
+
 use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
 use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use std::{collections::HashMap, io::Write, sync::Arc};
 
-use crate::common::{
-    infra::{
-        cache,
-        config::{CONFIG, FILE_EXT_PARQUET},
-        file_list as infra_file_list, ider, metrics, storage,
+use crate::{
+    common::{
+        infra::{
+            cache,
+            config::{CONFIG, FILE_EXT_PARQUET},
+            file_list as infra_file_list, ider, metrics, storage,
+        },
+        meta::{
+            common::{FileKey, FileMeta},
+            stream::StreamStats,
+            StreamType,
+        },
+        utils::json,
     },
-    meta::{
-        common::{FileKey, FileMeta},
-        stream::StreamStats,
-        StreamType,
-    },
-    utils::json,
+    service::{db, file_list, search::datafusion, stream},
 };
-use crate::service::{db, file_list, search::datafusion, stream};
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -95,11 +98,14 @@ pub async fn merge_by_stream(
         )
         .unwrap()
         .timestamp_micros();
-    // 1. if step_secs less than 1 hour, must wait for at least max_file_retention_time
-    // 2. if step_secs greater than 1 hour, must wait for at least 3 * max_file_retention_time
+    // 1. if step_secs less than 1 hour, must wait for at least
+    //    max_file_retention_time
+    // 2. if step_secs greater than 1 hour, must wait for at least 3 *
+    //    max_file_retention_time
     // -- first period: the last hour local file upload to storage, write file list
     // -- second period, the last hour file list upload to storage
-    // -- third period, we can do the merge, so, at least 3 times of max_file_retention_time
+    // -- third period, we can do the merge, so, at least 3 times of
+    // max_file_retention_time
     if (CONFIG.compact.step_secs < 3600
         && time_now.timestamp_micros() - offset
             <= Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
@@ -135,9 +141,10 @@ pub async fn merge_by_stream(
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     if files.is_empty() {
-        // this hour is no data, and check if pass allowed_upto, then just write new offset
-        // if offset > 0 && offset_time_hour + Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() < time_now_hour {
-        // -- no check it
+        // this hour is no data, and check if pass allowed_upto, then just write new
+        // offset if offset > 0 && offset_time_hour +
+        // Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() <
+        // time_now_hour { -- no check it
         // }
         let offset = offset
             + Duration::seconds(CONFIG.compact.step_secs)
@@ -246,7 +253,8 @@ pub async fn merge_by_stream(
     Ok(())
 }
 
-/// merge some small files into one big file, upload to storage, returns the big file key and merged files
+/// merge some small files into one big file, upload to storage, returns the big
+/// file key and merged files
 async fn merge_files(
     org_id: &str,
     stream_name: &str,

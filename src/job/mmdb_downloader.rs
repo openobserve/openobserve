@@ -13,18 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::infra::config::{CONFIG, GEOIP_TABLE, MAXMIND_DB_CLIENT, MMDB_CITY_FILE_NAME};
-use crate::common::meta::maxmind::MaxmindClient;
-use crate::service::enrichment_table::geoip::{Geoip, GeoipConfig};
+use std::{cmp::min, path::Path};
+
 use futures::stream::StreamExt;
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use sha256::try_digest;
-use std::cmp::min;
-use std::path::Path;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
-use tokio::time;
+use tokio::{fs::File, io::AsyncWriteExt, time};
+
+use crate::{
+    common::{
+        infra::config::{CONFIG, GEOIP_TABLE, MAXMIND_DB_CLIENT, MMDB_CITY_FILE_NAME},
+        meta::maxmind::MaxmindClient,
+    },
+    service::enrichment_table::geoip::{Geoip, GeoipConfig},
+};
 
 static CLIENT_INITIALIZED: Lazy<bool> = Lazy::new(|| true);
 

@@ -17,12 +17,15 @@ use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::{
-    infra::{file_list as infra_file_list, metrics},
-    meta::{stream::PartitionTimeLevel, StreamType},
-};
-use crate::handler::grpc::cluster_rpc::{
-    filelist_server::Filelist, EmptyRequest, FileKey, FileList, FileListQueryRequest, MaxIdResponse,
+use crate::{
+    common::{
+        infra::{file_list as infra_file_list, metrics},
+        meta::{stream::PartitionTimeLevel, StreamType},
+    },
+    handler::grpc::cluster_rpc::{
+        filelist_server::Filelist, EmptyRequest, FileKey, FileList, FileListQueryRequest,
+        MaxIdResponse,
+    },
 };
 
 pub struct Filelister;

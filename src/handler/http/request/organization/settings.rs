@@ -13,22 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Error as StdErr;
+
+use actix_web::{get, post, web, HttpResponse};
+
 use crate::{
     common::{
         infra::errors::{DbError, Error},
         meta::{
-            http::HttpResponse as MetaHttpResponse, organization::OrganizationSetting,
-            organization::OrganizationSettingResponse,
+            http::HttpResponse as MetaHttpResponse,
+            organization::{OrganizationSetting, OrganizationSettingResponse},
         },
         utils::json,
     },
     service::db::organization::{get_org_setting, set_org_setting},
 };
 
-use actix_web::{get, post, web, HttpResponse};
-use std::io::Error as StdErr;
-
-/** Organization specific settings */
+/// Organization specific settings
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -63,7 +64,7 @@ async fn create(
     }
 }
 
-/** Retrieve organization specific settings*/
+/// Retrieve organization specific settings
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",

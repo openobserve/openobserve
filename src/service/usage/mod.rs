@@ -13,27 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ahash::AHashMap;
 use chrono::{Datelike, Timelike, Utc};
 use once_cell::sync::Lazy;
-use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::common::{
-    meta::usage::{STATS_STREAM, USAGE_STREAM},
-    utils::json,
-    {
+use crate::{
+    common::{
         infra::{
             config::{CONFIG, SIZE_IN_MB},
             metrics,
         },
         meta::{
-            usage::{AggregatedData, GroupKey, RequestStats, UsageData, UsageEvent, UsageType},
+            usage::{
+                AggregatedData, GroupKey, RequestStats, UsageData, UsageEvent, UsageType,
+                STATS_STREAM, USAGE_STREAM,
+            },
             StreamType,
         },
+        utils::json,
     },
+    handler::grpc::cluster_rpc,
 };
-use crate::handler::grpc::cluster_rpc;
 
 pub mod ingestion_service;
 pub mod stats;

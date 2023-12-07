@@ -13,35 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::AHashMap as HashMap;
-use futures::future::try_join_all;
 use std::{
     cmp::{max, min},
     sync::Arc,
 };
+
+use ahash::AHashMap as HashMap;
+use futures::future::try_join_all;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::CONFIG,
-        errors::{Error, ErrorCodes, Result},
-    },
-    meta::StreamType,
-};
 use crate::{
-    common::meta::usage::UsageType,
+    common::{
+        infra::{
+            cluster,
+            config::CONFIG,
+            errors::{Error, ErrorCodes, Result},
+        },
+        meta::{
+            stream::ScanStats,
+            usage::{RequestStats, UsageType},
+            StreamType,
+        },
+    },
+    handler::grpc::cluster_rpc,
     service::{
         promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
         search::{server_internal_error, MetadataMap},
+        usage::report_request_usage_stats,
     },
-};
-use crate::{
-    common::meta::{stream::ScanStats, usage::RequestStats},
-    handler::grpc::cluster_rpc,
-    service::usage::report_request_usage_stats,
 };
 
 pub mod grpc;
@@ -92,8 +93,8 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         step
     };
 
-    // partition request, here plus 1 second, because division is integer, maybe lose some precision
-    // XXX-REFACTORME: move this into a function
+    // partition request, here plus 1 second, because division is integer, maybe
+    // lose some precision XXX-REFACTORME: move this into a function
     let session_id = uuid::Uuid::new_v4().to_string();
     let job_id = session_id[30..].to_string(); // take the last 6 characters as job id
     let job = cluster_rpc::Job {

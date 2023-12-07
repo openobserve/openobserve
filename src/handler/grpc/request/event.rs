@@ -17,11 +17,13 @@ use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::{
-    infra::{file_list as infra_file_list, metrics},
-    meta::common::FileKey,
+use crate::{
+    common::{
+        infra::{file_list as infra_file_list, metrics},
+        meta::common::FileKey,
+    },
+    handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList},
 };
-use crate::handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
 
 pub struct Eventer;
 

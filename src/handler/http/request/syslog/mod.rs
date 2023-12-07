@@ -13,22 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use std::io::Error;
+
+use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 
 use crate::{
     common::meta::syslog::{SyslogRoute, SyslogServer},
     service::syslogs_route::{self},
 };
 
-/** Start/StopSyslog Server */
+/// Start/StopSyslog Server
 
 #[post("/{org_id}/syslog-server")]
 pub async fn toggle_state(details: web::Json<SyslogServer>) -> Result<HttpResponse, Error> {
     syslogs_route::toggle_state(details.into_inner()).await
 }
 
-/** CreateSyslogRoute */
+/// CreateSyslogRoute
 #[utoipa::path(
     context_path = "/api",
     tag = "Syslog Routes",

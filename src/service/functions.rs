@@ -13,21 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Error;
+
 use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use std::io::Error;
 
-use crate::common::{
-    infra::config::STREAM_FUNCTIONS,
-    meta::{
-        functions::{FunctionList, StreamFunctionsList, StreamOrder, StreamTransform, Transform},
-        http::HttpResponse as MetaHttpResponse,
-        StreamType,
+use crate::{
+    common::{
+        infra::config::STREAM_FUNCTIONS,
+        meta::{
+            functions::{
+                FunctionList, StreamFunctionsList, StreamOrder, StreamTransform, Transform,
+            },
+            http::HttpResponse as MetaHttpResponse,
+            StreamType,
+        },
     },
+    service::{db, ingestion::compile_vrl_function},
 };
-use crate::service::{db, ingestion::compile_vrl_function};
 
 const FN_SUCCESS: &str = "Function saved successfully";
 const FN_NOT_FOUND: &str = "Function not found";
@@ -95,7 +100,8 @@ pub async fn update_function(
         return Ok(HttpResponse::Ok().json(func));
     }
 
-    // UI mostly like in 1st version wont send streams, so we need to add them back from existing function
+    // UI mostly like in 1st version wont send streams, so we need to add them back
+    // from existing function
     func.streams = existing_fn.streams;
 
     if !func.function.as_str().trim().ends_with('.') {
@@ -222,7 +228,8 @@ pub async fn delete_stream_function(
                 )),
             )
         } else {
-            // cant be removed from watcher of function as stream name & type wont be available , hence being removed here
+            // cant be removed from watcher of function as stream name & type wont be
+            // available , hence being removed here
             let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
             remove_stream_fn_from_cache(&key, fn_name);
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
@@ -363,8 +370,10 @@ mod test {
         let list_resp = list_functions("nexus".to_string()).await;
         assert!(list_resp.is_ok());
 
-        assert!(delete_function("nexus".to_string(), "dummyfn".to_owned())
-            .await
-            .is_ok());
+        assert!(
+            delete_function("nexus".to_string(), "dummyfn".to_owned())
+                .await
+                .is_ok()
+        );
     }
 }

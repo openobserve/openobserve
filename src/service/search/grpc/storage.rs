@@ -13,33 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ahash::AHashMap as HashMap;
 use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
 use futures::future::try_join_all;
-use std::sync::Arc;
 use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
 
-use crate::common::{
-    infra::{
-        cache::file_data,
-        config::{is_local_disk_storage, CONFIG},
-        errors::{Error, ErrorCodes},
+use crate::{
+    common::{
+        infra::{
+            cache::file_data,
+            config::{is_local_disk_storage, CONFIG},
+            errors::{Error, ErrorCodes},
+        },
+        meta::{
+            self,
+            common::FileKey,
+            search::SearchType,
+            stream::{PartitionTimeLevel, ScanStats},
+        },
     },
-    meta::{
-        self,
-        common::FileKey,
-        search::SearchType,
-        stream::{PartitionTimeLevel, ScanStats},
+    service::{
+        db, file_list,
+        search::{
+            datafusion::{exec, storage::StorageType},
+            sql::Sql,
+        },
+        stream,
     },
-};
-use crate::service::{
-    db, file_list,
-    search::{
-        datafusion::{exec, storage::StorageType},
-        sql::Sql,
-    },
-    stream,
 };
 
 /// search in remote object storage
@@ -347,7 +350,10 @@ async fn cache_parquet_files(
                 if e.to_string().to_lowercase().contains("not found") {
                     // delete file from file list
                     if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                        log::error!("[session_id {session_id}] search->storage: delete from file_list err: {}", e);
+                        log::error!(
+                            "[session_id {session_id}] search->storage: delete from file_list err: {}",
+                            e
+                        );
                     }
                     Some(file_name)
                 } else {

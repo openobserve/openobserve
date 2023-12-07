@@ -17,9 +17,13 @@ use datafusion::arrow::datatypes::Schema;
 use once_cell::sync::Lazy;
 use regex::{self, Regex};
 
-use crate::common;
-use crate::common::infra::config::CONFIG;
-use crate::common::meta::prom::{Metadata, HASH_LABEL, METADATA_LABEL, VALUE_LABEL};
+use crate::{
+    common,
+    common::{
+        infra::config::CONFIG,
+        meta::prom::{Metadata, HASH_LABEL, METADATA_LABEL, VALUE_LABEL},
+    },
+};
 
 pub mod json;
 pub mod otlp_grpc;
@@ -45,7 +49,8 @@ impl From<Signature> for String {
     }
 }
 
-/// `signature_without_labels` is just as [`signature`], but only for labels not matching `names`.
+/// `signature_without_labels` is just as [`signature`], but only for labels not
+/// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(
     labels: &common::utils::json::Map<String, common::utils::json::Value>,

@@ -13,37 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::{BufRead, BufReader};
+
 use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::io::{BufRead, BufReader};
 
 use super::StreamMeta;
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
-    },
-    meta::{
-        alerts::Alert,
-        functions::{StreamTransform, VRLResultResolver},
-        ingestion::{
-            BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
-            StreamSchemaChk,
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
         },
-        stream::{PartitioningDetails, StreamParams},
-        usage::UsageType,
-        StreamType,
+        meta::{
+            alerts::Alert,
+            functions::{StreamTransform, VRLResultResolver},
+            ingestion::{
+                BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
+                StreamSchemaChk,
+            },
+            stream::{PartitioningDetails, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-};
-use crate::service::{
-    db, distinct_values,
-    ingestion::{evaluate_trigger, write_file_arrow, TriggerAlertData},
-    schema::stream_schema_exists,
-    usage::report_request_usage_stats,
+    service::{
+        db, distinct_values,
+        ingestion::{evaluate_trigger, write_file_arrow, TriggerAlertData},
+        schema::stream_schema_exists,
+        usage::report_request_usage_stats,
+    },
 };
 
 pub const TRANSFORM_FAILED: &str = "document_failed_transform";
@@ -64,7 +67,7 @@ pub async fn ingest(
         return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
-    //let mut errors = false;
+    // let mut errors = false;
     let mut bulk_res = BulkResponse {
         took: 0,
         errors: false,
@@ -160,11 +163,11 @@ pub async fn ingest(
             let stream_data = stream_data_map.get_mut(&stream_name).unwrap();
             let buf = &mut stream_data.data;
 
-            //Start row based transform
+            // Start row based transform
 
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
 
-            //JSON Flattening
+            // JSON Flattening
             let mut value = flatten::flatten(&value)?;
 
             if let Some(transforms) = stream_transform_map.get(&key) {
@@ -193,7 +196,7 @@ pub async fn ingest(
                     value = ret_value;
                 }
             }
-            //End row based transform
+            // End row based transform
 
             // get json object
             let local_val = value.as_object_mut().unwrap();
@@ -338,7 +341,7 @@ pub async fn ingest(
         )
         .await;
         req_stats.response_time += time;
-        //metric + data usage
+        // metric + data usage
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
         report_request_usage_stats(
             req_stats,
@@ -403,7 +406,7 @@ fn add_record_status(
                 failure_type,
                 stream_name.clone(),
                 failure_reason.unwrap(),
-                "0".to_owned(), //TODO check
+                "0".to_owned(), // TODO check
             );
 
             item.insert(

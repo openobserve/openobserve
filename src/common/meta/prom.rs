@@ -18,8 +18,7 @@ use serde::{Deserialize, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
 
-use crate::common::infra::config::FxIndexMap;
-use crate::service::metrics::prom::prometheus as proto;
+use crate::{common::infra::config::FxIndexMap, service::metrics::prom::prometheus as proto};
 
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";
@@ -129,7 +128,8 @@ pub struct RequestRangeQuery {
     pub start: Option<String>,
     /// End timestamp, inclusive.
     pub end: Option<String>,
-    /// Query resolution step width in `duration` format or float number of seconds.
+    /// Query resolution step width in `duration` format or float number of
+    /// seconds.
     pub step: Option<String>,
     /// Evaluation timeout.
     pub timeout: Option<String>,

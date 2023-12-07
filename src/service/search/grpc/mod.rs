@@ -13,27 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ::datafusion::{
     arrow::{ipc, record_batch::RecordBatch},
     common::SchemaError,
     error::DataFusionError,
 };
 use ahash::AHashMap as HashMap;
-use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::CONFIG,
-        errors::{Error, ErrorCodes},
-    },
-    meta::{common::FileKey, stream::ScanStats, StreamType},
-};
-use crate::handler::grpc::cluster_rpc;
-use crate::service::db;
-
 use super::datafusion;
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::CONFIG,
+            errors::{Error, ErrorCodes},
+        },
+        meta::{common::FileKey, stream::ScanStats, StreamType},
+    },
+    handler::grpc::cluster_rpc,
+    service::db,
+};
 
 mod storage;
 mod wal;
@@ -120,7 +122,7 @@ pub async fn search(
         Err(err) => {
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 err.to_string(),
-            )))
+            )));
         }
     };
     if !batches1.is_empty() {
@@ -140,7 +142,7 @@ pub async fn search(
         Err(err) => {
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 err.to_string(),
-            )))
+            )));
         }
     };
     if !batches2.is_empty() {
@@ -160,7 +162,7 @@ pub async fn search(
         Err(err) => {
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 err.to_string(),
-            )))
+            )));
         }
     };
 
@@ -327,10 +329,12 @@ fn check_memory_circuit_breaker(scan_stats: &ScanStats) -> Result<(), Error> {
         if cur_memory.physical_mem as i64 + scan_size
             > (CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100) as i64
         {
-            let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, larger than limit of [{} bytes] ",
-                              scan_size,
-                              cur_memory.physical_mem,
-                              CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100);
+            let err = format!(
+                "fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, larger than limit of [{} bytes] ",
+                scan_size,
+                cur_memory.physical_mem,
+                CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100
+            );
             log::warn!("{}", err);
             return Err(Error::Message(err.to_string()));
         }

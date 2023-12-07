@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::promql::value::{InstantValue, Sample, Value};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
+
+use crate::service::promql::value::{InstantValue, Sample, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators
 pub fn group(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {

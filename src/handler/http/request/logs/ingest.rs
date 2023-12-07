@@ -13,20 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
-use crate::common::infra::config::CONFIG;
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::common::meta::ingestion::{IngestionRequest, KinesisFHIngestionResponse};
-use crate::handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
-use crate::service::logs::otlp_http::{logs_json_handler, logs_proto_handler};
+use actix_web::{http, post, web, HttpRequest, HttpResponse};
+
 use crate::{
-    common::meta::ingestion::{GCPIngestionRequest, KinesisFHRequest},
-    service::logs,
+    common::{
+        infra::config::CONFIG,
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            ingestion::{
+                GCPIngestionRequest, IngestionRequest, KinesisFHIngestionResponse, KinesisFHRequest,
+            },
+        },
+    },
+    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    service::{
+        logs,
+        logs::otlp_http::{logs_json_handler, logs_proto_handler},
+    },
 };
 
-/** _bulk ES compatible ingestion API */
+/// _bulk ES compatible ingestion API
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
@@ -62,7 +70,7 @@ pub async fn bulk(
     })
 }
 
-/** _multi ingestion API */
+/// _multi ingestion API
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
@@ -108,7 +116,7 @@ pub async fn multi(
     )
 }
 
-/** _json ingestion API */
+/// _json ingestion API
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
@@ -154,7 +162,7 @@ pub async fn json(
     )
 }
 
-/** _kinesis_firehose ingestion API*/
+/// _kinesis_firehose ingestion API
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
@@ -237,7 +245,7 @@ pub async fn handle_gcp_request(
     )
 }
 
-/** LogsIngest */
+/// LogsIngest
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",

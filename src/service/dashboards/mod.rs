@@ -13,17 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{http, web, HttpResponse};
 use std::io;
 
-use crate::common::{
-    meta::{
-        dashboards::{Dashboards, Folder, DEFAULT_FOLDER},
-        http::HttpResponse as MetaHttpResponse,
+use actix_web::{http, web, HttpResponse};
+
+use crate::{
+    common::{
+        meta::{
+            dashboards::{Dashboards, Folder, DEFAULT_FOLDER},
+            http::HttpResponse as MetaHttpResponse,
+        },
+        utils::json,
     },
-    utils::json,
+    service::db::dashboards,
 };
-use crate::service::db::dashboards;
 
 pub mod folders;
 
@@ -163,7 +166,7 @@ pub async fn move_dashboard(
             return Ok(Response::InternalServerError(error).into());
         }
 
-        //delete the dashboard from the source folder
+        // delete the dashboard from the source folder
         let _ = dashboards::delete(org_id, dashboard_id, from_folder).await;
         Ok(Response::OkMessage("Dashboard moved successfully".to_string()).into())
     } else {

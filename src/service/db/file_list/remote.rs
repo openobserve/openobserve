@@ -13,23 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use bytes::Buf;
-use chrono::{DateTime, Duration, TimeZone, Utc};
-use futures::future::try_join_all;
-use once_cell::sync::Lazy;
 use std::{
     collections::HashSet,
     io::{BufRead, BufReader},
     sync::atomic,
 };
+
+use bytes::Buf;
+use chrono::{DateTime, Duration, TimeZone, Utc};
+use futures::future::try_join_all;
+use once_cell::sync::Lazy;
 use tokio::{sync::RwLock, time};
 
-use crate::common::{
-    infra::{cache::stats, config::CONFIG, file_list as infra_file_list, storage},
-    meta::common::FileKey,
-    utils::json,
+use crate::{
+    common::{
+        infra::{cache::stats, config::CONFIG, file_list as infra_file_list, storage},
+        meta::common::FileKey,
+        utils::json,
+    },
+    service::db,
 };
-use crate::service::db;
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));

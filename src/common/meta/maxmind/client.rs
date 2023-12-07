@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{path::Path, sync::Arc};
+
 use anyhow::{Context, Result};
 use maxminddb::Reader;
-use std::path::Path;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct MaxmindClient {
@@ -31,7 +31,8 @@ impl MaxmindClient {
         }
     }
 
-    /// Create a new instance of MaxmindClient with path to city/country database
+    /// Create a new instance of MaxmindClient with path to city/country
+    /// database
     pub fn new_with_path<T: AsRef<Path>>(city_database: T) -> Result<MaxmindClient> {
         let city_reader: Reader<Vec<u8>> =
             Reader::open_readfile(&city_database).with_context(|| {

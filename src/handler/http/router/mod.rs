@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::rc::Rc;
+
 use actix_cors::Cors;
 use actix_web::{
     body::MessageBody,
@@ -23,21 +25,21 @@ use actix_web::{
 use actix_web_httpauth::middleware::HttpAuthentication;
 use actix_web_lab::middleware::from_fn;
 use futures::FutureExt;
-use std::rc::Rc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use super::auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum};
-use super::request::{
-    dashboards::folders::*, dashboards::*, enrichment_table, functions, kv, logs, metrics,
-    organization, prom, rum, search, status, stream, syslog, traces, users,
+use super::{
+    auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum},
+    request::{
+        dashboards::{folders::*, *},
+        enrichment_table, functions, kv, logs, metrics, organization, prom, rum, search, status,
+        stream, syslog, traces, users, *,
+    },
 };
 use crate::common::{
     infra::config::CONFIG,
     meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
 };
-
-use super::request::*;
 
 pub mod openapi;
 pub mod ui;
@@ -303,9 +305,9 @@ pub fn get_other_service_routes(cfg: &mut web::ServiceConfig) {
             .service(logs::ingest::handle_gcp_request),
     );
 
-    //NOTE: Here the order of middlewares matter. Once we consume the api-token in `rum_auth`,
-    //we drop it in the RumExtraData data.
-    //https://docs.rs/actix-web/latest/actix_web/middleware/index.html#ordering
+    // NOTE: Here the order of middlewares matter. Once we consume the api-token in
+    // `rum_auth`, we drop it in the RumExtraData data.
+    // https://docs.rs/actix-web/latest/actix_web/middleware/index.html#ordering
     let rum_auth = HttpAuthentication::with_fn(validator_rum);
     cfg.service(
         web::scope("/rum")

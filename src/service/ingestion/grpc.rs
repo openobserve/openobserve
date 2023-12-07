@@ -18,8 +18,7 @@ use opentelemetry_proto::tonic::{
     metrics::v1::{exemplar, number_data_point},
 };
 
-use crate::common::utils::json;
-use crate::service::ingestion::get_value;
+use crate::{common::utils::json, service::ingestion::get_value};
 
 pub fn get_val(attr_val: &Option<&AnyValue>) -> json::Value {
     match attr_val {

@@ -13,16 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ahash::AHashMap as HashMap;
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
-use std::sync::Arc;
 
-use crate::common::meta::prom::NAME_LABEL;
-use crate::service::promql::{
-    value::{Label, Labels, LabelsExt, Signature, Value},
-    Engine,
+use crate::{
+    common::meta::prom::NAME_LABEL,
+    service::promql::{
+        value::{Label, Labels, LabelsExt, Signature, Value},
+        Engine,
+    },
 };
 
 mod avg;
@@ -166,7 +169,7 @@ pub(crate) fn eval_arithmetic(
         _ => {
             return Err(DataFusionError::Plan(format!(
                 "[{f_name}] function only accept vector values"
-            )))
+            )));
         }
     };
 
@@ -226,7 +229,7 @@ pub async fn eval_top(
         _ => {
             return Err(DataFusionError::Plan(format!(
                 "[{fn_name}] param must be NumberLiteral"
-            )))
+            )));
         }
     };
 
@@ -236,7 +239,7 @@ pub async fn eval_top(
         _ => {
             return Err(DataFusionError::Plan(format!(
                 "[{fn_name}] function only accept vector values"
-            )))
+            )));
         }
     };
 
@@ -319,7 +322,7 @@ pub(crate) fn eval_std_dev_var(
         _ => {
             return Err(DataFusionError::Plan(format!(
                 "[{f_name}] function only accepts vector values"
-            )))
+            )));
         }
     };
 
@@ -361,7 +364,7 @@ pub(crate) fn eval_count_values(
         _ => {
             return Err(DataFusionError::Plan(format!(
                 "[{f_name}] function only accept vector values"
-            )))
+            )));
         }
     };
 

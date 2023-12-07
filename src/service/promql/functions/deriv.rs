@@ -15,8 +15,10 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::common::linear_regression;
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::{
+    common::linear_regression,
+    value::{RangeValue, Value},
+};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#deriv
 pub(crate) fn deriv(data: &Value) -> Result<Value> {

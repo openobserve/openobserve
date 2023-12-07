@@ -13,21 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ahash::AHashSet;
 use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
-use std::sync::Arc;
 
-use crate::common::{
-    infra::{
-        cache,
-        config::{is_local_disk_storage, CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS},
-        db as infra_db,
+use crate::{
+    common::{
+        infra::{
+            cache,
+            config::{is_local_disk_storage, CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS},
+            db as infra_db,
+        },
+        meta::{stream::StreamSchema, StreamType},
+        utils::json,
     },
-    meta::{stream::StreamSchema, StreamType},
-    utils::json,
+    service::enrichment::StreamTable,
 };
-use crate::service::enrichment::StreamTable;
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/schema/{org_id}/{stream_type}/{stream_name}")
@@ -53,7 +56,8 @@ pub async fn get(
         }
         Ok(v) => {
             let local_val: json::Value = json::from_slice(&v).unwrap();
-            // for backward compatibility check if value in etcd is vec or schema based on it return value
+            // for backward compatibility check if value in etcd is vec or schema based on
+            // it return value
             if local_val.is_array() {
                 let local_vec: Vec<Schema> = json::from_slice(&v).unwrap();
                 local_vec.last().unwrap().clone()
@@ -78,7 +82,8 @@ pub async fn get_from_db(
         }
         Ok(v) => {
             let local_val: json::Value = json::from_slice(&v).unwrap();
-            // for backward compatibility check if value in etcd is vec or schema based on it return value
+            // for backward compatibility check if value in etcd is vec or schema based on
+            // it return value
             if local_val.is_array() {
                 let local_vec: Vec<Schema> = json::from_slice(&v).unwrap();
                 local_vec.last().unwrap().clone()
@@ -108,7 +113,8 @@ pub async fn get_versions(
             vec![]
         }
         Ok(v) => {
-            // for backward compatibility check if value in etcd is vec or schema based on it return value
+            // for backward compatibility check if value in etcd is vec or schema based on
+            // it return value
             let local_val: json::Value = json::from_slice(&v).unwrap();
             if local_val.is_array() {
                 json::from_slice(&v).unwrap()
@@ -134,7 +140,7 @@ pub async fn set(
     if STREAM_SCHEMAS.contains_key(map_key) {
         versions = STREAM_SCHEMAS.get(map_key).unwrap().value().clone();
         if min_ts.is_some() && new_version {
-            //update last schema to add end date
+            // update last schema to add end date
             let last_schema = versions.pop().unwrap();
             if !last_schema.fields.eq(&schema.fields) {
                 let mut last_meta = last_schema.metadata().clone();
@@ -142,7 +148,7 @@ pub async fn set(
                 last_meta.insert("end_dt".to_string(), min_ts.unwrap().to_string());
                 versions.push(last_schema.with_metadata(last_meta));
 
-                //update current schema to add start date
+                // update current schema to add start date
                 let mut metadata = schema.metadata().clone();
                 metadata.insert("start_dt".to_string(), min_ts.unwrap().to_string());
                 metadata.insert("created_at".to_string(), created_at);
