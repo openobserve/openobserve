@@ -286,6 +286,7 @@
     "streamSettings": "Stream Settings",
     "streamPartitionKey": "Partition Key",
     "streamftsKey": "Full Text Search Key",
+    "streamBloomKey": "Bloom Filter",
     "delete": "Delete",
     "deleteIndex": "Delete Stream",
     "confirmDeleteHead": "Delete Stream",
