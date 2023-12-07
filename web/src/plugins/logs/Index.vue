@@ -371,7 +371,9 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
       restoreUrlQueryParams();
       loadLogsData();
-      MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
+      if (config.isCloud == "true") {
+        MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
+      }
     });
 
     const runQueryFn = async () => {
