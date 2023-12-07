@@ -16,10 +16,12 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
+use futures::future::try_join_all;
 use sqlx::{Postgres, QueryBuilder, Row};
 
 use crate::common::{
     infra::{
+        config::CONFIG,
         db::postgres::CLIENT,
         errors::{Error, Result},
     },
@@ -173,27 +175,44 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
         if files.is_empty() {
             return Ok(());
         }
-        let pool = CLIENT.clone();
-        let chunks = files.chunks(100);
-        for files in chunks {
-            let mut tx = pool.begin().await?;
-            for file in files {
-                let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                let sql = format!("DELETE FROM file_list WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
-                match sqlx::query(&sql).execute(&mut *tx).await {
-                    Ok(_) => {}
-                    Err(e) => {
-                        if let Err(e) = tx.rollback().await {
-                            log::error!("[POSTGRES] rollback batch remove error: {}", e);
+
+        let mut tasks = Vec::with_capacity(CONFIG.limit.cpu_num);
+        let chunk_size = std::cmp::max(1, files.len() / CONFIG.limit.cpu_num);
+        for chunk in files.chunks(chunk_size) {
+            let chunk = chunk.to_vec();
+            let pool = CLIENT.clone();
+            let task: tokio::task::JoinHandle<Result<()>> = tokio::task::spawn(async move {
+                let chunks = chunk.chunks(100);
+                for files in chunks {
+                    let mut tx = pool.begin().await?;
+                    for file in files {
+                        let (stream_key, date_key, file_name) =
+                            super::parse_file_key_columns(file)?;
+                        let sql = format!("DELETE FROM file_list WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
+                        match sqlx::query(&sql).execute(&mut *tx).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                if let Err(e) = tx.rollback().await {
+                                    log::error!("[POSTGRES] rollback batch remove error: {}", e);
+                                }
+                                return Err(e.into());
+                            }
                         }
+                    }
+                    if let Err(e) = tx.commit().await {
+                        log::error!("[POSTGRES] commit file_list batch remove error: {}", e);
                         return Err(e.into());
                     }
                 }
-            }
-            if let Err(e) = tx.commit().await {
-                log::error!("[POSTGRES] commit file_list batch remove error: {}", e);
-                return Err(e.into());
-            }
+                Ok(())
+            });
+            tasks.push(task);
+        }
+        let task_results = try_join_all(tasks)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        for task_result in task_results {
+            task_result?;
         }
         Ok(())
     }

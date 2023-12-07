@@ -423,8 +423,8 @@ async fn write_file_list_db_only(
         log::info!(
             "[COMPACT:RETENTION] deleting file_list from db, key: {}, need delete {}, put {}",
             _key,
+            del_items.len(),
             put_items.len(),
-            del_items.len()
         );
 
         // set to external db
