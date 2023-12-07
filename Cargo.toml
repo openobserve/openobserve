@@ -25,6 +25,7 @@ publish = false
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
+enterprise = ["dep:o2_enterprise"]
 
 [profile.release]
 debug = false
@@ -103,6 +104,7 @@ log = "0.4"
 maxminddb = "0.23.0"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
+o2_enterprise = {version = "0.1.0",path = "../o2-enterprise", optional = true}
 once_cell = "1.17"
 opentelemetry = { version = "0.18", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.11", features = [

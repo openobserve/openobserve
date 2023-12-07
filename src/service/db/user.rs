@@ -114,6 +114,7 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
             token: org.token,
             rum_token: org.rum_token.clone(),
             salt: user.salt.clone(),
+            is_ldap: user.is_ldap,
         };
         USERS.insert(
             format!("{}/{}", org.name.clone(), user.email.clone()),
@@ -234,6 +235,17 @@ pub async fn reset() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn check_user_exists_by_email(email: &str) -> bool {
+    let db = infra_db::get_db().await;
+    let key = "/user/";
+    let mut ret = db.list_values(key).await.unwrap();
+    ret.retain(|item| {
+        let user: DBUser = json::from_slice(item).unwrap();
+        user.email.eq(email)
+    });
+    !ret.is_empty()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249,6 +261,7 @@ mod tests {
             salt: String::from("sdfjshdkfshdfkshdfkshdfkjh"),
             first_name: "admin".to_owned(),
             last_name: "".to_owned(),
+            is_ldap: false,
             organizations: vec![UserOrg {
                 role: crate::common::meta::user::UserRole::Admin,
                 name: org_id.clone(),
