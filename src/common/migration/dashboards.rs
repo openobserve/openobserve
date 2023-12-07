@@ -9,10 +9,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let local_key = key.strip_prefix('/').unwrap_or(&key);
         let len = local_key.split('/').collect::<Vec<&str>>().len();
         if len > 3 {
-            /* println!(
-                "Skip dashboard migration as it is already part of folder: {}",
-                key
-            ); */
+            // println!(
+            // "Skip dashboard migration as it is already part of folder: {}",
+            // key
+            // );
             continue;
         }
         let new_key = key.replace("/dashboard/", "/dashboard/default/");

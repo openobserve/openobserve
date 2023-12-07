@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::HashSet, sync::Arc};
+
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
-use std::{collections::HashSet, sync::Arc};
 
 use crate::{
     common::meta::prom::NAME_LABEL,
@@ -35,7 +36,7 @@ pub(crate) fn label_join(
         _ => {
             return Err(DataFusionError::Plan(
                 "label_join: vector argument expected".into(),
-            ))
+            ));
         }
     };
 

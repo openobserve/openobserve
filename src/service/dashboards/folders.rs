@@ -17,11 +17,13 @@ use std::io::Error;
 
 use actix_web::{http, HttpResponse};
 
-use crate::common::meta::{
-    dashboards::{Folder, FolderList, DEFAULT_FOLDER},
-    http::HttpResponse as MetaHttpResponse,
+use crate::{
+    common::meta::{
+        dashboards::{Folder, FolderList, DEFAULT_FOLDER},
+        http::HttpResponse as MetaHttpResponse,
+    },
+    service::db,
 };
-use crate::service::db;
 
 #[tracing::instrument(skip(folder))]
 pub async fn save_folder(

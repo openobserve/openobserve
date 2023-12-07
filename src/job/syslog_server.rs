@@ -13,23 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{
+    io::Write,
+    net::{SocketAddr, TcpStream},
+};
+
 use once_cell::sync::Lazy;
-use std::io::Write;
-use std::net::{SocketAddr, TcpStream};
-use tokio::sync::RwLock;
 use tokio::{
     net::{TcpListener, UdpSocket},
-    sync::broadcast,
+    sync::{broadcast, RwLock},
 };
 
-use crate::handler::tcp_udp::STOP_SRV;
-use crate::service::db::syslog::toggle_syslog_setting;
 use crate::{
     common::infra::config::{CONFIG, SYSLOG_ENABLED},
-    handler::tcp_udp::{tcp_server, udp_server},
+    handler::tcp_udp::{tcp_server, udp_server, STOP_SRV},
+    service::db::syslog::toggle_syslog_setting,
 };
 
-//TCP UDP Server
+// TCP UDP Server
 pub static BROADCASTER: Lazy<RwLock<broadcast::Sender<bool>>> = Lazy::new(|| {
     let (tx, _) = broadcast::channel(2);
     RwLock::new(tx)

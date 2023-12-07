@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use aws_sdk_dynamodb::types::AttributeValue;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
 
 use crate::common::{
     infra::{
@@ -93,7 +94,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>>;
     async fn set_stream_stats(&self, org_id: &str, streams: &[(String, StreamStats)])
-        -> Result<()>;
+    -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
     async fn reset_stream_stats_min_ts(
         &self,

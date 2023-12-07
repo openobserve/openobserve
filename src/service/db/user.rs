@@ -192,7 +192,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/user/";
     let ret = db.list(key).await?;
     for (_, item_value) in ret {
-        //let item_key = item_key.strip_prefix(key).unwrap();
+        // let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: DBUser = json::from_slice(&item_value).unwrap();
         let users = json_val.get_all_users();
         for user in users {

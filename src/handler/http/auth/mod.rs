@@ -13,24 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::infra::config::CONFIG;
-use crate::common::meta::ingestion::INGESTION_EP;
-use crate::common::meta::proxy::QueryParamProxyURL;
-use crate::common::meta::user::UserRole;
-use crate::common::utils::{
-    auth::{get_hash, is_root_user},
-    base64,
-};
-use crate::service::{db, users};
 use actix_web::{
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorUnauthorized},
-    http::header,
-    http::Method,
+    http::{header, Method},
     web, Error,
 };
-
 use actix_web_httpauth::extractors::basic::BasicAuth;
+
+use crate::{
+    common::{
+        infra::config::CONFIG,
+        meta::{ingestion::INGESTION_EP, proxy::QueryParamProxyURL, user::UserRole},
+        utils::{
+            auth::{get_hash, is_root_user},
+            base64,
+        },
+    },
+    service::{db, users},
+};
 
 pub async fn validator(
     req: ServiceRequest,
@@ -312,8 +313,7 @@ pub async fn validator_rum(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::infra::db as infra_db;
-    use crate::common::meta::user::UserRequest;
+    use crate::common::{infra::db as infra_db, meta::user::UserRequest};
 
     #[actix_web::test]
     async fn test_validate() {
@@ -347,13 +347,17 @@ mod tests {
                 .await
                 .unwrap()
         );
-        assert!(!validate_credentials("", pwd, "default/_bulk")
-            .await
-            .unwrap());
+        assert!(
+            !validate_credentials("", pwd, "default/_bulk")
+                .await
+                .unwrap()
+        );
         assert!(!validate_credentials("", pwd, "/").await.unwrap());
-        assert!(!validate_credentials("user1@example.com", pwd, "/")
-            .await
-            .unwrap());
+        assert!(
+            !validate_credentials("user1@example.com", pwd, "/")
+                .await
+                .unwrap()
+        );
         assert!(
             validate_credentials("user1@example.com", pwd, "default/user")
                 .await

@@ -13,6 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{
+    io::{BufReader, Cursor},
+    path::Path,
+    sync::Arc,
+    time::UNIX_EPOCH,
+};
+
 use ahash::AHashMap as HashMap;
 use arrow::ipc::reader::StreamReader;
 use datafusion::{
@@ -20,37 +27,33 @@ use datafusion::{
     common::FileType,
 };
 use futures::future::try_join_all;
-use std::{
-    io::{BufReader, Cursor},
-    path::Path,
-    sync::Arc,
-    time::UNIX_EPOCH,
-};
 use tokio::time::Duration;
-
 use tracing::{info_span, Instrument};
 
-use crate::common::{
-    infra::{
-        cache::tmpfs,
-        config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
-        errors::{Error, ErrorCodes},
-        wal,
+use crate::{
+    common::{
+        infra::{
+            cache::tmpfs,
+            config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
+            errors::{Error, ErrorCodes},
+            wal,
+        },
+        meta::{
+            self, common::FileKey, prom::NAME_LABEL, search::SearchType, stream::ScanStats,
+            StreamType,
+        },
+        utils::{
+            file::{get_file_contents, get_file_meta, scan_files},
+            schema::infer_json_schema,
+        },
     },
-    meta::{
-        self, common::FileKey, prom::NAME_LABEL, search::SearchType, stream::ScanStats, StreamType,
-    },
-    utils::{
-        file::{get_file_contents, get_file_meta, scan_files},
-        schema::infer_json_schema,
-    },
-};
-use crate::service::{
-    db,
-    schema::filter_schema_null_fields,
-    search::{
-        datafusion::{exec, storage::StorageType},
-        sql::Sql,
+    service::{
+        db,
+        schema::filter_schema_null_fields,
+        search::{
+            datafusion::{exec, storage::StorageType},
+            sql::Sql,
+        },
     },
 };
 
@@ -325,7 +328,8 @@ pub async fn search(
     Ok((results, scan_stats))
 }
 
-/// get file list from local wal, no need match_source, each file will be searched
+/// get file list from local wal, no need match_source, each file will be
+/// searched
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
     session_id: &str,
@@ -455,7 +459,8 @@ async fn get_file_list(
 }
 
 fn get_schema_version(file: &str) -> Result<String, Error> {
-    // eg: /a-b-c-d/files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
+    // eg: /a-b-c-d/files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
+    // 7099303408192061440f3XQ2p.json
     let column = file.split('/').collect::<Vec<&str>>();
     if column.len() < 12 {
         return Err(Error::Message(format!("invalid wal file name: {}", file)));

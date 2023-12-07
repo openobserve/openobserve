@@ -13,15 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use cloudevents::{Event, EventBuilder, EventBuilderV10};
 use log::{Metadata, Record};
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 
-use crate::common::infra::{config::CONFIG, ider::generate};
-use crate::common::utils::json;
+use crate::common::{
+    infra::{config::CONFIG, ider::generate},
+    utils::json,
+};
 
 pub static EVENT_SENDER: Lazy<broadcast::Sender<Event>> = Lazy::new(|| {
     let (tx, _) = broadcast::channel(1024);

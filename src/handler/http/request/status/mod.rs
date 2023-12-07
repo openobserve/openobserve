@@ -13,19 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Error;
+
 use actix_web::{get, HttpResponse};
 use ahash::AHashMap as HashMap;
 use datafusion::arrow::datatypes::{Field, Schema};
 use serde::Serialize;
-use std::io::Error;
 use utoipa::ToSchema;
 
-use crate::common::{
-    infra::{cache, cluster, config::*, file_list},
-    meta::functions::ZoFunction,
-    utils::json,
+use crate::{
+    common::{
+        infra::{cache, cluster, config::*, file_list},
+        meta::functions::ZoFunction,
+        utils::json,
+    },
+    service::{db, search::datafusion::DEFAULT_FUNCTIONS},
 };
-use crate::service::{db, search::datafusion::DEFAULT_FUNCTIONS};
 
 #[derive(Serialize, ToSchema)]
 pub struct HealthzResponse {
@@ -49,7 +52,7 @@ struct ConfigResponse<'a> {
     data_retention_days: i64,
 }
 
-/** Healthz */
+/// Healthz
 #[utoipa::path(
     path = "/healthz",
     tag = "Meta",

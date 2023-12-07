@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use aws_sdk_dynamodb::types::AttributeValue;
 use byteorder::{ByteOrder, LittleEndian};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use crate::common::infra::file_list::parse_file_key_columns;
 

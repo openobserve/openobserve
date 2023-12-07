@@ -13,18 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::HashMap;
-use async_trait::async_trait;
-use bytes::Bytes;
-use etcd_client::{
-    Certificate, DeleteOptions, EventType, GetOptions, Identity, SortOrder, SortTarget, TlsOptions,
-};
 use std::{
     cmp::min,
     sync::{
         atomic::{AtomicU8, Ordering},
         Arc,
     },
+};
+
+use ahash::HashMap;
+use async_trait::async_trait;
+use bytes::Bytes;
+use etcd_client::{
+    Certificate, DeleteOptions, EventType, GetOptions, Identity, SortOrder, SortTarget, TlsOptions,
 };
 use tokio::{
     sync::{mpsc, OnceCell},
@@ -501,8 +502,7 @@ impl Locker {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Db;
-    use super::*;
+    use super::{super::Db, *};
 
     #[tokio::test]
     async fn test_etcd_prefix() {

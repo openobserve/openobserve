@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use datafusion::{
     arrow::{
         array::{ArrayRef, BooleanArray, StringArray},
@@ -25,7 +27,6 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 use once_cell::sync::Lazy;
-use std::sync::Arc;
 
 use crate::common::utils::str;
 
@@ -64,7 +65,8 @@ pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
             )));
         }
 
-        // 1. cast both arguments to string. These casts MUST be aligned with the signature or this function panics!
+        // 1. cast both arguments to string. These casts MUST be aligned with the
+        //    signature or this function panics!
         let haystack = &args[0]
             .as_any()
             .downcast_ref::<StringArray>()
@@ -81,7 +83,8 @@ pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
             .map(|(haystack, needle)| {
                 match (haystack, needle) {
                     // in arrow, any value can be null.
-                    // Here we decide to make our UDF to return null when either haystack or needle is null.
+                    // Here we decide to make our UDF to return null when either haystack or needle
+                    // is null.
                     (Some(haystack), Some(needle)) => match case_insensitive {
                         true => Some(str::find(
                             haystack.to_lowercase().as_str(),
@@ -104,12 +107,17 @@ pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::array::{Int64Array, StringArray};
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
-    use datafusion::arrow::record_batch::RecordBatch;
-    use datafusion::datasource::MemTable;
-    use datafusion::prelude::SessionContext;
     use std::sync::Arc;
+
+    use datafusion::{
+        arrow::{
+            array::{Int64Array, StringArray},
+            datatypes::{DataType, Field, Schema},
+            record_batch::RecordBatch,
+        },
+        datasource::MemTable,
+        prelude::SessionContext,
+    };
 
     use super::*;
 
@@ -135,12 +143,14 @@ mod tests {
         )
         .unwrap();
 
-        // declare a new context. In spark API, this corresponds to a new spark SQLsession
+        // declare a new context. In spark API, this corresponds to a new spark
+        // SQLsession
         let ctx = SessionContext::new();
         ctx.register_udf(MATCH_UDF.clone());
         ctx.register_udf(MATCH_IGNORE_CASE_UDF.clone());
 
-        // declare a table in memory. In spark API, this corresponds to createDataFrame(...).
+        // declare a table in memory. In spark API, this corresponds to
+        // createDataFrame(...).
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 

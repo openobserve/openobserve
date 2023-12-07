@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::ops::Range;
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
@@ -20,11 +22,12 @@ use object_store::{
     path::Path, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, ObjectMeta,
     ObjectStore, PutOptions, PutResult, Result,
 };
-use std::ops::Range;
 use tokio::io::AsyncWrite;
 
-use crate::common::infra::{cache::file_data, storage};
-use crate::common::utils::time::BASE_TIME;
+use crate::common::{
+    infra::{cache::file_data, storage},
+    utils::time::BASE_TIME,
+};
 
 /// File system with memory cache
 #[derive(Debug, Default)]

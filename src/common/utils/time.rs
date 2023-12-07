@@ -18,7 +18,8 @@ use once_cell::sync::Lazy;
 
 use super::json;
 
-// BASE_TIME is the time when the timestamp is 1 year, used to check a timestamp is in seconds or milliseconds or microseconds or nanoseconds
+// BASE_TIME is the time when the timestamp is 1 year, used to check a timestamp
+// is in seconds or milliseconds or microseconds or nanoseconds
 pub static BASE_TIME: Lazy<DateTime<Utc>> =
     Lazy::new(|| Utc.with_ymd_and_hms(1971, 1, 1, 0, 0, 0).unwrap());
 

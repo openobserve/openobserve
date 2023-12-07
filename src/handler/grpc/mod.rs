@@ -15,9 +15,10 @@
 
 use uuid::Uuid;
 
-use crate::common::meta;
-use crate::common::utils::json;
-use crate::service::promql;
+use crate::{
+    common::{meta, utils::json},
+    service::promql,
+};
 
 pub mod auth;
 pub mod request;

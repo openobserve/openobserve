@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
 use ahash::{HashMap, HashSet};
+use datafusion::error::{DataFusionError, Result};
+use once_cell::sync::Lazy;
+use promql_parser::parser::{token, BinaryExpr, VectorMatchCardinality};
+use rayon::prelude::*;
 
 use crate::{
     common::meta::prom::NAME_LABEL,
@@ -9,13 +13,9 @@ use crate::{
         value::{signature, InstantValue, Label, LabelsExt, Sample, Signature, Value},
     },
 };
-use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{token, BinaryExpr, VectorMatchCardinality};
-use rayon::prelude::*;
 
-use once_cell::sync::Lazy;
-
-// DROP_METRIC_VECTOR_BIN_OP if the operation is one of these, drop the metric __name__
+// DROP_METRIC_VECTOR_BIN_OP if the operation is one of these, drop the metric
+// __name__
 pub static DROP_METRIC_VECTOR_BIN_OP: Lazy<HashSet<u8>> = Lazy::new(|| {
     HashSet::from_iter([
         token::T_ADD,
@@ -87,8 +87,9 @@ pub async fn vector_scalar_bin_op(
     Ok(Value::Vector(output))
 }
 
-/// vector1 or vector2 results in a vector that contains all original elements (label sets + values)
-/// of vector1 and additionally all elements of vector2 which do not have matching label sets in vector1.
+/// vector1 or vector2 results in a vector that contains all original elements
+/// (label sets + values) of vector1 and additionally all elements of vector2
+/// which do not have matching label sets in vector1.
 ///
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#logical-set-binary-operators
 fn vector_or(expr: &BinaryExpr, left: &[InstantValue], right: &[InstantValue]) -> Result<Value> {
@@ -111,7 +112,8 @@ fn vector_or(expr: &BinaryExpr, left: &[InstantValue], right: &[InstantValue]) -
         .map(|item| signature(&item.labels))
         .collect();
 
-    // Add all right-hand side elements which have not been added from the left-hand side.
+    // Add all right-hand side elements which have not been added from the left-hand
+    // side.
     let right_instants: Vec<InstantValue> = right
         .par_iter()
         .filter(|item| {
@@ -125,9 +127,9 @@ fn vector_or(expr: &BinaryExpr, left: &[InstantValue], right: &[InstantValue]) -
     Ok(Value::Vector(output))
 }
 
-/// vector1 unless vector2 results in a vector consisting of the elements of vector1
-/// for which there are no elements in vector2 with exactly matching label sets.
-/// All matching elements in both vectors are dropped.
+/// vector1 unless vector2 results in a vector consisting of the elements of
+/// vector1 for which there are no elements in vector2 with exactly matching
+/// label sets. All matching elements in both vectors are dropped.
 ///
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#logical-set-binary-operators
 fn vector_unless(
@@ -164,9 +166,10 @@ fn vector_unless(
     Ok(Value::Vector(output))
 }
 
-/// vector1 and vector2 results in a vector consisting of the elements of vector1 for which there
-/// are elements in vector2 with exactly matching label sets.
-/// Other elements are dropped. The metric name and values are carried over from the left-hand side vector.
+/// vector1 and vector2 results in a vector consisting of the elements of
+/// vector1 for which there are elements in vector2 with exactly matching label
+/// sets. Other elements are dropped. The metric name and values are carried
+/// over from the left-hand side vector.
 ///
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#logical-set-binary-operators
 fn vector_and(expr: &BinaryExpr, left: &[InstantValue], right: &[InstantValue]) -> Result<Value> {
@@ -306,21 +309,23 @@ fn vector_arithmatic_operators(
 ///
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#comparison-binary-operators
 ///
-/// Between two instant vectors, a binary arithmetic operator is applied to each entry in the
-/// left-hand side vector and its matching element in the right-hand vector. The result is
-/// propagated into the result vector with the grouping labels becoming the output label set.
-/// The metric name is dropped. Entries for which no matching entry in the right-hand vector
-/// can be found are not part of the result.
+/// Between two instant vectors, a binary arithmetic operator is applied to each
+/// entry in the left-hand side vector and its matching element in the
+/// right-hand vector. The result is propagated into the result vector with the
+/// grouping labels becoming the output label set. The metric name is dropped.
+/// Entries for which no matching entry in the right-hand vector can be found
+/// are not part of the result.
 ///
 ///
-/// Between two instant vectors, comparison binary operators behave as a filter by default,
-/// applied to matching entries. Vector elements for which the expression is not true or which
-/// do not find a match on the other side of the expression get dropped from the result, while
-/// the others are propagated into a result vector with the grouping labels becoming the output
-/// label set. If the bool modifier is provided, vector elements that would have been dropped
-/// instead have the value 0 and vector elements that would be kept have the value 1, with the
-/// grouping labels again becoming the output label set. The metric name is dropped if the bool
-/// modifier is provided.
+/// Between two instant vectors, comparison binary operators behave as a filter
+/// by default, applied to matching entries. Vector elements for which the
+/// expression is not true or which do not find a match on the other side of the
+/// expression get dropped from the result, while the others are propagated into
+/// a result vector with the grouping labels becoming the output label set. If
+/// the bool modifier is provided, vector elements that would have been dropped
+/// instead have the value 0 and vector elements that would be kept have the
+/// value 1, with the grouping labels again becoming the output label set. The
+/// metric name is dropped if the bool modifier is provided.
 pub fn vector_bin_op(
     expr: &BinaryExpr,
     left: &[InstantValue],

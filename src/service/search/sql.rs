@@ -13,32 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{
+    collections::HashMap,
+    fmt::{Display, Formatter},
+};
+
 use ahash::AHashMap;
 use chrono::Duration;
 use datafusion::arrow::datatypes::{DataType, Schema};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    fmt::{Display, Formatter},
-};
 
-use crate::common::{
-    infra::{
-        config::{CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS},
-        errors::{Error, ErrorCodes},
+use crate::{
+    common::{
+        infra::{
+            config::{CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS},
+            errors::{Error, ErrorCodes},
+        },
+        meta::{
+            common::FileKey,
+            sql::{Sql as MetaSql, SqlOperator},
+            stream::StreamParams,
+            StreamType,
+        },
+        utils::str::find,
     },
-    meta::{
-        common::FileKey,
-        sql::{Sql as MetaSql, SqlOperator},
-        stream::StreamParams,
-        StreamType,
-    },
-    utils::str::find,
+    handler::grpc::cluster_rpc,
+    service::{db, search::match_source, stream::get_stream_setting_fts_fields},
 };
-use crate::handler::grpc::cluster_rpc;
-use crate::service::{db, search::match_source, stream::get_stream_setting_fts_fields};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
@@ -72,7 +75,8 @@ pub struct Sql {
     pub aggs: AHashMap<String, (String, MetaSql)>,
     pub fields: Vec<String>,
     pub sql_mode: SqlMode,
-    pub fast_mode: bool, // there is no where, no group by, no aggregatioin, we can just get data from the latest file
+    pub fast_mode: bool, /* there is no where, no group by, no aggregatioin, we can just get
+                          * data from the latest file */
     pub schema: Schema,
     pub query_context: String,
     pub uses_zo_fn: bool,
@@ -844,53 +848,70 @@ mod tests {
     #[actix_web::test]
     async fn test_sql_contexts() {
         let sqls = [
-            ("select * from table1", true, (0,0)),
-            ("select * from table1 where a=1", true, (0,0)),
-            ("select * from table1 where a='b'", true, (0,0)),
-            ("select * from table1 where a='b' limit 10 offset 10", false, (0,0)),
-            ("select * from table1 where a='b' group by abc", false, (0,0)),
+            ("select * from table1", true, (0, 0)),
+            ("select * from table1 where a=1", true, (0, 0)),
+            ("select * from table1 where a='b'", true, (0, 0)),
+            (
+                "select * from table1 where a='b' limit 10 offset 10",
+                false,
+                (0, 0),
+            ),
+            (
+                "select * from table1 where a='b' group by abc",
+                false,
+                (0, 0),
+            ),
             (
                 "select * from table1 where a='b' group by abc having count(*) > 19",
-                false, (0,0),
+                false,
+                (0, 0),
             ),
-            ("select * from table1, table2 where a='b'", false, (0,0)),
+            ("select * from table1, table2 where a='b'", false, (0, 0)),
             (
                 "select * from table1 left join table2 on table1.a=table2.b where a='b'",
-                false, (0,0),
+                false,
+                (0, 0),
             ),
             (
                 "select * from table1 union select * from table2 where a='b'",
-                false, (0,0),
+                false,
+                (0, 0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  openobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150'",
-                true, (0,0),
+                true,
+                (0, 0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  openobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
-                false, (0,0),
+                false,
+                (0, 0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  openobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
-                true, (1679202494333000, 1679203394333000),
+                true,
+                (1679202494333000, 1679203394333000),
             ),
             (
                 "select * from table1 WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000 AND str_match(log, 's')) order by _timestamp desc",
-                true, (1679202494333000, 1679203394333000),
+                true,
+                (1679202494333000, 1679203394333000),
             ),
             (
                 "select * from table1 WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000 AND str_match(log, 's') AND str_match_IGNORE_CASE(log, 's')) order by _timestamp desc",
-                true, (1679202494333000, 1679203394333000),
+                true,
+                (1679202494333000, 1679203394333000),
             ),
             (
                 "select * from table1 where match_all('abc') order by _timestamp desc limit 10 offset 10",
-                false, (0,0),
+                false,
+                (0, 0),
             ),
             (
                 "select * from table1 where match_all('abc') and str_match(log,'abc') order by _timestamp desc",
-                false, (0,0),
+                false,
+                (0, 0),
             ),
-
         ];
 
         let org_id = "test_org";
@@ -940,45 +961,70 @@ mod tests {
     #[actix_web::test]
     async fn test_sql_full() {
         let sqls = [
-            ("select * from table1", true, 0,(0,0)),
-            ("select * from table1 where a=1", true, 0,(0,0)),
-            ("select * from table1 where a='b'", true, 0,(0,0)),
-            ("select * from table1 where a='b' limit 10 offset 10", true, 10,(0,0)),
-            ("select * from table1 where a='b' group by abc", true, 0,(0,0)),
+            ("select * from table1", true, 0, (0, 0)),
+            ("select * from table1 where a=1", true, 0, (0, 0)),
+            ("select * from table1 where a='b'", true, 0, (0, 0)),
+            (
+                "select * from table1 where a='b' limit 10 offset 10",
+                true,
+                10,
+                (0, 0),
+            ),
+            (
+                "select * from table1 where a='b' group by abc",
+                true,
+                0,
+                (0, 0),
+            ),
             (
                 "select * from table1 where a='b' group by abc having count(*) > 19",
-                true, 0, (0,0),
+                true,
+                0,
+                (0, 0),
             ),
-            ("select * from table1, table2 where a='b'", false, 0,(0,0)),
+            ("select * from table1, table2 where a='b'", false, 0, (0, 0)),
             (
                 "select * from table1 left join table2 on table1.a=table2.b where a='b'",
-                false, 0, (0,0),
+                false,
+                0,
+                (0, 0),
             ),
             (
                 "select * from table1 union select * from table2 where a='b'",
-                false, 0, (0,0),
+                false,
+                0,
+                (0, 0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  openobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150'",
-                true, 0, (0,0),
+                true,
+                0,
+                (0, 0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  openobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
-                true, 10, (0,0),
+                true,
+                10,
+                (0, 0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  openobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
-                true, 0, (1679202494333000, 1679203394333000),
+                true,
+                0,
+                (1679202494333000, 1679203394333000),
             ),
             (
                 "select histogram(_timestamp, '5 second') AS zo_sql_key, count(*) AS zo_sql_num from table1 GROUP BY zo_sql_key ORDER BY zo_sql_key",
-                true, 0, (0,0),
+                true,
+                0,
+                (0, 0),
             ),
             (
                 "select DISTINCT field1, field2, field3 FROM table1",
-                true, 0, (0,0),
+                true,
+                0,
+                (0, 0),
             ),
-
         ];
 
         let org_id = "test_org";

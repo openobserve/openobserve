@@ -77,8 +77,8 @@ pub async fn get_view(org_id: &str, view_id: &str) -> Result<View, Error> {
     Ok(view)
 }
 
-/// Return all the saved views but query limited data only, associated with a provided org_id
-/// This will not contain the payload.
+/// Return all the saved views but query limited data only, associated with a
+/// provided org_id This will not contain the payload.
 pub async fn get_views_list_only(org_id: &str) -> Result<ViewsWithoutData, Error> {
     let db = &infra_db::get_db().await;
     let key = format!("{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id);
@@ -93,7 +93,8 @@ pub async fn get_views_list_only(org_id: &str) -> Result<ViewsWithoutData, Error
 }
 
 /// Delete a saved view id associated with an org-id
-// pub async fn delete_view(org_id: &str, view_id: &str) -> Result<View, Error> {
+// pub async fn delete_view(org_id: &str, view_id: &str) -> Result<View, Error>
+// {
 pub async fn delete_view(org_id: &str, view_id: &str) -> Result<(), Error> {
     let db = &infra_db::get_db().await;
     let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);

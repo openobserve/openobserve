@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::ops::Range;
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Utc;
@@ -21,7 +23,6 @@ use object_store::{
     path::Path, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, ObjectMeta,
     ObjectStore, PutOptions, PutResult, Result,
 };
-use std::ops::Range;
 use thiserror::Error as ThisError;
 use tokio::io::AsyncWrite;
 

@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::atomic::AtomicBool;
+
 use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
 use sqlx::{Pool, QueryBuilder, Row, Sqlite};
-use std::sync::atomic::AtomicBool;
 
 use crate::common::{
     infra::{
@@ -96,7 +97,7 @@ impl super::FileList for SqliteFileList {
     async fn remove(&self, file: &str) -> Result<()> {
         let tx = CHANNEL.db_tx.clone();
         tx.send(DbEvent::FileList(DbEventFileList::BatchRemove(vec![
-            file.to_string()
+            file.to_string(),
         ])))
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
@@ -449,7 +450,9 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
     let chunks = files.chunks(100);
     for files in chunks {
         let mut tx = client.begin().await?;
-        let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
+        let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+            "INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)",
+        );
         query_builder.push_values(files, |mut b, item| {
             let (stream_key, date_key, file_name) =
                 super::parse_file_key_columns(&item.key).expect("parse file key failed");
@@ -785,16 +788,17 @@ CREATE TABLE IF NOT EXISTS stream_stats
 pub async fn create_table_index(client: &Pool<Sqlite>) -> Result<()> {
     let sqls = vec![
         (
-            "file_list", 
-            "CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);"),
+            "file_list",
+            "CREATE INDEX IF NOT EXISTS file_list_org_idx on file_list (org);",
+        ),
         (
             "file_list",
             "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
         ),
         // (
         //     "file_list",
-        //     "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream, date, file);",
-        // ),
+        //     "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream,
+        // date, file);", ),
         (
             "file_list_deleted",
             "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_idx on file_list_deleted (stream);",

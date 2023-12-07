@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::promql::common::std_deviation2;
-use crate::service::promql::value::{InstantValue, Sample, Value};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
+
+use crate::service::promql::{
+    common::std_deviation2,
+    value::{InstantValue, Sample, Value},
+};
 pub fn stddev(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
     let score_values = super::eval_std_dev_var(param, data, "stddev")?;
     if score_values.is_none() {
