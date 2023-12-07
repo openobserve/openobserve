@@ -216,6 +216,12 @@ export default defineComponent({
           chart?.dispatchAction({
             type: "restore",
           });
+          // we need that toolbox datazoom button initally selected
+          chart?.dispatchAction({
+            type: "takeGlobalCursor",
+            key: "dataZoomSelect",
+            dataZoomSelectActive: true,
+          });
         }
       }
     );
