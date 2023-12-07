@@ -763,9 +763,10 @@ pub async fn add_stream_schema(
     if stream_type == StreamType::Traces {
         let settings = crate::common::meta::stream::StreamSettings {
             partition_keys: vec!["service_name".to_string()],
-            full_text_search_keys: vec![],
-            data_retention: 0,
             partition_time_level: None,
+            full_text_search_keys: vec![],
+            bloom_filter_fields: vec![],
+            data_retention: 0,
         };
         metadata.insert(
             "settings".to_string(),

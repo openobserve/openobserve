@@ -199,6 +199,8 @@ pub struct StreamSettings {
     #[serde(default)]
     pub full_text_search_keys: Vec<String>,
     #[serde(default)]
+    pub bloom_filter_fields: Vec<String>,
+    #[serde(default)]
     pub data_retention: i64,
 }
 
@@ -218,6 +220,7 @@ impl Serialize for StreamSettings {
             &self.partition_time_level.unwrap_or_default(),
         )?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
+        state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
         state.serialize_field("data_retention", &self.data_retention)?;
         state.end()
     }
@@ -250,6 +253,15 @@ impl From<&str> for StreamSettings {
             }
         }
 
+        let mut bloom_filter_fields = Vec::new();
+        let fts = settings.get("bloom_filter_fields");
+        if let Some(value) = fts {
+            let v: Vec<_> = value.as_array().unwrap().iter().collect();
+            for item in v {
+                bloom_filter_fields.push(item.as_str().unwrap().to_string())
+            }
+        }
+
         let mut data_retention = 0;
         if let Some(v) = settings.get("data_retention") {
             data_retention = v.as_i64().unwrap();
@@ -259,6 +271,7 @@ impl From<&str> for StreamSettings {
             partition_keys,
             partition_time_level,
             full_text_search_keys,
+            bloom_filter_fields,
             data_retention,
         }
     }
