@@ -17,27 +17,28 @@ use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
 use datafusion::arrow::datatypes::Schema;
 
-use crate::common::{
-    infra::config::CONFIG,
-    meta::{
-        alerts::Alert,
-        ingestion::RecordStatus,
-        stream::{PartitionTimeLevel, SchemaRecords},
-        StreamType,
-    },
-    utils::{
-        self,
-        hasher::get_fields_key_xxh3,
-        json::{Map, Value},
-    },
-};
-use crate::service::{
-    ingestion::{get_value, get_wal_time_key},
-    schema::check_for_schema,
-    stream::unwrap_partition_time_level,
-};
-
 use super::ingestion::TriggerAlertData;
+use crate::{
+    common::{
+        infra::config::CONFIG,
+        meta::{
+            alerts::Alert,
+            ingestion::RecordStatus,
+            stream::{PartitionTimeLevel, SchemaRecords},
+            StreamType,
+        },
+        utils::{
+            self,
+            hasher::get_fields_key_xxh3,
+            json::{Map, Value},
+        },
+    },
+    service::{
+        ingestion::{get_value, get_wal_time_key},
+        schema::check_for_schema,
+        stream::unwrap_partition_time_level,
+    },
+};
 
 pub mod bulk;
 pub mod ingest;
@@ -76,7 +77,7 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, String)> {
 
 pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Option<String>) {
     let local_map = value.as_object_mut().unwrap();
-    //let mut error_msg = String::new();
+    // let mut error_msg = String::new();
     let mut parse_error = String::new();
     for field in delta {
         let field_map = local_map.get(field.name());
@@ -204,7 +205,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Opt
 
 pub fn cast_to_type_arrow(mut value: Value, delta: Vec<Field>) -> (Option<String>, Option<String>) {
     let local_map = value.as_object_mut().unwrap();
-    //let mut error_msg = String::new();
+    // let mut error_msg = String::new();
     let mut parse_error = String::new();
     for field in delta {
         let field_map = local_map.get(field.name());

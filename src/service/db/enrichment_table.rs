@@ -14,14 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
+
 use vrl::prelude::NotNan;
 
-use crate::common::infra::cache::stats;
-use crate::common::{
-    meta::{self, search::Request},
-    utils::json,
+use crate::{
+    common::{
+        infra::cache::stats,
+        meta::{self, search::Request},
+        utils::json,
+    },
+    service::search as SearchService,
 };
-use crate::service::search as SearchService;
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
     let stats = stats::get_stream_stats(org_id, name, meta::StreamType::EnrichmentTables);

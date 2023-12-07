@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, http::header::ContentType, post, web, HttpRequest, HttpResponse};
-use ahash::HashMap;
 use std::io::Error;
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::service::kv;
+use actix_web::{delete, get, http::header::ContentType, post, web, HttpRequest, HttpResponse};
+use ahash::HashMap;
 
-/** GetValue */
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
+
+/// GetValue
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -50,7 +50,7 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
     }
 }
 
-/** SetValue */
+/// SetValue
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -87,7 +87,7 @@ pub async fn set(
     }
 }
 
-/** RemoveValue */
+/// RemoveValue
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -117,7 +117,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     }
 }
 
-/** ListKeys */
+/// ListKeys
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",

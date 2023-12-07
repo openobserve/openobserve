@@ -25,7 +25,7 @@ pub(crate) fn clamp(data: &Value, min: f64, max: f64) -> Result<Value> {
         _ => {
             return Err(DataFusionError::Plan(
                 "clamp: InstantValue argument expected".into(),
-            ))
+            ));
         }
     };
 

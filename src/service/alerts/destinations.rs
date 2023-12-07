@@ -15,9 +15,13 @@
 
 use actix_web::http;
 
-use crate::common::infra::config::STREAM_ALERTS;
-use crate::common::meta::alerts::destinations::{Destination, DestinationWithTemplate};
-use crate::service::db;
+use crate::{
+    common::{
+        infra::config::STREAM_ALERTS,
+        meta::alerts::destinations::{Destination, DestinationWithTemplate},
+    },
+    service::db,
+};
 
 pub async fn save(
     org_id: &str,

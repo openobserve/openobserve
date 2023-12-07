@@ -13,18 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::{prelude::*, Error};
+
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
 use actix_web::{post, web, HttpResponse};
 use ahash::AHashMap;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
-use std::io::{prelude::*, Error};
 
-use crate::common::{
-    meta::{http::HttpResponse as MetaHttpResponse, middleware_data::RumExtraData},
-    utils::json,
+use crate::{
+    common::{
+        meta::{http::HttpResponse as MetaHttpResponse, middleware_data::RumExtraData},
+        utils::json,
+    },
+    service::logs,
 };
-use crate::service::logs;
 
 pub const RUM_LOG_STREAM: &str = "_rumlog";
 pub const RUM_SESSION_REPLAY_STREAM: &str = "_sessionreplay";
@@ -85,7 +88,7 @@ pub struct View {
     pub id: String,
 }
 
-/** Rum data ingestion API */
+/// Rum data ingestion API
 #[utoipa::path(
     context_path = "/rum",
     tag = "Rum",
@@ -114,7 +117,7 @@ pub async fn data(
     ingest_multi_json(&org_id, RUM_DATA_STREAM, body, extend_json, **thread_id).await
 }
 
-/** Rum log ingestion API */
+/// Rum log ingestion API
 #[utoipa::path(
     context_path = "/rum",
     tag = "Rum",
@@ -143,7 +146,7 @@ pub async fn log(
     ingest_multi_json(&org_id, RUM_LOG_STREAM, body, extend_json, **thread_id).await
 }
 
-/** Rum session-replay ingestion API */
+/// Rum session-replay ingestion API
 #[utoipa::path(
     context_path = "/rum",
     tag = "Rum",

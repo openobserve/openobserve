@@ -13,31 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use arrow::ipc::reader::StreamReader;
-use bytes::Bytes;
-use datafusion::arrow::json::ReaderBuilder;
 use std::{
     io::{BufReader, Cursor},
     sync::Arc,
 };
+
+use arrow::ipc::reader::StreamReader;
+use bytes::Bytes;
+use datafusion::arrow::json::ReaderBuilder;
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, FILE_EXT_ARROW},
-        metrics, storage, wal,
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, FILE_EXT_ARROW},
+            metrics, storage, wal,
+        },
+        meta::{common::FileMeta, StreamType},
+        utils::{
+            json,
+            schema::{infer_json_schema, infer_json_schema_from_iterator},
+            stream::populate_file_meta,
+        },
     },
-    meta::{common::FileMeta, StreamType},
-    utils::{
-        json,
-        schema::{infer_json_schema, infer_json_schema_from_iterator},
-        stream::populate_file_meta,
+    service::{
+        db, schema::schema_evolution, search::datafusion::new_parquet_writer,
+        usage::report_compression_stats,
     },
-};
-use crate::service::{
-    db, schema::schema_evolution, search::datafusion::new_parquet_writer,
-    usage::report_compression_stats,
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -60,9 +63,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/*
- * upload compressed files to storage & delete moved files from local
- */
+// upload compressed files to storage & delete moved files from local
 pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     // need to clone here, to avoid thread boundry issues across awaits
     let files = wal::MEMORY_FILES.list("").await;
@@ -73,8 +74,9 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let local_file = file.to_owned();
         let columns = local_file.splitn(5, '/').collect::<Vec<&str>>();
 
-        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
-        // let _ = columns[0].to_string(); // files/
+        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
+        // 7099303408192061440f3XQ2p.json let _ = columns[0].to_string(); //
+        // files/
         let org_id = columns[1].to_string();
         let stream_type: StreamType = StreamType::from(columns[2]);
         let stream_name = columns[3].to_string();

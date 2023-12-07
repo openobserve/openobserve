@@ -13,14 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::net::SocketAddr;
+
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::net::SocketAddr;
 use syslog_loose::{Message, ProcId, Protocol};
 
-use crate::service::{db, distinct_values, get_formatted_stream_name, ingestion::write_file_arrow};
+use super::StreamMeta;
 use crate::{
     common::{
         infra::{
@@ -38,10 +39,11 @@ use crate::{
         },
         utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
-    service::ingestion::{evaluate_trigger, TriggerAlertData},
+    service::{
+        db, distinct_values, get_formatted_stream_name,
+        ingestion::{evaluate_trigger, write_file_arrow, TriggerAlertData},
+    },
 };
-
-use super::StreamMeta;
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow::Error> {
     let start = std::time::Instant::now();

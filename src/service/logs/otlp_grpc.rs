@@ -25,30 +25,33 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use super::StreamMeta;
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
+        },
+        meta::{
+            alerts::Alert,
+            http::HttpResponse as MetaHttpResponse,
+            ingestion::{IngestionResponse, StreamStatus},
+            stream::{SchemaRecords, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
-    meta::{
-        alerts::Alert,
-        http::HttpResponse as MetaHttpResponse,
-        ingestion::{IngestionResponse, StreamStatus},
-        stream::{SchemaRecords, StreamParams},
-        usage::UsageType,
-        StreamType,
+    service::{
+        db, distinct_values, get_formatted_stream_name,
+        ingestion::{
+            evaluate_trigger,
+            grpc::{get_val, get_val_with_type_retained},
+            write_file_arrow, TriggerAlertData,
+        },
+        schema::stream_schema_exists,
+        usage::report_request_usage_stats,
     },
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-};
-use crate::service::{
-    db, distinct_values, get_formatted_stream_name,
-    ingestion::{
-        evaluate_trigger, grpc::get_val, grpc::get_val_with_type_retained, write_file_arrow,
-        TriggerAlertData,
-    },
-    schema::stream_schema_exists,
-    usage::report_request_usage_stats,
 };
 
 pub async fn usage_ingest(
@@ -104,7 +107,7 @@ pub async fn usage_ingest(
     let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for item in reader.iter() {
-        //JSON Flattening
+        // JSON Flattening
         let mut value = flatten::flatten(item)?;
 
         // get json object
@@ -348,7 +351,7 @@ pub async fn handle_grpc_request(
 
                 rec[CONFIG.common.column_timestamp.clone()] = ts.into();
                 rec["severity"] = log_record.severity_text.to_owned().into();
-                //rec["name"] = log_record.name.to_owned().into();
+                // rec["name"] = log_record.name.to_owned().into();
                 rec["body"] = get_val(&log_record.body.as_ref());
                 for item in &log_record.attributes {
                     rec[item.key.as_str()] = get_val_with_type_retained(&item.value.as_ref());
@@ -382,7 +385,7 @@ pub async fn handle_grpc_request(
                     }
                 };
 
-                //flattening
+                // flattening
                 rec = flatten::flatten(&rec)?;
 
                 if !local_trans.is_empty() {
@@ -483,7 +486,7 @@ pub async fn handle_grpc_request(
         .inc();
 
     req_stats.response_time = start.elapsed().as_secs_f64();
-    //metric + data usage
+    // metric + data usage
     report_request_usage_stats(
         req_stats,
         org_id,
@@ -508,11 +511,14 @@ pub async fn handle_grpc_request(
 #[cfg(test)]
 pub mod test {
 
-    use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
-    use opentelemetry_proto::tonic::common::v1::any_value::Value::{IntValue, StringValue};
-    use opentelemetry_proto::tonic::common::v1::{InstrumentationScope, KeyValue};
-    use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
-    use opentelemetry_proto::tonic::{common::v1::AnyValue, logs::v1::LogRecord};
+    use opentelemetry_proto::tonic::{
+        collector::logs::v1::ExportLogsServiceRequest,
+        common::v1::{
+            any_value::Value::{IntValue, StringValue},
+            AnyValue, InstrumentationScope, KeyValue,
+        },
+        logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
+    };
 
     use crate::service::logs::otlp_grpc::handle_grpc_request;
 
@@ -525,7 +531,7 @@ pub mod test {
             time_unix_nano: 1581452773000000789,
             severity_number: 9,
             severity_text: "Info".to_string(),
-            //name: "logA".to_string(),
+            // name: "logA".to_string(),
             body: Some(AnyValue {
                 value: Some(StringValue("This is a log message".to_string())),
             }),

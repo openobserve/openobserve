@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
+
 use vector_enrichment::{Table, TableRegistry};
 
 use crate::common::{

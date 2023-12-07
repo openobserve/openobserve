@@ -13,16 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
 use std::{collections::HashMap, io::Error};
 
-use crate::common::meta::dashboards::MoveDashboard;
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::service::dashboards;
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+
+use crate::{
+    common::meta::{dashboards::MoveDashboard, http::HttpResponse as MetaHttpResponse},
+    service::dashboards,
+};
 
 pub mod folders;
 
-/** CreateDashboard */
+/// CreateDashboard
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",

@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{io::Result, process::Command};
+
 use chrono::{DateTime, SecondsFormat, Utc};
-use std::io::Result;
-use std::process::Command;
 
 fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=build.rs");

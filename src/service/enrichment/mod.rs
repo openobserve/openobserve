@@ -1,5 +1,6 @@
-use async_trait::async_trait;
 use std::collections::BTreeMap;
+
+use async_trait::async_trait;
 use vector_enrichment::{Case, IndexHandle, Table};
 use vrl::value::Value;
 

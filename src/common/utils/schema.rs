@@ -13,16 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::borrow::Borrow;
-use std::io::{BufRead, Seek};
-use std::sync::Arc;
+use std::{
+    borrow::Borrow,
+    io::{BufRead, Seek},
+    sync::Arc,
+};
 
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
-use datafusion::arrow::error::ArrowError;
-use datafusion::arrow::json::reader;
+use datafusion::arrow::{
+    datatypes::{DataType, Field, Schema},
+    error::ArrowError,
+    json::reader,
+};
 
-use crate::common::meta::StreamType;
-use crate::common::utils::json::Value;
+use crate::common::{meta::StreamType, utils::json::Value};
 
 pub fn infer_json_schema<R: BufRead>(
     reader: R,

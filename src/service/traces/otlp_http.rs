@@ -13,32 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Error;
+
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
-use std::io::Error;
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
-    },
-    meta::{
-        alerts::Alert,
-        http::HttpResponse as MetaHttpResponse,
-        stream::{PartitionTimeLevel, StreamParams},
-        traces::{Event, Span, SpanRefType},
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{flatten, hasher::get_fields_key_xxh3, json},
-};
 use crate::{
-    common::{meta::stream::SchemaRecords, utils},
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
+        },
+        meta::{
+            alerts::Alert,
+            http::HttpResponse as MetaHttpResponse,
+            stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
+            traces::{Event, Span, SpanRefType},
+            usage::UsageType,
+            StreamType,
+        },
+        utils,
+        utils::{flatten, hasher::get_fields_key_xxh3, json},
+    },
     service::{
         db, distinct_values, format_partition_key, format_stream_name,
         ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file_arrow, TriggerAlertData},
@@ -146,14 +147,15 @@ pub async fn traces_json(
     let mut trigger: TriggerAlertData = None;
 
     let mut service_name: String = traces_stream_name.to_string();
-    //let export_req: ExportTraceServiceRequest = json::from_slice(body.as_ref()).unwrap();
+    // let export_req: ExportTraceServiceRequest =
+    // json::from_slice(body.as_ref()).unwrap();
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
         Err(e) => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("Invalid json: {}", e),
-            )))
+            )));
         }
     };
     let spans = match body.get("resourceSpans") {
@@ -163,14 +165,14 @@ pub async fn traces_json(
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
                     "Invalid json: the structure must be {{\"resourceSpans\":[]}}".to_string(),
-                )))
+                )));
             }
         },
         None => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 "Invalid json: the structure must be {{\"resourceSpans\":[]}}".to_string(),
-            )))
+            )));
         }
     };
     for res_span in spans.iter() {
@@ -291,7 +293,7 @@ pub async fn traces_json(
                         service_name: service_name.clone(),
                         attributes: span_att_map,
                         service: service_att_map.clone(),
-                        flags: 1, //TODO add appropriate value
+                        flags: 1, // TODO add appropriate value
                         events: json::to_string(&events).unwrap(),
                     };
                     if timestamp < min_ts.try_into().unwrap() {
@@ -300,7 +302,7 @@ pub async fn traces_json(
 
                     let mut value: json::Value = json::to_value(local_val).unwrap();
 
-                    //JSON Flattening
+                    // JSON Flattening
                     value = flatten::flatten(&value).unwrap();
 
                     if !local_trans.is_empty() {
@@ -447,7 +449,7 @@ pub async fn traces_json(
         ])
         .inc();
 
-    //metric + data usage
+    // metric + data usage
     report_request_usage_stats(
         req_stats,
         org_id,
@@ -466,13 +468,14 @@ pub async fn traces_json(
         "request processed".to_string(),
     )))
 
-    //Ok(HttpResponse::Ok().into())
+    // Ok(HttpResponse::Ok().into())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use json::json;
+
+    use super::*;
 
     #[test]
     fn test_get_val_for_attr() {

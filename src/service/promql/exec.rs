@@ -13,18 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::AHashMap as HashMap;
-use datafusion::error::Result;
-use promql_parser::parser::EvalStmt;
 use std::{
     sync::Arc,
     time::{Duration, SystemTime},
 };
+
+use ahash::AHashMap as HashMap;
+use datafusion::error::Result;
+use promql_parser::parser::EvalStmt;
 use tokio::sync::RwLock;
 
-use crate::common::meta::stream::ScanStats;
-use crate::service::promql::{
-    micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK,
+use crate::{
+    common::meta::stream::ScanStats,
+    service::promql::{micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK},
 };
 
 #[derive(Clone)]

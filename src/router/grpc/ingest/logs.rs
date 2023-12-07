@@ -24,8 +24,10 @@ use tonic::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::infra::{cluster, config::CONFIG};
-use crate::service::search::MetadataMap;
+use crate::{
+    common::infra::{cluster, config::CONFIG},
+    service::search::MetadataMap,
+};
 
 #[derive(Default)]
 pub struct LogsServer;

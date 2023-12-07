@@ -13,34 +13,37 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use datafusion::{
     arrow::datatypes::Schema,
     common::FileType,
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
-use std::sync::Arc;
 use tokio::sync::Semaphore;
 
-use crate::common::{
-    infra::{
-        cache::file_data,
-        config::{is_local_disk_storage, CONFIG},
+use crate::{
+    common::{
+        infra::{
+            cache::file_data,
+            config::{is_local_disk_storage, CONFIG},
+        },
+        meta::{
+            common::FileKey,
+            search::{SearchType, Session as SearchSession},
+            stream::{PartitionTimeLevel, ScanStats, StreamParams},
+            StreamType,
+        },
     },
-    meta::{
-        common::FileKey,
-        search::{SearchType, Session as SearchSession},
-        stream::{PartitionTimeLevel, ScanStats, StreamParams},
-        StreamType,
+    service::{
+        db, file_list,
+        search::{
+            datafusion::{exec::register_table, storage::StorageType},
+            match_source,
+        },
+        stream,
     },
-};
-use crate::service::{
-    db, file_list,
-    search::{
-        datafusion::{exec::register_table, storage::StorageType},
-        match_source,
-    },
-    stream,
 };
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip_all, fields(org_id = org_id, stream_name = stream_name))]

@@ -13,21 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use opentelemetry::global;
 use std::time::UNIX_EPOCH;
+
+use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::infra::config::{FILE_EXT_ARROW, FILE_EXT_JSON};
-use crate::common::infra::{config::CONFIG, errors, metrics, wal};
-use crate::common::meta;
-use crate::common::utils::file::{get_file_contents, get_file_meta, scan_files};
-use crate::handler::grpc::cluster_rpc::{
-    metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
-    MetricsWalFileRequest, MetricsWalFileResponse,
+use crate::{
+    common::{
+        infra::{
+            config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
+            errors, metrics, wal,
+        },
+        meta,
+        utils::file::{get_file_contents, get_file_meta, scan_files},
+    },
+    handler::grpc::{
+        cluster_rpc::{
+            metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
+            MetricsWalFileRequest, MetricsWalFileResponse,
+        },
+        request::MetadataMap,
+    },
+    service::promql::search as SearchService,
 };
-use crate::handler::grpc::request::MetadataMap;
-use crate::service::promql::search as SearchService;
 
 pub struct Querier;
 

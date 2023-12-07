@@ -13,22 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
-use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
-use promql_parser::parser;
 use std::{
     sync::Arc,
     time::{Duration, UNIX_EPOCH},
 };
 
-use crate::common::{
-    infra::{cache::tmpfs, config::CONFIG, errors::Result},
-    meta::stream::ScanStats,
-};
-use crate::handler::grpc::cluster_rpc;
-use crate::service::{
-    promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
-    search,
+use async_trait::async_trait;
+use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
+use promql_parser::parser;
+
+use crate::{
+    common::{
+        infra::{cache::tmpfs, config::CONFIG, errors::Result},
+        meta::stream::ScanStats,
+    },
+    handler::grpc::cluster_rpc,
+    service::{
+        promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
+        search,
+    },
 };
 
 mod storage;

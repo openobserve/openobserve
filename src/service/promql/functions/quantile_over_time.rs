@@ -15,8 +15,10 @@
 
 use datafusion::error::{DataFusionError, Result};
 
-use crate::service::promql::common::quantile;
-use crate::service::promql::value::{InstantValue, Labels, LabelsExt, Sample, Value};
+use crate::service::promql::{
+    common::quantile,
+    value::{InstantValue, Labels, LabelsExt, Sample, Value},
+};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#quantile_over_time
 pub(crate) fn quantile_over_time(timestamp: i64, phi_quantile: f64, data: &Value) -> Result<Value> {
@@ -36,7 +38,7 @@ pub(crate) fn eval(
             return Err(DataFusionError::Plan(format!(
                 "quantile_over_time: matrix argument expected, got {:?}",
                 v.get_type()
-            )))
+            )));
         }
     };
 

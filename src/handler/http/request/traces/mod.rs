@@ -13,20 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::HashMap, io::Error};
+
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
 use serde::Serialize;
-use std::{collections::HashMap, io::Error};
 
-use crate::common::{
-    infra::{config::CONFIG, errors, metrics},
-    meta::{self, http::HttpResponse as MetaHttpResponse, StreamType},
-    utils::json,
+use crate::{
+    common::{
+        infra::{config::CONFIG, errors, metrics},
+        meta::{self, http::HttpResponse as MetaHttpResponse, StreamType},
+        utils::json,
+    },
+    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    service::{search as SearchService, traces::otlp_http},
 };
-use crate::handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
-use crate::service::{search as SearchService, traces::otlp_http};
 
-/** TracesIngest */
+/// TracesIngest
 #[utoipa::path(
     context_path = "/api",
     tag = "Traces",
@@ -86,7 +89,7 @@ async fn handle_req(
     }
 }
 
-/** GetLatestTraces */
+/// GetLatestTraces
 #[utoipa::path(
     context_path = "/api",
     tag = "Traces",
@@ -165,7 +168,10 @@ pub async fn get_latest_traces(
     let _locker = locker.lock().await;
 
     // search
-    let query_sql = format!("SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM default", CONFIG.common.column_timestamp);
+    let query_sql = format!(
+        "SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM default",
+        CONFIG.common.column_timestamp
+    );
     let query_sql = if filter.is_empty() {
         format!("{query_sql} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
     } else {
@@ -260,10 +266,9 @@ pub async fn get_latest_traces(
         .map(|v| v.trace_id.clone())
         .collect::<Vec<String>>()
         .join("','");
-    let query_sql = format!("SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM default WHERE trace_id IN ('{}') ORDER BY {} ASC LIMIT 9999",
-        CONFIG.common.column_timestamp,
-        trace_ids,
-        CONFIG.common.column_timestamp,
+    let query_sql = format!(
+        "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM default WHERE trace_id IN ('{}') ORDER BY {} ASC LIMIT 9999",
+        CONFIG.common.column_timestamp, trace_ids, CONFIG.common.column_timestamp,
     );
     req.query.sql = query_sql.to_string();
     req.query.start_time = start_time;

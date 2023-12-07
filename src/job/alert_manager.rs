@@ -15,8 +15,7 @@
 
 use tokio::time;
 
-use crate::common::infra::cluster::is_alert_manager;
-use crate::service;
+use crate::{common::infra::cluster::is_alert_manager, service};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !is_alert_manager(&super::cluster::LOCAL_NODE_ROLE) {

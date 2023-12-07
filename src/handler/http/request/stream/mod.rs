@@ -13,20 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse, Responder};
-use ahash::AHashMap as HashMap;
 use std::io::{Error, ErrorKind};
 
-use crate::common::meta::{
-    self,
-    http::HttpResponse as MetaHttpResponse,
-    stream::{ListStream, StreamDeleteFields, StreamSettings},
-    StreamType,
-};
-use crate::common::utils::http::get_stream_type_from_request;
-use crate::service::stream;
+use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse, Responder};
+use ahash::AHashMap as HashMap;
 
-/** GetSchema */
+use crate::{
+    common::{
+        meta::{
+            self,
+            http::HttpResponse as MetaHttpResponse,
+            stream::{ListStream, StreamDeleteFields, StreamSettings},
+            StreamType,
+        },
+        utils::http::get_stream_type_from_request,
+    },
+    service::stream,
+};
+
+/// GetSchema
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -58,14 +63,14 @@ async fn schema(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
                 )),
-            )
+            );
         }
     };
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     stream::get_stream(&org_id, &stream_name, stream_type).await
 }
 
-/** UpdateStreamSettings */
+/// UpdateStreamSettings
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -113,14 +118,14 @@ async fn settings(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
                 )),
-            )
+            );
         }
     };
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
 }
 
-/** DeleteStreamFields */
+/// DeleteStreamFields
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -154,7 +159,7 @@ async fn delete_fields(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
                 )),
-            )
+            );
         }
     };
     match stream::delete_fields(
@@ -176,7 +181,7 @@ async fn delete_fields(
     }
 }
 
-/** DeleteStream */
+/// DeleteStream
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -208,14 +213,14 @@ async fn delete(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
                 )),
-            )
+            );
         }
     };
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     stream::delete_stream(&org_id, &stream_name, stream_type).await
 }
 
-/** ListStreams */
+/// ListStreams
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -242,7 +247,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
                 )),
-            )
+            );
         }
     };
 

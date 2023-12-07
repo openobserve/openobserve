@@ -14,14 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use anyhow::Error;
-use rand::rngs::StdRng;
-use rand::seq::SliceRandom;
-use rand::SeedableRng;
+use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
-use crate::common::infra::cluster;
-use crate::common::infra::config::CONFIG;
-use crate::handler::grpc::cluster_rpc::{self, UsageResponse};
+use crate::{
+    common::infra::{cluster, config::CONFIG},
+    handler::grpc::cluster_rpc::{self, UsageResponse},
+};
 
 pub async fn ingest(
     dest_org_id: &str,

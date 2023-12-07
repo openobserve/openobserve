@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::fmt;
+
 use ahash::HashMap;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use utoipa::ToSchema;
 
 use super::templates::Template;

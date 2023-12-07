@@ -13,17 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::{
-    infra::config::USERS_RUM_TOKEN,
-    meta::{
-        organization::{
-            IngestionPasscode, IngestionTokensContainer, OrgSummary, RumIngestionToken,
+use crate::{
+    common::{
+        infra::config::USERS_RUM_TOKEN,
+        meta::{
+            organization::{
+                IngestionPasscode, IngestionTokensContainer, OrgSummary, RumIngestionToken,
+            },
+            user::UserOrg,
         },
-        user::UserOrg,
+        utils::{auth::is_root_user, rand::generate_random_string},
     },
-    utils::{auth::is_root_user, rand::generate_random_string},
+    service::{db, stream::get_streams},
 };
-use crate::service::{db, stream::get_streams};
 
 #[tracing::instrument]
 pub async fn get_summary(org_id: &str) -> OrgSummary {
@@ -109,7 +111,8 @@ async fn update_passcode_inner(
         // Find the org which we need to update
         existing_org.retain(|org| org.name.eq(&local_org_id));
 
-        // Filter out the org which needs to be updated, so that we can modify and insert it back.
+        // Filter out the org which needs to be updated, so that we can modify and
+        // insert it back.
         orgs.retain(|org| !org.name.eq(&local_org_id));
 
         // Invalidate the local cache
@@ -167,7 +170,7 @@ mod tests {
         infra_db::create_table().await.unwrap();
         let org_id = "dummy";
         let user_id = "userone@example.com";
-        //let passcode = "samplePassCode";
+        // let passcode = "samplePassCode";
         let resp = users::post_user(
             org_id,
             UserRequest {

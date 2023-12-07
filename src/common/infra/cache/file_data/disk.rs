@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use bytes::Bytes;
-use hashlink::lru_cache::LruCache;
-use once_cell::sync::Lazy;
 use std::{
     cmp::{max, min},
     path::Path,
 };
+
+use bytes::Bytes;
+use hashlink::lru_cache::LruCache;
+use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
 use crate::common::{
@@ -27,8 +28,7 @@ use crate::common::{
         config::{is_local_disk_storage, CONFIG},
         metrics, storage,
     },
-    utils::asynchronism::file::*,
-    utils::file::scan_files,
+    utils::{asynchronism::file::*, file::scan_files},
 };
 
 static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
@@ -116,7 +116,9 @@ impl FileData {
             loop {
                 let item = self.data.remove_lru();
                 if item.is_none() {
-                    log::error!("[session_id {session_id}] File disk cache is corrupt, it shouldn't be none");
+                    log::error!(
+                        "[session_id {session_id}] File disk cache is corrupt, it shouldn't be none"
+                    );
                     break;
                 }
                 let (key, data_size) = item.unwrap();

@@ -21,7 +21,7 @@ pub fn scalar_binary_operations(
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported scalar comparison operation: {:?} {:?} {:?}",
                     token, lhs, rhs
-                )))
+                )));
             }
         };
         if return_bool {
@@ -51,7 +51,7 @@ pub fn scalar_binary_operations(
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported scalar operation: {:?} {:?} {:?}",
                     token, lhs, rhs
-                )))
+                )));
             }
         }
     };

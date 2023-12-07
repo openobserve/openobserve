@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::utils::{base64, json};
-use crate::service::search::datafusion::storage::StorageType;
+use crate::{
+    common::utils::{base64, json},
+    service::search::datafusion::storage::StorageType,
+};
 
 #[derive(Clone, Debug)]
 pub struct Session {

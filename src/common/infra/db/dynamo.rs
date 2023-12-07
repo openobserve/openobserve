@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ahash::HashMap;
 use async_trait::async_trait;
 use aws_sdk_dynamodb::{
@@ -25,7 +27,6 @@ use aws_sdk_dynamodb::{
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tokio::sync::{mpsc, OnceCell};
 
 use crate::common::infra::{
@@ -246,7 +247,7 @@ impl super::Db for DynamoDb {
                                 None => {
                                     return Err(Error::from(DbError::KeyNotExists(
                                         prefix.to_string(),
-                                    )))
+                                    )));
                                 }
                             }
                         }
@@ -301,7 +302,7 @@ impl super::Db for DynamoDb {
                                 Err(_) => continue,
                             },
                             None => {
-                                return Err(Error::from(DbError::KeyNotExists(prefix.to_string())))
+                                return Err(Error::from(DbError::KeyNotExists(prefix.to_string())));
                             }
                         }
                     }
@@ -362,7 +363,7 @@ impl super::Db for DynamoDb {
                                 None => {
                                     return Err(Error::from(DbError::KeyNotExists(
                                         prefix.to_string(),
-                                    )))
+                                    )));
                                 }
                             }
                         }
@@ -413,7 +414,7 @@ impl super::Db for DynamoDb {
                                 None => {
                                     return Err(Error::from(DbError::KeyNotExists(
                                         prefix.to_string(),
-                                    )))
+                                    )));
                                 }
                             }
                         }

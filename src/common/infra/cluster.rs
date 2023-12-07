@@ -13,21 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{net::IpAddr, str::FromStr, sync::Arc};
+
 use etcd_client::PutOptions;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::{net::IpAddr, str::FromStr, sync::Arc};
 use uuid::Uuid;
 
-use crate::common::{
-    infra::{
-        config::{RwHashMap, CONFIG, INSTANCE_ID},
-        db::{etcd, Event},
-        errors::{Error, Result},
+use crate::{
+    common::{
+        infra::{
+            config::{RwHashMap, CONFIG, INSTANCE_ID},
+            db::{etcd, Event},
+            errors::{Error, Result},
+        },
+        utils::json,
     },
-    utils::json,
+    service::db,
 };
-use crate::service::db;
 
 static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
 static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;

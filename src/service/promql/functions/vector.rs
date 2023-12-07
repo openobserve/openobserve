@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::promql::value::{InstantValue, Labels, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
+
+use crate::service::promql::value::{InstantValue, Labels, Sample, Value};
 
 pub(crate) fn vector(data: &Value, eval_ts: i64) -> Result<Value> {
     let value = match data {
