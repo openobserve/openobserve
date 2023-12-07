@@ -9,6 +9,9 @@
     borderless
     dense
     @update:model-value="$emit('update:modelValue', $event)"
+    :display-value="`${
+        histogramIntervalModel.label ?? 'Auto'
+    }`"
   >
   </q-select>
 </template>
@@ -29,7 +32,7 @@ export default defineComponent({
     const histogramIntervalOptions = [
       {
         label: "Auto",
-        value: "auto",
+        value: null,
       },
       {
         label: "1 second",

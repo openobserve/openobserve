@@ -173,7 +173,7 @@ export default defineComponent({
 
     // histogram interval
     const histogramInterval: any = ref({
-      value: "auto",
+      value: null,
       label: "Auto",
     });
 
@@ -200,8 +200,8 @@ export default defineComponent({
                 histogramExpr.args &&
                 histogramExpr.args.type === "expr_list"
               ) {
-                // if selected histogramInterval is auto then remove interval argument
-                if (histogramInterval.value.value == "auto") {
+                // if selected histogramInterval is null then remove interval argument
+                if (!histogramInterval.value.value) {
                   histogramExpr.args.value = histogramExpr.args.value.slice(
                     0,
                     1

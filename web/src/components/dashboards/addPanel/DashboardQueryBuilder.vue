@@ -818,19 +818,21 @@ export default defineComponent({
     ];
 
     // v-model for histogram interval
-    // if no args object in the field, set it with object with interval = auto
+    // if no args object in the field, set it with object with interval = null
     const getHistoramIntervalField = (field: any) => {
-      // if no interval is set, set it to auto
+      // if no interval is set, set it to null
       if (!field.args) {
         field.args = [
           {
-            value: "auto",
+            value: null,
           },
         ];
+        return { value: null, label: "Auto" };
       } else if (field?.args?.length === 0) {
         field?.args?.push({
-          value: "auto",
+          value: null,
         });
+        return { value: null, label: "Auto" };
       }
       return { value: field?.args[0]?.value, label: field?.args[0]?.value };
     };
