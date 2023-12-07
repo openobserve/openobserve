@@ -156,7 +156,7 @@ pub async fn delete_all(
     // delete from file list
     delete_from_file_list(org_id, stream_name, stream_type, (0, 0)).await?;
     log::info!(
-        "deleted file list for: {}/{}/{}/all",
+        "[COMPACT:RETENTION] deleted file list for: {}/{}/{}/all",
         org_id,
         stream_type,
         stream_name
@@ -165,7 +165,7 @@ pub async fn delete_all(
     // mark delete done
     db::compact::retention::delete_stream_done(org_id, stream_name, stream_type, None).await?;
     log::info!(
-        "deleted stream all: {}/{}/{}",
+        "[COMPACT:RETENTION] deleted stream all: {}/{}/{}",
         org_id,
         stream_type,
         stream_name
@@ -288,7 +288,7 @@ pub async fn delete_by_date(
     );
     delete_from_file_list(org_id, stream_name, stream_type, time_range).await?;
     log::info!(
-        "deleted file_list for: {}/{}/{}/{:?}",
+        "[COMPACT:RETENTION] deleted file_list for: {}/{}/{}/{:?}",
         org_id,
         stream_type,
         stream_name,
