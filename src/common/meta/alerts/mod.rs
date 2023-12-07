@@ -77,9 +77,11 @@ impl Default for Alert {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct TriggerCondition {
-    pub period: i64,        // 10 minutes
+    pub period: i64, // 10 minutes
+    #[serde(default)]
     pub operator: Operator, // >=
-    pub threshold: i64,     // 3 times
+    #[serde(default)]
+    pub threshold: i64, // 3 times
     #[serde(default)]
     pub frequency: i64, // 1 minute
     #[serde(default)]
