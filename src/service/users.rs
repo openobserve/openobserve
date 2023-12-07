@@ -48,8 +48,14 @@ pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpRespons
         let password = get_hash(&usr_req.password, &salt);
         let token = generate_random_string(16);
         let rum_token = format!("rum{}", generate_random_string(16));
-        let user =
-            usr_req.to_new_dbuser(password, salt, org_id.replace(' ', "_"), token, rum_token);
+        let user = usr_req.to_new_dbuser(
+            password,
+            salt,
+            org_id.replace(' ', "_"),
+            token,
+            rum_token,
+            usr_req.is_ldap,
+        );
         db::user::set(user).await.unwrap();
         Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
@@ -318,6 +324,7 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
                 role: user.value().role.clone(),
                 first_name: user.value().first_name.clone(),
                 last_name: user.value().last_name.clone(),
+                is_ldap: user.value().is_ldap,
             })
         }
     }
@@ -415,6 +422,7 @@ mod tests {
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
                 org: "dummy".to_string(),
+                is_ldap: false,
             },
         );
     }
@@ -448,6 +456,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
+                is_ldap: false,
             },
         )
         .await;
@@ -465,6 +474,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
+                is_ldap: false,
             },
         )
         .await;
@@ -481,6 +491,7 @@ mod tests {
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
                 org: "dummy".to_string(),
+                is_ldap: false,
             },
         );
 
