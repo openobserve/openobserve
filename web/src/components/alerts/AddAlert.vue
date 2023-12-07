@@ -699,7 +699,8 @@ export default defineComponent({
           : this.formData.query_condition.type;
 
         this.formData.context_attributes.forEach((attr: any) => {
-          payload.context_attributes[attr.key] = attr.value;
+          if (attr.key?.trim() && attr.value?.trim())
+            payload.context_attributes[attr.key] = attr.value;
         });
 
         payload.trigger_condition.threshold = parseInt(
