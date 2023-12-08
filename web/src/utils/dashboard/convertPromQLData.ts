@@ -362,6 +362,7 @@ export const convertPromQLData = (
       case "gauge": {
         const series = it?.result?.map((metric: any) => {
           const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+          // taking last value for gauge
           const unitValue = getUnitValue(
             values[values.length - 1][1],
             panelSchema.config?.unit,

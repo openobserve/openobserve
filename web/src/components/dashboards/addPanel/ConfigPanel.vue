@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="
         dashboardPanelData.data.type != 'table' &&
         dashboardPanelData.data.type != 'heatmap' &&
-        dashboardPanelData.data.type != 'metric'
-        && dashboardPanelData.data.type != 'gauge'
+        dashboardPanelData.data.type != 'metric' &&
+        dashboardPanelData.data.type != 'gauge'
       "
       outlined
       v-model="dashboardPanelData.data.config.legends_position"
@@ -180,7 +180,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- </q-input> -->
     <div class="space"></div>
 
-    
     <!-- for auto sql query limit -->
     <!-- it should not be promql and custom query -->
     <q-input
@@ -312,23 +311,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     </q-input>
 
-    <q-input v-if="dashboardPanelData.data.type === 'gauge'" v-model.number="dashboardPanelData.data.config.min" :value="0" @update:model-value="(value) => dashboardPanelData.data.config.min = value ? value : 0" label="Gauge Min Value" color="input-border"
-      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot placeholder="0" :type="'number'">
+    <q-input
+      v-if="dashboardPanelData.data.type === 'gauge'"
+      v-model.number="dashboardPanelData.data.config.min"
+      :value="0"
+      @update:model-value="
+        (value) => (dashboardPanelData.data.config.min = value ? value : 0)
+      "
+      label="Gauge Min Value"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      placeholder="0"
+      :type="'number'"
+    >
       <template v-slot:label>
-        <div class="row items-center all-pointer-events">
-          Gauge Min Value
-        </div>
+        <div class="row items-center all-pointer-events">Gauge Min Value</div>
       </template>
     </q-input>
-    <q-input v-if="dashboardPanelData.data.type === 'gauge'" v-model.number="dashboardPanelData.data.config.max" :value="100" @update:model-value="(value) => dashboardPanelData.data.config.max = value ? value : 100" label="Gauge Max Value" color="input-border"
-      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot placeholder="100" :type="'number'">
+    <q-input
+      v-if="dashboardPanelData.data.type === 'gauge'"
+      v-model.number="dashboardPanelData.data.config.max"
+      :value="100"
+      @update:model-value="
+        (value) => (dashboardPanelData.data.config.max = value ? value : 100)
+      "
+      label="Gauge Max Value"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      placeholder="100"
+      :type="'number'"
+    >
       <template v-slot:label>
-        <div class="row items-center all-pointer-events">
-          Gauge Max Value
-        </div>
+        <div class="row items-center all-pointer-events">Gauge Max Value</div>
       </template>
     </q-input>
-
   </div>
 </template>
 
