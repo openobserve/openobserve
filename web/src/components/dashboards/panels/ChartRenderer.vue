@@ -15,7 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="chartRef" id="chart1" style="height: 100%; width: 100%"></div>
+  <div
+    data-test="chart-renderer"
+    ref="chartRef"
+    id="chart1"
+    style="height: 100%; width: 100%"
+  ></div>
 </template>
 
 <script lang="ts">
