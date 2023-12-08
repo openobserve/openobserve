@@ -25,7 +25,7 @@ publish = false
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
-#enterprise feature
+#enterprise feature used to enable enterprise features
 enterprise = ["dep:o2_enterprise"]
 
 [profile.release]
