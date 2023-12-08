@@ -20,6 +20,7 @@ ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 RUN rustc --version && sccache --version
 
 WORKDIR /app
+RUN ls -lrt
 COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 RUN mkdir -p /app/target/release/
