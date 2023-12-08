@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="q-pl-sm float-left">
     <q-btn-dropdown
+      data-test="logs-search-bar-refresh-interval-btn-dropdown"
       v-model="btnRefreshInterval"
       border
       no-caps
