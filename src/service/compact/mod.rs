@@ -55,17 +55,17 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             // get the working node for the organization
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
             if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-                log::warn!("[COMPACT] organization {org_id} is merging by {node}");
+                log::warn!("[COMPACT] organization {org_id} is process by {node}");
                 continue;
             }
 
-            // before start merging, set current node to lock the organization
+            // before start process, set current node to lock the organization
             let lock_key = format!("compact/organization/{org_id}");
             let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
             // check the working node for the organization again, maybe other node locked it first
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
             if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-                log::warn!("[COMPACT] organization {org_id} is merging by {node}");
+                log::warn!("[COMPACT] organization {org_id} is process by {node}");
                 dist_lock::unlock(&locker).await?;
                 continue;
             }
@@ -182,17 +182,17 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::warn!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is process by {node}");
             continue;
         }
 
-        // before start merging, set current node to lock the organization
+        // before start process, set current node to lock the organization
         let lock_key = format!("compact/organization/{org_id}");
         let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
         // check the working node for the organization again, maybe other node locked it first
         let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::warn!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is process by {node}");
             dist_lock::unlock(&locker).await?;
             continue;
         }
@@ -288,18 +288,18 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::warn!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is process by {node}");
             continue;
         }
 
-        // before start merging, set current node to lock the organization
+        // before start process, set current node to lock the organization
         let lock_key = format!("compact/organization/{org_id}");
         let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
         // check the working node for the organization again, maybe other node locked it first
         let (offset, node) =
             db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::warn!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is process by {node}");
             dist_lock::unlock(&locker).await?;
             continue;
         }

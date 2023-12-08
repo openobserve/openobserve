@@ -255,7 +255,7 @@ pub async fn delete_by_date(
         }
 
         // at the end, fetch a file list from s3 to guatantte there is no file
-        while date_start <= date_end {
+        while date_start < date_end {
             let prefix = format!(
                 "files/{org_id}/{stream_type}/{stream_name}/{}/",
                 date_start.format("%Y/%m/%d")
