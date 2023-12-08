@@ -459,12 +459,12 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
                 ));
             }
         };
-        build_expr(&agg.having, "alert_threshold", data_type)?
+        build_expr(&agg.having, "alert_agg_value", data_type)?
     };
     if let Some(group) = agg.group_by.as_ref() {
         if !group.is_empty() {
             sql = format!(
-                "SELECT {}, {}(\"{}\") AS alert_threshold, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
+                "SELECT {}, {}(\"{}\") AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
                 group.join(", "),
                 agg.function.to_string(),
                 agg.having.column,
@@ -479,7 +479,7 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
     }
     if sql.is_empty() {
         sql = format!(
-            "SELECT {}(\"{}\") AS alert_threshold, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
+            "SELECT {}(\"{}\") AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
             agg.function.to_string(),
             agg.having.column,
             CONFIG.common.column_timestamp,
