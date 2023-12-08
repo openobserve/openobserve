@@ -179,6 +179,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
+                is_ldap: false,
             },
         )
         .await;
