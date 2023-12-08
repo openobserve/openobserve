@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex justify-evenly q-py-sm">
           <q-btn
+            data-test="date-time-relative-tab"
             size="md"
             class="tab-button no-border"
             color="primary"
@@ -50,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
           <q-separator vertical inset />
           <q-btn
+            data-test="date-time-absolute-tab"
             size="md"
             class="tab-button no-border"
             color="primary"
@@ -244,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
           <q-separator class="q-my-sm" />
           <q-btn
+            data-test="date-time-apply-btn"
             class="no-border q-py-xs"
             color="secondary"
             no-caps

@@ -120,7 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>org_name, stream_type, stream_name</div>
             <div>alert_name, alert_type</div>
             <div>alert_period, alert_operator, alert_threshold</div>
-            <div>alert_count, alert_start_time, alert_end_time</div>
+            <div>alert_count, alert_agg_value</div>
+            <div>alert_start_time, alert_end_time</div>
             <div><b>All of the stream fields are variables.</b></div>
           </div>
           <div class="q-pb-md q-px-xs">
