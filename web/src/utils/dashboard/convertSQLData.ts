@@ -977,6 +977,16 @@ export const convertSQLData = (
       options.tooltip = {
         show: true,
         trigger: "item",
+        textStyle: {
+          color: store.state.theme === "dark" ? "#fff" : "#000",
+          fontSize: 12,
+        },
+        enterable: true,
+        backgroundColor:
+          store.state.theme === "dark"
+            ? "rgba(0,0,0,1)"
+            : "rgba(255,255,255,1)",
+        extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       };
       options.angleAxis = {
         show: false,
