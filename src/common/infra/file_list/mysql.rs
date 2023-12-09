@@ -363,16 +363,17 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_deleted(&self, org_id: &str, time_max: i64) -> Result<Vec<String>> {
+    async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>> {
         if time_max == 0 {
             return Ok(Vec::new());
         }
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file FROM file_list_deleted WHERE org = ? AND created_at < ?;"#,
+            r#"SELECT stream, date, file FROM file_list_deleted WHERE org = ? AND created_at < ? LIMIT ?;"#,
         )
         .bind(org_id)
         .bind(time_max)
+        .bind(limit)
         .fetch_all(&pool)
         .await?;
         Ok(ret

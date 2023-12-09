@@ -316,8 +316,23 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         dist_lock::unlock(&locker).await?;
         drop(locker);
 
-        if let Err(e) = file_list_deleted::delete(&org_id, offset, time_max).await {
-            log::error!("[COMPACTOR] delete files error: {}", e);
+        let batch_size = 10000;
+        loop {
+            match file_list_deleted::delete(&org_id, offset, time_max, batch_size).await {
+                Ok(affected) => {
+                    if CONFIG.common.print_key_event {
+                        log::info!("[COMPACTOR] deleted from file_list_deleted {affected} files");
+                    }
+                    if affected == 0 {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    log::error!("[COMPACTOR] delete files error: {}", e);
+                    break;
+                }
+            };
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
 
         // update offset

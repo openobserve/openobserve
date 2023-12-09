@@ -338,7 +338,7 @@ impl super::FileList for DynamoFileList {
         Ok(resp)
     }
 
-    async fn query_deleted(&self, org_id: &str, time_max: i64) -> Result<Vec<String>> {
+    async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>> {
         if time_max == 0 {
             return Ok(Vec::new());
         }
@@ -353,6 +353,7 @@ impl super::FileList for DynamoFileList {
             .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
             .expression_attribute_values(":ts", AttributeValue::N(time_max.to_string()))
             .select(Select::AllAttributes)
+            .limit(limit as i32)
             .into_paginator()
             .page_size(1000)
             .send()

@@ -81,9 +81,7 @@ async fn run_delete() -> Result<(), anyhow::Error> {
 
 /// Delete files based on the file_file_deleted in the database
 async fn run_delete_files() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.compact.delete_files_delay_hours as u64 * 3600,
-    ));
+    let mut interval = time::interval(time::Duration::from_secs(600));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
