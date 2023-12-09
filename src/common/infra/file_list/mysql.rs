@@ -175,12 +175,24 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
         let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
+            let mut tx = pool.begin().await?;
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
                 let sql = format!("DELETE FROM file_list WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
-                _ = sqlx::query(&sql).execute(&pool).await?;
+                match sqlx::query(&sql).execute(&mut *tx).await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        if let Err(e) = tx.rollback().await {
+                            log::error!("[MYSQL] rollback batch remove error: {}", e);
+                        }
+                        return Err(e.into());
+                    }
+                }
             }
-            tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
+            if let Err(e) = tx.commit().await {
+                log::error!("[MYSQL] commit file_list batch remove error: {}", e);
+                return Err(e.into());
+            }
         }
         Ok(())
     }
