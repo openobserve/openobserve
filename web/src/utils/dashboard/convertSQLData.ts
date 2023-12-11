@@ -27,10 +27,12 @@ import {
   formatUnitValue,
   getUnitValue,
 } from "./convertDataIntoUnitValue";
+import { calculateGridPositions } from "./calculateGridForSubPlot";
 export const convertSQLData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any
+  store: any,
+  chartPanelRef: any
 ) => {
   // if no data than return it
   if (
@@ -365,7 +367,7 @@ export const convertSQLData = (
     },
     toolbox: {
       orient: "vertical",
-      show: !["pie", "donut", "metric"].includes(panelSchema.type),
+      show: !["pie", "donut", "metric", "gauge"].includes(panelSchema.type),
       feature: {
         dataZoom: {
           yAxisIndex: "none",
@@ -567,7 +569,12 @@ export const convertSQLData = (
       options.yAxis = temp;
 
       options.yAxis.map((it: any) => {
-        it.nameGap = calculateWidthText(largestLabel(it.data)) + 14;
+        it.nameGap = calculateWidthText(
+          xAxisKeys.reduce(
+            (str: any, it: any) => str + largestLabel(getAxisDataFromKey(it)),
+            ""
+          )
+        );
       });
       (options.xAxis.name =
         panelSchema.queries[0]?.fields?.y?.length >= 1
@@ -906,7 +913,7 @@ export const convertSQLData = (
       options.xAxis = options.yAxis;
       options.yAxis = temp;
       options.yAxis.map((it: any) => {
-        it.nameGap = calculateWidthText(largestLabel(it.data)) + 8;
+        it.nameGap = calculateWidthText(largestLabel(it.data)) + 20;
       });
       options.xAxis.nameGap = 20;
       break;
@@ -954,6 +961,126 @@ export const convertSQLData = (
       ];
       break;
     }
+    case "gauge": {
+      const key1 = yAxisKeys[0];
+      const yAxisValue = getAxisDataFromKey(key1);
+      // used for gague name
+      const xAxisValue = getAxisDataFromKey(xAxisKeys[0]);
+
+      // create grid array based on chart panel width, height and total no. of gauge
+      const gridDataForGauge = calculateGridPositions(
+        chartPanelRef.value.offsetWidth,
+        chartPanelRef.value.offsetHeight,
+        yAxisValue.length
+      );
+
+      options.dataset = { source: [[]] };
+      options.tooltip = {
+        show: true,
+        trigger: "item",
+        textStyle: {
+          color: store.state.theme === "dark" ? "#fff" : "#000",
+          fontSize: 12,
+        },
+        enterable: true,
+        backgroundColor:
+          store.state.theme === "dark"
+            ? "rgba(0,0,0,1)"
+            : "rgba(255,255,255,1)",
+        extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
+      };
+      options.angleAxis = {
+        show: false,
+      };
+      options.radiusAxis = {
+        show: false,
+      };
+      options.polar = {};
+      options.xAxis = [];
+      options.yAxis = [];
+      // for each gague we have seperate grid
+      options.grid = gridDataForGauge.gridArray;
+
+      options.series = yAxisValue.map((it: any, index: any) => {
+        return {
+          ...getPropsByChartTypeForSeries(panelSchema.type),
+          min: panelSchema?.queries[0]?.config?.min || 0,
+          max: panelSchema?.queries[0]?.config?.max || 100,
+
+          //which grid will be used
+          gridIndex: index,
+          // radius, progress and axisline width will be calculated based on grid width and height
+          radius: `${
+            Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) /
+              2 -
+            5
+          }px`,
+          progress: {
+            show: true,
+            width: `${
+              Math.min(
+                gridDataForGauge.gridWidth,
+                gridDataForGauge.gridHeight
+              ) / 6
+            }`,
+          },
+          axisLine: {
+            lineStyle: {
+              width: `${
+                Math.min(
+                  gridDataForGauge.gridWidth,
+                  gridDataForGauge.gridHeight
+                ) / 6
+              }`,
+            },
+          },
+          title: {
+            fontSize: 10,
+            offsetCenter: [0, "70%"],
+            // width: upto chart width
+            width: `${gridDataForGauge.gridWidth}`,
+            overflow: "truncate",
+          },
+
+          // center of gauge
+          // x: left + width / 2,
+          // y: top + height / 2,
+          center: [
+            `${
+              parseFloat(options.grid[index].left) +
+              parseFloat(options.grid[index].width) / 2
+            }%`,
+            `${
+              parseFloat(options.grid[index].top) +
+              parseFloat(options.grid[index].height) / 2
+            }%`,
+          ],
+
+          data: [
+            {
+              name: JSON.stringify(xAxisValue[index] || ""),
+              value: it,
+              detail: {
+                formatter: function (value: any) {
+                  const unitValue = getUnitValue(
+                    value,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom
+                  );
+                  return unitValue.value + unitValue.unit;
+                },
+              },
+            },
+          ],
+          detail: {
+            valueAnimation: true,
+            offsetCenter: [0, 0],
+            fontSize: 12,
+          },
+        };
+      });
+      break;
+    }
     default: {
       break;
     }
@@ -992,30 +1119,30 @@ export const convertSQLData = (
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
       options?.series?.map((seriesObj: any) => {
-        if(field) {
+        if (field) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
             store.state.timezone != "UTC"
-            ? utcToZonedTime(
-              Number.isInteger(options?.xAxis[0]?.data[index])
-                  ? options?.xAxis[0]?.data[index]
-                  : new Date(options?.xAxis[0]?.data[index]).getTime(),
-                store.state.timezone
-              )
-            : new Date(options?.xAxis[0]?.data[index])
-                .toISOString()
-                .slice(0, -1),
-                it,
-              ]);
-            } else if(timestampField) {
-              seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-                utcToZonedTime(
-                  new Date(options.xAxis[0].data[index]).getTime() / 1000,
+              ? utcToZonedTime(
+                  Number.isInteger(options?.xAxis[0]?.data[index])
+                    ? options?.xAxis[0]?.data[index]
+                    : new Date(options?.xAxis[0]?.data[index]).getTime(),
                   store.state.timezone
-                ),
-                it,
-              ]);
-            }
-          });
+                )
+              : new Date(options?.xAxis[0]?.data[index])
+                  .toISOString()
+                  .slice(0, -1),
+            it,
+          ]);
+        } else if (timestampField) {
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            utcToZonedTime(
+              new Date(options.xAxis[0].data[index]).getTime() / 1000,
+              store.state.timezone
+            ),
+            it,
+          ]);
+        }
+      });
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
@@ -1103,7 +1230,7 @@ export const convertSQLData = (
 
     const isTimeSeriesData = isTimeSeries(sample);
     const isTimeStampData = isTimeStamp(sample);
-    
+
     if (isTimeSeriesData || isTimeStampData) {
       options?.series?.map((seriesObj: any) => {
         if (isTimeSeriesData) {
@@ -1406,6 +1533,33 @@ const getPropsByChartTypeForSeries = (type: string) => {
         stack: "total",
         emphasis: {
           focus: "series",
+        },
+      };
+    case "gauge":
+      return {
+        type: "gauge",
+        startAngle: 205,
+        endAngle: -25,
+        progress: {
+          show: true,
+          width: 10,
+        },
+        pointer: {
+          show: false,
+        },
+        axisLine: {
+          lineStyle: {
+            width: 10,
+          },
+        },
+        axisTick: {
+          show: false,
+        },
+        splitLine: {
+          show: false,
+        },
+        axisLabel: {
+          show: false,
         },
       };
     default:
