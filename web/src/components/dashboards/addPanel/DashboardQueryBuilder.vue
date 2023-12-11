@@ -54,7 +54,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.layout.currentQueryIndex
           ].fields.x"
           :key="index"
-        >
+          >
+          <div
+            :draggable="true"
+            @dragstart="onFieldDragStart($event, index, itemX.column)"
+          >
+          <q-icon
+            name="drag_indicator"
+            color="grey-13"
+            class="'q-mr-xs'"
+          />
           <q-btn
             icon-right="arrow_drop_down"
             no-caps
@@ -175,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="removeXAxisItem(itemX.column)"
             icon="close"
           />
+        </div>
         </q-btn-group>
         <div
           class="text-caption text-weight-bold text-center q-mt-xs"
@@ -228,6 +238,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].fields.y"
           :key="index"
         >
+        <div
+          :draggable="true" 
+          @dragstart="onFieldDragStart($event, index, itemY.column)"
+        >
+        <q-icon
+          name="drag_indicator"
+          color="grey-13"
+          class="'q-mr-xs'"
+        />
           <q-btn
             icon-right="arrow_drop_down"
             no-caps
@@ -371,6 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="removeYAxisItem(itemY.column)"
             icon="close"
           />
+          </div>
         </q-btn-group>
         <div
           class="text-caption text-weight-bold text-center q-mt-xs"
@@ -419,6 +439,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields.z"
             :key="index"
           >
+          <div
+            :draggable="true" 
+            @dragstart="onFieldDragStart($event, index, itemZ.column)"
+          >
+          <q-icon
+            name="drag_indicator"
+            color="grey-13"
+            class="'q-mr-xs'"
+          />
             <q-btn
               icon-right="arrow_drop_down"
               no-caps
@@ -509,6 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="removeZAxisItem(itemZ.column)"
               icon="close"
             />
+            </div>
           </q-btn-group>
           <div
             class="text-caption text-weight-bold text-center q-mt-xs"
@@ -843,6 +873,7 @@ export default defineComponent({
         if (oldVal == false && newVal == true) {
           expansionItems.x = true;
           expansionItems.y = true;
+          expansionItems.z = true;
           expansionItems.config = false;
           expansionItems.filter = true;
         }
@@ -852,22 +883,39 @@ export default defineComponent({
     const currentDragArea = ref("");
 
     const onDrop = (e: any, area: string) => {
+      console.log("onDrop", e, area);
+      
       const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
-
+      console.log("onDrop dragItem", dragItem);
+      
       dashboardPanelData.meta.dragAndDrop.dragging = false;
+      console.log("onDrop dragging", dashboardPanelData.meta.dragAndDrop.dragging);
+      
       dashboardPanelData.meta.dragAndDrop.dragElement = null;
+      console.log("onDrop dragElement", dashboardPanelData.meta.dragAndDrop.dragElement);
+      
+      dashboardPanelData.meta.dragAndDrop.dragElementType = null;
+      console.log("onDrop dragElementType", dashboardPanelData.meta.dragAndDrop.dragElementType);
+      if(dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldList") {
+        console.log("onDrop fieldList-------------");
+        
+        if (dragItem && area == "x") {
+          console.log("addXAxisItem onDrop", dragItem);
 
-      if (dragItem && area == "x") {
-        addXAxisItem(dragItem);
-      } else if (dragItem && area == "y") {
-        addYAxisItem(dragItem);
-      } else if (dragItem && area == "z") {
-        addZAxisItem(dragItem);
-      } else if (dragItem && area == "f") {
-        addFilteredItem(dragItem?.name);
-      } else {
+          addXAxisItem(dragItem);
+        } else if (dragItem && area == "y") {
+          addYAxisItem(dragItem);
+        } else if (dragItem && area == "z") {
+          addZAxisItem(dragItem);
+        } else if (dragItem && area == "f") {
+          addFilteredItem(dragItem?.name);
+        } else {
+        }
+        currentDragArea.value = "";
+      } else if(dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldElement") {
+        console.log("onDrop fieldElement-------------");
+        
       }
-      currentDragArea.value = "";
     };
 
     const onDragEnter = (e: any, area: string) => {
@@ -890,6 +938,19 @@ export default defineComponent({
     const onDragOver = (e: any, area: string) => {
       currentDragArea.value = area;
       e.preventDefault();
+    };
+
+    const onFieldDragStart = (e: any, item: any, fieldElement: string) => {
+      console.log("onFieldDragStart item", item);
+      
+        dashboardPanelData.meta.dragAndDrop.dragging = true;
+        dashboardPanelData.meta.dragAndDrop.dragElement = item;
+        dashboardPanelData.meta.dragAndDrop.dragElementType = fieldElement;
+        console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragElement);
+        console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragging);
+        console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragElementType);
+        
+        // dashboardPanelData.meta.dragAndDrop.dragStartIndex = index;
     };
 
     const handler2 = () => {};
@@ -1024,6 +1085,7 @@ export default defineComponent({
       xLabel,
       yLabel,
       zLabel,
+      onFieldDragStart,
       getHistoramIntervalField,
     };
   },

@@ -94,6 +94,7 @@ const getDefaultDashboardPanelData: any = () => ({
     dragAndDrop: {
       dragging: false,
       dragElement: null,
+      dragElementType: null,
     },
     errors: {
       queryErrors: [],
@@ -158,12 +159,27 @@ const useDashboardPanelData = () => {
   };
 
   const generateLabelFromName = (name: string) => {
+    console.log("name", name);
+    
     return name
       .replace(/[\_\-\s\.]/g, " ")
       .split(" ")
       .map((string) => string.charAt(0).toUpperCase() + string.slice(1))
       .filter((it) => it)
       .join(" ");
+  };
+
+  const getFieldLabel = (field: any, fieldItem: any) => {
+    console.log("field", field);
+    console.log("fieldElement", fieldItem);
+    if (fieldItem === "fieldElement") {
+      console.log("generateLabelFromName", field.name);
+      return field.name;
+    } else {
+      console.log("generateLabelFromName");
+
+      return generateLabelFromName(field.name);
+    }
   };
 
   const promqlMode = computed(
@@ -240,6 +256,8 @@ const useDashboardPanelData = () => {
   });
 
   const addXAxisItem = (row: any) => {
+    console.log("rowwww", row);
+    
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -260,14 +278,18 @@ const useDashboardPanelData = () => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.find((it: any) => it.column == row.name)
     ) {
+      console.log(
+        "dashboardPanelData.meta.dragAndDrop.dragging",
+        dashboardPanelData.meta.dragAndDrop
+      );
+      
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.push({
-        label: !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? generateLabelFromName(row.name)
-          : row.name,
+        label: getFieldLabel(
+          row,
+          dashboardPanelData.meta.dragAndDrop.dragElementType
+        ),
         alias: !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
@@ -285,6 +307,8 @@ const useDashboardPanelData = () => {
             : null,
       });
     }
+    console.log("label", dashboardPanelData.data.queries[0].fields.x);
+    
     updateArrayAlias();
   };
 
@@ -311,11 +335,10 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.y.push({
-        label: !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? generateLabelFromName(row.name)
-          : row.name,
+        label: getFieldLabel(
+          row,
+          dashboardPanelData.meta.dragAndDrop.dragElementType
+        ),
         alias: !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
@@ -357,11 +380,10 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.z.push({
-        label: !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? generateLabelFromName(row.name)
-          : row.name,
+        label: getFieldLabel(
+          row,
+          dashboardPanelData.meta.dragAndDrop.dragElementType
+        ),
         alias: !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
