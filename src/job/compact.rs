@@ -59,7 +59,7 @@ async fn run_merge() -> Result<(), anyhow::Error> {
 
 /// Deletion for data retention
 async fn run_delete() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval));
+    let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval + 1));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
@@ -81,7 +81,7 @@ async fn run_delete() -> Result<(), anyhow::Error> {
 
 /// Delete files based on the file_file_deleted in the database
 async fn run_delete_files() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(600));
+    let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval + 2));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;

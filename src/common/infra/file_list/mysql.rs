@@ -172,10 +172,10 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
         if files.is_empty() {
             return Ok(());
         }
-        let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
             // get ids of the files
+            let pool = CLIENT.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
@@ -256,36 +256,51 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
         }
         let chunks = files.chunks(100);
         for files in chunks {
-            log::info!("[MYSQL] batch_remove_deleted: begin transaction");
-            let mut tx = CLIENT.clone().begin().await?;
-            log::info!("[MYSQL] batch_remove_deleted: created transaction");
+            log::info!("[MYSQL] batch_remove_deleted: start deleting new 100 items");
+            // get ids of the files
+            let pool = CLIENT.clone();
+            let mut ids = Vec::with_capacity(files.len());
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                let sql = format!("DELETE FROM file_list_deleted WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
-                match sqlx::query(&sql).execute(&mut *tx).await {
-                    Ok(_) => {
-                        log::info!("[MYSQL] batch_remove_deleted: deleted 1 record in transaction");
-                    }
-                    Err(e) => {
-                        if let Err(e) = tx.rollback().await {
-                            log::error!(
-                                "[MYSQL] rollback file_list_deleted batch remove error: {}",
-                                e
-                            );
-                        }
-                        return Err(e.into());
+                let sql = format!("SELECT id FROM file_list_deleted WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
+                let ret: Option<i64> = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
+                match ret {
+                    Some(v) => ids.push(v.to_string()),
+                    None => {
+                        return Err(Error::Message(
+                            "[MYSQL] query error: id should not empty from file_list_deleted"
+                                .to_string(),
+                        ));
                     }
                 }
             }
-            log::info!(
-                "[MYSQL] batch_remove_deleted: deleted {} record in transaction",
-                files.len()
+            // delete files by ids
+            let mut tx = pool.begin().await?;
+            let sql = format!(
+                "DELETE FROM file_list_deleted WHERE id IN({});",
+                ids.join(",")
             );
+            log::info!("[MYSQL] batch_remove_deleted: {}", sql);
+            match sqlx::query(&sql).execute(&mut *tx).await {
+                Ok(_) => {}
+                Err(e) => {
+                    if let Err(e) = tx.rollback().await {
+                        log::error!(
+                            "[MYSQL] rollback file_list_deleted batch remove error: {}",
+                            e
+                        );
+                    }
+                    return Err(e.into());
+                }
+            }
             if let Err(e) = tx.commit().await {
                 log::error!("[MYSQL] commit file_list_deleted batch remove error: {}", e);
                 return Err(e.into());
             }
-            log::info!("[MYSQL] batch_remove_deleted: commit transaction");
+            log::info!(
+                "[MYSQL] batch_remove_deleted: deleted {} record in transaction",
+                ids.len()
+            );
         }
         Ok(())
     }
