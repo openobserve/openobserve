@@ -231,7 +231,6 @@ export default defineComponent({
 
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
-      console.log("selected date time updated: ", convertDateToReadableFormat(selectedDate.value));
       currentTimeObj.value = {
         start_time: new Date(selectedDate.value.startTime),
         end_time: new Date(selectedDate.value.endTime),
@@ -241,9 +240,13 @@ export default defineComponent({
     const convertDateToReadableFormat = (date) => {
       const convertTimestamp = (timestampInMicro: number) => {
         return new Date(timestampInMicro / 1000).toLocaleString("en-US");
-      }
+      };
 
-      return (convertTimestamp(date.startTime) + " - " + convertTimestamp(date.endTime));
+      return (
+        convertTimestamp(date.startTime) +
+        " - " +
+        convertTimestamp(date.endTime)
+      );
     };
 
     const getQueryParamsForDuration = (data: any) => {
@@ -289,7 +292,7 @@ export default defineComponent({
 
     const onDataZoom = (event: any) => {
       dateTimePicker?.value?.setCustomDate("absolute", event);
-    }
+    };
 
     // ------- work with query params ----------
     onActivated(async () => {
@@ -356,7 +359,7 @@ export default defineComponent({
       loadDashboard,
       initialVariableValues,
       getQueryParamsForDuration,
-      onDataZoom
+      onDataZoom,
     };
   },
 });
