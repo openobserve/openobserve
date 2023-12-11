@@ -466,7 +466,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
 }
 
 pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
-    let chunks = files.chunks(500);
+    let chunks = files.chunks(100);
     for files in chunks {
         let mut tx = client.begin().await?;
         let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
@@ -524,7 +524,7 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
 }
 
 pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
-    let chunks = files.chunks(500);
+    let chunks = files.chunks(100);
     for files in chunks {
         let mut tx = client.begin().await?;
         for file in files {
@@ -568,7 +568,7 @@ pub async fn batch_add_deleted(
     created_at: i64,
     files: &[String],
 ) -> Result<()> {
-    let chunks = files.chunks(500);
+    let chunks = files.chunks(100);
     for files in chunks {
         let mut tx = client.begin().await?;
         let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
@@ -598,7 +598,7 @@ pub async fn batch_add_deleted(
 }
 
 pub async fn batch_remove_deleted(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
-    let chunks = files.chunks(500);
+    let chunks = files.chunks(100);
     for files in chunks {
         let mut tx = client.begin().await?;
         for file in files {

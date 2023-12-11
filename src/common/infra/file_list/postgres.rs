@@ -112,7 +112,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             return Ok(());
         }
         let pool = CLIENT.clone();
-        let chunks = files.chunks(500);
+        let chunks = files.chunks(100);
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
@@ -174,7 +174,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             return Ok(());
         }
         let pool = CLIENT.clone();
-        let chunks = files.chunks(500);
+        let chunks = files.chunks(100);
         for files in chunks {
             let mut tx = pool.begin().await?;
             for file in files {
@@ -208,7 +208,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             return Ok(());
         }
         let pool = CLIENT.clone();
-        let chunks = files.chunks(500);
+        let chunks = files.chunks(100);
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
@@ -245,7 +245,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             return Ok(());
         }
         let pool = CLIENT.clone();
-        let chunks = files.chunks(500);
+        let chunks = files.chunks(100);
         for files in chunks {
             let mut tx = pool.begin().await?;
             for file in files {
