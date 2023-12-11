@@ -237,18 +237,6 @@ export default defineComponent({
       };
     });
 
-    const convertDateToReadableFormat = (date) => {
-      const convertTimestamp = (timestampInMicro: number) => {
-        return new Date(timestampInMicro / 1000).toLocaleString("en-US");
-      };
-
-      return (
-        convertTimestamp(date.startTime) +
-        " - " +
-        convertTimestamp(date.endTime)
-      );
-    };
-
     const getQueryParamsForDuration = (data: any) => {
       if (data.relativeTimePeriod) {
         return {
