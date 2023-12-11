@@ -273,13 +273,6 @@ export default defineComponent({
       }
     );
 
-    const fn = throttle((params) => {
-      // console.log(params);
-      // for timeseries hover
-      // setIndex(params.batch[0].dataIndex, params.batch[0].seriesIndex);
-      // setPanelId(props?.data?.extras?.panelId);
-    }, 100);
-
     onMounted(async () => {
       await nextTick();
       await nextTick();
@@ -302,30 +295,6 @@ export default defineComponent({
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
-      // chart?.on("click", (e: any) => {
-      //   console.log(e, "click");
-      // });
-      // chart?.on("dblclick", (e: any) => {
-      //   console.log(e, "dblclick");
-      // });
-      // chart?.on("mousedown", (e: any) => {
-      //   console.log(e, "mousedown");
-      // });
-      // chart?.on("mousemove", (e: any) => {
-      //   console.log(e, "mousemove");
-      // });
-      // chart?.on("mouseup", (e: any) => {
-      //   console.log(e, "mousedown");
-      // });
-      // chart?.on("mouseover", (e: any) => {
-      //   console.log(e, "mouseover");
-      // });
-      // chart?.on("mouseout", (e: any) => {
-      //   console.log(e, "mouseout");
-      // });
-      // chart?.on("downplay", (params: any) => {
-      //   fn(params);
-      // });
       chart?.on("downplay", (params: any) => {
         // downplay event will only called by currently hovered panel else it will go into infinite loop
         // and chart must be timeseries chart
