@@ -24,7 +24,12 @@ import { convertMapData } from "@/utils/dashboard/convertMapData";
  * @param {any} data - The data to be converted.
  * @return {any} The converted data.
  */
-export const convertPanelData = (panelSchema: any, data: any, store: any) => {
+export const convertPanelData = (
+  panelSchema: any,
+  data: any,
+  store: any,
+  chartPanelRef: any
+) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
   switch (panelSchema.type) {
@@ -39,20 +44,23 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
     case "pie":
     case "donut":
     case "scatter":
-    case "metric": {
+    case "metric":
+    case "gauge": {
       if (
         // panelSchema?.fields?.stream_type == "metrics" &&
         // panelSchema?.customQuery &&
         panelSchema?.queryType == "promql"
       ) {
+        // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,
-          ...convertPromQLData(panelSchema, data, store),
+          ...convertPromQLData(panelSchema, data, store, chartPanelRef),
         };
       } else {
+        // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,
-          ...convertSQLData(panelSchema, data, store),
+          ...convertSQLData(panelSchema, data, store, chartPanelRef),
         };
       }
     }

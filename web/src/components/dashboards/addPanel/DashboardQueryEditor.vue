@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inline-label
             outside-arrows
             mobile-arrows
+            @click.stop
           >
             <q-tab
               no-caps
@@ -423,11 +424,7 @@ export default defineComponent({
               break;
             case "histogram": {
               // if inteval is not null, then use it
-              if (
-                field?.args &&
-                field?.args?.length &&
-                field?.args[0].value
-              ) {
+              if (field?.args && field?.args?.length && field?.args[0].value) {
                 selector += `${field.aggregationFunction}(${field.column}, '${field.args[0].value}')`;
               } else {
                 selector += `${field.aggregationFunction}(${field.column})`;

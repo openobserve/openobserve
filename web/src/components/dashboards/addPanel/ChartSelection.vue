@@ -35,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             item.id != 'bar' &&
             item.id != 'scatter' &&
             item.id != 'area-stacked' &&
-            item.id != 'metric'
+            item.id != 'metric' &&
+            item.id != 'gauge'
           "
           :key="index"
           clickable
@@ -152,6 +153,11 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/123.png"),
         title: t("dashboard.metricTextLabel"),
         id: "metric",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
+        title: "Gauge",
+        id: "gauge",
       },
     ]);
 
