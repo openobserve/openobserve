@@ -45,7 +45,7 @@ pub async fn get(
     let map_key = key.strip_prefix("/schema/").unwrap();
 
     if let Some(schema) = STREAM_SCHEMAS.get(map_key) {
-        return Ok(schema.value().clone().last().unwrap().clone());
+        return Ok(schema.value().last().unwrap().clone());
     }
 
     let db = infra_db::get_db().await;
