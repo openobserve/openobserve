@@ -288,22 +288,7 @@ export default defineComponent({
     };
 
     const onDataZoom = (event: any) => {
-      console.log("onDataZoom", event);
-      const startTime = new Date(event.start)
-      const endTime = new Date(event.end)
-
-      startTime.setSeconds(0)
-      endTime.setSeconds(0)
-      startTime.setMilliseconds(0)
-      endTime.setMilliseconds(0)
-      const timeRange = {
-        startTime: startTime.getTime() * 1000,
-        endTime: endTime.getTime() * 1000,
-        valueType: "absolute",
-        relativeTimePeriod: null,
-      };
-      selectedDate.value = timeRange
-      // dateTimePicker?.value?.updateDateTime(timeRange);
+      dateTimePicker?.value?.setCustomDate("absolute", event);
     }
 
     // ------- work with query params ----------
