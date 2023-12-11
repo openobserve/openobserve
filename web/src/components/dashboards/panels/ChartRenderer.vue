@@ -296,6 +296,9 @@ export default defineComponent({
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
       chart?.on("downplay", (params: any) => {
+        // reset hovered series name on downplay
+        hoveredSeriesState?.value?.setHoveredSeriesName("");
+
         // downplay event will only called by currently hovered panel else it will go into infinite loop
         // and chart must be timeseries chart
         if (

@@ -209,6 +209,14 @@ export const convertPromQLData = (
     toolbox: {
       orient: "vertical",
       show: !["pie", "donut", "metric", "gauge"].includes(panelSchema.type),
+      showTitle: false,
+      tooltip: {
+        show: false,
+      },
+      itemSize:0,
+      itemGap:0,
+      // it is used to hide toolbox buttons
+      bottom:"100%",
       feature: {
         dataZoom: {
           filterMode: "none",
