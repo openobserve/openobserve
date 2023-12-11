@@ -356,8 +356,8 @@ export const convertPromQLData = (
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
-                // taking last value for gauge
-                value: parseFloat(values[values.length - 1][1]).toFixed(2),
+                // taking first value for gauge
+                value: parseFloat(values[0][1]).toFixed(2),
                 detail: {
                   formatter: function (value: any) {
                     const unitValue = getUnitValue(
