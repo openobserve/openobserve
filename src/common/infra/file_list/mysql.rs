@@ -254,15 +254,18 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
         if files.is_empty() {
             return Ok(());
         }
-        let pool = CLIENT.clone();
         let chunks = files.chunks(100);
         for files in chunks {
-            let mut tx = pool.begin().await?;
+            log::info!("[MYSQL] batch_remove_deleted: begin transaction");
+            let mut tx = CLIENT.clone().begin().await?;
+            log::info!("[MYSQL] batch_remove_deleted: created transaction");
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
                 let sql = format!("DELETE FROM file_list_deleted WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
                 match sqlx::query(&sql).execute(&mut *tx).await {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        log::info!("[MYSQL] batch_remove_deleted: deleted 1 record in transaction");
+                    }
                     Err(e) => {
                         if let Err(e) = tx.rollback().await {
                             log::error!(
@@ -274,10 +277,15 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
                     }
                 }
             }
+            log::info!(
+                "[MYSQL] batch_remove_deleted: deleted {} record in transaction",
+                files.len()
+            );
             if let Err(e) = tx.commit().await {
                 log::error!("[MYSQL] commit file_list_deleted batch remove error: {}", e);
                 return Err(e.into());
             }
+            log::info!("[MYSQL] batch_remove_deleted: commit transaction");
         }
         Ok(())
     }
