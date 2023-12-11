@@ -42,16 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('settings.generalLabel')"
             content-class="tab_content"
           />
-          <q-route-tab
-            v-if="config.isCloud == 'true'"
-            exact
-            default
-            name="api_keys"
-            :to="'/settings/apikeys'"
-            icon="key"
-            :label="t('settings.apikeyLabel')"
-            content-class="tab_content"
-          />
         </q-tabs>
       </template>
 
