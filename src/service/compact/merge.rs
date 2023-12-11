@@ -33,7 +33,11 @@ use crate::{
         },
         utils::json,
     },
-    service::{db, file_list, search::datafusion, stream},
+    service::{
+        db, file_list,
+        search::datafusion,
+        stream::{self, get_stream_setting_bloom_filter_fields},
+    },
 };
 
 /// compactor run steps on a stream:
@@ -324,6 +328,7 @@ async fn merge_files(
     let schema_versions = db::schema::get_versions(org_id, stream_name, stream_type).await?;
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
+    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(schema_latest).unwrap();
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
             // get the schema version of the file
@@ -373,6 +378,7 @@ async fn merge_files(
                 file_tmp_dir.name(),
                 &mut buf,
                 Arc::new(schema),
+                &bloom_filter_fields,
                 diff_fields,
                 FileType::PARQUET,
             )
@@ -387,9 +393,14 @@ async fn merge_files(
     }
 
     let mut buf = Vec::new();
-    let mut new_file_meta =
-        datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema, new_file_size)
-            .await?;
+    let mut new_file_meta = datafusion::exec::merge_parquet_files(
+        tmp_dir.name(),
+        &mut buf,
+        schema,
+        &bloom_filter_fields,
+        new_file_size,
+    )
+    .await?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.records == 0 {
