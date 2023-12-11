@@ -144,7 +144,7 @@ const getConfig = async () => {
       version: "v1",
     });
 
-    datadogRum.startSessionReplayRecording(
+    datadogRum.startSessionReplayRecording();
   });
 };
 
