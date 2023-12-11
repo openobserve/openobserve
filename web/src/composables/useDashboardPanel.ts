@@ -75,6 +75,9 @@ const getDefaultDashboardPanelData: any = () => ({
           layer_type: "scatter",
           weight_fixed: 1,
           limit: 0,
+          // gauge min and max values
+          min: 0,
+          max: 100,
         },
       },
     ],
