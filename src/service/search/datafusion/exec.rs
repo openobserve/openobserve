@@ -841,6 +841,7 @@ pub async fn convert_parquet_file(
     session_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
+    bloom_filter_fields: &[String],
     rules: HashMap<String, DataType>,
     file_type: FileType,
 ) -> Result<()> {
@@ -926,7 +927,7 @@ pub async fn convert_parquet_file(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
     let file_meta = FileMeta::default();
-    let mut writer = super::new_parquet_writer(buf, &schema, &file_meta);
+    let mut writer = super::new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -946,6 +947,7 @@ pub async fn merge_parquet_files(
     session_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
+    bloom_filter_fields: &[String],
     original_size: i64,
 ) -> Result<FileMeta> {
     let start = std::time::Instant::now();
@@ -999,7 +1001,7 @@ pub async fn merge_parquet_files(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
 
-    let mut writer = super::new_parquet_writer(buf, &schema, &file_meta);
+    let mut writer = super::new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }
