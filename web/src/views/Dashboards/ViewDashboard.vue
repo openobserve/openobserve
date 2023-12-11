@@ -291,6 +291,7 @@ export default defineComponent({
     };
 
     const onDataZoom = (event: any) => {
+      // set it as a absolute time
       dateTimePicker?.value?.setCustomDate("absolute", event);
     };
 
