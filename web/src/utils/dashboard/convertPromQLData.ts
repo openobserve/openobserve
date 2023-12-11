@@ -47,6 +47,9 @@ export const convertPromQLData = (
     return { options: null };
   }
 
+  // flag to check if the data is time seriesc
+  let isTimeSeriesFlag = true;
+
   const legendPosition = getLegendPosition(
     panelSchema?.config?.legends_position
   );
@@ -291,6 +294,9 @@ export const convertPromQLData = (
         }
       }
       case "gauge": {
+        // we doesnt required to hover timeseries for gauge chart
+        isTimeSeriesFlag = false;
+
         const series = it?.result?.map((metric: any) => {
           const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
@@ -404,6 +410,9 @@ export const convertPromQLData = (
         return series;
       }
       case "metric": {
+        // we doesnt required to hover timeseries for gauge chart
+        isTimeSeriesFlag = false;
+
         switch (it?.resultType) {
           case "matrix": {
             const series = it?.result?.map((metric: any) => {
@@ -473,7 +482,10 @@ export const convertPromQLData = (
   options.series = options.series.flat();
 
   // promql query will be always timeseries
-  return { options, extras: { panelId: panelSchema?.id, isTimeSeries: true } };
+  return {
+    options,
+    extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
+  };
 };
 
 /**

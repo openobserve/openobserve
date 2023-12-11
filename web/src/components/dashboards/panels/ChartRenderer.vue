@@ -305,12 +305,15 @@ export default defineComponent({
           const seriesIndex = params?.batch?.[0]?.seriesIndex;
           const dataIndex = Math.max(params?.batch?.[0]?.dataIndex, 0);
 
-          hoveredSeriesState?.value?.setIndex(
-            dataIndex,
-            seriesIndex,
-            props?.data?.extras?.panelId || -1,
-            chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0]
-          );
+          // set current hovered series name in state
+          if (chart?.getOption()?.series[seriesIndex]?.data[dataIndex]) {
+            hoveredSeriesState?.value?.setIndex(
+              dataIndex,
+              seriesIndex,
+              props?.data?.extras?.panelId || -1,
+              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0]
+            );
+          }
         }
       });
       emit("updated:chart", {

@@ -78,6 +78,7 @@
                   :variablesData="variablesData"
                   :width="6"
                   @error="handleChartApiError"
+                  @updated:data-zoom="onDataZoom"
                 />
               </div>
               <DashboardErrorsComponent :errors="errorData" />
@@ -240,6 +241,25 @@ export default defineComponent({
       }
     );
 
+    const onDataZoom = (event: any) => {
+      const selectedDateObj = {
+        start: new Date(event.start),
+        end: new Date(event.end),
+      };
+      // Truncate seconds and milliseconds from the dates
+      selectedDateObj.start.setSeconds(0, 0);
+      selectedDateObj.end.setSeconds(0, 0);
+
+      // Compare the truncated dates
+      if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {
+        // Increment the end date by 1 minute
+        selectedDateObj.end.setMinutes(selectedDateObj.end.getMinutes() + 1);
+      }
+
+      // set it as a absolute time
+      dateTimePickerRef?.value?.setCustomDate("absolute", selectedDateObj);
+    };
+
     onUnmounted(async () => {
       // clear a few things
       resetDashboardPanelData();
@@ -372,6 +392,7 @@ export default defineComponent({
       promqlMode,
       histogramInterval,
       histogramFields,
+      onDataZoom,
     };
   },
 });

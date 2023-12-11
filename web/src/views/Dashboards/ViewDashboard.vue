@@ -291,8 +291,22 @@ export default defineComponent({
     };
 
     const onDataZoom = (event: any) => {
+      const selectedDateObj = {
+        start: new Date(event.start),
+        end: new Date(event.end),
+      };
+      // Truncate seconds and milliseconds from the dates
+      selectedDateObj.start.setSeconds(0, 0);
+      selectedDateObj.end.setSeconds(0, 0);
+
+      // Compare the truncated dates
+      if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {
+        // Increment the end date by 1 minute
+        selectedDateObj.end.setMinutes(selectedDateObj.end.getMinutes() + 1);
+      }
+
       // set it as a absolute time
-      dateTimePicker?.value?.setCustomDate("absolute", event);
+      dateTimePicker?.value?.setCustomDate("absolute", selectedDateObj);
     };
 
     // ------- work with query params ----------
