@@ -106,8 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="overflow: hidden"
     data-test="dashboard-query"
   >
-    <div class="row">
-      <div class="col">
+    <div class="column" style="width: 100%; height: 100%">
+      <div class="col" style="width: 100%">
         <query-editor
           ref="queryEditorRef"
           class="monaco-editor"
@@ -129,9 +129,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :language="dashboardPanelData.data.queryType"
         ></query-editor>
-        <div style="color: red" class="q-mx-sm">
-          {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}&nbsp;
-        </div>
+      </div>
+      <div style="color: red; z-index: 100000" class="q-mx-sm col-auto">
+        {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
       </div>
     </div>
   </div>
@@ -572,6 +572,14 @@ export default defineComponent({
         // }
       },
       { deep: true }
+    );
+
+    // on queryerror change dispatch resize event to resize monaco editor
+    watch(
+      () => dashboardPanelData.meta.errors.queryErrors,
+      () => {
+        window.dispatchEvent(new Event("resize"));
+      }
     );
 
     // This function parses the custom query and generates the errors and custom fields

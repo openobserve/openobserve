@@ -332,8 +332,9 @@ export default defineComponent({
     onMounted(async () => {
       provider.value?.dispose();
       registerAutoCompleteProvider();
-      window.addEventListener("click", () => {
-        editorObj.layout();
+      window.addEventListener("resize", async () => {
+        await nextTick();
+          editorObj.layout();
         // queryEditorRef.value.resetEditorLayout();
       });
     });
@@ -476,7 +477,7 @@ export default defineComponent({
 
 <style>
 #editor {
-  min-height: 100%;
+  height: 100%;
   width: 100%;
   /* min-height: 4rem; */
   border-radius: 5px;
