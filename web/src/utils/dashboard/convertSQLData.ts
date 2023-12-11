@@ -1002,12 +1002,6 @@ export const convertSQLData = (
       options.grid = gridDataForGauge.gridArray;
 
       options.series = yAxisValue.map((it: any, index: any) => {
-        const unitValue = getUnitValue(
-          it,
-          panelSchema.config?.unit,
-          panelSchema.config?.unit_custom
-        );
-
         return {
           ...getPropsByChartTypeForSeries(panelSchema.type),
           min: panelSchema?.queries[0]?.config?.min || 0,
@@ -1065,10 +1059,15 @@ export const convertSQLData = (
           data: [
             {
               name: JSON.stringify(xAxisValue[index] || ""),
-              value: unitValue.value,
+              value: it,
               detail: {
                 formatter: function (value: any) {
-                  return value + unitValue.unit;
+                  const unitValue = getUnitValue(
+                    value,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom
+                  );
+                  return unitValue.value + unitValue.unit;
                 },
               },
             },

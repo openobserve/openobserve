@@ -293,12 +293,6 @@ export const convertPromQLData = (
       case "gauge": {
         const series = it?.result?.map((metric: any) => {
           const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
-          // taking last value for gauge
-          const unitValue = getUnitValue(
-            values[values.length - 1][1],
-            panelSchema.config?.unit,
-            panelSchema.config?.unit_custom
-          );
           gaugeIndex++;
           return {
             ...getPropsByChartTypeForSeries(panelSchema.type),
@@ -362,10 +356,16 @@ export const convertPromQLData = (
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
-                value: parseFloat(unitValue.value).toFixed(2),
+                // taking last value for gauge
+                value: parseFloat(values[values.length - 1][1]).toFixed(2),
                 detail: {
                   formatter: function (value: any) {
-                    return value + unitValue.unit;
+                    const unitValue = getUnitValue(
+                      value,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom
+                    );
+                    return unitValue.value + unitValue.unit;
                   },
                 },
               },
