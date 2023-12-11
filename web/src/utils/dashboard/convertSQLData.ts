@@ -1007,8 +1007,7 @@ export const convertSQLData = (
           panelSchema.config?.unit,
           panelSchema.config?.unit_custom
         );
-        console.log(panelSchema);
-        
+
         return {
           ...getPropsByChartTypeForSeries(panelSchema.type),
           min: panelSchema?.queries[0]?.config?.min || 0,

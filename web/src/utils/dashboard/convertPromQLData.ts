@@ -46,9 +46,6 @@ export const convertPromQLData = (
     return { options: null };
   }
 
-  console.log(panelSchema, searchQueryData, "panelSchema");
-  
-
   // It is used to keep track of the current series name in tooltip to bold the series name
   let currentSeriesName = "";
 
