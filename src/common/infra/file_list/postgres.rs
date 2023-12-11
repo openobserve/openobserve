@@ -680,10 +680,6 @@ pub async fn create_table_index() -> Result<()> {
         // ),
         (
             "file_list_deleted",
-            "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_idx on file_list_deleted (stream);",
-        ),
-        (
-            "file_list_deleted",
             "CREATE INDEX IF NOT EXISTS file_list_deleted_created_at_idx on file_list_deleted (org, created_at);",
         ),
         (
