@@ -29,7 +29,6 @@ import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
-const Settings = () => import("@/components/settings/index.vue");
 
 const useEnvRoutes = () => {
   const parentRoutes = [
@@ -91,24 +90,6 @@ const useEnvRoutes = () => {
           path: "invoice_history",
           name: "invoice_history",
           component: InvoiceHistory,
-        },
-      ],
-    },
-    {
-      path: "settings",
-      name: "settings",
-      component: Settings,
-      meta: {
-        keepAlive: true,
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
-      },
-      children: [
-        {
-          path: "apikeys",
-          name: "apiKeys",
-          component: () => import("@/enterprise/components/settings/ApiKeys.vue"),
         },
       ],
     },
