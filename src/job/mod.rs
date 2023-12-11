@@ -32,6 +32,7 @@ mod alert_manager;
 mod compact;
 pub(crate) mod file_list;
 pub(crate) mod files;
+mod keygen;
 mod metrics;
 mod mmdb_downloader;
 mod prom;
@@ -67,6 +68,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         )
         .await;
+    }
+
+    if CONFIG.common.enable_jwt_auth {
+        keygen::generate_pem_certificate_and_write(&CONFIG.common.certs_base_dir)
+            .expect("failed to generate pem certificate");
     }
 
     if !CONFIG.common.mmdb_disable_download {

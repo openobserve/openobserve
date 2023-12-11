@@ -393,6 +393,12 @@ pub struct Common {
     pub memory_circuit_breaker_enable: bool,
     #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 100)]
     pub memory_circuit_breaker_ratio: usize,
+
+    // Cert generation related env vars
+    #[env_config(name = "ZO_CERTS_BASE_PATH", default = "./data/openobserve/certs/")]
+    pub certs_base_dir: String,
+    #[env_config(name = "ZO_ENABLE_JWT_AUTH", default = false)]
+    pub enable_jwt_auth: bool,
 }
 
 #[derive(EnvConfig)]
@@ -826,6 +832,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.mmdb_data_dir.ends_with('/') {
         cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
+    }
+    if cfg.common.certs_base_dir.is_empty() {
+        cfg.common.certs_base_dir = format!("{}certs/", cfg.common.data_dir);
+    }
+    if !cfg.common.certs_base_dir.ends_with('/') {
+        cfg.common.certs_base_dir = format!("{}/", cfg.common.certs_base_dir);
     }
     Ok(())
 }

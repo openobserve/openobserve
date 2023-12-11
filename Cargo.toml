@@ -173,6 +173,7 @@ walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"
 memory-stats = "1.1.0"
+rsa = "0.9.6"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
