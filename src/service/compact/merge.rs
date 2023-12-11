@@ -33,11 +33,7 @@ use crate::{
         },
         utils::json,
     },
-    service::{
-        db, file_list,
-        search::datafusion,
-        stream::{self, get_stream_setting_bloom_filter_fields},
-    },
+    service::{db, file_list, search::datafusion, stream},
 };
 
 /// compactor run steps on a stream:
@@ -328,7 +324,8 @@ async fn merge_files(
     let schema_versions = db::schema::get_versions(org_id, stream_name, stream_type).await?;
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(schema_latest).unwrap();
+    let bloom_filter_fields =
+        stream::get_stream_setting_bloom_filter_fields(schema_latest).unwrap();
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
             // get the schema version of the file
