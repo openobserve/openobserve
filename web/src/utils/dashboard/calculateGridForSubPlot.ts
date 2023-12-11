@@ -6,33 +6,18 @@ export function calculateGridPositions(width: any, height: any, numGrids: any) {
   if (numGrids <= 0) {
     return gridArray;
   }
+  // Calculate the aspect ratio of the available space
+  const aspectRatio = width / height;
 
-  // if only one grid then return single grid array, width, height, gridNoOfRow, gridNoOfCol
-  if (numGrids == 1) {
-    return {
-      gridArray: [
-        {
-          left: "0%",
-          top: "0%",
-          width: "100%",
-          height: "100%",
-        },
-      ],
-      gridWidth: width,
-      gridHeight: height,
-      gridNoOfRow: 1,
-      gridNoOfCol: 1,
-    };
+  // Calculate the number of rows and columns based on the aspect ratio
+  let numRows = Math.ceil(Math.sqrt(numGrids / aspectRatio));
+  let numCols = Math.ceil(numGrids / numRows);
+
+  // Adjust the number of rows and columns if necessary to fit all grids
+  while ((numRows - 1) * numCols >= numGrids) {
+    numRows--;
+    numCols = Math.ceil(numGrids / numRows);
   }
-
-  // total area of chart element
-  const totalArea = width * height;
-  // per gauge area
-  // chart will be square, so width and height are same, that's why used sqrt
-  const perChartArea = Math.sqrt(totalArea / numGrids);
-  // number of row and column for gauge rendering
-  let numRows = Math.ceil(height / perChartArea);
-  let numCols = Math.ceil(width / perChartArea);
 
   // width and height for single gauge
   const cellWidth = 100 / numCols;
