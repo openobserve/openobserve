@@ -28,11 +28,20 @@ pub async fn delete(
     time_max: i64,
     batch_size: i64,
 ) -> Result<i64, anyhow::Error> {
+    if CONFIG.common.print_key_event {
+        log::info!("[COMPACTOR] deleting from file_list_deleted start get data from DB");
+    }
     let files = query_deleted(org_id, time_min, time_max, batch_size).await?;
     if files.is_empty() {
         return Ok(0);
     }
     let files_num = files.values().flatten().count() as i64;
+    if CONFIG.common.print_key_event {
+        log::info!("[COMPACTOR] deleting from file_list_deleted get {files_num} files from DB");
+    }
+    if CONFIG.common.print_key_event {
+        log::info!("[COMPACTOR] deleting from file_list_deleted start delete files from s3");
+    }
 
     // delete files from storage
     if let Err(e) = storage::del(
@@ -50,6 +59,9 @@ pub async fn delete(
             return Err(e);
         }
     }
+    if CONFIG.common.print_key_event {
+        log::info!("[COMPACTOR] deleting from file_list_deleted deleted {files_num} files from s3");
+    }
 
     // delete files from file_list_deleted s3
     if files.keys().len() > 1 || !files.contains_key("") {
@@ -59,6 +71,10 @@ pub async fn delete(
             log::error!("[COMPACT] delete files from storage failed: {}", e);
             return Err(e);
         }
+    }
+
+    if CONFIG.common.print_key_event {
+        log::info!("[COMPACTOR] deleting from file_list_deleted start delete files from DB");
     }
 
     // delete files from file_list_deleted table
@@ -73,6 +89,9 @@ pub async fn delete(
     {
         log::error!("[COMPACT] delete files from table failed: {}", e);
         return Err(e.into());
+    }
+    if CONFIG.common.print_key_event {
+        log::info!("[COMPACTOR] deleting from file_list_deleted deleted {files_num} files from DB");
     }
 
     Ok(files_num)

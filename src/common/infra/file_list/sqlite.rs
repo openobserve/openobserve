@@ -824,6 +824,10 @@ pub async fn create_table_index(client: &Pool<Sqlite>) -> Result<()> {
             "CREATE INDEX IF NOT EXISTS file_list_deleted_created_at_idx on file_list_deleted (org, created_at);",
         ),
         (
+            "file_list_deleted",
+            "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_date_file_idx on file_list_deleted (stream, date, file);",
+        ),
+        (
             "stream_stats",
             "CREATE INDEX IF NOT EXISTS stream_stats_org_idx on stream_stats (org);",
         ),
