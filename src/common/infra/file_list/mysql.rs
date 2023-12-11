@@ -16,7 +16,7 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
-use sqlx::{MySql, QueryBuilder, Row};
+use sqlx::{Executor, MySql, QueryBuilder, Row};
 
 use crate::common::{
     infra::{
@@ -111,7 +111,7 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
             return Ok(());
         }
         let pool = CLIENT.clone();
-        let chunks = files.chunks(100);
+        let chunks = files.chunks(500);
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
@@ -172,7 +172,7 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
         if files.is_empty() {
             return Ok(());
         }
-        let chunks = files.chunks(100);
+        let chunks = files.chunks(500);
         for files in chunks {
             // get ids of the files
             let pool = CLIENT.clone();
@@ -191,22 +191,9 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
                 }
             }
             // delete files by ids
-            let mut tx = pool.begin().await?;
             let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
             log::info!("[MYSQL] batch_remove: {}", sql);
-            match sqlx::query(&sql).execute(&mut *tx).await {
-                Ok(_) => {}
-                Err(e) => {
-                    if let Err(e) = tx.rollback().await {
-                        log::error!("[MYSQL] rollback batch remove error: {}", e);
-                    }
-                    return Err(e.into());
-                }
-            }
-            if let Err(e) = tx.commit().await {
-                log::error!("[MYSQL] commit file_list batch remove error: {}", e);
-                return Err(e.into());
-            }
+            _ = pool.execute(sql.as_str()).await?;
         }
         Ok(())
     }
@@ -221,7 +208,7 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
             return Ok(());
         }
         let pool = CLIENT.clone();
-        let chunks = files.chunks(100);
+        let chunks = files.chunks(500);
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
@@ -254,9 +241,8 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
         if files.is_empty() {
             return Ok(());
         }
-        let chunks = files.chunks(100);
+        let chunks = files.chunks(500);
         for files in chunks {
-            log::info!("[MYSQL] batch_remove_deleted: start deleting new 100 items");
             // get ids of the files
             let pool = CLIENT.clone();
             let mut ids = Vec::with_capacity(files.len());
@@ -275,32 +261,12 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
                 }
             }
             // delete files by ids
-            let mut tx = pool.begin().await?;
             let sql = format!(
                 "DELETE FROM file_list_deleted WHERE id IN({});",
                 ids.join(",")
             );
             log::info!("[MYSQL] batch_remove_deleted: {}", sql);
-            match sqlx::query(&sql).execute(&mut *tx).await {
-                Ok(_) => {}
-                Err(e) => {
-                    if let Err(e) = tx.rollback().await {
-                        log::error!(
-                            "[MYSQL] rollback file_list_deleted batch remove error: {}",
-                            e
-                        );
-                    }
-                    return Err(e.into());
-                }
-            }
-            if let Err(e) = tx.commit().await {
-                log::error!("[MYSQL] commit file_list_deleted batch remove error: {}", e);
-                return Err(e.into());
-            }
-            log::info!(
-                "[MYSQL] batch_remove_deleted: deleted {} record in transaction",
-                ids.len()
-            );
+            _ = pool.execute(sql.as_str()).await?;
         }
         Ok(())
     }
