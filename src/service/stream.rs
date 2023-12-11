@@ -280,6 +280,15 @@ pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, any
     }
 }
 
+pub fn get_stream_setting_bloom_filter_fields(
+    schema: &Schema,
+) -> Result<Vec<String>, anyhow::Error> {
+    match stream_settings(schema) {
+        Some(setting) => Ok(setting.bloom_filter_fields),
+        None => Ok(vec![]),
+    }
+}
+
 fn transform_stats(stats: &mut StreamStats) {
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
