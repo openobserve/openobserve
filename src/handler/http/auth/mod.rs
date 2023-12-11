@@ -21,7 +21,10 @@ use actix_web::{
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{common::infra::config::LDAP_CONFIG, ldap::service::LdapUser};
+use o2_enterprise::{
+    enterprise::{common::infra::config::LDAP_CONFIG, ldap::service::client::LdapUser},
+    errors::O2EnterpriseError,
+};
 
 use crate::{
     common::{
@@ -186,7 +189,7 @@ async fn validate_user_from_db(
 /// Validate the incoming user from the ldap, if ldap is enabled
 #[cfg(feature = "enterprise")]
 async fn validate_user_from_ldap(user_id: &str, user_password: &str) -> Result<bool, Error> {
-    let ldap_user_res: Result<LdapUser, anyhow::Error> =
+    let ldap_user_res: Result<LdapUser, O2EnterpriseError> =
         o2_enterprise::enterprise::ldap::service::auth::get_user_from_ldap(user_id, user_password)
             .await;
 
@@ -206,13 +209,11 @@ async fn validate_user_from_ldap(user_id: &str, user_password: &str) -> Result<b
                 let user_exists = db::user::check_user_exists_by_email(user_id).await;
                 if !user_exists {
                     log::info!("User does not exist in the database");
-                    log::warn!("Email is replaced using user_id, beware, in ldap.");
                     // create the user
                     let _ = users::post_user(
                         org,
                         crate::common::meta::user::UserRequest {
-                            // email: ldap_user.attributes.email.clone(),
-                            email: user_id.to_string(),
+                            email: ldap_user.attributes.email.clone(),
                             password: "ldap+pass".to_owned(),
                             role,
                             first_name: ldap_user.attributes.firstname.clone(),

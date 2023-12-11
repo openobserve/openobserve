@@ -116,7 +116,7 @@ opentelemetry-proto = { version = "0.2", features = [
   "logs",
   "metrics",
   "with-serde",
-] }
+]}
 parking_lot = "0.12"
 prometheus = "0.13"
 promql-parser = "0.2"
