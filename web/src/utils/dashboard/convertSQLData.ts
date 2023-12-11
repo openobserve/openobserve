@@ -1007,10 +1007,12 @@ export const convertSQLData = (
           panelSchema.config?.unit,
           panelSchema.config?.unit_custom
         );
+        console.log(panelSchema);
+        
         return {
           ...getPropsByChartTypeForSeries(panelSchema.type),
-          min: panelSchema?.config?.min || 0,
-          max: panelSchema?.config?.max || 100,
+          min: panelSchema?.queries[0]?.config?.min || 0,
+          max: panelSchema?.queries[0]?.config?.max || 100,
 
           //which grid will be used
           gridIndex: index,

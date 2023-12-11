@@ -313,10 +313,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-input
       v-if="dashboardPanelData.data.type === 'gauge'"
-      v-model.number="dashboardPanelData.data.config.min"
+      v-model.number="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.min
+      "
       :value="0"
       @update:model-value="
-        (value) => (dashboardPanelData.data.config.min = value ? value : 0)
+        (value) =>
+          (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.min = value ? value : 0)
       "
       label="Gauge Min Value"
       color="input-border"
@@ -336,10 +343,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-input>
     <q-input
       v-if="dashboardPanelData.data.type === 'gauge'"
-      v-model.number="dashboardPanelData.data.config.max"
+      v-model.number="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.max
+      "
       :value="100"
       @update:model-value="
-        (value) => (dashboardPanelData.data.config.max = value ? value : 100)
+        (value) =>
+          (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.max = value ? value : 100)
       "
       label="Gauge Max Value"
       color="input-border"

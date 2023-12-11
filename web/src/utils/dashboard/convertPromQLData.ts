@@ -46,6 +46,9 @@ export const convertPromQLData = (
     return { options: null };
   }
 
+  console.log(panelSchema, searchQueryData, "panelSchema");
+  
+
   // It is used to keep track of the current series name in tooltip to bold the series name
   let currentSeriesName = "";
 
@@ -302,8 +305,8 @@ export const convertPromQLData = (
           gaugeIndex++;
           return {
             ...getPropsByChartTypeForSeries(panelSchema.type),
-            min: panelSchema?.config?.min || 0,
-            max: panelSchema?.config?.max || 100,
+            min: panelSchema?.queries[index]?.config?.min || 0,
+            max: panelSchema?.queries[index]?.config?.max || 100,
 
             //which grid will be used
             gridIndex: gaugeIndex - 1,

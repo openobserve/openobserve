@@ -149,10 +149,6 @@ pub struct PanelConfig {
     unit_custom: Option<String>,
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    min: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -164,6 +160,10 @@ pub struct QueryConfig {
     weight_fixed: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     limit: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    min: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max: Option<f64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
