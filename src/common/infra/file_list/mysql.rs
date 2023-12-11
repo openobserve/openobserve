@@ -179,8 +179,14 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                let sql = format!("SELECT id FROM file_list WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
-                let ret: Option<i64> = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
+                let ret: Option<i64> = sqlx::query_scalar(
+                    r#"SELECT id FROM file_list WHERE stream = ? AND date = ? AND file = ?"#,
+                )
+                .bind(stream_key)
+                .bind(date_key)
+                .bind(file_name)
+                .fetch_one(&pool)
+                .await?;
                 match ret {
                     Some(v) => ids.push(v.to_string()),
                     None => {
@@ -248,8 +254,13 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
                 let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
-                let sql = format!("SELECT id FROM file_list_deleted WHERE stream = '{stream_key}' AND date = '{date_key}' AND file = '{file_name}';");
-                let ret: Option<i64> = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
+                let ret: Option<i64> = sqlx::query_scalar(
+                    r#"SELECT id FROM file_list_deleted WHERE stream = ? AND date = ? AND file = ?"#,
+                )
+                .bind(stream_key)
+                .bind(date_key)
+                .bind(file_name)
+                .fetch_one(&pool).await?;
                 match ret {
                     Some(v) => ids.push(v.to_string()),
                     None => {
