@@ -160,7 +160,8 @@ import AdvancedValuesFilter from "./fields-sidebar/AdvancedValuesFilter.vue";
 import { computed } from "vue";
 import { Parser } from "node-sql-parser";
 import { f } from "msw/lib/SetupApi-8ab693f7";
-import { filter } from "lodash-es";
+import { cloneDeep, filter } from "lodash-es";
+import { onMounted } from "vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -266,14 +267,14 @@ export default defineComponent({
         searchObj.data.stream.filters.push({
           field_name: column,
           values,
-          operator: "in",
+          operator: "IN",
         });
         return;
       } else if (filters.length && filterIndex === -1) {
         searchObj.data.stream.filters.push({
           field_name: column,
           values,
-          operator: "in",
+          operator: "IN",
         });
         searchObj.data.query += ` AND ${column} IN (${valuesString})`;
         return;
@@ -351,6 +352,50 @@ export default defineComponent({
         modifyWhereClause(node.left, fieldName, newValue);
         modifyWhereClause(node.right, fieldName, newValue);
       }
+    };
+
+    const restoreFiltersFromQuery = (node, filters) => {
+      if (!node) return;
+      if (node.type === "binary_expr") {
+        if (node.left.column) {
+          let values = [];
+          console.log(node);
+          if (node.operator === "IN") {
+            values = node.right.value.map(
+              (_value: { value: string }) => _value.value
+            );
+          }
+          filters.push({
+            field_name: node.left.column,
+            values,
+            operator: node.operator,
+          });
+        }
+      }
+
+      // Recurse through AND/OR expressions
+      if (
+        node.type === "binary_expr" &&
+        (node.operator === "AND" || node.operator === "OR")
+      ) {
+        restoreFiltersFromQuery(node.left, filters);
+        restoreFiltersFromQuery(node.right, filters);
+      }
+    };
+
+    const restoreFilters = () => {
+      const filters = searchObj.data.stream.filters;
+
+      // const filters = searchObj.data.stream.filters;
+      const parser = new Parser();
+      const sql =
+        "SELECT * FROM `default` WHERE `operation_name` IN ('GetUser', 'GetHobbies', 'GetHobbiesCall', '/') AND service_name IN ('otel1-gin-gonic')";
+
+      const parsedQuery = parser.astify(sql);
+
+      restoreFiltersFromQuery(parsedQuery.where, filters);
+
+      console.log(cloneDeep(filters));
     };
 
     return {
