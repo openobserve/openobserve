@@ -99,6 +99,7 @@ http-auth-basic = "0.3"
 indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"
 itertools = "0.12"
+jsonwebtoken = "9.2.0"
 log = "0.4"
 maxminddb = "0.23.0"
 memchr = "2.5"

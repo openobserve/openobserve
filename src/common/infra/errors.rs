@@ -76,6 +76,16 @@ pub enum ErrorCodes {
     SearchSQLExecuteError(String),
 }
 
+#[derive(ThisError, Debug)]
+pub enum JwtError {
+    #[error("No matching JWK found for the given kid")]
+    KeyNotExists(),
+    #[error("Token doesn't have a {0} field")]
+    MissingAttribute(String),
+    #[error("Token can't be verified")]
+    ValidationFailed(),
+}
+
 impl std::fmt::Display for ErrorCodes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

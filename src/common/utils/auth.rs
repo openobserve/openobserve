@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+use futures::future::{ready, Ready};
 
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
@@ -47,6 +49,28 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
     match USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,
+    }
+}
+
+pub struct UserEmail {
+    pub user_id: String,
+}
+
+impl FromRequest for UserEmail {
+    type Error = Error;
+    type Future = Ready<Result<Self, Error>>;
+
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        if let Some(user_header) = req.headers().get("user_id") {
+            if let Ok(user_str) = user_header.to_str() {
+                return ready(Ok(UserEmail {
+                    user_id: user_str.to_owned(),
+                }));
+            }
+        }
+        ready(Err(actix_web::error::ErrorUnauthorized(
+            "No Bearer token found",
+        )))
     }
 }
 

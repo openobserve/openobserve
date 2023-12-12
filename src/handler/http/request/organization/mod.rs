@@ -16,7 +16,6 @@
 use std::{collections::HashSet, io::Error};
 
 use actix_web::{get, post, put, web, HttpResponse, Result};
-use actix_web_httpauth::extractors::basic::BasicAuth;
 
 use crate::{
     common::{
@@ -25,7 +24,7 @@ use crate::{
             OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, RumIngestionResponse,
             CUSTOM, DEFAULT_ORG, THRESHOLD,
         },
-        utils::auth::is_root_user,
+        utils::auth::{is_root_user, UserEmail},
     },
     service::organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
 };
@@ -49,8 +48,8 @@ pub mod settings;
     )
 )]
 #[get("/{org_id}/organizations")]
-pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error> {
-    let user_id = credentials.user_id();
+pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error> {
+    let user_id = user_email.user_id;
     let mut id = 0;
 
     let mut orgs: Vec<OrgDetails> = vec![];
@@ -61,7 +60,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         email: user_id.to_string(),
     };
 
-    let is_root_user = is_root_user(user_id);
+    let is_root_user = is_root_user(&user_id);
     if is_root_user {
         id += 1;
         org_names.insert(DEFAULT_ORG.to_string());
@@ -167,16 +166,16 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 )]
 #[get("/{org_id}/organizations/passcode")]
 async fn get_user_passcode(
-    credentials: BasicAuth,
+    user_email: UserEmail,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
-    let user_id = credentials.user_id();
+    let user_id = user_email.user_id;
     let mut org_id = Some(org.as_str());
-    if is_root_user(user_id) {
+    if is_root_user(&user_id) {
         org_id = None;
     }
-    let passcode = get_passcode(org_id, user_id).await;
+    let passcode = get_passcode(org_id, &user_id).await;
     Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
 }
 
@@ -197,16 +196,16 @@ async fn get_user_passcode(
 )]
 #[put("/{org_id}/organizations/passcode")]
 async fn update_user_passcode(
-    credentials: BasicAuth,
+    user_email: UserEmail,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
-    let user_id = credentials.user_id();
+    let user_id = user_email.user_id;
     let mut org_id = Some(org.as_str());
-    if is_root_user(user_id) {
+    if is_root_user(&user_id) {
         org_id = None;
     }
-    let passcode = update_passcode(org_id, user_id).await;
+    let passcode = update_passcode(org_id, &user_id).await;
     Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
 }
 
@@ -227,16 +226,16 @@ async fn update_user_passcode(
 )]
 #[get("/{org_id}/organizations/rumtoken")]
 async fn get_user_rumtoken(
-    credentials: BasicAuth,
+    user_email: UserEmail,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
-    let user_id = credentials.user_id();
+    let user_id = user_email.user_id;
     let mut org_id = Some(org.as_str());
-    if is_root_user(user_id) {
+    if is_root_user(&user_id) {
         org_id = None;
     }
-    let rumtoken = get_rum_token(org_id, user_id).await;
+    let rumtoken = get_rum_token(org_id, &user_id).await;
     Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
 }
 
@@ -257,16 +256,16 @@ async fn get_user_rumtoken(
 )]
 #[put("/{org_id}/organizations/rumtoken")]
 async fn update_user_rumtoken(
-    credentials: BasicAuth,
+    user_email: UserEmail,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
-    let user_id = credentials.user_id();
+    let user_id = user_email.user_id;
     let mut org_id = Some(org.as_str());
-    if is_root_user(user_id) {
+    if is_root_user(&user_id) {
         org_id = None;
     }
-    let rumtoken = update_rum_token(org_id, user_id).await;
+    let rumtoken = update_rum_token(org_id, &user_id).await;
     Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
 }
 
@@ -287,15 +286,15 @@ async fn update_user_rumtoken(
 )]
 #[post("/{org_id}/organizations/rumtoken")]
 async fn create_user_rumtoken(
-    credentials: BasicAuth,
+    user_email: UserEmail,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
-    let user_id = credentials.user_id();
+    let user_id = user_email.user_id;
     let mut org_id = Some(org.as_str());
-    if is_root_user(user_id) {
+    if is_root_user(&user_id) {
         org_id = None;
     }
-    let rumtoken = update_rum_token(org_id, user_id).await;
+    let rumtoken = update_rum_token(org_id, &user_id).await;
     Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
 }

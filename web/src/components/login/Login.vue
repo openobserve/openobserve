@@ -25,40 +25,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-card>
             <q-card-section class="bg-white">
               <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
-                <q-input
-                  v-model="name"
-                  data-cy="login-user-id"
-                  :label="t('login.email') + ' *'"
-                >
+                <q-input v-model="name" data-cy="login-user-id" :label="t('login.email') + ' *'">
                   <template #prepend>
                     <q-icon name="email" />
                   </template>
                 </q-input>
 
-                <q-input
-                  v-model="password"
-                  data-cy="login-password"
-                  type="password"
-                  :label="t('login.password') + ' *'"
-                >
+                <q-input v-model="password" data-cy="login-password" type="password" :label="t('login.password') + ' *'">
                   <template #prepend>
                     <q-icon name="lock" />
                   </template>
                 </q-input>
 
                 <q-card-actions class="q-px-lg q-mt-md q-mb-xl">
-                  <q-btn
-                    data-cy="login-sign-in"
-                    unelevated
-                    size="lg"
-                    class="full-width"
-                    color="primary"
-                    type="submit"
-                    :label="t('login.signIn')"
-                    :loading="submitting"
-                    no-caps
-                    @click="onSignIn()"
-                  />
+                  <q-btn data-cy="login-sign-in" unelevated size="lg" class="full-width" color="primary" type="submit"
+                    :label="t('login.signIn')" :loading="submitting" no-caps @click="onSignIn()" />
                 </q-card-actions>
               </q-form>
             </q-card-section>
@@ -124,9 +105,16 @@ export default defineComponent({
             })
             .then(async (res: any) => {
               //if user is authorized, get user info
+              console.log("user token is: ", res);
               if (res.data.status == true) {
                 //get user info from backend and extract auth token and set it into localstorage
-                const authToken = getBasicAuth(name.value, password.value);
+                let authToken = "";
+                if (res.data.token && res.data.token.length > 0) {
+                  authToken = "Bearer " + res.data.token;
+                } else {
+                  authToken = getBasicAuth(name.value, password.value);
+                };
+
                 useLocalToken(authToken);
                 const userInfo = {
                   given_name: name.value,

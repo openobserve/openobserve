@@ -399,6 +399,12 @@ pub struct Common {
     pub certs_base_dir: String,
     #[env_config(name = "ZO_ENABLE_JWT_AUTH", default = false)]
     pub enable_jwt_auth: bool,
+    // Cert generation related env vars
+    #[env_config(name = "ZO_JWT_KEY_BITS", default = 4096)]
+    pub key_bits: usize,
+    // Cert generation related env vars
+    #[env_config(name = "ZO_JWT_TTL", default = 30)] //in minutes
+    pub token_ttl: i64,
 }
 
 #[derive(EnvConfig)]

@@ -231,4 +231,11 @@ pub struct SignInUser {
 pub struct SignInResponse {
     pub status: bool,
     pub message: String,
+    pub token: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct TokenValidationResponse {
+    pub is_valid: bool,
+    pub user_email: String,
 }

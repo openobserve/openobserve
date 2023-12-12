@@ -29,7 +29,7 @@ use crate::{
         meta::{
             ingestion::INGESTION_EP,
             proxy::QueryParamProxyURL,
-            user::{DBUser, UserRole},
+            user::{DBUser, TokenValidationResponse, UserRole},
         },
         utils::{
             auth::{get_hash, is_root_user},
@@ -38,6 +38,8 @@ use crate::{
     },
     service::{db, users},
 };
+
+pub mod token;
 
 pub async fn validator(
     req: ServiceRequest,
@@ -59,7 +61,7 @@ pub async fn validator(
     .await
     {
         Ok(res) => {
-            if res {
+            if res.is_valid {
                 // / Hack for prometheus, need support POST and check the header
                 let mut req = req;
                 if req.method().eq(&Method::POST) && !req.headers().contains_key("content-type") {
@@ -68,6 +70,15 @@ pub async fn validator(
                         header::HeaderValue::from_static("application/x-www-form-urlencoded"),
                     );
                 }
+                req.headers_mut().insert(
+                    header::HeaderName::from_static("user_id"),
+                    header::HeaderValue::from_str(&res.user_email).unwrap(),
+                );
+                println!(
+                    "{:?}",
+                    req.headers()
+                        .get(header::HeaderName::from_static("user_id"))
+                );
                 Ok(req)
             } else {
                 Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -94,7 +105,7 @@ pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
     path: &str,
-) -> Result<bool, Error> {
+) -> Result<TokenValidationResponse, Error> {
     #[cfg(feature = "enterprise")]
     if LDAP_CONFIG.ldap_enabled {
         log::info!("LDAP authentication enabled");
@@ -113,7 +124,10 @@ pub async fn validate_credentials(
     if is_root_user(user_id) {
         user = users::get_user(None, user_id).await;
         if user.is_none() {
-            return Ok(false);
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_owned(),
+            });
         }
     } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
@@ -139,19 +153,28 @@ pub async fn validate_credentials(
     };
 
     if user.is_none() {
-        return Ok(false);
+        return Ok(TokenValidationResponse {
+            is_valid: false,
+            user_email: "".to_owned(),
+        });
     }
     let user = user.unwrap();
 
     if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
         && user.token.eq(&user_password)
     {
-        return Ok(true);
+        return Ok(TokenValidationResponse {
+            is_valid: true,
+            user_email: user.email,
+        });
     }
 
     let in_pass = get_hash(user_password, &user.salt);
     if !user.password.eq(&in_pass) {
-        return Ok(false);
+        return Ok(TokenValidationResponse {
+            is_valid: false,
+            user_email: "".to_owned(),
+        });
     }
     if !path.contains("/user")
         || (path.contains("/user")
@@ -159,7 +182,10 @@ pub async fn validate_credentials(
                 || user.role.eq(&UserRole::Root)
                 || user.email.eq(user_id)))
     {
-        Ok(true)
+        Ok(TokenValidationResponse {
+            is_valid: true,
+            user_email: user.email,
+        })
     } else {
         Err(ErrorForbidden("Not allowed"))
     }
@@ -168,13 +194,16 @@ pub async fn validate_credentials(
 async fn validate_user_from_db(
     db_user: Result<DBUser, anyhow::Error>,
     user_password: &str,
-) -> Result<bool, Error> {
+) -> Result<TokenValidationResponse, Error> {
     // let db_user = db::user::get_db_user(user_id).await;
     match db_user {
         Ok(user) => {
             let in_pass = get_hash(user_password, &user.salt);
             if user.password.eq(&in_pass) {
-                Ok(true)
+                Ok(TokenValidationResponse {
+                    is_valid: true,
+                    user_email: user.email,
+                })
             } else {
                 Err(ErrorForbidden("Not allowed"))
             }
@@ -185,7 +214,10 @@ async fn validate_user_from_db(
 
 /// Validate the incoming user from the ldap, if ldap is enabled
 #[cfg(feature = "enterprise")]
-async fn validate_user_from_ldap(user_id: &str, user_password: &str) -> Result<bool, Error> {
+async fn validate_user_from_ldap(
+    user_id: &str,
+    user_password: &str,
+) -> Result<TokenValidationResponse, Error> {
     let ldap_user_res: Result<LdapUser, anyhow::Error> =
         o2_enterprise::enterprise::ldap::service::auth::get_user_from_ldap(user_id, user_password)
             .await;
@@ -232,14 +264,20 @@ async fn validate_user_from_ldap(user_id: &str, user_password: &str) -> Result<b
                 }
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
-            Ok(true)
+            return Ok(TokenValidationResponse {
+                is_valid: true,
+                user_email: user_id.to_string(),
+            });
         }
         Err(_) => Ok(false),
     }
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, Error> {
+pub async fn validate_user(
+    user_id: &str,
+    user_password: &str,
+) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
     let is_ldap_user = match db_user.as_ref() {
         Ok(user) => user.is_ldap,
@@ -254,7 +292,10 @@ pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, E
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, Error> {
+pub async fn validate_user(
+    user_id: &str,
+    user_password: &str,
+) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
     validate_user_from_db(db_user, user_password).await
 }
@@ -283,7 +324,7 @@ pub async fn validator_aws(
 
                 match validate_credentials(&creds[0], &creds[1], path).await {
                     Ok(res) => {
-                        if res {
+                        if res.is_valid {
                             Ok(req)
                         } else {
                             Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -321,7 +362,7 @@ pub async fn validator_gcp(
 
             match validate_credentials(&creds[0], &creds[1], path).await {
                 Ok(res) => {
-                    if res {
+                    if res.is_valid {
                         Ok(req)
                     } else {
                         Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -351,7 +392,7 @@ pub async fn validator_proxy_url(
 
     match validate_credentials(&creds[0], &creds[1], path).await {
         Ok(res) => {
-            if res {
+            if res.is_valid {
                 Ok(req)
             } else {
                 Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -439,28 +480,38 @@ mod tests {
             validate_credentials("root@example.com", pwd, "default/_bulk")
                 .await
                 .unwrap()
+                .is_valid
         );
         assert!(
             !validate_credentials("", pwd, "default/_bulk")
                 .await
                 .unwrap()
+                .is_valid
         );
-        assert!(!validate_credentials("", pwd, "/").await.unwrap());
+        assert!(!validate_credentials("", pwd, "/").await.unwrap().is_valid);
         assert!(
             !validate_credentials("user1@example.com", pwd, "/")
                 .await
                 .unwrap()
+                .is_valid
         );
         assert!(
             validate_credentials("user1@example.com", pwd, "default/user")
                 .await
                 .unwrap()
+                .is_valid
         );
         assert!(
             !validate_credentials("user1@example.com", "x", "default/user")
                 .await
                 .unwrap()
+                .is_valid
         );
-        assert!(validate_user("root@example.com", pwd).await.unwrap());
+        assert!(
+            validate_user("root@example.com", pwd)
+                .await
+                .unwrap()
+                .is_valid
+        );
     }
 }

@@ -268,6 +268,7 @@ export const getBasicAuth = (username: string, password: string) => {
   return "Basic " + hash;
 };
 
+
 export const getImageURL = (image_path: string) => {
   return getPath() + "src/assets/" + image_path;
 };
