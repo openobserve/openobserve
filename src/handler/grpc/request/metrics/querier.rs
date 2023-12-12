@@ -15,6 +15,8 @@
 
 use std::time::UNIX_EPOCH;
 
+use arrow_schema::Schema;
+use chrono::DateTime;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -25,7 +27,7 @@ use crate::{
             config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
             errors, metrics, wal,
         },
-        meta,
+        meta::{self, stream::PartitionTimeLevel, StreamType},
         utils::file::{get_file_contents, get_file_meta, scan_files},
     },
     handler::grpc::{
@@ -35,7 +37,11 @@ use crate::{
         },
         request::MetadataMap,
     },
-    service::promql::search as SearchService,
+    service::{
+        db,
+        promql::search as SearchService,
+        stream::{stream_settings, unwrap_partition_time_level},
+    },
 };
 
 pub struct Querier;
@@ -129,6 +135,14 @@ impl Metrics for Querier {
             return Ok(Response::new(resp));
         }
 
+        // get schema settings
+        let schema_latest = db::schema::get(org_id, stream_name, StreamType::Metrics)
+            .await
+            .unwrap_or(Schema::empty());
+        let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
+        let partition_time_level =
+            unwrap_partition_time_level(schema_settings.partition_time_level, StreamType::Metrics);
+
         // lock theses files
         let files = files
             .iter()
@@ -144,6 +158,31 @@ impl Metrics for Querier {
         wal::lock_files(&files).await;
 
         for file in files.iter() {
+            // check wal file created time, we can skip files which created time > end_time
+            let file_columns = file.split('/').collect::<Vec<&str>>();
+            let file_time_start = format!(
+                "{}-{}-{}T{}:00:00Z",
+                file_columns[5], file_columns[6], file_columns[7], file_columns[8]
+            );
+            let mut file_time_start = match DateTime::parse_from_rfc3339(&file_time_start) {
+                Ok(v) => v.timestamp_micros(),
+                Err(_) => 0,
+            };
+            let mut file_time_end = format!(
+                "{}-{}-{}T{}:59:59Z",
+                file_columns[5], file_columns[6], file_columns[7], file_columns[8]
+            );
+            if file_columns[8] == "00" && partition_time_level.eq(&PartitionTimeLevel::Daily) {
+                file_time_end = format!(
+                    "{}-{}-{}T23:59:59Z",
+                    file_columns[5], file_columns[6], file_columns[7]
+                );
+            }
+            let mut file_time_end = match DateTime::parse_from_rfc3339(&file_time_end) {
+                Ok(v) => v.timestamp_micros(),
+                Err(_) => 0,
+            };
+
             let source_file = wal_dir.to_string() + "/" + file;
             if start_time > 0 || end_time > 0 {
                 // check wal file created time, we can skip files which created time > end_time
@@ -159,22 +198,27 @@ impl Metrics for Querier {
                     .unwrap_or(UNIX_EPOCH)
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
-                    .as_micros();
+                    .as_micros() as i64;
                 let file_created = file_meta
                     .created()
                     .unwrap_or(UNIX_EPOCH)
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
-                    .as_micros();
+                    .as_micros() as i64;
                 let file_created = (file_created as i64)
                     - chrono::Duration::hours(CONFIG.limit.ingest_allowed_upto)
                         .num_microseconds()
                         .unwrap_or_default();
-
-                if (start_time > 0 && (file_modified as i64) < start_time)
-                    || (end_time > 0 && file_created > end_time)
+                if file_created > 0 && file_time_start == 0 {
+                    file_time_start = file_created;
+                }
+                if file_modified < file_time_end || file_time_end == 0 {
+                    file_time_end = file_modified;
+                }
+                if (start_time > 0 && (file_time_end as i64) < start_time)
+                    || (end_time > 0 && file_time_start > end_time)
                 {
-                    log::info!(
+                    log::debug!(
                         "skip wal file: {} time_range: [{},{}]",
                         file,
                         file_created,
