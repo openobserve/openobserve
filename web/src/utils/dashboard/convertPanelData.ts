@@ -28,7 +28,8 @@ export const convertPanelData = (
   panelSchema: any,
   data: any,
   store: any,
-  chartPanelRef: any
+  chartPanelRef: any,
+  hoveredSeriesState: any
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -54,13 +55,25 @@ export const convertPanelData = (
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,
-          ...convertPromQLData(panelSchema, data, store, chartPanelRef),
+          ...convertPromQLData(
+            panelSchema,
+            data,
+            store,
+            chartPanelRef,
+            hoveredSeriesState
+          ),
         };
       } else {
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,
-          ...convertSQLData(panelSchema, data, store, chartPanelRef),
+          ...convertSQLData(
+            panelSchema,
+            data,
+            store,
+            chartPanelRef,
+            hoveredSeriesState
+          ),
         };
       }
     }

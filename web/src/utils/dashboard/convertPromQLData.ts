@@ -34,7 +34,8 @@ export const convertPromQLData = (
   panelSchema: any,
   searchQueryData: any,
   store: any,
-  chartPanelRef: any
+  chartPanelRef: any,
+  hoveredSeriesState: any
 ) => {
   // if no data than return it
   if (
@@ -46,13 +47,8 @@ export const convertPromQLData = (
     return { options: null };
   }
 
-  // It is used to keep track of the current series name in tooltip to bold the series name
-  let currentSeriesName = "";
-
-  // set the current series name (will be set at chartrenderer on mouseover)
-  const setCurrentSeriesValue = (newValue: any) => {
-    currentSeriesName = newValue ?? "";
-  };
+  // flag to check if the data is time seriesc
+  let isTimeSeriesFlag = true;
 
   const legendPosition = getLegendPosition(
     panelSchema?.config?.legends_position
@@ -69,6 +65,10 @@ export const convertPromQLData = (
       textStyle: {
         fontSize: 12,
       },
+      formatter: (params: any) => {
+        hoveredSeriesState?.value?.setHoveredSeriesName(params?.name);
+        return params?.name;
+      },
     },
     textStyle: {
       width: 150,
@@ -83,7 +83,7 @@ export const convertPromQLData = (
       },
     },
     formatter: (name: any) => {
-      return name == currentSeriesName
+      return name == hoveredSeriesState?.value?.hoveredSeriesName
         ? "{a|" + name + "}"
         : "{b|" + name + "}";
     },
@@ -124,13 +124,16 @@ export const convertPromQLData = (
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
       extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       formatter: function (name: any) {
+        // show tooltip for hovered panel only for other we only need axis so just return empty string
+        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
 
         // get the current series index from name
         const currentSeriesIndex = name.findIndex(
-          (it: any) => it.seriesName == currentSeriesName
+          (it: any) =>
+            it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
         );
 
         // swap current hovered series index to top in tooltip
@@ -141,7 +144,7 @@ export const convertPromQLData = (
         let hoverText = name.map((it: any) => {
           // check if the series is the current series being hovered
           // if have than bold it
-          if (it?.seriesName == currentSeriesName)
+          if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -206,6 +209,14 @@ export const convertPromQLData = (
     toolbox: {
       orient: "vertical",
       show: !["pie", "donut", "metric", "gauge"].includes(panelSchema.type),
+      showTitle: false,
+      tooltip: {
+        show: false,
+      },
+      itemSize:0,
+      itemGap:0,
+      // it is used to hide toolbox buttons
+      bottom:"100%",
       feature: {
         dataZoom: {
           filterMode: "none",
@@ -291,6 +302,9 @@ export const convertPromQLData = (
         }
       }
       case "gauge": {
+        // we doesnt required to hover timeseries for gauge chart
+        isTimeSeriesFlag = false;
+
         const series = it?.result?.map((metric: any) => {
           const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
@@ -404,6 +418,9 @@ export const convertPromQLData = (
         return series;
       }
       case "metric": {
+        // we doesnt required to hover timeseries for gauge chart
+        isTimeSeriesFlag = false;
+
         switch (it?.resultType) {
           case "matrix": {
             const series = it?.result?.map((metric: any) => {
@@ -472,9 +489,11 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  // extras will be used to return other data to chart renderer
-  // e.g. setCurrentSeriesValue to set the current series index which is hovered
-  return { options, extras: { setCurrentSeriesValue } };
+  // promql query will be always timeseries
+  return {
+    options,
+    extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
+  };
 };
 
 /**
