@@ -42,11 +42,6 @@ pub async fn token_validator(
                     header::HeaderName::from_static("user_id"),
                     header::HeaderValue::from_str(&res.user_email).unwrap(),
                 );
-                println!(
-                    "{:?}",
-                    req.headers()
-                        .get(header::HeaderName::from_static("user_id"))
-                );
                 Ok(req)
             } else {
                 Err((ErrorUnauthorized("Unauthorized Access"), req))
