@@ -897,6 +897,7 @@ export default defineComponent({
             start_time: 1,
           };
           const importantFields = {
+            duration: 1,
             service_name: 1,
             operation_name: 1,
             trace_id: 1,

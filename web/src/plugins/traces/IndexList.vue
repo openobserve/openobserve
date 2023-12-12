@@ -70,134 +70,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <q-expansion-item
-                v-else
-                dense
-                switch-toggle-side
-                :label="props.row.name"
-                expand-icon-class="field-expansion-icon"
-                expand-icon="
-                   expand_more
-                "
-                @before-show="(event: any) => openFilterCreator(event, props.row)"
-              >
-                <template v-slot:header>
+              <div v-else>
+                <template
+                  v-if="
+                    ['operation_name', 'service_name'].includes(props.row.name)
+                  "
+                >
+                  <advanced-values-filter
+                    :row="props.row"
+                    @update:values="updateQueryFilter"
+                  />
+                </template>
+                <template v-else-if="props.row.name === 'duration'">
+                  <div class="q-mx-lg q-mt-sm">Duration</div>
+                  <div class="q-mx-lg q-pb-xs" style="margin: 0px 36px">
+                    <q-range
+                      v-model="durationFilterValue"
+                      :min="duration.min"
+                      :max="duration.max"
+                      :marker-labels="fnMarkerLabel"
+                      markers
+                      label
+                      switch-label-side
+                    />
+                  </div>
                   <div
-                    class="flex content-center ellipsis"
-                    :title="props.row.name"
+                    class="flex justify-between items-center q-px-lg q-mb-md"
                   >
-                    <div class="field_label ellipsis">
-                      {{ props.row.name }}
+                    <div class="flex column">
+                      <label>Min (in ms)</label>
+                      <input
+                        type="number"
+                        v-model="duration.min"
+                        aria-label="min"
+                        style="width: 100px"
+                      />
                     </div>
-                    <div class="field_overlay">
-                      <q-btn
-                        :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                        :icon="outlinedAdd"
-                        style="margin-right: 0.375rem"
-                        size="0.4rem"
-                        class="q-mr-sm"
-                        @click.stop="addToFilter(`${props.row.name}=''`)"
-                        round
+                    <div class="flex column">
+                      <label>Max (in ms)</label>
+                      <input
+                        type="number"
+                        aria-label="max"
+                        v-model="duration.max"
+                        style="width: 100px"
                       />
                     </div>
                   </div>
                 </template>
-                <q-card>
-                  <q-card-section class="q-pl-md q-pr-xs q-py-xs">
-                    <div class="filter-values-container">
-                      <div
-                        v-show="fieldValues[props.row.name]?.isLoading"
-                        class="q-pl-md q-py-xs"
-                        style="height: 60px"
-                      >
-                        <q-inner-loading
-                          size="xs"
-                          :showing="fieldValues[props.row.name]?.isLoading"
-                          label="Fetching values..."
-                          label-style="font-size: 1.1em"
-                        />
-                      </div>
-                      <div
-                        v-show="
-                          !fieldValues[props.row.name]?.values?.length &&
-                          !fieldValues[props.row.name]?.isLoading
-                        "
-                        class="q-pl-md q-py-xs text-subtitle2"
-                      >
-                        No values found
-                      </div>
-                      <div
-                        v-for="value in fieldValues[props.row.name]?.values ||
-                        []"
-                        :key="value.key"
-                      >
-                        <q-list dense>
-                          <q-item tag="label" class="q-pr-none">
-                            <div
-                              class="flex row wrap justify-between"
-                              style="width: calc(100% - 46px)"
-                            >
-                              <div
-                                :title="value.key"
-                                class="ellipsis q-pr-xs"
-                                style="width: calc(100% - 50px)"
-                              >
-                                {{ value.key }}
-                              </div>
-                              <div
-                                :title="value.count"
-                                class="ellipsis text-right q-pr-sm"
-                                style="width: 50px"
-                              >
-                                {{ value.count }}
-                              </div>
-                            </div>
-                            <div
-                              class="flex row"
-                              :class="
-                                store.state.theme === 'dark'
-                                  ? 'text-white'
-                                  : 'text-black'
-                              "
-                            >
-                              <q-btn
-                                class="q-mr-xs"
-                                size="6px"
-                                title="Include Term"
-                                round
-                                @click="
-                                  addSearchTerm(
-                                    `${props.row.name}='${value.key}'`
-                                  )
-                                "
-                              >
-                                <q-icon>
-                                  <EqualIcon></EqualIcon>
-                                </q-icon>
-                              </q-btn>
-                              <q-btn
-                                class="q-mr-xs"
-                                size="6px"
-                                title="Include Term"
-                                round
-                                @click="
-                                  addSearchTerm(
-                                    `${props.row.name}!='${value.key}'`
-                                  )
-                                "
-                              >
-                                <q-icon>
-                                  <NotEqualIcon></NotEqualIcon>
-                                </q-icon>
-                              </q-btn>
-                            </div>
-                          </q-item>
-                        </q-list>
-                      </div>
-                    </div>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                <template v-else>
+                  <basic-values-filter :row="props.row" />
+                </template>
+              </div>
             </q-td>
           </q-tr>
         </template>
@@ -230,22 +153,20 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useTraces from "../../composables/useTraces";
-import {
-  b64EncodeUnicode,
-  formatLargeNumber,
-  getImageURL,
-} from "../../utils/zincutils";
-import streamService from "../../services/stream";
-import { getConsumableDateTime } from "@/utils/commons";
+import { getImageURL } from "../../utils/zincutils";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
-import EqualIcon from "../../components/icons/EqualIcon.vue";
-import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
+import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
+import AdvancedValuesFilter from "./fields-sidebar/AdvancedValuesFilter.vue";
+import { computed } from "vue";
+import { Parser } from "node-sql-parser";
+import { f } from "msw/lib/SetupApi-8ab693f7";
+import { filter } from "lodash-es";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: {
-    EqualIcon,
-    NotEqualIcon,
+    BasicValuesFilter,
+    AdvancedValuesFilter,
   },
   setup() {
     const store = useStore();
@@ -260,6 +181,13 @@ export default defineComponent({
         values: { key: string; count: string }[];
       };
     }> = ref({});
+
+    const duration = ref({
+      min: 0,
+      max: 100,
+    });
+
+    const durationFilterValue = ref({ min: 0, max: 50 });
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
@@ -302,113 +230,127 @@ export default defineComponent({
       updatedLocalLogFilterField();
     }
 
-    const openFilterCreator = (event: any, { name, ftsKey }: any) => {
-      if (ftsKey) {
-        event.stopPropagation();
-        event.preventDefault();
-        return;
-      }
-
-      fieldValues.value[name] = {
-        isLoading: true,
-        values: [],
-      };
-
-      try {
-        let query_context = "";
-        let query = searchObj.data.editorValue;
-        let parseQuery = query.split("|");
-        let whereClause = "";
-        if (parseQuery.length > 1) {
-          whereClause = parseQuery[1].trim();
-        } else {
-          whereClause = parseQuery[0].trim();
-        }
-
-        query_context =
-          `SELECT * FROM "` +
-          searchObj.data.stream.selectedStream.value +
-          `" [WHERE_CLAUSE]`;
-
-        if (whereClause.trim() != "") {
-          whereClause = whereClause
-            .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-            .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-            .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-          whereClause = whereClause
-            .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-            .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-            .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-            .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
-
-          const parsedSQL = whereClause.split(" ");
-          searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-            parsedSQL.forEach((node: any, index: any) => {
-              if (node == field.name) {
-                node = node.replaceAll('"', "");
-                parsedSQL[index] = '"' + node + '"';
-              }
-            });
-          });
-
-          whereClause = parsedSQL.join(" ");
-
-          query_context = query_context.replace(
-            "[WHERE_CLAUSE]",
-            " WHERE " + whereClause
-          );
-        } else {
-          query_context = query_context.replace("[WHERE_CLAUSE]", "");
-        }
-        query_context = b64EncodeUnicode(query_context) || "";
-
-        fieldValues.value[name] = {
-          isLoading: true,
-          values: [],
-        };
-
-        streamService
-          .fieldValues({
-            org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchObj.data.stream.selectedStream.value,
-            start_time: searchObj.data.datetime.startTime,
-            end_time: searchObj.data.datetime.endTime,
-            fields: [name],
-            size: 10,
-            type: "traces",
-            query_context,
-          })
-          .then((res: any) => {
-            if (res.data.hits.length) {
-              fieldValues.value[name]["values"] = res.data.hits
-                .find((field: any) => field.field === name)
-                .values.map((value: any) => {
-                  return {
-                    key: value.zo_sql_key ? value.zo_sql_key : "null",
-                    count: formatLargeNumber(value.zo_sql_num),
-                  };
-                });
-            }
-          })
-          .catch(() => {
-            $q.notify({
-              type: "negative",
-              message: `Error while fetching values for ${name}`,
-            });
-          })
-          .finally(() => {
-            fieldValues.value[name]["isLoading"] = false;
-          });
-      } catch (e) {
-        fieldValues.value[name]["isLoading"] = false;
-        console.log("Error while fetching field values");
-      }
-    };
-
     const addSearchTerm = (term: string) => {
       // searchObj.meta.showDetailTab = false;
       searchObj.data.stream.addToFilter = term;
+    };
+
+    const fnMarkerLabel = computed(() => {
+      const markers = [];
+      const diffDuration = duration.value.max - duration.value.min;
+      const step = diffDuration / 4;
+      for (let i = 0; i < 5; i++) {
+        markers.push({
+          label: `${Math.round(duration.value.min + step * i)}ms`,
+          value: duration.value.min + step * i,
+        });
+      }
+      return markers;
+    });
+
+    const updateQueryFilter = (column, values) => {
+      const filters = searchObj.data.stream.filters;
+      const filterIndex = filters.findIndex(
+        (f: any) => f.field_name === column
+      );
+
+      // const filters = searchObj.data.stream.filters;
+      const parser = new Parser();
+
+      const valuesString = values
+        .map((value: string) => "'" + value + "'")
+        .join(",");
+
+      if (!filters.length) {
+        searchObj.data.query += ` WHERE ${column} IN (${valuesString})`;
+        searchObj.data.stream.filters.push({
+          field_name: column,
+          values,
+          operator: "in",
+        });
+        return;
+      } else if (filters.length && filterIndex === -1) {
+        searchObj.data.stream.filters.push({
+          field_name: column,
+          values,
+          operator: "in",
+        });
+        searchObj.data.query += ` AND ${column} IN (${valuesString})`;
+        return;
+      }
+
+      if (filterIndex > -1) {
+        searchObj.data.stream.filters[filterIndex].values = values;
+      }
+
+      const parsedQuery = parser.astify(searchObj.data.query);
+
+      if (filters.length && filterIndex > -1 && values.length === 0) {
+        parsedQuery.where = removeCondition(parsedQuery.where, column);
+        searchObj.data.stream.filters = searchObj.data.stream.filters.filter(
+          (f: any) => f.field_name !== column
+        );
+      } else {
+        modifyWhereClause(parsedQuery?.where, column, values);
+      }
+
+      // Convert the AST back to SQL query
+      let modifiedQuery = parser.sqlify(parsedQuery);
+
+      if (modifiedQuery) searchObj.data.query = modifiedQuery;
+    };
+
+    const removeCondition = (node, fieldName): any => {
+      if (!node) return null;
+
+      if (node.type === "binary_expr") {
+        if (node.left.column === fieldName) {
+          // Return null to indicate this node should be removed
+          return null;
+        }
+      }
+
+      // Recurse through AND/OR expressions
+      if (
+        node.type === "binary_expr" &&
+        (node.operator === "AND" || node.operator === "OR")
+      ) {
+        const left = removeCondition(node.left, fieldName);
+        const right = removeCondition(node.right, fieldName);
+
+        if (!left) return right;
+        if (!right) return left;
+
+        node.left = left;
+        node.right = right;
+      }
+
+      return node;
+    };
+
+    const modifyWhereClause = (node, fieldName, newValue) => {
+      if (!node) return;
+
+      if (node.type === "binary_expr") {
+        if (node.left.column === fieldName) {
+          // Assuming the right side is a literal
+          node.right.value = newValue.map((value: string) => {
+            return {
+              type: "single_quote_string",
+              value: value,
+            };
+          });
+        }
+      }
+
+      // Recurse through AND/OR expressions
+      if (
+        node.type === "binary_expr" &&
+        (node.operator === "AND" || node.operator === "OR")
+      ) {
+        modifyWhereClause(node.left, fieldName, newValue);
+        modifyWhereClause(node.right, fieldName, newValue);
+      }
     };
 
     return {
@@ -422,10 +364,13 @@ export default defineComponent({
       clickFieldFn,
       getImageURL,
       filterStreamFn,
-      openFilterCreator,
       addSearchTerm,
       fieldValues,
       outlinedAdd,
+      durationFilterValue,
+      fnMarkerLabel,
+      duration,
+      updateQueryFilter,
     };
   },
 });

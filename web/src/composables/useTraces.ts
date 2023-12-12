@@ -70,7 +70,7 @@ const defaultObject = {
     serviceColors: {} as any,
   },
   data: {
-    query: "",
+    query: "SELECT * FROM 'default'",
     parsedQuery: {},
     errorMsg: "",
     errorCode: 0,
@@ -83,6 +83,7 @@ const defaultObject = {
       filterField: "",
       addToFilter: "",
       functions: [],
+      filters: [] as any[],
     },
     resultGrid: {
       currentDateTime: new Date(),

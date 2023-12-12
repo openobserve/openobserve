@@ -62,6 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></q-btn>
       </div>
     </div>
+    <span class="text-subtitle2"> {{ searchObj.data.query }}</span>
+
     <div
       class="row"
       v-if="searchObj.meta.showQuery"
@@ -160,6 +162,12 @@ export default defineComponent({
       (fields) => {
         if (fields.length) updateFieldKeywords(fields);
       },
+      { immediate: true, deep: true }
+    );
+
+    watch(
+      () => searchObj.data.stream.filters,
+      () => {},
       { immediate: true, deep: true }
     );
 
@@ -351,6 +359,7 @@ export default defineComponent({
           this.queryEditorRef.setValue(this.searchObj.data.query);
       }
     },
+    filters() {},
   },
 });
 </script>
