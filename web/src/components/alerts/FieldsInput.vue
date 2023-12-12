@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="text-bold">Conditions</div>
+    <div class="text-bold">Conditions *</div>
     <template v-if="!fields.length">
       <q-btn
         color="primary"

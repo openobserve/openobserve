@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-input
               data-test="add-alert-name-input"
               v-model="formData.name"
-              :label="t('alerts.name')"
+              :label="t('alerts.name') + ' *'"
               color="input-border"
               bg-color="input-bg"
               class="showLabelOnTop"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               v-bind:readonly="beingUpdated"
               v-bind:disable="beingUpdated"
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
               style="min-width: 250px"
             />
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-select
               v-model="formData.stream_type"
               :options="streamTypes"
-              :label="t('alerts.streamType')"
+              :label="t('alerts.streamType') + ' *'"
               :popup-content-style="{ textTransform: 'lowercase' }"
               color="input-border"
               bg-color="input-bg"
@@ -77,6 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
+              v-bind:readonly="beingUpdated"
+              v-bind:disable="beingUpdated"
               @update:model-value="updateStreams()"
               :rules="[(val: any) => !!val || 'Field is required!']"
               style="min-width: 150px"
@@ -87,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-alert-stream-select"
               v-model="formData.stream_name"
               :options="filteredStreams"
-              :label="t('alerts.stream_name')"
+              :label="t('alerts.stream_name') + ' *'"
               :loading="isFetchingStreams"
               color="input-border"
               bg-color="input-bg"
@@ -99,6 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               use-input
               hide-selected
               fill-input
+              v-bind:readonly="beingUpdated"
+              v-bind:disable="beingUpdated"
               :input-debounce="400"
               @filter="filterStreams"
               @update:model-value="updateStreamFields(formData.stream_name)"
@@ -149,19 +153,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:trigger="formData.trigger_condition"
             v-model:sql="formData.query_condition.sql"
             v-model:query_type="formData.query_condition.type"
+            v-model:aggregation="formData.query_condition.aggregation"
+            v-model:isAggregationEnabled="isAggregationEnabled"
             @field:add="addField"
             @field:remove="removeField"
             class="q-mt-sm"
           />
         </div>
 
-        <div class="col-12 flex justify-start items-center q-mt-sm">
+        <div class="col-12 flex justify-start items-center q-mt-md">
           <div
             class="q-py-sm showLabelOnTop text-bold text-h7"
             data-test="add-alert-delay-title"
             style="width: 180px"
           >
-            {{ t("alerts.silenceNotification") }}
+            {{ t("alerts.silenceNotification") + " *" }}
           </div>
           <div class="col-8 row justify-left align-center q-gutter-sm">
             <div
@@ -178,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   dense
                   filled
-                  min="0"
+                  min="1"
                   style="background: none"
                 />
               </div>
@@ -198,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-mt-lg">
-          <div class="text-bold">{{ t("alerts.destination") }}</div>
+          <div class="text-bold">{{ t("alerts.destination") + " *" }}</div>
           <q-select
             data-test="add-alert-destination-select"
             v-model="formData.destinations"
@@ -298,7 +304,7 @@ import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
 import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import { is, useQuasar } from "quasar";
 import streamService from "../../services/stream";
 import { Parser } from "node-sql-parser/build/mysql";
 import segment from "../../services/segment_analytics";
@@ -327,6 +333,15 @@ const defaultValue: any = () => {
       sql: "",
       promql: null,
       type: "custom",
+      aggregation: {
+        group_by: [""],
+        function: "avg",
+        having: {
+          column: "",
+          operator: ">=",
+          value: 0,
+        },
+      },
     },
     trigger_condition: {
       period: 10,
@@ -337,6 +352,7 @@ const defaultValue: any = () => {
     destinations: [],
     context_attributes: {},
     enabled: true,
+    description: "",
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -384,6 +400,7 @@ export default defineComponent({
     var triggerCols: any = ref([]);
     const selectedDestinations = ref("slack");
     const originalStreamFields: any = ref([]);
+    const isAggregationEnabled = ref(false);
     var triggerOperators: any = ref([
       "=",
       "!=",
@@ -472,6 +489,7 @@ export default defineComponent({
         streamCols = column.schema.map((column: any) => ({
           label: column.name,
           value: column.name,
+          type: column.type,
         }));
       }
 
@@ -503,6 +521,9 @@ export default defineComponent({
       return filteredOptions;
     };
     const updateStreams = (resetStream = true) => {
+      if (formData.value.stream_type === "metrics") {
+        isAggregationEnabled.value = true;
+      }
       if (resetStream) formData.value.stream_name = "";
       if (streams.value[formData.value.stream_type]) {
         schemaList.value = streams.value[formData.value.stream_type];
@@ -513,6 +534,9 @@ export default defineComponent({
         );
         return;
       }
+
+      if (!formData.value.stream_type) return Promise.resolve();
+
       isFetchingStreams.value = true;
       return streamService
         .nameList(
@@ -611,6 +635,7 @@ export default defineComponent({
       selectedDestinations,
       scheduledAlertRef,
       router,
+      isAggregationEnabled,
     };
   },
   created() {
@@ -678,6 +703,7 @@ export default defineComponent({
         message: "Please wait...",
         timeout: 2000,
       });
+
       this.addAlertForm.validate().then((valid: any) => {
         if (!valid) {
           return false;
@@ -694,20 +720,27 @@ export default defineComponent({
           : this.formData.query_condition.type;
 
         this.formData.context_attributes.forEach((attr: any) => {
-          payload.context_attributes[attr.key] = attr.value;
+          if (attr.key?.trim() && attr.value?.trim())
+            payload.context_attributes[attr.key] = attr.value;
         });
 
-        this.formData.trigger_condition.threshold = parseInt(
+        payload.trigger_condition.threshold = parseInt(
           this.formData.trigger_condition.threshold
         );
 
-        this.formData.trigger_condition.period = parseInt(
+        payload.trigger_condition.period = parseInt(
           this.formData.trigger_condition.period
         );
 
-        this.formData.trigger_condition.silence = parseInt(
+        payload.trigger_condition.silence = parseInt(
           this.formData.trigger_condition.silence
         );
+
+        payload.description = this.formData.description.trim();
+
+        if (!this.isAggregationEnabled) {
+          payload.query_condition.aggregation = null;
+        }
 
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
@@ -787,7 +820,7 @@ export default defineComponent({
     white-space: nowrap;
   }
   .q-field__bottom {
-    padding: 8px 0;
+    padding: 2px 0;
   }
 }
 .silence-notification-input,
