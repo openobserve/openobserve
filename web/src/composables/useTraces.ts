@@ -56,6 +56,7 @@ const defaultObject = {
     showDetailTab: false,
     showTraceDetails: false,
     sqlMode: false,
+    filterType: "advance",
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,

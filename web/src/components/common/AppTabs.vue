@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ tab.label }}
       </div>
     </div>
-    <q-separator class="full-width" />
   </div>
 </template>
 
