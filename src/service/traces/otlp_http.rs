@@ -92,21 +92,20 @@ pub async fn traces_json(
     let start = std::time::Instant::now();
     let traces_stream_name = match in_stream_name {
         Some(name) => format_stream_name(name),
-        None => "default".to_owned(),
+        None => "default".to_string(),
     };
-
     let traces_stream_name = &traces_stream_name;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
     let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let mut partial_success = ExportTracePartialSuccess::default();
-
     let mut data_buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+
     let stream_schema = stream_schema_exists(
         org_id,
         traces_stream_name,
