@@ -169,18 +169,6 @@ const useDashboardPanelData = () => {
       .join(" ");
   };
 
-  const getFieldLabel = (field: any, fieldItem: any) => {
-    console.log("field", field);
-    console.log("fieldElement", fieldItem);
-    if (fieldItem === "fieldElement") {
-      console.log("generateLabelFromName", field.name);
-      return field.name;
-    } else {
-      console.log("generateLabelFromName");
-
-      return generateLabelFromName(field.name);
-    }
-  };
 
   const promqlMode = computed(
     () => dashboardPanelData.data.queryType == "promql"
@@ -286,10 +274,11 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.push({
-        label: getFieldLabel(
-          row,
-          dashboardPanelData.meta.dragAndDrop.dragElementType
-        ),
+        label: !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? generateLabelFromName(row.name)
+          : row.name,
         alias: !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
@@ -335,10 +324,11 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.y.push({
-        label: getFieldLabel(
-          row,
-          dashboardPanelData.meta.dragAndDrop.dragElementType
-        ),
+        label: !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? generateLabelFromName(row.name)
+          : row.name,
         alias: !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
@@ -380,10 +370,11 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.z.push({
-        label: getFieldLabel(
-          row,
-          dashboardPanelData.meta.dragAndDrop.dragElementType
-        ),
+        label: !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? generateLabelFromName(row.name)
+          : row.name,
         alias: !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery

@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <div
             :draggable="true"
-            @dragstart="onFieldDragStart($event, index, itemX.column)"
+            @dragstart="onFieldDragStart($event, itemX)"
           >
           <q-icon
             name="drag_indicator"
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <div
           :draggable="true" 
-          @dragstart="onFieldDragStart($event, index, itemY.column)"
+          @dragstart="onFieldDragStart($event, itemY)"
         >
         <q-icon
           name="drag_indicator"
@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <div
             :draggable="true" 
-            @dragstart="onFieldDragStart($event, index, itemZ.column)"
+            @dragstart="onFieldDragStart($event, itemZ)"
           >
           <q-icon
             name="drag_indicator"
@@ -885,19 +885,19 @@ export default defineComponent({
     const onDrop = (e: any, area: string) => {
       console.log("onDrop", e, area);
       
-      const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
-      console.log("onDrop dragItem", dragItem);
-      
-      dashboardPanelData.meta.dragAndDrop.dragging = false;
-      console.log("onDrop dragging", dashboardPanelData.meta.dragAndDrop.dragging);
-      
-      dashboardPanelData.meta.dragAndDrop.dragElement = null;
-      console.log("onDrop dragElement", dashboardPanelData.meta.dragAndDrop.dragElement);
-      
-      dashboardPanelData.meta.dragAndDrop.dragElementType = null;
-      console.log("onDrop dragElementType", dashboardPanelData.meta.dragAndDrop.dragElementType);
       if(dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldList") {
         console.log("onDrop fieldList-------------");
+        const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement; 
+        console.log("onDrop dragItem", dragItem);
+        
+        dashboardPanelData.meta.dragAndDrop.dragging = false;
+        console.log("onDrop dragging", dashboardPanelData.meta.dragAndDrop.dragging);
+        
+        dashboardPanelData.meta.dragAndDrop.dragElement = null;
+        console.log("onDrop dragElement", dashboardPanelData.meta.dragAndDrop.dragElement);
+        
+        dashboardPanelData.meta.dragAndDrop.dragElementType = null;
+        console.log("onDrop dragElementType", dashboardPanelData.meta.dragAndDrop.dragElementType);
         
         if (dragItem && area == "x") {
           console.log("addXAxisItem onDrop", dragItem);
@@ -914,7 +914,44 @@ export default defineComponent({
         currentDragArea.value = "";
       } else if(dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldElement") {
         console.log("onDrop fieldElement-------------");
+        const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
+        console.log("onDrop dragItem fieldElement", dragItem);
+
+        dashboardPanelData.meta.dragAndDrop.dragging = false;
+        console.log("onDrop dragging fieldElement", dashboardPanelData.meta.dragAndDrop.dragging);
+
+        dashboardPanelData.meta.dragAndDrop.dragElement = null;
+        console.log("onDrop dragElement fieldElement", dashboardPanelData.meta.dragAndDrop.dragElement);
+
+        dashboardPanelData.meta.dragAndDrop.dragElementType = null;
+        console.log("onDrop dragElementType fieldElement", dashboardPanelData.meta.dragAndDrop.dragElementType);
+
+        console.log("onDrop dragItem selectedStreamFields", dashboardPanelData.meta.stream.selectedStreamFields);
         
+        const dragName = dashboardPanelData.meta.stream.selectedStreamFields.find(
+          (item: any) => {
+            return item.name == dragItem.column;
+          }
+        );
+
+        console.log("onDrop dragItem---", dragName);
+        
+
+        if (dragName && area == "x") {
+          console.log("addXAxisItem onDrop", dragName);
+
+          addXAxisItem(dragItem);
+        } else if (dragName && area == "y") {
+          console.log("addYAxisItem onDrop", dragName);
+
+          addYAxisItem(dragName);
+        } else if (dragName && area == "z") {
+          console.log("addZAxisItem onDrop", dragName);
+
+          addZAxisItem(dragName);
+        } else {
+        }
+        currentDragArea.value = "";
       }
     };
 
@@ -940,12 +977,12 @@ export default defineComponent({
       e.preventDefault();
     };
 
-    const onFieldDragStart = (e: any, item: any, fieldElement: string) => {
+    const onFieldDragStart = (e: any, item: any) => {
       console.log("onFieldDragStart item", item);
       
         dashboardPanelData.meta.dragAndDrop.dragging = true;
         dashboardPanelData.meta.dragAndDrop.dragElement = item;
-        dashboardPanelData.meta.dragAndDrop.dragElementType = fieldElement;
+        dashboardPanelData.meta.dragAndDrop.dragElementType = "fieldElement";
         console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragElement);
         console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragging);
         console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragElementType);
