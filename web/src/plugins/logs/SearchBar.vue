@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <q-label>Update</q-label>
+          <span>Update</span>
           <q-toggle
             data-test="saved-view-action-toggle"
             v-bind:disable="searchObj.data.savedViews.length == 0"
@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label=""
             @change="savedViewName = ''"
           />
-          <q-label>Create</q-label>
+          <span>Create</span>
           <div v-if="isSavedViewAction == 'create'">
             <q-input
               data-test="add-alert-name-input"
@@ -317,7 +317,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[
                 (val) => !!val.trim() || 'This field is required',
                 (val) =>
-                  /^[-A-Za-z0-9 /@/_]+$/.test(val) || 'Input must be alphanumeric',
+                  /^[-A-Za-z0-9 /@/_]+$/.test(val) ||
+                  'Input must be alphanumeric',
               ]"
               tabindex="0"
             />
@@ -1092,7 +1093,6 @@ export default defineComponent({
             deleteViewID.value
           )
           .then((res) => {
-            console.log(res);
             if (res.status == 200) {
               $q.notify({
                 message: `View deleted successfully.`,

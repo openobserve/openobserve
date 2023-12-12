@@ -64,6 +64,14 @@ export const convertLogData = (
     toolbox: {
       orient: "vertical",
       show: true,
+      showTitle: false,
+      tooltip: {
+        show: false,
+      },
+      itemSize:0,
+      itemGap:0,
+      // it is used to hide toolbox buttons
+      bottom:"100%",
       feature: {
         dataZoom: {
           show: true,

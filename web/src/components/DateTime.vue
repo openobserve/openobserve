@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             no-caps
             :flat="selectedType !== 'relative'"
-            @click="selectedType = 'relative'"
+            @click="setDateType('relative')"
           >
             Relative
           </q-btn>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             no-caps
             :flat="selectedType !== 'absolute'"
-            @click="selectedType = 'absolute'"
+            @click="setDateType('absolute')"
           >
             Absolute
           </q-btn>
@@ -369,20 +369,12 @@ export default defineComponent({
         );
         setRelativeTime(props.defaultRelativeTime);
         displayValue.value = getDisplayValue();
+
         if (props.autoApply) saveDate(props.defaultType);
       } catch (e) {
         console.log(e);
       }
     });
-
-    watch(
-      () => selectedType.value,
-      (value) => {
-        displayValue.value = getDisplayValue();
-        if (props.autoApply)
-          saveDate(value === "absolute" ? "absolute" : "relative-custom");
-      }
-    );
 
     watch(
       () => {
@@ -403,27 +395,29 @@ export default defineComponent({
       { deep: true }
     );
 
-    watch(
-      () => props.defaultAbsoluteTime,
-      (value) => {
-        if (
-          (value.startTime !== datePayload.value.startTime ||
-            value.endTime !== datePayload.value.endTime) &&
-          store.state.savedViewFlag == false
-        ) {
-          selectedType.value = props.defaultType;
-          setAbsoluteTime(value.startTime, value.endTime);
-        }
-      },
-      {
-        deep: true,
-      }
-    );
+    // watch(
+    //   () => props.defaultAbsoluteTime,
+    //   (value) => {
+    //     console.log("defaultAbsoluteTime", value);
+    //     if (
+    //       (value.startTime !== datePayload.value.startTime ||
+    //         value.endTime !== datePayload.value.endTime) &&
+    //       store.state.savedViewFlag == false
+    //     ) {
+    //       selectedType.value = props.defaultType;
+    //       setAbsoluteTime(value.startTime, value.endTime);
+    //     }
+    //   },
+    //   {
+    //     deep: true,
+    //   }
+    // );
 
     const setRelativeDate = (period, value) => {
       selectedType.value = "relative";
       relativePeriod.value = period;
       relativeValue.value = value;
+
       if (props.autoApply) saveDate("relative");
     };
 
@@ -552,7 +546,6 @@ export default defineComponent({
       selectedTime.value.endTime = endObj.time;
 
       selectedType.value = dateType;
-      saveDate(dateType);
     };
 
     const onBeforeShow = () => {
@@ -653,6 +646,7 @@ export default defineComponent({
     const setSavedDate = (dateobj: any) => {
       timezone.value = store.state.timezone;
       selectedType.value = dateobj.type;
+
       if (dateobj.type === "relative") {
         setRelativeTime(dateobj.relativeTimePeriod);
       } else {
@@ -727,6 +721,14 @@ export default defineComponent({
       return date >= "1999/01/01" && date <= formattedDate;
     };
 
+    const setDateType = (type) => {
+      selectedType.value = type;
+      displayValue.value = getDisplayValue();
+
+      if (props.autoApply)
+        saveDate(type === "absolute" ? "absolute" : "relative-custom");
+    };
+
     return {
       t,
       datetimeBtn,
@@ -754,6 +756,7 @@ export default defineComponent({
       setCustomDate,
       setSavedDate,
       optionsFn,
+      setDateType,
     };
   },
 });
