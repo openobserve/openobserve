@@ -158,6 +158,89 @@ export default defineComponent({
       }
     };
 
+    // restore chart and select datazoom button
+    const restoreChart = () => {
+      chart?.dispatchAction({
+        type: "restore",
+      });
+      // we need that toolbox datazoom button initally selected
+      chart?.dispatchAction({
+        type: "takeGlobalCursor",
+        key: "dataZoomSelect",
+        dataZoomSelectActive: true,
+      });
+    };
+
+    const chartInitialSetUp = () => {
+      chart?.on("mouseover", mouseHoverEffectFn);
+      chart?.on("mouseout", mouseOutEffectFn);
+      chart?.on("globalout", () => {
+        mouseHoverEffectFn({});
+        hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
+        hoveredSeriesState?.value?.setHoveredSeriesName("");
+      });
+
+      chart?.on("legendselectchanged", legendSelectChangedFn);
+      chart?.on("downplay", (params: any) => {
+        // reset hovered series name on downplay
+        hoveredSeriesState?.value?.setHoveredSeriesName("");
+
+        // downplay event will only called by currently hovered panel else it will go into infinite loop
+        // and chart must be timeseries chart
+        if (
+          props.data.extras?.panelId == hoveredSeriesState?.value?.panelId &&
+          props?.data?.extras?.isTimeSeries === true
+        ) {
+          const seriesIndex = params?.batch?.[0]?.seriesIndex;
+          const dataIndex = Math.max(params?.batch?.[0]?.dataIndex, 0);
+
+          // set current hovered series name in state
+          if (chart?.getOption()?.series[seriesIndex]?.data[dataIndex]) {
+            hoveredSeriesState?.value?.setIndex(
+              dataIndex,
+              seriesIndex,
+              props?.data?.extras?.panelId || -1,
+              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0]
+            );
+          }
+        }
+      });
+      emit("updated:chart", {
+        start: chart?.getOption()?.dataZoom[0]?.startValue || 0,
+        end: chart?.getOption()?.dataZoom[0]?.endValue || 0,
+      });
+
+      //on dataZoom emit an event of start x and end x
+      chart?.on("dataZoom", function (params: any) {
+        //if batch then emit dataZoom event
+        if (params?.batch) {
+          emit("updated:dataZoom", {
+            start: params?.batch[0]?.startValue || 0,
+            end: params?.batch[0]?.endValue || 0,
+          });
+          restoreChart();
+        }
+        //else if daatazoom then emit dataZoom event
+        else if (chart?.getOption()?.dataZoom) {
+          emit("updated:chart", {
+            start: chart?.getOption()?.dataZoom[0]?.startValue || 0,
+            end: chart?.getOption()?.dataZoom[0]?.endValue || 0,
+          });
+        }
+      });
+      chart?.on("click", function (params: any) {
+        emit("click", params);
+      });
+      window.addEventListener("resize", windowResizeEventCallback);
+
+      // we need that toolbox datazoom button initally selected
+      chart?.dispatchAction({
+        type: "takeGlobalCursor",
+        key: "dataZoomSelect",
+        dataZoomSelectActive: true,
+      });
+    };
+
     // dispatch tooltip action for all charts
     watch(
       () => [
@@ -213,15 +296,7 @@ export default defineComponent({
           hoveredSeriesState.value?.panelId == -1 &&
           hoveredSeriesState.value?.hoveredTime == null
         ) {
-          chart?.dispatchAction({
-            type: "restore",
-          });
-          // we need that toolbox datazoom button initally selected
-          chart?.dispatchAction({
-            type: "takeGlobalCursor",
-            key: "dataZoomSelect",
-            dataZoomSelectActive: true,
-          });
+          restoreChart();
         }
       }
     );
@@ -255,21 +330,7 @@ export default defineComponent({
         options.animation = false;
         chart?.setOption(options, true);
         chart?.setOption({ animation: true });
-        chart?.on("mouseover", mouseHoverEffectFn);
-        chart?.on("mouseout", mouseOutEffectFn);
-        chart?.on("globalout", () => {
-          mouseHoverEffectFn({});
-          hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
-          hoveredSeriesState?.value?.setHoveredSeriesName("");
-        });
-        chart?.on("legendselectchanged", legendSelectChangedFn);
-
-        // we need that toolbox datazoom button initally selected
-        chart?.dispatchAction({
-          type: "takeGlobalCursor",
-          key: "dataZoomSelect",
-          dataZoomSelectActive: true,
-        });
+        chartInitialSetUp();
       }
     );
 
@@ -286,72 +347,7 @@ export default defineComponent({
         chart = echarts.init(chartRef.value, theme);
       }
       chart?.setOption(props?.data?.options || {}, true);
-      chart?.on("mouseover", mouseHoverEffectFn);
-      chart?.on("mouseout", mouseOutEffectFn);
-      chart?.on("globalout", () => {
-        mouseHoverEffectFn({});
-        hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
-        hoveredSeriesState?.value?.setHoveredSeriesName("");
-      });
-
-      chart?.on("legendselectchanged", legendSelectChangedFn);
-      chart?.on("downplay", (params: any) => {
-        // reset hovered series name on downplay
-        hoveredSeriesState?.value?.setHoveredSeriesName("");
-
-        // downplay event will only called by currently hovered panel else it will go into infinite loop
-        // and chart must be timeseries chart
-        if (
-          props.data.extras?.panelId == hoveredSeriesState?.value?.panelId &&
-          props?.data?.extras?.isTimeSeries === true
-        ) {
-          const seriesIndex = params?.batch?.[0]?.seriesIndex;
-          const dataIndex = Math.max(params?.batch?.[0]?.dataIndex, 0);
-
-          // set current hovered series name in state
-          if (chart?.getOption()?.series[seriesIndex]?.data[dataIndex]) {
-            hoveredSeriesState?.value?.setIndex(
-              dataIndex,
-              seriesIndex,
-              props?.data?.extras?.panelId || -1,
-              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0]
-            );
-          }
-        }
-      });
-      emit("updated:chart", {
-        start: chart?.getOption()?.dataZoom[0]?.startValue || 0,
-        end: chart?.getOption()?.dataZoom[0]?.endValue || 0,
-      });
-
-      //on dataZoom emit an event of start x and end x
-      chart?.on("dataZoom", function (params: any) {
-        //if batch then emit dataZoom event
-        if (params?.batch) {
-          emit("updated:dataZoom", {
-            start: params?.batch[0]?.startValue || 0,
-            end: params?.batch[0]?.endValue || 0,
-          });
-        }
-        //else if daatazoom then emit dataZoom event
-        else if (chart?.getOption()?.dataZoom) {
-          emit("updated:chart", {
-            start: chart?.getOption()?.dataZoom[0]?.startValue || 0,
-            end: chart?.getOption()?.dataZoom[0]?.endValue || 0,
-          });
-        }
-      });
-      chart?.on("click", function (params: any) {
-        emit("click", params);
-      });
-      window.addEventListener("resize", windowResizeEventCallback);
-
-      // we need that toolbox datazoom button initally selected
-      chart?.dispatchAction({
-        type: "takeGlobalCursor",
-        key: "dataZoomSelect",
-        dataZoomSelectActive: true,
-      });
+      chartInitialSetUp();
     });
     onUnmounted(() => {
       window.removeEventListener("resize", windowResizeEventCallback);
