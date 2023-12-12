@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <div
             :draggable="true"
-            @dragstart="onFieldDragStart($event, itemX)"
+            @dragstart="onFieldDragStart($event, itemX, 'x')"
           >
           <q-icon
             name="drag_indicator"
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <div
           :draggable="true" 
-          @dragstart="onFieldDragStart($event, itemY)"
+          @dragstart="onFieldDragStart($event, itemY, 'y')"
         >
         <q-icon
           name="drag_indicator"
@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <div
             :draggable="true" 
-            @dragstart="onFieldDragStart($event, itemZ)"
+            @dragstart="onFieldDragStart($event, itemZ, 'z')"
           >
           <q-icon
             name="drag_indicator"
@@ -937,18 +937,32 @@ export default defineComponent({
         console.log("onDrop dragItem---", dragName);
         
 
-        if (dragName && area == "x") {
-          console.log("addXAxisItem onDrop", dragName);
+        if (dragName) {
+          // Remove from the original axis
+          if (onLeave.value == "x") {
+            removeXAxisItem(dragName.name);
+            console.log("removeXAxisItem onDrop", dragName.name);
 
-          addXAxisItem(dragItem);
-        } else if (dragName && area == "y") {
-          console.log("addYAxisItem onDrop", dragName);
+          } else if (onLeave.value == "y") {
+            removeYAxisItem(dragName.name);
+            console.log("removeYAxisItem onDrop", dragName.name);
+            
+          } else if (onLeave.value == "z") {
+            removeZAxisItem(dragName.name);
+            console.log("removeZAxisItem onDrop", dragName.name);
+          }
 
-          addYAxisItem(dragName);
-        } else if (dragName && area == "z") {
-          console.log("addZAxisItem onDrop", dragName);
-
-          addZAxisItem(dragName);
+          // Add to the new axis
+          if (area == "x") {
+            console.log("addXAxisItem onDrop", dragName);
+            addXAxisItem(dragName);
+          } else if (area == "y") {
+            console.log("addYAxisItem onDrop", dragName);
+            addYAxisItem(dragName);
+          } else if (area == "z") {
+            console.log("addZAxisItem onDrop", dragName);
+            addZAxisItem(dragName);
+          }
         } else {
         }
         currentDragArea.value = "";
@@ -966,6 +980,7 @@ export default defineComponent({
       e.preventDefault();
     };
 
+    const onLeave = ref("");
     const onDragLeave = (e: any, area: string) => {
       currentDragArea.value = "";
 
@@ -977,8 +992,9 @@ export default defineComponent({
       e.preventDefault();
     };
 
-    const onFieldDragStart = (e: any, item: any) => {
+    const onFieldDragStart = (e: any, item: any, axis: string) => {
       console.log("onFieldDragStart item", item);
+      onLeave.value = axis;
       
         dashboardPanelData.meta.dragAndDrop.dragging = true;
         dashboardPanelData.meta.dragAndDrop.dragElement = item;
