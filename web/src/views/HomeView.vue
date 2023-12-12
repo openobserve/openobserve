@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             no-caps
             color="primary"
-            @click="() => $router.push('/ingestion/logs/fluentbit')"
+            @click="() => $router.push({ name: 'ingestion' })"
             flat
             >{{ t("home.findIngestion") }}
           </q-btn>
