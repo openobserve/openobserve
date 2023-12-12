@@ -267,85 +267,96 @@ pub async fn get_latest_traces(
         .collect::<Vec<String>>()
         .join("','");
     let query_sql = format!(
-        "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM default WHERE trace_id IN ('{}') ORDER BY {} ASC LIMIT 9999",
+        "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM default WHERE trace_id IN ('{}') ORDER BY {} ASC",
         CONFIG.common.column_timestamp, trace_ids, CONFIG.common.column_timestamp,
     );
+    req.query.size = 9999;
     req.query.sql = query_sql.to_string();
     req.query.start_time = start_time;
     req.query.end_time = end_time;
-    let resp_search = match SearchService::search(&session_id, &org_id, stream_type, &req).await {
-        Ok(res) => res,
-        Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/traces/latest",
-                    "500",
-                    &org_id,
-                    "default",
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/traces/latest",
-                    "500",
-                    &org_id,
-                    "default",
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
-            log::error!("get traces latest data error: {:?}", err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
-        }
-    };
-
     let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
-    for item in resp_search.hits {
-        let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
-        let trace_start_time = item.get("start_time").unwrap().as_i64().unwrap();
-        let trace_end_time = item.get("end_time").unwrap().as_i64().unwrap();
-        let duration = item.get("duration").unwrap().as_i64().unwrap();
-        let service_name = item
-            .get("service_name")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-        let span_status = item
-            .get("span_status")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-        let trace = traces_data.get_mut(&trace_id).unwrap();
-        if trace.first_event.is_null() {
-            trace.first_event = item.clone();
+
+    loop {
+        let resp_search = match SearchService::search(&session_id, &org_id, stream_type, &req).await
+        {
+            Ok(res) => res,
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/api/org/traces/latest",
+                        "500",
+                        &org_id,
+                        "default",
+                        stream_type.to_string().as_str(),
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/api/org/traces/latest",
+                        "500",
+                        &org_id,
+                        "default",
+                        stream_type.to_string().as_str(),
+                    ])
+                    .inc();
+                log::error!("get traces latest data error: {:?}", err);
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                        .json(meta::http::HttpResponse::error_code(code)),
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
+            }
+        };
+
+        let resp_size = resp_search.hits.len();
+        for item in resp_search.hits {
+            let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
+            let trace_start_time = item.get("start_time").unwrap().as_i64().unwrap();
+            let trace_end_time = item.get("end_time").unwrap().as_i64().unwrap();
+            let duration = item.get("duration").unwrap().as_i64().unwrap();
+            let service_name = item
+                .get("service_name")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string();
+            let span_status = item
+                .get("span_status")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string();
+            let trace = traces_data.get_mut(&trace_id).unwrap();
+            if trace.first_event.is_null() {
+                trace.first_event = item.clone();
+            }
+            trace.spans[0] += 1;
+            if span_status.eq("ERROR") {
+                trace.spans[1] += 1;
+            }
+            if trace.duration < duration {
+                trace.duration = duration;
+            }
+            if trace.start_time == 0 || trace.start_time > trace_start_time {
+                trace.start_time = trace_start_time;
+            }
+            if trace.end_time < trace_end_time {
+                trace.end_time = trace_end_time;
+            }
+            let service_name_map = traces_service_name.entry(trace_id.clone()).or_default();
+            let count = service_name_map.entry(service_name.clone()).or_default();
+            *count += 1;
         }
-        trace.spans[0] += 1;
-        if span_status.eq("ERROR") {
-            trace.spans[1] += 1;
+        if resp_size < req.query.size {
+            break;
         }
-        if trace.duration < duration {
-            trace.duration = duration;
-        }
-        if trace.start_time == 0 || trace.start_time > trace_start_time {
-            trace.start_time = trace_start_time;
-        }
-        if trace.end_time < trace_end_time {
-            trace.end_time = trace_end_time;
-        }
-        let service_name_map = traces_service_name.entry(trace_id.clone()).or_default();
-        let count = service_name_map.entry(service_name.clone()).or_default();
-        *count += 1;
+        req.query.from += req.query.size;
     }
+
     // apply service_name to traces_data
     for (trace_id, service_name_map) in traces_service_name {
         let trace = traces_data.get_mut(&trace_id).unwrap();
