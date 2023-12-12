@@ -18,7 +18,6 @@ use crate::common::{
 };
 
 static JWKS: OnceCell<String> = OnceCell::const_new();
-
 static PVT_KEY: OnceCell<EncodingKey> = OnceCell::const_new();
 
 #[derive(Serialize)]
@@ -73,7 +72,7 @@ pub(crate) async fn generate_token(user: &str) -> String {
     };
 
     let mut header = Header::new(Algorithm::RS256);
-    header.kid = Some("abc123".to_owned());
+    header.kid = Some("abc123".to_owned()); // TODO change key id
 
     // Encode the token
     jsonwebtoken::encode(&header, &my_claims, &get_pvt_key().await).unwrap()
