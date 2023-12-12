@@ -17,6 +17,15 @@ fn write_to_file(path: &str, data: &str, perms: u32) -> Result<(), Box<dyn Error
             .mode(perms)
             .open(path)?;
         file.write_all(data.as_bytes())?;
+
+        if cfg!(windows) {
+            let mut perms = file.metadata()?.permissions();
+            perms.set_readonly(true);
+            file.set_permissions(perms)?;
+        } else {
+            let perms = Permissions::from_mode(permissions);
+            fs::set_permissions(path, perms)?;
+        }
         Ok(())
     } else {
         Err("File already exists , skipping key generation".to_string().into())
@@ -45,7 +54,7 @@ pub fn generate_pem_certificate_and_write(base_path: &str) -> Result<(), Box<dyn
         .to_pkcs8_pem(LineEnding::LF)
         .expect("failed to encode private key");
 
-    let certificate = pub_key
+    let public_key = pub_key
         .to_public_key_pem(LineEnding::LF)
         .expect("failed to encode public key");
 
@@ -57,6 +66,6 @@ pub fn generate_pem_certificate_and_write(base_path: &str) -> Result<(), Box<dyn
         log::debug!("File already exists, not overwriting: {}", e);
     }
 
-    log::info!("Successfully generated pem certificate");
+    log::info!("Successfully generated pem keys");
     Ok(())
 }
