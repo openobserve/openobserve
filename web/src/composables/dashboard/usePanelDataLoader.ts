@@ -183,15 +183,15 @@ export const usePanelDataLoader = (
     : [];
 
   console.log("variablesData currentAdHocVariablesData", variablesData.value);
-  console.log(
-    "variablesData.value currentAdHocVariablesData",
-    JSON.parse(JSON.stringify(variablesData.value))
-  );
+  // console.log(
+  //   "variablesData.value currentAdHocVariablesData",
+  //   JSON.parse(JSON.stringify(variablesData.value))
+  // );
 
-  console.log(
-    "variablesData.value.values currentAdHocVariablesData",
-    JSON.parse(JSON.stringify(variablesData.value.values))
-  );
+  // console.log(
+  //   "variablesData.value.values currentAdHocVariablesData",
+  //   JSON.parse(JSON.stringify(variablesData.value.values))
+  // );
 
   let currentAdHocVariablesData = variablesData.value?.values
     ? JSON.parse(
@@ -283,6 +283,7 @@ export const usePanelDataLoader = (
           .catch((error) => {
             // Process API error for "promql"
             processApiError(error, "promql");
+            return { result: null, metadata: metadata };
           });
       });
 
@@ -351,6 +352,7 @@ export const usePanelDataLoader = (
 
               // Process API error for "sql"
               processApiError(error, "sql");
+              return { result: null, metadata: metadata };
             });
         }
       );

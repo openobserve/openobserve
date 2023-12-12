@@ -38,20 +38,20 @@ export default defineComponent({
     const queryData = props.metaData?.queries || [] ;
     
     const getRows = (query: any) => {
-      const timestampOfStartTime = query.startTime;
+      const timestampOfStartTime = query?.startTime;
       const formattedStartTime = new Date(timestampOfStartTime / 1000);
       const startTimeEntry = `${timestampOfStartTime} (${formattedStartTime})`;
 
-      const timestampOfEndTime = query.endTime;
+      const timestampOfEndTime = query?.endTime;
       const formattedEndTime = new Date(timestampOfEndTime / 1000);
       const endTimeEntry = `${timestampOfEndTime} (${formattedEndTime})`;
 
       const rows: any[] = [
-        ["Original Query", query.originalQuery],
-        ["Query", query.query],
+        ["Original Query", query?.originalQuery],
+        ["Query", query?.query],
         ["Start Time", startTimeEntry],
         ["End Time", endTimeEntry],
-        ["Query Type", query.queryType],
+        ["Query Type", query?.queryType],
         ["Variable(s)", ],
         ["Fixed Variable(s)",],
         ["Dynamic Variable(s)",],
@@ -61,7 +61,7 @@ export default defineComponent({
       const fixedVariableRows: any[] = [];
       const dynamicVariableRows: any[] = [];
 
-      query.variables.forEach((variable: any) => {
+      query?.variables?.forEach((variable: any) => {
         if (variable.type === 'variable') {
           variableRows.push(`${variable.name}: ${variable.value}`);
         } else if (variable.type === 'fixed') {
