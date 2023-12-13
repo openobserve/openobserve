@@ -24,8 +24,7 @@ COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 RUN mkdir -p /app/target/release/
 
-RUN rustup component add rust-src --toolchain nightly-2023-10-24-x86_64-unknown-linux-gnu
-RUN --mount=type=cache,target=/root/.cache/sccache cargo build -Z build-std --release --features mimalloc --target x86_64-unknown-linux-gnu \
+RUN --mount=type=cache,target=/root/.cache/sccache cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu \
   && sccache --show-stats
 RUN mv /app/target/x86_64-unknown-linux-gnu/release/openobserve /app/target/release/openobserve
 
