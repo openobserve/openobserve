@@ -71,7 +71,8 @@ const defaultObject = {
     serviceColors: {} as any,
   },
   data: {
-    query: "SELECT * FROM 'default'",
+    query: "",
+    advanceFiltersQuery: "",
     parsedQuery: {},
     errorMsg: "",
     errorCode: 0,

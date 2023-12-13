@@ -10,22 +10,20 @@
   >
     <template v-slot:header>
       <div class="flex content-center ellipsis full-width" :title="row.name">
-        <div class="field_label ellipsis" style="width: calc(100% - 28px)">
+        <div
+          class="field_label ellipsis"
+          style="width: calc(100% - 28px); font-size: 14px"
+        >
           {{ row.name }}
         </div>
-        <div
-          class="field_overlay"
-          :style="{
-            background: store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
-          }"
-        >
+        <div class="field_overlay">
           <q-btn
             :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
             :icon="outlinedAdd"
             style="margin-right: 0.375rem"
-            size="4px"
+            size="6px"
             class="q-mr-sm"
-            @click.stop="addToFilter(`${row.name}=''`)"
+            @click.stop="addSearchTerm(`${row.name}=''`)"
             round
           />
         </div>
@@ -144,8 +142,8 @@ const $q = useQuasar();
 
 const { searchObj } = useTraces();
 
-const addSearchTerm = () => {
-  addToFilter(`${row.name}=''`);
+const addSearchTerm = (term: string) => {
+  searchObj.data.stream.addToFilter = term;
 };
 
 const openFilterCreator = (event: any, { name, ftsKey }: any) => {
@@ -255,12 +253,20 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
 
 <style lang="scss">
 .q-expansion-item {
+  .field_overlay {
+    visibility: hidden;
+
+    .q-icon {
+      opacity: 0;
+    }
+  }
+
   .q-item {
     display: flex;
     align-items: center;
     padding: 0;
-    height: 25px !important;
-    min-height: 25px !important;
+    height: 32px !important;
+    min-height: 32px !important;
   }
   .q-item__section--avatar {
     min-width: 12px;
@@ -289,9 +295,10 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
     }
   }
   .field-expansion-icon {
-    img {
-      width: 12px;
-      height: 12px;
+    margin-right: 4px !important;
+    .q-icon {
+      font-size: 18px;
+      color: #808080;
     }
   }
 }

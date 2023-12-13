@@ -10,24 +10,11 @@
   >
     <template v-slot:header>
       <div class="flex content-center ellipsis full-width" :title="row.name">
-        <div class="field_label ellipsis" style="width: calc(100% - 28px)">
-          {{ row.name }}
-        </div>
         <div
-          class="field_overlay"
-          :style="{
-            background: store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
-          }"
+          class="field_label ellipsis"
+          style="width: calc(100% - 28px); font-size: 14px"
         >
-          <q-btn
-            :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
-            :icon="outlinedAdd"
-            style="margin-right: 0.375rem"
-            size="4px"
-            class="q-mr-sm"
-            @click.stop="addToFilter(`${row.name}=''`)"
-            round
-          />
+          {{ row.name }}
         </div>
       </div>
     </template>
@@ -307,8 +294,8 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
     display: flex;
     align-items: center;
     padding: 0;
-    height: 25px !important;
-    min-height: 25px !important;
+    height: 32px !important;
+    min-height: 32px !important;
   }
   .q-item__section--avatar {
     min-width: 12px;
@@ -337,9 +324,10 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
     }
   }
   .field-expansion-icon {
-    img {
-      width: 12px;
-      height: 12px;
+    margin-right: 4px !important;
+    .q-icon {
+      font-size: 18px;
+      color: #808080;
     }
   }
 }

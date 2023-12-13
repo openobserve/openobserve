@@ -840,7 +840,6 @@ export default defineComponent({
             if (serviceColorIndex.value >= colors.value.length)
               generateNewColor();
 
-            console.log(serviceColorIndex.value, colors.value);
             searchObj.meta.serviceColors[service.service_name] =
               colors.value[serviceColorIndex.value];
 

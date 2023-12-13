@@ -33,21 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :tabs="[
               {
-                label: 'Advanced',
-                value: 'advance',
-                style: {
-                  width: 'fit-content',
-                  padding: '0px 8px',
-                  background:
-                    searchObj.meta.filterType === 'advance' ? '#5960B2' : '',
-                  border: 'none !important',
-                  color:
-                    searchObj.meta.filterType === 'advance'
-                      ? '#ffffff !important'
-                      : '',
-                },
-              },
-              {
                 label: 'Basic',
                 value: 'basic',
                 style: {
@@ -62,10 +47,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : '',
                 },
               },
+              {
+                label: 'Advanced',
+                value: 'advance',
+                style: {
+                  width: 'fit-content',
+                  padding: '0px 8px',
+                  background:
+                    searchObj.meta.filterType === 'advance' ? '#5960B2' : '',
+                  border: 'none !important',
+                  color:
+                    searchObj.meta.filterType === 'advance'
+                      ? '#ffffff !important'
+                      : '',
+                },
+              },
             ]"
             active-tab="searchObj.meta.filterType"
             @update:active-tab="updateFilterType"
-          ></app-tabs>
+          />
         </div>
       </div>
       <div class="float-right col-auto">
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:query="searchObj.data.editorValue"
           :keywords="autoCompleteKeywords"
           v-model:functions="searchObj.data.stream.functions"
-          :read-only="searchObj.meta.filterType === 'advance'"
+          :read-only="searchObj.meta.filterType === 'basic'"
           @update:query="updateQueryValue"
           @run-query="searchData"
         ></query-editor>
@@ -360,7 +360,7 @@ export default defineComponent({
     };
 
     const updateFilterType = (value) => {
-      if (value === "advance") {
+      if (value === "basic") {
         showWarningDialog.value = true;
       } else {
         searchObj.meta.filterType = value;
@@ -369,7 +369,8 @@ export default defineComponent({
 
     const changeToggle = () => {
       showWarningDialog.value = false;
-      searchObj.meta.filterType = "advance";
+      searchObj.meta.filterType = "basic";
+      searchObj.data.editorValue = searchObj.data.advanceFiltersQuery;
     };
 
     return {

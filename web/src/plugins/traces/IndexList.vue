@@ -49,14 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
                 :title="props.row.name"
               >
-                <div class="field_label ellipsis">
+                <div class="field_label ellipsis" style="font-size: 14px">
                   {{ props.row.name }}
                 </div>
                 <div
                   class="field_overlay"
                   :style="{
                     background:
-                      store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
+                      store.state.theme === 'dark' ? '#414345' : '#e8e8e8',
                   }"
                 >
                   <q-btn
@@ -73,15 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-else>
                 <template
                   v-if="
-                    ['operation_name', 'service_name'].includes(props.row.name)
+                    searchObj.meta.filterType === 'basic' &&
+                    props.row.name === 'duration'
                   "
                 >
-                  <advanced-values-filter
-                    :row="props.row"
-                    @update:values="updateQueryFilter"
-                  />
-                </template>
-                <template v-else-if="props.row.name === 'duration'">
                   <div class="q-mx-lg q-mt-sm">Duration</div>
                   <div class="q-mx-lg q-pb-xs" style="margin: 0px 36px">
                     <q-range
@@ -116,6 +111,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </div>
+                </template>
+                <template v-else-if="searchObj.meta.filterType === 'basic'">
+                  <advanced-values-filter
+                    :row="props.row"
+                    @update:values="updateQueryFilter"
+                  />
                 </template>
                 <template v-else>
                   <basic-values-filter :row="props.row" />
@@ -159,9 +160,7 @@ import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import AdvancedValuesFilter from "./fields-sidebar/AdvancedValuesFilter.vue";
 import { computed } from "vue";
 import { Parser } from "node-sql-parser";
-import { f } from "msw/lib/SetupApi-8ab693f7";
-import { cloneDeep, filter } from "lodash-es";
-import { onMounted } from "vue";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -249,7 +248,7 @@ export default defineComponent({
       return markers;
     });
 
-    const updateQueryFilter = (column, values) => {
+    const updateQueryFilter = (column: string, values: string[]) => {
       const filters = searchObj.data.stream.filters;
       const filterIndex = filters.findIndex(
         (f: any) => f.field_name === column
@@ -262,8 +261,14 @@ export default defineComponent({
         .map((value: string) => "'" + value + "'")
         .join(",");
 
+      let query = "SELECT * FROM 'default'";
+
       if (!filters.length) {
-        searchObj.data.query += ` WHERE ${column} IN (${valuesString})`;
+        searchObj.data.editorValue += ` ${column} IN (${valuesString})`;
+        query +=
+          " WHERE " +
+          searchObj.data.editorValue +
+          ` ${column} IN (${valuesString})`;
         searchObj.data.stream.filters.push({
           field_name: column,
           values,
@@ -276,7 +281,9 @@ export default defineComponent({
           values,
           operator: "IN",
         });
-        searchObj.data.query += ` AND ${column} IN (${valuesString})`;
+        searchObj.data.editorValue += ` AND ${column} IN (${valuesString})`;
+        query +=
+          searchObj.data.editorValue + ` AND ${column} IN (${valuesString})`;
         return;
       }
 
@@ -284,7 +291,9 @@ export default defineComponent({
         searchObj.data.stream.filters[filterIndex].values = values;
       }
 
-      const parsedQuery = parser.astify(searchObj.data.query);
+      query += " WHERE " + searchObj.data.editorValue;
+
+      const parsedQuery = parser.astify(query);
 
       if (filters.length && filterIndex > -1 && values.length === 0) {
         parsedQuery.where = removeCondition(parsedQuery.where, column);
@@ -297,11 +306,17 @@ export default defineComponent({
 
       // Convert the AST back to SQL query
       let modifiedQuery = parser.sqlify(parsedQuery);
+      if (modifiedQuery) {
+        searchObj.data.editorValue = (
+          modifiedQuery.split("WHERE")[1] || ""
+        ).replace(/`/g, "");
 
-      if (modifiedQuery) searchObj.data.query = modifiedQuery;
+        // Saving query in this variable, as while switching back from advance to basic we don't have to recreate the query from filters
+        searchObj.data.advanceFiltersQuery = searchObj.data.editorValue;
+      }
     };
 
-    const removeCondition = (node, fieldName): any => {
+    const removeCondition = (node: any, fieldName: string): any => {
       if (!node) return null;
 
       if (node.type === "binary_expr") {
@@ -329,7 +344,11 @@ export default defineComponent({
       return node;
     };
 
-    const modifyWhereClause = (node, fieldName, newValue) => {
+    const modifyWhereClause = (
+      node: any,
+      fieldName: string,
+      newValue: string[]
+    ) => {
       if (!node) return;
 
       if (node.type === "binary_expr") {
@@ -354,12 +373,11 @@ export default defineComponent({
       }
     };
 
-    const restoreFiltersFromQuery = (node, filters) => {
+    const restoreFiltersFromQuery = (node: any, filters: any[]) => {
       if (!node) return;
       if (node.type === "binary_expr") {
         if (node.left.column) {
           let values = [];
-          console.log(node);
           if (node.operator === "IN") {
             values = node.right.value.map(
               (_value: { value: string }) => _value.value
@@ -394,8 +412,6 @@ export default defineComponent({
       const parsedQuery = parser.astify(sql);
 
       restoreFiltersFromQuery(parsedQuery.where, filters);
-
-      console.log(cloneDeep(filters));
     };
 
     return {
@@ -539,7 +555,7 @@ export default defineComponent({
     }
     &:hover {
       .field-container {
-        background-color: color-mix(in srgb, currentColor 15%, transparent);
+        background-color: #e8e8e8;
       }
     }
   }
