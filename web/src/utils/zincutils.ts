@@ -292,7 +292,7 @@ export const routeGuard = async (
   next: any
 ) => {
   if (to.path.indexOf("/ingestion") == -1) {
-    const local_organization = useLocalOrganization();
+    const local_organization: any = useLocalOrganization();
     const $q = useQuasar();
 
     await streamService
