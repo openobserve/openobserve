@@ -18,6 +18,8 @@ import { ref } from "vue";
 import { DateTime } from "luxon";
 import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
+import streamService from "@/services/stream";
+import { useQuasar } from "quasar";
 
 const useLocalStorage = (
   key: string,
@@ -284,14 +286,34 @@ export const getPath = () => {
   return config.isCloud == "true" ? cloudPath : path;
 };
 
-export const routeGuardPendingSubscriptions = (
+export const routeGuard = async (
   to: any,
   from: any,
   next: any
 ) => {
-  next();
-  // const local_organization = ref();
-  // local_organization.value = useLocalOrganization();
+  if (to.path.indexOf("/ingestion") == -1) {
+    const local_organization: any = useLocalOrganization();
+    const $q = useQuasar();
+
+    await streamService
+      .nameList(local_organization?.value?.identifier, "", false)
+      .then((response) => {
+        if (response.data.list.length == 0) {
+          $q.notify({
+            type: "warning",
+            message:
+            "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
+            timeout: 5000,
+          });
+          next({ path: "/ingestion" });
+        } else {
+          next();
+        }
+      });
+  } else {
+    next();
+  }
+
   // if (local_organization.value.value == null || config.isCloud == "false") {
   //   next();
   // }
