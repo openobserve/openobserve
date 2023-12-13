@@ -111,7 +111,7 @@ pub fn new_parquet_writer<'a>(
         .set_dictionary_enabled(true)
         .set_encoding(Encoding::PLAIN)
         .set_sorting_columns(Some(
-            [SortingColumn::new(sort_column_id as i32, false, false)].to_vec(),
+            [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),
         ))
         .set_column_dictionary_enabled(
             ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
@@ -131,6 +131,10 @@ pub fn new_parquet_writer<'a>(
             ),
         ]));
     for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
+        writer_props = writer_props
+            .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
+    }
+    for field in BLOOM_FILTER_DEFAULT_FIELDS.iter() {
         writer_props = writer_props
             .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
     }

@@ -76,10 +76,10 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5", version = "33", features = [
+datafusion = { git = "https://github.com/apache/arrow-datafusion.git", rev = "b648d4e22e82989c65523e62312e1995a1543888", version = "33", features = [
   "simd",
 ] }
-datafusion-expr = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5", version = "33" }
+datafusion-expr = { git = "https://github.com/apache/arrow-datafusion.git", rev = "b648d4e22e82989c65523e62312e1995a1543888", version = "33" }
 arrow = { version = "49", features = ["simd", "ipc_compression"] }
 arrow-schema = { version = "49", features = ["serde"] }
 parquet = { version = "49", features = ["arrow", "async"] }
@@ -141,7 +141,7 @@ sha256 = "1.4.0"
 simd-json = "0.13"
 sled = "0.34"
 snap = "1"
-sqlparser = { version = "0.40", features = ["serde", "visitor"] }
+sqlparser = { version = "0.39", features = ["serde", "visitor"] }
 sqlx = { version = "0.7", features = [
   "runtime-tokio-rustls",
   "postgres",
