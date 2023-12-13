@@ -449,12 +449,14 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "DashboardMapQueryBuilder",
   components: { SortByBtnGrp },
   setup() {
     const { t } = useI18n();
+    const $q = useQuasar();
     const expansionItems = reactive({
       latitude: true,
       longitude: true,
@@ -533,16 +535,31 @@ export default defineComponent({
 
           if( area == "latitude" && currentQueryField.latitude) {
             console.log("Dragging not allowed in 'latitude' axis.");
+            $q.notify({
+              type: "negative",
+              message: "Dragging not allowed in 'latitude' axis.",
+              timeout: 5000,
+            });
             return;
           }
 
           if (area == "longitude" && currentQueryField.longitude) {
             console.log("Dragging not allowed in 'longitude' axis.");
+            $q.notify({
+              type: "negative",
+              message: "Dragging not allowed in 'longitude' axis.",
+              timeout: 5000,
+            });
             return;
           }
 
           if (area == "weight" && currentQueryField.weight) {
             console.log("Dragging not allowed in 'weight' axis.");
+            $q.notify({
+              type: "negative",
+              message: "Dragging not allowed in 'weight' axis.",
+              timeout: 5000,
+            });
             return;
           }
 

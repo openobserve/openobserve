@@ -816,6 +816,7 @@ import { getImageURL } from "../../../utils/zincutils";
 import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -829,6 +830,7 @@ export default defineComponent({
     const panelName = ref("");
     const panelDesc = ref("");
     const { t } = useI18n();
+    const $q = useQuasar();
     const expansionItems = reactive({
       x: true,
       y: true,
@@ -962,16 +964,31 @@ export default defineComponent({
           if (area !== "f") {
              if (area === "x" && isAddXAxisNotAllowed.value) {
               console.log("Dragging not allowed in 'x' axis.");
+              $q.notify({
+                type: "negative",
+                message: "Dragging not allowed in 'x' axis.",
+                timeout: 5000,
+              });
               return;
             }
 
             if (area === "y" && isAddYAxisNotAllowed.value) {
               console.log("Dragging not allowed in 'y' axis.");
+              $q.notify({
+                type: "negative",
+                message: "Dragging not allowed in 'y' axis.",
+                timeout: 5000,
+              });
               return;
             }
 
             if (area === "z" && isAddZAxisNotAllowed.value) {
               console.log("Dragging not allowed in 'z' axis.");
+              $q.notify({
+                type: "negative",
+                message: "Dragging not allowed in 'z' axis.",
+                timeout: 5000,
+              });
               return;
             }
             
@@ -992,6 +1009,11 @@ export default defineComponent({
 
           if (area === "f") {
             console.log("Dropping on 'f' axis with fieldElement type. Disabled.");
+            $q.notify({
+              type: "negative",
+              message: "Dropping on 'f' axis with fieldElement type. Disabled.",
+              timeout: 5000,
+            });
             return;
           }
 
