@@ -22,11 +22,7 @@ pub async fn get_mark(org_id: &str) -> String {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => "".to_string(),
     };
-    if val.eq("NOP") {
-        "".to_string()
-    } else {
-        val
-    }
+    if val.eq("NOP") { "".to_string() } else { val }
 }
 
 pub async fn set_mark(org_id: &str, node: Option<&str>) -> Result<(), anyhow::Error> {

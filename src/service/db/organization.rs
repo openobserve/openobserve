@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
+use bytes::Bytes;
+
 use crate::common::{
     infra::{
         config::ORGANIZATION_SETTING,
@@ -22,8 +26,6 @@ use crate::common::{
     meta::organization::OrganizationSetting,
     utils::json,
 };
-use bytes::Bytes;
-use std::sync::Arc;
 
 // DBKey to set settings for an org
 pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";

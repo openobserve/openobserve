@@ -15,15 +15,17 @@
 
 use chrono::{Duration, Utc};
 
-use crate::common::{
-    infra::{
-        cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-        config::{CONFIG, TRIGGERS},
-        dist_lock,
+use crate::{
+    common::{
+        infra::{
+            cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+            config::{CONFIG, TRIGGERS},
+            dist_lock,
+        },
+        meta::{alerts::triggers::Trigger, StreamType},
     },
-    meta::{alerts::triggers::Trigger, StreamType},
+    service::db,
 };
-use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // maybe in the future we can support multiple organizations
@@ -38,7 +40,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // before start merging, set current node to lock the organization
     let lock_key = format!("alert_manager/organization/{org_id}");
     let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
-    // check the working node for the organization again, maybe other node locked it first
+    // check the working node for the organization again, maybe other node locked it
+    // first
     let node = db::alerts::alert_manager::get_mark(org_id).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
         log::warn!("[ALERT_MANAGER] is processing by {node}");

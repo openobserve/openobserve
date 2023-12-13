@@ -15,9 +15,10 @@
 
 use actix_web::http;
 
-use crate::common::infra::config::ALERTS_DESTINATIONS;
-use crate::common::meta::alerts::templates::Template;
-use crate::service::db;
+use crate::{
+    common::{infra::config::ALERTS_DESTINATIONS, meta::alerts::templates::Template},
+    service::db,
+};
 
 pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<(), anyhow::Error> {
     if template.body.is_null() || template.body.as_str().unwrap_or_default().is_empty() {

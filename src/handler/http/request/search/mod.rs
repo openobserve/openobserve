@@ -14,27 +14,30 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod saved_view;
+use std::{collections::HashMap, io::Error};
+
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
 use chrono::Duration;
-use std::{collections::HashMap, io::Error};
 
-use crate::common::{
-    infra::{
-        config::{CONFIG, DISTINCT_FIELDS},
-        errors, metrics,
+use crate::{
+    common::{
+        infra::{
+            config::{CONFIG, DISTINCT_FIELDS},
+            errors, metrics,
+        },
+        meta::{
+            self,
+            http::HttpResponse as MetaHttpResponse,
+            usage::{RequestStats, UsageType},
+            StreamType,
+        },
+        utils::{base64, functions, http::get_stream_type_from_request, json},
     },
-    meta::{
-        self,
-        http::HttpResponse as MetaHttpResponse,
-        usage::{RequestStats, UsageType},
-        StreamType,
-    },
-    utils::{base64, functions, http::get_stream_type_from_request, json},
+    service::{search as SearchService, usage::report_request_usage_stats},
 };
-use crate::service::{search as SearchService, usage::report_request_usage_stats};
 
-/** SearchStreamData*/
+/// SearchStreamData
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -224,7 +227,7 @@ pub async fn search(
     }
 }
 
-/** SearchAround*/
+/// SearchAround
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -300,11 +303,7 @@ pub async fn around(
                     .await
                     .iter()
                     .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-                if uses_fn {
-                    v
-                } else {
-                    default_sql
-                }
+                if uses_fn { v } else { default_sql }
             }
         },
     };
@@ -491,7 +490,7 @@ pub async fn around(
     Ok(HttpResponse::Ok().json(resp))
 }
 
-/** SearchTopNValues */
+/// SearchTopNValues
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -779,7 +778,10 @@ async fn values_v2(
     let start = std::time::Instant::now();
     let session_id = uuid::Uuid::new_v4().to_string();
 
-    let mut query_sql =  format!("SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'", stream_type,stream_name,field);
+    let mut query_sql = format!(
+        "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
+        stream_type, stream_name, field
+    );
     if let Some((key, val)) = filter {
         query_sql = format!(
             "{} AND filter_name ='{}' AND filter_value='{}'",

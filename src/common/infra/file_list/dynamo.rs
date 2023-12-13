@@ -13,15 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
-use aws_sdk_dynamodb::{operation::query::QueryOutput, types::*};
-use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::{
     cmp::{max, min},
     collections::HashMap,
 };
+
+use async_trait::async_trait;
+use aws_sdk_dynamodb::{operation::query::QueryOutput, types::*};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use tokio_stream::StreamExt;
 
+use super::parse_file_key_columns;
 use crate::common::{
     infra::{
         config::CONFIG,
@@ -35,8 +37,6 @@ use crate::common::{
     },
     utils::time::BASE_TIME,
 };
-
-use super::parse_file_key_columns;
 
 pub struct DynamoFileList {
     file_list_table: String,
@@ -338,7 +338,7 @@ impl super::FileList for DynamoFileList {
         Ok(resp)
     }
 
-    async fn query_deleted(&self, org_id: &str, time_max: i64) -> Result<Vec<String>> {
+    async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>> {
         if time_max == 0 {
             return Ok(Vec::new());
         }
@@ -353,6 +353,7 @@ impl super::FileList for DynamoFileList {
             .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
             .expression_attribute_values(":ts", AttributeValue::N(time_max.to_string()))
             .select(Select::AllAttributes)
+            .limit(limit as i32)
             .into_paginator()
             .page_size(1000)
             .send()
@@ -374,8 +375,18 @@ impl super::FileList for DynamoFileList {
         Ok(resp)
     }
 
+    async fn get_min_ts(
+        &self,
+        _org_id: &str,
+        _stream_type: StreamType,
+        _stream_name: &str,
+    ) -> Result<i64> {
+        Ok(0) // TODO
+    }
+
     async fn get_max_pk_value(&self) -> Result<i64> {
-        // we subtract 10 minutes to avoid the case that the last file insert at the same time
+        // we subtract 10 minutes to avoid the case that the last file insert at the
+        // same time
         Ok(Utc::now().timestamp_micros() - Duration::minutes(10).num_microseconds().unwrap())
     }
 

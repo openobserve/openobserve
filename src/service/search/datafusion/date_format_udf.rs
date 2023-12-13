@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{iter::zip, sync::Arc};
+
 use chrono::{FixedOffset, TimeZone, Utc};
 use datafusion::{
     arrow::{
@@ -26,8 +28,6 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 use once_cell::sync::Lazy;
-use std::iter::zip;
-use std::sync::Arc;
 
 use crate::common::utils::time;
 
@@ -56,7 +56,8 @@ pub fn date_format_expr_impl() -> ScalarFunctionImplementation {
             )));
         }
 
-        // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this function panics!
+        // 1. cast both arguments to Union. These casts MUST be aligned with the
+        //    signature or this function panics!
         let timestamp = &args[0]
             .as_any()
             .downcast_ref::<Int64Array>()
@@ -103,13 +104,18 @@ pub fn date_format_expr_impl() -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::array::{Int64Array, StringArray};
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
-    use datafusion::arrow::record_batch::RecordBatch;
-    use datafusion::assert_batches_eq;
-    use datafusion::datasource::MemTable;
-    use datafusion::prelude::SessionContext;
     use std::sync::Arc;
+
+    use datafusion::{
+        arrow::{
+            array::{Int64Array, StringArray},
+            datatypes::{DataType, Field, Schema},
+            record_batch::RecordBatch,
+        },
+        assert_batches_eq,
+        datasource::MemTable,
+        prelude::SessionContext,
+    };
 
     use super::*;
 
@@ -185,11 +191,13 @@ mod tests {
         )
         .unwrap();
 
-        // declare a new context. In spark API, this corresponds to a new spark SQLsession
+        // declare a new context. In spark API, this corresponds to a new spark
+        // SQLsession
         let ctx = SessionContext::new();
         ctx.register_udf(DATE_FORMAT_UDF.clone());
 
-        // declare a table in memory. In spark API, this corresponds to createDataFrame(...).
+        // declare a table in memory. In spark API, this corresponds to
+        // createDataFrame(...).
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 

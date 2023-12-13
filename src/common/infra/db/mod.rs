@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
-use std::sync::Arc;
 use tokio::sync::{mpsc, OnceCell};
 
 use crate::common::{
@@ -210,8 +211,8 @@ pub enum DbEventMeta {
 impl std::fmt::Debug for DbEventMeta {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DbEventMeta::Put(key, _, _) => write!(f, "Put({})", key),
-            DbEventMeta::Delete(key, _, _) => write!(f, "Delete({})", key),
+            DbEventMeta::Put(key, ..) => write!(f, "Put({})", key),
+            DbEventMeta::Delete(key, ..) => write!(f, "Delete({})", key),
         }
     }
 }

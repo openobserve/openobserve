@@ -13,25 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::AHashMap;
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
-use datafusion::arrow::error::ArrowError;
-use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::{BufReader, Seek, SeekFrom};
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    fs::File,
+    io::{BufReader, Seek, SeekFrom},
+    sync::Arc,
+};
 
-use crate::common::infra::config::{CONFIG, LOCAL_SCHEMA_LOCKER};
-use crate::common::infra::db::etcd;
-use crate::common::meta::prom::METADATA_LABEL;
-use crate::common::meta::stream::SchemaEvolution;
-use crate::common::meta::{ingestion::StreamSchemaChk, StreamType};
-use crate::common::utils::json;
-use crate::common::utils::schema::infer_json_schema;
-use crate::common::utils::schema_ext::SchemaExt;
-use crate::service::db;
-use crate::service::search::server_internal_error;
+use ahash::AHashMap;
+use datafusion::arrow::{
+    datatypes::{DataType, Field, Schema},
+    error::ArrowError,
+};
+use itertools::Itertools;
+
+use crate::{
+    common::{
+        infra::{
+            config::{CONFIG, LOCAL_SCHEMA_LOCKER},
+            db::etcd,
+        },
+        meta::{
+            ingestion::StreamSchemaChk, prom::METADATA_LABEL, stream::SchemaEvolution, StreamType,
+        },
+        utils::{json, schema::infer_json_schema, schema_ext::SchemaExt},
+    },
+    service::{db, search::server_internal_error},
+};
 
 #[tracing::instrument(name = "service:schema:schema_evolution", skip(inferred_schema))]
 pub async fn schema_evolution(
@@ -136,7 +144,8 @@ pub async fn schema_evolution(
 fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowError> {
     let mut merged_metadata: HashMap<String, String> = HashMap::new();
     let mut merged_fields: Vec<Field> = Vec::new();
-    // TODO : this dummy initialization is to avoid compiler complaining for uninitialized value
+    // TODO : this dummy initialization is to avoid compiler complaining for
+    // uninitialized value
     let mut temp_field = Field::new("dummy", DataType::Utf8, false);
 
     for schema in schemas {
@@ -269,7 +278,7 @@ pub async fn check_for_schema(
     };
 
     if !schema.fields().is_empty() && CONFIG.common.skip_schema_validation {
-        //return (true, None, schema.fields().to_vec());
+        // return (true, None, schema.fields().to_vec());
         return SchemaEvolution {
             schema_compatible: true,
             types_delta: None,
@@ -284,7 +293,7 @@ pub async fn check_for_schema(
     filter_schema_null_fields(&mut inferred_schema);
 
     if schema.fields.eq(&inferred_schema.fields) {
-        //return (true, None, schema.fields().to_vec());
+        // return (true, None, schema.fields().to_vec());
         return SchemaEvolution {
             schema_compatible: true,
             types_delta: None,
@@ -295,7 +304,7 @@ pub async fn check_for_schema(
     }
 
     if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
-        //return (false, None, inferred_schema.fields().to_vec());
+        // return (false, None, inferred_schema.fields().to_vec());
         return SchemaEvolution {
             schema_compatible: false,
             types_delta: None,
@@ -458,7 +467,7 @@ async fn handle_existing_schema(
                 .unwrap();
                 stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
             } else {
-                //No Change in schema.
+                // No Change in schema.
                 stream_schema_map.insert(stream_name.to_string(), schema);
             }
             drop(lock_acquired); // release lock
@@ -544,7 +553,7 @@ async fn handle_new_schema(
                     stream_name
                 );
 
-                //return (true, None, final_schema.fields().to_vec());
+                // return (true, None, final_schema.fields().to_vec());
                 return Some(SchemaEvolution {
                     schema_compatible: true,
                     types_delta: None,
@@ -678,21 +687,21 @@ fn get_schema_changes(
             }
         }
     }
-    /*let mut rec_schema = Schema::empty();
-      if !field_datatype_delta.is_empty() {
-        //update data type
-        match try_merge(vec![
-            schema.clone(),
-            Arc::into_inner(inferred_schema.clone().into()).unwrap(),
-        ]) {
-            Err(e) => {
-                log::error!("get_schema_changes: schema merge failed err: {:?}", e);
-            }
-            Ok(merged) => {
-                rec_schema = merged;
-            }
-        }
-    } */
+    // let mut rec_schema = Schema::empty();
+    // if !field_datatype_delta.is_empty() {
+    // update data type
+    // match try_merge(vec![
+    // schema.clone(),
+    // Arc::into_inner(inferred_schema.clone().into()).unwrap(),
+    // ]) {
+    // Err(e) => {
+    // log::error!("get_schema_changes: schema merge failed err: {:?}", e);
+    // }
+    // Ok(merged) => {
+    // rec_schema = merged;
+    // }
+    // }
+    // }
 
     let final_fields: Vec<Field> = merged_fields.drain().map(|(_key, value)| value).collect();
     (
@@ -763,9 +772,10 @@ pub async fn add_stream_schema(
     if stream_type == StreamType::Traces {
         let settings = crate::common::meta::stream::StreamSettings {
             partition_keys: vec!["service_name".to_string()],
-            full_text_search_keys: vec![],
-            data_retention: 0,
             partition_time_level: None,
+            full_text_search_keys: vec![],
+            bloom_filter_fields: vec![],
+            data_retention: 0,
         };
         metadata.insert(
             "settings".to_string(),

@@ -14,14 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{fs, path::Path};
+
 use tokio::time;
 
-use crate::common::{
-    infra::{cluster, config::CONFIG, storage, wal},
-    meta::{stream::StreamParams, StreamType},
-    utils::file::scan_files,
+use crate::{
+    common::{
+        infra::{cluster, config::CONFIG, storage, wal},
+        meta::{stream::StreamParams, StreamType},
+        utils::file::scan_files,
+    },
+    service::db,
 };
-use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if CONFIG.common.local_mode || CONFIG.common.meta_store_external {
@@ -49,9 +52,7 @@ pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
     }
 }
 
-/*
- * upload compressed file_list to storage & delete moved files from local
- */
+// upload compressed file_list to storage & delete moved files from local
 pub async fn move_file_list_to_storage(check_in_use: bool) -> Result<(), anyhow::Error> {
     let data_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()

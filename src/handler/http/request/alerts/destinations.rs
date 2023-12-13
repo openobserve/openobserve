@@ -13,15 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, http, post, web, HttpResponse};
 use std::io::Error;
 
-use crate::common::meta::{
-    alerts::destinations::Destination, http::HttpResponse as MetaHttpResponse,
-};
-use crate::service::alerts::destinations;
+use actix_web::{delete, get, http, post, web, HttpResponse};
 
-/** CreateDestination */
+use crate::{
+    common::meta::{alerts::destinations::Destination, http::HttpResponse as MetaHttpResponse},
+    service::alerts::destinations,
+};
+
+/// CreateDestination
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -52,7 +53,7 @@ pub async fn save_destination(
     }
 }
 
-/** GetDestination */
+/// GetDestination
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -78,7 +79,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
     }
 }
 
-/** ListDestinations */
+/// ListDestinations
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -103,7 +104,7 @@ async fn list_destinations(path: web::Path<String>) -> Result<HttpResponse, Erro
     }
 }
 
-/** DeleteDestination */
+/// DeleteDestination
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",

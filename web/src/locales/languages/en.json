@@ -37,7 +37,8 @@
     "attributes": "Attributes",
     "events": "Events",
     "goHome": "Go Home",
-    "name": "Name"
+    "name": "Name",
+    "add": "Add"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -286,6 +287,7 @@
     "streamSettings": "Stream Settings",
     "streamPartitionKey": "Partition Key",
     "streamftsKey": "Full Text Search Key",
+    "streamBloomKey": "Bloom Filter",
     "delete": "Delete",
     "deleteIndex": "Delete Stream",
     "confirmDeleteHead": "Delete Stream",
@@ -635,7 +637,8 @@
     "addTitle": "Add Alert",
     "updateTitle": "Update Alert",
     "start": "start",
-    "pause": "Pause"
+    "pause": "Pause",
+    "groupBy": "Group by"
   },
   "alert_templates": {
     "header": "Templates",

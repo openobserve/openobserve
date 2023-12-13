@@ -13,11 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
-use utoipa::{Modify, OpenApi};
+use utoipa::{
+    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+    Modify, OpenApi,
+};
 
-use crate::common::{infra::config::CONFIG, meta};
-use crate::handler::http::request;
+use crate::{
+    common::{infra::config::CONFIG, meta},
+    handler::http::request,
+};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -157,7 +161,9 @@ use crate::handler::http::request;
             meta::alerts::Alert,
             meta::alerts::Condition,
             meta::alerts::Operator,
+            meta::alerts::Aggregation,
             meta::alerts::TriggerCondition,
+            meta::alerts::QueryCondition,
             meta::alerts::destinations::Destination,
             meta::alerts::destinations::DestinationWithTemplate,
             meta::alerts::destinations::HTTPType,

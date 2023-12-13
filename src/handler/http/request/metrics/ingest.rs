@@ -13,15 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
-use crate::service::metrics::otlp_http::{metrics_json_handler, metrics_proto_handler};
-use crate::service::metrics::{self};
+use actix_web::{http, post, web, HttpRequest, HttpResponse};
 
-/** _json ingestion API */
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    service::metrics::{
+        otlp_http::{metrics_json_handler, metrics_proto_handler},
+        {self},
+    },
+};
+
+/// _json ingestion API
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
@@ -59,7 +64,7 @@ pub async fn json(
     )
 }
 
-/** MetricsIngest */
+/// MetricsIngest
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",

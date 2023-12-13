@@ -24,32 +24,36 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
-use crate::common::meta::stream::SchemaRecords;
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
-    },
-    meta::{
-        alerts::Alert, http::HttpResponse as MetaHttpResponse, ingestion::StreamStatus,
-        stream::StreamParams, usage::UsageType, StreamType,
-    },
-    utils::{flatten, json},
-};
-use crate::handler::http::request::CONTENT_TYPE_JSON;
-use crate::service::schema::stream_schema_exists;
-use crate::service::usage::report_request_usage_stats;
-use crate::service::{
-    db, distinct_values, get_formatted_stream_name,
-    ingestion::{
-        evaluate_trigger,
-        otlp_json::{get_int_value, get_val_for_attr},
-        write_file_arrow, TriggerAlertData,
-    },
-};
-
 use super::StreamMeta;
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
+        },
+        meta::{
+            alerts::Alert,
+            http::HttpResponse as MetaHttpResponse,
+            ingestion::StreamStatus,
+            stream::{SchemaRecords, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json},
+    },
+    handler::http::request::CONTENT_TYPE_JSON,
+    service::{
+        db, distinct_values, get_formatted_stream_name,
+        ingestion::{
+            evaluate_trigger,
+            otlp_json::{get_int_value, get_val_for_attr},
+            write_file_arrow, TriggerAlertData,
+        },
+        schema::stream_schema_exists,
+        usage::report_request_usage_stats,
+    },
+};
 
 const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";
@@ -77,7 +81,7 @@ pub async fn logs_proto_handler(
     }
 }
 
-//example at: https://opentelemetry.io/docs/specs/otel/protocol/file-exporter/#examples
+// example at: https://opentelemetry.io/docs/specs/otel/protocol/file-exporter/#examples
 // otel collector handling json request for logs https://github.com/open-telemetry/opentelemetry-collector/blob/main/pdata/plog/json.go
 pub async fn logs_json_handler(
     org_id: &str,
@@ -161,7 +165,7 @@ pub async fn logs_json_handler(
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("Invalid json: {}", e),
-            )))
+            )));
         }
     };
 
@@ -269,13 +273,13 @@ pub async fn logs_json_handler(
                         );
                     }
                 }
-                //remove attributes after adding
+                // remove attributes after adding
                 local_val.remove("attributes");
 
-                //remove body before adding
+                // remove body before adding
                 local_val.remove("body_stringvalue");
 
-                //process trace id
+                // process trace id
                 let trace_id = if log.get("trace_id").is_some() {
                     local_val.remove("trace_id");
                     log.get("trace_id").unwrap()
@@ -288,7 +292,7 @@ pub async fn logs_json_handler(
                 let trace_id = TraceId::from_bytes(trace_id_bytes).to_string();
                 local_val.insert("trace_id".to_owned(), trace_id.into());
 
-                //process span id
+                // process span id
 
                 let span_id = if log.get("span_id").is_some() {
                     log.get("span_id").unwrap()
@@ -325,7 +329,7 @@ pub async fn logs_json_handler(
 
                 value = json::to_value(local_val).unwrap();
 
-                //JSON Flattening
+                // JSON Flattening
                 value = flatten::flatten(&value).unwrap();
 
                 if !local_trans.is_empty() {
@@ -422,7 +426,7 @@ pub async fn logs_json_handler(
         .inc();
 
     req_stats.response_time = start.elapsed().as_secs_f64();
-    //metric + data usage
+    // metric + data usage
     report_request_usage_stats(
         req_stats,
         org_id,

@@ -196,8 +196,8 @@ mod tests {
     //     let result = holt_winters_calculation(&data, 0.1, 0.1);
     //     let expected = -2.507;
     //     match result {
-    //         Some(got) => assert!(approx_eq!(f64, expected, got, epsilon = 0.001)),
-    //         None => assert!(false),
+    //         Some(got) => assert!(approx_eq!(f64, expected, got, epsilon =
+    // 0.001)),         None => assert!(false),
     //     }
     // }
 }

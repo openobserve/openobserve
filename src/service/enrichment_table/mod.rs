@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Error;
+
 use actix_multipart::Multipart;
 use actix_web::{
     http::{self, StatusCode},
@@ -23,29 +25,30 @@ use bytes::Bytes;
 use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
-use std::io::Error;
 
-use crate::common::{
-    infra::{
-        cache::stats,
-        cluster,
-        config::{CONFIG, STREAM_SCHEMAS},
+use crate::{
+    common::{
+        infra::{
+            cache::stats,
+            cluster,
+            config::{CONFIG, STREAM_SCHEMAS},
+        },
+        meta::{
+            self,
+            http::HttpResponse as MetaHttpResponse,
+            stream::{PartitionTimeLevel, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::json,
     },
-    meta::{
-        self,
-        http::HttpResponse as MetaHttpResponse,
-        stream::{PartitionTimeLevel, StreamParams},
-        usage::UsageType,
-        StreamType,
+    service::{
+        compact::retention,
+        db, format_stream_name,
+        ingestion::{chk_schema_by_record, write_file},
+        schema::stream_schema_exists,
+        usage::report_request_usage_stats,
     },
-    utils::json,
-};
-use crate::service::{
-    compact::retention,
-    db, format_stream_name,
-    ingestion::{chk_schema_by_record, write_file},
-    schema::stream_schema_exists,
-    usage::report_request_usage_stats,
 };
 
 pub mod geoip;
@@ -184,7 +187,7 @@ pub async fn save_enrichment_data(
     )
     .await;
     req_stats.response_time = start.elapsed().as_secs_f64();
-    //metric + data usage
+    // metric + data usage
     report_request_usage_stats(
         req_stats,
         org_id,

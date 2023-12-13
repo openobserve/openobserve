@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="full-height"
                   />
                   <q-btn
+                    data-test="logs-search-field-list-collapse-btn"
                     :icon="
                       searchObj.meta.showFields
                         ? 'chevron_left'

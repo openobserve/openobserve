@@ -16,12 +16,16 @@
 use ahash::AHashMap;
 use tokio::time::{self, Duration};
 
-use crate::common::infra::{
-    cluster,
-    config::{CONFIG, METRIC_CLUSTER_LEADER},
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, METRIC_CLUSTER_LEADER},
+        },
+        meta::prom::ClusterLeader,
+    },
+    service::db,
 };
-use crate::common::meta::prom::ClusterLeader;
-use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {

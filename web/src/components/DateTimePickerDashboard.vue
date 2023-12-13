@@ -70,10 +70,16 @@ export default defineComponent({
       dateTimePicker.value.refresh();
     };
 
+    // setCustomDate with type of date(absolute) and dateObj(start and end)
+    const setCustomDate = (type: string, dateObj: any) => {
+      dateTimePicker.value.setCustomDate(type, dateObj);
+    };
+
     return {
       updateDateTime,
       refresh,
       dateTimePicker,
+      setCustomDate,
     };
   },
 });

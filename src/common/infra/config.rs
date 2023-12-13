@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{path::Path, sync::Arc, time::Duration};
+
 use ahash::{AHashMap, AHashSet};
 use dashmap::{DashMap, DashSet};
 use datafusion::arrow::datatypes::Schema;
@@ -22,25 +24,25 @@ use itertools::chain;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use reqwest::Client;
-use std::{path::Path, sync::Arc, time::Duration};
 use sysinfo::{DiskExt, SystemExt};
 use tokio::sync::RwLock as TRwLock;
 use vector_enrichment::TableRegistry;
 
-use crate::common::{
-    meta::{
-        alerts,
-        functions::{StreamFunctionsList, Transform},
-        maxmind::MaxmindClient,
-        organization::OrganizationSetting,
-        prom::ClusterLeader,
-        syslog::SyslogRoute,
-        user::User,
+use crate::{
+    common::{
+        meta::{
+            alerts,
+            functions::{StreamFunctionsList, Transform},
+            maxmind::MaxmindClient,
+            organization::OrganizationSetting,
+            prom::ClusterLeader,
+            syslog::SyslogRoute,
+            user::User,
+        },
+        utils::{cgroup, file::get_file_meta},
     },
-    utils::{cgroup, file::get_file_meta},
+    service::{enrichment::StreamTable, enrichment_table::geoip::Geoip},
 };
-use crate::service::enrichment::StreamTable;
-use crate::service::enrichment_table::geoip::Geoip;
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
@@ -440,11 +442,11 @@ pub struct Limit {
     pub http_worker_max_blocking: usize,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // in seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] //size in mb
+    #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
     pub enrichment_table_limit: usize,
-    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] //in second
+    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // in second
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] //in second
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // in second
     pub keep_alive: u64,
 }
 
@@ -477,7 +479,8 @@ pub struct MemoryCache {
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
-    // MB, will skip the cache when a query need cache great than this value, default is 80% of max_size
+    // MB, will skip the cache when a query need cache great than this value, default is 80% of
+    // max_size
     #[env_config(name = "ZO_MEMORY_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
     // MB, when cache is full will release how many data once time, default is 1% of max_size
@@ -497,7 +500,8 @@ pub struct DiskCache {
     // MB, default is 50% of local volume available space and maximum 100GB
     #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
-    // MB, will skip the cache when a query need cache great than this value, default is 80% of max_size
+    // MB, will skip the cache when a query need cache great than this value, default is 80% of
+    // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
     // MB, when cache is full will release how many data once time, default is 1% of max_size
@@ -882,13 +886,15 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.max_size *= 1024 * 1024;
     }
     if cfg.memory_cache.skip_size == 0 {
-        // will skip the cache when a query need cache great than this value, default is 80% of max_size
+        // will skip the cache when a query need cache great than this value, default is
+        // 80% of max_size
         cfg.memory_cache.skip_size = cfg.memory_cache.max_size / 10 * 8;
     } else {
         cfg.memory_cache.skip_size *= 1024 * 1024;
     }
     if cfg.memory_cache.release_size == 0 {
-        // when cache is full will release how many data once time, default is 1% of max_size
+        // when cache is full will release how many data once time, default is 1% of
+        // max_size
         cfg.memory_cache.release_size = cfg.memory_cache.max_size / 100;
     } else {
         cfg.memory_cache.release_size *= 1024 * 1024;
@@ -938,13 +944,15 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.disk_cache.max_size *= 1024 * 1024;
     }
     if cfg.disk_cache.skip_size == 0 {
-        // will skip the cache when a query need cache great than this value, default is 80% of max_size
+        // will skip the cache when a query need cache great than this value, default is
+        // 80% of max_size
         cfg.disk_cache.skip_size = cfg.disk_cache.max_size / 10 * 8;
     } else {
         cfg.disk_cache.skip_size *= 1024 * 1024;
     }
     if cfg.disk_cache.release_size == 0 {
-        // when cache is full will release how many data once time, default is 1% of max_size
+        // when cache is full will release how many data once time, default is 1% of
+        // max_size
         cfg.disk_cache.release_size = cfg.disk_cache.max_size / 100;
     } else {
         cfg.disk_cache.release_size *= 1024 * 1024;

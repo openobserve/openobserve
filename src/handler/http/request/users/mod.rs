@@ -13,18 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, http, post, put, web, HttpResponse};
-use actix_web_httpauth::extractors::basic::BasicAuth;
 use std::io::Error;
 
-use crate::common::meta;
-use crate::common::meta::user::UpdateUser;
-use crate::common::meta::user::UserOrgRole;
-use crate::common::meta::user::UserRequest;
-use crate::common::meta::user::{SignInResponse, SignInUser};
-use crate::service::users;
+use actix_web::{delete, get, http, post, put, web, HttpResponse};
+use actix_web_httpauth::extractors::basic::BasicAuth;
 
-/** ListUsers */
+use crate::{
+    common::{
+        meta,
+        meta::user::{SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest},
+    },
+    service::users,
+};
+
+/// ListUsers
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -45,7 +47,7 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     users::list_users(&org_id).await
 }
 
-/** CreateUser */
+/// CreateUser
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -71,7 +73,7 @@ pub async fn save(
     users::post_user(&org_id, user).await
 }
 
-/** UpdateUser */
+/// UpdateUser
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -109,7 +111,7 @@ pub async fn update(
     users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
 }
 
-/** AddUserToOrganization */
+/// AddUserToOrganization
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -138,7 +140,7 @@ pub async fn add_user_to_org(
     users::add_user_to_org(&org_id, &email_id, role, initiator_id).await
 }
 
-/** RemoveUserFromOrganization */
+/// RemoveUserFromOrganization
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -161,7 +163,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     users::remove_user_from_org(&org_id, &email_id).await
 }
 
-/** AuthenticateUser */
+/// AuthenticateUser
 #[utoipa::path(
     context_path = "/auth",
     tag = "Auth",

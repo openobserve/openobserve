@@ -82,7 +82,7 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
         .for_each_concurrent(CONFIG.limit.query_thread_num, |file| async move {
             match DEFAULT.delete(&(file.as_str().into())).await {
                 Ok(_) => {
-                    log::info!("Deleted object: {}", file);
+                    log::debug!("Deleted object: {}", file);
                 }
                 Err(e) => {
                     log::error!("Failed to delete object: {:?}", e);

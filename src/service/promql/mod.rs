@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
-use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
-use serde::{Deserialize, Serialize};
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+
+use async_trait::async_trait;
+use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 mod aggregations;
@@ -132,7 +133,8 @@ pub enum ApiErrorType {
     NotFound,
 }
 
-/// Converts `t` to the number of microseconds elapsed since the beginning of the Unix epoch.
+/// Converts `t` to the number of microseconds elapsed since the beginning of
+/// the Unix epoch.
 pub(crate) fn micros_since_epoch(t: SystemTime) -> i64 {
     micros(
         t.duration_since(UNIX_EPOCH)
@@ -148,8 +150,9 @@ pub(crate) fn micros(t: Duration) -> i64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use expect_test::expect;
+
+    use super::*;
 
     #[test]
     fn test_api_func_response_serialize() {
