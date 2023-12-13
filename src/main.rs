@@ -15,7 +15,6 @@
 
 use std::{
     collections::HashMap,
-    io::Write,
     net::SocketAddr,
     str::FromStr,
     sync::{
@@ -27,7 +26,7 @@ use std::{
 
 use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use chrono::Local;
+use chrono::{Local, Utc};
 use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
@@ -78,7 +77,8 @@ use pyroscope::PyroscopeAgent;
 use pyroscope_pprofrs::{pprof_backend, PprofConfig};
 use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
-use tracing_subscriber::{prelude::*, Registry};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::Registry;
 use uaparser::UserAgentParser;
 
 #[cfg(feature = "mimalloc")]
@@ -93,6 +93,67 @@ static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/ua_regex/regexes.yaml"
 ));
+
+use tracing_subscriber::{
+    self,
+    filter::LevelFilter as TracingLevelFilter,
+    fmt::{format::Writer, time::FormatTime, Layer},
+    prelude::*,
+    EnvFilter,
+};
+struct CustomTimeFormat;
+
+impl FormatTime for CustomTimeFormat {
+    fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
+        if CONFIG.common.log_local_time_format.is_empty() {
+            write!(w, "{}", Utc::now().to_rfc3339())
+        } else {
+            write!(
+                w,
+                "{}",
+                Local::now().format(&CONFIG.common.log_local_time_format)
+            )
+        }
+    }
+}
+
+/// Setup the tracing related components
+pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
+    use tracing_subscriber::fmt::writer::BoxMakeWriter;
+
+    let (writer, guard) = if CONFIG.log.log_file_dir.is_empty() {
+        let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
+        (BoxMakeWriter::new(non_blocking), _guard)
+    } else {
+        let file_appender = tracing_appender::rolling::daily(&CONFIG.log.log_file_dir, "o2.log");
+        let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+        (BoxMakeWriter::new(non_blocking), _guard)
+    };
+    let layer = if !CONFIG.log.log_file_dir.is_empty() {
+        Layer::default()
+            .with_writer(writer)
+            .with_timer(CustomTimeFormat)
+            .with_ansi(false)
+            .boxed()
+    } else {
+        Layer::default()
+            .with_writer(writer)
+            .with_timer(CustomTimeFormat)
+            .json()
+            .with_ansi(false)
+            .boxed()
+    };
+
+    tracing_subscriber::registry()
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(TracingLevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .with(layer)
+        .init();
+    guard
+}
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -112,7 +173,7 @@ async fn main() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    if CONFIG.log.events_enabled {
+    let _guard: Option<WorkerGuard> = if CONFIG.log.events_enabled {
         let logger = zo_logger::ZoLogger {
             sender: zo_logger::EVENT_SENDER.clone(),
         };
@@ -121,35 +182,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 LevelFilter::from_str(&CONFIG.log.level).unwrap_or(LevelFilter::Info),
             )
         })?;
+        None
     } else if CONFIG.common.tracing_enabled {
         enable_tracing()?;
+        None
     } else {
-        let mut log_builder = env_logger::Builder::from_env(
-            env_logger::Env::new().default_filter_or(&CONFIG.log.level),
-        );
-        if !CONFIG.log.file.is_empty() {
-            let target = std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .append(true)
-                .open(&CONFIG.log.file)
-                .unwrap_or_else(|_| panic!("open log file [{}] error", CONFIG.log.file));
-            log_builder.target(env_logger::Target::Pipe(Box::new(target)));
-        }
-        if !CONFIG.common.log_local_time_format.trim().is_empty() {
-            log_builder.format(|buf, record| {
-                writeln!(
-                    buf,
-                    "[{} {} {}] {}",
-                    Local::now().format(CONFIG.common.log_local_time_format.as_str()),
-                    CONFIG.common.app_name,
-                    record.level(),
-                    record.args()
-                )
-            });
-        }
-        log_builder.init();
-    }
+        Some(setup_logs())
+    };
 
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(

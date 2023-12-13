@@ -513,8 +513,10 @@ pub struct DiskCache {
 pub struct Log {
     #[env_config(name = "RUST_LOG", default = "info")]
     pub level: String,
-    #[env_config(name = "ZO_LOG_FILE", default = "")]
-    pub file: String,
+
+    #[env_config(name = "ZO_LOG_FILE_DIR", default = "")]
+    pub log_file_dir: String,
+
     #[env_config(name = "ZO_EVENTS_ENABLED", default = false)]
     pub events_enabled: bool,
     #[env_config(
