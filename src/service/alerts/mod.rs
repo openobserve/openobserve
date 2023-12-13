@@ -13,26 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::{HashMap, HashSet};
+
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
-use std::collections::{HashMap, HashSet};
 
-use crate::common::{
-    infra::config::CONFIG,
-    meta::{
-        alerts::{
-            destinations::{DestinationWithTemplate, HTTPType},
-            Alert, Condition, Operator, QueryCondition, QueryType,
+use crate::{
+    common::{
+        infra::config::CONFIG,
+        meta::{
+            alerts::{
+                destinations::{DestinationWithTemplate, HTTPType},
+                Alert, Condition, Operator, QueryCondition, QueryType,
+            },
+            search, StreamType,
         },
-        search, StreamType,
+        utils::{
+            json::{self, Map, Value},
+            schema_ext::SchemaExt,
+        },
     },
-    utils::{
-        json::{self, Map, Value},
-        schema_ext::SchemaExt,
-    },
+    service::{db, search as SearchService},
 };
-use crate::service::{db, search as SearchService};
 
 pub mod alert_manager;
 pub mod destinations;
@@ -46,20 +49,35 @@ pub async fn save(
     name: &str,
     mut alert: Alert,
 ) -> Result<(), anyhow::Error> {
-    alert.name = name.to_string();
-    alert.org_id = org_id.to_string();
+    alert.name = name.trim().to_string();
+    alert.org_id = org_id.trim().to_string();
     alert.stream_type = stream_type;
-    alert.stream_name = stream_name.to_string();
+    alert.stream_name = stream_name.trim().to_string();
 
-    if alert.name.is_empty() {
+    if alert.name.is_empty() || alert.stream_name.is_empty() {
         return Err(anyhow::anyhow!("Alert name is required"));
     }
 
     // before saving alert check alert destination
+    if alert.destinations.is_empty() {
+        return Err(anyhow::anyhow!("Alert destinations is required"));
+    }
     for dest in alert.destinations.iter() {
         if db::alerts::destinations::get(org_id, dest).await.is_err() {
             return Err(anyhow::anyhow!("Alert destination {dest} not found"));
         };
+    }
+
+    // before saving alert check alert context attributes
+    if alert.context_attributes.is_some() {
+        let attrs = alert.context_attributes.as_ref().unwrap();
+        let mut new_attrs = HashMap::with_capacity(attrs.len());
+        for key in attrs.keys() {
+            let new_key = key.trim().to_string();
+            if !new_key.is_empty() {
+                new_attrs.insert(new_key, attrs.get(key).unwrap().to_string());
+            }
+        }
     }
 
     // before saving alert check column type to decide numeric condition
@@ -77,7 +95,11 @@ pub async fn save(
 
     match alert.query_condition.query_type {
         QueryType::Custom => {
-            if alert.query_condition.conditions.is_none()
+            if alert.query_condition.aggregation.is_some() {
+                // if it has result we should fire the alert when enable aggregation
+                alert.trigger_condition.operator = Operator::GreaterThanEquals;
+                alert.trigger_condition.threshold = 1;
+            } else if alert.query_condition.conditions.is_none()
                 || alert
                     .query_condition
                     .conditions
@@ -263,7 +285,7 @@ impl QueryCondition {
         let sql = match self.query_type {
             QueryType::Custom => {
                 if let Some(v) = self.conditions.as_ref() {
-                    if v.is_empty() {
+                    if self.aggregation.is_none() && v.is_empty() {
                         return Ok(None);
                     } else {
                         build_sql(alert, v).await?
@@ -405,156 +427,221 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
                     "Column {} not found on stream {}",
                     &cond.column,
                     &alert.stream_name
-                ))
-            }
-        };
-        let cond = match data_type {
-            DataType::Utf8 => {
-                let val = if cond.value.is_string() {
-                    cond.value.as_str().unwrap_or_default().to_string()
-                } else {
-                    cond.value.to_string()
-                };
-                match cond.operator {
-                    Operator::EqualTo => format!("\"{}\" {} '{}'", cond.column, "=", val),
-                    Operator::NotEqualTo => format!("\"{}\" {} '{}'", cond.column, "!=", val),
-                    Operator::GreaterThan => format!("\"{}\" {} '{}'", cond.column, ">", val),
-                    Operator::GreaterThanEquals => {
-                        format!("\"{}\" {} '{}'", cond.column, ">=", val)
-                    }
-                    Operator::LessThan => format!("\"{}\" {} '{}'", cond.column, "<", val),
-                    Operator::LessThanEquals => format!("\"{}\" {} '{}'", cond.column, "<=", val),
-                    Operator::Contains => format!("\"{}\" {} '%{}%'", cond.column, "LIKE", val),
-                    Operator::NotContains => {
-                        format!("\"{}\" {} '%{}%'", cond.column, "NOT LIKE", val)
-                    }
-                }
-            }
-            DataType::Int16 | DataType::Int32 | DataType::Int64 => {
-                let val = if cond.value.is_number() {
-                    cond.value.as_i64().unwrap_or_default()
-                } else {
-                    cond.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .map_err(|e| {
-                            anyhow::anyhow!(
-                                "Column [{}] dataType is [{}] but value is [{}], err: {}",
-                                cond.column,
-                                data_type,
-                                cond.value,
-                                e
-                            )
-                        })?
-                };
-                match cond.operator {
-                    Operator::EqualTo => format!("\"{}\" {} {}", cond.column, "=", val),
-                    Operator::NotEqualTo => format!("\"{}\" {} {}", cond.column, "!=", val),
-                    Operator::GreaterThan => format!("\"{}\" {} {}", cond.column, ">", val),
-                    Operator::GreaterThanEquals => {
-                        format!("\"{}\" {} {}", cond.column, ">=", val)
-                    }
-                    Operator::LessThan => format!("\"{}\" {} {}", cond.column, "<", val),
-                    Operator::LessThanEquals => {
-                        format!("\"{}\" {} {}", cond.column, "<=", val)
-                    }
-                    _ => {
-                        return Err(anyhow::anyhow!(
-                            "Column {} has data_type [{}] and it does not supported operator [{:?}]",
-                            cond.column,
-                            data_type,
-                            cond.operator
-                        ));
-                    }
-                }
-            }
-            DataType::Float32 | DataType::Float64 => {
-                let val = if cond.value.is_number() {
-                    cond.value.as_f64().unwrap_or_default()
-                } else {
-                    cond.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .map_err(|e| {
-                            anyhow::anyhow!(
-                                "Column [{}] dataType is [{}] but value is [{}], err: {}",
-                                cond.column,
-                                data_type,
-                                cond.value,
-                                e
-                            )
-                        })?
-                };
-                match cond.operator {
-                    Operator::EqualTo => format!("\"{}\" {} {}", cond.column, "=", val),
-                    Operator::NotEqualTo => format!("\"{}\" {} {}", cond.column, "!=", val),
-                    Operator::GreaterThan => format!("\"{}\" {} {}", cond.column, ">", val),
-                    Operator::GreaterThanEquals => {
-                        format!("\"{}\" {} {}", cond.column, ">=", val)
-                    }
-                    Operator::LessThan => format!("\"{}\" {} {}", cond.column, "<", val),
-                    Operator::LessThanEquals => {
-                        format!("\"{}\" {} {}", cond.column, "<=", val)
-                    }
-                    _ => {
-                        return Err(anyhow::anyhow!(
-                            "Column {} has data_type [{}] and it does not supported operator [{:?}]",
-                            cond.column,
-                            data_type,
-                            cond.operator
-                        ));
-                    }
-                }
-            }
-            DataType::Boolean => {
-                let val = if cond.value.is_boolean() {
-                    cond.value.as_bool().unwrap_or_default()
-                } else {
-                    cond.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .map_err(|e| {
-                            anyhow::anyhow!(
-                                "Column [{}] dataType is [{}] but value is [{}], err: {}",
-                                cond.column,
-                                data_type,
-                                cond.value,
-                                e
-                            )
-                        })?
-                };
-                match cond.operator {
-                    Operator::EqualTo => format!("\"{}\" {} {}", cond.column, "=", val),
-                    Operator::NotEqualTo => format!("\"{}\" {} {}", cond.column, "!=", val),
-                    _ => {
-                        return Err(anyhow::anyhow!(
-                        "Column {} has data_type [{}] and it does not supported operator [{:?}]",
-                        cond.column,
-                        data_type,
-                        cond.operator
-                    ));
-                    }
-                }
-            }
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Column {} has data_type [{}] and it does not supported by alert, if you think this is a bug please report it to us",
-                    cond.column,
-                    data_type
                 ));
             }
         };
-        wheres.push(cond);
+        let expr = build_expr(cond, "", data_type)?;
+        wheres.push(expr);
     }
-    let sql = format!(
-        "SELECT * FROM \"{}\" WHERE {}",
-        alert.stream_name,
-        wheres.join(" AND ")
-    );
+    let where_sql = if !wheres.is_empty() {
+        format!("WHERE {}", wheres.join(" AND "))
+    } else {
+        String::new()
+    };
+    if alert.query_condition.aggregation.is_none() {
+        return Ok(format!(
+            "SELECT * FROM \"{}\" {}",
+            alert.stream_name, where_sql
+        ));
+    }
+
+    // handle aggregation
+    let mut sql = String::new();
+    let agg = alert.query_condition.aggregation.as_ref().unwrap();
+    let having_expr = {
+        let data_type = match schema.field_with_name(&agg.having.column) {
+            Ok(field) => field.data_type(),
+            Err(_) => {
+                return Err(anyhow::anyhow!(
+                    "Aggregation column {} not found on stream {}",
+                    &agg.having.column,
+                    &alert.stream_name
+                ));
+            }
+        };
+        build_expr(&agg.having, "alert_agg_value", data_type)?
+    };
+    if let Some(group) = agg.group_by.as_ref() {
+        if !group.is_empty() {
+            sql = format!(
+                "SELECT {}, {}(\"{}\") AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
+                group.join(", "),
+                agg.function.to_string(),
+                agg.having.column,
+                CONFIG.common.column_timestamp,
+                CONFIG.common.column_timestamp,
+                alert.stream_name,
+                where_sql,
+                group.join(", "),
+                having_expr
+            );
+        }
+    }
+    if sql.is_empty() {
+        sql = format!(
+            "SELECT {}(\"{}\") AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
+            agg.function.to_string(),
+            agg.having.column,
+            CONFIG.common.column_timestamp,
+            CONFIG.common.column_timestamp,
+            alert.stream_name,
+            where_sql,
+            having_expr
+        );
+    }
     Ok(sql)
+}
+
+fn build_expr(
+    cond: &Condition,
+    field_alias: &str,
+    field_type: &DataType,
+) -> Result<String, anyhow::Error> {
+    let field_alias = if !field_alias.is_empty() {
+        field_alias
+    } else {
+        cond.column.as_str()
+    };
+    let expr = match field_type {
+        DataType::Utf8 => {
+            let val = if cond.value.is_string() {
+                cond.value.as_str().unwrap_or_default().to_string()
+            } else {
+                cond.value.to_string()
+            };
+            match cond.operator {
+                Operator::EqualTo => format!("\"{}\" {} '{}'", field_alias, "=", val),
+                Operator::NotEqualTo => format!("\"{}\" {} '{}'", field_alias, "!=", val),
+                Operator::GreaterThan => format!("\"{}\" {} '{}'", field_alias, ">", val),
+                Operator::GreaterThanEquals => {
+                    format!("\"{}\" {} '{}'", field_alias, ">=", val)
+                }
+                Operator::LessThan => format!("\"{}\" {} '{}'", field_alias, "<", val),
+                Operator::LessThanEquals => format!("\"{}\" {} '{}'", field_alias, "<=", val),
+                Operator::Contains => format!("\"{}\" {} '%{}%'", field_alias, "LIKE", val),
+                Operator::NotContains => {
+                    format!("\"{}\" {} '%{}%'", field_alias, "NOT LIKE", val)
+                }
+            }
+        }
+        DataType::Int16 | DataType::Int32 | DataType::Int64 => {
+            let val = if cond.value.is_number() {
+                cond.value.as_i64().unwrap_or_default()
+            } else {
+                cond.value
+                    .as_str()
+                    .unwrap_or_default()
+                    .parse()
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "Column [{}] dataType is [{}] but value is [{}], err: {}",
+                            cond.column,
+                            field_type,
+                            cond.value,
+                            e
+                        )
+                    })?
+            };
+            match cond.operator {
+                Operator::EqualTo => format!("\"{}\" {} {}", field_alias, "=", val),
+                Operator::NotEqualTo => format!("\"{}\" {} {}", field_alias, "!=", val),
+                Operator::GreaterThan => format!("\"{}\" {} {}", field_alias, ">", val),
+                Operator::GreaterThanEquals => {
+                    format!("\"{}\" {} {}", field_alias, ">=", val)
+                }
+                Operator::LessThan => format!("\"{}\" {} {}", field_alias, "<", val),
+                Operator::LessThanEquals => {
+                    format!("\"{}\" {} {}", field_alias, "<=", val)
+                }
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "Column {} has data_type [{}] and it does not supported operator [{:?}]",
+                        cond.column,
+                        field_type,
+                        cond.operator
+                    ));
+                }
+            }
+        }
+        DataType::Float32 | DataType::Float64 => {
+            let val = if cond.value.is_number() {
+                cond.value.as_f64().unwrap_or_default()
+            } else {
+                cond.value
+                    .as_str()
+                    .unwrap_or_default()
+                    .parse()
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "Column [{}] dataType is [{}] but value is [{}], err: {}",
+                            cond.column,
+                            field_type,
+                            cond.value,
+                            e
+                        )
+                    })?
+            };
+            match cond.operator {
+                Operator::EqualTo => format!("\"{}\" {} {}", field_alias, "=", val),
+                Operator::NotEqualTo => format!("\"{}\" {} {}", field_alias, "!=", val),
+                Operator::GreaterThan => format!("\"{}\" {} {}", field_alias, ">", val),
+                Operator::GreaterThanEquals => {
+                    format!("\"{}\" {} {}", field_alias, ">=", val)
+                }
+                Operator::LessThan => format!("\"{}\" {} {}", field_alias, "<", val),
+                Operator::LessThanEquals => {
+                    format!("\"{}\" {} {}", field_alias, "<=", val)
+                }
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "Column {} has data_type [{}] and it does not supported operator [{:?}]",
+                        cond.column,
+                        field_type,
+                        cond.operator
+                    ));
+                }
+            }
+        }
+        DataType::Boolean => {
+            let val = if cond.value.is_boolean() {
+                cond.value.as_bool().unwrap_or_default()
+            } else {
+                cond.value
+                    .as_str()
+                    .unwrap_or_default()
+                    .parse()
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "Column [{}] dataType is [{}] but value is [{}], err: {}",
+                            cond.column,
+                            field_type,
+                            cond.value,
+                            e
+                        )
+                    })?
+            };
+            match cond.operator {
+                Operator::EqualTo => format!("\"{}\" {} {}", field_alias, "=", val),
+                Operator::NotEqualTo => format!("\"{}\" {} {}", field_alias, "!=", val),
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "Column {} has data_type [{}] and it does not supported operator [{:?}]",
+                        cond.column,
+                        field_type,
+                        cond.operator
+                    ));
+                }
+            }
+        }
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Column {} has data_type [{}] and it does not supported by alert, if you think this is a bug please report it to us",
+                cond.column,
+                field_type
+            ));
+        }
+    };
+    Ok(expr)
 }
 
 pub async fn send_notification(
@@ -586,6 +673,22 @@ pub async fn send_notification(
             if alert_start_time == 0 || val < alert_start_time {
                 alert_start_time = val;
             }
+            if alert_end_time == 0 || val > alert_end_time {
+                alert_end_time = val;
+            }
+        }
+    }
+    if let Some(values) = vars.get("zo_sql_min_time") {
+        for val in values {
+            let val = val.parse::<i64>().unwrap_or_default();
+            if alert_start_time == 0 || val < alert_start_time {
+                alert_start_time = val;
+            }
+        }
+    }
+    if let Some(values) = vars.get("zo_sql_max_time") {
+        for val in values {
+            let val = val.parse::<i64>().unwrap_or_default();
             if alert_end_time == 0 || val > alert_end_time {
                 alert_end_time = val;
             }
@@ -638,16 +741,19 @@ pub async fn send_notification(
     for (key, value) in vars.iter() {
         if resp.contains(&format!("{{{key}}}")) {
             let val = value.iter().cloned().collect::<Vec<_>>();
-            resp = resp.replace(&format!("{{{key}}}"), &val.join(","));
+            resp = resp.replace(
+                &format!("{{{key}}}"),
+                &format_variable_value(&val.join(", ")),
+            );
         }
     }
     if let Some(attrs) = &alert.context_attributes {
         for (key, value) in attrs.iter() {
-            resp = resp.replace(&format!("{{{key}}}"), value)
+            resp = resp.replace(&format!("{{{key}}}"), &format_variable_value(value));
         }
     }
 
-    let msg: Value = json::from_str(&resp).unwrap();
+    let msg: Value = json::from_str(&resp)?;
     let msg: Value = match &msg {
         Value::String(obj) => match json::from_str(obj) {
             Ok(obj) => obj,
@@ -662,38 +768,33 @@ pub async fn send_notification(
     } else {
         reqwest::Client::new()
     };
-    match url::Url::parse(&dest.url) {
-        Ok(url) => {
-            let mut req = match dest.method {
-                HTTPType::POST => client.post(url),
-                HTTPType::PUT => client.put(url),
-                HTTPType::GET => client.get(url),
-            }
-            .header("Content-type", "application/json");
+    let url = url::Url::parse(&dest.url)?;
+    let mut req = match dest.method {
+        HTTPType::POST => client.post(url),
+        HTTPType::PUT => client.put(url),
+        HTTPType::GET => client.get(url),
+    }
+    .header("Content-type", "application/json");
 
-            // Add additional headers if any from destination description
-            if let Some(headers) = &dest.headers {
-                for (key, value) in headers.iter() {
-                    if !key.is_empty() && !value.is_empty() {
-                        req = req.header(key, value);
-                    }
-                }
-            };
-
-            let resp = req.json(&msg).send().await;
-            match resp {
-                Ok(resp) => {
-                    if !resp.status().is_success() {
-                        log::error!("Alert Notification sent error: {:?}", resp.bytes().await);
-                    }
-                }
-                Err(err) => log::error!("Alert Notification sending error {:?}", err),
+    // Add additional headers if any from destination description
+    if let Some(headers) = &dest.headers {
+        for (key, value) in headers.iter() {
+            if !key.is_empty() && !value.is_empty() {
+                req = req.header(key, value);
             }
         }
-        Err(err) => {
-            log::error!("Alert Notification sending error {:?}", err);
-        }
+    };
+
+    let resp = req.json(&msg).send().await?;
+    if !resp.status().is_success() {
+        return Err(anyhow::anyhow!("sent error: {:?}", resp.bytes().await));
     }
 
     Ok(())
+}
+
+fn format_variable_value(val: &str) -> String {
+    val.replace('\n', "\\\\n")
+        .replace('\r', "\\\\r")
+        .replace('\"', "\\\\\\\"")
 }

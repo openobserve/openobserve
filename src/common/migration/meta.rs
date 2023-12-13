@@ -70,8 +70,8 @@ pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
             // let final_key;
             // let key = if key.starts_with("/trigger") {
             //     let local_val: Trigger = json::from_slice(value).unwrap();
-            //     final_key = format!("/trigger/{}/{}", local_val.org, local_val.alert_name);
-            //     &final_key
+            //     final_key = format!("/trigger/{}/{}", local_val.org,
+            // local_val.alert_name);     &final_key
             // } else {
             //     key
             // };
@@ -116,8 +116,8 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
             // let final_key;
             // let key = if key.starts_with("/trigger") {
             //     let local_val: Trigger = json::from_slice(value).unwrap();
-            //     final_key = format!("/trigger/{}/{}", local_val.org, local_val.alert_name);
-            //     &final_key
+            //     final_key = format!("/trigger/{}/{}", local_val.org,
+            // local_val.alert_name);     &final_key
             // } else {
             //     key
             // };

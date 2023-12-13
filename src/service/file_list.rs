@@ -13,26 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use futures::future::try_join_all;
 use std::io::Write;
+
+use futures::future::try_join_all;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::{
-    infra::{
-        cluster,
-        errors::{Error, ErrorCodes},
-        {config::CONFIG, file_list, ider, storage},
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::CONFIG,
+            errors::{Error, ErrorCodes},
+            file_list, ider, storage,
+        },
+        meta::{
+            common::{FileKey, FileMeta},
+            stream::{PartitionTimeLevel, ScanStats},
+            StreamType,
+        },
+        utils::{file::get_file_meta as util_get_file_meta, json},
     },
-    meta::{
-        common::{FileKey, FileMeta},
-        stream::{PartitionTimeLevel, ScanStats},
-        StreamType,
-    },
-    utils::{file::get_file_meta as util_get_file_meta, json},
+    handler::grpc::cluster_rpc,
+    service::{db, search::MetadataMap},
 };
-use crate::handler::grpc::cluster_rpc;
-use crate::service::{db, search::MetadataMap};
 
 pub async fn query(
     org_id: &str,

@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-toggle
       v-if="
         dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap'
+        dashboardPanelData.data.type != 'heatmap' &&
+        dashboardPanelData.data.type != 'metric' &&
+        dashboardPanelData.data.type != 'gauge'
       "
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
@@ -30,7 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-select
       v-if="
         dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap'
+        dashboardPanelData.data.type != 'heatmap' &&
+        dashboardPanelData.data.type != 'metric' &&
+        dashboardPanelData.data.type != 'gauge'
       "
       outlined
       v-model="dashboardPanelData.data.config.legends_position"
@@ -50,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-select
       outlined
+      v-if="dashboardPanelData.data.type != 'table'"
       v-model="dashboardPanelData.data.config.unit"
       :options="unitOptions"
       dense
@@ -175,6 +180,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- </q-input> -->
     <div class="space"></div>
 
+    <!-- for auto sql query limit -->
+    <!-- it should not be promql and custom query -->
+    <q-input
+      v-if="
+        !promqlMode &&
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+      "
+      v-model.number="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit
+      "
+      :value="0"
+      :min="0"
+      @update:model-value="
+        (value) =>
+          (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.limit = value ? value : 0)
+      "
+      label="Limit"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-sm showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      placeholder="0"
+      :type="'number'"
+    >
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">
+          Query Limit
+          <div>
+            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+            >
+              Limit for the query result
+            </q-tooltip>
+          </div>
+        </div>
+      </template>
+    </q-input>
+
     <q-input
       v-if="promqlMode"
       v-model="
@@ -253,6 +309,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       label-slot
       :type="'number'"
     >
+    </q-input>
+
+    <q-input
+      v-if="dashboardPanelData.data.type === 'gauge'"
+      v-model.number="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.min
+      "
+      :value="0"
+      @update:model-value="
+        (value) =>
+          (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.min = value ? value : 0)
+      "
+      label="Gauge Min Value"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      placeholder="0"
+      :type="'number'"
+    >
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">Gauge Min Value</div>
+      </template>
+    </q-input>
+    <q-input
+      v-if="dashboardPanelData.data.type === 'gauge'"
+      v-model.number="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.max
+      "
+      :value="100"
+      @update:model-value="
+        (value) =>
+          (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.max = value ? value : 100)
+      "
+      label="Gauge Max Value"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      placeholder="100"
+      :type="'number'"
+    >
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">Gauge Max Value</div>
+      </template>
     </q-input>
   </div>
 </template>

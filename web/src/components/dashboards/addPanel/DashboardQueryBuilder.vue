@@ -109,6 +109,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-select>
                   </div>
                 </div>
+                <!-- histogram interval if auto sql and aggregation function is histogram-->
+                <div
+                  v-if="
+                    !dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery &&
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x[index].aggregationFunction === 'histogram'
+                  "
+                  class="q-mb-sm"
+                >
+                  <!-- histogram interval for sql queries -->
+                  <HistogramIntervalDropDown
+                    v-if="!promqlMode"
+                    :model-value="
+                      getHistoramIntervalField(
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.x[index]
+                      )
+                    "
+                    @update:modelValue="(newValue: any) => {dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x[index].args[0].value = newValue.value}"
+                  />
+                </div>
                 <q-input
                   dense
                   filled
@@ -121,6 +148,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val.length > 0 || 'Required']"
                 />
+                <div
+                  v-if="
+                    !dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                  "
+                >
+                  <SortByBtnGrp
+                    :fieldObj="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.x[index]
+                    "
+                  />
+                </div>
               </div>
             </q-menu>
           </q-btn>
@@ -263,6 +305,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </div>
+                <!-- histogram interval if auto sql and aggregation function is histogram-->
+                <div
+                  v-if="
+                    !dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery &&
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y[index].aggregationFunction === 'histogram'
+                  "
+                  class="q-mb-sm"
+                >
+                  <!-- histogram interval for sql queries -->
+                  <HistogramIntervalDropDown
+                    v-if="!promqlMode"
+                    :model-value="
+                      getHistoramIntervalField(
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.y[index]
+                      )
+                    "
+                    @update:modelValue="(newValue: any) => {dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y[index].args[0].value = newValue.value}"
+                  />
+                </div>
                 <q-input
                   dense
                   filled
@@ -275,6 +344,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :rules="[(val) => val.length > 0 || 'Required']"
                 />
+                <div
+                  v-if="
+                    !dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery && dashboardPanelData.data.queryType == 'sql'
+                  "
+                >
+                  <SortByBtnGrp
+                    :fieldObj="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.y[index]
+                    "
+                  />
+                </div>
               </div>
             </q-menu>
           </q-btn>
@@ -398,6 +482,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :rules="[(val) => val.length > 0 || 'Required']"
                   />
+                  <div
+                    v-if="
+                      !dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery &&
+                      dashboardPanelData.data.queryType == 'sql'
+                    "
+                  >
+                    <SortByBtnGrp
+                      :fieldObj="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.z[index]
+                      "
+                    />
+                  </div>
                 </div>
               </q-menu>
             </q-btn>
@@ -669,10 +769,16 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
+import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
+import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
-  components: { DashboardMapQueryBuilder },
+  components: {
+    DashboardMapQueryBuilder,
+    SortByBtnGrp,
+    HistogramIntervalDropDown,
+  },
   setup() {
     const showXAxis = ref(true);
     const panelName = ref("");
@@ -710,6 +816,26 @@ export default defineComponent({
     const triggerOperatorsWithHistogram: any = [
       { label: t("dashboard.histogram"), value: "histogram" },
     ];
+
+    // v-model for histogram interval
+    // if no args object in the field, set it with object with interval = null
+    const getHistoramIntervalField = (field: any) => {
+      // if no interval is set, set it to null
+      if (!field.args) {
+        field.args = [
+          {
+            value: null,
+          },
+        ];
+        return { value: null, label: "Auto" };
+      } else if (field?.args?.length === 0) {
+        field?.args?.push({
+          value: null,
+        });
+        return { value: null, label: "Auto" };
+      }
+      return { value: field?.args[0]?.value, label: field?.args[0]?.value };
+    };
 
     watch(
       () => dashboardPanelData.meta.dragAndDrop.dragging,
@@ -898,6 +1024,7 @@ export default defineComponent({
       xLabel,
       yLabel,
       zLabel,
+      getHistoramIntervalField,
     };
   },
 });

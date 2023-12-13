@@ -13,16 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, post, put, web, HttpResponse};
-use actix_web::{http, HttpRequest};
-use ahash::AHashMap as HashMap;
 use std::io::Error;
 
-use crate::common::meta;
-use crate::common::meta::functions::{StreamOrder, Transform};
-use crate::common::utils::http::get_stream_type_from_request;
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use ahash::AHashMap as HashMap;
 
-/** CreateFunction*/
+use crate::common::{
+    meta,
+    meta::functions::{StreamOrder, Transform},
+    utils::http::get_stream_type_from_request,
+};
+
+/// CreateFunction
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -49,7 +51,7 @@ pub async fn save_function(
     crate::service::functions::save_function(org_id, transform).await
 }
 
-/** ListFunctions */
+/// ListFunctions
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -69,7 +71,7 @@ async fn list_functions(org_id: web::Path<String>) -> Result<HttpResponse, Error
     crate::service::functions::list_functions(org_id.into_inner()).await
 }
 
-/** DeleteFunction*/
+/// DeleteFunction
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -92,7 +94,7 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
     crate::service::functions::delete_function(org_id, name).await
 }
 
-/** UpdateFunction */
+/// UpdateFunction
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -120,7 +122,7 @@ pub async fn update_function(
     crate::service::functions::update_function(org_id, name, transform).await
 }
 
-/** ListStreamFunctions */
+/// ListStreamFunctions
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -151,13 +153,13 @@ async fn list_stream_functions(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
                 )),
-            )
+            );
         }
     };
     crate::service::functions::list_stream_functions(&org_id, stream_type, &stream_name).await
 }
 
-/** RemoveStreamFunction*/
+/// RemoveStreamFunction
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -190,14 +192,14 @@ async fn delete_stream_function(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
                 )),
-            )
+            );
         }
     };
     crate::service::functions::delete_stream_function(&org_id, stream_type, &stream_name, &name)
         .await
 }
 
-/** ApplyFunctionToStream */
+/// ApplyFunctionToStream
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -232,7 +234,7 @@ pub async fn add_function_to_stream(
                     http::StatusCode::BAD_REQUEST.into(),
                     e.to_string(),
                 )),
-            )
+            );
         }
     };
     crate::service::functions::add_function_to_stream(

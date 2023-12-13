@@ -13,24 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::infra::config::CONFIG;
-use crate::common::meta::ingestion::INGESTION_EP;
-use crate::common::meta::proxy::QueryParamProxyURL;
-use crate::common::meta::user::UserRole;
-use crate::common::utils::{
-    auth::{get_hash, is_root_user},
-    base64,
-};
-use crate::service::{db, users};
 use actix_web::{
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorUnauthorized},
-    http::header,
-    http::Method,
+    http::{header, Method},
     web, Error,
 };
-
 use actix_web_httpauth::extractors::basic::BasicAuth;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::{common::infra::config::LDAP_CONFIG, ldap::service::LdapUser};
+
+use crate::{
+    common::{
+        infra::config::CONFIG,
+        meta::{
+            ingestion::INGESTION_EP,
+            proxy::QueryParamProxyURL,
+            user::{DBUser, UserRole},
+        },
+        utils::{
+            auth::{get_hash, is_root_user},
+            base64,
+        },
+    },
+    service::{db, users},
+};
 
 pub async fn validator(
     req: ServiceRequest,
@@ -88,6 +95,12 @@ pub async fn validate_credentials(
     user_password: &str,
     path: &str,
 ) -> Result<bool, Error> {
+    #[cfg(feature = "enterprise")]
+    if LDAP_CONFIG.ldap_enabled {
+        log::info!("LDAP authentication enabled");
+        return validate_user(user_id, user_password).await;
+    }
+
     let user;
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last() {
@@ -152,8 +165,11 @@ pub async fn validate_credentials(
     }
 }
 
-pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, Error> {
-    let db_user = db::user::get_db_user(user_id).await;
+async fn validate_user_from_db(
+    db_user: Result<DBUser, anyhow::Error>,
+    user_password: &str,
+) -> Result<bool, Error> {
+    // let db_user = db::user::get_db_user(user_id).await;
     match db_user {
         Ok(user) => {
             let in_pass = get_hash(user_password, &user.salt);
@@ -165,6 +181,82 @@ pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, E
         }
         Err(_) => Err(ErrorForbidden("Not allowed")),
     }
+}
+
+/// Validate the incoming user from the ldap, if ldap is enabled
+#[cfg(feature = "enterprise")]
+async fn validate_user_from_ldap(user_id: &str, user_password: &str) -> Result<bool, Error> {
+    let ldap_user_res: Result<LdapUser, anyhow::Error> =
+        o2_enterprise::enterprise::ldap::service::auth::get_user_from_ldap(user_id, user_password)
+            .await;
+
+    match ldap_user_res {
+        Ok(ldap_user) => {
+            for group in ldap_user.groups {
+                let hierarchy = group.split(',').collect::<Vec<_>>();
+                let org = hierarchy[1].split('=').last().unwrap();
+                let role = if group.contains("admin") {
+                    crate::common::meta::user::UserRole::Admin
+                } else {
+                    crate::common::meta::user::UserRole::Member
+                };
+                log::info!("Orgs retrieved from the ldap server: {:?}", org);
+
+                // Check if the user exists in the database
+                let user_exists = db::user::check_user_exists_by_email(user_id).await;
+                if !user_exists {
+                    log::info!("User does not exist in the database");
+                    log::warn!("Email is replaced using user_id, beware, in ldap.");
+                    // create the user
+                    let _ = users::post_user(
+                        org,
+                        crate::common::meta::user::UserRequest {
+                            // email: ldap_user.attributes.email.clone(),
+                            email: user_id.to_string(),
+                            password: "ldap+pass".to_owned(),
+                            role,
+                            first_name: ldap_user.attributes.firstname.clone(),
+                            last_name: ldap_user.attributes.lastname.clone(),
+                            is_ldap: true,
+                        },
+                    )
+                    .await
+                    .unwrap();
+                } else {
+                    log::info!("User exists in the database, should have sync'd the org now");
+                    let root_user = crate::common::infra::config::ROOT_USER.clone();
+                    let initiating_user = root_user.get("root").unwrap().clone();
+                    let _ = users::add_user_to_org(org, user_id, role, &initiating_user.email)
+                        .await
+                        .unwrap();
+                }
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+            Ok(true)
+        }
+        Err(_) => Ok(false),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, Error> {
+    let db_user = db::user::get_db_user(user_id).await;
+    let is_ldap_user = match db_user.as_ref() {
+        Ok(user) => user.is_ldap,
+        Err(_) => true,
+    };
+
+    if LDAP_CONFIG.ldap_enabled && is_ldap_user {
+        validate_user_from_ldap(user_id, user_password).await
+    } else {
+        validate_user_from_db(db_user, user_password).await
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, Error> {
+    let db_user = db::user::get_db_user(user_id).await;
+    validate_user_from_db(db_user, user_password).await
 }
 
 pub async fn validator_aws(
@@ -312,8 +404,7 @@ pub async fn validator_rum(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::infra::db as infra_db;
-    use crate::common::meta::user::UserRequest;
+    use crate::common::{infra::db as infra_db, meta::user::UserRequest};
 
     #[actix_web::test]
     async fn test_validate() {
@@ -326,6 +417,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
+                is_ldap: false,
             },
         )
         .await;
@@ -337,6 +429,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Member,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
+                is_ldap: false,
             },
         )
         .await;
@@ -347,13 +440,17 @@ mod tests {
                 .await
                 .unwrap()
         );
-        assert!(!validate_credentials("", pwd, "default/_bulk")
-            .await
-            .unwrap());
+        assert!(
+            !validate_credentials("", pwd, "default/_bulk")
+                .await
+                .unwrap()
+        );
         assert!(!validate_credentials("", pwd, "/").await.unwrap());
-        assert!(!validate_credentials("user1@example.com", pwd, "/")
-            .await
-            .unwrap());
+        assert!(
+            !validate_credentials("user1@example.com", pwd, "/")
+                .await
+                .unwrap()
+        );
         assert!(
             validate_credentials("user1@example.com", pwd, "default/user")
                 .await

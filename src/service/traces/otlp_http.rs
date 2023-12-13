@@ -13,36 +13,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Error;
+
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
-use std::{fs::OpenOptions, io::Error};
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
+        },
+        meta::{
+            alerts::Alert,
+            http::HttpResponse as MetaHttpResponse,
+            stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
+            traces::{
+                Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanRefType,
+            },
+            usage::UsageType,
+            StreamType,
+        },
+        utils,
+        utils::{flatten, hasher::get_fields_key_xxh3, json},
     },
-    meta::{
-        alerts::Alert,
-        http::HttpResponse as MetaHttpResponse,
-        stream::{PartitionTimeLevel, StreamParams},
-        traces::{Event, Span, SpanRefType},
-        usage::UsageType,
-        StreamType,
+    service::{
+        db, distinct_values, format_partition_key, format_stream_name,
+        ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file_arrow, TriggerAlertData},
+        schema::{check_for_schema, stream_schema_exists},
+        stream::unwrap_partition_time_level,
+        usage::report_request_usage_stats,
     },
-    utils::{flatten, json},
-};
-use crate::service::{
-    db, distinct_values, format_partition_key, format_stream_name,
-    ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file, TriggerAlertData},
-    schema::{add_stream_schema, stream_schema_exists},
-    stream::unwrap_partition_time_level,
-    usage::report_request_usage_stats,
 };
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
@@ -86,21 +92,19 @@ pub async fn traces_json(
     let start = std::time::Instant::now();
     let traces_stream_name = match in_stream_name {
         Some(name) => format_stream_name(name),
-        None => "default".to_owned(),
+        None => "default".to_string(),
     };
-
     let traces_stream_name = &traces_stream_name;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
-        AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
-    let mut min_ts =
+    let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
-    let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut partial_success = ExportTracePartialSuccess::default();
+    let mut data_buf: AHashMap<String, SchemaRecords> = AHashMap::new();
 
     let stream_schema = stream_schema_exists(
         org_id,
@@ -145,14 +149,15 @@ pub async fn traces_json(
     let mut trigger: TriggerAlertData = None;
 
     let mut service_name: String = traces_stream_name.to_string();
-    //let export_req: ExportTraceServiceRequest = json::from_slice(body.as_ref()).unwrap();
+    // let export_req: ExportTraceServiceRequest =
+    // json::from_slice(body.as_ref()).unwrap();
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
         Err(e) => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("Invalid json: {}", e),
-            )))
+            )));
         }
     };
     let spans = match body.get("resourceSpans") {
@@ -162,14 +167,14 @@ pub async fn traces_json(
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
                     "Invalid json: the structure must be {{\"resourceSpans\":[]}}".to_string(),
-                )))
+                )));
             }
         },
         None => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 "Invalid json: the structure must be {{\"resourceSpans\":[]}}".to_string(),
-            )))
+            )));
         }
     };
     for res_span in spans.iter() {
@@ -290,16 +295,17 @@ pub async fn traces_json(
                         service_name: service_name.clone(),
                         attributes: span_att_map,
                         service: service_att_map.clone(),
-                        flags: 1, //TODO add appropriate value
+                        flags: 1, // TODO add appropriate value
                         events: json::to_string(&events).unwrap(),
                     };
                     if timestamp < min_ts.try_into().unwrap() {
-                        min_ts = timestamp as i64;
+                        partial_success.rejected_spans += 1;
+                        continue;
                     }
 
                     let mut value: json::Value = json::to_value(local_val).unwrap();
 
-                    //JSON Flattening
+                    // JSON Flattening
                     value = flatten::flatten(&value).unwrap();
 
                     if !local_trans.is_empty() {
@@ -343,13 +349,29 @@ pub async fn traces_json(
                     }
 
                     let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
+
+                    // check schema
+                    let schema_evolution = check_for_schema(
+                        org_id,
+                        traces_stream_name,
+                        StreamType::Traces,
+                        &value_str,
+                        &mut traces_schema_map,
+                        timestamp.try_into().unwrap(),
+                        true,
+                    )
+                    .await;
+
+                    // get hour key
+                    let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
+
                     // get hour key
                     let mut hour_key = crate::service::ingestion::get_wal_time_key(
                         timestamp.try_into().unwrap(),
                         &partition_keys,
                         partition_time_level,
                         val_map,
-                        None,
+                        Some(&schema_key),
                     );
 
                     if trigger.is_none() && !stream_alerts_map.is_empty() {
@@ -376,23 +398,24 @@ pub async fn traces_json(
                         hour_key.push_str(&format!("/{}", format_partition_key(&partition_key)));
                     }
 
-                    let hour_buf = data_buf.entry(hour_key.clone()).or_default();
+                    let rec_schema = traces_schema_map.get(traces_stream_name).unwrap();
 
-                    hour_buf.push(value_str);
-                    //Trace Metadata
-                    let mut trace_meta = json::Map::new();
-                    trace_meta.insert("trace_id".to_owned(), json::Value::String(trace_id.clone()));
-                    trace_meta.insert("_timestamp".to_owned(), start_time.into());
-
-                    let hour_meta_buf = trace_meta_coll.entry(hour_key.clone()).or_default();
-                    hour_meta_buf.push(trace_meta);
+                    let hour_buf = data_buf.entry(hour_key).or_insert(SchemaRecords {
+                        schema: rec_schema
+                            .clone()
+                            .with_metadata(std::collections::HashMap::new()),
+                        records: vec![],
+                    });
+                    let loc_value: utils::json::Value =
+                        utils::json::from_slice(value_str.as_bytes()).unwrap();
+                    hour_buf.records.push(loc_value);
                 }
             }
         }
     }
 
     let mut traces_file_name = "".to_string();
-    let mut req_stats = write_file(
+    let mut req_stats = write_file_arrow(
         &data_buf,
         thread_id,
         &StreamParams::new(org_id, traces_stream_name, StreamType::Traces),
@@ -429,7 +452,7 @@ pub async fn traces_json(
         ])
         .inc();
 
-    //metric + data usage
+    // metric + data usage
     report_request_usage_stats(
         req_stats,
         org_id,
@@ -440,44 +463,26 @@ pub async fn traces_json(
     )
     .await;
 
-    let schema_exists = stream_schema_exists(
-        org_id,
-        traces_stream_name,
-        StreamType::Traces,
-        &mut traces_schema_map,
-    )
-    .await;
-    if !schema_exists.has_fields && !traces_file_name.is_empty() {
-        let file = OpenOptions::new()
-            .read(true)
-            .open(&traces_file_name)
-            .unwrap();
-        add_stream_schema(
-            org_id,
-            traces_stream_name,
-            StreamType::Traces,
-            &file,
-            &mut traces_schema_map,
-            min_ts,
-        )
-        .await;
-    }
-
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK.into(),
-        "request processed".to_string(),
-    )))
-
-    //Ok(HttpResponse::Ok().into())
+    let resp = if partial_success.rejected_spans > 0 {
+        partial_success.error_message =
+            "Some spans were rejected due to exceeding the allowed retention period".to_string();
+        HttpResponse::PartialContent().json(ExportTraceServiceResponse {
+            partial_success: Some(partial_success),
+        })
+    } else {
+        HttpResponse::Ok().json(ExportTraceServiceResponse::default())
+    };
+    Ok(resp)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use json::json;
+
+    use super::*;
 
     #[test]
     fn test_get_val_for_attr() {

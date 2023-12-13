@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::promql::value::{InstantValue, Sample, Value};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
+
+use crate::service::promql::value::{InstantValue, Sample, Value};
 
 pub fn max(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
     let score_values =
@@ -25,11 +26,7 @@ pub fn max(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Resul
             data,
             "max",
             |prev, val| {
-                if prev >= val {
-                    prev
-                } else {
-                    val
-                }
+                if prev >= val { prev } else { val }
             },
         )?;
     if score_values.is_none() {

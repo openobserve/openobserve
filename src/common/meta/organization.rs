@@ -16,9 +16,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::infra::config::CONFIG;
-
 use super::{alerts::Alert, functions::Transform, stream::Stream};
+use crate::common::infra::config::CONFIG;
 
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
@@ -98,7 +97,8 @@ fn default_scrape_interval() -> u32 {
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSetting {
-    /// Ideally this should be the same as prometheus-scrape-interval (in seconds).
+    /// Ideally this should be the same as prometheus-scrape-interval (in
+    /// seconds).
     #[serde(default = "default_scrape_interval")]
     pub scrape_interval: u32,
 }

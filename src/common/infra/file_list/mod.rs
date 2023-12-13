@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use aws_sdk_dynamodb::types::AttributeValue;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
 
 use crate::common::{
     infra::{
@@ -77,7 +78,13 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_deleted(&self, org_id: &str, time_max: i64) -> Result<Vec<String>>;
+    async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>>;
+    async fn get_min_ts(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<i64>;
     async fn get_max_pk_value(&self) -> Result<i64>;
     async fn stats(
         &self,
@@ -93,7 +100,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>>;
     async fn set_stream_stats(&self, org_id: &str, streams: &[(String, StreamStats)])
-        -> Result<()>;
+    -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
     async fn reset_stream_stats_min_ts(
         &self,
@@ -181,8 +188,13 @@ pub async fn query(
 }
 
 #[inline]
-pub async fn query_deleted(org_id: &str, time_max: i64) -> Result<Vec<String>> {
-    CLIENT.query_deleted(org_id, time_max).await
+pub async fn query_deleted(org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>> {
+    CLIENT.query_deleted(org_id, time_max, limit).await
+}
+
+#[inline]
+pub async fn get_min_ts(org_id: &str, stream_type: StreamType, stream_name: &str) -> Result<i64> {
+    CLIENT.get_min_ts(org_id, stream_type, stream_name).await
 }
 
 #[inline]

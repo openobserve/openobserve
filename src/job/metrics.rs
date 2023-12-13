@@ -13,20 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::HashMap;
 use std::path::Path;
+
+use ahash::HashMap;
 use tokio::time;
 
-use crate::common::{
-    infra::{
-        cache, cluster,
-        config::{CONFIG, USERS},
-        metrics,
+use crate::{
+    common::{
+        infra::{
+            cache, cluster,
+            config::{CONFIG, USERS},
+            metrics,
+        },
+        meta::StreamType,
+        utils::file::scan_files,
     },
-    meta::StreamType,
-    utils::file::scan_files,
+    service::db,
 };
-use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics
@@ -158,7 +161,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         }
     }
 
-    //let users = db.count("/user/").await?;
+    // let users = db.count("/user/").await?;
     let users = USERS.len();
 
     metrics::META_NUM_USERS_TOTAL

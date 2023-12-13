@@ -13,16 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, post, put, web, HttpResponse};
 use std::io::Error;
 
-use crate::common::meta::{
-    http::HttpResponse as MetaHttpResponse,
-    saved_view::{
-        CreateViewRequest, CreateViewResponse, DeleteViewResponse, UpdateViewRequest, View,
+use actix_web::{delete, get, post, put, web, HttpResponse};
+
+use crate::{
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse,
+        saved_view::{
+            CreateViewRequest, CreateViewResponse, DeleteViewResponse, UpdateViewRequest, View,
+        },
     },
+    service::db::saved_view,
 };
-use crate::service::db::saved_view;
 
 // GetSavedView
 //

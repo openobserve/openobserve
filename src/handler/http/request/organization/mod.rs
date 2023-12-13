@@ -13,24 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::HashSet, io::Error};
+
 use actix_web::{get, post, put, web, HttpResponse, Result};
 use actix_web_httpauth::extractors::basic::BasicAuth;
-use std::collections::HashSet;
-use std::io::Error;
 
-use crate::common::infra::config::{STREAM_SCHEMAS, USERS};
-use crate::common::meta::organization::{
-    OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, RumIngestionResponse, CUSTOM,
-    DEFAULT_ORG, THRESHOLD,
+use crate::{
+    common::{
+        infra::config::{STREAM_SCHEMAS, USERS},
+        meta::organization::{
+            OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, RumIngestionResponse,
+            CUSTOM, DEFAULT_ORG, THRESHOLD,
+        },
+        utils::auth::is_root_user,
+    },
+    service::organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
 };
-use crate::common::utils::auth::is_root_user;
-use crate::service::organization::{self, update_passcode};
-use crate::service::organization::{get_passcode, get_rum_token, update_rum_token};
 
 pub mod es;
 pub mod settings;
 
-/** GetOrganizations */
+/// GetOrganizations
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -125,7 +128,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
     Ok(HttpResponse::Ok().json(org_response))
 }
 
-/** GetOrganizationSummary */
+/// GetOrganizationSummary
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -147,7 +150,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(org_summary))
 }
 
-/** GetIngestToken */
+/// GetIngestToken
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -177,7 +180,7 @@ async fn get_user_passcode(
     Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
 }
 
-/** UpdateIngestToken */
+/// UpdateIngestToken
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -207,7 +210,7 @@ async fn update_user_passcode(
     Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
 }
 
-/** GetRumIngestToken */
+/// GetRumIngestToken
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -237,7 +240,7 @@ async fn get_user_rumtoken(
     Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
 }
 
-/** UpdateRumIngestToken */
+/// UpdateRumIngestToken
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -267,7 +270,7 @@ async fn update_user_rumtoken(
     Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
 }
 
-/** CreateRumIngestToken */
+/// CreateRumIngestToken
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",

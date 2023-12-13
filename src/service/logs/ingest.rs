@@ -13,39 +13,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::{BufRead, Read};
+
 use actix_web::http;
 use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
-use std::io::{BufRead, Read};
 use vrl::compiler::runtime::Runtime;
 
-use crate::common::{
-    infra::{
-        config::{CONFIG, DISTINCT_FIELDS},
-        metrics,
-    },
-    meta::{
-        alerts::Alert,
-        functions::{StreamTransform, VRLResultResolver},
-        ingestion::{
-            AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
-            IngestionRequest, IngestionResponse, KinesisFHData, KinesisFHIngestionResponse,
-            StreamStatus,
+use crate::{
+    common::{
+        infra::{
+            config::{CONFIG, DISTINCT_FIELDS},
+            metrics,
         },
-        stream::{SchemaRecords, StreamParams},
-        usage::UsageType,
-        StreamType,
+        meta::{
+            alerts::Alert,
+            functions::{StreamTransform, VRLResultResolver},
+            ingestion::{
+                AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter,
+                IngestionError, IngestionRequest, IngestionResponse, KinesisFHData,
+                KinesisFHIngestionResponse, StreamStatus,
+            },
+            stream::{SchemaRecords, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-};
-use crate::service::{
-    distinct_values, get_formatted_stream_name,
-    ingestion::{evaluate_trigger, is_ingestion_allowed, write_file_arrow, TriggerAlertData},
-    logs::StreamMeta,
-    usage::report_request_usage_stats,
+    service::{
+        distinct_values, get_formatted_stream_name,
+        ingestion::{evaluate_trigger, is_ingestion_allowed, write_file_arrow, TriggerAlertData},
+        logs::StreamMeta,
+        usage::report_request_usage_stats,
+    },
 };
 
 pub async fn ingest(
@@ -402,7 +405,7 @@ impl<'a> IngestionData<'a> {
                         }
                         Ok((decompressed_data, record_type)) => {
                             let mut value;
-                            //let mut timestamp;
+                            // let mut timestamp;
                             if record_type.eq(&AWSRecordType::Cloudwatch) {
                                 let kfh_data: KinesisFHData =
                                     json::from_str(&decompressed_data).unwrap();

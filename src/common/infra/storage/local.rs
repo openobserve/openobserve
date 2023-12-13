@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::ops::Range;
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::BoxStream;
@@ -20,7 +22,6 @@ use object_store::{
     limit::LimitStore, local::LocalFileSystem, path::Path, Error, GetOptions, GetResult,
     ListResult, MultipartId, ObjectMeta, ObjectStore, PutOptions, PutResult, Result,
 };
-use std::ops::Range;
 use tokio::io::AsyncWrite;
 
 use crate::common::infra::{

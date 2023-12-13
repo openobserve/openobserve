@@ -15,13 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <div class="col-12 items-center no-wrap q-pt-md">
-      <div class="col" data-test="add-template-title">
-        <div v-if="isUpdatingTemplate" class="text-h6">
-          {{ t("alert_templates.updateTitle") }}
+    <div class="row items-center no-wrap q-mx-md q-my-sm">
+      <div class="flex items-center">
+        <div
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="router.back()"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div v-else class="text-h6">
-          {{ t("alert_templates.addTitle") }}
+        <div class="col" data-test="add-template-title">
+          <div v-if="isUpdatingTemplate" class="text-h6">
+            {{ t("alert_templates.updateTitle") }}
+          </div>
+          <div v-else class="text-h6">
+            {{ t("alert_templates.addTitle") }}
+          </div>
         </div>
       </div>
     </div>
@@ -49,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               v-bind:readonly="isUpdatingTemplate"
               v-bind:disable="isUpdatingTemplate"
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
             />
           </div>
@@ -105,7 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>org_name, stream_type, stream_name</div>
             <div>alert_name, alert_type</div>
             <div>alert_period, alert_operator, alert_threshold</div>
-            <div>alert_count, alert_start_time, alert_end_time</div>
+            <div>alert_count, alert_agg_value</div>
+            <div>alert_start_time, alert_end_time</div>
             <div><b>All of the stream fields are variables.</b></div>
           </div>
           <div class="q-pb-md q-px-xs">
@@ -160,6 +176,7 @@ import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import { copyToClipboard, useQuasar } from "quasar";
 import type { TemplateData, Template } from "@/ts/interfaces/index";
+import { useRouter } from "vue-router";
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 const { t } = useI18n();
@@ -272,6 +289,8 @@ const isTemplateBodyValid = () => {
     return false;
   }
 };
+
+const router = useRouter();
 
 const isTemplateFilled = () => formData.value.name && formData.value.body;
 

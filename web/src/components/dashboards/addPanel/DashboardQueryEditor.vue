@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inline-label
             outside-arrows
             mobile-arrows
+            @click.stop
           >
             <q-tab
               no-caps
@@ -105,8 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="overflow: hidden"
     data-test="dashboard-query"
   >
-    <div class="row">
-      <div class="col">
+    <div class="column" style="width: 100%; height: 100%">
+      <div class="col" style="width: 100%">
         <query-editor
           ref="queryEditorRef"
           class="monaco-editor"
@@ -128,9 +129,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :language="dashboardPanelData.data.queryType"
         ></query-editor>
-        <div style="color: red" class="q-mx-sm">
-          {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}&nbsp;
-        </div>
+      </div>
+      <div style="color: red; z-index: 100000" class="q-mx-sm col-auto">
+        {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
       </div>
     </div>
   </div>
@@ -280,6 +281,9 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.weight,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit,
       ],
       () => {
         // only continue if current mode is auto query generation
@@ -340,6 +344,28 @@ export default defineComponent({
           }
         }
       }
+
+      // array of sorting fields with followed by asc or desc
+      const orderByArr = [];
+
+      [latitude, longitude, weight].forEach((it: any) => {
+        // ignore if None is selected or sortBy is not there
+        if (it?.sortBy) {
+          orderByArr.push(`${it.alias} ${it.sortBy}`);
+        }
+      });
+
+      // append with query by joining array with comma
+      query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
+
+      // append limit
+      // if limit is less than or equal to 0 then don't add
+      const queryLimit =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit ?? 0;
+      query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
       return query;
     };
 
@@ -396,6 +422,15 @@ export default defineComponent({
             case "count-distinct":
               selector += `count(distinct(${field.column}))`;
               break;
+            case "histogram": {
+              // if inteval is not null, then use it
+              if (field?.args && field?.args?.length && field?.args[0].value) {
+                selector += `${field.aggregationFunction}(${field.column}, '${field.args[0].value}')`;
+              } else {
+                selector += `${field.aggregationFunction}(${field.column})`;
+              }
+              break;
+            }
             default:
               selector += `${field.aggregationFunction}(${field.column})`;
               break;
@@ -482,7 +517,28 @@ export default defineComponent({
       } else {
         query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
       }
-      query += xAxisAlias.length ? " ORDER BY " + xAxisAlias.join(", ") : "";
+
+      // array of sorting fields with followed by asc or desc
+      const orderByArr = [];
+
+      fields.forEach((it: any) => {
+        // ignore if None is selected or sortBy is not there
+        if (it?.sortBy) {
+          orderByArr.push(`${it.alias} ${it.sortBy}`);
+        }
+      });
+
+      // append with query by joining array with comma
+      query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
+
+      // append limit
+      // if limit is less than or equal to 0 then don't add
+      const queryLimit =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit ?? 0;
+      query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
       return query;
     };
 
@@ -516,6 +572,14 @@ export default defineComponent({
         // }
       },
       { deep: true }
+    );
+
+    // on queryerror change dispatch resize event to resize monaco editor
+    watch(
+      () => dashboardPanelData.meta.errors.queryErrors,
+      () => {
+        window.dispatchEvent(new Event("resize"));
+      }
     );
 
     // This function parses the custom query and generates the errors and custom fields

@@ -35,11 +35,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 100%"
       >
         <template #no-data>
-          <NoData />
+          <div
+            v-if="!templates.length || !destinations.length"
+            class="full-width flex column justify-center items-center text-center"
+          >
+            <div style="width: 600px" class="q-mt-xl">
+              <template v-if="!templates.length">
+                <div class="text-subtitle1">
+                  It looks like you haven't created any Templates yet. To create
+                  an Alert, you'll need to have at least one Destination and one
+                  Template in place
+                </div>
+                <q-btn
+                  class="q-mt-md"
+                  label="Create Template"
+                  size="md"
+                  color="primary"
+                  no-caps
+                  style="border-radius: 4px"
+                  @click="routeTo('alertTemplates')"
+                />
+              </template>
+              <template v-if="!destinations.length">
+                <div class="text-subtitle1">
+                  It looks like you haven't created any Destinations yet. To
+                  create an Alert, you'll need to have at least one Destination
+                  and one Template in place
+                </div>
+                <q-btn
+                  class="q-mt-md"
+                  label="Create Destination"
+                  size="md"
+                  color="primary"
+                  no-caps
+                  style="border-radius: 4px"
+                  @click="routeTo('alertDestinations')"
+                />
+              </template>
+            </div>
+          </div>
+          <template v-else>
+            <NoData />
+          </template>
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
+            <div
+              v-if="alertStateLoadingMap[props.row.name]"
+              style="display: inline-block; width: 33.14px; height: auto"
+              class="flex justify-center items-center q-ml-xs"
+              :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+            >
+              <q-circular-progress
+                indeterminate
+                rounded
+                size="16px"
+                :value="1"
+                color="secondary"
+              />
+            </div>
             <q-btn
+              v-else
               :data-test="`alert-list-${props.row.name}-udpate-alert`"
               :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
               class="q-ml-xs material-symbols-outlined"
@@ -51,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
               @click="toggleAlertState(props.row)"
-            ></q-btn>
+            />
             <q-btn
               :data-test="`alert-list-${props.row.name}-udpate-alert`"
               icon="edit"
@@ -109,6 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             padding="sm lg"
             color="secondary"
             no-caps
+            :disable="!destinations.length"
+            :title="!destinations.length ? t('alerts.noDestinations') : ''"
             :label="t(`alerts.add`)"
             @click="showAddUpdateFn({})"
           />
@@ -163,6 +221,7 @@ import { useI18n } from "vue-i18n";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
+import templateService from "@/services/alert_templates";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -199,6 +258,7 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const splitterModel = ref(220);
+    const alertStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
     const folders = ref([
       {
         name: "folder1",
@@ -265,7 +325,8 @@ export default defineComponent({
       },
     ]);
     const activeTab: any = ref("alerts");
-    const destinations = ref([]);
+    const destinations = ref([0]);
+    const templates = ref([0]);
     const getAlerts = () => {
       const dismiss = $q.notify({
         spinner: true,
@@ -301,12 +362,16 @@ export default defineComponent({
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
+              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
               stream_name: data.stream_name ? data.stream_name : "--",
               stream_type: data.stream_type,
               enabled: data.enabled,
-              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
+              conditions: conditions,
               description: data.description,
             };
+          });
+          alertsRows.value.forEach((alert: AlertListItem) => {
+            alertStateLoadingMap.value[alert.name] = false;
           });
           if (router.currentRoute.value.query.action == "add") {
             showAddUpdateFn({ row: undefined });
@@ -335,7 +400,10 @@ export default defineComponent({
     if (!alerts.value.length) {
       getAlerts();
     }
-    onBeforeMount(() => getDestinations());
+    onBeforeMount(async () => {
+      await getTemplates();
+      getDestinations();
+    });
     onActivated(() => getDestinations());
     watch(
       () => router.currentRoute.value.query.action,
@@ -355,7 +423,24 @@ export default defineComponent({
           $q.notify({
             type: "negative",
             message: "Error while fetching destinations.",
-            timeout: 2000,
+            timeout: 3000,
+          })
+        );
+    };
+
+    const getTemplates = () => {
+      templateService
+        .list({
+          org_identifier: store.state.selectedOrganization.identifier,
+        })
+        .then((res) => {
+          templates.value = res.data;
+        })
+        .catch(() =>
+          $q.notify({
+            type: "negative",
+            message: "Error while fetching templates.",
+            timeout: 3000,
           })
         );
     };
@@ -481,6 +566,7 @@ export default defineComponent({
     };
 
     const toggleAlertState = (row: any) => {
+      alertStateLoadingMap.value[row.name] = true;
       const alert: Alert = alerts.value.find(
         (alert) => alert.name === row.name
       ) as Alert;
@@ -496,8 +582,22 @@ export default defineComponent({
           alertsRows.value.forEach((alert) => {
             alert.name === row.name ? (alert.enabled = !alert.enabled) : null;
           });
+        })
+        .finally(() => {
+          alertStateLoadingMap.value[row.name] = false;
         });
     };
+
+    const routeTo = (name: string) => {
+      router.push({
+        name: name,
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     return {
       t,
       qTable,
@@ -546,6 +646,9 @@ export default defineComponent({
       outlinedPlayArrow,
       alertsRows,
       toggleAlertState,
+      alertStateLoadingMap,
+      templates,
+      routeTo,
     };
   },
 });

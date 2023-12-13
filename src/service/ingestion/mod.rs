@@ -13,40 +13,43 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::BTreeMap, io::BufReader, sync::Arc};
+
 use ahash::AHashMap;
 use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
-use std::{collections::BTreeMap, io::BufReader, sync::Arc};
 use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
     prelude::state,
 };
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
-        wal::{get_or_create, get_or_create_arrow},
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
+            wal::{get_or_create, get_or_create_arrow},
+        },
+        meta::{
+            alerts::Alert,
+            functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
+            stream::{PartitionTimeLevel, PartitioningDetails, SchemaRecords, StreamParams},
+            usage::RequestStats,
+            StreamType,
+        },
+        utils::{
+            flatten,
+            functions::get_vrl_compiler_config,
+            json::{self, Map, Value},
+            schema::infer_json_schema,
+        },
     },
-    meta::{
-        alerts::Alert,
-        functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-        stream::{PartitionTimeLevel, PartitioningDetails, SchemaRecords, StreamParams},
-        usage::RequestStats,
-        StreamType,
+    service::{
+        db, format_partition_key, schema::filter_schema_null_fields, stream::stream_settings,
     },
-    utils::{
-        flatten,
-        functions::get_vrl_compiler_config,
-        json::{self, Map, Value},
-        schema::infer_json_schema,
-    },
-};
-use crate::service::{
-    db, format_partition_key, schema::filter_schema_null_fields, stream::stream_settings,
 };
 
 pub mod grpc;
@@ -373,28 +376,28 @@ pub async fn write_file_arrow(
             continue;
         }
         let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(entry.records.len());
-        //let value = &entry.records.first().unwrap();
-        //let first_record = json::to_string(value).unwrap();
+        // let value = &entry.records.first().unwrap();
+        // let first_record = json::to_string(value).unwrap();
 
         // let mut schema_reader = BufReader::new(first_record.as_bytes());
         // let inferred_schema =
         //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
-        //let inferred_schema = entry.schema.clone();
+        // let inferred_schema = entry.schema.clone();
 
         // let mut schema_reader = BufReader::new(first_record.as_bytes());
         // let inferred_schema =
         //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
-        //let inferred_schema = entry.schema.clone();
+        // let inferred_schema = entry.schema.clone();
 
         // let mut schema_reader = BufReader::new(first_record.as_bytes());
         // let inferred_schema =
         //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
-        //let inferred_schema = entry.schema.clone();
+        // let inferred_schema = entry.schema.clone();
 
         // let mut schema_reader = BufReader::new(first_record.as_bytes());
         // let inferred_schema =
         //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
-        //let inferred_schema = entry.schema.clone();
+        // let inferred_schema = entry.schema.clone();
 
         let mut decoder = ReaderBuilder::new(Arc::new(entry.schema.clone()))
             .with_batch_size(batch_size)

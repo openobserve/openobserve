@@ -13,14 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{
-    common::utils::time::parse_i64_to_timestamp_micros,
-    service::promql::value::{InstantValue, LabelsExt, Sample, Value},
-};
 use chrono::{Datelike, NaiveDate, Timelike};
 use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
 use strum::EnumIter;
+
+use crate::{
+    common::utils::time::parse_i64_to_timestamp_micros,
+    service::promql::value::{InstantValue, LabelsExt, Sample, Value},
+};
 
 #[derive(Debug, EnumIter)]
 pub enum TimeOperationType {
@@ -123,8 +124,9 @@ fn exec(data: &Value, op: &TimeOperationType) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use strum::IntoEnumIterator;
+
+    use super::*;
 
     #[test]
     fn test_get_component_from_ts() {

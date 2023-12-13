@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::dashboards::folders;
-use actix_web::{delete, get, post, put, web, HttpResponse};
 use std::io::Error;
 
-use crate::common::meta::dashboards::Folder;
+use actix_web::{delete, get, post, put, web, HttpResponse};
 
-/** CreateFolder */
+use crate::{common::meta::dashboards::Folder, service::dashboards::folders};
+
+/// CreateFolder
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -52,7 +52,7 @@ pub async fn create_folder(
     folders::save_folder(&org_id, folder.into_inner(), false).await
 }
 
-/** UpdateFolder */
+/// UpdateFolder
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",

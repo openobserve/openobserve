@@ -13,15 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{http::StatusCode, HttpResponse};
-use ipnetwork::IpNetwork;
 use std::io;
 
-use crate::common::infra::config::SYSLOG_ROUTES;
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::common::meta::syslog::{SyslogRoute, SyslogRoutes, SyslogServer};
-use crate::job;
-use crate::service::db::syslog;
+use actix_web::{http::StatusCode, HttpResponse};
+use ipnetwork::IpNetwork;
+
+use crate::{
+    common::{
+        infra::config::SYSLOG_ROUTES,
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            syslog::{SyslogRoute, SyslogRoutes, SyslogServer},
+        },
+    },
+    job,
+    service::db::syslog,
+};
 
 #[tracing::instrument(skip_all)]
 pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Error> {

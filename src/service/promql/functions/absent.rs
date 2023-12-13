@@ -31,7 +31,7 @@ pub(crate) fn absent(data: &Value, eval_ts: i64) -> Result<Value> {
         _ => {
             return Err(DataFusionError::Plan(
                 "Unexpected input for absent func".into(),
-            ))
+            ));
         }
     };
     Ok(Value::None)

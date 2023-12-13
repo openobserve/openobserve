@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use bytes::Bytes;
 use std::sync::Arc;
+
+use bytes::Bytes;
 
 use crate::common::{
     infra::{cluster::LOCAL_NODE_UUID, config::METRIC_CLUSTER_LEADER, db as infra_db},

@@ -35,7 +35,7 @@ pub async fn quantile(
         _ => {
             return Err(DataFusionError::Plan(
                 "[quantile] param must be a NumberLiteral".to_string(),
-            ))
+            ));
         }
     };
     let data = match data {
@@ -44,7 +44,7 @@ pub async fn quantile(
         _ => {
             return Err(DataFusionError::Plan(
                 "[quantile] function only accept vector values".to_string(),
-            ))
+            ));
         }
     };
 

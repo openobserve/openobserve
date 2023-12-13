@@ -15,9 +15,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::common::infra::config::SIZE_IN_MB;
-
 use super::{common::FileMeta, StreamType};
+use crate::common::infra::config::SIZE_IN_MB;
 
 pub const USAGE_STREAM: &str = "usage";
 pub const STATS_STREAM: &str = "stats";
@@ -29,6 +28,7 @@ pub struct UsageData {
     pub month: u32,
     pub day: u32,
     pub hour: u32,
+    pub event_time_hour: String,
     pub org_id: String,
     pub request_body: String,
     pub size: f64,

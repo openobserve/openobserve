@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{cmp::Ordering, sync::Arc, time::Duration};
+
 use ahash::HashSet;
 use once_cell::sync::Lazy;
 use regex::{self, Regex};
@@ -20,10 +22,8 @@ use serde::{
     ser::{SerializeSeq, SerializeStruct, Serializer},
     Serialize,
 };
-use std::{cmp::Ordering, sync::Arc, time::Duration};
 
-use crate::common::infra::config::FxIndexMap;
-use crate::common::meta::prom::NAME_LABEL;
+use crate::common::{infra::config::FxIndexMap, meta::prom::NAME_LABEL};
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
 static RE_VALID_LABEL_NAME: Lazy<Regex> =
@@ -214,7 +214,6 @@ pub struct TimeWindow {
     pub range: Duration,
     /// The offset used during the query execution.
     /// We don't use it (yet), so its value is always zero.
-    //
     // See https://github.com/prometheus/prometheus/blob/80b7f73d267a812b3689321554aec637b75f468d/promql/parser/ast.go#L192-L198
     pub offset: Duration,
 }
@@ -289,7 +288,8 @@ pub(crate) enum ExtrapolationKind {
     /// See <https://prometheus.io/docs/prometheus/latest/querying/functions/#increase>
     Increase,
 
-    /// Calculate the difference between the first and last value. Don't adjust for counter resets. Should only be used with gauges.
+    /// Calculate the difference between the first and last value. Don't adjust
+    /// for counter resets. Should only be used with gauges.
     ///
     /// See <https://prometheus.io/docs/prometheus/latest/querying/functions/#delta>
     Delta,
@@ -308,7 +308,6 @@ pub(crate) enum ExtrapolationKind {
 /// # Panics
 ///
 /// Panics if the samples are not in the range.
-//
 // cf. https://github.com/prometheus/prometheus/blob/80b7f73d267a812b3689321554aec637b75f468d/promql/functions.go#L67
 pub(crate) fn extrapolated_rate(
     samples: &[Sample],
@@ -496,9 +495,9 @@ impl Value {
         }
     }
 
-    /// Checks if the vector or matrix types contain duplicated label set or not.
-    /// This is an undefined condition, hence caller should raise an error in
-    /// case this evaluates to `true`.
+    /// Checks if the vector or matrix types contain duplicated label set or
+    /// not. This is an undefined condition, hence caller should raise an
+    /// error in case this evaluates to `true`.
     pub fn contains_same_label_set(&self) -> bool {
         match self {
             Value::Vector(v) => match v.len() {
@@ -550,7 +549,8 @@ pub fn signature(labels: &Labels) -> Signature {
     signature_without_labels(labels, &[])
 }
 
-/// `signature_without_labels` is just as [`signature`], but only for labels not matching `names`.
+/// `signature_without_labels` is just as [`signature`], but only for labels not
+/// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> Signature {
     let mut hasher = blake3::Hasher::new();
@@ -566,9 +566,10 @@ pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> Sign
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use expect_test::expect;
     use float_cmp::approx_eq;
+
+    use super::*;
 
     fn generate_test_labels() -> Labels {
         let labels: Labels = vec![

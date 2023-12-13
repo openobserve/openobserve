@@ -13,27 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::AHashMap;
-use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+
+use ahash::AHashMap;
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, RwLock},
     time,
 };
 
-use crate::common::{
-    infra::{
-        config::{FxIndexMap, CONFIG},
-        errors::{Error, Result},
+use crate::{
+    common::{
+        infra::{
+            config::{FxIndexMap, CONFIG},
+            errors::{Error, Result},
+        },
+        meta::{stream::StreamParams, StreamType},
+        utils::json,
     },
-    meta::{stream::StreamParams, StreamType},
-    utils::json,
+    service::{ingestion, stream::unwrap_partition_time_level},
 };
-use crate::service::{ingestion, stream::unwrap_partition_time_level};
 
 const CHANNEL_SIZE: usize = 10240;
 const STREAM_NAME: &str = "distinct_values";

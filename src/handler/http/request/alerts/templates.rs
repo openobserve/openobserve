@@ -13,13 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, http, post, web, HttpResponse};
 use std::io::Error;
 
-use crate::common::meta::{alerts::templates::Template, http::HttpResponse as MetaHttpResponse};
-use crate::service::alerts::templates;
+use actix_web::{delete, get, http, post, web, HttpResponse};
 
-/** CreateTemplate */
+use crate::{
+    common::meta::{alerts::templates::Template, http::HttpResponse as MetaHttpResponse},
+    service::alerts::templates,
+};
+
+/// CreateTemplate
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -50,7 +53,7 @@ pub async fn save_template(
     }
 }
 
-/** GetTemplateByName */
+/// GetTemplateByName
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -76,7 +79,7 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
     }
 }
 
-/** ListTemplates */
+/// ListTemplates
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -101,7 +104,7 @@ async fn list_templates(path: web::Path<String>) -> Result<HttpResponse, Error> 
     }
 }
 
-/** DeleteTemplate */
+/// DeleteTemplate
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",

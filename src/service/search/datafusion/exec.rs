@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{str::FromStr, sync::Arc};
+
 use ahash::AHashMap as HashMap;
 use datafusion::{
     arrow::{
@@ -40,25 +42,27 @@ use datafusion::{
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
-use std::{str::FromStr, sync::Arc};
 
-use crate::common::{
-    infra::{
-        cache::tmpfs,
-        config::{CONFIG, PARQUET_BATCH_SIZE},
-    },
-    meta::{
-        common::{FileKey, FileMeta},
-        functions::VRLResultResolver,
-        search::{SearchType, Session as SearchSession},
-        sql,
-    },
-    utils::{flatten, json},
+use super::{
+    storage::{file_list, StorageType},
+    transform_udf::get_all_transform,
 };
-use crate::service::{schema::filter_schema_null_fields, search::sql::Sql};
-
-use super::storage::{file_list, StorageType};
-use super::transform_udf::get_all_transform;
+use crate::{
+    common::{
+        infra::{
+            cache::tmpfs,
+            config::{CONFIG, PARQUET_BATCH_SIZE},
+        },
+        meta::{
+            common::{FileKey, FileMeta},
+            functions::VRLResultResolver,
+            search::{SearchType, Session as SearchSession},
+            sql,
+        },
+        utils::{flatten, json},
+    },
+    service::{schema::filter_schema_null_fields, search::sql::Sql},
+};
 
 const AGGREGATE_UDF_LIST: [&str; 7] = [
     "min",
@@ -128,7 +132,7 @@ pub async fn sql(
         .await?,
     );
 
-    //get alias from context query for agg sql
+    // get alias from context query for agg sql
     let meta_sql = sql::Sql::new(&sql.query_context);
 
     for (name, orig_agg_sql) in sql.aggs.iter() {
@@ -837,6 +841,7 @@ pub async fn convert_parquet_file(
     session_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
+    bloom_filter_fields: &[String],
     rules: HashMap<String, DataType>,
     file_type: FileType,
 ) -> Result<()> {
@@ -922,7 +927,7 @@ pub async fn convert_parquet_file(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
     let file_meta = FileMeta::default();
-    let mut writer = super::new_parquet_writer(buf, &schema, &file_meta);
+    let mut writer = super::new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -942,6 +947,7 @@ pub async fn merge_parquet_files(
     session_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
+    bloom_filter_fields: &[String],
     original_size: i64,
 ) -> Result<FileMeta> {
     let start = std::time::Instant::now();
@@ -995,7 +1001,7 @@ pub async fn merge_parquet_files(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
 
-    let mut writer = super::new_parquet_writer(buf, &schema, &file_meta);
+    let mut writer = super::new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -1218,7 +1224,7 @@ mod test {
     async fn test_register_udf() {
         let mut ctx = SessionContext::new();
         let _ = register_udf(&mut ctx, "nexus").await;
-        //assert!(res)
+        // assert!(res)
     }
 
     #[actix_web::test]

@@ -13,15 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{
-    common::infra::{
+use http_auth_basic::Credentials;
+use tonic::{Request, Status};
+
+use crate::common::{
+    infra::{
         cluster::get_internal_grpc_token,
         config::{CONFIG, ROOT_USER, USERS},
     },
-    common::utils::auth::{get_hash, is_root_user},
+    utils::auth::{get_hash, is_root_user},
 };
-use http_auth_basic::Credentials;
-use tonic::{Request, Status};
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     let metadata = req.metadata();
@@ -106,6 +107,7 @@ mod tests {
                 token: "token".to_string(),
                 rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
+                is_ldap: false,
             },
         );
 
@@ -134,6 +136,7 @@ mod tests {
                 token: "token".to_string(),
                 rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
+                is_ldap: false,
             },
         );
 
@@ -160,6 +163,7 @@ mod tests {
                 token: "token".to_string(),
                 rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
+                is_ldap: false,
             },
         );
         let mut request = tonic::Request::new(());

@@ -56,7 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div style="height: 100%">
             <PanelContainer
-              @onDeletePanel="OnDeletePanel"
+              @onDeletePanel="onDeletePanel"
+              @onViewPanel="onViewPanel"
               :viewOnly="viewOnly"
               :data="item"
               :dashboardId="dashboardData.id"
@@ -64,12 +65,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :variablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
+              @updated:data-zoom="$emit('updated:data-zoom', $event)"
             >
             </PanelContainer>
           </div>
         </grid-item>
       </grid-layout>
     </div>
+
+    <!-- view panel dialog -->
+    <q-dialog v-model="showViewPanel">
+      <q-card style="min-width: 95vw; min-height: 90vh">
+        <ViewPanel
+          :panelId="viewPanelId"
+          :currentTimeObj="currentTimeObj"
+          :initialVariableValues="initialVariableValues"
+          @close-panel="() => (showViewPanel = false)"
+          :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+        />
+      </q-card>
+    </q-dialog>
     <div v-if="!dashboardData.panels?.length">
       <!-- if data not available show nodata component -->
       <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
@@ -79,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent, provide, ref } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -91,10 +106,11 @@ import { useRoute } from "vue-router";
 import { updateDashboard } from "../../utils/commons";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
+import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
-  emits: ["onDeletePanel", "variablesData"],
+  emits: ["onDeletePanel", "onViewPanel", "variablesData", "updated:data-zoom"],
   props: [
     "viewOnly",
     "dashboardData",
@@ -107,6 +123,7 @@ export default defineComponent({
     PanelContainer,
     NoPanel,
     VariablesValueSelector,
+    ViewPanel,
   },
   setup(props: any, { emit }) {
     const { t } = useI18n();
@@ -116,12 +133,42 @@ export default defineComponent({
     const $q = useQuasar();
     const gridLayoutRef = ref(null);
 
+    const showViewPanel = ref(false);
+    // holds the view panel id
+    const viewPanelId = ref("");
+
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
       emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
     };
+
+    const hoveredSeriesState = ref({
+      hoveredSeriesName: "",
+      panelId: -1,
+      dataIndex: -1,
+      seriesIndex: -1,
+      hoveredTime: null,
+      setHoveredSeriesName: function (name: string) {
+        hoveredSeriesState.value.hoveredSeriesName = name ?? "";
+      },
+      setIndex: function (
+        dataIndex: number,
+        seriesIndex: number,
+        panelId: any,
+        hoveredTime?: any
+      ) {
+        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
+        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
+        hoveredSeriesState.value.panelId = panelId ?? -1;
+        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
+      },
+    });
+
+    // used provide and inject to share data between components
+    // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
+    provide("hoveredSeriesState", hoveredSeriesState);
 
     // save the dashboard value
     const saveDashboard = async () => {
@@ -219,6 +266,7 @@ export default defineComponent({
     };
 
     return {
+      store,
       addPanelData,
       t,
       movedEvent,
@@ -231,11 +279,17 @@ export default defineComponent({
       getDashboardLayout,
       gridLayoutRef,
       layoutUpdate,
+      showViewPanel,
+      viewPanelId,
     };
   },
   methods: {
-    OnDeletePanel(panelId) {
+    onDeletePanel(panelId) {
       this.$emit("onDeletePanel", panelId);
+    },
+    onViewPanel(panelId) {
+      this.viewPanelId = panelId;
+      this.showViewPanel = true;
     },
   },
 });

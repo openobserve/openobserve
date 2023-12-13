@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="text-bold">Conditions</div>
+    <div class="text-bold">Conditions *</div>
     <template v-if="!fields.length">
       <q-btn
         color="primary"
@@ -26,7 +26,7 @@
         <div class="q-ml-none">
           <q-select
             v-model="field.column"
-            :options="streamFields"
+            :options="filteredFields"
             :popup-content-style="{ textTransform: 'lowercase' }"
             color="input-border"
             bg-color="input-bg"
@@ -38,8 +38,9 @@
             use-input
             hide-selected
             fill-input
-            input-debounce="500"
+            :input-debounce="400"
             :placeholder="t('alerts.column')"
+            @filter="filterColumns"
             behavior="menu"
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="min-width: 250px"
@@ -142,6 +143,8 @@ var triggerOperators: any = ref([
 ]);
 const emits = defineEmits(["add", "remove"]);
 
+const filteredFields = ref(props.streamFields);
+
 const { t } = useI18n();
 
 const deleteApiHeader = (field: any) => {
@@ -150,6 +153,20 @@ const deleteApiHeader = (field: any) => {
 
 const addApiHeader = () => {
   emits("add");
+};
+
+const filterColumns = (val: string, update: Function) => {
+  if (val === "") {
+    update(() => {
+      filteredFields.value = [...props.streamFields];
+    });
+  }
+  update(() => {
+    const value = val.toLowerCase();
+    filteredFields.value = props.streamFields.filter(
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+    );
+  });
 };
 </script>
 

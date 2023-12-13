@@ -151,7 +151,7 @@ pub(crate) fn eval_idelta(
             return Err(DataFusionError::Plan(format!(
                 "{fn_name}: matrix argument expected but got {}",
                 v.get_type()
-            )))
+            )));
         }
     };
 

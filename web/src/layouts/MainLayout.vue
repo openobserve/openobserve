@@ -28,13 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             @click="goToHome"
           />
-          <span v-if="config.isCloud == 'true'" class="absolute beta-text"
+          <span v-if="config.isCloud == 'true'"
+class="absolute beta-text"
             >Beta</span
           >
         </div>
 
         <q-toolbar-title></q-toolbar-title>
-        <ThemeSwitcher></ThemeSwitcher>
         <div
           class="headerMenu float-left"
           v-if="store.state.organizationData.quotaThresholdMsg"
@@ -45,7 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs"
+class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -61,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >Upgrade to PRO Plan</q-btn
           >
         </div>
+        <ThemeSwitcher></ThemeSwitcher>
         <template v-if="config.isCloud !== 'true'">
           <q-btn
             class="q-ml-xs no-border"
@@ -79,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="languageWrapper">
           <q-btn-dropdown
+            data-test="language-dropdown"
             unelevated
             no-caps
             flat
@@ -92,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <q-list class="languagelist">
               <q-item
+                data-test="language-dropdown-item"
                 v-for="lang in langList"
                 :key="lang.code"
                 v-ripple="true"
@@ -105,7 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon :name="lang.icon" class="flagIcon" />
                 </q-item-section>
 
-                <q-item-section>
+                <q-item-section
+                  :data-test="`language-dropdown-item-${lang.code}`"
+                >
                   <q-item-label>{{ lang.label }}</q-item-label>
                 </q-item-section>
               </q-item>
@@ -124,10 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
+          <q-btn-dropdown flat
+unelevated no-caps
+padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md" color="grey"
+text-color="white">
                   <img
                     :src="
                       user.picture
@@ -277,6 +286,7 @@ import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
+import streamService from "@/services/stream";
 import Tracker from "@openreplay/tracker";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import {
@@ -421,7 +431,7 @@ export default defineComponent({
       {
         title: t("menu.alerts"),
         icon: outlinedReportProblem,
-        link: "/alerts",
+        link: "/alerts/alerts",
       },
       {
         title: t("menu.ingestion"),
@@ -548,7 +558,7 @@ export default defineComponent({
       }
     }
 
-    const updateOrganization = () => {
+    const updateOrganization = async () => {
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =
         router.currentRoute.value.path.indexOf(".logs") > -1
@@ -562,7 +572,22 @@ export default defineComponent({
         },
       });
       useLocalOrganization(selectedOrg.value);
-      store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+      // store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+
+      await streamService
+        .nameList(selectedOrg.value?.identifier, "", false)
+        .then((response) => {
+          store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+          if (response.data.list.length == 0) {
+            $q.notify({
+              type: "warning",
+              message:
+                "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
+              timeout: 5000,
+            });
+            router.push({ name: "ingestion" });
+          }
+        });
     };
 
     const setSelectedOrganization = async () => {

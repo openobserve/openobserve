@@ -13,11 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::promql::value::{InstantValue, Label, LabelsExt, Value};
+use std::sync::Arc;
+
 use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
 use regex::{self, Regex};
-use std::sync::Arc;
+
+use crate::service::promql::value::{InstantValue, Label, LabelsExt, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_replace
 pub(crate) fn label_replace(
@@ -33,7 +35,7 @@ pub(crate) fn label_replace(
         _ => {
             return Err(DataFusionError::Plan(
                 "label_replace: vector argument expected".into(),
-            ))
+            ));
         }
     };
 

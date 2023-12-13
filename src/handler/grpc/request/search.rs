@@ -17,9 +17,11 @@ use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::infra::{errors, metrics};
-use crate::handler::grpc::cluster_rpc::{search_server::Search, SearchRequest, SearchResponse};
-use crate::service::search as SearchService;
+use crate::{
+    common::infra::{errors, metrics},
+    handler::grpc::cluster_rpc::{search_server::Search, SearchRequest, SearchResponse},
+    service::search as SearchService,
+};
 
 pub struct Searcher;
 

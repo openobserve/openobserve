@@ -13,20 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{cmp::max, collections::HashMap};
+
 use arrow_schema::Field;
 use chrono::Duration;
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
-use std::{cmp::max, collections::HashMap};
 use utoipa::ToSchema;
 
+use super::prom::Metadata;
 use crate::common::{
     infra::config::CONFIG,
     meta::{common::FileMeta, usage::Stats, StreamType},
     utils::json,
 };
-
-use super::prom::Metadata;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
@@ -66,7 +66,8 @@ pub struct StreamStats {
 }
 
 impl StreamStats {
-    /// Returns true iff [start, end] time range intersects with the stream's time range.
+    /// Returns true iff [start, end] time range intersects with the stream's
+    /// time range.
     pub(crate) fn time_range_intersects(&self, start: i64, end: i64) -> bool {
         assert!(start <= end);
         let (min, max) = self.time_range();
@@ -199,6 +200,8 @@ pub struct StreamSettings {
     #[serde(default)]
     pub full_text_search_keys: Vec<String>,
     #[serde(default)]
+    pub bloom_filter_fields: Vec<String>,
+    #[serde(default)]
     pub data_retention: i64,
 }
 
@@ -218,6 +221,7 @@ impl Serialize for StreamSettings {
             &self.partition_time_level.unwrap_or_default(),
         )?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
+        state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
         state.serialize_field("data_retention", &self.data_retention)?;
         state.end()
     }
@@ -250,6 +254,15 @@ impl From<&str> for StreamSettings {
             }
         }
 
+        let mut bloom_filter_fields = Vec::new();
+        let fts = settings.get("bloom_filter_fields");
+        if let Some(value) = fts {
+            let v: Vec<_> = value.as_array().unwrap().iter().collect();
+            for item in v {
+                bloom_filter_fields.push(item.as_str().unwrap().to_string())
+            }
+        }
+
         let mut data_retention = 0;
         if let Some(v) = settings.get("data_retention") {
             data_retention = v.as_i64().unwrap();
@@ -259,6 +272,7 @@ impl From<&str> for StreamSettings {
             partition_keys,
             partition_time_level,
             full_text_search_keys,
+            bloom_filter_fields,
             data_retention,
         }
     }

@@ -15,8 +15,10 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::common::std_deviation;
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::{
+    common::std_deviation,
+    value::{RangeValue, Value},
+};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#stddev_over_time
 pub(crate) fn stddev_over_time(data: &Value) -> Result<Value> {

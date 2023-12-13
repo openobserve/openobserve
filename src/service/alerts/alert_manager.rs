@@ -15,12 +15,46 @@
 
 use chrono::{Duration, Utc};
 
-use crate::common::{
-    infra::config::TRIGGERS,
-    meta::{alerts::triggers::Trigger, StreamType},
+use crate::{
+    common::{
+        infra::{
+            cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+            config::{CONFIG, TRIGGERS},
+            dist_lock,
+        },
+        meta::{alerts::triggers::Trigger, StreamType},
+    },
+    service::db,
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
+    // maybe in the future we can support multiple organizations
+    let org_id = "default";
+    // get the working node for the organization
+    let node = db::alerts::alert_manager::get_mark(org_id).await;
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        log::warn!("[ALERT_MANAGER] is processing by {node}");
+        return Ok(());
+    }
+
+    // before start merging, set current node to lock the organization
+    let lock_key = format!("alert_manager/organization/{org_id}");
+    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    // check the working node for the organization again, maybe other node locked it
+    // first
+    let node = db::alerts::alert_manager::get_mark(org_id).await;
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        log::warn!("[ALERT_MANAGER] is processing by {node}");
+        dist_lock::unlock(&locker).await?;
+        return Ok(());
+    }
+    if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+        db::alerts::alert_manager::set_mark(org_id, Some(&LOCAL_NODE_UUID.clone())).await?;
+    }
+    // already bind to this node, we can unlock now
+    dist_lock::unlock(&locker).await?;
+    drop(locker);
+
     let now = Utc::now().timestamp_micros();
     let cacher = TRIGGERS.read().await;
 
@@ -65,14 +99,6 @@ pub async fn handle_triggers(
         super::triggers::save(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
         return Ok(());
     }
-
-    log::warn!(
-        "[ALERT_MANAGER] handle_triggers: {}/{}/{}/{}",
-        org_id,
-        stream_name,
-        stream_type,
-        alert_name
-    );
 
     let alert = match super::get(org_id, stream_type, stream_name, alert_name).await? {
         Some(alert) => alert,

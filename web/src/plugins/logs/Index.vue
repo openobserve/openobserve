@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="full-height"
                   />
                   <q-btn
+                    data-test="logs-search-field-list-collapse-btn"
                     :icon="
                       searchObj.meta.showFields
                         ? 'chevron_left'
@@ -225,7 +226,7 @@ import { b64DecodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
-import { on } from "events";
+import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 export default defineComponent({
   name: "PageSearch",
@@ -234,6 +235,7 @@ export default defineComponent({
     IndexList,
     SearchResult,
   },
+  mixins: [MainLayoutCloudMixin],
   methods: {
     setHistogramDate(date: any) {
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
@@ -354,13 +356,13 @@ export default defineComponent({
     });
 
     onActivated(async () => {
-      if (!searchObj.loading) updateStreams();
       if (
         searchObj.organizationIdetifier !=
         store.state.selectedOrganization.identifier
       ) {
         loadLogsData();
-      }
+      } else if (!searchObj.loading) updateStreams();
+
       refreshHistogramChart();
     });
 
@@ -369,6 +371,9 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
       restoreUrlQueryParams();
       loadLogsData();
+      if (config.isCloud == "true") {
+        MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
+      }
     });
 
     const runQueryFn = async () => {

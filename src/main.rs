@@ -13,27 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
-use actix_web_opentelemetry::RequestTracing;
-use chrono::Local;
-use log::LevelFilter;
-use opentelemetry::{
-    sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
-    KeyValue,
-};
-use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_proto::tonic::collector::{
-    logs::v1::logs_service_server::LogsServiceServer,
-    metrics::v1::metrics_service_server::MetricsServiceServer,
-    trace::v1::trace_service_server::TraceServiceServer,
-};
-#[cfg(feature = "profiling")]
-use pyroscope::PyroscopeAgent;
-#[cfg(feature = "profiling")]
-use pyroscope_pprofrs::{pprof_backend, PprofConfig};
-use std::io::Write;
 use std::{
     collections::HashMap,
+    io::Write,
     net::SocketAddr,
     str::FromStr,
     sync::{
@@ -42,11 +24,11 @@ use std::{
     },
     time::Duration,
 };
-use tokio::sync::oneshot;
-use tonic::codec::CompressionEncoding;
-use tracing_subscriber::{prelude::*, Registry};
-use uaparser::UserAgentParser;
 
+use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
+use actix_web_opentelemetry::RequestTracing;
+use chrono::Local;
+use log::LevelFilter;
 use openobserve::{
     common::{
         infra::{
@@ -79,6 +61,24 @@ use openobserve::{
     job, router,
     service::{compact, db, distinct_values, file_list, users},
 };
+use opentelemetry::{
+    sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
+    KeyValue,
+};
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_proto::tonic::collector::{
+    logs::v1::logs_service_server::LogsServiceServer,
+    metrics::v1::metrics_service_server::MetricsServiceServer,
+    trace::v1::trace_service_server::TraceServiceServer,
+};
+#[cfg(feature = "profiling")]
+use pyroscope::PyroscopeAgent;
+#[cfg(feature = "profiling")]
+use pyroscope_pprofrs::{pprof_backend, PprofConfig};
+use tokio::sync::oneshot;
+use tonic::codec::CompressionEncoding;
+use tracing_subscriber::{prelude::*, Registry};
+use uaparser::UserAgentParser;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -188,7 +188,8 @@ async fn main() -> Result<(), anyhow::Error> {
     // let node online
     let _ = cluster::set_online().await;
 
-    // This is specifically for enrichment tables, as caching is happening using search service
+    // This is specifically for enrichment tables, as caching is happening using
+    // search service
     db::schema::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
@@ -529,6 +530,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                             role: meta::user::UserRole::Root,
                             first_name: "root".to_owned(),
                             last_name: "".to_owned(),
+                            is_ldap: false,
                         },
                     )
                     .await?;

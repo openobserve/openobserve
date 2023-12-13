@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
 use std::fmt;
+
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -27,6 +28,9 @@ pub struct UserRequest {
     pub password: String,
     #[serde(skip_serializing)]
     pub role: UserRole,
+    /// Is the user created via ldap flow.
+    #[serde(default)]
+    pub is_ldap: bool,
 }
 
 impl UserRequest {
@@ -37,6 +41,7 @@ impl UserRequest {
         org: String,
         token: String,
         rum_token: String,
+        is_ldap: bool,
     ) -> DBUser {
         DBUser {
             email: self.email.clone(),
@@ -50,6 +55,7 @@ impl UserRequest {
                 rum_token: Some(rum_token),
                 role: self.role.clone(),
             }],
+            is_ldap,
         }
     }
 }
@@ -65,6 +71,8 @@ pub struct DBUser {
     #[serde(default)]
     pub salt: String,
     pub organizations: Vec<UserOrg>,
+    #[serde(default)]
+    pub is_ldap: bool,
 }
 
 impl DBUser {
@@ -90,6 +98,7 @@ impl DBUser {
             token: org.token.clone(),
             rum_token: org.rum_token.clone(),
             salt: local.salt,
+            is_ldap: false,
         })
     }
 
@@ -109,6 +118,7 @@ impl DBUser {
                     token: org.token,
                     rum_token: org.rum_token,
                     salt: self.salt.clone(),
+                    is_ldap: false,
                 })
             }
             ret_val
@@ -131,6 +141,8 @@ pub struct User {
     pub rum_token: Option<String>,
     pub role: UserRole,
     pub org: String,
+    /// Is the user authenticated and created via LDAP
+    pub is_ldap: bool,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema)]
@@ -200,6 +212,8 @@ pub struct UserResponse {
     #[serde(default)]
     pub last_name: String,
     pub role: UserRole,
+    #[serde(default)]
+    pub is_ldap: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

@@ -15,16 +15,18 @@
 
 use regex::Regex;
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
-        file_list as infra_file_list, ider,
+use crate::{
+    common::{
+        infra::{
+            cluster,
+            config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
+            file_list as infra_file_list, ider,
+        },
+        meta::{organization::DEFAULT_ORG, user::UserRequest},
+        utils::file::clean_empty_dirs,
     },
-    meta::{organization::DEFAULT_ORG, user::UserRequest},
-    utils::file::clean_empty_dirs,
+    service::{compact::stats::update_stats_from_file_list, db, users},
 };
-use crate::service::{compact::stats::update_stats_from_file_list, db, users};
 
 mod alert_manager;
 mod compact;
@@ -49,7 +51,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
             || !email_regex.is_match(&CONFIG.auth.root_user_email)
             || CONFIG.auth.root_user_password.is_empty()
         {
-            panic!("Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})");
+            panic!(
+                "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
+            );
         }
         let _ = users::post_user(
             DEFAULT_ORG,
@@ -59,6 +63,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
+                is_ldap: false,
             },
         )
         .await;
@@ -76,7 +81,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("organization cache sync failed");
 
-    //set instance id
+    // set instance id
     let instance_id = match db::get_instance().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {

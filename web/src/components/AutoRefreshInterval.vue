@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="q-pl-sm float-left">
     <q-btn-dropdown
+      data-test="logs-search-bar-refresh-interval-btn-dropdown"
       v-model="btnRefreshInterval"
       border
       no-caps
@@ -198,7 +199,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .refresh-interval-dropdown {
   min-width: 36px;
-  height: 30px;
+  height: 100%;
   min-height: 30px;
   line-height: 30px;
   padding: 0px 5px;

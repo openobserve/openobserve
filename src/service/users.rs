@@ -13,26 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Error;
+
 use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use std::io::Error;
 use uuid::Uuid;
 
-use crate::common::{
-    infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
-    meta::{
-        http::HttpResponse as MetaHttpResponse,
-        organization::DEFAULT_ORG,
-        user::{UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole},
+use crate::{
+    common::{
+        infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            organization::DEFAULT_ORG,
+            user::{UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole},
+        },
+        utils::{
+            auth::{get_hash, is_root_user},
+            rand::generate_random_string,
+        },
     },
-    utils::{
-        auth::{get_hash, is_root_user},
-        rand::generate_random_string,
-    },
+    service::db,
 };
-use crate::service::db;
 
 pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {
     let existing_user = if is_root_user(&usr_req.email) {
@@ -45,18 +48,23 @@ pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpRespons
         let password = get_hash(&usr_req.password, &salt);
         let token = generate_random_string(16);
         let rum_token = format!("rum{}", generate_random_string(16));
-        let user =
-            usr_req.to_new_dbuser(password, salt, org_id.replace(' ', "_"), token, rum_token);
+        let user = usr_req.to_new_dbuser(
+            password,
+            salt,
+            org_id.replace(' ', "_"),
+            token,
+            rum_token,
+            usr_req.is_ldap,
+        );
         db::user::set(user).await.unwrap();
         Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "User saved successfully".to_string(),
         )))
     } else {
-        let msg = format!("User with email {} already exists", &usr_req.email);
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
             http::StatusCode::BAD_REQUEST.into(),
-            msg,
+            "Unable to process your request".to_string(),
         )))
     }
 }
@@ -315,6 +323,7 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
                 role: user.value().role.clone(),
                 first_name: user.value().first_name.clone(),
                 last_name: user.value().last_name.clone(),
+                is_ldap: user.value().is_ldap,
             })
         }
     }
@@ -334,7 +343,7 @@ pub async fn remove_user_from_org(org_id: &str, email_id: &str) -> Result<HttpRe
                     orgs.retain(|x| !x.name.eq(&org_id.to_string()));
                     user.organizations = orgs;
                     let resp = db::user::set(user).await;
-                    //special case as we cache flattened user struct
+                    // special case as we cache flattened user struct
                     if resp.is_ok() {
                         USERS.remove(&format!("{org_id}/{email_id}"));
                     }
@@ -412,6 +421,7 @@ mod tests {
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
                 org: "dummy".to_string(),
+                is_ldap: false,
             },
         );
     }
@@ -445,6 +455,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
+                is_ldap: false,
             },
         )
         .await;
@@ -462,6 +473,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
+                is_ldap: false,
             },
         )
         .await;
@@ -478,6 +490,7 @@ mod tests {
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
                 org: "dummy".to_string(),
+                is_ldap: false,
             },
         );
 

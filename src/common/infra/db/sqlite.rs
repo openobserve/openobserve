@@ -13,6 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{
+    str::FromStr,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
+};
+
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -23,11 +29,6 @@ use sqlx::{
         SqliteSynchronous,
     },
     Pool, Sqlite,
-};
-use std::{
-    str::FromStr,
-    sync::{atomic::AtomicBool, Arc},
-    time::Duration,
 };
 use tokio::{
     sync::{mpsc, RwLock},

@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{path::Path, sync::Arc};
+
 use ahash::HashMap;
 use arrow::{ipc::writer::StreamWriter, record_batch::RecordBatch};
 use arrow_schema::Schema;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use once_cell::sync::Lazy;
-use std::{path::Path, sync::Arc};
 use tokio::{
     fs::{create_dir_all, File, OpenOptions},
     io::AsyncWriteExt,
@@ -41,14 +42,16 @@ use crate::common::{
 // SEARCHING_FILES for searching files, in use, should not move to s3
 static SEARCHING_FILES: Lazy<RwAHashSet<String>> = Lazy::new(|| RwLock::new(Default::default()));
 
-// EXCLUDE_ARROW_FILES for exclusion from searching files, since json isn't converted yet
+// EXCLUDE_ARROW_FILES for exclusion from searching files, since json isn't
+// converted yet
 static EXCLUDE_ARROW_FILES: Lazy<RwAHashSet<String>> =
     Lazy::new(|| RwLock::new(Default::default()));
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
 
-// MEMORY_FILES for in-memory mode WAL files, already not in use, should move to s3
+// MEMORY_FILES for in-memory mode WAL files, already not in use, should move to
+// s3
 pub static MEMORY_FILES: Lazy<MemoryFiles> = Lazy::new(MemoryFiles::new);
 
 type RwData = RwLock<HashMap<String, Arc<RwFile>>>;
@@ -431,7 +434,8 @@ impl RwFile {
                 .timestamp();
             let expired = time_now.timestamp() + level_duration;
             if expired > time_end_day {
-                // if the file expired time is tomorrow, it should be deleted at 23:59:59 + 10min
+                // if the file expired time is tomorrow, it should be deleted at 23:59:59 +
+                // 10min
                 time_end_day + CONFIG.limit.max_file_retention_time as i64
             } else {
                 expired

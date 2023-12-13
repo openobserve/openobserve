@@ -17,9 +17,8 @@ use ahash::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::utils::json::Value;
-
 use super::StreamType;
+use crate::common::utils::json::Value;
 
 pub mod destinations;
 pub mod templates;
@@ -78,9 +77,11 @@ impl Default for Alert {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct TriggerCondition {
-    pub period: i64,        // 10 minutes
+    pub period: i64, // 10 minutes
+    #[serde(default)]
     pub operator: Operator, // >=
-    pub threshold: i64,     // 3 times
+    #[serde(default)]
+    pub threshold: i64, // 3 times
     #[serde(default)]
     pub frequency: i64, // 1 minute
     #[serde(default)]
@@ -89,12 +90,52 @@ pub struct TriggerCondition {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct QueryCondition {
-    pub conditions: Option<Vec<Condition>>,
-    pub sql: Option<String>,
-    pub promql: Option<String>,
     #[serde(default)]
     #[serde(rename = "type")]
     pub query_type: QueryType,
+    pub conditions: Option<Vec<Condition>>,
+    pub sql: Option<String>,
+    pub promql: Option<String>,
+    pub aggregation: Option<Aggregation>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct Aggregation {
+    pub group_by: Option<Vec<String>>,
+    pub function: AggFunction,
+    pub having: Condition,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub enum AggFunction {
+    #[serde(rename = "avg")]
+    Avg,
+    #[serde(rename = "min")]
+    Min,
+    #[serde(rename = "max")]
+    Max,
+}
+
+impl ToString for AggFunction {
+    fn to_string(&self) -> String {
+        match self {
+            AggFunction::Avg => "avg".to_string(),
+            AggFunction::Min => "min".to_string(),
+            AggFunction::Max => "max".to_string(),
+        }
+    }
+}
+
+impl TryFrom<&str> for AggFunction {
+    type Error = &'static str;
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Ok(match s.to_lowercase().as_str() {
+            "avg" => AggFunction::Avg,
+            "min" => AggFunction::Min,
+            "max" => AggFunction::Max,
+            _ => return Err("invalid aggregation function"),
+        })
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]

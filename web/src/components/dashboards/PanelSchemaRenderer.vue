@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? panelData
             : { options: {} }
         "
-      />
+      @updated:data-zoom="$emit('updated:data-zoom', $event)" />
     </div>
     <div v-if="!errorDetail" class="noData">{{ noData }}</div>
     <div
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, watch, ref, toRefs, computed } from "vue";
+import { defineComponent, watch, ref, toRefs, computed, inject } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
@@ -96,6 +96,7 @@ export default defineComponent({
       type: Object,
     },
   },
+  emits: ["updated:data-zoom", "error"],
   setup(props, { emit }) {
     const store = useStore();
 
@@ -113,6 +114,10 @@ export default defineComponent({
       chartPanelRef
     );
 
+  // hovered series state
+  // used to show tooltip axis for all charts
+  const hoveredSeriesState: any = inject("hoveredSeriesState", null);
+
     // when we get the new data from the apis, convert the data to render the panel
     watch(
       [data, store?.state],
@@ -120,10 +125,13 @@ export default defineComponent({
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value) {
           try {
+            // passing chartpanelref to get width and height of DOM element
             panelData.value = convertPanelData(
               panelSchema.value,
               data.value,
-              store
+              store,
+              chartPanelRef,
+              hoveredSeriesState
             );
             errorDetail.value = "";
           } catch (error: any) {
@@ -171,10 +179,11 @@ export default defineComponent({
           // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
           return (
             data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => data.value[0][0][x]) &&
-              yAlias.every((y: any) => data.value[0][0][y]))
+            (xAlias.every((x: any) => data.value[0][0][x] != null) &&
+              yAlias.every((y: any) => data.value[0][0][y]) != null)
           );
         }
+        case "gauge":
         case "metric": {
           return (
             data.value[0]?.length > 1 ||
@@ -187,16 +196,16 @@ export default defineComponent({
         case "heatmap": {
           return (
             data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => data.value[0][0][x]) &&
-              yAlias.every((y: any) => data.value[0][0][y]) &&
-              zAlias.every((z: any) => data.value[0][0][z]))
+            (xAlias.every((x: any) => data.value[0][0][x] != null) &&
+              yAlias.every((y: any) => data.value[0][0][y] != null) &&
+              zAlias.every((z: any) => data.value[0][0][z]) != null)
           );
         }
         case "pie":
         case "donut": {
           return (
             data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => data.value[0][0][y])
+            yAlias.every((y: any) => data.value[0][0][y] != null)
           );
         }
         default:
@@ -210,7 +219,7 @@ export default defineComponent({
       if (panelSchema.value?.queryType == "promql") {
         // Check if the 'data' array has elements and every item has a non-empty 'result' array
         return data.value.length &&
-          data.value.every((item: any) => item?.result?.length)
+          data.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
       } else {

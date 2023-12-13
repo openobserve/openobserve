@@ -13,18 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
-use ahash::AHashMap as HashMap;
 use std::io::Error;
 
-use crate::common::meta::{alerts::Alert, http::HttpResponse as MetaHttpResponse};
-use crate::common::utils::http::get_stream_type_from_request;
-use crate::service::alerts;
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use ahash::AHashMap as HashMap;
+
+use crate::{
+    common::{
+        meta::{alerts::Alert, http::HttpResponse as MetaHttpResponse},
+        utils::http::get_stream_type_from_request,
+    },
+    service::alerts,
+};
 
 pub mod destinations;
 pub mod templates;
 
-/** CreateAlert */
+/// CreateAlert
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -71,7 +76,7 @@ pub async fn save_alert(
     }
 }
 
-/** ListStreamAlerts */
+/// ListStreamAlerts
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -111,7 +116,7 @@ async fn list_stream_alerts(
     }
 }
 
-/** ListAlerts */
+/// ListAlerts
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -139,7 +144,7 @@ async fn list_alerts(path: web::Path<String>) -> Result<HttpResponse, Error> {
     }
 }
 
-/** GetAlertByName */
+/// GetAlertByName
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -176,7 +181,7 @@ async fn get_alert(
     }
 }
 
-/** DeleteAlert */
+/// DeleteAlert
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -217,7 +222,7 @@ async fn delete_alert(
     }
 }
 
-/** EnableAlert */
+/// EnableAlert
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -265,7 +270,7 @@ async fn enable_alert(
     }
 }
 
-/** TriggerAlert */
+/// TriggerAlert
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",

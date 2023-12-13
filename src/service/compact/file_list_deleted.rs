@@ -13,19 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::{BufRead, BufReader};
+
 use ahash::AHashMap as HashMap;
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use futures::future::try_join_all;
-use std::io::{BufRead, BufReader};
 
 use crate::common::infra::{config::CONFIG, file_list as infra_file_list, storage};
 
-pub async fn delete(org_id: &str, time_min: i64, time_max: i64) -> Result<(), anyhow::Error> {
-    let files = query_deleted(org_id, time_min, time_max).await?;
+pub async fn delete(
+    org_id: &str,
+    time_min: i64,
+    time_max: i64,
+    batch_size: i64,
+) -> Result<i64, anyhow::Error> {
+    let files = query_deleted(org_id, time_min, time_max, batch_size).await?;
     if files.is_empty() {
-        return Ok(());
+        return Ok(0);
     }
+    let files_num = files.values().flatten().count() as i64;
+
     // delete files from storage
     if let Err(e) = storage::del(
         &files
@@ -67,18 +75,19 @@ pub async fn delete(org_id: &str, time_min: i64, time_max: i64) -> Result<(), an
         return Err(e.into());
     }
 
-    Ok(())
+    Ok(files_num)
 }
 
 async fn query_deleted(
     org_id: &str,
     time_min: i64,
     time_max: i64,
+    limit: i64,
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
     if CONFIG.common.meta_store_external {
-        query_deleted_from_table(org_id, time_min, time_max).await
+        query_deleted_from_table(org_id, time_min, time_max, limit).await
     } else {
-        query_deleted_from_s3(org_id, time_min, time_max).await
+        query_deleted_from_s3(org_id, time_min, time_max, limit).await
     }
 }
 
@@ -86,8 +95,9 @@ async fn query_deleted_from_table(
     org_id: &str,
     _time_min: i64,
     time_max: i64,
+    limit: i64,
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
-    let files = infra_file_list::query_deleted(org_id, time_max).await?;
+    let files = infra_file_list::query_deleted(org_id, time_max, limit).await?;
     let mut hash_files = HashMap::default();
     if !files.is_empty() {
         hash_files.insert("".to_string(), files);
@@ -99,6 +109,7 @@ async fn query_deleted_from_s3(
     org_id: &str,
     time_min: i64,
     time_max: i64,
+    _limit: i64,
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
     let mut cur_time = if time_min != 0 {
         time_min

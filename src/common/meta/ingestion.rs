@@ -20,9 +20,8 @@ use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::utils::json;
-
 use super::stream::SchemaRecords;
+use crate::common::utils::json;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {

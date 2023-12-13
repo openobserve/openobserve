@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::promql::common::calculate_trend;
-use crate::service::promql::value::{InstantValue, LabelsExt, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
+
+use crate::service::promql::{
+    common::calculate_trend,
+    value::{InstantValue, LabelsExt, RangeValue, Sample, Value},
+};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#holt_winters
 pub(crate) fn holt_winters(data: &Value, scaling_factor: f64, trend_factor: f64) -> Result<Value> {
@@ -26,7 +29,7 @@ pub(crate) fn holt_winters(data: &Value, scaling_factor: f64, trend_factor: f64)
             return Err(DataFusionError::Plan(format!(
                 "holt_winters: matrix argument expected got {}",
                 v.get_type()
-            )))
+            )));
         }
     };
 

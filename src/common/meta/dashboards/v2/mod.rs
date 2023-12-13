@@ -104,6 +104,15 @@ pub struct AxisItem {
     pub color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aggregation_function: Option<AggregationFunc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<Vec<AxisArg>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct AxisArg {
+    value: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -149,6 +158,12 @@ pub struct QueryConfig {
     layer_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     weight_fixed: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    limit: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    min: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max: Option<f64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

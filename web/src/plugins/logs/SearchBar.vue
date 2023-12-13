@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></syntax-guide>
         <q-btn-group class="q-ml-sm no-outline q-pa-none no-border">
           <q-btn-dropdown
+            data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
             auto-close
             size="12px"
@@ -62,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-label>{{ item.view_name }}</q-item-label>
                   </q-item-section>
                   <q-item-section
+                    :data-test="`logs-search-bar-delete-${item.view_name}-saved-view-btn`"
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
@@ -101,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="32px"
         />
         <q-select
+          data-test="logs-search-bar-function-dropdown"
           v-model="functionModel"
           :options="functionOptions"
           option-label="name"
@@ -138,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-select>
         <q-btn
+          data-test="logs-search-bar-save-function-btn"
           :disable="
             !functionModel ||
             !searchObj.data.tempFunctionContent ||
@@ -151,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="saveFunction"
         ></q-btn>
         <q-btn
+          data-test="logs-search-bar-reset-function-btn"
           class="q-mr-sm download-logs-btn q-px-sm"
           size="sm"
           v-bind:disable="
@@ -215,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before>
             <query-editor
+              data-test="logs-search-bar-query-editor"
               editor-id="logsQueryEditor"
               ref="queryEditorRef"
               class="monaco-editor"
@@ -238,6 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
             >
               <div
+                data-test="logs-vrl-function-editor"
                 ref="fnEditorRef"
                 id="fnEditor"
                 style="height: 100%"
@@ -262,11 +269,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-card-actions align="right">
           <q-btn
+            data-test="logs-search-bar-confirm-dialog-cancel-btn"
             :label="t('confirmDialog.cancel')"
             color="primary"
             @click="cancelConfirmDialog"
           />
           <q-btn
+            data-test="logs-search-bar-confirm-dialog-ok-btn"
             :label="t('confirmDialog.ok')"
             color="positive"
             @click="confirmDialogOK"
@@ -281,8 +290,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <q-label>Update</q-label>
+          <span>Update</span>
           <q-toggle
+            data-test="saved-view-action-toggle"
             v-bind:disable="searchObj.data.savedViews.length == 0"
             name="saved_view_action"
             v-model="isSavedViewAction"
@@ -291,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label=""
             @change="savedViewName = ''"
           />
-          <q-label>Create</q-label>
+          <span>Create</span>
           <div v-if="isSavedViewAction == 'create'">
             <q-input
               data-test="add-alert-name-input"
@@ -307,13 +317,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[
                 (val) => !!val.trim() || 'This field is required',
                 (val) =>
-                  /^[A-Za-z0-9 ]+$/.test(val) || 'Input must be alphanumeric',
+                  /^[-A-Za-z0-9 /@/_]+$/.test(val) ||
+                  'Input must be alphanumeric',
               ]"
               tabindex="0"
             />
           </div>
           <div v-else>
             <q-select
+              data-test="saved-view-name-select"
               v-model="savedViewSelectedName"
               :options="searchObj.data.savedViews"
               option-label="view_name"
@@ -334,6 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-card-actions align="right" class="bg-white text-teal">
           <q-btn
+            data-test="saved-view-dialog-cancel-btn"
             unelevated
             no-caps
             class="q-mr-sm text-bold"
@@ -342,6 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-close-popup
           />
           <q-btn
+            data-test="saved-view-dialog-save-btn"
             v-if="!saveViewLoader"
             unelevated
             no-caps
@@ -351,6 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleSavedView"
           />
           <q-btn
+            data-test="saved-view-dialog-loading-btn"
             v-if="saveViewLoader"
             unelevated
             no-caps
@@ -1078,7 +1093,6 @@ export default defineComponent({
             deleteViewID.value
           )
           .then((res) => {
-            console.log(res);
             if (res.status == 200) {
               $q.notify({
                 message: `View deleted successfully.`,

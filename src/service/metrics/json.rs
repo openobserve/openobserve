@@ -13,31 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::HashMap, io::BufReader};
+
 use actix_web::{http, web};
 use ahash::AHashMap;
 use anyhow::{anyhow, Result};
 use datafusion::arrow::datatypes::Schema;
-use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
-use crate::common::{
-    infra::{cluster, config::CONFIG, metrics},
-    meta::{
-        ingestion::{IngestionResponse, StreamStatus},
-        prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
-        stream::{PartitioningDetails, StreamParams},
-        usage::UsageType,
-        StreamType,
-    },
-    utils::{flatten, json, schema::infer_json_schema, time},
-};
-use crate::service::{
-    db, format_stream_name, ingestion::get_wal_time_key, ingestion::write_file,
-    schema::filter_schema_null_fields, stream::unwrap_partition_time_level,
-    usage::report_request_usage_stats,
-};
-
 use super::get_exclude_labels;
+use crate::{
+    common::{
+        infra::{cluster, config::CONFIG, metrics},
+        meta::{
+            ingestion::{IngestionResponse, StreamStatus},
+            prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+            stream::{PartitioningDetails, StreamParams},
+            usage::UsageType,
+            StreamType,
+        },
+        utils::{flatten, json, schema::infer_json_schema, time},
+    },
+    service::{
+        db, format_stream_name,
+        ingestion::{get_wal_time_key, write_file},
+        schema::filter_schema_null_fields,
+        stream::unwrap_partition_time_level,
+        usage::report_request_usage_stats,
+    },
+};
 
 pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
@@ -288,7 +292,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             &StreamType::Metrics.to_string(),
         ])
         .inc();
-    //let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
+    // let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),

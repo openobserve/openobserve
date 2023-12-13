@@ -203,8 +203,9 @@ impl ErrorCodes {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use expect_test::expect;
+
+    use super::*;
 
     #[test]
     fn test_error() {

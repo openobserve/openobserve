@@ -13,28 +13,32 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{http, http::StatusCode, HttpResponse};
-use datafusion::arrow::datatypes::Schema;
 use std::{collections::HashMap, io::Error};
 
-use crate::common::{
-    infra::{
-        cache::stats,
-        config::{
-            is_local_disk_storage, CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, STREAM_SCHEMAS,
+use actix_web::{http, http::StatusCode, HttpResponse};
+use datafusion::arrow::datatypes::Schema;
+
+use crate::{
+    common::{
+        infra::{
+            cache::stats,
+            config::{
+                is_local_disk_storage, CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
+                STREAM_SCHEMAS,
+            },
         },
+        meta::{
+            self,
+            http::HttpResponse as MetaHttpResponse,
+            prom,
+            stream::{PartitionTimeLevel, Stream, StreamProperty, StreamSettings, StreamStats},
+            usage::Stats,
+            StreamType,
+        },
+        utils::json,
     },
-    meta::{
-        self,
-        http::HttpResponse as MetaHttpResponse,
-        prom,
-        stream::{PartitionTimeLevel, Stream, StreamProperty, StreamSettings, StreamStats},
-        usage::Stats,
-        StreamType,
-    },
-    utils::json,
+    service::{db, metrics::get_prom_metadata_from_schema, search as SearchService},
 };
-use crate::service::{db, metrics::get_prom_metadata_from_schema, search as SearchService};
 
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
@@ -276,6 +280,15 @@ pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, any
     }
 }
 
+pub fn get_stream_setting_bloom_filter_fields(
+    schema: &Schema,
+) -> Result<Vec<String>, anyhow::Error> {
+    match stream_settings(schema) {
+        Some(setting) => Ok(setting.bloom_filter_fields),
+        None => Ok(vec![]),
+    }
+}
+
 fn transform_stats(stats: &mut StreamStats) {
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
@@ -369,9 +382,13 @@ async fn _get_stream_stats(
     stream_name: Option<String>,
 ) -> Result<HashMap<String, StreamStats>, anyhow::Error> {
     let mut sql = if CONFIG.common.usage_report_compressed_size {
-        format!("select min(min_ts) as min_ts  , max(max_ts) as max_ts , max(compressed_size) as compressed_size , max(original_size) as original_size , max(records) as records ,stream_name , org_id , stream_type from  \"stats\" where org_id='{org_id}' ")
+        format!(
+            "select min(min_ts) as min_ts  , max(max_ts) as max_ts , max(compressed_size) as compressed_size , max(original_size) as original_size , max(records) as records ,stream_name , org_id , stream_type from  \"stats\" where org_id='{org_id}' "
+        )
     } else {
-        format!("select min(min_ts) as min_ts  , max(max_ts) as max_ts , max(original_size) as original_size , max(records) as records ,stream_name , org_id , stream_type from  \"stats\" where org_id='{org_id}'")
+        format!(
+            "select min(min_ts) as min_ts  , max(max_ts) as max_ts , max(original_size) as original_size , max(records) as records ,stream_name , org_id , stream_type from  \"stats\" where org_id='{org_id}'"
+        )
     };
 
     sql = match stream_type {
@@ -419,8 +436,9 @@ async fn _get_stream_stats(
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
+
+    use super::*;
 
     #[test]
     fn test_stream_res() {

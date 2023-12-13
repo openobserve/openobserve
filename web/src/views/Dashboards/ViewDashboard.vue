@@ -89,7 +89,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardData="currentDashboardData.data"
       :currentTimeObj="currentTimeObj"
       @onDeletePanel="onDeletePanel"
+      @updated:data-zoom="onDataZoom"
     />
+
     <q-dialog
       v-model="showDashboardSettingsDialog"
       position="right"
@@ -276,6 +278,25 @@ export default defineComponent({
       dateTimePicker.value.refresh();
     };
 
+    const onDataZoom = (event: any) => {
+      const selectedDateObj = {
+        start: new Date(event.start),
+        end: new Date(event.end),
+      };
+      // Truncate seconds and milliseconds from the dates
+      selectedDateObj.start.setSeconds(0, 0);
+      selectedDateObj.end.setSeconds(0, 0);
+
+      // Compare the truncated dates
+      if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {
+        // Increment the end date by 1 minute
+        selectedDateObj.end.setMinutes(selectedDateObj.end.getMinutes() + 1);
+      }
+
+      // set it as a absolute time
+      dateTimePicker?.value?.setCustomDate("absolute", selectedDateObj);
+    };
+
     // ------- work with query params ----------
     onActivated(async () => {
       const params = route.query;
@@ -341,6 +362,7 @@ export default defineComponent({
       loadDashboard,
       initialVariableValues,
       getQueryParamsForDuration,
+      onDataZoom,
     };
   },
 });

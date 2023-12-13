@@ -54,7 +54,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         _ => {
             return Err(DataFusionError::Plan(
                 "histogram_quantile: vector argument expected".to_owned(),
-            ))
+            ));
         }
     };
 
@@ -198,8 +198,9 @@ fn ensure_monotonic(buckets: &mut [Bucket]) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use expect_test::expect;
+
+    use super::*;
 
     #[test]
     fn test_coalesce_buckets() {

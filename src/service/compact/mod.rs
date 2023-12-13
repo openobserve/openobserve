@@ -13,18 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use once_cell::sync::Lazy;
-use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
 
-use crate::common::infra::{
-    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-    config::CONFIG,
-    dist_lock,
+use crate::{
+    common::{
+        infra::{
+            cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+            config::CONFIG,
+            dist_lock,
+        },
+        meta::StreamType,
+    },
+    service::db,
 };
-use crate::common::meta::StreamType;
-use crate::service::db;
 
 mod file_list;
 pub mod file_list_deleted;
@@ -55,17 +60,18 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             // get the working node for the organization
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
             if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-                log::error!("[COMPACT] organization {org_id} is merging by {node}");
+                log::warn!("[COMPACT] organization {org_id} is processing by {node}");
                 continue;
             }
 
-            // before start merging, set current node to lock the organization
+            // before start processing, set current node to lock the organization
             let lock_key = format!("compact/organization/{org_id}");
             let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
-            // check the working node for the organization again, maybe other node locked it first
+            // check the working node for the organization again, maybe other node locked it
+            // first
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
             if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-                log::error!("[COMPACT] organization {org_id} is merging by {node}");
+                log::warn!("[COMPACT] organization {org_id} is processing by {node}");
                 dist_lock::unlock(&locker).await?;
                 continue;
             }
@@ -178,17 +184,18 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::error!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is processing by {node}");
             continue;
         }
 
-        // before start merging, set current node to lock the organization
+        // before start processing, set current node to lock the organization
         let lock_key = format!("compact/organization/{org_id}");
         let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
-        // check the working node for the organization again, maybe other node locked it first
+        // check the working node for the organization again, maybe other node locked it
+        // first
         let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::error!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is processing by {node}");
             dist_lock::unlock(&locker).await?;
             continue;
         }
@@ -216,7 +223,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                     stream_type,
                     None,
                 ) {
-                    log::info!(
+                    log::warn!(
                         "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
                         &org_id,
                         stream_type,
@@ -260,7 +267,8 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 }
 
 /// compactor delete files run steps:
-/// 1. get pending deleted files from file_list_deleted table, created_at > 2 hours
+/// 1. get pending deleted files from file_list_deleted table, created_at > 2
+///    hours
 /// 2. delete files from storage
 pub async fn run_delete_files() -> Result<(), anyhow::Error> {
     let now = Utc::now();
@@ -281,18 +289,19 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::error!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is processing by {node}");
             continue;
         }
 
-        // before start merging, set current node to lock the organization
+        // before start processing, set current node to lock the organization
         let lock_key = format!("compact/organization/{org_id}");
         let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
-        // check the working node for the organization again, maybe other node locked it first
+        // check the working node for the organization again, maybe other node locked it
+        // first
         let (offset, node) =
             db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::error!("[COMPACT] organization {org_id} is merging by {node}");
+            log::warn!("[COMPACT] organization {org_id} is processing by {node}");
             dist_lock::unlock(&locker).await?;
             continue;
         }
@@ -309,8 +318,23 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         dist_lock::unlock(&locker).await?;
         drop(locker);
 
-        if let Err(e) = file_list_deleted::delete(&org_id, offset, time_max).await {
-            log::error!("[COMPACTOR] delete files error: {}", e);
+        let batch_size = 10000;
+        loop {
+            match file_list_deleted::delete(&org_id, offset, time_max, batch_size).await {
+                Ok(affected) => {
+                    if CONFIG.common.print_key_event {
+                        log::info!("[COMPACTOR] deleted from file_list_deleted {affected} files");
+                    }
+                    if affected == 0 {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    log::error!("[COMPACTOR] delete files error: {}", e);
+                    break;
+                }
+            };
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
 
         // update offset

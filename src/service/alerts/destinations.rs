@@ -15,9 +15,13 @@
 
 use actix_web::http;
 
-use crate::common::infra::config::STREAM_ALERTS;
-use crate::common::meta::alerts::destinations::{Destination, DestinationWithTemplate};
-use crate::service::db;
+use crate::{
+    common::{
+        infra::config::STREAM_ALERTS,
+        meta::alerts::destinations::{Destination, DestinationWithTemplate},
+    },
+    service::db,
+};
 
 pub async fn save(
     org_id: &str,
@@ -33,7 +37,10 @@ pub async fn save(
             destination.template
         ));
     }
-    destination.name = name.to_string();
+    destination.name = name.trim().to_string();
+    if destination.name.is_empty() {
+        return Err(anyhow::anyhow!("Alert destination name is required"));
+    }
     db::alerts::destinations::set(org_id, name, destination).await
 }
 

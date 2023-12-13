@@ -13,44 +13,53 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::AHashMap as HashMap;
-use arrow::ipc::reader::StreamReader;
-use datafusion::{
-    arrow::{datatypes::Schema, record_batch::RecordBatch},
-    common::FileType,
-};
-use futures::future::try_join_all;
 use std::{
     io::{BufReader, Cursor},
     path::Path,
     sync::Arc,
     time::UNIX_EPOCH,
 };
-use tokio::time::Duration;
 
+use ahash::AHashMap as HashMap;
+use arrow::ipc::reader::StreamReader;
+use chrono::DateTime;
+use datafusion::{
+    arrow::{datatypes::Schema, record_batch::RecordBatch},
+    common::FileType,
+};
+use futures::future::try_join_all;
+use tokio::time::Duration;
 use tracing::{info_span, Instrument};
 
-use crate::common::{
-    infra::{
-        cache::tmpfs,
-        config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
-        errors::{Error, ErrorCodes},
-        wal,
+use crate::{
+    common::{
+        infra::{
+            cache::tmpfs,
+            config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
+            errors::{Error, ErrorCodes},
+            wal,
+        },
+        meta::{
+            self,
+            common::FileKey,
+            prom::NAME_LABEL,
+            search::SearchType,
+            stream::{PartitionTimeLevel, ScanStats},
+            StreamType,
+        },
+        utils::{
+            file::{get_file_contents, get_file_meta, scan_files},
+            schema::infer_json_schema,
+        },
     },
-    meta::{
-        self, common::FileKey, prom::NAME_LABEL, search::SearchType, stream::ScanStats, StreamType,
-    },
-    utils::{
-        file::{get_file_contents, get_file_meta, scan_files},
-        schema::infer_json_schema,
-    },
-};
-use crate::service::{
-    db,
-    schema::filter_schema_null_fields,
-    search::{
-        datafusion::{exec, storage::StorageType},
-        sql::Sql,
+    service::{
+        db,
+        schema::filter_schema_null_fields,
+        search::{
+            datafusion::{exec, storage::StorageType},
+            sql::Sql,
+        },
+        stream::{stream_settings, unwrap_partition_time_level},
     },
 };
 
@@ -62,8 +71,22 @@ pub async fn search(
     stream_type: meta::StreamType,
     timeout: u64,
 ) -> super::SearchResult {
+    let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
+        .await
+        .unwrap_or(Schema::empty());
+    let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
+    let partition_time_level =
+        unwrap_partition_time_level(schema_settings.partition_time_level, stream_type);
+
     // get file list
-    let mut files = get_file_list(session_id, &sql, stream_type, FILE_EXT_JSON).await?;
+    let mut files = get_file_list(
+        session_id,
+        &sql,
+        stream_type,
+        &partition_time_level,
+        FILE_EXT_JSON,
+    )
+    .await?;
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
     let mut scan_stats = ScanStats::new();
 
@@ -146,18 +169,6 @@ pub async fn search(
     }
 
     // fetch all schema versions, get latest schema
-    let schema_latest = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
-        Ok(schema) => schema,
-        Err(err) => {
-            log::error!("[session_id {session_id}] get schema error: {}", err);
-            // release all files
-            wal::release_files(&lock_files).await;
-            tmpfs::delete(session_id, true).unwrap();
-            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                sql.stream_name.clone(),
-            )));
-        }
-    };
     let schema_latest = Arc::new(
         schema_latest
             .to_owned()
@@ -325,12 +336,14 @@ pub async fn search(
     Ok((results, scan_stats))
 }
 
-/// get file list from local wal, no need match_source, each file will be searched
+/// get file list from local wal, no need match_source, each file will be
+/// searched
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
     session_id: &str,
     sql: &Sql,
     stream_type: meta::StreamType,
+    partition_time_level: &PartitionTimeLevel,
     extension: &str,
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
@@ -402,6 +415,30 @@ async fn get_file_list(
     for file in files.iter() {
         if time_range != (0, 0) {
             // check wal file created time, we can skip files which created time > end_time
+            let file_columns = file.split('/').collect::<Vec<&str>>();
+            let file_time_start = format!(
+                "{}-{}-{}T{}:00:00Z",
+                file_columns[5], file_columns[6], file_columns[7], file_columns[8]
+            );
+            let mut file_time_start = match DateTime::parse_from_rfc3339(&file_time_start) {
+                Ok(v) => v.timestamp_micros(),
+                Err(_) => 0,
+            };
+            let mut file_time_end = format!(
+                "{}-{}-{}T{}:59:59Z",
+                file_columns[5], file_columns[6], file_columns[7], file_columns[8]
+            );
+            if file_columns[8] == "00" && partition_time_level.eq(&PartitionTimeLevel::Daily) {
+                file_time_end = format!(
+                    "{}-{}-{}T23:59:59Z",
+                    file_columns[5], file_columns[6], file_columns[7]
+                );
+            }
+            let mut file_time_end = match DateTime::parse_from_rfc3339(&file_time_end) {
+                Ok(v) => v.timestamp_micros(),
+                Err(_) => 0,
+            };
+
             let source_file = wal_dir.to_string() + "/" + file.as_str();
             let file_meta = match get_file_meta(&source_file) {
                 Ok(meta) => meta,
@@ -419,22 +456,27 @@ async fn get_file_list(
                 .unwrap_or(UNIX_EPOCH)
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_micros();
+                .as_micros() as i64;
             let file_created = file_meta
                 .created()
                 .unwrap_or(UNIX_EPOCH)
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_micros();
+                .as_micros() as i64;
             let file_created = (file_created as i64)
                 - chrono::Duration::hours(CONFIG.limit.ingest_allowed_upto)
                     .num_microseconds()
                     .unwrap_or_default();
-
-            if (time_range.0 > 0 && (file_modified as i64) < time_range.0)
-                || (time_range.1 > 0 && file_created > time_range.1)
+            if file_created > 0 && file_time_start == 0 {
+                file_time_start = file_created;
+            }
+            if file_modified < file_time_end || file_time_end == 0 {
+                file_time_end = file_modified;
+            }
+            if (time_range.0 > 0 && file_time_end < time_range.0)
+                || (time_range.1 > 0 && file_time_start > time_range.1)
             {
-                log::info!(
+                log::debug!(
                     "[session_id {session_id}] skip wal file: {} time_range: [{},{}]",
                     file,
                     file_created,
@@ -455,7 +497,8 @@ async fn get_file_list(
 }
 
 fn get_schema_version(file: &str) -> Result<String, Error> {
-    // eg: /a-b-c-d/files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
+    // eg: /a-b-c-d/files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
+    // 7099303408192061440f3XQ2p.json
     let column = file.split('/').collect::<Vec<&str>>();
     if column.len() < 12 {
         return Err(Error::Message(format!("invalid wal file name: {}", file)));
@@ -471,8 +514,22 @@ pub async fn search_arrow(
     stream_type: meta::StreamType,
     timeout: u64,
 ) -> super::SearchResult {
+    let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
+        .await
+        .unwrap_or(Schema::empty());
+    let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
+    let partition_time_level =
+        unwrap_partition_time_level(schema_settings.partition_time_level, stream_type);
+
     // get file list
-    let mut files = get_file_list(session_id, &sql, stream_type, FILE_EXT_ARROW).await?;
+    let mut files = get_file_list(
+        session_id,
+        &sql,
+        stream_type,
+        &partition_time_level,
+        FILE_EXT_ARROW,
+    )
+    .await?;
     let mut scan_stats = ScanStats::new();
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
@@ -517,18 +574,6 @@ pub async fn search_arrow(
     );
 
     // fetch all schema versions, get latest schema
-    let schema_latest = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
-        Ok(schema) => schema,
-        Err(err) => {
-            log::error!("get schema error: {}", err);
-            // release all files
-            wal::release_files(&lock_files).await;
-            tmpfs::delete(session_id, true).unwrap();
-            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                sql.stream_name.clone(),
-            )));
-        }
-    };
     let schema_latest = Arc::new(
         schema_latest
             .to_owned()
