@@ -963,30 +963,80 @@ export default defineComponent({
         if (dragName) {
           if (area !== "f") {
              if (area === "x" && isAddXAxisNotAllowed.value) {
-              console.log("Dragging not allowed in 'x' axis.");
+              let maxAllowedXAxisFields;
+
+              switch (dashboardPanelData.data.type) {
+                case "pie":
+                case "donut":
+                case "heatmap":
+                  maxAllowedXAxisFields = 1;
+                  break;
+                case "metric":
+                  maxAllowedXAxisFields = 0;
+                  break;
+                case "table":
+                  break;
+                default:
+                  maxAllowedXAxisFields = 2;
+              }
+
+              const errorMessage = `Max ${maxAllowedXAxisFields} field(s) in 'x' axis is allowed.`;
+
+              console.log(`Dragging not allowed in 'x' axis. ${errorMessage}`);
               $q.notify({
                 type: "negative",
-                message: "Dragging not allowed in 'x' axis.",
+                message: `${errorMessage}`,
                 timeout: 5000,
               });
               return;
             }
 
             if (area === "y" && isAddYAxisNotAllowed.value) {
-              console.log("Dragging not allowed in 'y' axis.");
+              let maxAllowedYAxisFields;
+
+              switch (dashboardPanelData.data.type) {
+                case "pie":
+                case "donut":
+                case "metric":
+                case "area-stacked":
+                case "stacked":
+                case "heatmap":
+                case "h-stacked":
+                  maxAllowedYAxisFields = 1;
+                  break;
+                default:
+                  maxAllowedYAxisFields = 0;
+              }
+
+              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in 'y' axis is allowed.`;
+
+              console.log(`Dragging not allowed in 'y' axis. ${errorMessage}`);
               $q.notify({
                 type: "negative",
-                message: "Dragging not allowed in 'y' axis.",
+                message: ` ${errorMessage}`,
                 timeout: 5000,
               });
               return;
             }
 
             if (area === "z" && isAddZAxisNotAllowed.value) {
-              console.log("Dragging not allowed in 'z' axis.");
+              let maxAllowedYAxisFields;
+
+              switch (dashboardPanelData.data.type) {
+                
+                case "heatmap":
+                  maxAllowedYAxisFields = 1;
+                  break;
+                default:
+                  maxAllowedYAxisFields = 0;
+              }
+
+              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in 'z' axis is allowed.`;
+
+              console.log(`Dragging not allowed in 'y' axis. ${errorMessage}`);
               $q.notify({
                 type: "negative",
-                message: "Dragging not allowed in 'z' axis.",
+                message: `${errorMessage}`,
                 timeout: 5000,
               });
               return;
