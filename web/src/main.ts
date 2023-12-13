@@ -30,6 +30,12 @@ import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
 
+import { openobserveRum } from "@openobserve/browser-rum";
+import { openobserveLogs } from "@openobserve/browser-logs";
+
+import { datadogRum } from "@datadog/browser-rum";
+import { datadogLogs } from "@datadog/browser-logs";
+
 const app = createApp(App);
 const router = createRouter(store);
 
@@ -71,6 +77,74 @@ const getConfig = async () => {
         tracesSampleRate: 1.0,
       });
     }
+
+    const options = {
+      clientToken: config.ooClientToken,
+      applicationId: config.ooApplicationID,
+      site: config.ooSite,
+      service: config.ooService,
+      env: config.environment,
+      version: "0.0.1",
+      organizationIdentifier: "default",
+      insecureHTTP: false,
+      apiVersion: "v1",
+    };
+
+    openobserveRum.init({
+      applicationId: options.applicationId, // required, any string identifying your application
+      clientToken: options.clientToken,
+      site: options.site,
+      organizationIdentifier: options.organizationIdentifier,
+      service: options.service,
+      env: options.env,
+      version: options.version,
+      trackResources: true,
+      trackLongTasks: true,
+      trackUserInteractions: true,
+      apiVersion: options.apiVersion,
+      insecureHTTP: options.insecureHTTP,
+    });
+
+    openobserveLogs.init({
+      clientToken: options.clientToken,
+      site: options.site,
+      organizationIdentifier: options.organizationIdentifier,
+      service: options.service,
+      env: options.env,
+      version: options.version,
+      forwardErrorsToLogs: true,
+      insecureHTTP: options.insecureHTTP,
+      apiVersion: options.apiVersion,
+    });
+
+    openobserveRum.startSessionReplayRecording();
+
+    datadogRum.init({
+      applicationId: config.ddAPPID, // required, any string identifying your application
+      clientToken: config.ddClientToken,
+      site: config.ddSite,
+      service: "openobserve",
+      // service: "my-web-application",
+      // env: "production",
+      // version: "1.0.0",
+      sessionSampleRate: 100,
+      sessionReplaySampleRate: 100, // if not included, the default is 100
+      trackResources: true,
+      trackLongTasks: true,
+      trackUserInteractions: true,
+      version: "v1",
+      defaultPrivacyLevel: "allow",
+    });
+
+    datadogLogs.init({
+      clientToken: config.ddClientToken,
+      site: config.ddSite,
+      forwardErrorsToLogs: true,
+      sessionSampleRate: 100,
+      version: "v1",
+    });
+
+    datadogRum.startSessionReplayRecording();
   });
 };
 

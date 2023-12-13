@@ -22,7 +22,9 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
-    collector::trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
+    collector::trace::v1::{
+        ExportTracePartialSuccess, ExportTraceServiceRequest, ExportTraceServiceResponse,
+    },
     trace::v1::{status::StatusCode, Status},
 };
 use prost::Message;
@@ -139,10 +141,12 @@ pub async fn handle_trace_request(
 
     let mut trigger: TriggerAlertData = None;
 
+    let min_ts =
+        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    let mut partial_success = ExportTracePartialSuccess::default();
+
     let mut data_buf: AHashMap<String, SchemaRecords> = AHashMap::new();
 
-    let mut min_ts =
-        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
     for res_span in res_spans {
@@ -340,7 +344,8 @@ pub async fn handle_trace_request(
                 hour_buf.records.push(loc_value);
 
                 if timestamp < min_ts.try_into().unwrap() {
-                    min_ts = timestamp as i64;
+                    partial_success.rejected_spans += 1;
+                    continue;
                 }
             }
         }
@@ -404,7 +409,14 @@ pub async fn handle_trace_request(
     evaluate_trigger(trigger).await;
 
     let res = ExportTraceServiceResponse {
-        partial_success: None,
+        partial_success: if partial_success.rejected_spans > 0 {
+            partial_success.error_message =
+                "Some spans were rejected due to exceeding the allowed retention period"
+                    .to_string();
+            Some(partial_success)
+        } else {
+            None
+        },
     };
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");

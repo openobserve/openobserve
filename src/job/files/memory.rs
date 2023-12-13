@@ -20,7 +20,7 @@ use std::{
 
 use arrow::ipc::reader::StreamReader;
 use bytes::Bytes;
-use datafusion::arrow::json::ReaderBuilder;
+use datafusion::arrow::{datatypes::Schema, json::ReaderBuilder};
 use tokio::{sync::Semaphore, task, time};
 
 use crate::{
@@ -39,7 +39,7 @@ use crate::{
     },
     service::{
         db, schema::schema_evolution, search::datafusion::new_parquet_writer,
-        usage::report_compression_stats,
+        stream::get_stream_setting_bloom_filter_fields, usage::report_compression_stats,
     },
 };
 
@@ -273,9 +273,21 @@ async fn upload_file(
     };
     populate_file_meta(arrow_schema.clone(), vec![batches.to_vec()], &mut file_meta).await?;
 
+    // get bloom filter setting
+    let db_schema = match db::schema::get(org_id, stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(_) => Schema::empty(),
+    };
+    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&db_schema).unwrap();
+
     // write parquet file
     let mut buf_parquet = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf_parquet, &arrow_schema, &file_meta);
+    let mut writer = new_parquet_writer(
+        &mut buf_parquet,
+        &arrow_schema,
+        &bloom_filter_fields,
+        &file_meta,
+    );
     for batch in batches {
         writer.write(&batch)?;
     }

@@ -570,6 +570,7 @@ export default defineComponent({
           "scatter",
           "area-stacked",
           "metric",
+          "gauge",
         ];
         if (!allowedChartTypes.includes(dashboardPanelData.data.type)) {
           errors.push(

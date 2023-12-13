@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="languageWrapper">
           <q-btn-dropdown
+            data-test="language-dropdown"
             unelevated
             no-caps
             flat
@@ -92,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <q-list class="languagelist">
               <q-item
+                data-test="language-dropdown-item"
                 v-for="lang in langList"
                 :key="lang.code"
                 v-ripple="true"
@@ -105,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon :name="lang.icon" class="flagIcon" />
                 </q-item-section>
 
-                <q-item-section>
+                <q-item-section :data-test="`language-dropdown-item-${lang.code}`">
                   <q-item-label>{{ lang.label }}</q-item-label>
                 </q-item-section>
               </q-item>

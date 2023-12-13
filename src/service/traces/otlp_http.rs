@@ -33,7 +33,9 @@ use crate::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
             stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
-            traces::{Event, Span, SpanRefType},
+            traces::{
+                Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanRefType,
+            },
             usage::UsageType,
             StreamType,
         },
@@ -90,18 +92,18 @@ pub async fn traces_json(
     let start = std::time::Instant::now();
     let traces_stream_name = match in_stream_name {
         Some(name) => format_stream_name(name),
-        None => "default".to_owned(),
+        None => "default".to_string(),
     };
-
     let traces_stream_name = &traces_stream_name;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
-    let mut min_ts =
+    let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    let mut partial_success = ExportTracePartialSuccess::default();
     let mut data_buf: AHashMap<String, SchemaRecords> = AHashMap::new();
 
     let stream_schema = stream_schema_exists(
@@ -297,7 +299,8 @@ pub async fn traces_json(
                         events: json::to_string(&events).unwrap(),
                     };
                     if timestamp < min_ts.try_into().unwrap() {
-                        min_ts = timestamp as i64;
+                        partial_success.rejected_spans += 1;
+                        continue;
                     }
 
                     let mut value: json::Value = json::to_value(local_val).unwrap();
@@ -463,12 +466,16 @@ pub async fn traces_json(
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK.into(),
-        "request processed".to_string(),
-    )))
-
-    // Ok(HttpResponse::Ok().into())
+    let resp = if partial_success.rejected_spans > 0 {
+        partial_success.error_message =
+            "Some spans were rejected due to exceeding the allowed retention period".to_string();
+        HttpResponse::PartialContent().json(ExportTraceServiceResponse {
+            partial_success: Some(partial_success),
+        })
+    } else {
+        HttpResponse::Ok().json(ExportTraceServiceResponse::default())
+    };
+    Ok(resp)
 }
 
 #[cfg(test)]

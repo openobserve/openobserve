@@ -530,6 +530,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                             role: meta::user::UserRole::Root,
                             first_name: "root".to_owned(),
                             last_name: "".to_owned(),
+                            is_ldap: false,
                         },
                     )
                     .await?;

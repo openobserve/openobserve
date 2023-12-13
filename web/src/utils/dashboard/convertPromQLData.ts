@@ -20,6 +20,7 @@ import {
   getUnitValue,
 } from "./convertDataIntoUnitValue";
 import { utcToZonedTime } from "date-fns-tz";
+import { calculateGridPositions } from "./calculateGridForSubPlot";
 
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
@@ -32,7 +33,9 @@ import { utcToZonedTime } from "date-fns-tz";
 export const convertPromQLData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any
+  store: any,
+  chartPanelRef: any,
+  hoveredSeriesState: any
 ) => {
   // if no data than return it
   if (
@@ -44,13 +47,8 @@ export const convertPromQLData = (
     return { options: null };
   }
 
-  // It is used to keep track of the current series name in tooltip to bold the series name
-  let currentSeriesName = "";
-
-  // set the current series name (will be set at chartrenderer on mouseover)
-  const setCurrentSeriesValue = (newValue: any) => {
-    currentSeriesName = newValue ?? "";
-  };
+  // flag to check if the data is time seriesc
+  let isTimeSeriesFlag = true;
 
   const legendPosition = getLegendPosition(
     panelSchema?.config?.legends_position
@@ -67,6 +65,10 @@ export const convertPromQLData = (
       textStyle: {
         fontSize: 12,
       },
+      formatter: (params: any) => {
+        hoveredSeriesState?.value?.setHoveredSeriesName(params?.name);
+        return params?.name;
+      },
     },
     textStyle: {
       width: 150,
@@ -81,7 +83,7 @@ export const convertPromQLData = (
       },
     },
     formatter: (name: any) => {
-      return name == currentSeriesName
+      return name == hoveredSeriesState?.value?.hoveredSeriesName
         ? "{a|" + name + "}"
         : "{b|" + name + "}";
     },
@@ -122,13 +124,16 @@ export const convertPromQLData = (
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
       extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       formatter: function (name: any) {
+        // show tooltip for hovered panel only for other we only need axis so just return empty string
+        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
 
         // get the current series index from name
         const currentSeriesIndex = name.findIndex(
-          (it: any) => it.seriesName == currentSeriesName
+          (it: any) =>
+            it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
         );
 
         // swap current hovered series index to top in tooltip
@@ -139,7 +144,7 @@ export const convertPromQLData = (
         let hoverText = name.map((it: any) => {
           // check if the series is the current series being hovered
           // if have than bold it
-          if (it?.seriesName == currentSeriesName)
+          if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
             return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
               getUnitValue(
                 it.data[1],
@@ -203,7 +208,15 @@ export const convertPromQLData = (
     },
     toolbox: {
       orient: "vertical",
-      show: !["pie", "donut", "metric"].includes(panelSchema.type),
+      show: !["pie", "donut", "metric", "gauge"].includes(panelSchema.type),
+      showTitle: false,
+      tooltip: {
+        show: false,
+      },
+      itemSize:0,
+      itemGap:0,
+      // it is used to hide toolbox buttons
+      bottom:"100%",
       feature: {
         dataZoom: {
           filterMode: "none",
@@ -213,6 +226,32 @@ export const convertPromQLData = (
     },
     series: [],
   };
+  // to pass grid index in gauge chart
+  let gaugeIndex = 0;
+
+  // for gauge chart we need total no. of gauge to calculate grid positions
+  let totalLength = 0;
+  // for gauge chart, it contains grid array, single chart height and width, no. of charts per row and no. of columns
+  let gridDataForGauge: any = {};
+
+  if (panelSchema.type === "gauge") {
+    // calculate total length of all metrics
+    searchQueryData.forEach((metric: any) => {
+      if (metric.result && Array.isArray(metric.result)) {
+        totalLength += metric.result.length;
+      }
+    });
+
+    // create grid array based on chart panel width, height and total no. of gauge
+    gridDataForGauge = calculateGridPositions(
+      chartPanelRef.value.offsetWidth,
+      chartPanelRef.value.offsetHeight,
+      totalLength
+    );
+
+    //assign grid array to gauge chart options
+    options.grid = gridDataForGauge.gridArray;
+  }
 
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
@@ -262,10 +301,129 @@ export const convertPromQLData = (
           }
         }
       }
+      case "gauge": {
+        // we doesnt required to hover timeseries for gauge chart
+        isTimeSeriesFlag = false;
+
+        const series = it?.result?.map((metric: any) => {
+          const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+          gaugeIndex++;
+          return {
+            ...getPropsByChartTypeForSeries(panelSchema.type),
+            min: panelSchema?.queries[index]?.config?.min || 0,
+            max: panelSchema?.queries[index]?.config?.max || 100,
+
+            //which grid will be used
+            gridIndex: gaugeIndex - 1,
+            // radius, progress and axisline width will be calculated based on grid width and height
+            radius: `${
+              Math.min(
+                gridDataForGauge.gridWidth,
+                gridDataForGauge.gridHeight
+              ) /
+                2 -
+              5
+            }px`,
+            progress: {
+              show: true,
+              width: `${
+                Math.min(
+                  gridDataForGauge.gridWidth,
+                  gridDataForGauge.gridHeight
+                ) / 6
+              }`,
+            },
+            axisLine: {
+              lineStyle: {
+                width: `${
+                  Math.min(
+                    gridDataForGauge.gridWidth,
+                    gridDataForGauge.gridHeight
+                  ) / 6
+                }`,
+              },
+            },
+            title: {
+              fontSize: 10,
+              offsetCenter: [0, "70%"],
+              // width: upto chart width
+              width: `${gridDataForGauge.gridWidth}`,
+              overflow: "truncate",
+            },
+
+            // center of gauge
+            // x: left + width / 2,
+            // y: top + height / 2,
+            center: [
+              `${
+                parseFloat(options.grid[gaugeIndex - 1].left) +
+                parseFloat(options.grid[gaugeIndex - 1].width) / 2
+              }%`,
+              `${
+                parseFloat(options.grid[gaugeIndex - 1].top) +
+                parseFloat(options.grid[gaugeIndex - 1].height) / 2
+              }%`,
+            ],
+            data: [
+              {
+                name: getPromqlLegendName(
+                  metric.metric,
+                  panelSchema.queries[index].config.promql_legend
+                ),
+                // taking first value for gauge
+                value: parseFloat(values[0][1]).toFixed(2),
+                detail: {
+                  formatter: function (value: any) {
+                    const unitValue = getUnitValue(
+                      value,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom
+                    );
+                    return unitValue.value + unitValue.unit;
+                  },
+                },
+              },
+            ],
+            detail: {
+              valueAnimation: true,
+              offsetCenter: [0, 0],
+              fontSize: 12,
+            },
+          };
+        });
+        options.dataset = { source: [[]] };
+        options.tooltip = {
+          show: true,
+          trigger: "item",
+          textStyle: {
+            color: store.state.theme === "dark" ? "#fff" : "#000",
+            fontSize: 12,
+          },
+          enterable: true,
+          backgroundColor:
+            store.state.theme === "dark"
+              ? "rgba(0,0,0,1)"
+              : "rgba(255,255,255,1)",
+          extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
+        };
+        options.angleAxis = {
+          show: false,
+        };
+        options.radiusAxis = {
+          show: false,
+        };
+        options.polar = {};
+        options.xAxis = [];
+        options.yAxis = [];
+        return series;
+      }
       case "metric": {
+        // we doesnt required to hover timeseries for gauge chart
+        isTimeSeriesFlag = false;
+
         switch (it?.resultType) {
           case "matrix": {
-            const traces = it?.result?.map((metric: any) => {
+            const series = it?.result?.map((metric: any) => {
               const values = metric.values.sort(
                 (a: any, b: any) => a[0] - b[0]
               );
@@ -307,7 +465,7 @@ export const convertPromQLData = (
             options.polar = {};
             options.xAxis = [];
             options.yAxis = [];
-            return traces;
+            return series;
           }
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
@@ -331,9 +489,11 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  // extras will be used to return other data to chart renderer
-  // e.g. setCurrentSeriesValue to set the current series index which is hovered
-  return { options, extras: { setCurrentSeriesValue } };
+  // promql query will be always timeseries
+  return {
+    options,
+    extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
+  };
 };
 
 /**
@@ -448,6 +608,24 @@ const getPropsByChartTypeForSeries = (type: string) => {
         showSymbol: false,
         emphasis: {
           focus: "series",
+        },
+      };
+    case "gauge":
+      return {
+        type: "gauge",
+        startAngle: 205,
+        endAngle: -25,
+        pointer: {
+          show: false,
+        },
+        axisTick: {
+          show: false,
+        },
+        splitLine: {
+          show: false,
+        },
+        axisLabel: {
+          show: false,
         },
       };
     case "metric":

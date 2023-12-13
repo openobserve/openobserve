@@ -218,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-virtual-scroll>
       <q-dialog
+        data-test="logs-search-result-detail-dialog"
         v-model="searchObj.meta.showDetailTab"
         position="right"
         full-height
