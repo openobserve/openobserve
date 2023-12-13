@@ -62,10 +62,9 @@ pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpRespons
             "User saved successfully".to_string(),
         )))
     } else {
-        let msg = format!("User with email {} already exists", &usr_req.email);
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
             http::StatusCode::BAD_REQUEST.into(),
-            msg,
+            "Unable to process your request".to_string(),
         )))
     }
 }
