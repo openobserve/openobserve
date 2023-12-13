@@ -961,6 +961,26 @@ export default defineComponent({
         
 
         if (dragName) {
+          const axisArray = getAxisArray(area);
+          console.log("onDrop axisArray", axisArray);
+          
+          const duplicateName = axisArray.some(
+            (item: any) => {
+              return item.column  === dragName.name;
+            }
+          );
+
+          if (duplicateName) {
+            const errorMessage = `Field '${dragName.name}' already exists in '${area}' axis.`;
+            console.log(`Duplicate field. ${errorMessage}`);
+            $q.notify({
+              type: "negative",
+              message: errorMessage,
+              timeout: 5000,
+            });
+            return;
+          }
+
           if (area !== "f") {
              if (area === "x" && isAddXAxisNotAllowed.value) {
               let maxAllowedXAxisFields;
@@ -1084,6 +1104,24 @@ export default defineComponent({
       }
     };
 
+    const getAxisArray = (area: string) => {
+      switch (area) {
+        case "x":
+          return dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.x;
+        case "y":
+          return dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.y;
+        case "z":
+          return dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.z;
+        default:
+          return [];
+      }
+    };
     const onDragEnter = (e: any, area: string) => {
       // // don't drop on other draggables
       // if (e.target.draggable !== true) {
