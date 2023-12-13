@@ -33,7 +33,7 @@ use crate::{
             stream::{PartitionTimeLevel, StreamStats},
             StreamType,
         },
-        utils::json,
+        utils::{json, time::BASE_TIME},
     },
     service::{db, file_list},
 };
@@ -55,6 +55,19 @@ pub async fn delete_by_stream(
     let lifecycle_start = lifecycle_start.as_str();
     if lifecycle_start.ge(lifecycle_end) {
         return Ok(()); // created_at is after lifecycle_end, just skip
+    }
+
+    // Hack for 1970-01-01
+    if lifecycle_start.le("1970-01-01") {
+        let lifecycle_end = created_at + Duration::days(1);
+        let lifecycle_end = lifecycle_end.format("%Y-%m-%d").to_string();
+        return db::compact::retention::delete_stream(
+            org_id,
+            stream_name,
+            stream_type,
+            Some((lifecycle_start, lifecycle_end.as_str())),
+        )
+        .await;
     }
 
     // delete files
@@ -144,7 +157,7 @@ pub async fn delete_all(
     // delete from file list
     delete_from_file_list(org_id, stream_name, stream_type, (0, 0)).await?;
     log::info!(
-        "deleted file list for: {}/{}/{}",
+        "deleted file list for: {}/{}/{}/all",
         org_id,
         stream_type,
         stream_name
@@ -235,7 +248,7 @@ pub async fn delete_by_date(
         }
 
         // at the end, fetch a file list from s3 to guatantte there is no file
-        while date_start <= date_end {
+        while date_start < date_end {
             let prefix = format!(
                 "files/{org_id}/{stream_type}/{stream_name}/{}/",
                 date_start.format("%Y/%m/%d")
@@ -261,12 +274,28 @@ pub async fn delete_by_date(
     delete_from_file_list(org_id, stream_name, stream_type, time_range).await?;
 
     // update stream stats retention time
+    let mut stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
+    let mut min_ts = if time_range.1 > BASE_TIME.timestamp_micros() {
+        time_range.1
+    } else {
+        infra_file_list::get_min_ts(org_id, stream_type, stream_name)
+            .await
+            .unwrap_or_default()
+    };
+    if min_ts == 0 {
+        min_ts = stats.doc_time_min;
+    };
     infra_file_list::reset_stream_stats_min_ts(
         org_id,
         format!("{org_id}/{stream_type}/{stream_name}").as_str(),
-        time_range.1,
+        min_ts,
     )
     .await?;
+    // update stream stats in cache
+    if min_ts > stats.doc_time_min {
+        stats.doc_time_min = min_ts;
+        cache::stats::set_stream_stats(org_id, stream_name, stream_type, stats);
+    }
 
     // mark delete done
     db::compact::retention::delete_stream_done(org_id, stream_name, stream_type, Some(date_range))
