@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use aws_sdk_dynamodb::types::AttributeValue;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
 
 use crate::common::{
     infra::{

@@ -2272,7 +2272,7 @@ checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 [[package]]
 name = "datafusion"
 version = "33.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=b648d4e22e82989c65523e62312e1995a1543888#b648d4e22e82989c65523e62312e1995a1543888"
+source = "git+https://github.com/openobserve/arrow-datafusion.git?rev=7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5#7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5"
 dependencies = [
  "ahash 0.8.6",
  "arrow",
@@ -2318,7 +2318,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "33.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=b648d4e22e82989c65523e62312e1995a1543888#b648d4e22e82989c65523e62312e1995a1543888"
+source = "git+https://github.com/openobserve/arrow-datafusion.git?rev=7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5#7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5"
 dependencies = [
  "ahash 0.8.6",
  "arrow",
@@ -2337,7 +2337,7 @@ dependencies = [
 [[package]]
 name = "datafusion-execution"
 version = "33.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=b648d4e22e82989c65523e62312e1995a1543888#b648d4e22e82989c65523e62312e1995a1543888"
+source = "git+https://github.com/openobserve/arrow-datafusion.git?rev=7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5#7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5"
 dependencies = [
  "arrow",
  "chrono",
@@ -2357,7 +2357,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "33.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=b648d4e22e82989c65523e62312e1995a1543888#b648d4e22e82989c65523e62312e1995a1543888"
+source = "git+https://github.com/openobserve/arrow-datafusion.git?rev=7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5#7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5"
 dependencies = [
  "ahash 0.8.6",
  "arrow",
@@ -2372,7 +2372,7 @@ dependencies = [
 [[package]]
 name = "datafusion-optimizer"
 version = "33.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=b648d4e22e82989c65523e62312e1995a1543888#b648d4e22e82989c65523e62312e1995a1543888"
+source = "git+https://github.com/openobserve/arrow-datafusion.git?rev=7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5#7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5"
 dependencies = [
  "arrow",
  "async-trait",
@@ -2389,7 +2389,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "33.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=b648d4e22e82989c65523e62312e1995a1543888#b648d4e22e82989c65523e62312e1995a1543888"
+source = "git+https://github.com/openobserve/arrow-datafusion.git?rev=7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5#7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5"
 dependencies = [
  "ahash 0.8.6",
  "arrow",
@@ -2422,7 +2422,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-plan"
 version = "33.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=b648d4e22e82989c65523e62312e1995a1543888#b648d4e22e82989c65523e62312e1995a1543888"
+source = "git+https://github.com/openobserve/arrow-datafusion.git?rev=7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5#7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5"
 dependencies = [
  "ahash 0.8.6",
  "arrow",
@@ -2452,7 +2452,7 @@ dependencies = [
 [[package]]
 name = "datafusion-sql"
 version = "33.0.0"
-source = "git+https://github.com/apache/arrow-datafusion.git?rev=b648d4e22e82989c65523e62312e1995a1543888#b648d4e22e82989c65523e62312e1995a1543888"
+source = "git+https://github.com/openobserve/arrow-datafusion.git?rev=7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5#7c899bfc7ed0cc71f9b7fc40b74d98f841cb07c5"
 dependencies = [
  "arrow",
  "arrow-schema",
@@ -6445,9 +6445,9 @@ dependencies = [
 
 [[package]]
 name = "sqlparser"
-version = "0.39.0"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "743b4dc2cbde11890ccb254a8fc9d537fa41b36da00de2a1c5e9848c9bc42bd7"
+checksum = "7c80afe31cdb649e56c0d9bb5503be9166600d68a852c38dd445636d126858e5"
 dependencies = [
  "log",
  "serde",
@@ -6456,9 +6456,9 @@ dependencies = [
 
 [[package]]
 name = "sqlparser_derive"
-version = "0.1.1"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55fe75cb4a364c7f7ae06c7dbbc8d84bddd85d6cdf9975963c3935bc1991761e"
+checksum = "3e9c2e1dde0efa87003e7923d94a90f46e3274ad1649f51de96812be561f041f"
 dependencies = [
  "proc-macro2",
  "quote",

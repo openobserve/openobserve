@@ -114,7 +114,9 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
         let chunks = files.chunks(100);
         for files in chunks {
             let mut tx = pool.begin().await?;
-            let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new("INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)");
+            let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
+                "INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)",
+            );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
                     super::parse_file_key_columns(&item.key).expect("parse file key failed");
@@ -198,7 +200,6 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
             }
             // delete files by ids
             let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
-            log::info!("[MYSQL] batch_remove: {}", sql);
             _ = pool.execute(sql.as_str()).await?;
         }
         Ok(())
@@ -276,7 +277,6 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
                 "DELETE FROM file_list_deleted WHERE id IN({});",
                 ids.join(",")
             );
-            log::info!("[MYSQL] batch_remove_deleted: {}", sql);
             _ = pool.execute(sql.as_str()).await?;
         }
         Ok(())
@@ -395,8 +395,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             sqlx::query_scalar(r#"SELECT MIN(min_ts) AS id FROM file_list FORCE INDEX (file_list_stream_ts_idx) WHERE stream = ? AND min_ts > ?;"#)
             .bind(stream_key)
             .bind(min_ts)
-                .fetch_one(&pool)
-                .await?;
+            .fetch_one(&pool)
+            .await?;
         Ok(ret.unwrap_or_default())
     }
 

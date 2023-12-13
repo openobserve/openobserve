@@ -13,15 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
-use aws_sdk_dynamodb::{operation::query::QueryOutput, types::*};
-use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::{
     cmp::{max, min},
     collections::HashMap,
 };
+
+use async_trait::async_trait;
+use aws_sdk_dynamodb::{operation::query::QueryOutput, types::*};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use tokio_stream::StreamExt;
 
+use super::parse_file_key_columns;
 use crate::common::{
     infra::{
         config::CONFIG,
@@ -35,8 +37,6 @@ use crate::common::{
     },
     utils::time::BASE_TIME,
 };
-
-use super::parse_file_key_columns;
 
 pub struct DynamoFileList {
     file_list_table: String,
@@ -385,7 +385,8 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn get_max_pk_value(&self) -> Result<i64> {
-        // we subtract 10 minutes to avoid the case that the last file insert at the same time
+        // we subtract 10 minutes to avoid the case that the last file insert at the
+        // same time
         Ok(Utc::now().timestamp_micros() - Duration::minutes(10).num_microseconds().unwrap())
     }
 

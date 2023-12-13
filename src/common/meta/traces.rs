@@ -16,6 +16,7 @@
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 use crate::common::utils::json;
 
@@ -60,18 +61,41 @@ pub struct Event {
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub attributes: AHashMap<String, json::Value>,
 }
-/* #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct SpanReference {
-    pub parent_trace_id: String,
-    pub parent_span_id: String,
-    pub ref_type: SpanRefType,
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct ExportTraceServiceResponse {
+    // The details of a partially successful export request.
+    //
+    // If the request is only partially accepted
+    // (i.e. when the server accepts only parts of the data and rejects the rest)
+    // the server MUST initialize the `partial_success` field and MUST
+    // set the `rejected_<signal>` with the number of items it rejected.
+    //
+    // Servers MAY also make use of the `partial_success` field to convey
+    // warnings/suggestions to senders even when the request was fully accepted.
+    // In such cases, the `rejected_<signal>` MUST have a value of `0` and
+    // the `error_message` MUST be non-empty.
+    //
+    // A `partial_success` message with an empty value (rejected_<signal> = 0 and
+    // `error_message` = "") is equivalent to it not being set/present. Senders
+    // SHOULD interpret it the same way as in the full success case.
+    pub partial_success: Option<ExportTracePartialSuccess>,
 }
 
-//Service which has generated the trace id - span id ...in distributed tracing there can be multiple services using same trace id
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Service {
-    pub name: String,
-    #[serde(flatten)]
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub attributes: AHashMap<String, Value>,
-} */
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct ExportTracePartialSuccess {
+    // The number of rejected spans.
+    //
+    // A `rejected_<signal>` field holding a `0` value indicates that the
+    // request was fully accepted.
+    pub rejected_spans: i64,
+
+    // A developer-facing human-readable message in English. It should be used
+    // either to explain why the server rejected parts of the data during a partial
+    // success or to convey warnings/suggestions during a full success. The message
+    // should offer guidance on how users can address such issues.
+    //
+    // error_message is an optional field. An error_message with an empty value
+    // is equivalent to it not being set.
+    pub error_message: String,
+}
