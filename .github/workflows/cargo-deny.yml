@@ -1,7 +1,9 @@
-name: "Cargo deny licenses checker"
+name: "Licenses checker"
 on:
-  pull_request_target:
-    types: [opened, reopened, synchronize]
+  push:
+    paths:
+      - "**/Cargo.lock"
+      - "**/Cargo.toml"
 
 jobs:
   check:
@@ -14,5 +16,4 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@v1.5.5
         with:
           # The command to run with cargo-deny
-          command: check
-          arguments: licenses
+          command: check licenses
