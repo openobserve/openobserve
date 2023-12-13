@@ -49,6 +49,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields?.latitude
           "
         >
+        <div
+          :draggable="true"
+          @dragstart="onFieldDragStart($event, dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields?.latitude.column, 'latitude')"
+        >
+          <q-icon
+            name="drag_indicator"
+            color="grey-13"
+            class="'q-mr-xs'"
+          />
           <q-btn
             icon-right="arrow_drop_down"
             no-caps
@@ -120,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="removeLatitude()"
             icon="close"
           />
+        </div>
         </q-btn-group>
         <div
           class="text-caption text-weight-bold text-center q-mt-xs"
@@ -167,6 +179,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields?.longitude
           "
         >
+        <div
+          :draggable="true"
+          @dragstart="onFieldDragStart($event, dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields?.longitude.column, 'longitude')"
+        >
+        <q-icon
+          name="drag_indicator"
+          color="grey-13"
+          class="'q-mr-xs'"
+        />
           <q-btn
             icon-right="arrow_drop_down"
             no-caps
@@ -238,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="removeLongitude()"
             icon="close"
           />
+          </div>
         </q-btn-group>
         <div
           class="text-caption text-weight-bold text-center q-mt-xs"
@@ -285,6 +309,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields?.weight
           "
         >
+        <div
+          :draggable="true"
+          @dragstart="onFieldDragStart($event, dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields?.weight.column, 'weight')"
+        >
+        <q-icon
+          name="drag_indicator"
+          color="grey-13"
+          class="'q-mr-xs'"
+        />
           <q-btn
             icon-right="arrow_drop_down"
             no-caps
@@ -391,6 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="removeWeight()"
             icon="close"
           />
+          </div>
         </q-btn-group>
         <div
           class="text-caption text-weight-bold text-center q-mt-xs"
@@ -460,11 +496,15 @@ export default defineComponent({
     const currentDragArea = ref("");
 
     const onDrop = (e: any, area: string) => {
+      console.log(e, area,"map");
+      
+      if (dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldList") {
       const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
-
+        console.log(dragItem,"dragItem");
+        
       dashboardPanelData.meta.dragAndDrop.dragging = false;
       dashboardPanelData.meta.dragAndDrop.dragElement = null;
-
+      dashboardPanelData.meta.dragAndDrop.dragElementType = null;
       if (dragItem && area == "latitude") {
         addLatitude(dragItem);
       } else if (dragItem && area == "longitude") {
@@ -473,7 +513,50 @@ export default defineComponent({
         addWeight(dragItem);
       }
       currentDragArea.value = "";
-    };
+    } else if(dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldElement"){
+      const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
+      console.log(dragItem,"dragItem");
+      
+      dashboardPanelData.meta.dragAndDrop.dragging = false;
+      dashboardPanelData.meta.dragAndDrop.dragElement = null;
+      dashboardPanelData.meta.dragAndDrop.dragElementType = null;
+        
+      const dragName = dashboardPanelData.meta.stream.selectedStreamFields.find(
+          (item: any) => {
+            return item.name == dragItem;
+          }
+        );
+
+        if(dragName) {
+          if(onLeave.value == "latitude") {
+            console.log(onLeave.value,"onLeave lat");
+            
+            removeLatitude();
+          } else if(onLeave.value == "longitude") {
+            console.log(onLeave.value,"onLeave long");
+            
+            removeLongitude();
+          } else if(onLeave.value == "weight") {
+            console.log(onLeave.value,"onLeave weight");
+            removeWeight();
+          }
+
+          if(area == "latitude") {
+            console.log(area,"area lat");
+            
+            addLatitude(dragName);
+          } else if(area == "longitude") {
+            console.log(area,"area long");
+            addLongitude(dragName);
+          } else if(area == "weight") {
+            console.log(area,"area weight");
+            addWeight(dragName);
+          }
+        } else{
+        }
+        currentDragArea.value = "";
+    }
+  }
 
     const onDragEnter = (e: any, area: string) => {};
 
@@ -490,6 +573,22 @@ export default defineComponent({
     const onDragOver = (e: any, area: string) => {
       currentDragArea.value = area;
       e.preventDefault();
+    };
+
+    const onLeave = ref("");
+     
+    const onFieldDragStart = (e: any, item: any, axis: string) => {
+      console.log("onFieldDragStart item", item);
+      onLeave.value = axis;
+
+      dashboardPanelData.meta.dragAndDrop.dragging = true;
+      dashboardPanelData.meta.dragAndDrop.dragElement = item;
+      dashboardPanelData.meta.dragAndDrop.dragElementType = "fieldElement";
+      console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragElement);
+      console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragging);
+      console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragElementType);
+
+      // dashboardPanelData.meta.dragAndDrop.dragStartIndex = index;
     };
 
     const handler2 = () => {};
@@ -562,6 +661,7 @@ export default defineComponent({
       WeightHint,
       promqlMode,
       weightLabel,
+      onFieldDragStart
     };
   },
 });
