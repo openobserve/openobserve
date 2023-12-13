@@ -939,6 +939,7 @@ export default defineComponent({
 
         if (dragName) {
           // Remove from the original axis
+          if (area !== "f") {
           if (onLeave.value == "x") {
             removeXAxisItem(dragName.name);
             console.log("removeXAxisItem onDrop", dragName.name);
@@ -950,6 +951,12 @@ export default defineComponent({
           } else if (onLeave.value == "z") {
             removeZAxisItem(dragName.name);
             console.log("removeZAxisItem onDrop", dragName.name);
+          }
+        }
+
+          if (area === "f") {
+            console.log("Dropping on 'f' axis with fieldElement type. Disabled.");
+            return;
           }
 
           // Add to the new axis
@@ -988,6 +995,15 @@ export default defineComponent({
     };
 
     const onDragOver = (e: any, area: string) => {
+       if (
+        dashboardPanelData.meta.dragAndDrop.dragElementType === "fieldElement" &&
+        area === "f"
+      ) {
+        console.log("Drag over 'f' axis with fieldElement type. Disabled.");
+        e.preventDefault();
+        return;
+      }
+
       currentDragArea.value = area;
       e.preventDefault();
     };
