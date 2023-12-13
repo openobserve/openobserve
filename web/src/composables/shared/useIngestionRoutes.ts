@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import config from "@/aws-exports";
-import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
+import { routeGuard } from "@/utils/zincutils";
 import SysLog from "@/components/ingestion/logs/SysLog.vue";
 import SyslogNg from "@/components/ingestion/logs/SyslogNg.vue";
 import Ingestion from "@/views/Ingestion.vue";
@@ -47,17 +47,11 @@ const useIngestionRoutes = () => {
       path: "ingestion",
       name: "ingestion",
       component: Ingestion,
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
-      },
       children: [
         {
           path: "custom",
           name: "custom",
           component: Custom,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuardPendingSubscriptions(to, from, next);
-          },
           children: [
             {
               path: "logs",
@@ -141,9 +135,6 @@ const useIngestionRoutes = () => {
           path: "recommended",
           name: "recommended",
           component: Recommended,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuardPendingSubscriptions(to, from, next);
-          },
           children: [
             {
               path: "kubernetes",

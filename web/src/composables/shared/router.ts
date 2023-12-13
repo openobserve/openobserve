@@ -56,7 +56,7 @@ const ErrorsDashboard = () =>
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
 
-import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
+import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
 const useRoutes = () => {
   const parentRoutes: never[] = [];
@@ -78,7 +78,7 @@ const useRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -89,7 +89,7 @@ const useRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -100,7 +100,7 @@ const useRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -108,13 +108,16 @@ const useRoutes = () => {
       path: "streams/stream-explore",
       component: StreamExplorer,
       props: true,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
     },
     {
       path: "streams",
       name: "logstreams",
       component: LogStream,
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -125,7 +128,7 @@ const useRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -144,7 +147,7 @@ const useRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -156,7 +159,7 @@ const useRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -168,7 +171,7 @@ const useRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -180,7 +183,7 @@ const useRoutes = () => {
         // keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -191,7 +194,7 @@ const useRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -202,7 +205,7 @@ const useRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -213,13 +216,16 @@ const useRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
       children: [
         {
           path: "general",
           name: "general",
           component: () => import("@/components/settings/General.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
       ],
     },
@@ -228,23 +234,32 @@ const useRoutes = () => {
       name: "functions",
       component: Functions,
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
       children: [
         {
           path: "functions",
           name: "functionList",
           component: FunctionList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
         {
           path: "stream-association",
           name: "streamFunctions",
           component: AssociatedStreamFunction,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
         {
           path: "enrichment-tables",
           name: "enrichmentTables",
           component: EnrichmentTableList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
       ],
     },
@@ -253,7 +268,7 @@ const useRoutes = () => {
       name: "alerts",
       component: Alerts,
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
       meta: {
         keepAlive: true,
@@ -263,16 +278,25 @@ const useRoutes = () => {
           path: "alerts",
           name: "alertList",
           component: AlertList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
         {
           path: "destinations",
           name: "alertDestinations",
           component: DestinationList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
         {
           path: "templates",
           name: "alertTemplates",
           component: TemplateList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
       ],
     },
@@ -281,7 +305,7 @@ const useRoutes = () => {
       name: "RUM",
       component: RealUserMonitoring,
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
       children: [
         {
@@ -290,6 +314,9 @@ const useRoutes = () => {
           component: AppSessions,
           meta: {
             keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
           },
         },
         {
@@ -300,6 +327,9 @@ const useRoutes = () => {
           meta: {
             keepAlive: false,
           },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
         {
           path: "errors",
@@ -307,6 +337,9 @@ const useRoutes = () => {
           component: AppErrors,
           meta: {
             keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
           },
         },
         {
@@ -317,6 +350,9 @@ const useRoutes = () => {
           meta: {
             keepAlive: true,
           },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
         {
           path: "performance",
@@ -326,26 +362,41 @@ const useRoutes = () => {
           meta: {
             keepAlive: true,
           },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
           children: [
             {
               path: "overview",
               name: "rumPerformanceSummary",
               component: PerformanceSummary,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
             },
             {
               path: "web-vitals",
               name: "rumPerformanceWebVitals",
               component: WebVitalsDashboard,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
             },
             {
               path: "errors",
               name: "rumPerformanceErrors",
               component: ErrorsDashboard,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
             },
             {
               path: "apis",
               name: "rumPerformanceApis",
               component: ApiDashboard,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
             },
           ],
         },
