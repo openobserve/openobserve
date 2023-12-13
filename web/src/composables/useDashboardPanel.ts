@@ -1035,6 +1035,7 @@ const useDashboardPanelData = () => {
   return {
     dashboardPanelData,
     resetDashboardPanelData,
+    updateArrayAlias,
     addXAxisItem,
     addYAxisItem,
     addZAxisItem,

@@ -57,7 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <div
             :draggable="true"
-            @dragstart="onFieldDragStart($event, itemX, 'x')"
+            @dragstart="onFieldDragStart($event, itemX, 'x', index)"
+             @dragover="onFieldDragOver('x', index, dashboardPanelData.data.queries[
+               dashboardPanelData.layout.currentQueryIndex
+             ].fields.x)"
+            @drop="onFieldDrop('x', index)"
+            @dragend="onFieldDragEnd"
           >
           <q-icon
             name="drag_indicator"
@@ -240,7 +245,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <div
           :draggable="true" 
-          @dragstart="onFieldDragStart($event, itemY, 'y')"
+          @dragstart="onFieldDragStart($event, itemY, 'y', index)"
+          @dragover="onFieldDragOver('y',index, dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.y)"
+          @drop="onFieldDrop('y',index)"
+          @dragend="onFieldDragEnd"
         >
         <q-icon
           name="drag_indicator"
@@ -441,7 +451,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <div
             :draggable="true" 
-            @dragstart="onFieldDragStart($event, itemZ, 'z')"
+            @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
+             @dragover="onFieldDragOver('z', index, dashboardPanelData.data.queries[
+               dashboardPanelData.layout.currentQueryIndex
+             ].fields.z)"
+            @drop="onFieldDrop('z', index)"
+            @dragend="onFieldDragEnd"
           >
           <q-icon
             name="drag_indicator"
@@ -834,6 +849,7 @@ export default defineComponent({
       addFilteredItem,
       loadFilterItem,
       promqlMode,
+      updateArrayAlias
     } = useDashboardPanelData();
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -883,7 +899,9 @@ export default defineComponent({
     const currentDragArea = ref("");
 
     const onDrop = (e: any, area: string) => {
-      console.log("onDrop", e, area);
+      if(area == onLeave.value)
+        return;
+      console.log("onDrop::", e, area);
       
       if(dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldList") {
         console.log("onDrop fieldList-------------");
@@ -1008,9 +1026,15 @@ export default defineComponent({
       e.preventDefault();
     };
 
-    const onFieldDragStart = (e: any, item: any, axis: string) => {
+    const fieldIndex = ref(0);
+
+    const onFieldDragStart = (e: any, item: any, axis: string, index: number) => {
       console.log("onFieldDragStart item", item);
       onLeave.value = axis;
+      fieldIndex.value = index;
+      console.log("onFieldDragStart index", index);
+      console.log("onFieldDragStart onLeave", onLeave.value);
+      
       
         dashboardPanelData.meta.dragAndDrop.dragging = true;
         dashboardPanelData.meta.dragAndDrop.dragElement = item;
@@ -1021,6 +1045,39 @@ export default defineComponent({
         
         // dashboardPanelData.meta.dragAndDrop.dragStartIndex = index;
     };
+
+    const onFieldDragOver = (axis, index, array) => {
+      console.log("onDrop:: onFieldDragOver", axis, index, array);
+
+      // Prevent default behavior to allow the drop
+      event.preventDefault();
+      // Swap the elements in the array
+      const draggedItem = array[fieldIndex.value];
+      array.splice(fieldIndex.value, 1);
+      array.splice(index, 0, draggedItem);
+      // Update the drag index for next iteration
+      fieldIndex.value = index;
+    }
+    const onFieldDrop = (axis, index) => {
+      if (axis != onLeave.value) return;
+
+      dashboardPanelData.meta.dragAndDrop.dragging = false;
+      console.log("onDrop dragging", dashboardPanelData.meta.dragAndDrop.dragging);
+
+      dashboardPanelData.meta.dragAndDrop.dragElement = null;
+      console.log("onDrop dragElement", dashboardPanelData.meta.dragAndDrop.dragElement);
+
+      dashboardPanelData.meta.dragAndDrop.dragElementType = null;
+      console.log("onDrop dragElementType", dashboardPanelData.meta.dragAndDrop.dragElementType);
+
+      // Reset the drag index
+      fieldIndex.value = null;
+    }
+    const onFieldDragEnd = () => {
+      updateArrayAlias();
+      // Clean up and perform any additional actions after dragging ends
+      // console.log('Reordered array:', array);
+    }
 
     const handler2 = () => {};
 
@@ -1155,6 +1212,9 @@ export default defineComponent({
       yLabel,
       zLabel,
       onFieldDragStart,
+      onFieldDragOver,
+      onFieldDragEnd,
+      onFieldDrop,
       getHistoramIntervalField,
     };
   },
