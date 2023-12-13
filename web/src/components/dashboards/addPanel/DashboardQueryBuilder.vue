@@ -849,7 +849,10 @@ export default defineComponent({
       addFilteredItem,
       loadFilterItem,
       promqlMode,
-      updateArrayAlias
+      updateArrayAlias,
+      isAddXAxisNotAllowed,
+      isAddYAxisNotAllowed,
+      isAddZAxisNotAllowed,
     } = useDashboardPanelData();
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -956,8 +959,23 @@ export default defineComponent({
         
 
         if (dragName) {
-          // Remove from the original axis
           if (area !== "f") {
+             if (area === "x" && isAddXAxisNotAllowed.value) {
+              console.log("Dragging not allowed in 'x' axis.");
+              return;
+            }
+
+            if (area === "y" && isAddYAxisNotAllowed.value) {
+              console.log("Dragging not allowed in 'y' axis.");
+              return;
+            }
+
+            if (area === "z" && isAddZAxisNotAllowed.value) {
+              console.log("Dragging not allowed in 'z' axis.");
+              return;
+            }
+            
+          // Remove from the original axis
           if (onLeave.value == "x") {
             removeXAxisItem(dragName.name);
             console.log("removeXAxisItem onDrop", dragName.name);
@@ -1026,7 +1044,7 @@ export default defineComponent({
       e.preventDefault();
     };
 
-    const fieldIndex = ref(0);
+    const fieldIndex: any = ref(0);
 
     const onFieldDragStart = (e: any, item: any, axis: string, index: number) => {
       console.log("onFieldDragStart item", item);
@@ -1046,7 +1064,7 @@ export default defineComponent({
         // dashboardPanelData.meta.dragAndDrop.dragStartIndex = index;
     };
 
-    const onFieldDragOver = (axis, index, array) => {
+    const onFieldDragOver = (axis: any, index: any, array: any) => {
       console.log("onDrop:: onFieldDragOver", axis, index, array);
 
       // Prevent default behavior to allow the drop
@@ -1058,7 +1076,7 @@ export default defineComponent({
       // Update the drag index for next iteration
       fieldIndex.value = index;
     }
-    const onFieldDrop = (axis, index) => {
+    const onFieldDrop = (axis: any, index: any) => {
       if (axis != onLeave.value) return;
 
       dashboardPanelData.meta.dragAndDrop.dragging = false;
