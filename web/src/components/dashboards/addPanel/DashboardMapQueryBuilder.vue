@@ -528,6 +528,24 @@ export default defineComponent({
         );
 
         if(dragName) {
+
+          const currentQueryField = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
+
+          if( area == "latitude" && currentQueryField.latitude) {
+            console.log("Dragging not allowed in 'latitude' axis.");
+            return;
+          }
+
+          if (area == "longitude" && currentQueryField.longitude) {
+            console.log("Dragging not allowed in 'longitude' axis.");
+            return;
+          }
+
+          if (area == "weight" && currentQueryField.weight) {
+            console.log("Dragging not allowed in 'weight' axis.");
+            return;
+          }
+
           if(onLeave.value == "latitude") {
             console.log(onLeave.value,"onLeave lat");
             
