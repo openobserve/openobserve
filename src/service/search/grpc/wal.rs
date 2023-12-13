@@ -473,7 +473,7 @@ async fn get_file_list(
             if file_modified < file_time_end || file_time_end == 0 {
                 file_time_end = file_modified;
             }
-            if (time_range.0 > 0 && (file_time_end as i64) < time_range.0)
+            if (time_range.0 > 0 && file_time_end < time_range.0)
                 || (time_range.1 > 0 && file_time_start > time_range.1)
             {
                 log::debug!(

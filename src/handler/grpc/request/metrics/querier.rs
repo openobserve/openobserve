@@ -215,7 +215,7 @@ impl Metrics for Querier {
                 if file_modified < file_time_end || file_time_end == 0 {
                     file_time_end = file_modified;
                 }
-                if (start_time > 0 && (file_time_end as i64) < start_time)
+                if (start_time > 0 && file_time_end < start_time)
                     || (end_time > 0 && file_time_start > end_time)
                 {
                     log::debug!(
