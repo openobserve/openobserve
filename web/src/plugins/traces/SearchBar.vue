@@ -224,12 +224,6 @@ export default defineComponent({
       { immediate: true, deep: true }
     );
 
-    watch(
-      () => searchObj.data.stream.filters,
-      () => {},
-      { immediate: true, deep: true }
-    );
-
     const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
       autoCompleteData.value.cursorIndex =

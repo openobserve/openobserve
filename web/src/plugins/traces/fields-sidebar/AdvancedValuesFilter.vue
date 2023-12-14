@@ -4,9 +4,11 @@
     dense
     switch-toggle-side
     :label="row.name"
+    v-model:model-value="_isOpen"
     expand-icon-class="field-expansion-icon"
     expand-icon="expand_more"
     @before-show="(event: any) => openFilterCreator(event, row)"
+    @before-hide="(event: any) => closeFilterCreator()"
   >
     <template v-slot:header>
       <div class="flex content-center ellipsis full-width" :title="row.name">
@@ -24,39 +26,18 @@
           <input
             v-model="searchValue"
             class="full-width"
-            :disabled="
-              !fieldValues[row.name]?.values?.length &&
-              !fieldValues[row.name]?.isLoading
-            "
+            :disabled="!values?.length && !filter.isLoading"
             @input="onSearchValue()"
           />
         </div>
         <div class="filter-values-container q-mt-sm">
           <div
-            v-show="fieldValues[row.name]?.isLoading"
-            class="q-pl-md q-mb-xs q-mt-md"
-            style="height: 60px"
-          >
-            <q-inner-loading
-              size="xs"
-              :showing="fieldValues[row.name]?.isLoading"
-              label="Fetching values..."
-              label-style="font-size: 1.1em"
-            />
-          </div>
-          <div
-            v-show="
-              !fieldValues[row.name]?.values?.length &&
-              !fieldValues[row.name]?.isLoading
-            "
+            v-show="!values?.length && !filter.isLoading"
             class="q-py-xs text-grey-9 text-center"
           >
             No values found
           </div>
-          <div
-            v-for="value in fieldValues[row.name]?.values || []"
-            :key="value.key"
-          >
+          <div v-for="value in values || []" :key="value.key">
             <q-list dense>
               <q-item tag="label" class="q-pr-none">
                 <div
@@ -65,7 +46,7 @@
                 >
                   <q-checkbox
                     size="xs"
-                    v-model="selectedValues"
+                    v-model="_selectedValues"
                     :val="value.key"
                     class="filter-check-box cursor-pointer"
                     @update:model-value="processValues(value.key)"
@@ -89,7 +70,19 @@
             </q-list>
           </div>
           <div
-            v-show="fieldValues[row.name]?.values.length === valuesSize"
+            v-show="filter.isLoading"
+            class="q-pl-md q-mb-xs q-mt-md"
+            style="height: 60px; position: relative"
+          >
+            <q-inner-loading
+              size="xs"
+              :showing="filter.isLoading"
+              label="Fetching values..."
+              label-style="font-size: 1.1em"
+            />
+          </div>
+          <div
+            v-show="values.length === filter.size"
             class="text-right flex items-center justify-end q-pt-xs"
           >
             <div
@@ -110,38 +103,53 @@
 
 <script lang="ts" setup>
 import { ref, defineEmits } from "vue";
-import useTraces from "@/composables/useTraces";
-import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
-import streamService from "@/services/stream";
-import { useStore } from "vuex";
-import { useQuasar } from "quasar";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import { debounce } from "quasar";
+import { watch } from "vue";
+import { cloneDeep } from "lodash-es";
 
 const props = defineProps({
   row: {
     type: Object,
     default: () => null,
   },
+  filter: {
+    type: Object,
+    default: () => {},
+  },
+  values: {
+    type: Array,
+    default: () => [],
+  },
+  selectedValues: {
+    type: Array,
+    default: () => [],
+  },
 });
 
-const fieldValues = ref<any>({});
-
-const store = useStore();
-
-const $q = useQuasar();
-
-const { searchObj, addToFilter } = useTraces();
+watch(
+  () => props.selectedValues,
+  () => {
+    if (
+      JSON.stringify(props.selectedValues) !==
+      JSON.stringify(_selectedValues.value)
+    ) {
+      _selectedValues.value = props.selectedValues;
+    }
+  },
+  {
+    deep: true,
+  }
+);
 
 const searchValue = ref("");
 
-const showShowMore = ref(true);
+const _selectedValues = ref(props.selectedValues);
 
-const selectedValues = ref([]);
+const _isOpen = ref(props.filter.isOpen);
 
 const valuesSize = ref(4);
 
-const emits = defineEmits(["update:values"]);
+const emits = defineEmits(["update:selectedValues", "update:isOpen"]);
 
 const onSearchValue = () => {
   debouncedOpenFilterCreator();
@@ -157,7 +165,16 @@ const fetchMoreValues = () => {
 };
 
 const processValues = () => {
-  emits("update:values", props.row.name, selectedValues.value);
+  console.log(cloneDeep(_selectedValues));
+  emits(
+    "update:selectedValues",
+    _selectedValues.value,
+    cloneDeep(props.selectedValues)
+  );
+};
+
+const closeFilterCreator = () => {
+  emits("update:isOpen", false);
 };
 
 const openFilterCreator = (event: any, { name, ftsKey }: any) => {
@@ -167,112 +184,7 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
     return;
   }
 
-  fieldValues.value[name] = {
-    isLoading: true,
-    values: [],
-  };
-
-  try {
-    let query_context = "";
-    let query = searchObj.data.editorValue;
-    let parseQuery = query.split("|");
-    let whereClause = "";
-    if (parseQuery.length > 1) {
-      whereClause = parseQuery[1].trim();
-    } else {
-      whereClause = parseQuery[0].trim();
-    }
-
-    query_context =
-      `SELECT * FROM "` +
-      searchObj.data.stream.selectedStream.value +
-      `" [WHERE_CLAUSE]`;
-
-    if (whereClause.trim() != "") {
-      whereClause = whereClause
-        .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-        .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-        .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-      whereClause = whereClause
-        .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-        .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-        .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-        .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
-
-      const parsedSQL = whereClause.split(" ");
-      searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-        parsedSQL.forEach((node: any, index: any) => {
-          if (node == field.name) {
-            node = node.replaceAll('"', "");
-            parsedSQL[index] = '"' + node + '"';
-          }
-        });
-      });
-
-      whereClause = parsedSQL.join(" ");
-
-      query_context = query_context.replace(
-        "[WHERE_CLAUSE]",
-        " WHERE " + whereClause
-      );
-    } else {
-      query_context = query_context.replace("[WHERE_CLAUSE]", "");
-    }
-
-    if (searchValue.value) {
-      if (whereClause) {
-        query_context =
-          query_context + ` AND ${name} ILIKE '${searchValue.value}%'`;
-      } else {
-        query_context =
-          query_context + `WHERE ${name} ILIKE '${searchValue.value}%'`;
-      }
-    }
-
-    query_context = b64EncodeUnicode(query_context) || "";
-
-    fieldValues.value[name] = {
-      isLoading: true,
-      values: [],
-    };
-
-    streamService
-      .fieldValues({
-        org_identifier: store.state.selectedOrganization.identifier,
-        stream_name: searchObj.data.stream.selectedStream.value,
-        start_time: searchObj.data.datetime.startTime,
-        end_time: searchObj.data.datetime.endTime,
-        fields: [name],
-        size: valuesSize.value,
-        type: "traces",
-        query_context,
-      })
-      .then((res: any) => {
-        if (res.data.hits.length) {
-          fieldValues.value[name]["values"] = res.data.hits
-            .find((field: any) => field.field === name)
-            .values.map((value: any) => {
-              return {
-                key: value.zo_sql_key ? value.zo_sql_key : "null",
-                count: formatLargeNumber(value.zo_sql_num),
-              };
-            });
-        }
-      })
-      .catch(() => {
-        $q.notify({
-          type: "negative",
-          message: `Error while fetching values for ${name}`,
-        });
-      })
-      .finally(() => {
-        fieldValues.value[name]["isLoading"] = false;
-      });
-  } catch (e) {
-    fieldValues.value[name]["isLoading"] = false;
-    console.log("Error while fetching field values");
-  }
+  emits("update:isOpen", true);
 };
 </script>
 
