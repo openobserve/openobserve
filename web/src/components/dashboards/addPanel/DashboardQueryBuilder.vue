@@ -586,7 +586,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="axis-container droppable scroll"
         :class="{
-          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging && dashboardPanelData.meta.dragAndDrop.dragElementType != 'fieldElement',
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             currentDragArea == 'f',
@@ -784,7 +784,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-menu>
           </q-btn>
           <q-btn
-            style="height: 100%;"
             size="xs"
             dense
             @click="removeFilterItem(filteredItem.column)"
