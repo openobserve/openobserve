@@ -49,10 +49,10 @@ pub async fn save(
     name: &str,
     mut alert: Alert,
 ) -> Result<(), anyhow::Error> {
-    alert.name = name.trim().to_string();
-    alert.org_id = org_id.trim().to_string();
+    alert.name = name.to_string();
+    alert.org_id = org_id.to_string();
     alert.stream_type = stream_type;
-    alert.stream_name = stream_name.trim().to_string();
+    alert.stream_name = stream_name.to_string();
 
     if alert.name.is_empty() || alert.stream_name.is_empty() {
         return Err(anyhow::anyhow!("Alert name is required"));

@@ -56,7 +56,8 @@ use crate::{
 #[get("/{org_id}/savedviews/{view_id}")]
 pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, view_id) = path.into_inner();
-    match saved_view::get_view(&org_id, &view_id).await {
+    let view_id = view_id.trim();
+    match saved_view::get_view(&org_id, view_id).await {
         Ok(view) => {
             let view: View = view;
             Ok(MetaHttpResponse::json(view))
