@@ -119,7 +119,6 @@ import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import QueryInspector from "@/components/dashboards/QueryInspector.vue";
-import { ref } from "vue";
 
 export default defineComponent({
   name: "PanelContainer",
@@ -222,7 +221,6 @@ export default defineComponent({
           },
         });
         return;
-      } catch (err: any) {
       } catch (err: any) {
         // Show an error notification.
         $q.notify({

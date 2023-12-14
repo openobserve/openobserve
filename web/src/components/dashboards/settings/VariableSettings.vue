@@ -209,7 +209,7 @@ export default defineComponent({
           name: it.name,
           type: variableTypes.value.find((type: any) => type.value === it.type)?.label,
         }
-      );
+      });
     };
 
     const addVariables = () => {
