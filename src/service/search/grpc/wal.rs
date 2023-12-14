@@ -130,7 +130,7 @@ pub async fn search(
     );
 
     if CONFIG.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(&scan_stats)?;
+        super::check_memory_circuit_breaker(session_id, &scan_stats)?;
     }
 
     // fetch all schema versions, get latest schema
