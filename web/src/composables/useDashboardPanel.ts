@@ -159,7 +159,6 @@ const useDashboardPanelData = () => {
   };
 
   const generateLabelFromName = (name: string) => {
-    console.log("name", name);
     
     return name
       .replace(/[\_\-\s\.]/g, " ")
@@ -244,7 +243,6 @@ const useDashboardPanelData = () => {
   });
 
   const addXAxisItem = (row: any) => {
-    console.log("rowwww", row);
     
     if (
       !dashboardPanelData.data.queries[
@@ -266,10 +264,6 @@ const useDashboardPanelData = () => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.find((it: any) => it.column == row.name)
     ) {
-      console.log(
-        "dashboardPanelData.meta.dragAndDrop.dragging",
-        dashboardPanelData.meta.dragAndDrop
-      );
       
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -296,7 +290,6 @@ const useDashboardPanelData = () => {
             : null,
       });
     }
-    console.log("label", dashboardPanelData.data.queries[0].fields.x);
     
     updateArrayAlias();
   };

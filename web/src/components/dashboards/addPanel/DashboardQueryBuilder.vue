@@ -906,25 +906,15 @@ export default defineComponent({
     const onDrop = (e: any, area: string) => {
       if(area == onLeave.value)
         return;
-      console.log("onDrop::", e, area);
       
       if(dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldList") {
-        console.log("onDrop fieldList-------------");
         const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement; 
-        console.log("onDrop dragItem", dragItem);
         
         dashboardPanelData.meta.dragAndDrop.dragging = false;
-        console.log("onDrop dragging", dashboardPanelData.meta.dragAndDrop.dragging);
-        
         dashboardPanelData.meta.dragAndDrop.dragElement = null;
-        console.log("onDrop dragElement", dashboardPanelData.meta.dragAndDrop.dragElement);
-        
         dashboardPanelData.meta.dragAndDrop.dragElementType = null;
-        console.log("onDrop dragElementType", dashboardPanelData.meta.dragAndDrop.dragElementType);
         
         if (dragItem && area == "x") {
-          console.log("addXAxisItem onDrop", dragItem);
-
           addXAxisItem(dragItem);
         } else if (dragItem && area == "y") {
           addYAxisItem(dragItem);
@@ -936,33 +926,20 @@ export default defineComponent({
         }
         currentDragArea.value = "";
       } else if(dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldElement") {
-        console.log("onDrop fieldElement-------------");
         const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
-        console.log("onDrop dragItem fieldElement", dragItem);
 
         dashboardPanelData.meta.dragAndDrop.dragging = false;
-        console.log("onDrop dragging fieldElement", dashboardPanelData.meta.dragAndDrop.dragging);
-
         dashboardPanelData.meta.dragAndDrop.dragElement = null;
-        console.log("onDrop dragElement fieldElement", dashboardPanelData.meta.dragAndDrop.dragElement);
-
         dashboardPanelData.meta.dragAndDrop.dragElementType = null;
-        console.log("onDrop dragElementType fieldElement", dashboardPanelData.meta.dragAndDrop.dragElementType);
 
-        console.log("onDrop dragItem selectedStreamFields", dashboardPanelData.meta.stream.selectedStreamFields);
-        
         const dragName = dashboardPanelData.meta.stream.selectedStreamFields.find(
           (item: any) => {
             return item.name == dragItem.column;
           }
         );
 
-        console.log("onDrop dragItem---", dragName);
-        
-
         if (dragName) {
           const axisArray = getAxisArray(area);
-          console.log("onDrop axisArray", axisArray);
           
           const duplicateName = axisArray.some(
             (item: any) => {
@@ -972,7 +949,6 @@ export default defineComponent({
 
           if (duplicateName) {
             const errorMessage = `Field '${dragName.name}' already exists in '${area}' axis.`;
-            console.log(`Duplicate field. ${errorMessage}`);
             $q.notify({
               type: "negative",
               message: errorMessage,
@@ -1002,7 +978,6 @@ export default defineComponent({
 
               const errorMessage = `Max ${maxAllowedXAxisFields} field(s) in 'x' axis is allowed.`;
 
-              console.log(`Dragging not allowed in 'x' axis. ${errorMessage}`);
               $q.notify({
                 type: "negative",
                 message: `${errorMessage}`,
@@ -1030,7 +1005,6 @@ export default defineComponent({
 
               const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in 'y' axis is allowed.`;
 
-              console.log(`Dragging not allowed in 'y' axis. ${errorMessage}`);
               $q.notify({
                 type: "negative",
                 message: ` ${errorMessage}`,
@@ -1053,7 +1027,6 @@ export default defineComponent({
 
               const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in 'z' axis is allowed.`;
 
-              console.log(`Dragging not allowed in 'y' axis. ${errorMessage}`);
               $q.notify({
                 type: "negative",
                 message: `${errorMessage}`,
@@ -1065,20 +1038,16 @@ export default defineComponent({
           // Remove from the original axis
           if (onLeave.value == "x") {
             removeXAxisItem(dragName.name);
-            console.log("removeXAxisItem onDrop", dragName.name);
 
           } else if (onLeave.value == "y") {
             removeYAxisItem(dragName.name);
-            console.log("removeYAxisItem onDrop", dragName.name);
             
           } else if (onLeave.value == "z") {
             removeZAxisItem(dragName.name);
-            console.log("removeZAxisItem onDrop", dragName.name);
           }
         }
 
           if (area === "f") {
-            console.log("Dropping on 'f' axis with fieldElement type. Disabled.");
             $q.notify({
               type: "negative",
               message: "Dropping on filter is Disabled.",
@@ -1089,13 +1058,10 @@ export default defineComponent({
 
           // Add to the new axis
           if (area == "x") {
-            console.log("addXAxisItem onDrop", dragName);
             addXAxisItem(dragName);
           } else if (area == "y") {
-            console.log("addYAxisItem onDrop", dragName);
             addYAxisItem(dragName);
           } else if (area == "z") {
-            console.log("addZAxisItem onDrop", dragName);
             addZAxisItem(dragName);
           }
         } else {
@@ -1145,7 +1111,6 @@ export default defineComponent({
         dashboardPanelData.meta.dragAndDrop.dragElementType === "fieldElement" &&
         area === "f"
       ) {
-        console.log("Drag over 'f' axis with fieldElement type. Disabled.");
         e.preventDefault();
         return;
       }
@@ -1157,25 +1122,16 @@ export default defineComponent({
     const fieldIndex: any = ref(0);
 
     const onFieldDragStart = (e: any, item: any, axis: string, index: number) => {
-      console.log("onFieldDragStart item", item);
       onLeave.value = axis;
       fieldIndex.value = index;
-      console.log("onFieldDragStart index", index);
-      console.log("onFieldDragStart onLeave", onLeave.value);
-      
       
         dashboardPanelData.meta.dragAndDrop.dragging = true;
         dashboardPanelData.meta.dragAndDrop.dragElement = item;
         dashboardPanelData.meta.dragAndDrop.dragElementType = "fieldElement";
-        console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragElement);
-        console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragging);
-        console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragElementType);
-        
-        // dashboardPanelData.meta.dragAndDrop.dragStartIndex = index;
+      
     };
 
     const onFieldDragOver = (axis: any, index: any, array: any) => {
-      console.log("onDrop:: onFieldDragOver", axis, index, array);
 
       // Prevent default behavior to allow the drop
       event.preventDefault();
@@ -1190,21 +1146,14 @@ export default defineComponent({
       if (axis != onLeave.value) return;
 
       dashboardPanelData.meta.dragAndDrop.dragging = false;
-      console.log("onDrop dragging", dashboardPanelData.meta.dragAndDrop.dragging);
-
       dashboardPanelData.meta.dragAndDrop.dragElement = null;
-      console.log("onDrop dragElement", dashboardPanelData.meta.dragAndDrop.dragElement);
-
       dashboardPanelData.meta.dragAndDrop.dragElementType = null;
-      console.log("onDrop dragElementType", dashboardPanelData.meta.dragAndDrop.dragElementType);
 
       // Reset the drag index
       fieldIndex.value = null;
     }
     const onFieldDragEnd = () => {
       updateArrayAlias();
-      // Clean up and perform any additional actions after dragging ends
-      // console.log('Reordered array:', array);
     }
 
     const handler2 = () => {};

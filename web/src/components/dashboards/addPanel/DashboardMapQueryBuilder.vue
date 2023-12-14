@@ -498,15 +498,14 @@ export default defineComponent({
     const currentDragArea = ref("");
 
     const onDrop = (e: any, area: string) => {
-      console.log(e, area,"map");
       
       if (dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldList") {
       const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
-        console.log(dragItem,"dragItem");
         
       dashboardPanelData.meta.dragAndDrop.dragging = false;
       dashboardPanelData.meta.dragAndDrop.dragElement = null;
       dashboardPanelData.meta.dragAndDrop.dragElementType = null;
+
       if (dragItem && area == "latitude") {
         addLatitude(dragItem);
       } else if (dragItem && area == "longitude") {
@@ -517,7 +516,6 @@ export default defineComponent({
       currentDragArea.value = "";
     } else if(dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldElement"){
       const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
-      console.log(dragItem,"dragItem");
       
       dashboardPanelData.meta.dragAndDrop.dragging = false;
       dashboardPanelData.meta.dragAndDrop.dragElement = null;
@@ -534,7 +532,6 @@ export default defineComponent({
           const currentQueryField = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
 
           if( area == "latitude" && currentQueryField.latitude) {
-            console.log("Dragging not allowed in 'latitude' axis.");
             $q.notify({
               type: "negative",
               message: "Max 1 field in 'latitude' is allowed.",
@@ -544,7 +541,6 @@ export default defineComponent({
           }
 
           if (area == "longitude" && currentQueryField.longitude) {
-            console.log("Dragging not allowed in 'longitude' axis.");
             $q.notify({
               type: "negative",
               message: "Max 1 field in 'longitude' is allowed.",
@@ -554,7 +550,6 @@ export default defineComponent({
           }
 
           if (area == "weight" && currentQueryField.weight) {
-            console.log("Dragging not allowed in 'weight' axis.");
             $q.notify({
               type: "negative",
               message: "Max 1 field in 'weight' is allowed.",
@@ -563,28 +558,19 @@ export default defineComponent({
             return;
           }
 
-          if(onLeave.value == "latitude") {
-            console.log(onLeave.value,"onLeave lat");
-            
+          if(onLeave.value == "latitude") {            
             removeLatitude();
-          } else if(onLeave.value == "longitude") {
-            console.log(onLeave.value,"onLeave long");
-            
+          } else if(onLeave.value == "longitude") {            
             removeLongitude();
           } else if(onLeave.value == "weight") {
-            console.log(onLeave.value,"onLeave weight");
             removeWeight();
           }
 
-          if(area == "latitude") {
-            console.log(area,"area lat");
-            
+          if(area == "latitude") {            
             addLatitude(dragName);
           } else if(area == "longitude") {
-            console.log(area,"area long");
             addLongitude(dragName);
           } else if(area == "weight") {
-            console.log(area,"area weight");
             addWeight(dragName);
           }
         } else{
@@ -613,17 +599,11 @@ export default defineComponent({
     const onLeave = ref("");
      
     const onFieldDragStart = (e: any, item: any, axis: string) => {
-      console.log("onFieldDragStart item", item);
       onLeave.value = axis;
 
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
       dashboardPanelData.meta.dragAndDrop.dragElementType = "fieldElement";
-      console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragElement);
-      console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragging);
-      console.log("onFieldDragStart", dashboardPanelData.meta.dragAndDrop.dragElementType);
-
-      // dashboardPanelData.meta.dragAndDrop.dragStartIndex = index;
     };
 
     const handler2 = () => {};
