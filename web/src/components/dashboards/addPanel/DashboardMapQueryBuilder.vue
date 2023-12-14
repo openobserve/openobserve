@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-pt-xs"
+        class="axis-container droppable scroll "
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-x-layout"
       >
         <q-btn-group
-          class="q-mr-sm q-mb-sm"
+          class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -58,14 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon
             name="drag_indicator"
             color="grey-13"
-            class="'q-mr-xs'"
+            size="13px"
+            class="'q-my-xs'"
           />
           <q-btn
+            square
             icon-right="arrow_drop_down"
             no-caps
             color="primary"
             dense
-            rounded
             size="sm"
             :label="
               dashboardPanelData.data.queries[
@@ -119,9 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-menu>
           </q-btn>
           <q-btn
+            style="height: 100%;"
             size="xs"
-            round
-            flat
             dense
             :data-test="`dashboard-x-item-${
               dashboardPanelData.data.queries[
@@ -134,14 +134,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-mt-xs"
+          class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.latitude == null
           "
         >
-          {{ Hint }}
+          <div class="q-mt-xs">{{ Hint }}</div>
         </div>
       </div>
     </div>
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-pt-xs"
+        class="axis-container droppable scroll "
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <q-btn-group
-          class="q-mr-sm q-mb-sm"
+          class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -188,14 +188,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon
           name="drag_indicator"
           color="grey-13"
-          class="'q-mr-xs'"
+          size="13px"
+          class="'q-my-xs'"
         />
           <q-btn
+            square
             icon-right="arrow_drop_down"
             no-caps
             dense
             color="primary"
-            rounded
             size="sm"
             :label="
               dashboardPanelData.data.queries[
@@ -249,9 +250,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-menu>
           </q-btn>
           <q-btn
+            style="height: 100%;"
             size="xs"
-            round
-            flat
             dense
             :data-test="`dashboard-y-item-${
               dashboardPanelData.data.queries[
@@ -264,14 +264,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-mt-xs"
+          class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.longitude == null
           "
         >
-          {{ Hint }}
+          <div class="q-mt-xs">{{ Hint }}</div>
         </div>
       </div>
     </div>
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-pt-xs"
+        class="axis-container droppable scroll "
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <q-btn-group
-          class="q-mr-sm q-mb-sm"
+          class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -318,14 +318,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon
           name="drag_indicator"
           color="grey-13"
-          class="'q-mr-xs'"
+          size="13px"
+          class="'q-my-xs'"
         />
           <q-btn
+            square
             icon-right="arrow_drop_down"
             no-caps
             dense
             color="primary"
-            rounded
             size="sm"
             :label="weightLabel"
             :data-test="`dashboard-y-item-${
@@ -414,9 +415,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-menu>
           </q-btn>
           <q-btn
+            style="height: 100%;"
             size="xs"
-            round
-            flat
             dense
             :data-test="`dashboard-y-item-${
               dashboardPanelData.data.queries[
@@ -429,14 +429,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-mt-xs"
+          class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.weight == null
           "
         >
-          {{ WeightHint }}
+          <div class="q-mt-xs">{{ WeightHint }}</div>
         </div>
       </div>
     </div>
@@ -703,6 +703,16 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.axis-field {
+  overflow: hidden;
+}
+:deep(.axis-field .q-btn--rectangle) {
+  border-radius: 0%;
+}
+:deep(.axis-field .q-btn:before) {
+  border: 0px solid transparent;
+}
+
 .axis-container {
   flex: 1;
   width: 100%;
@@ -737,7 +747,9 @@ export default defineComponent({
 }
 
 .drop-entered {
-  background-color: #b8b8b8;
+  transition: all;
+  transition-duration: 200ms;
+  background-color: #cbcbcb;
 }
 
 .color-input-wrapper {
