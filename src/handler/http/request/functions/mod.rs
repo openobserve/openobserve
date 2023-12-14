@@ -47,7 +47,9 @@ pub async fn save_function(
     func: web::Json<Transform>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let transform = func.into_inner();
+    let mut transform = func.into_inner();
+    transform.name = transform.name.trim().to_string();
+    transform.function = transform.function.trim().to_string();
     crate::service::functions::save_function(org_id, transform).await
 }
 
@@ -118,8 +120,11 @@ pub async fn update_function(
     func: web::Json<Transform>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    let transform = func.into_inner();
-    crate::service::functions::update_function(org_id, name, transform).await
+    let name = name.trim();
+    let mut transform = func.into_inner();
+    transform.name = transform.name.trim().to_string();
+    transform.function = transform.function.trim().to_string();
+    crate::service::functions::update_function(&org_id, name, transform).await
 }
 
 /// ListStreamFunctions

@@ -47,7 +47,8 @@ pub async fn save_destination(
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     let dest = dest.into_inner();
-    match destinations::save(&org_id, &name, dest).await {
+    let name = name.trim();
+    match destinations::save(&org_id, name, dest).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
