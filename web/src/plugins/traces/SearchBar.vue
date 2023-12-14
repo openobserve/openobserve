@@ -67,6 +67,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:active-tab="updateFilterType"
           />
         </div>
+        <q-btn
+          label="Reset Filters"
+          no-caps
+          size="sm"
+          icon="restart_alt"
+          class="q-pr-sm q-pl-xs reset-filters q-ml-md"
+          @click="resetFilters()"
+        ></q-btn>
       </div>
       <div class="float-right col-auto">
         <div class="float-left">
@@ -367,6 +375,13 @@ export default defineComponent({
       searchObj.data.editorValue = searchObj.data.advanceFiltersQuery;
     };
 
+    const resetFilters = () => {
+      searchObj.data.editorValue = "";
+      Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
+        field.selectedValues = [];
+      });
+    };
+
     return {
       t,
       router,
@@ -386,6 +401,7 @@ export default defineComponent({
       updateFilterType,
       showWarningDialog,
       changeToggle,
+      resetFilters,
     };
   },
   computed: {
@@ -560,6 +576,19 @@ export default defineComponent({
 
   .download-logs-btn {
     height: 30px;
+  }
+}
+</style>
+
+<style lang="scss">
+.reset-filters {
+  font-size: 22px;
+
+  .block {
+    font-size: 12px;
+  }
+  .q-icon {
+    margin-right: 4px;
   }
 }
 </style>

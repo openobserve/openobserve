@@ -27,6 +27,7 @@
             v-model="searchValue"
             class="full-width"
             :disabled="!values?.length && !filter.isLoading"
+            placeholder="Search"
             @input="onSearchValue()"
           />
         </div>

@@ -175,7 +175,6 @@ import { Parser } from "node-sql-parser";
 import streamService from "@/services/stream";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { watch } from "vue";
-import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -190,17 +189,10 @@ export default defineComponent({
     const $q = useQuasar();
     const { searchObj, updatedLocalLogFilterField } = useTraces();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
-    const fieldValues: Ref<{
-      [key: string | number]: {
-        isLoading: boolean;
-        values: { key: string; count: string }[];
-        selectedValues: { key: string; count: string }[];
-        size: number;
-        isOpen: boolean;
-      };
-    }> = ref({});
 
     const valuesSize = 5;
+
+    const fieldValues = computed(() => searchObj.data.stream.fieldValues);
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,

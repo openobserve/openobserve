@@ -86,6 +86,15 @@ const defaultObject = {
       addToFilter: "",
       functions: [],
       filters: [] as any[],
+      fieldValues: {} as {
+        [key: string | number]: {
+          isLoading: boolean;
+          values: { key: string; count: string }[];
+          selectedValues: { key: string; count: string }[];
+          size: number;
+          isOpen: boolean;
+        };
+      },
     },
     resultGrid: {
       currentDateTime: new Date(),
