@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-py-xs"
+        class="axis-container droppable scroll"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <q-btn-group
-          class="q-mr-sm q-mb-sm"
+          class="axis-field q-mr-sm q-my-xs"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.y"
@@ -256,14 +256,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon
           name="drag_indicator"
           color="grey-13"
-          class="'q-mr-xs'"
+          size="13px"
+          class="'q-my-xs'"
         />
           <q-btn
             icon-right="arrow_drop_down"
             no-caps
             dense
             color="primary"
-            rounded
+            square
             size="sm"
             :label="yLabel[index]"
             :data-test="`dashboard-y-item-${itemY.column}`"
@@ -393,9 +394,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-menu>
           </q-btn>
           <q-btn
+            style="height: 100%;"
             size="xs"
-            round
-            flat
             dense
             :data-test="`dashboard-y-item-${itemY.column}-remove`"
             @click="removeYAxisItem(itemY.column)"
@@ -404,14 +404,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-mt-xs"
+          class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.y.length < 1
           "
         >
-          {{ yAxisHint }}
+          <div class="q-mt-xs">{{ yAxisHint }}</div>
         </div>
       </div>
     </div>
@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <span class="layout-separator">:</span>
         <div
-          class="axis-container droppable scroll q-py-xs"
+          class="axis-container droppable scroll"
           :class="{
             'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
             'drop-entered':
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-mutation="handler2"
         >
           <q-btn-group
-            class="q-mr-sm q-mb-sm"
+            class="axis-field q-mr-sm q-my-xs"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.z"
@@ -462,14 +462,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon
             name="drag_indicator"
             color="grey-13"
-            class="'q-mr-xs'"
+            size="13px"
+            class="'q-my-xs'"
           />
             <q-btn
+              square
               icon-right="arrow_drop_down"
               no-caps
               dense
               color="primary"
-              rounded
               size="sm"
               :label="zLabel[index]"
               class="q-pl-sm"
@@ -547,9 +548,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-menu>
             </q-btn>
             <q-btn
+              style="height: 100%;"
               size="xs"
-              round
-              flat
               dense
               @click="removeZAxisItem(itemZ.column)"
               icon="close"
@@ -557,14 +557,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-btn-group>
           <div
-            class="text-caption text-weight-bold text-center q-mt-xs"
+            class="text-caption text-weight-bold text-center q-py-xs"
             v-if="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.z.length < 1
             "
           >
-            {{ zAxisHint }}
+            <div class="q-mt-xs">{{ zAxisHint }}</div>
           </div>
         </div>
       </div>
@@ -584,7 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="layout-name">{{ t("panel.filters") }}</div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll q-py-xs"
+        class="axis-container droppable scroll"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -599,18 +599,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-filter-layout"
       >
         <q-btn-group
-          class="q-mr-sm q-mb-sm"
+          class="axis-field q-mr-sm q-my-xs"
           v-for="(filteredItem, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.filter"
           :key="index"
         >
           <q-btn
+            square
             icon-right="arrow_drop_down"
             no-caps
             dense
             color="primary"
-            rounded
             size="sm"
             :label="filteredItem.column"
             :data-test="`dashboard-filter-item-${filteredItem.column}`"
@@ -784,16 +784,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-menu>
           </q-btn>
           <q-btn
+            style="height: 100%;"
             size="xs"
-            round
-            flat
             dense
             @click="removeFilterItem(filteredItem.column)"
             icon="close"
           />
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-mt-xs"
+          class="text-caption text-weight-bold text-center q-py-xs q-mt-xs"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -1082,7 +1081,7 @@ export default defineComponent({
             console.log("Dropping on 'f' axis with fieldElement type. Disabled.");
             $q.notify({
               type: "negative",
-              message: "Dropping on 'f' axis with fieldElement type. Disabled.",
+              message: "Dropping on filter is Disabled.",
               timeout: 5000,
             });
             return;
