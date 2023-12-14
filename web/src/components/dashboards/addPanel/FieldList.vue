@@ -571,7 +571,7 @@ export default defineComponent({
     const onDragStart = (e: any, item: any) => {
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
-      dashboardPanelData.meta.dragAndDrop.dragElementType = "fieldList";      
+      dashboardPanelData.meta.dragAndDrop.dragElementType = "fieldList";
     };
 
     const onDragLeave = (e: any) => {

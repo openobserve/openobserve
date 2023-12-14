@@ -159,7 +159,6 @@ const useDashboardPanelData = () => {
   };
 
   const generateLabelFromName = (name: string) => {
-    
     return name
       .replace(/[\_\-\s\.]/g, " ")
       .split(" ")
@@ -167,7 +166,6 @@ const useDashboardPanelData = () => {
       .filter((it) => it)
       .join(" ");
   };
-
 
   const promqlMode = computed(
     () => dashboardPanelData.data.queryType == "promql"
@@ -243,7 +241,6 @@ const useDashboardPanelData = () => {
   });
 
   const addXAxisItem = (row: any) => {
-    
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -264,7 +261,6 @@ const useDashboardPanelData = () => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.find((it: any) => it.column == row.name)
     ) {
-      
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.push({
@@ -290,7 +286,7 @@ const useDashboardPanelData = () => {
             : null,
       });
     }
-    
+
     updateArrayAlias();
   };
 
