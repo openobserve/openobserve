@@ -259,10 +259,8 @@ onMounted(async () => {
     suggestOnTriggerCharacters: false,
   });
   editorobj.onKeyUp((e: any) => {
-    if (editorobj.getValue() != "") {
-      editorData.value = editorobj.getValue();
-      formData.value.body = editorobj.getValue();
-    }
+    editorData.value = editorobj.getValue();
+    formData.value.body = editorobj.getValue();
   });
   editorobj.setValue(formData.value.body);
 });
