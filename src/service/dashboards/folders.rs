@@ -31,7 +31,8 @@ pub async fn save_folder(
     mut folder: Folder,
     is_internal: bool,
 ) -> Result<HttpResponse, Error> {
-    if folder.name.trim().is_empty() {
+    folder.name = folder.name.trim().to_string();
+    if folder.name.is_empty() {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::BAD_REQUEST.into(),
