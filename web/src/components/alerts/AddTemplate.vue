@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-input
               data-test="add-template-name-input"
               v-model="formData.name"
-              :label="t('alerts.name')"
+              :label="t('alerts.name') + ' *'"
               color="input-border"
               bg-color="input-bg"
               class="showLabelOnTop"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pb-sm text-bold"
               data-test="add-template-body-input-title"
             >
-              {{ t("alert_templates.body") }}
+              {{ t("alert_templates.body") + " *" }}
             </div>
             <div
               data-test="add-template-body-input"
