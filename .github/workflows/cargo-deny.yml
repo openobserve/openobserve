@@ -1,18 +1,17 @@
-name: "Cargo deny licenses checker"
+name: "Licenses checker"
 on:
-  pull_request_target:
-    types: [opened, reopened, synchronize]
+  push:
+    paths:
+      - "**/Cargo.lock"
+      - "**/Cargo.toml"
 
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: cargo-deny
-        # You may pin to the exact commit or the version.
-        # uses: EmbarkStudios/cargo-deny-action@1e59595bed8fc55c969333d08d7817b36888f0c5
-        uses: EmbarkStudios/cargo-deny-action@v1.5.5
+      - uses: actions/checkout@v3
+      - uses: EmbarkStudios/cargo-deny-action@v1.5.5
         with:
           # The command to run with cargo-deny
-          command: check
-          arguments: licenses
+          command: check licenses
