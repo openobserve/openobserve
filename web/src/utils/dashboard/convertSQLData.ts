@@ -1078,7 +1078,7 @@ export const convertSQLData = (
 
           data: [
             {
-              name: JSON.stringify(xAxisValue[index] || ""),
+              name: xAxisValue[index] ? JSON.stringify(xAxisValue[index]) : null,
               value: it,
               detail: {
                 formatter: function (value: any) {
