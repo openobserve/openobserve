@@ -280,21 +280,23 @@ fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
     None
 }
 
-fn check_memory_circuit_breaker(scan_stats: &ScanStats) -> Result<(), Error> {
+fn check_memory_circuit_breaker(session_id: &str, scan_stats: &ScanStats) -> Result<(), Error> {
     let scan_size = if scan_stats.compressed_size > 0 {
         scan_stats.compressed_size
     } else {
         scan_stats.original_size
     };
     if let Some(cur_memory) = memory_stats::memory_stats() {
-        if cur_memory.physical_mem as i64 + scan_size
-            > (CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100) as i64
+        if (CONFIG.limit.mem_total - cur_memory.physical_mem)
+            < (CONFIG.memory_cache.datafusion_max_size * CONFIG.common.memory_circuit_breaker_ratio
+            / 100)
         {
-            let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, larger than limit of [{} bytes] ",
+            let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, left memory {} bytes, less than limit of [{} bytes] ",
                               scan_size,
                               cur_memory.physical_mem,
-                              CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100);
-            log::warn!("{}", err);
+                              CONFIG.limit.mem_total - cur_memory.physical_mem,
+                              CONFIG.memory_cache.datafusion_max_size * CONFIG.common.memory_circuit_breaker_ratio / 100);
+            log::warn!("[{session_id}] {}", err);
             return Err(Error::Message(err.to_string()));
         }
     }
