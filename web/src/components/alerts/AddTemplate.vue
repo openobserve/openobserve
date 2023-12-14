@@ -159,12 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   onMounted,
-  computed,
   defineProps,
   onBeforeMount,
   onActivated,
   defineEmits,
-  nextTick,
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -292,7 +290,8 @@ const isTemplateBodyValid = () => {
 
 const router = useRouter();
 
-const isTemplateFilled = () => formData.value.name && formData.value.body;
+const isTemplateFilled = () =>
+  formData.value.name.trim() && formData.value.body.trim();
 
 const saveTemplate = () => {
   if (!isTemplateFilled()) {
@@ -318,7 +317,7 @@ const saveTemplate = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       template_name: formData.value.name,
       data: {
-        name: formData.value.name,
+        name: formData.value.name.trim(),
         body: formData.value.body,
       },
     })
