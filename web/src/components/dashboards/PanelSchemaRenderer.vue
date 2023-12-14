@@ -97,7 +97,7 @@ export default defineComponent({
       type: Object,
     },
   },
-  emits: ["updated:data-zoom", "error"],
+  emits: ["updated:data-zoom", "error", "metadata-update"],
   setup(props, { emit }) {
     const store = useStore();
 
