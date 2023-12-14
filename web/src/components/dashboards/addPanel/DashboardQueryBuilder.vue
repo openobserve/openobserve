@@ -1047,11 +1047,6 @@ export default defineComponent({
         }
 
           if (area === "f") {
-            $q.notify({
-              type: "negative",
-              message: "Dropping on filter is Disabled.",
-              timeout: 5000,
-            });
             return;
           }
 
