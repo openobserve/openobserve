@@ -184,8 +184,6 @@ export default defineComponent({
     // array of histogram fields
     let histogramFields: any = ref([]);
 
-    console.log(props.initialVariableValues, "initialVariableValues");
-
     watch(
       () => histogramInterval.value,
       () => {
