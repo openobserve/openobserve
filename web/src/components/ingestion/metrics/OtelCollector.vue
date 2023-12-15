@@ -58,7 +58,7 @@ const getOtelGrpcConfig = computed(() => {
   otlp/openobserve:
       endpoint: ${endpoint.value.host}:5081
       headers:
-        Authorization: "Basic ${accessKey.value}"
+        Authorization: "Basic [BASIC_PASSCODE]"
         organization: ${props.currOrgIdentifier}
         stream-name: default
       tls:
@@ -70,7 +70,7 @@ const getOtelHttpConfig = computed(() => {
   otlphttp/openobserve:
     endpoint: ${endpoint.value.url}/api/${props.currOrgIdentifier}/
     headers:
-      Authorization: Basic ${accessKey.value}
+      Authorization: Basic [BASIC_PASSCODE]
       stream-name: default`;
 });
 </script>
