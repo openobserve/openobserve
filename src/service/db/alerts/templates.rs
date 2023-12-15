@@ -15,6 +15,8 @@
 
 use std::sync::Arc;
 
+use itertools::Itertools;
+
 use crate::common::{
     infra::{config::ALERTS_TEMPLATES, db as infra_db},
     meta::{alerts::templates::Template, organization::DEFAULT_ORG},
@@ -70,6 +72,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, anyhow::Error> {
                 (k.starts_with(&format!("{org_id}/")) || k.starts_with(&format!("{DEFAULT_ORG}/")))
                     .then(|| template.value().clone())
             })
+            .sorted_by(|a, b| a.name.cmp(&b.name))
             .collect());
     }
 
