@@ -67,7 +67,10 @@
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
                 :selectedTimeDate="dashboardPanelData.meta.dateTime"
-                :initialVariableValues="initialVariableValues"
+                :initialVariableValues="initialVariableValues?.values?.reduce((initialObj: any, variable: any) => {
+                  initialObj[variable?.name] = variable?.value;
+                  return initialObj;
+                }, {})"
                 @variablesData="variablesDataUpdated"
               />
               <div style="flex: 1">
