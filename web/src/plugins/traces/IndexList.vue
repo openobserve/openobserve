@@ -304,9 +304,9 @@ export default defineComponent({
       }
 
       if (searchObj.data.editorValue && fieldValues.value[name].searchKeyword) {
-        query_context += ` AND ${name} ALIKE '%${fieldValues.value[name].searchKeyword}%'`;
-      } else {
-        query_context += ` WHERE ${name} ALIKE '%${fieldValues.value[name].searchKeyword}%'`;
+        query_context += ` AND ${name} ILIKE '%${fieldValues.value[name].searchKeyword}%'`;
+      } else if (fieldValues.value[name].searchKeyword) {
+        query_context += ` WHERE ${name} ILIKE '%${fieldValues.value[name].searchKeyword}%'`;
       }
 
       fieldValues.value[name]["isLoading"] = true;
@@ -483,6 +483,14 @@ export default defineComponent({
           ),
         ] || [];
 
+      if (expandedFilters.value.includes("operation_name")) {
+        getSpecialFieldsValues("operation_name");
+      }
+
+      if (expandedFilters.value.includes("service_name")) {
+        getSpecialFieldsValues("service_name");
+      }
+
       if (!fields.length) return;
 
       streamService
@@ -655,6 +663,7 @@ export default defineComponent({
       filtersMapper,
       handleFilterCreator,
       getFieldValues,
+      filterExpandedFieldValues,
     };
   },
 });

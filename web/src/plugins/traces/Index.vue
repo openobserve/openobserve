@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before v-if="searchObj.meta.showFields">
             <index-list
+              ref="indexListRef"
               data-test="logs-search-index-list"
               :key="searchObj.data.stream.streamLists"
             />
@@ -217,6 +218,7 @@ export default defineComponent({
       if (this.searchObj.loading == false) {
         this.searchObj.loading = true;
         this.searchObj.runQuery = true;
+        this.indexListRef.filterExpandedFieldValues();
       }
 
       if (config.isCloud == "true") {
@@ -264,6 +266,7 @@ export default defineComponent({
     const { showErrorNotification } = useNotifications();
     const serviceColorIndex = ref(0);
     const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
+    const indexListRef = ref(null);
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -1293,6 +1296,7 @@ export default defineComponent({
       fieldValues,
       onSplitterUpdate,
       refreshTimezone,
+      indexListRef,
     };
   },
   computed: {
