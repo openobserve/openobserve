@@ -667,11 +667,14 @@ export default defineComponent({
             ) {
               errors.push("Only one value field is allowed for gauge chart");
             }
+            // gauge can have zero or one label
             if (
               dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length != 1
+                .fields.x.length != 1 &&
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.x.length != 0
             ) {
-              errors.push(`Only one label field is allowed for gauge chart`);
+              errors.push(`At max only one label field is allowed for gauge chart`);
             }
 
             break;
