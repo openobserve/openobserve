@@ -660,6 +660,25 @@ export default defineComponent({
 
             break;
           }
+          case "gauge": {
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.y.length != 1
+            ) {
+              errors.push("Only one value field is allowed for gauge chart");
+            }
+            // gauge can have zero or one label
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.x.length != 1 &&
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.x.length != 0
+            ) {
+              errors.push(`At max only one label field is allowed for gauge chart`);
+            }
+
+            break;
+          }
           case "h-bar":
           case "area":
           case "line":
