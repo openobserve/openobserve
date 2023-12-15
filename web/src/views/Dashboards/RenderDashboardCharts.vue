@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ViewPanel
           :panelId="viewPanelId"
           :currentTimeObj="currentTimeObj"
-          :initialVariableValues="initialVariableValues"
+          :initialVariableValues="variablesData"
           @close-panel="() => (showViewPanel = false)"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
         />
