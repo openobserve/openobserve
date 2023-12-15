@@ -363,7 +363,8 @@ export default defineComponent({
 
     const updateFilterType = (value) => {
       if (value === "basic") {
-        showWarningDialog.value = true;
+        searchObj.meta.filterType = "basic";
+        searchObj.data.editorValue = searchObj.data.advanceFiltersQuery;
       } else {
         searchObj.meta.filterType = value;
       }
@@ -372,7 +373,6 @@ export default defineComponent({
     const changeToggle = () => {
       showWarningDialog.value = false;
       searchObj.meta.filterType = "basic";
-      searchObj.data.editorValue = searchObj.data.advanceFiltersQuery;
     };
 
     const resetFilters = () => {

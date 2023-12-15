@@ -738,7 +738,9 @@ export default defineComponent({
             durationFilter.min * 1000
           } AND duration <= ${durationFilter.max * 1000}`;
 
-        const filter = searchObj.data.editorValue + duration;
+        const filter = searchObj.data.editorValue.trim()?.length
+          ? searchObj.data.editorValue + " AND" + duration
+          : duration;
 
         searchService
           .get_traces({
