@@ -114,6 +114,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery &&
                       dashboardPanelData.data.queryType == 'sql'
                     "
+                    :draggable="true"
+                    @dragstart="
+                      onFieldDragStart(
+                        $event,
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields?.latitude.column,
+                        'latitude'
+                      )
+                    "
                   >
                     <SortByBtnGrp
                       :fieldObj="
@@ -251,6 +261,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery &&
                       dashboardPanelData.data.queryType == 'sql'
                     "
+                    :draggable="true"
+                    @dragstart="
+                      onFieldDragStart(
+                        $event,
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields?.longitude.column,
+                        'latitude'
+                      )
+                    "
                   >
                     <SortByBtnGrp
                       :fieldObj="
@@ -372,6 +392,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.layout.currentQueryIndex
                         ].customQuery
                       "
+                      :draggable="true"
+                      @dragstart="
+                        onFieldDragStart(
+                          $event,
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields?.weight.column,
+                          'weight'
+                        )
+                      "
                       class="q-mr-xs"
                       style="width: 160px"
                     >
@@ -422,6 +452,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
                       dashboardPanelData.data.queryType == 'sql'
+                    "
+                    :draggable="true"
+                    @dragstart="
+                      onFieldDragStart(
+                        $event,
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields?.weight.column,
+                        'weight'
+                      )
                     "
                   >
                     <SortByBtnGrp
@@ -550,6 +590,11 @@ export default defineComponent({
             }
           );
 
+        const customDragName =
+          dashboardPanelData.meta.stream.customQueryFields.find((item: any) => {
+            return item.name == dragItem;
+          });
+
         if (dragName) {
           const currentQueryField =
             dashboardPanelData.data.queries[
@@ -559,7 +604,7 @@ export default defineComponent({
           if (area == "latitude" && currentQueryField.latitude) {
             $q.notify({
               type: "negative",
-              message: "Max 1 field in 'latitude' is allowed.",
+              message: "Max 1 field in Latitude is allowed.",
               timeout: 5000,
             });
             return;
@@ -568,7 +613,7 @@ export default defineComponent({
           if (area == "longitude" && currentQueryField.longitude) {
             $q.notify({
               type: "negative",
-              message: "Max 1 field in 'longitude' is allowed.",
+              message: "Max 1 field in Longitude is allowed.",
               timeout: 5000,
             });
             return;
@@ -577,7 +622,7 @@ export default defineComponent({
           if (area == "weight" && currentQueryField.weight) {
             $q.notify({
               type: "negative",
-              message: "Max 1 field in 'weight' is allowed.",
+              message: "Max 1 field in Weight is allowed.",
               timeout: 5000,
             });
             return;
@@ -598,7 +643,54 @@ export default defineComponent({
           } else if (area == "weight") {
             addWeight(dragName);
           }
-        } else {
+        } else if (customDragName) {
+          const currentQueryField =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields;
+
+          if (area == "latitude" && currentQueryField.latitude) {
+            $q.notify({
+              type: "negative",
+              message: "Max 1 field in latitude is allowed.",
+              timeout: 5000,
+            });
+            return;
+          }
+
+          if (area == "longitude" && currentQueryField.longitude) {
+            $q.notify({
+              type: "negative",
+              message: "Max 1 field in longitude is allowed.",
+              timeout: 5000,
+            });
+            return;
+          }
+
+          if (area == "weight" && currentQueryField.weight) {
+            $q.notify({
+              type: "negative",
+              message: "Max 1 field in weight is allowed.",
+              timeout: 5000,
+            });
+            return;
+          }
+
+          if (onLeave.value == "latitude") {
+            removeLatitude();
+          } else if (onLeave.value == "longitude") {
+            removeLongitude();
+          } else if (onLeave.value == "weight") {
+            removeWeight();
+          }
+
+          if (area == "latitude") {
+            addLatitude(customDragName);
+          } else if (area == "longitude") {
+            addLongitude(customDragName);
+          } else if (area == "weight") {
+            addWeight(customDragName);
+          }
         }
         currentDragArea.value = "";
       }
