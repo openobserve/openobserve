@@ -84,11 +84,11 @@ const getConfig = async () => {
         service: config.ooService,
         env: config.environment,
         version: "0.0.1",
-        organizationIdentifier: "default",
+        organizationIdentifier: config.ooOrgIdentifier,
         insecureHTTP: false,
         apiVersion: "v1",
       };
-  
+
       openobserveRum.init({
         applicationId: options.applicationId, // required, any string identifying your application
         clientToken: options.clientToken,
@@ -103,7 +103,7 @@ const getConfig = async () => {
         apiVersion: options.apiVersion,
         insecureHTTP: options.insecureHTTP,
       });
-  
+
       openobserveLogs.init({
         clientToken: options.clientToken,
         site: options.site,
@@ -115,9 +115,9 @@ const getConfig = async () => {
         insecureHTTP: options.insecureHTTP,
         apiVersion: options.apiVersion,
       });
-  
+
       openobserveRum.startSessionReplayRecording();
-  
+
       datadogRum.init({
         applicationId: config.ddAPPID, // required, any string identifying your application
         clientToken: config.ddClientToken,
@@ -134,7 +134,7 @@ const getConfig = async () => {
         version: "v1",
         defaultPrivacyLevel: "allow",
       });
-  
+
       datadogLogs.init({
         clientToken: config.ddClientToken,
         site: config.ddSite,
@@ -142,7 +142,7 @@ const getConfig = async () => {
         sessionSampleRate: 100,
         version: "v1",
       });
-  
+
       datadogRum.startSessionReplayRecording();
     }
   });
