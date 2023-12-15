@@ -80,11 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="q-mx-lg q-mt-sm">Duration</div>
                   <div class="q-mx-lg q-pb-xs" style="margin: 0px 36px">
                     <q-range
-                      v-model="durationFilterValue"
-                      :min="duration.min"
-                      :max="duration.max"
-                      :marker-labels="fnMarkerLabel"
-                      markers
+                      v-model="duration.input"
+                      :min="duration.slider.min"
+                      :max="duration.slider.max"
                       label
                       switch-label-side
                     />
@@ -96,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <label>Min (in ms)</label>
                       <input
                         type="number"
-                        v-model="duration.min"
+                        v-model="duration.input.min"
                         aria-label="min"
                         style="width: 100px"
                       />
@@ -106,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <input
                         type="number"
                         aria-label="max"
-                        v-model="duration.max"
+                        v-model="duration.input.max"
                         style="width: 100px"
                       />
                     </div>
@@ -230,8 +228,14 @@ export default defineComponent({
     const filtersMapper: Ref<{ [key: string]: any }> = ref({});
 
     const duration = ref({
-      min: 0,
-      max: 100,
+      slider: {
+        min: 0,
+        max: 0,
+      },
+      input: {
+        min: 0,
+        max: 0,
+      },
     });
 
     const getSpecialFieldsValues = (
@@ -359,8 +363,6 @@ export default defineComponent({
       }
     };
 
-    const durationFilterValue = ref({ min: 0, max: 50 });
-
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
         streamOptions.value = searchObj.data.stream.streamLists;
@@ -409,12 +411,13 @@ export default defineComponent({
 
     const fnMarkerLabel = computed(() => {
       const markers = [];
-      const diffDuration = duration.value.max - duration.value.min;
+      const diffDuration =
+        duration.value.slider.max - duration.value.slider.min;
       const step = diffDuration / 4;
       for (let i = 0; i < 5; i++) {
         markers.push({
-          label: `${Math.round(duration.value.min + step * i)}ms`,
-          value: duration.value.min + step * i,
+          label: `${Math.round(duration.value.slider.min + step * i)}ms`,
+          value: duration.value.slider.min + step * i,
         });
       }
       return markers;
@@ -531,49 +534,6 @@ export default defineComponent({
         });
     };
 
-    const updateAdvanceFilters = ({
-      column,
-      values,
-      operator,
-    }: {
-      column: string;
-      values: string[];
-      operator?: "IN";
-    }) => {
-      const filters = searchObj.data.stream.filters.length;
-      const filterIndex = searchObj.data.stream.filters.findIndex(
-        (f: any) => f.field_name === column
-      );
-
-      if (!filters) {
-        searchObj.data.stream.filters.push({
-          field_name: column,
-          values,
-          operator: operator,
-        });
-      } else if (filters && filterIndex === -1) {
-        searchObj.data.stream.filters.push({
-          field_name: column,
-          values,
-          operator: operator,
-        });
-      }
-
-      if (filterIndex > -1) {
-        searchObj.data.stream.filters[filterIndex].values = values;
-      }
-
-      if (!filtersMapper.value[column]) {
-        filtersMapper.value[column] =
-          searchObj.data.stream.filters[
-            searchObj.data.stream.filters.length - 1
-          ];
-      } else {
-        filtersMapper.value[column].values =
-          searchObj.data.stream.filters[filterIndex].values;
-      }
-    };
-
     const removeCondition = (node: any, fieldName: string): any => {
       if (!node) return null;
 
@@ -605,19 +565,29 @@ export default defineComponent({
     const modifyWhereClause = (
       node: any,
       fieldName: string,
-      newValue: string[]
+      newValue: any[]
     ) => {
       if (!node) return;
 
       if (node.type === "binary_expr") {
         if (node.left.column === fieldName) {
           // Assuming the right side is a literal
-          node.right.value = newValue.map((value: string) => {
-            return {
-              type: "single_quote_string",
-              value: value,
-            };
-          });
+          if (fieldName === "duration" && node.operator === ">=") {
+            node.right.value = newValue[0]["min"];
+          }
+
+          if (fieldName === "duration" && node.operator === "<=") {
+            node.right.value = newValue[0]["max"];
+          }
+
+          if (node.operator === "IN") {
+            node.right.value = newValue.map((value: string) => {
+              return {
+                type: "single_quote_string",
+                value: value,
+              };
+            });
+          }
         }
       }
 
@@ -642,6 +612,49 @@ export default defineComponent({
       }
     };
 
+    // const getFullQuery = () => {
+    //   let query = "SELECT * FROM 'default'";
+    //   if (searchObj.data.editorValue)
+    //     return query + " WHERE " + searchObj.data.editorValue;
+    //   else return query;
+    // };
+
+    // const handleDuration = () => {
+    //   if (
+    //     searchObj.data.editorValue.indexOf("duration >=") > -1 &&
+    //     searchObj.data.editorValue.indexOf("duration <=") > -1
+    //   ) {
+    //     const parser = new Parser();
+
+    //     const parsedQuery = parser.astify(getFullQuery());
+    //     modifyWhereClause(parsedQuery.where, "duration", [
+    //       duration.value.input,
+    //     ]);
+
+    //     // Convert the AST back to SQL query
+    //     let modifiedQuery = parser.sqlify(parsedQuery);
+    //     if (modifiedQuery) {
+    //       searchObj.data.editorValue = (modifiedQuery.split("WHERE")[1] || "")
+    //         .replace(/`/g, "")
+    //         .trim();
+
+    //       // Saving query in this variable, as while switching back from advance to basic we don't have to recreate the query from filters
+    //       searchObj.data.advanceFiltersQuery = searchObj.data.editorValue;
+    //     }
+    //   } else {
+    //     if (searchObj.data.editorValue) {
+    //       searchObj.data.editorValue += ` AND duration >= ${duration.value.input.min} AND duration <= ${duration.value.input.max}`;
+    //     } else {
+    //       searchObj.data.editorValue += `duration >= ${duration.value.input.min} AND duration <= ${duration.value.input.max}`;
+    //     }
+    //   }
+    // };
+
+    // const handleSliderDuration = () => {
+    //   handleDuration();
+    //   handleDuration();
+    // };
+
     return {
       t,
       store,
@@ -656,7 +669,6 @@ export default defineComponent({
       addSearchTerm,
       fieldValues,
       outlinedAdd,
-      durationFilterValue,
       fnMarkerLabel,
       duration,
       updateQueryFilter,

@@ -257,7 +257,6 @@ export default defineComponent({
     const $q = useQuasar();
     const { t } = useI18n();
     const { searchObj, resetSearchObj } = useTraces();
-    let dismiss = null;
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -270,42 +269,6 @@ export default defineComponent({
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
-
-    function ErrorException(message) {
-      searchObj.loading = false;
-      // searchObj.data.errorMsg = message;
-      $q.notify({
-        type: "negative",
-        message: message,
-        timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
-
-    function Notify() {
-      return $q.notify({
-        type: "positive",
-        message: "Waiting for response...",
-        timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
 
     function getQueryTransform() {
       try {
@@ -767,12 +730,22 @@ export default defineComponent({
           });
         }
 
+        const durationFilter = indexListRef.value.duration.input;
+
+        let duration = "";
+        if (durationFilter.max)
+          duration += ` duration >= ${
+            durationFilter.min * 1000
+          } AND duration <= ${durationFilter.max * 1000}`;
+
+        const filter = searchObj.data.editorValue + duration;
+
         searchService
           .get_traces({
             org_identifier: searchObj.organizationIdetifier,
             start_time: queryReq.query.start_time,
             end_time: queryReq.query.end_time,
-            filter: searchObj.data.editorValue || "",
+            filter: filter || "",
             size: queryReq.query.size,
             from: queryReq.query.from,
           })
@@ -788,6 +761,8 @@ export default defineComponent({
                 hits: formattedHits,
               };
             }
+
+            updateDurationFilter();
 
             updateFieldValues(res.data.hits);
 
@@ -1275,6 +1250,27 @@ export default defineComponent({
       const parsedQuery = parser.astify(defaultQuery + query);
 
       restoreFiltersFromQuery(parsedQuery.where);
+    };
+
+    const updateDurationFilter = () => {
+      let min = 0;
+      let max = 0;
+
+      searchObj.data.queryResults.hits.forEach((result) => {
+        if (result.duration < min) min = result.duration;
+        if (result.duration > max) max = result.duration;
+      });
+
+      // Converting from nano to milli
+      min = Math.floor(min / 1000);
+
+      max = Math.ceil(max / 1000);
+
+      indexListRef.value.duration.slider.min = min;
+      indexListRef.value.duration.slider.max = max;
+
+      indexListRef.value.duration.input.min = min;
+      indexListRef.value.duration.input.max = max;
     };
 
     return {
