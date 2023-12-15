@@ -288,7 +288,7 @@ fn check_memory_circuit_breaker(session_id: &str, scan_stats: &ScanStats) -> Res
     };
     if let Some(cur_memory) = memory_stats::memory_stats() {
         if (CONFIG.limit.mem_total - cur_memory.physical_mem)
-            < (CONFIG.memory_cache.datafusion_max_size * CONFIG.common.memory_circuit_breaker_ratio
+            > (CONFIG.memory_cache.datafusion_max_size * CONFIG.common.memory_circuit_breaker_ratio
             / 100)
         {
             let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, left memory {} bytes, less than limit of [{} bytes] ",
