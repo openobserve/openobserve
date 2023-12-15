@@ -315,7 +315,7 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
-    const metaData = ref();
+    const metaData = ref(null);
     const showViewPanel = ref(false);
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
