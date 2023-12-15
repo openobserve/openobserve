@@ -45,6 +45,7 @@ const config = {
   ooClientToken: import.meta.env.VITE_OO_CLIENT_TOKEN,
   ooSite: import.meta.env.VITE_OO_SITE,
   ooService: import.meta.env.VITE_OO_SERVICE,
+  ooOrgIdentifier: import.meta.env.VITE_OO_ORG_IDENTIFIER,
   environment: import.meta.env.VITE_ENVIRONMENT,
   ddAPPID: import.meta.env.VITE_DD_APP_ID,
   ddClientToken: import.meta.env.VITE_DD_CLIENT_TOKEN,

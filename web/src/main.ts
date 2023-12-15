@@ -55,7 +55,7 @@ const getConfig = async () => {
   await configService.get_config().then((res: any) => {
     store.dispatch("setConfig", res.data);
     config.enableAnalytics = res.data.telemetry_enabled.toString();
-    if (res.data.telemetry_enabled == true) {
+    if (res.data.telemetry_enabled == true && config.isCloud == "true") {
       Sentry.init({
         app,
         dsn: config.sentryDSN,
@@ -75,6 +75,74 @@ const getConfig = async () => {
         // We recommend adjusting this value in production
         tracesSampleRate: 1.0,
       });
+
+      const options = {
+        clientToken: config.ooClientToken,
+        applicationId: config.ooApplicationID,
+        site: config.ooSite,
+        service: config.ooService,
+        env: config.environment,
+        version: "0.0.1",
+        organizationIdentifier: config.ooOrgIdentifier,
+        insecureHTTP: false,
+        apiVersion: "v1",
+      };
+
+      openobserveRum.init({
+        applicationId: options.applicationId, // required, any string identifying your application
+        clientToken: options.clientToken,
+        site: options.site,
+        organizationIdentifier: options.organizationIdentifier,
+        service: options.service,
+        env: options.env,
+        version: options.version,
+        trackResources: true,
+        trackLongTasks: true,
+        trackUserInteractions: true,
+        apiVersion: options.apiVersion,
+        insecureHTTP: options.insecureHTTP,
+      });
+
+      openobserveLogs.init({
+        clientToken: options.clientToken,
+        site: options.site,
+        organizationIdentifier: options.organizationIdentifier,
+        service: options.service,
+        env: options.env,
+        version: options.version,
+        forwardErrorsToLogs: true,
+        insecureHTTP: options.insecureHTTP,
+        apiVersion: options.apiVersion,
+      });
+
+      openobserveRum.startSessionReplayRecording();
+
+      datadogRum.init({
+        applicationId: config.ddAPPID, // required, any string identifying your application
+        clientToken: config.ddClientToken,
+        site: config.ddSite,
+        service: "openobserve",
+        // service: "my-web-application",
+        // env: "production",
+        // version: "1.0.0",
+        sessionSampleRate: 100,
+        sessionReplaySampleRate: 100, // if not included, the default is 100
+        trackResources: true,
+        trackLongTasks: true,
+        trackUserInteractions: true,
+        version: "v1",
+        defaultPrivacyLevel: "allow",
+      });
+
+      datadogLogs.init({
+        clientToken: config.ddClientToken,
+        site: config.ddSite,
+        forwardErrorsToLogs: true,
+        sessionSampleRate: 100,
+        version: "v1",
+      });
+
+      datadogRum.startSessionReplayRecording();
     }
 
     const options = {
