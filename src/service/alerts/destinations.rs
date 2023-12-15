@@ -37,7 +37,7 @@ pub async fn save(
             destination.template
         ));
     }
-    destination.name = name.trim().to_string();
+    destination.name = name.to_string();
     if destination.name.is_empty() {
         return Err(anyhow::anyhow!("Alert destination name is required"));
     }

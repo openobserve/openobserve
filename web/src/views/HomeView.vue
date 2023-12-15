@@ -101,20 +101,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             no-caps
             color="primary"
-            @click="() => $router.push('/ingestion/logs/fluentbit')"
+            @click="() => $router.push({ name: 'ingestion' })"
             flat
             >{{ t("home.findIngestion") }}
           </q-btn>
         </q-card-actions>
-      </q-card>
-
-      <q-card v-if="isCloud === 'true'" class="my-card">
-        <q-card-section align="center" flat bordered class="my-card">
-          <div class="text-h6">{{ t("home.inestedInSearch") }}</div>
-          <div class="text-subtitle1">{{ t("home.searchInDemoOrg") }}</div>
-        </q-card-section>
-
-        <q-separator />
       </q-card>
     </div>
     <div class="row justify-center items-center">

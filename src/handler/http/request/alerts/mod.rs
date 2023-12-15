@@ -62,15 +62,8 @@ pub async fn save_alert(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::save(
-        &org_id,
-        stream_type,
-        &stream_name,
-        &name,
-        alert.into_inner(),
-    )
-    .await
-    {
+    let name = name.trim();
+    match alerts::save(&org_id, stream_type, &stream_name, name, alert.into_inner()).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }

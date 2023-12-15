@@ -24,7 +24,7 @@ pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<()
     if template.body.is_null() || template.body.as_str().unwrap_or_default().is_empty() {
         return Err(anyhow::anyhow!("Alert template body empty"));
     }
-    template.name = name.trim().to_string();
+    template.name = name.to_string();
     if template.name.is_empty() {
         return Err(anyhow::anyhow!("Alert template name is required"));
     }
