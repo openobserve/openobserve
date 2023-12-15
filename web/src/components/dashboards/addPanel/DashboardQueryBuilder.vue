@@ -1358,6 +1358,8 @@ export default defineComponent({
           return t("dashboard.twoFieldsMessage");
         case "heatmap":
           return t("dashboard.oneFieldMessage");
+        case "gauge":
+          return "Add 0 or 1 label field here";
         default:
           return t("dashboard.maxtwofieldMessage");
       }
@@ -1367,6 +1369,7 @@ export default defineComponent({
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
+        case "gauge":
           return t("dashboard.oneValueFieldMessage");
         case "metric":
           return t("dashboard.oneValueFieldMessage");
