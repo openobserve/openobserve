@@ -493,7 +493,10 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  // promql query will be always timeseries
+  // allowed to zoom, only if timeseries
+  options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
+
+  // promql query will be always timeseries except gauge and metric text chart.
   return {
     options,
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },

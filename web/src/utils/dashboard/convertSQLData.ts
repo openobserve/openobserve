@@ -1390,6 +1390,9 @@ export const convertSQLData = (
     }
   }
 
+  // allowed to zoom, only if timeseries
+  options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
+
   return {
     options,
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
