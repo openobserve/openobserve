@@ -7,7 +7,7 @@
     v-model:model-value="_isOpen"
     expand-icon-class="field-expansion-icon"
     expand-icon="expand_more"
-    @before-show="(event: any) => openFilterCreator(event, row)"
+    @before-show="(event: any) => openFilterCreator()"
     @before-hide="(event: any) => closeFilterCreator()"
   >
     <template v-slot:header>
@@ -38,7 +38,7 @@
           >
             No values found
           </div>
-          <div v-for="value in values || []" :key="value.key">
+          <div v-for="value in (values as any[])" :key="value.key">
             <q-list dense>
               <q-item tag="label" class="q-pr-none">
                 <div
@@ -50,7 +50,7 @@
                     v-model="_selectedValues"
                     :val="value.key"
                     class="filter-check-box cursor-pointer"
-                    @update:model-value="processValues(value.key)"
+                    @update:model-value="processValues()"
                   />
                   <div
                     :title="value.key"

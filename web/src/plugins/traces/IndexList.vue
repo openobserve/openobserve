@@ -278,12 +278,12 @@ export default defineComponent({
                 };
               }) || [];
 
-          fieldValues.value[name].selectedValues.forEach((value) => {
+          fieldValues.value[name].selectedValues.forEach((value: string) => {
             if (values.has(value)) return;
             else
-              fieldValues.value[name]["values"].unshift({
+              fieldValues.value[name].values.unshift({
                 key: value,
-                count: 0,
+                count: "0",
               });
           });
         })
@@ -342,12 +342,12 @@ export default defineComponent({
                   };
                 }) || [];
 
-            fieldValues.value[name].selectedValues.forEach((value) => {
+            fieldValues.value[name].selectedValues.forEach((value: string) => {
               if (values.has(value)) return;
               else
                 fieldValues.value[name]["values"].unshift({
                   key: value,
-                  count: 0,
+                  count: "0",
                 });
             });
           })
@@ -444,7 +444,7 @@ export default defineComponent({
 
       query += " WHERE " + searchObj.data.editorValue;
 
-      const parsedQuery = parser.astify(query);
+      const parsedQuery: any = parser.astify(query);
 
       if (!values.length) {
         parsedQuery.where = removeCondition(parsedQuery.where, column);

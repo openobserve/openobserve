@@ -90,7 +90,7 @@ const defaultObject = {
         [key: string | number]: {
           isLoading: boolean;
           values: { key: string; count: string }[];
-          selectedValues: { key: string; count: string }[];
+          selectedValues: string[];
           size: number;
           isOpen: boolean;
           searchKeyword: string;
