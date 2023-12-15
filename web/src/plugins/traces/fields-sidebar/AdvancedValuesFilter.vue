@@ -125,6 +125,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  searchKeyword: {
+    type: String,
+    default: "",
+  },
 });
 
 watch(
@@ -150,23 +154,26 @@ const _isOpen = ref(props.filter.isOpen);
 
 const valuesSize = ref(4);
 
-const emits = defineEmits(["update:selectedValues", "update:isOpen"]);
+const emits = defineEmits([
+  "update:selectedValues",
+  "update:isOpen",
+  "update:searchKeyword",
+]);
 
 const onSearchValue = () => {
   debouncedOpenFilterCreator();
 };
 
 const debouncedOpenFilterCreator = debounce(() => {
-  openFilterCreator(null, props.row);
+  emits("update:searchKeyword", searchValue);
 }, 400);
 
 const fetchMoreValues = () => {
   valuesSize.value = valuesSize.value * 2;
-  openFilterCreator(null, props.row);
+  openFilterCreator();
 };
 
 const processValues = () => {
-  console.log(cloneDeep(_selectedValues));
   emits(
     "update:selectedValues",
     _selectedValues.value,
@@ -178,14 +185,8 @@ const closeFilterCreator = () => {
   emits("update:isOpen", false);
 };
 
-const openFilterCreator = (event: any, { name, ftsKey }: any) => {
-  if (ftsKey) {
-    event.stopPropagation();
-    event.preventDefault();
-    return;
-  }
-
-  emits("update:isOpen", true);
+const openFilterCreator = () => {
+  emits("update:isOpen", true, props.row.name);
 };
 </script>
 

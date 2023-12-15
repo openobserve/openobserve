@@ -368,6 +368,16 @@ export default defineComponent({
                 data: [],
               };
             }
+
+            extractFields();
+
+            if (
+              searchObj.data.editorValue &&
+              searchObj.data.stream.selectedStreamFields.length
+            )
+              nextTick(() => {
+                restoreFilters(searchObj.data.editorValue);
+              });
           })
           .catch((e) => {
             searchObj.loading = false;
@@ -583,7 +593,6 @@ export default defineComponent({
         updateUrlQueryParams();
         return req;
       } catch (e) {
-        console.log(e);
         searchObj.loading = false;
         showErrorNotification("Invalid SQL Syntax");
       }
@@ -778,10 +787,9 @@ export default defineComponent({
             }
 
             updateFieldValues(res.data.hits);
-            //extract fields from query response
-            extractFields();
 
             generateHistogramData();
+
             //update grid columns
             updateGridColumns();
 
@@ -863,31 +871,17 @@ export default defineComponent({
       try {
         searchObj.data.stream.selectedStreamFields = [];
         if (searchObj.data.streamResults.list.length > 0) {
-          const queryResult = [];
-          const tempFieldsName = [];
+          const schema = [];
           const ignoreFields = [store.state.zoConfig.timestamp_column];
           let ftsKeys;
 
           searchObj.data.streamResults.list.forEach((stream: any) => {
             if (searchObj.data.stream.selectedStream.value == stream.name) {
-              queryResult.push(...stream.schema);
+              schema.push(...stream.schema);
               ftsKeys = new Set([...stream.settings.full_text_search_keys]);
             }
           });
 
-          queryResult.forEach((field: any) => {
-            tempFieldsName.push(field.name);
-          });
-
-          if (searchObj.data.queryResults.hits.length > 0) {
-            let firstRecord = searchObj.data.queryResults.hits[0];
-
-            Object.keys(firstRecord).forEach((key) => {
-              if (!tempFieldsName.includes(key)) {
-                queryResult.push({ name: key, type: "Utf8" });
-              }
-            });
-          }
           const idFields = {
             trace_id: 1,
             span_id: 1,
@@ -919,7 +913,7 @@ export default defineComponent({
             }
           });
 
-          queryResult.forEach((row: any) => {
+          schema.forEach((row: any) => {
             // let keys = deepKeys(row);
             // for (let i in row) {
             if (
@@ -939,7 +933,7 @@ export default defineComponent({
         }
       } catch (e) {
         searchObj.loading = false;
-        console.log("Error while extracting fields");
+        console.log("Error while extracting fields", e);
       }
     }
 
@@ -1206,6 +1200,10 @@ export default defineComponent({
       if (queryParams.query) {
         searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
       }
+
+      if (queryParams.filter_type) {
+        searchObj.meta.filterType = queryParams.filter_type;
+      }
     }
 
     function updateUrlQueryParams() {
@@ -1220,6 +1218,8 @@ export default defineComponent({
       }
 
       query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
+
+      query["filter_type"] = searchObj.meta.filterType;
 
       query["org_identifier"] = store.state.selectedOrganization.identifier;
 
@@ -1236,6 +1236,42 @@ export default defineComponent({
       updateGridColumns();
       generateHistogramData();
       searchResultRef.value.reDrawChart();
+    };
+
+    const restoreFiltersFromQuery = (node: any) => {
+      if (!node) return;
+      if (node.type === "binary_expr") {
+        if (node.left.column) {
+          let values = [];
+          if (node.operator === "IN") {
+            values = node.right.value.map(
+              (_value: { value: string }) => _value.value
+            );
+          }
+          searchObj.data.stream.fieldValues[node.left.column].selectedValues =
+            values;
+        }
+      }
+
+      // Recurse through AND/OR expressions
+      if (
+        node.type === "binary_expr" &&
+        (node.operator === "AND" || node.operator === "OR")
+      ) {
+        restoreFiltersFromQuery(node.left);
+        restoreFiltersFromQuery(node.right);
+      }
+    };
+
+    const restoreFilters = (query: string) => {
+      // const filters = searchObj.data.stream.filters;
+      const parser = new Parser();
+
+      const defaultQuery = "SELECT * FROM 'default' WHERE ";
+
+      const parsedQuery = parser.astify(defaultQuery + query);
+
+      restoreFiltersFromQuery(parsedQuery.where);
     };
 
     return {

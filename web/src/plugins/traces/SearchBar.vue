@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 },
               },
             ]"
-            active-tab="searchObj.meta.filterType"
+            :active-tab="searchObj.meta.filterType"
             @update:active-tab="updateFilterType"
           />
         </div>

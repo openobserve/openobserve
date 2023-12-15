@@ -120,6 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model:selectedValues="
                       fieldValues[props.row.name].selectedValues
                     "
+                    v-model:searchKeyword="
+                      fieldValues[props.row.name].searchKeyword
+                    "
                     :filter="fieldValues[props.row.name]"
                     @update:is-open="
                       (isOpen) => handleFilterCreator(isOpen, props.row.name)
@@ -128,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (currValue, prevValue) =>
                         updateQueryFilter(props.row.name, currValue, prevValue)
                     "
+                    @update:search-keyword="getFieldValues(props.row.name)"
                   />
                 </template>
                 <template v-else>
@@ -207,6 +211,7 @@ export default defineComponent({
                   selectedValues: [],
                   isOpen: false,
                   size: valuesSize,
+                  searchKeyword: "",
                 };
               }
             }
@@ -239,9 +244,9 @@ export default defineComponent({
         fieldValues.value["service_name"].selectedValues.length
       ) {
         const values = fieldValues.value["service_name"].selectedValues
-          .map((value) => "'" + value + "'")
+          .map((value) => value)
           .join(",");
-        filter += `service_name IN (${values})`;
+        filter += `service_name=${values}`;
       }
 
       streamService
@@ -254,20 +259,31 @@ export default defineComponent({
           size: fieldValues.value[name].size,
           type: "traces",
           filter,
+          keyword: fieldValues.value[name].searchKeyword,
         })
         .then((res: any) => {
-          if (res.data.hits.length) {
-            fieldValues.value[name]["values"] = res.data.hits
+          const values: any = new Set([]);
+          fieldValues.value[name]["values"] =
+            res.data.hits
               .find((field: any) => field.field === name)
-              .values.map((value: any) => {
+              ?.values.map((value: any) => {
+                values.add(value.zo_sql_key);
                 return {
                   key: value.zo_sql_key ? value.zo_sql_key : "null",
                   count: formatLargeNumber(value.zo_sql_num),
                 };
+              }) || [];
+
+          fieldValues.value[name].selectedValues.forEach((value) => {
+            if (values.has(value)) return;
+            else
+              fieldValues.value[name]["values"].unshift({
+                key: value,
+                count: 0,
               });
-          }
+          });
         })
-        .catch(() => {
+        .catch((e) => {
           $q.notify({
             type: "negative",
             message: `Error while fetching values for ${name}`,
@@ -278,19 +294,19 @@ export default defineComponent({
         });
     };
 
-    const getFieldValues = (event: any, { name, ftsKey }: any) => {
-      if (ftsKey) {
-        event.stopPropagation();
-        event.preventDefault();
-        return;
-      }
-
+    const getFieldValues = (name: string) => {
       fieldValues.value[name].size *= 2;
 
       let query_context = "SELECT * FROM 'default'";
 
       if (searchObj.data.editorValue) {
         query_context += " WHERE " + searchObj.data.editorValue;
+      }
+
+      if (searchObj.data.editorValue && fieldValues.value[name].searchKeyword) {
+        query_context += ` AND ${name} ALIKE '%${fieldValues.value[name].searchKeyword}%'`;
+      } else {
+        query_context += ` WHERE ${name} ALIKE '%${fieldValues.value[name].searchKeyword}%'`;
       }
 
       fieldValues.value[name]["isLoading"] = true;
@@ -310,16 +326,26 @@ export default defineComponent({
             query_context: b64EncodeUnicode(query_context),
           })
           .then((res: any) => {
-            if (res.data.hits.length) {
-              fieldValues.value[name]["values"] = res.data.hits
+            const values: any = new Set([]);
+
+            fieldValues.value[name]["values"] =
+              res.data.hits
                 .find((field: any) => field.field === name)
-                .values.map((value: any) => {
+                ?.values.map((value: any) => {
                   return {
                     key: value.zo_sql_key ? value.zo_sql_key : "null",
                     count: formatLargeNumber(value.zo_sql_num),
                   };
+                }) || [];
+
+            fieldValues.value[name].selectedValues.forEach((value) => {
+              if (values.has(value)) return;
+              else
+                fieldValues.value[name]["values"].unshift({
+                  key: value,
+                  count: 0,
                 });
-            }
+            });
           })
           .catch(() => {
             $q.notify({
@@ -466,15 +492,16 @@ export default defineComponent({
           start_time: searchObj.data.datetime.startTime,
           end_time: searchObj.data.datetime.endTime,
           fields,
-          size: Math.max(
-            ...expandedFilters.value.map(
-              (filter) => fieldValues.value[filter].size
-            )
-          ),
+          size: 10,
           type: "traces",
           query_context: b64EncodeUnicode(query_context),
         })
         .then((res: any) => {
+          fields.forEach((field) => {
+            fieldValues.value[field]["values"] = [];
+            fieldValues.value[field].size = 10;
+          });
+
           if (res.data.hits.length) {
             res.data.hits.forEach((field: { field: string; values: any[] }) => {
               fieldValues.value[field.field]["values"] = field.values.map(
@@ -596,51 +623,10 @@ export default defineComponent({
       }
     };
 
-    const restoreFiltersFromQuery = (node: any, filters: any[]) => {
-      if (!node) return;
-      if (node.type === "binary_expr") {
-        if (node.left.column) {
-          let values = [];
-          if (node.operator === "IN") {
-            values = node.right.value.map(
-              (_value: { value: string }) => _value.value
-            );
-          }
-          filters.push({
-            field_name: node.left.column,
-            values,
-            operator: node.operator,
-          });
-        }
-      }
-
-      // Recurse through AND/OR expressions
-      if (
-        node.type === "binary_expr" &&
-        (node.operator === "AND" || node.operator === "OR")
-      ) {
-        restoreFiltersFromQuery(node.left, filters);
-        restoreFiltersFromQuery(node.right, filters);
-      }
-    };
-
-    const restoreFilters = () => {
-      const filters = searchObj.data.stream.filters;
-
-      // const filters = searchObj.data.stream.filters;
-      const parser = new Parser();
-      const sql =
-        "SELECT * FROM `default` WHERE `operation_name` IN ('GetUser', 'GetHobbies', 'GetHobbiesCall', '/') AND service_name IN ('otel1-gin-gonic')";
-
-      const parsedQuery = parser.astify(sql);
-
-      restoreFiltersFromQuery(parsedQuery.where, filters);
-    };
-
     const handleFilterCreator = (show: boolean, columnName: string) => {
       if (show) {
         expandedFilters.value.push(columnName);
-        getFieldValues(null, { name: columnName });
+        getFieldValues(columnName);
       } else {
         expandedFilters.value = expandedFilters.value.filter(
           (_column) => _column !== columnName
@@ -668,6 +654,7 @@ export default defineComponent({
       updateQueryFilter,
       filtersMapper,
       handleFilterCreator,
+      getFieldValues,
     };
   },
 });

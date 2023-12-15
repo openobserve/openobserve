@@ -56,7 +56,7 @@ const defaultObject = {
     showDetailTab: false,
     showTraceDetails: false,
     sqlMode: false,
-    filterType: "advance",
+    filterType: "basic",
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
@@ -93,6 +93,7 @@ const defaultObject = {
           selectedValues: { key: string; count: string }[];
           size: number;
           isOpen: boolean;
+          searchKeyword: string;
         };
       },
     },
