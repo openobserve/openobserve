@@ -235,7 +235,11 @@ export const convertSQLData = (
       },
       formatter: function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
-        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+        if (
+          hoveredSeriesState?.value &&
+          hoveredSeriesState?.value?.panelId != panelSchema.id
+        )
+          return "";
         if (name.length == 0) return "";
 
         // get the current series index from name
@@ -375,10 +379,10 @@ export const convertSQLData = (
       tooltip: {
         show: false,
       },
-      itemSize:0,
-      itemGap:0,
+      itemSize: 0,
+      itemGap: 0,
       // it is used to hide toolbox buttons
-      bottom:"100%",
+      bottom: "100%",
       feature: {
         dataZoom: {
           yAxisIndex: "none",
@@ -488,7 +492,11 @@ export const convertSQLData = (
       } else {
         options.tooltip.formatter = function (name: any) {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+          if (
+            hoveredSeriesState?.value &&
+            hoveredSeriesState?.value?.panelId != panelSchema.id
+          )
+            return "";
           if (name.length == 0) return "";
 
           // get the current series index from name
@@ -610,7 +618,11 @@ export const convertSQLData = (
             : "rgba(255,255,255,1)",
         formatter: function (name: any) {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+          if (
+            hoveredSeriesState?.value &&
+            hoveredSeriesState?.value?.panelId != panelSchema.id
+          )
+            return "";
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
               name.value,
@@ -654,7 +666,11 @@ export const convertSQLData = (
             : "rgba(255,255,255,1)",
         formatter: function (name: any) {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+          if (
+            hoveredSeriesState?.value &&
+            hoveredSeriesState?.value?.panelId != panelSchema.id
+          )
+            return "";
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
               name.value,
@@ -817,7 +833,11 @@ export const convertSQLData = (
             : "rgba(255,255,255,1)",
         formatter: (params: any) => {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+          if (
+            hoveredSeriesState?.value &&
+            hoveredSeriesState?.value?.panelId != panelSchema.id
+          )
+            return "";
           // we have value[1] which return yaxis index
           // it is used to get y axis data
           return `${
@@ -1171,7 +1191,11 @@ export const convertSQLData = (
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
-        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+        if (
+          hoveredSeriesState?.value &&
+          hoveredSeriesState?.value?.panelId != panelSchema.id
+        )
+          return "";
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
@@ -1287,7 +1311,11 @@ export const convertSQLData = (
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
-        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+        if (
+          hoveredSeriesState?.value &&
+          hoveredSeriesState?.value?.panelId != panelSchema.id
+        )
+          return "";
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);

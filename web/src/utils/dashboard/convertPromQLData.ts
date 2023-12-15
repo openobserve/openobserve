@@ -125,7 +125,11 @@ export const convertPromQLData = (
       extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       formatter: function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
-        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+        if (
+          hoveredSeriesState?.value &&
+          hoveredSeriesState?.value?.panelId != panelSchema.id
+        )
+          return "";
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
@@ -213,10 +217,10 @@ export const convertPromQLData = (
       tooltip: {
         show: false,
       },
-      itemSize:0,
-      itemGap:0,
+      itemSize: 0,
+      itemGap: 0,
       // it is used to hide toolbox buttons
-      bottom:"100%",
+      bottom: "100%",
       feature: {
         dataZoom: {
           filterMode: "none",
