@@ -100,6 +100,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.layout.currentQueryIndex
                         ].customQuery
                       "
+                      :draggable="true"
+                      @dragstart="onFieldDragStart($event, itemX, 'x', index)"
+                      @dragover="
+                        onFieldDragOver(
+                          $event,
+                          'x',
+                          index,
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.x
+                        )
+                      "
+                      @drop="onFieldDrop('x', index)"
+                      @dragend="onFieldDragEnd"
                       class="q-mr-xs q-mb-sm"
                     >
                       <q-select
@@ -297,6 +311,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.layout.currentQueryIndex
                         ].customQuery
                       "
+                      :draggable="true"
+                      @dragstart="onFieldDragStart($event, itemY, 'y', index)"
+                      @dragover="
+                        onFieldDragOver(
+                          $event,
+                          'y',
+                          index,
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.y
+                        )
+                      "
+                      @drop="onFieldDrop('y', index)"
+                      @dragend="onFieldDragEnd"
                       class="q-mr-xs"
                       style="width: 160px"
                     >
@@ -507,6 +535,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].customQuery
                         "
+                        :draggable="true"
+                        @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
+                        @dragover="
+                          onFieldDragOver(
+                            $event,
+                            'z',
+                            index,
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.z
+                          )
+                        "
+                        @drop="onFieldDrop('z', index)"
+                        @dragend="onFieldDragEnd"
                         class="q-mr-xs"
                         style="width: 160px"
                       >
@@ -967,6 +1009,11 @@ export default defineComponent({
             }
           );
 
+        const customDragName =
+          dashboardPanelData.meta.stream.customQueryFields.find((item: any) => {
+            return item.name == dragItem.column;
+          });
+
         if (dragName) {
           const axisArray = getAxisArray(area);
 
@@ -1003,7 +1050,7 @@ export default defineComponent({
                   maxAllowedXAxisFields = 2;
               }
 
-              const errorMessage = `Max ${maxAllowedXAxisFields} field(s) in 'x' axis is allowed.`;
+              const errorMessage = `Max ${maxAllowedXAxisFields} field(s) in X-Axis is allowed.`;
 
               $q.notify({
                 type: "negative",
@@ -1030,7 +1077,7 @@ export default defineComponent({
                   maxAllowedYAxisFields = 0;
               }
 
-              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in 'y' axis is allowed.`;
+              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in Y-Axis is allowed.`;
 
               $q.notify({
                 type: "negative",
@@ -1051,7 +1098,7 @@ export default defineComponent({
                   maxAllowedYAxisFields = 0;
               }
 
-              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in 'z' axis is allowed.`;
+              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in Z-Axis is allowed.`;
 
               $q.notify({
                 type: "negative",
@@ -1083,7 +1130,122 @@ export default defineComponent({
           } else if (area == "z") {
             addZAxisItem(dragName);
           }
-        } else {
+        } else if (customDragName) {
+          const axisArray = getAxisArray(area);
+
+          const duplicateName = axisArray.some((item: any) => {
+            return item.column === customDragName.name;
+          });
+
+          if (duplicateName) {
+            const errorMessage = `Field '${customDragName.name}' already exists in '${area}' axis.`;
+            $q.notify({
+              type: "negative",
+              message: errorMessage,
+              timeout: 5000,
+            });
+            return;
+          }
+
+          if (area !== "f") {
+            if (area === "x" && isAddXAxisNotAllowed.value) {
+              let maxAllowedXAxisFields;
+
+              switch (dashboardPanelData.data.type) {
+                case "pie":
+                case "donut":
+                case "heatmap":
+                  maxAllowedXAxisFields = 1;
+                  break;
+                case "metric":
+                  maxAllowedXAxisFields = 0;
+                  break;
+                case "table":
+                  break;
+                default:
+                  maxAllowedXAxisFields = 2;
+              }
+
+              const errorMessage = `Max ${maxAllowedXAxisFields} field(s) in X-Axis is allowed.`;
+
+              $q.notify({
+                type: "negative",
+                message: `${errorMessage}`,
+                timeout: 5000,
+              });
+              return;
+            }
+
+            if (area === "y" && isAddYAxisNotAllowed.value) {
+              let maxAllowedYAxisFields;
+
+              switch (dashboardPanelData.data.type) {
+                case "pie":
+                case "donut":
+                case "metric":
+                case "area-stacked":
+                case "stacked":
+                case "heatmap":
+                case "h-stacked":
+                  maxAllowedYAxisFields = 1;
+                  break;
+                default:
+                  maxAllowedYAxisFields = 0;
+              }
+
+              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in Y-Axis is allowed.`;
+
+              $q.notify({
+                type: "negative",
+                message: ` ${errorMessage}`,
+                timeout: 5000,
+              });
+              return;
+            }
+
+            if (area === "z" && isAddZAxisNotAllowed.value) {
+              let maxAllowedYAxisFields;
+
+              switch (dashboardPanelData.data.type) {
+                case "heatmap":
+                  maxAllowedYAxisFields = 1;
+                  break;
+                default:
+                  maxAllowedYAxisFields = 0;
+              }
+
+              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in Z-Axis is allowed.`;
+
+              $q.notify({
+                type: "negative",
+                message: `${errorMessage}`,
+                timeout: 5000,
+              });
+              return;
+            }
+
+            // Remove from the original axis
+            if (onLeave.value == "x") {
+              removeXAxisItem(customDragName.name);
+            } else if (onLeave.value == "y") {
+              removeYAxisItem(customDragName.name);
+            } else if (onLeave.value == "z") {
+              removeZAxisItem(customDragName.name);
+            }
+          }
+
+          if (area === "f") {
+            return;
+          }
+
+          // Add to the new axis
+          if (area == "x") {
+            addXAxisItem(customDragName);
+          } else if (area == "y") {
+            addYAxisItem(customDragName);
+          } else if (area == "z") {
+            addZAxisItem(customDragName);
+          }
         }
         currentDragArea.value = "";
       }
