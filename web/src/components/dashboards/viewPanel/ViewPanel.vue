@@ -67,10 +67,7 @@
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
                 :selectedTimeDate="dashboardPanelData.meta.dateTime"
-                :initialVariableValues="initialVariableValues?.values?.reduce((initialObj: any, variable: any) => {
-                  initialObj[variable?.name] = variable?.value;
-                  return initialObj;
-                }, {})"
+                :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
               />
               <div style="flex: 1">
@@ -376,6 +373,29 @@ export default defineComponent({
       errorList.splice(0);
       errorList.push(errorMessage);
     };
+
+    const getInitialVariablesData = () => {
+      const variableObj: any = {};
+      props?.initialVariableValues?.values?.forEach((variable: any) => {
+        if (variable.type === "dynamic_filters") {
+          const filters = (variable.value || []).filter(
+            (item: any) => item.name && item.operator && item.value
+          );
+          const encodedFilters = filters.map((item: any) => ({
+            name: item.name,
+            operator: item.operator,
+            value: item.value,
+          }));
+          variableObj[`${variable.name}`] = encodeURIComponent(
+            JSON.stringify(encodedFilters)
+          );
+        } else {
+          variableObj[`${variable.name}`] = variable.value;
+        }
+        return variableObj;
+      });
+    };
+
     return {
       t,
       updateDateTime,
@@ -396,6 +416,7 @@ export default defineComponent({
       histogramInterval,
       histogramFields,
       onDataZoom,
+      getInitialVariablesData,
     };
   },
 });
