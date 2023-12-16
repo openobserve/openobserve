@@ -86,11 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               :label="xLabel[index]"
               class="q-pl-sm"
-              :data-test="`dashboard-x-item-${itemX.column}`"
+              :data-test="`dashboard-x-item-${itemX?.column}`"
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-x-item-${itemX.column}-menu`"
+                :data-test="`dashboard-x-item-${itemX?.column}-menu`"
               >
                 <div>
                   <div class="">
@@ -207,8 +207,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-x-item-${itemX.column}-remove`"
-              @click="removeXAxisItem(itemX.column)"
+              :data-test="`dashboard-x-item-${itemX?.column}-remove`"
+              @click="removeXAxisItem(itemX?.column)"
               icon="close"
             />
           </div>
@@ -296,12 +296,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               square
               size="sm"
               :label="yLabel[index]"
-              :data-test="`dashboard-y-item-${itemY.column}`"
+              :data-test="`dashboard-y-item-${itemY?.column}`"
               class="q-pl-sm"
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-y-item-${itemY.column}-menu`"
+                :data-test="`dashboard-y-item-${itemY?.column}-menu`"
               >
                 <div>
                   <div class="row q-mb-sm" style="align-items: center">
@@ -441,8 +441,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-y-item-${itemY.column}-remove`"
-              @click="removeYAxisItem(itemY.column)"
+              :data-test="`dashboard-y-item-${itemY?.column}-remove`"
+              @click="removeYAxisItem(itemY?.column)"
               icon="close"
             />
           </div>
@@ -618,7 +618,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="height: 100%"
                 size="xs"
                 dense
-                @click="removeZAxisItem(itemZ.column)"
+                @click="removeZAxisItem(itemZ?.column)"
                 icon="close"
               />
             </div>
@@ -1395,13 +1395,13 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
-        return field.column;
+        return field?.column;
       }
-      if (field.aggregationFunction) {
-        const aggregation = field.aggregationFunction.toUpperCase();
-        return `${aggregation}(${field.column})`;
+      if (field?.aggregationFunction) {
+        const aggregation = field?.aggregationFunction?.toUpperCase();
+        return `${aggregation}(${field?.column})`;
       } else {
-        return field.column;
+        return field?.column;
       }
     };
 
