@@ -240,7 +240,10 @@ export default defineComponent({
     );
 
     const setValue = (value: string) => {
-      if (editorObj?.setValue) editorObj.setValue(value);
+      if (editorObj?.setValue) {
+        editorObj.setValue(value);
+        editorObj.layout();
+      }
     };
 
     const registerAutoCompleteProvider = () => {

@@ -1,0 +1,17 @@
+name: "Licenses checker"
+on:
+  push:
+    paths:
+      - "**/Cargo.lock"
+      - "**/Cargo.toml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v3
+      - uses: EmbarkStudios/cargo-deny-action@v1.5.5
+        with:
+          # The command to run with cargo-deny
+          command: check licenses

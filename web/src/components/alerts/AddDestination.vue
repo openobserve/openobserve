@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             data-test="add-destination-name-input"
             v-model="formData.name"
-            :label="t('alerts.name')"
+            :label="t('alerts.name') + ' *'"
             color="input-border"
             bg-color="input-bg"
             class="showLabelOnTop"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-select
               data-test="add-destination-template-select"
               v-model="formData.template"
-              :label="t('alert_destinations.template')"
+              :label="t('alert_destinations.template') + ' *'"
               :options="getFormattedTemplates"
               color="input-border"
               bg-color="input-bg"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             data-test="add-destination-url-input"
             v-model="formData.url"
-            :label="t('alert_destinations.url')"
+            :label="t('alert_destinations.url') + ' *'"
             color="input-border"
             bg-color="input-bg"
             class="showLabelOnTop"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-select
             data-test="add-destination-method-select"
             v-model="formData.method"
-            :label="t('alert_destinations.method')"
+            :label="t('alert_destinations.method') + ' *'"
             :options="apiMethods"
             color="input-border"
             bg-color="input-bg"

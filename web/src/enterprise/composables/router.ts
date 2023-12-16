@@ -29,7 +29,7 @@ import Billing from "@/enterprise/components/billings/Billing.vue";
 import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
-import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
+import { routeGuard } from "@/utils/zincutils";
 
 const useEnvRoutes = () => {
   const parentRoutes = [
@@ -66,7 +66,7 @@ const useEnvRoutes = () => {
         keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
+        routeGuard(to, from, next);
       },
     },
     {
@@ -76,21 +76,33 @@ const useEnvRoutes = () => {
       meta: {
         keepAlive: false,
       },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
       children: [
         {
           path: "usage",
           name: "usage",
           component: Usage,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
         {
           path: "plans",
           name: "plans",
           component: Plans,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
         {
           path: "invoice_history",
           name: "invoice_history",
           component: InvoiceHistory,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
       ],
     },

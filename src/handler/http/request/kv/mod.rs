@@ -74,7 +74,8 @@ pub async fn set(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let (org_id, key) = path.into_inner();
-    match kv::set(&org_id, &key, body).await {
+    let key = key.trim();
+    match kv::set(&org_id, key, body).await {
         Ok(_) => Ok(HttpResponse::Ok()
             .content_type(ContentType::plaintext())
             .body("OK")),

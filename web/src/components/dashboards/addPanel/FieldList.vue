@@ -571,6 +571,7 @@ export default defineComponent({
     const onDragStart = (e: any, item: any) => {
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
+      dashboardPanelData.meta.dragAndDrop.dragElementType = "fieldList";
     };
 
     const onDragLeave = (e: any) => {
@@ -585,6 +586,7 @@ export default defineComponent({
     const onDrop = (e: any) => {
       dashboardPanelData.meta.dragAndDrop.dragging = false;
       dashboardPanelData.meta.dragAndDrop.dragElement = null;
+      dashboardPanelData.meta.dragAndDrop.dragElementType = null;
     };
 
     const filterStreamFn = (val: string, update: any) => {

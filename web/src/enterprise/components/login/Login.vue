@@ -75,6 +75,15 @@ export default defineComponent({
               id: data.id,
               identifier: data.identifier,
               user_email: store.state.userInfo.email,
+              ingest_threshold: data.ingest_threshold,
+              search_threshold: data.search_threshold,
+              subscription_type: data.hasOwnProperty("CustomerBillingObj")
+                ? data.CustomerBillingObj.subscription_type
+                : "",
+              status: data.status,
+              note: data.hasOwnProperty("CustomerBillingObj")
+                ? data.CustomerBillingObj.note
+                : "",
             };
 
             if (

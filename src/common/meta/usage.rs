@@ -28,6 +28,7 @@ pub struct UsageData {
     pub month: u32,
     pub day: u32,
     pub hour: u32,
+    pub event_time_hour: String,
     pub org_id: String,
     pub request_body: String,
     pub size: f64,

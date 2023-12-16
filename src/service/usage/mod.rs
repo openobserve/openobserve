@@ -81,6 +81,13 @@ pub async fn report_request_usage_stats(
             hour: now.hour(),
             month: now.month(),
             year: now.year(),
+            event_time_hour: format!(
+                "{:04}{:02}{:02}{:02}",
+                now.year(),
+                now.month(),
+                now.day(),
+                now.hour()
+            ),
             org_id: org_id.to_owned(),
             request_body: request_body.to_owned(),
             size: stats.size,
@@ -103,6 +110,13 @@ pub async fn report_request_usage_stats(
             hour: now.hour(),
             month: now.month(),
             year: now.year(),
+            event_time_hour: format!(
+                "{:04}{:02}{:02}{:02}",
+                now.year(),
+                now.month(),
+                now.day(),
+                now.hour()
+            ),
             org_id: org_id.to_owned(),
             request_body: request_body.to_owned(),
             size: stats.size,
@@ -143,6 +157,13 @@ pub async fn report_compression_stats(
         month: now.month(),
         day: now.day(),
         hour: now.hour(),
+        event_time_hour: format!(
+            "{:04}{:02}{:02}{:02}",
+            now.year(),
+            now.month(),
+            now.day(),
+            now.hour()
+        ),
         org_id: org_id.to_owned(),
         request_body: "".to_owned(),
         size: stats.size,

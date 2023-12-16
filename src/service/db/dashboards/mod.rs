@@ -62,7 +62,8 @@ pub(crate) async fn put(
     let d_version: DashboardVersion = json::from_slice(&body)?;
     if d_version.version == 1 {
         let mut dash: v1::Dashboard = json::from_slice(&body)?;
-        if dash.title.trim().is_empty() {
+        dash.title = dash.title.trim().to_string();
+        if dash.title.is_empty() {
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
@@ -80,7 +81,8 @@ pub(crate) async fn put(
         }
     } else {
         let mut dash: v2::Dashboard = json::from_slice(&body)?;
-        if dash.title.trim().is_empty() {
+        dash.title = dash.title.trim().to_string();
+        if dash.title.is_empty() {
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
