@@ -167,6 +167,7 @@ import BillingService from "@/services/billings";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
 import { useLocalOrganization, convertToTitleCase } from "@/utils/zincutils";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "plans",
@@ -272,11 +273,11 @@ export default defineComponent({
             this.store.dispatch("setQuotaThresholdMsg", "");
           } else if (
             res.data.data.CustomerBillingObj.subscription_type ==
-            "Free-Plan-USD-Monthly"
+            config.freePlan
           ) {
             this.planType = "basic";
             const localOrg: any = useLocalOrganization();
-            localOrg.value.subscription_type = "Free-Plan-USD-Monthly";
+            localOrg.value.subscription_type = config.freePlan;
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
           } else if (

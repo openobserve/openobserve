@@ -69,7 +69,8 @@ pub async fn save(
     user: web::Json<UserRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let user = user.into_inner();
+    let mut user = user.into_inner();
+    user.email = user.email.trim().to_string();
     users::post_user(&org_id, user).await
 }
 
@@ -97,6 +98,7 @@ pub async fn update(
     credentials: BasicAuth,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
+    let email_id = email_id.trim().to_string();
     let user = user.into_inner();
     if user.eq(&UpdateUser::default()) {
         return Ok(

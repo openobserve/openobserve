@@ -94,6 +94,7 @@ const getDefaultDashboardPanelData: any = () => ({
     dragAndDrop: {
       dragging: false,
       dragElement: null,
+      dragElementType: null,
     },
     errors: {
       queryErrors: [],
@@ -285,6 +286,7 @@ const useDashboardPanelData = () => {
             : null,
       });
     }
+
     updateArrayAlias();
   };
 
@@ -1022,6 +1024,7 @@ const useDashboardPanelData = () => {
   return {
     dashboardPanelData,
     resetDashboardPanelData,
+    updateArrayAlias,
     addXAxisItem,
     addYAxisItem,
     addZAxisItem,

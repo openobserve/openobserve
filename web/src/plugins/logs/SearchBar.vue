@@ -397,6 +397,7 @@ import {
   toRaw,
   onBeforeUnmount,
   onUnmounted,
+  onActivated,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
@@ -649,7 +650,6 @@ export default defineComponent({
     };
 
     const udpateQuery = () => {
-      // alert(searchObj.data.query);
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(searchObj.data.query);
     };
@@ -766,6 +766,10 @@ export default defineComponent({
         fnEditorobj.layout();
         // queryEditorRef.value.resetEditorLayout();
       });
+    });
+
+    onActivated(() => {
+      udpateQuery();
     });
 
     const saveFunction = () => {

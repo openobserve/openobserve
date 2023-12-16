@@ -51,7 +51,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             FN_ALREADY_EXIST.to_string(),
         )))
     } else {
-        if !func.function.as_str().trim().ends_with('.') {
+        if !func.function.ends_with('.') {
             func.function = format!("{} \n .", func.function);
         }
         if func.trans_type.unwrap() == 0 {
@@ -83,11 +83,11 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
 
 #[tracing::instrument(skip(func))]
 pub async fn update_function(
-    org_id: String,
-    fn_name: String,
+    org_id: &str,
+    fn_name: &str,
     mut func: Transform,
 ) -> Result<HttpResponse, Error> {
-    let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
+    let existing_fn = match check_existing_fn(org_id, fn_name).await {
         Some(function) => function,
         None => {
             return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -104,11 +104,11 @@ pub async fn update_function(
     // from existing function
     func.streams = existing_fn.streams;
 
-    if !func.function.as_str().trim().ends_with('.') {
+    if !func.function.ends_with('.') {
         func.function = format!("{} \n .", func.function);
     }
     if func.trans_type.unwrap() == 0 {
-        match compile_vrl_function(&func.function, &org_id) {
+        match compile_vrl_function(&func.function, org_id) {
             Ok(_) => {}
             Err(error) => {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -119,7 +119,7 @@ pub async fn update_function(
         }
     }
     extract_num_args(&mut func);
-    if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
+    if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
