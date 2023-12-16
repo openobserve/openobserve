@@ -308,7 +308,7 @@ const useDashboardPanelData = () => {
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.y.find((it: any) => it.column == row.name)
+      ].fields.y.find((it: any) => it?.column == row.name)
     ) {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -527,33 +527,33 @@ const useDashboardPanelData = () => {
   const updateArrayAlias = () => {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.x.forEach(
+    ].fields?.x.forEach(
       (it: any, index: any) =>
         (it.alias = !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
           ? "x_axis_" + (index + 1)
-          : it.column)
+          : it?.column)
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.y.forEach(
+    ].fields?.y.forEach(
       (it: any, index: any) =>
         (it.alias = !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
           ? "y_axis_" + (index + 1)
-          : it.column)
+          : it?.column)
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.z.forEach(
+    ].fields?.z.forEach(
       (it: any, index: any) =>
         (it.alias = !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
           ? "z_axis_" + (index + 1)
-          : it.column)
+          : it?.column)
     );
   };
 
