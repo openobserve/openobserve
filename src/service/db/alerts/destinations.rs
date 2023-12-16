@@ -15,6 +15,8 @@
 
 use std::sync::Arc;
 
+use itertools::Itertools;
+
 use crate::common::{
     infra::{config::ALERTS_DESTINATIONS, db as infra_db},
     meta::alerts::destinations::Destination,
@@ -55,14 +57,14 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
 pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {
     let cache = ALERTS_DESTINATIONS.clone();
     if !cache.is_empty() {
-        let items: Vec<Destination> = cache
+        return Ok(cache
             .iter()
             .filter_map(|dest| {
                 let k = dest.key();
                 (k.starts_with(&format!("{org_id}/"))).then(|| dest.value().clone())
             })
-            .collect();
-        return Ok(items);
+            .sorted_by(|a, b| a.name.cmp(&b.name))
+            .collect());
     }
 
     let db = infra_db::get_db().await;
