@@ -41,6 +41,7 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
             query_context: req.query.query_context.unwrap_or_default(),
             uses_zo_fn: req.query.uses_zo_fn,
             query_fn: req.query.query_fn.unwrap_or_default(),
+            skip_wal: req.query.skip_wal,
         };
 
         let job = cluster_rpc::Job {
@@ -239,6 +240,7 @@ mod test {
                 query_context: None,
                 uses_zo_fn: false,
                 query_fn: None,
+                skip_wal: false,
             },
             aggs: HashMap::new(),
             encoding: "base64".into(),

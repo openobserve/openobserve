@@ -185,6 +185,7 @@ pub async fn get_latest_traces(
             query_context: None,
             uses_zo_fn: false,
             query_fn: None,
+            skip_wal: false,
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
