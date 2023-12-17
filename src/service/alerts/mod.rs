@@ -307,6 +307,7 @@ impl QueryCondition {
                 uses_zo_fn: false,
                 query_context: None,
                 query_fn: None,
+                skip_wal: false,
             },
             aggs: HashMap::new(),
             encoding: search::RequestEncoding::Empty,

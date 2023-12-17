@@ -67,12 +67,13 @@ pub async fn search(
     let mut scan_stats = ScanStats::new();
 
     // search in WAL
+    let skip_wal = req.query.as_ref().unwrap().skip_wal;
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
     let wal_span = info_span!("service:search:grpc:in_wal", session_id = ?session_id1, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
     let task1 = tokio::task::spawn(
         async move {
-            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
                 wal::search(&session_id1, sql1, stream_type, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
@@ -287,18 +288,14 @@ fn check_memory_circuit_breaker(session_id: &str, scan_stats: &ScanStats) -> Res
         scan_stats.original_size
     };
     if let Some(cur_memory) = memory_stats::memory_stats() {
-        // left memory < datafusion * breaker_ratio and scan_size >=  left memory
-        let left_mem = CONFIG.limit.mem_total - cur_memory.physical_mem;
-        if (left_mem
+        if (CONFIG.limit.mem_total - cur_memory.physical_mem)
             < (CONFIG.memory_cache.datafusion_max_size * CONFIG.common.memory_circuit_breaker_ratio
-            / 100))
-            &&
-            (scan_size >= left_mem as i64 )
+                / 100)
         {
-            let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, left memory {} bytes, left memory more than limit of [{} bytes] or scan_size more than left memory , please submit a more shorter time range query ",
+            let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, left memory {} bytes, less than limit of [{} bytes] ",
                               scan_size,
                               cur_memory.physical_mem,
-                              left_mem,
+                              CONFIG.limit.mem_total - cur_memory.physical_mem,
                               CONFIG.memory_cache.datafusion_max_size * CONFIG.common.memory_circuit_breaker_ratio / 100);
             log::warn!("[{session_id}] {}", err);
             return Err(Error::Message(err.to_string()));
