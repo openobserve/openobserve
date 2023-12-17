@@ -80,6 +80,7 @@ import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
+import { useAdvancedPanelDataLoader } from "@/composables/dashboard/useAdavancedPanelDataLoader";
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: { ChartRenderer, TableRenderer, GeoMapRenderer },
@@ -108,7 +109,7 @@ export default defineComponent({
     const { panelSchema, selectedTimeObj, variablesData } = toRefs(props);
 
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata } = usePanelDataLoader(
+    let { data, loading, errorDetail, metadata } = useAdvancedPanelDataLoader(
       panelSchema,
       selectedTimeObj,
       variablesData,
