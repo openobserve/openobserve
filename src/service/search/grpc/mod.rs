@@ -288,14 +288,18 @@ fn check_memory_circuit_breaker(session_id: &str, scan_stats: &ScanStats) -> Res
         scan_stats.original_size
     };
     if let Some(cur_memory) = memory_stats::memory_stats() {
-        if (CONFIG.limit.mem_total - cur_memory.physical_mem)
+        // left memory < datafusion * breaker_ratio and scan_size >=  left memory
+        let left_mem = CONFIG.limit.mem_total - cur_memory.physical_mem;
+        if (left_mem
             < (CONFIG.memory_cache.datafusion_max_size * CONFIG.common.memory_circuit_breaker_ratio
-                / 100)
+            / 100))
+            &&
+            (scan_size >= left_mem as i64 )
         {
-            let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, left memory {} bytes, less than limit of [{} bytes] ",
+            let err = format!("fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, left memory {} bytes, left memory more than limit of [{} bytes] or scan_size more than left memory , please submit a new query with a short time range",
                               scan_size,
                               cur_memory.physical_mem,
-                              CONFIG.limit.mem_total - cur_memory.physical_mem,
+                              left_mem,
                               CONFIG.memory_cache.datafusion_max_size * CONFIG.common.memory_circuit_breaker_ratio / 100);
             log::warn!("[{session_id}] {}", err);
             return Err(Error::Message(err.to_string()));
