@@ -134,7 +134,7 @@ export default defineComponent({
   .q-table tbody td,
   .q-table th,
   .q-table td {
-    height: 25px;
+    height: 15px;
     padding: 0px 5px;
     font-size: 0.75rem;
   }
@@ -144,7 +144,7 @@ export default defineComponent({
   }
 
   .q-table__bottom {
-    min-height: 40px;
+    min-height: 20px;
     padding-top: 0;
     padding-bottom: 0;
   }

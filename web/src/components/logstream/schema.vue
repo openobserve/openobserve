@@ -596,7 +596,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .indexDetailsContainer {
   padding: 1.25rem;
   width: 100%;
@@ -619,15 +619,18 @@ export default defineComponent({
       th {
         font-size: 0.875rem;
         font-weight: 700;
+        height: 35px;
       }
     }
 
     tbody tr {
-      height: 3.25rem;
+      height: 15px;
 
       td {
         font-size: 0.875rem;
         font-weight: 600;
+        height: 35px;
+        padding: 0px 5px;
       }
     }
   }

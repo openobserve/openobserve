@@ -882,7 +882,7 @@ export default defineComponent({
 
   &--mini {
     .leftNavList {
-      padding: 8px 8px;
+      padding: 5px 8px;
     }
   }
   &--standard {
@@ -906,11 +906,11 @@ export default defineComponent({
 
 .q-list {
   &.leftNavList {
-    padding-bottom: 1.5rem;
-    padding-top: 1.5rem;
+    padding-bottom: 0px;
+    padding-top: 0px;
 
     .q-item {
-      margin-bottom: 0.5rem;
+      margin-bottom: 5px;
 
       .q-icon {
         height: 1.5rem;
