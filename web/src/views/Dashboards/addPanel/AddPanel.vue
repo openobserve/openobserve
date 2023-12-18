@@ -34,6 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="flex q-gutter-sm">
+        <q-btn
+          outline
+          padding="sm"
+          class="q-mr-sm"
+          no-caps
+          icon="info_outline"
+          @click="showViewPanel = true"
+        >
+          <q-tooltip anchor="center left" self="center right"
+            >Query Inspector
+          </q-tooltip>
+        </q-btn>
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
@@ -171,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <div style="flex: 1">
                         <PanelSchemaRenderer
+                          @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
                           :panelSchema="chartData"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
@@ -178,6 +191,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :width="6"
                           @error="handleChartApiError"
                         />
+                        <q-dialog v-model="showViewPanel">
+                          <QueryInspector
+                            :metaData="metaData"
+                            :data="panelTitle"
+                          ></QueryInspector>
+                        </q-dialog>
                       </div>
                       <DashboardErrorsComponent :errors="errorData" />
                     </div>
@@ -255,9 +274,12 @@ import VariablesValueSelector from "../../../components/dashboards/VariablesValu
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import { useLoading } from "@/composables/useLoading";
 import _ from "lodash-es";
+import QueryInspector from "@/components/dashboards/QueryInspector.vue";
 
 export default defineComponent({
   name: "AddPanel",
+  props: ["metaData"],
+
   components: {
     ChartSelection,
     FieldList,
@@ -269,8 +291,9 @@ export default defineComponent({
     VariablesValueSelector,
     PanelSchemaRenderer,
     DashboardQueryEditor,
+    QueryInspector,
   },
-  setup() {
+  setup(props) {
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref({});
@@ -292,6 +315,12 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
+    const metaData = ref(null);
+    const showViewPanel = ref(false);
+    const metaDataValue = (metadata: any) => {
+      metaData.value = metadata;
+    };
+
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
     };
@@ -525,6 +554,9 @@ export default defineComponent({
         // No unsaved changes or not leaving the edit route, allow navigation
         next();
       }
+    });
+    const panelTitle = computed(() => {
+      return { title: dashboardPanelData.data.title };
     });
 
     //validate the data
@@ -1075,6 +1107,10 @@ export default defineComponent({
       isOutDated,
       store,
       dateTimePickerRef,
+      showViewPanel,
+      metaDataValue,
+      metaData,
+      panelTitle,
     };
   },
   methods: {

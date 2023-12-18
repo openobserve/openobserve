@@ -726,6 +726,7 @@ export default defineComponent({
   // overflow: hidden;
   cursor: pointer;
 }
+
 .q-ml-sm:hover {
   background-color: #eaeaeaa5;
   border-radius: 50%;
