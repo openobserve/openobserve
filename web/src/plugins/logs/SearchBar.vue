@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   clickable
                   v-for="(item, i) in searchObj.data.savedViews"
                   :key="'saved-view-' + i"
+                  v-close-popup
                 >
                   <q-item-section @click.stop="applySavedView(item)">
                     <q-item-label>{{ item.view_name }}</q-item-label>
@@ -131,9 +132,11 @@ size="xs" />
                   clickable
                   v-for="(item, i) in functionOptions"
                   :key="'saved-view-' + i"
+                  v-close-popup
                 >
                   <q-item-section
                     @click.stop="populateFunctionImplementation(item)"
+                    v-close-popup
                   >
                     <q-item-label>{{ item.name }}</q-item-label>
                   </q-item-section>
@@ -1009,6 +1012,11 @@ export default defineComponent({
     };
 
     const populateFunctionImplementation = (fnValue) => {
+      $q.notify({
+        type: "positive",
+        message: `${fnValue.name} function applied successfully.`,
+        timeout: 3000,
+      });
       searchObj.meta.toggleFunction = true;
       searchObj.config.fnSplitterModel = 60;
       fnEditorobj.setValue(fnValue.function);
