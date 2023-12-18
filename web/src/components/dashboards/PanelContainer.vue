@@ -32,6 +32,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ props.data.title }}
         </div>
         <q-space />
+        <q-icon
+          v-if="dependentAdHocVariable"
+          name="info_outline"
+          style="cursor: pointer"
+          @click="showViewPanel = true"
+        >
+          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+            Some dynamic variables are not applied because the field is not
+            present in the query's stream. Open Query Inspector to see all the
+            details of the variables and queries executed to render this panel
+          </q-tooltip>
+        </q-icon>
         <q-btn
           v-if="!viewOnly && showFullScreenBtn"
           icon="fullscreen"
@@ -70,6 +82,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-label class="q-pa-sm">Delete Panel</q-item-label>
               </q-item-section>
             </q-item>
+            <q-item
+              clickable
+              v-if="metaData && metaData.queries.length > 0"
+              v-close-popup="true"
+              @click="showViewPanel = true"
+            >
+              <q-item-section>
+                <q-item-label class="q-pa-sm">Query Inspector</q-item-label>
+              </q-item-section>
+            </q-item>
           </q-list>
         </q-btn-dropdown>
       </q-bar>
@@ -80,19 +102,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :width="props.width"
       :height="props.height"
       :variablesData="props.variablesData"
+      @metadata-update="metaDataValue"
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
     ></PanelSchemaRenderer>
+    <q-dialog v-model="showViewPanel">
+      <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
+    </q-dialog>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
-import { ref } from "vue";
+import QueryInspector from "@/components/dashboards/QueryInspector.vue";
 
 export default defineComponent({
   name: "PanelContainer",
@@ -105,20 +131,47 @@ export default defineComponent({
     "height",
     "variablesData",
     "dashboardId",
+    "metaData",
   ],
   components: {
     PanelSchemaRenderer,
+    QueryInspector
   },
   setup(props) {
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
     const $q = useQuasar();
+    const metaData = ref();
+    const showViewPanel = ref(false);
+    const metaDataValue = (metadata: any) => {
+      metaData.value = metadata;
+    };
+
+    //check if dependent adhoc variable exists
+    const dependentAdHocVariable = computed(() => {
+
+      if(!metaData.value) return false
+
+      const adhocVariables = props.variablesData.values
+        ?.filter((it: any) => it.type === "dynamic_filters")
+        ?.map((it: any) => it?.value).flat()
+        ?.filter((it: any) => it?.operator && it?.name && it?.value)
+
+      const metaDataDynamic = metaData.value?.queries?.every((it: any) => {
+        const vars = it?.variables?.filter(
+          (it: any) => it.type === "dynamicVariable"
+        );
+        return vars?.length == adhocVariables?.length;
+      });
+      return !metaDataDynamic;
+    });
+
     // for full screen button
     const showFullScreenBtn: any = ref(false);
 
     //for edit panel
-    const onEditPanel = (data: any) => {
+    const onEditPanel = (data:  any) => {
       return router.push({
         path: "/dashboards/add_panel",
         query: {
@@ -130,6 +183,7 @@ export default defineComponent({
     };
     //create a duplicate panel
     const onDuplicatePanel = async (data: any): Promise<void> => {
+
       // Show a loading spinner notification.
       const dismiss = $q.notify({
         spinner: true,
@@ -137,28 +191,25 @@ export default defineComponent({
         timeout: 2000,
       });
 
+
       // Generate a unique panel ID.
-      const panelId =
-        "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
+      const panelId = "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 
       // Duplicate the panel data with the new ID.
       const panelData = JSON.parse(JSON.stringify(data));
       panelData.id = panelId;
 
+
       try {
         // Add the duplicated panel to the dashboard.
-        await addPanel(
-          store,
-          route.query.dashboard,
-          panelData,
-          route.query.folder ?? "default"
-        );
+        await addPanel(store, route.query.dashboard, panelData, route.query.folder ?? "default");
 
         // Show a success notification.
         $q.notify({
           type: "positive",
           message: `Panel Duplicated Successfully`,
         });
+
 
         // Navigate to the new panel.
         router.push({
@@ -188,15 +239,19 @@ export default defineComponent({
       onDuplicatePanel,
       showFullScreenBtn,
       store,
+      metaDataValue,
+      metaData,
+      showViewPanel,
+      dependentAdHocVariable,
     };
   },
   methods: {
     onPanelModifyClick(evt: any) {
-      if (evt == "ViewPanel") {
+      if  (evt == "ViewPanel") {
         this.$emit("onViewPanel", this.props.data.id);
-      } else if (evt == "EditPanel") {
+      } else if (evt == "EditPanel")  {
         this.onEditPanel(this.props.data);
-      } else if (evt == "DeletePanel") {
+      } else if  (evt == "DeletePanel") {
         this.$emit("onDeletePanel", this.props.data.id);
       } else if (evt == "DuplicatePanel") {
         this.onDuplicatePanel(this.props.data);
@@ -211,6 +266,7 @@ export default defineComponent({
 .panelcontainer {
   height: calc(100% - 24px);
 }
+
 .panelHeader {
   white-space: nowrap;
   overflow: hidden;

@@ -149,8 +149,23 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
       const variableObj = {};
-      data.values.forEach((v) => {
-        variableObj[`var-${v.name}`] = v.value;
+      data.values.forEach((variable) => {
+
+        if (variable.type === "dynamic_filters") {
+          const filters = (variable.value || []).filter(
+            (item: any) => item.name && item.operator && item.value
+          );
+          const encodedFilters = filters.map((item: any) => ({
+            name: item.name,
+            operator: item.operator,
+            value: item.value,
+          }));
+          variableObj[`var-${variable.name}`] = encodeURIComponent(
+            JSON.stringify(encodedFilters)
+          );
+        } else {
+          variableObj[`var-${variable.name}`] = variable.value;
+        }
       });
       router.replace({
         query: {
