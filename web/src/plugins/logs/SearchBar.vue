@@ -60,7 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="'saved-view-' + i"
                   v-close-popup
                 >
-                  <q-item-section @click.stop="applySavedView(item)" v-close-popup>
+                  <q-item-section
+                    @click.stop="applySavedView(item)"
+                    v-close-popup
+                  >
                     <q-item-label>{{ item.view_name }}</q-item-label>
                   </q-item-section>
                   <q-item-section
@@ -135,7 +138,7 @@ size="xs" />
                   v-close-popup
                 >
                   <q-item-section
-                    @click.stop="populateFunctionImplementation(item)"
+                    @click.stop="populateFunctionImplementation(item, true)"
                     v-close-popup
                   >
                     <q-item-label>{{ item.name }}</q-item-label>
@@ -1011,12 +1014,14 @@ export default defineComponent({
       }, 100);
     };
 
-    const populateFunctionImplementation = (fnValue) => {
-      $q.notify({
-        type: "positive",
-        message: `${fnValue.name} function applied successfully.`,
-        timeout: 3000,
-      });
+    const populateFunctionImplementation = (fnValue, flag = false) => {
+      if (flag) {
+        $q.notify({
+          type: "positive",
+          message: `${fnValue.name} function applied successfully.`,
+          timeout: 3000,
+        });
+      }
       searchObj.meta.toggleFunction = true;
       searchObj.config.fnSplitterModel = 60;
       fnEditorobj.setValue(fnValue.function);
@@ -1127,10 +1132,13 @@ export default defineComponent({
             searchObj.value = mergeDeep(searchObj, extractedObj);
             await nextTick();
             if (extractedObj.data.tempFunctionContent != "") {
-              populateFunctionImplementation({
-                name: "",
-                function: searchObj.data.tempFunctionContent,
-              });
+              populateFunctionImplementation(
+                {
+                  name: "",
+                  function: searchObj.data.tempFunctionContent,
+                },
+                false
+              );
               searchObj.data.tempFunctionContent =
                 extractedObj.data.tempFunctionContent;
               searchObj.meta.functionEditorPlaceholderFlag = false;
@@ -1543,7 +1551,6 @@ export default defineComponent({
       }
     },
     toggleFunction(newVal) {
-
       if (newVal == false) {
         this.searchObj.config.fnSplitterModel = 99.5;
         this.resetFunctionContent();
