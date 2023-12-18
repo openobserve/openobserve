@@ -289,7 +289,8 @@ const isTemplateBodyValid = () => {
 const router = useRouter();
 
 const isTemplateFilled = () =>
-  formData.value.name.trim() && formData.value.body.trim();
+  formData.value.name.trim().trim().length &&
+  formData.value.body.trim().trim().length;
 
 const saveTemplate = () => {
   if (!isTemplateFilled()) {

@@ -162,6 +162,10 @@ export default defineComponent({
       return style;
     });
 
+    const getSpanStartTime = computed(() => {
+      return props.span.startTimeMs - props.baseTracePosition["startTimeMs"];
+    });
+
     const onResize = () => {
       spanBlockWidth.value = spanBlock.value.clientWidth;
     };
@@ -178,6 +182,7 @@ export default defineComponent({
       spanBlock,
       onResize,
       onePixelPercent,
+      getSpanStartTime,
     };
   },
 });

@@ -17,11 +17,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="search-bar-component" id="searchBarComponent">
     <div class="row q-my-xs">
-      <div class="float-right col">
+      <div class="float-right col flex items-center">
         <syntax-guide
+          class="q-mr-lg"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
-        ></syntax-guide>
+        />
+        <div class="flex items-center">
+          <div class="q-mr-xs text-bold">Filters:</div>
+          <app-tabs
+            style="
+              border: 1px solid #8a8a8a;
+              border-radius: 4px;
+              overflow: hidden;
+            "
+            :tabs="[
+              {
+                label: 'Basic',
+                value: 'basic',
+                style: {
+                  width: 'fit-content',
+                  padding: '0px 8px',
+                  background:
+                    searchObj.meta.filterType === 'basic' ? '#5960B2' : '',
+                  border: 'none !important',
+                  color:
+                    searchObj.meta.filterType === 'basic'
+                      ? '#ffffff !important'
+                      : '',
+                },
+              },
+              {
+                label: 'Advanced',
+                value: 'advance',
+                style: {
+                  width: 'fit-content',
+                  padding: '0px 8px',
+                  background:
+                    searchObj.meta.filterType === 'advance' ? '#5960B2' : '',
+                  border: 'none !important',
+                  color:
+                    searchObj.meta.filterType === 'advance'
+                      ? '#ffffff !important'
+                      : '',
+                },
+              },
+            ]"
+            :active-tab="searchObj.meta.filterType"
+            @update:active-tab="updateFilterType"
+          />
+        </div>
+        <q-btn
+          label="Reset Filters"
+          no-caps
+          size="sm"
+          icon="restart_alt"
+          class="q-pr-sm q-pl-xs reset-filters q-ml-md"
+          @click="resetFilters()"
+        ></q-btn>
       </div>
       <div class="float-right col-auto">
         <div class="float-left">
@@ -75,11 +128,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:query="searchObj.data.editorValue"
           :keywords="autoCompleteKeywords"
           v-model:functions="searchObj.data.stream.functions"
+          :read-only="searchObj.meta.filterType === 'basic'"
           @update:query="updateQueryValue"
           @run-query="searchData"
         ></query-editor>
       </div>
     </div>
+    <template>
+      <confirm-dialog
+        title="Change Filter Type"
+        message="Query will be wiped off and reset to default."
+        @update:ok="changeToggle()"
+        @update:cancel="showWarningDialog = false"
+        v-model="showWarningDialog"
+      />
+    </template>
   </div>
 </template>
 
@@ -99,6 +162,8 @@ import { Parser } from "node-sql-parser/build/mysql";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import AppTabs from "@/components/common/AppTabs.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -106,6 +171,8 @@ export default defineComponent({
     DateTime,
     QueryEditor,
     SyntaxGuide,
+    AppTabs,
+    ConfirmDialog,
   },
   emits: ["searchdata"],
   props: {
@@ -137,6 +204,8 @@ export default defineComponent({
 
     const { searchObj } = useTraces();
     const queryEditorRef = ref(null);
+
+    const showWarningDialog = ref(false);
 
     const parser = new Parser();
     let streamName = "";
@@ -292,6 +361,27 @@ export default defineComponent({
       emit("onChangeTimezone");
     };
 
+    const updateFilterType = (value) => {
+      if (value === "basic") {
+        searchObj.meta.filterType = "basic";
+        searchObj.data.editorValue = searchObj.data.advanceFiltersQuery;
+      } else {
+        searchObj.meta.filterType = value;
+      }
+    };
+
+    const changeToggle = () => {
+      showWarningDialog.value = false;
+      searchObj.meta.filterType = "basic";
+    };
+
+    const resetFilters = () => {
+      searchObj.data.editorValue = "";
+      Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
+        field.selectedValues = [];
+      });
+    };
+
     return {
       t,
       router,
@@ -308,6 +398,10 @@ export default defineComponent({
       autoCompleteKeywords,
       updateTimezone,
       dateTimeRef,
+      updateFilterType,
+      showWarningDialog,
+      changeToggle,
+      resetFilters,
     };
   },
   computed: {
@@ -351,6 +445,7 @@ export default defineComponent({
           this.queryEditorRef.setValue(this.searchObj.data.query);
       }
     },
+    filters() {},
   },
 });
 </script>
@@ -481,6 +576,19 @@ export default defineComponent({
 
   .download-logs-btn {
     height: 30px;
+  }
+}
+</style>
+
+<style lang="scss">
+.reset-filters {
+  font-size: 22px;
+
+  .block {
+    font-size: 12px;
+  }
+  .q-icon {
+    margin-right: 4px;
   }
 }
 </style>
