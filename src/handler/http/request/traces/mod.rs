@@ -270,6 +270,7 @@ pub async fn get_latest_traces(
         "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM default WHERE trace_id IN ('{}') ORDER BY {} ASC",
         CONFIG.common.column_timestamp, trace_ids, CONFIG.common.column_timestamp,
     );
+    req.query.from = 0;
     req.query.size = 9999;
     req.query.sql = query_sql.to_string();
     req.query.start_time = start_time;
