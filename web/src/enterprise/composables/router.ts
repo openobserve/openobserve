@@ -30,14 +30,25 @@ import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
 import { routeGuard } from "@/utils/zincutils";
+import { getAuthorizationCode } from '../../services/auth_dex';
 
 const useEnvRoutes = () => {
   const parentRoutes = [
     {
       path: "/login",
       component: Login,
-      beforeEnter(to: any, from: any, next: any) {
-        window.location.href = getLoginURL();
+      beforeEnter: async (to: any, from: any, next: any) => {
+        try {
+          const url = await getAuthorizationCode();
+          if (url) {
+            window.location.href = url;
+          } else {
+            next(); // Proceed with the navigation if URL is not available
+          }
+        } catch (error) {
+          console.error("Error during redirection:", error);
+          next(false); // Optionally handle the error case, e.g., redirect to an error page
+        }
       },
     },
     {
@@ -46,7 +57,6 @@ const useEnvRoutes = () => {
         useLocalToken("", true);
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
-
         window.location.href = getLogoutURL();
       },
     },

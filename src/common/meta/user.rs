@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
+use jsonwebtoken::TokenData;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -231,4 +233,10 @@ pub struct SignInUser {
 pub struct SignInResponse {
     pub status: bool,
     pub message: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct TokenValidationResponse {
+    pub is_valid: bool,
+    pub user_email: String,
 }
