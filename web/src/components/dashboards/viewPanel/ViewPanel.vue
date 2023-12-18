@@ -392,8 +392,8 @@ export default defineComponent({
         } else {
           variableObj[`${variable.name}`] = variable.value;
         }
-        return variableObj;
       });
+      return variableObj;
     };
 
     return {
