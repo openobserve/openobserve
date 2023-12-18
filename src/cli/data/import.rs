@@ -17,10 +17,11 @@ use std::fs;
 
 use bytes::Bytes;
 
-use crate::cli::data::cli::Cli;
-use crate::cli::data::Context;
-use crate::common::meta::ingestion::IngestionRequest;
-use crate::service::logs;
+use crate::{
+    cli::data::{cli::Cli, Context},
+    common::meta::ingestion::IngestionRequest,
+    service::logs,
+};
 
 pub struct Import {}
 
@@ -38,12 +39,19 @@ fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow::Error
             let path = entry.path();
             if path.is_file() {
                 let content = fs::read(&path)?;
-                if let Err(e) = logs::ingest::ingest(&c.org, &c.stream_name,
-                                                     IngestionRequest::JSON(&Bytes::from(content)), 0).await {
+                if let Err(e) = logs::ingest::ingest(
+                    &c.org,
+                    &c.stream_name,
+                    IngestionRequest::JSON(&Bytes::from(content)),
+                    0,
+                )
+                .await
+                {
                     eprintln!("insert data fail {:?}: {:?}", path, e);
                     return Ok(false);
                 }
-            } else if path.is_dir() && !read_files_in_directory(c.clone(), &path.to_string_lossy())? {
+            } else if path.is_dir() && !read_files_in_directory(c.clone(), &path.to_string_lossy())?
+            {
                 return Ok(false);
             }
         }

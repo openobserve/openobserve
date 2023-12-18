@@ -854,7 +854,7 @@ pub fn filter_schema_null_fields(schema: &mut Schema) {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use ahash::AHashMap;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
 

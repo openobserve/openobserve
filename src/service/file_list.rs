@@ -358,7 +358,7 @@ async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), a
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[actix_web::test]
