@@ -972,8 +972,6 @@ export default defineComponent({
 
     const currentDragArea = ref("");
 
-    console.log("dashboardPanelData", dashboardPanelData);
-
     const onDrop = (e: any, area: string) => {
 
       if (dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldList") {

@@ -136,11 +136,6 @@ export default defineComponent({
     );
 
     const emitVariablesData = () => {
-      console.log(
-        "emit variables data",
-        JSON.stringify(variablesData, null, 2)
-      );
-
       instance?.proxy?.$forceUpdate();
       emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
     };
@@ -150,12 +145,6 @@ export default defineComponent({
       if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
         variablesData.values = [];
         variablesData.isVariablesLoading = false;
-        console.log(
-          "no variables or date",
-          props.variablesConfig?.list,
-          props.selectedTimeDate?.start_time
-        );
-
         emitVariablesData();
         return;
       }
@@ -176,8 +165,6 @@ export default defineComponent({
           })
         );
       }
-
-      console.log("initializing old variables", oldVariableValue);
 
       // continue as we have variables
 
@@ -363,9 +350,7 @@ export default defineComponent({
                         (it3: any) => it3.name === it2.name
                       )?.streams,
                     }));
-                    console.log("obj inside if", old, obj.value);
                   } else {
-                    console.log("obj inside else", obj);
 
                     obj.value = [];
                   }
@@ -376,7 +361,6 @@ export default defineComponent({
 
                   // triggers rerendering in the current component
                   variablesData.values[index] = obj;
-                  console.log("obj", obj);
                   emitVariablesData();
                   return obj;
                 })
