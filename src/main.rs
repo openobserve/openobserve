@@ -105,54 +105,12 @@ struct CustomTimeFormat;
 
 impl FormatTime for CustomTimeFormat {
     fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
-        if CONFIG.common.log_local_time_format.is_empty() {
+        if CONFIG.log.local_time_format.is_empty() {
             write!(w, "{}", Utc::now().to_rfc3339())
         } else {
-            write!(
-                w,
-                "{}",
-                Local::now().format(&CONFIG.common.log_local_time_format)
-            )
+            write!(w, "{}", Local::now().format(&CONFIG.log.local_time_format))
         }
     }
-}
-
-/// Setup the tracing related components
-pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
-    use tracing_subscriber::fmt::writer::BoxMakeWriter;
-
-    let (writer, guard) = if CONFIG.log.log_file_dir.is_empty() {
-        let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
-        (BoxMakeWriter::new(non_blocking), _guard)
-    } else {
-        let file_appender = tracing_appender::rolling::daily(&CONFIG.log.log_file_dir, "o2.log");
-        let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-        (BoxMakeWriter::new(non_blocking), _guard)
-    };
-    let layer = if !CONFIG.log.log_file_dir.is_empty() {
-        Layer::default()
-            .with_writer(writer)
-            .with_timer(CustomTimeFormat)
-            .with_ansi(false)
-            .boxed()
-    } else {
-        Layer::default()
-            .with_writer(writer)
-            .with_timer(CustomTimeFormat)
-            .json()
-            .with_ansi(false)
-            .boxed()
-    };
-
-    tracing_subscriber::registry()
-        .with(
-            EnvFilter::builder()
-                .with_default_directive(TracingLevelFilter::INFO.into())
-                .from_env_lossy(),
-        )
-        .with(layer)
-        .init();
-    guard
 }
 
 #[tokio::main]
@@ -448,6 +406,44 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Setup the tracing related components
+pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
+    use tracing_subscriber::fmt::writer::BoxMakeWriter;
+
+    let (writer, guard) = if CONFIG.log.file_dir.is_empty() {
+        let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
+        (BoxMakeWriter::new(non_blocking), _guard)
+    } else {
+        let file_appender = tracing_appender::rolling::daily(&CONFIG.log.file_dir, "o2.log");
+        let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+        (BoxMakeWriter::new(non_blocking), _guard)
+    };
+    let layer = if CONFIG.log.json_format {
+        Layer::default()
+            .with_writer(writer)
+            .with_timer(CustomTimeFormat)
+            .with_ansi(false)
+            .json()
+            .boxed()
+    } else {
+        Layer::default()
+            .with_writer(writer)
+            .with_timer(CustomTimeFormat)
+            .with_ansi(false)
+            .boxed()
+    };
+
+    tracing_subscriber::registry()
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(TracingLevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .with(layer)
+        .init();
+    guard
+}
+
 fn enable_tracing() -> Result<(), anyhow::Error> {
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
     let mut headers = HashMap::new();
@@ -470,9 +466,18 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
         ])))
         .install_batch(opentelemetry::runtime::Tokio)?;
 
+    let layer = if CONFIG.log.json_format {
+        tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .json()
+            .boxed()
+    } else {
+        tracing_subscriber::fmt::layer().with_ansi(false).boxed()
+    };
+
     Registry::default()
         .with(tracing_subscriber::EnvFilter::new(&CONFIG.log.level))
-        .with(tracing_subscriber::fmt::layer())
+        .with(layer)
         .with(tracing_opentelemetry::layer().with_tracer(tracer))
         .init();
     Ok(())

@@ -386,9 +386,6 @@ pub struct Common {
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
-    // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%S
-    #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
-    pub log_local_time_format: String,
     #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLE", default = false)]
     pub memory_circuit_breaker_enable: bool,
     #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 100)]
@@ -513,10 +510,13 @@ pub struct DiskCache {
 pub struct Log {
     #[env_config(name = "RUST_LOG", default = "info")]
     pub level: String,
-
+    #[env_config(name = "ZO_LOG_JSON_FORMAT", default = false)]
+    pub json_format: bool,
     #[env_config(name = "ZO_LOG_FILE_DIR", default = "")]
-    pub log_file_dir: String,
-
+    pub file_dir: String,
+    // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%SZ
+    #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
+    pub local_time_format: String,
     #[env_config(name = "ZO_EVENTS_ENABLED", default = false)]
     pub events_enabled: bool,
     #[env_config(
