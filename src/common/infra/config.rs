@@ -393,6 +393,8 @@ pub struct Common {
     pub memory_circuit_breaker_enable: bool,
     #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 100)]
     pub memory_circuit_breaker_ratio: usize,
+    #[env_config(name = "ZO_ENABLE_JWT_AUTH", default = false)]
+    pub enable_jwt_auth: bool,
 }
 
 #[derive(EnvConfig)]

@@ -20,6 +20,7 @@ use actix_web::{
     web, Error,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::ldap::service::client::LdapUser;
@@ -39,6 +40,7 @@ use crate::{
     },
     service::{db, users},
 };
+pub mod token;
 
 pub async fn validator(
     req: ServiceRequest,
