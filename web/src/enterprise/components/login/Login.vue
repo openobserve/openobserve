@@ -167,6 +167,7 @@ export default defineComponent({
         loginState: true,
         userInfo: this.userInfo,
       });
+      this.getDefaultOrganization();
     } else {
       this.VerifyAndCreateUser();
     }

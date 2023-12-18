@@ -13,11 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{
+    borrow::Cow,
+    io::{Error, ErrorKind},
+};
 
-use actix_web::{get, HttpResponse};
+use actix_web::{get, http::header, web, HttpRequest, HttpResponse};
 use ahash::AHashMap as HashMap;
 use datafusion::arrow::datatypes::{Field, Schema};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::dex::{
+    meta::LoginData,
+    service::{
+        auth as dex_auth,
+        auth::{exchange_code, get_jwks},
+    },
+};
+use openidconnect::{
+    core::{CoreClient, CoreProviderMetadata},
+    reqwest::async_http_client,
+    AuthorizationCode, ClientId, ClientSecret, IssuerUrl, OAuth2TokenResponse, RedirectUrl,
+};
+use regex::bytes::Regex;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -164,4 +181,116 @@ fn get_stream_schema_status() -> (usize, usize, usize) {
         }
     }
     (stream_num, stream_schema_num, mem_size)
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/callback")]
+pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
+    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+
+    use crate::{common::utils::jwt::verify_decode_token, service::users};
+
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let code = match query.get("code") {
+        Some(code) => code,
+        None => {
+            return Err(Error::new(ErrorKind::Other, "no code in request"));
+        }
+    };
+
+    // TODO Validate state from db
+    let state = match query.get("state") {
+        Some(code) => code,
+        None => {
+            return Err(Error::new(ErrorKind::Other, "no state in request"));
+        }
+    };
+
+    match exchange_code(code).await {
+        Ok(login_data) => {
+            let token = login_data.access_token;
+            let keys = get_jwks().await;
+            let token_ver =
+                verify_decode_token(&token, &keys, &O2_CONFIG.dex.client_id, true).await;
+
+            match token_ver {
+                Ok(res) => {
+                    let dec_token = res.1.unwrap();
+                    let groups = dec_token.claims.get("groups").unwrap().as_array().unwrap();
+                    let name = dec_token.claims.get("name").unwrap().as_str().unwrap();
+                    for group in groups {
+                        let test = parse_dn(group.as_str().unwrap()).unwrap();
+                        let user_email = res.0.user_email.to_owned();
+
+                        let role = if test.0.contains("admin") {
+                            crate::common::meta::user::UserRole::Admin
+                        } else {
+                            crate::common::meta::user::UserRole::Member
+                        };
+                        // Check if the user exists in the database
+                        let user_exists = db::user::check_user_exists_by_email(&user_email).await;
+                        if !user_exists {
+                            log::info!("User does not exist in the database");
+                            log::warn!("Email is replaced using user_id, beware, in ldap.");
+                            // create the user
+                            let _ = users::post_user(
+                                &test.1,
+                                crate::common::meta::user::UserRequest {
+                                    email: user_email,
+                                    password: "dex+pass".to_owned(),
+                                    role,
+                                    first_name: name.to_owned(),
+                                    last_name: name.to_owned(),
+                                    is_ldap: true,
+                                },
+                            )
+                            .await
+                            .unwrap();
+                        } else {
+                            log::info!(
+                                "User exists in the database, should have sync'd the org now"
+                            );
+                            let root_user = crate::common::infra::config::ROOT_USER.clone();
+                            let initiating_user = root_user.get("root").unwrap().clone();
+                            let _ = users::add_user_to_org(
+                                &test.1,
+                                &user_email,
+                                role,
+                                &initiating_user.email,
+                            )
+                            .await
+                            .unwrap();
+                        }
+                    }
+                }
+                Err(_) => todo!(),
+            }
+
+            Ok(HttpResponse::Found()
+                .append_header((header::LOCATION, login_data.url))
+                .finish())
+        }
+        Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/dex_login")]
+pub async fn dex_login() -> Result<HttpResponse, Error> {
+    use o2_enterprise::enterprise::dex::meta::PreLoginData;
+
+    let login_data: PreLoginData = dex_auth::get_dex_login();
+    let state = login_data.state;
+
+    Ok(HttpResponse::Ok().json(login_data.url))
+}
+
+fn parse_dn(dn: &str) -> Option<(String, String)> {
+    let re = Regex::new(r"cn=(?P<role>[^,]+),ou=(?P<team>[^,]+)").unwrap();
+
+    re.captures(dn.as_bytes()).map(|caps| {
+        let role = String::from_utf8_lossy(caps.name("role").unwrap().as_bytes()).to_string();
+        let team = String::from_utf8_lossy(caps.name("team").unwrap().as_bytes()).to_string();
+        (role, team)
+    })
 }

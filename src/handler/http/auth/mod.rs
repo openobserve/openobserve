@@ -20,8 +20,9 @@ use actix_web::{
     web, Error,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
+use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{common::infra::config::LDAP_CONFIG, ldap::service::LdapUser};
+use o2_enterprise::enterprise::ldap::service::client::LdapUser;
 
 use crate::{
     common::{
@@ -96,7 +97,7 @@ pub async fn validate_credentials(
     path: &str,
 ) -> Result<bool, Error> {
     #[cfg(feature = "enterprise")]
-    if LDAP_CONFIG.ldap_enabled {
+    if O2_CONFIG.ldap.ldap_enabled {
         log::info!("LDAP authentication enabled");
         return validate_user(user_id, user_password).await;
     }
@@ -186,7 +187,9 @@ async fn validate_user_from_db(
 /// Validate the incoming user from the ldap, if ldap is enabled
 #[cfg(feature = "enterprise")]
 async fn validate_user_from_ldap(user_id: &str, user_password: &str) -> Result<bool, Error> {
-    let ldap_user_res: Result<LdapUser, anyhow::Error> =
+    use o2_enterprise::errors::O2EnterpriseError;
+
+    let ldap_user_res: Result<LdapUser, O2EnterpriseError> =
         o2_enterprise::enterprise::ldap::service::auth::get_user_from_ldap(user_id, user_password)
             .await;
 
@@ -246,7 +249,7 @@ pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, E
         Err(_) => true,
     };
 
-    if LDAP_CONFIG.ldap_enabled && is_ldap_user {
+    if O2_CONFIG.ldap.ldap_enabled && is_ldap_user {
         validate_user_from_ldap(user_id, user_password).await
     } else {
         validate_user_from_db(db_user, user_password).await

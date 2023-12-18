@@ -201,6 +201,16 @@ impl ErrorCodes {
     }
 }
 
+#[derive(ThisError, Debug)]
+pub enum JwtError {
+    #[error("No matching JWK found for the given kid")]
+    KeyNotExists(),
+    #[error("Token doesn't have a {0} field")]
+    MissingAttribute(String),
+    #[error("Token can't be verified")]
+    ValidationFailed(),
+}
+
 #[cfg(test)]
 mod tests {
     use expect_test::expect;

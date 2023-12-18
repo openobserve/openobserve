@@ -66,6 +66,9 @@ export default function (store: any) {
     const isAuthenticated = store.state.loggedIn;
 
     if (!isAuthenticated) {
+      if (to.path == "/cb") {
+        next();
+      }
       const sessionUserInfo = getDecodedUserInfo();
 
       const localStorageToken: any = useLocalToken();
