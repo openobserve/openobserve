@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="axis-field q-mr-sm q-my-xs"
           v-for="(itemX, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.x"
+          ].fields?.x"
           :key="index"
         >
           <div
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 index,
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields.x
+                ].fields?.x
               )
             "
             @drop="onFieldDrop('x', index)"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           index,
                           dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
-                          ].fields.x
+                          ].fields?.x
                         )
                       "
                       @drop="onFieldDrop('x', index)"
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery &&
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].fields.x[index].aggregationFunction === 'histogram'
+                      ].fields?.x[index]?.aggregationFunction === 'histogram'
                     "
                     class="q-mb-sm"
                   >
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         getHistoramIntervalField(
                           dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
-                          ].fields.x[index]
+                          ].fields?.x[index]
                         )
                       "
                       @update:modelValue="(newValue: any) => {dashboardPanelData.data.queries[
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :fieldObj="
                         dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
-                        ].fields.x[index]
+                        ].fields?.x[index]
                       "
                     />
                   </div>
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.x.length < 1
+            ].fields?.x?.length < 1
           "
         >
           <div class="q-mt-xs">{{ xAxisHint }}</div>
@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="axis-field q-mr-sm q-my-xs"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.y"
+          ].fields?.y"
           :key="index"
         >
           <div
@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 index,
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields.y
+                ].fields?.y
               )
             "
             @drop="onFieldDrop('y', index)"
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           index,
                           dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y
+                          ].fields?.y
                         )
                       "
                       @drop="onFieldDrop('y', index)"
@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery &&
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].fields.y[index].aggregationFunction === 'histogram'
+                      ].fields?.y[index]?.aggregationFunction === 'histogram'
                     "
                     class="q-mb-sm"
                   >
@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :fieldObj="
                         dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
-                        ].fields.y[index]
+                        ].fields?.y[index]
                       "
                     />
                   </div>
@@ -452,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.y.length < 1
+            ].fields?.y?.length < 1
           "
         >
           <div class="q-mt-xs">{{ yAxisHint }}</div>
@@ -491,7 +491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="axis-field q-mr-sm q-my-xs"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.z"
+            ].fields?.z"
             :key="index"
           >
             <div
@@ -504,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   index,
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
-                  ].fields.z
+                  ].fields?.z
                 )
               "
               @drop="onFieldDrop('z', index)"
@@ -544,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             index,
                             dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
-                            ].fields.z
+                            ].fields?.z
                           )
                         "
                         @drop="onFieldDrop('z', index)"
@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :fieldObj="
                           dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
-                          ].fields.z[index]
+                          ].fields?.z[index]
                         "
                       />
                     </div>
@@ -628,7 +628,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields.z.length < 1
+              ].fields?.z?.length < 1
             "
           >
             <div class="q-mt-xs">{{ zAxisHint }}</div>
@@ -672,7 +672,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="axis-field q-mr-sm q-my-xs"
           v-for="(filteredItem, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.filter"
+          ].fields?.filter"
           :key="index"
         >
           <q-btn
@@ -755,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               !['Is Null', 'Is Not Null'].includes(
                                 dashboardPanelData.data.queries[
                                   dashboardPanelData.layout.currentQueryIndex
-                                ].fields.filter[index].operator
+                                ].fields?.filter[index]?.operator
                               )
                             "
                             v-model="
@@ -865,7 +865,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.filter < 1
+            ].fields?.filter < 1
           "
         >
           {{ t("dashboard.addFieldMessage") }}
@@ -995,6 +995,8 @@ export default defineComponent({
       } else if (
         dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldElement"
       ) {
+        console.log("dragItem");
+        
         const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
 
         dashboardPanelData.meta.dragAndDrop.dragging = false;
@@ -1004,13 +1006,13 @@ export default defineComponent({
         const dragName =
           dashboardPanelData.meta.stream.selectedStreamFields.find(
             (item: any) => {
-              return item.name == dragItem.column;
+              return item?.name == dragItem?.column;
             }
           );
 
         const customDragName =
           dashboardPanelData.meta.stream.customQueryFields.find((item: any) => {
-            return item.name == dragItem.column;
+            return item?.name == dragItem?.column;
           });
 
         if (dragName) {
@@ -1246,6 +1248,8 @@ export default defineComponent({
             addZAxisItem(customDragName);
           }
         }
+      updateArrayAlias();
+
         currentDragArea.value = "";
       }
     };
@@ -1255,15 +1259,15 @@ export default defineComponent({
         case "x":
           return dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.x;
+          ].fields?.x;
         case "y":
           return dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.y;
+          ].fields?.y;
         case "z":
           return dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.z;
+          ].fields?.z;
         default:
           return [];
       }
@@ -1337,7 +1341,6 @@ export default defineComponent({
       fieldIndex.value = null;
     };
     const onFieldDragEnd = () => {
-      updateArrayAlias();
     };
 
     const handler2 = () => {};
@@ -1409,7 +1412,7 @@ export default defineComponent({
       const xFields =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.x;
+        ].fields?.x;
       return xFields.map(commonBtnLabel);
     });
 
@@ -1417,7 +1420,7 @@ export default defineComponent({
       const yFields =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.y;
+        ].fields?.y;
       return yFields.map(commonBtnLabel);
     });
 
@@ -1425,7 +1428,7 @@ export default defineComponent({
       const zFields =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.z;
+        ].fields?.z;
       return zFields.map(commonBtnLabel);
     });
 

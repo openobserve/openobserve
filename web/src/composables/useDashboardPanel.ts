@@ -443,7 +443,7 @@ const useDashboardPanelData = () => {
   const getNewColorValue = () => {
     const YAxisColor = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.y.map((it: any) => it.color);
+    ].fields.y.map((it: any) => it?.color);
     let newColor = colors.filter((el: any) => !YAxisColor.includes(el));
     if (!newColor.length) {
       newColor = colors;
@@ -531,7 +531,7 @@ const useDashboardPanelData = () => {
   const updateArrayAlias = () => {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields?.x.forEach(
+    ].fields?.x?.forEach(
       (it: any, index: any) =>
         (it.alias = !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -541,7 +541,7 @@ const useDashboardPanelData = () => {
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields?.y.forEach(
+    ].fields?.y?.forEach(
       (it: any, index: any) =>
         (it.alias = !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -551,7 +551,7 @@ const useDashboardPanelData = () => {
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields?.z.forEach(
+    ].fields?.z?.forEach(
       (it: any, index: any) =>
         (it.alias = !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -936,7 +936,7 @@ const useDashboardPanelData = () => {
 
         let fieldIndex = dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.x.findIndex((it: any) => it.alias == oldName);
+        ].fields.x?.findIndex((it: any) => it?.alias == oldName);
         // Check if the field is in the x fields array
         if (fieldIndex >= 0) {
           const newName = newArray[changedIndex[0]]?.name;
@@ -952,7 +952,7 @@ const useDashboardPanelData = () => {
         // Check if the field is in the y fields array
         fieldIndex = dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.findIndex((it: any) => it.alias == oldName);
+        ].fields.y?.findIndex((it: any) => it?.alias == oldName);
         if (fieldIndex >= 0) {
           const newName = newArray[changedIndex[0]]?.name;
           const field =
@@ -967,7 +967,7 @@ const useDashboardPanelData = () => {
         // Check if the field is in the z fields array
         fieldIndex = dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.z.findIndex((it: any) => it.alias == oldName);
+        ].fields.z?.findIndex((it: any) => it?.alias == oldName);
         if (fieldIndex >= 0) {
           const newName = newArray[changedIndex[0]]?.name;
           const field =
