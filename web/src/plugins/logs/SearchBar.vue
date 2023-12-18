@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="'saved-view-' + i"
                   v-close-popup
                 >
-                  <q-item-section @click.stop="applySavedView(item)">
+                  <q-item-section @click.stop="applySavedView(item)" v-close-popup>
                     <q-item-label>{{ item.view_name }}</q-item-label>
                   </q-item-section>
                   <q-item-section
