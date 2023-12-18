@@ -58,8 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   clickable
                   v-for="(item, i) in searchObj.data.savedViews"
                   :key="'saved-view-' + i"
+                  v-close-popup
                 >
-                  <q-item-section @click.stop="applySavedView(item)">
+                  <q-item-section
+                    @click.stop="applySavedView(item)"
+                    v-close-popup
+                  >
                     <q-item-label>{{ item.view_name }}</q-item-label>
                   </q-item-section>
                   <q-item-section
@@ -131,9 +135,11 @@ size="xs" />
                   clickable
                   v-for="(item, i) in functionOptions"
                   :key="'saved-view-' + i"
+                  v-close-popup
                 >
                   <q-item-section
-                    @click.stop="populateFunctionImplementation(item)"
+                    @click.stop="populateFunctionImplementation(item, true)"
+                    v-close-popup
                   >
                     <q-item-label>{{ item.name }}</q-item-label>
                   </q-item-section>
@@ -143,7 +149,7 @@ size="xs" />
                 <q-item>
                   <q-item-section>
                     <q-item-label>{{
-                      t("search.savedViewsNotFound")
+                      t("search.savedFunctionNotFound")
                     }}</q-item-label>
                   </q-item-section>
                 </q-item>
@@ -869,6 +875,7 @@ export default defineComponent({
     });
 
     const saveFunction = () => {
+      saveFunctionLoader.value = true;
       let callTransform: Promise<{ data: any }>;
       const content = fnEditorobj.getValue();
       let fnName = "";
@@ -884,6 +891,7 @@ export default defineComponent({
           message:
             "The function field must contain a value and cannot be left empty.",
         });
+        saveFunctionLoader.value = false;
         return;
       }
 
@@ -893,6 +901,7 @@ export default defineComponent({
           type: "negative",
           message: "Function name is not valid.",
         });
+        saveFunctionLoader.value = false;
         return;
       }
 
@@ -900,6 +909,7 @@ export default defineComponent({
       formData.value.function = content;
       formData.value.transType = 0;
       formData.value.name = fnName;
+      searchObj.data.tempFunctionContent = content;
 
       // const result = functionOptions.value.find((obj) => obj.name === fnName);
       if (isSavedFunctionAction.value == "create") {
@@ -910,8 +920,6 @@ export default defineComponent({
 
         callTransform
           .then((res: { data: any }) => {
-            searchObj.data.tempFunctionLoading = false;
-
             $q.notify({
               type: "positive",
               message: res.data.message,
@@ -934,7 +942,7 @@ export default defineComponent({
             savedFunctionSelectedName.value = "";
           })
           .catch((err) => {
-            searchObj.data.tempFunctionLoading = false;
+            saveFunctionLoader.value = false;
             $q.notify({
               type: "negative",
               message:
@@ -944,7 +952,9 @@ export default defineComponent({
             });
           });
       } else {
+        saveFunctionLoader.value = false;
         showConfirmDialog(() => {
+          saveFunctionLoader.value = true;
           callTransform = jsTransformService.update(
             store.state.selectedOrganization.identifier,
             formData.value
@@ -952,8 +962,6 @@ export default defineComponent({
 
           callTransform
             .then((res: { data: any }) => {
-              searchObj.data.tempFunctionLoading = false;
-
               $q.notify({
                 type: "positive",
                 message: "Function updated successfully.",
@@ -977,7 +985,7 @@ export default defineComponent({
               savedFunctionSelectedName.value = "";
             })
             .catch((err) => {
-              searchObj.data.tempFunctionLoading = false;
+              saveFunctionLoader.value = false;
               $q.notify({
                 type: "negative",
                 message:
@@ -1006,7 +1014,14 @@ export default defineComponent({
       }, 100);
     };
 
-    const populateFunctionImplementation = (fnValue) => {
+    const populateFunctionImplementation = (fnValue, flag = false) => {
+      if (flag) {
+        $q.notify({
+          type: "positive",
+          message: `${fnValue.name} function applied successfully.`,
+          timeout: 3000,
+        });
+      }
       searchObj.meta.toggleFunction = true;
       searchObj.config.fnSplitterModel = 60;
       fnEditorobj.setValue(fnValue.function);
@@ -1117,10 +1132,13 @@ export default defineComponent({
             searchObj.value = mergeDeep(searchObj, extractedObj);
             await nextTick();
             if (extractedObj.data.tempFunctionContent != "") {
-              populateFunctionImplementation({
-                name: "",
-                function: searchObj.data.tempFunctionContent,
-              });
+              populateFunctionImplementation(
+                {
+                  name: "",
+                  function: searchObj.data.tempFunctionContent,
+                },
+                false
+              );
               searchObj.data.tempFunctionContent =
                 extractedObj.data.tempFunctionContent;
               searchObj.meta.functionEditorPlaceholderFlag = false;
@@ -1533,7 +1551,6 @@ export default defineComponent({
       }
     },
     toggleFunction(newVal) {
-
       if (newVal == false) {
         this.searchObj.config.fnSplitterModel = 99.5;
         this.resetFunctionContent();

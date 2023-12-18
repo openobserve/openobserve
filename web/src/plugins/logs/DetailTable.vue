@@ -474,6 +474,7 @@ export default defineComponent({
 .indexDetailsContainer .q-list .q-item {
   height: auto;
   min-height: fit-content;
+  padding: 2px 8px;
 }
 
 .indexDetailsContainer .q-list .q-item .q-item__section {
