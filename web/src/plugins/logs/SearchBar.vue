@@ -143,7 +143,7 @@ size="xs" />
                 <q-item>
                   <q-item-section>
                     <q-item-label>{{
-                      t("search.savedViewsNotFound")
+                      t("search.savedFunctionNotFound")
                     }}</q-item-label>
                   </q-item-section>
                 </q-item>

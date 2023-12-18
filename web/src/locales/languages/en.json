@@ -69,6 +69,7 @@
     "functionMessage": "Press Tab/Enter button to apply new function name.",
     "saveFunctionLabel": "Save Function",
     "saveFunctionName": "Function Name",
+    "savedFunctionNotFound": "Function not found!",
     "exportLogs": "Export logs",
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
