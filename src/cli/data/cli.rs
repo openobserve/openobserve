@@ -29,7 +29,7 @@ pub struct Cli {
     pub end_time: i64,
 }
 
-pub fn args() -> impl IntoIterator<Item=impl Into<clap::Arg>> {
+pub fn args() -> impl IntoIterator<Item = impl Into<clap::Arg>> {
     [
         clap::Arg::new("stream").long("stream").alias("c").default_value("stream")
             .help("for stream data, maybe we can export stream, users, metadata, but for now we can only support stream"),
@@ -87,18 +87,16 @@ fn handle_args(app: clap::ArgMatches) -> Cli {
 
     let start = match app.get_one::<String>("start_time") {
         Some(time) => time.parse::<i64>().unwrap(),
-        None => {
-            Local::now()
-                .date_naive()
-                .and_hms_milli_opt(0, 0, 0, 0)
-                .unwrap()
-                .timestamp_micros()
-        }
+        None => Local::now()
+            .date_naive()
+            .and_hms_milli_opt(0, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros(),
     };
 
     let end = match app.get_one::<String>("end_time") {
         Some(time) => time.parse::<i64>().unwrap(),
-        None => { (Local::now() - Duration::hours(1)).timestamp_micros() }
+        None => (Local::now() - Duration::hours(1)).timestamp_micros(),
     };
 
     Cli {

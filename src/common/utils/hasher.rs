@@ -55,7 +55,7 @@ pub fn get_fields_key_xxh3(fields: &[Field]) -> String {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use arrow_schema::{DataType, Field};
 
