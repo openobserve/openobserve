@@ -869,6 +869,7 @@ export default defineComponent({
     });
 
     const saveFunction = () => {
+      saveFunctionLoader.value = true;
       let callTransform: Promise<{ data: any }>;
       const content = fnEditorobj.getValue();
       let fnName = "";
@@ -884,6 +885,7 @@ export default defineComponent({
           message:
             "The function field must contain a value and cannot be left empty.",
         });
+        saveFunctionLoader.value = false;
         return;
       }
 
@@ -893,6 +895,7 @@ export default defineComponent({
           type: "negative",
           message: "Function name is not valid.",
         });
+        saveFunctionLoader.value = false;
         return;
       }
 
@@ -900,6 +903,7 @@ export default defineComponent({
       formData.value.function = content;
       formData.value.transType = 0;
       formData.value.name = fnName;
+      searchObj.data.tempFunctionContent = content;
 
       // const result = functionOptions.value.find((obj) => obj.name === fnName);
       if (isSavedFunctionAction.value == "create") {
@@ -910,8 +914,6 @@ export default defineComponent({
 
         callTransform
           .then((res: { data: any }) => {
-            searchObj.data.tempFunctionLoading = false;
-
             $q.notify({
               type: "positive",
               message: res.data.message,
@@ -934,7 +936,7 @@ export default defineComponent({
             savedFunctionSelectedName.value = "";
           })
           .catch((err) => {
-            searchObj.data.tempFunctionLoading = false;
+            saveFunctionLoader.value = false;
             $q.notify({
               type: "negative",
               message:
@@ -944,7 +946,9 @@ export default defineComponent({
             });
           });
       } else {
+        saveFunctionLoader.value = false;
         showConfirmDialog(() => {
+          saveFunctionLoader.value = true;
           callTransform = jsTransformService.update(
             store.state.selectedOrganization.identifier,
             formData.value
@@ -952,8 +956,6 @@ export default defineComponent({
 
           callTransform
             .then((res: { data: any }) => {
-              searchObj.data.tempFunctionLoading = false;
-
               $q.notify({
                 type: "positive",
                 message: "Function updated successfully.",
@@ -977,7 +979,7 @@ export default defineComponent({
               savedFunctionSelectedName.value = "";
             })
             .catch((err) => {
-              searchObj.data.tempFunctionLoading = false;
+              saveFunctionLoader.value = false;
               $q.notify({
                 type: "negative",
                 message:
