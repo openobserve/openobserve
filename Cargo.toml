@@ -76,10 +76,8 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { git = "https://github.com/apache/arrow-datafusion.git", rev = "b648d4e22e82989c65523e62312e1995a1543888", version = "33", features = [
-  "simd",
-] }
-datafusion-expr = { git = "https://github.com/apache/arrow-datafusion.git", rev = "b648d4e22e82989c65523e62312e1995a1543888", version = "33" }
+datafusion = { version = "34", features = ["simd"] }
+datafusion-expr = { version = "34" }
 arrow = { version = "49", features = ["simd", "ipc_compression"] }
 arrow-schema = { version = "49", features = ["serde"] }
 parquet = { version = "49", features = ["arrow", "async"] }
@@ -141,7 +139,7 @@ simd-json = "0.13"
 sha256 = "1.4.0"
 sled = "0.34"
 snap = "1"
-sqlparser = { version = "0.39", features = ["serde", "visitor"] }
+sqlparser = { version = "0.40", features = ["serde", "visitor"] }
 sqlx = { version = "0.7", features = [
   "runtime-tokio-rustls",
   "postgres",
@@ -168,7 +166,7 @@ utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "66667dd291482a440c5eb2032ef3cbfb7377b53b" }
-vrl = { version = "0.8.1", features = ["value", "compiler","test"] }
+vrl = { version = "0.8.1", features = ["value", "compiler", "test"] }
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"

@@ -1214,7 +1214,7 @@ fn apply_query_fn(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use arrow::array::{Int32Array, NullArray, StringArray};
     use arrow_schema::Field;
 
