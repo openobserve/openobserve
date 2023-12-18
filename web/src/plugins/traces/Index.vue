@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before v-if="searchObj.meta.showFields">
             <index-list
+              ref="indexListRef"
               data-test="logs-search-index-list"
               :key="searchObj.data.stream.streamLists"
             />
@@ -217,6 +218,7 @@ export default defineComponent({
       if (this.searchObj.loading == false) {
         this.searchObj.loading = true;
         this.searchObj.runQuery = true;
+        this.indexListRef.filterExpandedFieldValues();
       }
 
       if (config.isCloud == "true") {
@@ -255,7 +257,6 @@ export default defineComponent({
     const $q = useQuasar();
     const { t } = useI18n();
     const { searchObj, resetSearchObj } = useTraces();
-    let dismiss = null;
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -264,45 +265,10 @@ export default defineComponent({
     const { showErrorNotification } = useNotifications();
     const serviceColorIndex = ref(0);
     const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
+    const indexListRef = ref(null);
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
-
-    function ErrorException(message) {
-      searchObj.loading = false;
-      // searchObj.data.errorMsg = message;
-      $q.notify({
-        type: "negative",
-        message: message,
-        timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
-
-    function Notify() {
-      return $q.notify({
-        type: "positive",
-        message: "Waiting for response...",
-        timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
 
     function getQueryTransform() {
       try {
@@ -368,6 +334,16 @@ export default defineComponent({
                 data: [],
               };
             }
+
+            extractFields();
+
+            if (
+              searchObj.data.editorValue &&
+              searchObj.data.stream.selectedStreamFields.length
+            )
+              nextTick(() => {
+                restoreFilters(searchObj.data.editorValue);
+              });
           })
           .catch((e) => {
             searchObj.loading = false;
@@ -583,7 +559,6 @@ export default defineComponent({
         updateUrlQueryParams();
         return req;
       } catch (e) {
-        console.log(e);
         searchObj.loading = false;
         showErrorNotification("Invalid SQL Syntax");
       }
@@ -755,12 +730,24 @@ export default defineComponent({
           });
         }
 
+        const durationFilter = indexListRef.value.duration.input;
+
+        let duration = "";
+        if (durationFilter.max)
+          duration += ` duration >= ${
+            durationFilter.min * 1000
+          } AND duration <= ${durationFilter.max * 1000}`;
+
+        const filter = searchObj.data.editorValue.trim()?.length
+          ? searchObj.data.editorValue + " AND" + duration
+          : duration;
+
         searchService
           .get_traces({
             org_identifier: searchObj.organizationIdetifier,
             start_time: queryReq.query.start_time,
             end_time: queryReq.query.end_time,
-            filter: searchObj.data.editorValue || "",
+            filter: filter || "",
             size: queryReq.query.size,
             from: queryReq.query.from,
           })
@@ -777,11 +764,12 @@ export default defineComponent({
               };
             }
 
+            updateDurationFilter();
+
             updateFieldValues(res.data.hits);
-            //extract fields from query response
-            extractFields();
 
             generateHistogramData();
+
             //update grid columns
             updateGridColumns();
 
@@ -840,7 +828,6 @@ export default defineComponent({
             if (serviceColorIndex.value >= colors.value.length)
               generateNewColor();
 
-            console.log(serviceColorIndex.value, colors.value);
             searchObj.meta.serviceColors[service.service_name] =
               colors.value[serviceColorIndex.value];
 
@@ -864,31 +851,17 @@ export default defineComponent({
       try {
         searchObj.data.stream.selectedStreamFields = [];
         if (searchObj.data.streamResults.list.length > 0) {
-          const queryResult = [];
-          const tempFieldsName = [];
+          const schema = [];
           const ignoreFields = [store.state.zoConfig.timestamp_column];
           let ftsKeys;
 
           searchObj.data.streamResults.list.forEach((stream: any) => {
             if (searchObj.data.stream.selectedStream.value == stream.name) {
-              queryResult.push(...stream.schema);
+              schema.push(...stream.schema);
               ftsKeys = new Set([...stream.settings.full_text_search_keys]);
             }
           });
 
-          queryResult.forEach((field: any) => {
-            tempFieldsName.push(field.name);
-          });
-
-          if (searchObj.data.queryResults.hits.length > 0) {
-            let firstRecord = searchObj.data.queryResults.hits[0];
-
-            Object.keys(firstRecord).forEach((key) => {
-              if (!tempFieldsName.includes(key)) {
-                queryResult.push({ name: key, type: "Utf8" });
-              }
-            });
-          }
           const idFields = {
             trace_id: 1,
             span_id: 1,
@@ -896,9 +869,12 @@ export default defineComponent({
             reference_parent_trace_id: 1,
             start_time: 1,
           };
+
           const importantFields = {
+            duration: 1,
             service_name: 1,
             operation_name: 1,
+            span_status: 1,
             trace_id: 1,
             span_id: 1,
             reference_parent_span_id: 1,
@@ -919,7 +895,7 @@ export default defineComponent({
             }
           });
 
-          queryResult.forEach((row: any) => {
+          schema.forEach((row: any) => {
             // let keys = deepKeys(row);
             // for (let i in row) {
             if (
@@ -939,7 +915,7 @@ export default defineComponent({
         }
       } catch (e) {
         searchObj.loading = false;
-        console.log("Error while extracting fields");
+        console.log("Error while extracting fields", e);
       }
     }
 
@@ -1206,6 +1182,10 @@ export default defineComponent({
       if (queryParams.query) {
         searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
       }
+
+      if (queryParams.filter_type) {
+        searchObj.meta.filterType = queryParams.filter_type;
+      }
     }
 
     function updateUrlQueryParams() {
@@ -1220,6 +1200,8 @@ export default defineComponent({
       }
 
       query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
+
+      query["filter_type"] = searchObj.meta.filterType;
 
       query["org_identifier"] = store.state.selectedOrganization.identifier;
 
@@ -1236,6 +1218,63 @@ export default defineComponent({
       updateGridColumns();
       generateHistogramData();
       searchResultRef.value.reDrawChart();
+    };
+
+    const restoreFiltersFromQuery = (node: any) => {
+      if (!node) return;
+      if (node.type === "binary_expr") {
+        if (node.left.column) {
+          let values = [];
+          if (node.operator === "IN") {
+            values = node.right.value.map(
+              (_value: { value: string }) => _value.value
+            );
+          }
+          searchObj.data.stream.fieldValues[node.left.column].selectedValues =
+            values;
+        }
+      }
+
+      // Recurse through AND/OR expressions
+      if (
+        node.type === "binary_expr" &&
+        (node.operator === "AND" || node.operator === "OR")
+      ) {
+        restoreFiltersFromQuery(node.left);
+        restoreFiltersFromQuery(node.right);
+      }
+    };
+
+    const restoreFilters = (query: string) => {
+      // const filters = searchObj.data.stream.filters;
+      const parser = new Parser();
+
+      const defaultQuery = "SELECT * FROM 'default' WHERE ";
+
+      const parsedQuery = parser.astify(defaultQuery + query);
+
+      restoreFiltersFromQuery(parsedQuery.where);
+    };
+
+    const updateDurationFilter = () => {
+      let min = 0;
+      let max = 0;
+
+      searchObj.data.queryResults.hits.forEach((result) => {
+        if (result.duration < min) min = result.duration;
+        if (result.duration > max) max = result.duration;
+      });
+
+      // Converting from nano to milli
+      min = Math.floor(min / 1000);
+
+      max = Math.ceil(max / 1000);
+
+      indexListRef.value.duration.slider.min = min;
+      indexListRef.value.duration.slider.max = max;
+
+      indexListRef.value.duration.input.min = min;
+      indexListRef.value.duration.input.max = max;
     };
 
     return {
@@ -1257,6 +1296,7 @@ export default defineComponent({
       fieldValues,
       onSplitterUpdate,
       refreshTimezone,
+      indexListRef,
     };
   },
   computed: {

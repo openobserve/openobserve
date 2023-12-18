@@ -51,6 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="text-bold q-mx-sm span_details_tabs"
   >
     <q-tab
+      name="details"
+      :label="t('common.details')"
+      style="text-transform: capitalize"
+    />
+    <q-tab
       name="tags"
       :label="t('common.attributes')"
       style="text-transform: capitalize"
