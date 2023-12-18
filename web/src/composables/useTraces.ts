@@ -127,6 +127,7 @@ const defaultObject = {
       loading: false,
       selectedSpanId: null as string | null,
       showSpanDetails: false,
+      traceDetailsPosition: "right",
     },
   },
 };

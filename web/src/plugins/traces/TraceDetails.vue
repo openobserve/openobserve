@@ -82,7 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator style="width: 100%" class="q-mb-sm" />
       <div
         :class="
-          isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
+          isSidebarOpen && traceDetailsPosition === 'right'
+            ? 'histogram-container'
+            : 'histogram-container-full'
         "
       >
         <trace-header
@@ -90,36 +92,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :splitterWidth="splitterModel"
         />
         <div class="histogram-spans-container">
-          <q-splitter v-model="splitterModel">
-            <template v-slot:before>
-              <div
-                class="trace-tree-container"
-                :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-              >
-                <trace-tree
-                  :collapseMapping="collapseMapping"
-                  :spans="spanPositionList"
-                  :baseTracePosition="baseTracePosition"
-                  :spanDimensions="spanDimensions"
-                  class="trace-tree"
-                  @toggle-collapse="toggleSpanCollapse"
-                />
-              </div>
-            </template>
-            <template v-slot:after>
-              <SpanRenderer
-                :collapseMapping="collapseMapping"
-                :spans="spanPositionList"
-                :baseTracePosition="baseTracePosition"
-                :spanDimensions="spanDimensions"
-                ref="traceRootSpan"
-              />
-            </template>
-          </q-splitter>
+          <div
+            class="trace-tree-container"
+            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+          >
+            <trace-tree
+              :collapseMapping="collapseMapping"
+              :spans="spanPositionList"
+              :baseTracePosition="baseTracePosition"
+              :spanDimensions="spanDimensions"
+              class="trace-tree"
+              @toggle-collapse="toggleSpanCollapse"
+            />
+          </div>
         </div>
       </div>
       <q-separator vertical />
-      <div v-if="isSidebarOpen && selectedSpanId" class="histogram-sidebar">
+      <div
+        v-if="
+          isSidebarOpen && selectedSpanId && traceDetailsPosition === 'right'
+        "
+        class="histogram-sidebar"
+      >
         <trace-details-sidebar
           :span="spanMap[selectedSpanId]"
           @close="closeSidebar"
@@ -234,6 +228,10 @@ export default defineComponent({
       },
       { immediate: true }
     );
+
+    const traceDetailsPosition = computed(() => {
+      return searchObj.data.traceDetails.traceDetailsPosition;
+    });
 
     const isSidebarOpen = computed(() => {
       return searchObj.data.traceDetails.showSpanDetails;
@@ -617,6 +615,7 @@ export default defineComponent({
       traceVisuals,
       getImageURL,
       store,
+      traceDetailsPosition,
     };
   },
 });
