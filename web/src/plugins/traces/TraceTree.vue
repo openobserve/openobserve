@@ -17,63 +17,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="q-pl-xs q-pt-sm">
     <template v-for="span in spans as any[]" :key="span.spanId">
-      <div :style="{ position: 'relative', width: '100%', overflow: 'hidden' }">
-        <div
-          :style="{
-            height: spanDimensions.textHeight - 8 + 'px',
-            margin: `4px 0px 4px ${
-              span.hasChildSpans
-                ? span.style.left
-                : parseInt(span.style.left) +
-                  spanDimensions.collapseWidth +
-                  'px'
-            }`,
-          }"
-          class="flex items-center no-wrap justify-start ellipsis"
-          :title="span.operationName"
-        >
+      <div
+        :style="{
+          position: 'relative',
+          width: '100%',
+          overflow: 'visible',
+          flexWrap: 'nowrap',
+        }"
+        class="flex"
+      >
+        <div style="width: 25%">
           <div
-            v-if="span.hasChildSpans"
             :style="{
-              width: spanDimensions.collapseWidth + 'px',
-              height: spanDimensions.collapseHeight + 'px',
+              height: spanDimensions.textHeight - 8 + 'px',
+              margin: `4px 0px 4px ${
+                span.hasChildSpans
+                  ? span.style.left
+                  : parseInt(span.style.left) +
+                    spanDimensions.collapseWidth +
+                    'px'
+              }`,
             }"
-            class="flex justify-center items-center collapse-container cursor-pointer"
-            @click.stop="toggleSpanCollapse(span.spanId)"
+            class="flex items-center no-wrap justify-start ellipsis"
+            :title="span.operationName"
           >
-            <q-icon
-              dense
-              round
-              flat
-              name="expand_more"
-              class="collapse-btn"
+            <div
+              v-if="span.hasChildSpans"
               :style="{
-                rotate: collapseMapping[span.spanId] ? '0deg' : '270deg',
+                width: spanDimensions.collapseWidth + 'px',
+                height: spanDimensions.collapseHeight + 'px',
               }"
-            />
-          </div>
-          <div
-            class="ellipsis q-ml-xs cursor-pointer"
-            :style="{
-              paddingLeft: '4px',
-              borderLeft: `3px solid ${span.style.color}`,
-            }"
-            @click="selectSpan(span.spanId)"
-          >
-            <span class="text-subtitle2 text-bold q-mr-sm">
-              {{ span.serviceName }}
-            </span>
-            <span
-              class="text-body2"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'text-grey-5'
-                  : 'text-blue-grey-9'
-              "
-              >{{ span.operationName }}</span
+              class="flex justify-center items-center collapse-container cursor-pointer"
+              @click.stop="toggleSpanCollapse(span.spanId)"
             >
+              <q-icon
+                dense
+                round
+                flat
+                name="expand_more"
+                class="collapse-btn"
+                :style="{
+                  rotate: collapseMapping[span.spanId] ? '0deg' : '270deg',
+                }"
+              />
+            </div>
+            <div
+              class="ellipsis q-pl-xs cursor-pointer"
+              :style="{
+                paddingLeft: '4px',
+                borderLeft: `3px solid ${span.style.color}`,
+              }"
+              @click="selectSpan(span.spanId)"
+            >
+              <span class="text-subtitle2 text-bold q-mr-sm">
+                {{ span.serviceName }}
+              </span>
+              <span
+                class="text-body2"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'text-grey-5'
+                    : 'text-blue-grey-9'
+                "
+                >{{ span.operationName }}</span
+              >
+            </div>
           </div>
         </div>
+        <span-block
+          :span="span"
+          :depth="depth"
+          :baseTracePosition="baseTracePosition"
+          :styleObj="{
+            position: 'absolute',
+            top: span.style.top,
+            left: span.style.left,
+            height: '60px',
+          }"
+          :spanDimensions="spanDimensions"
+          :isCollapsed="collapseMapping[span.spanId]"
+          style="width: 75%"
+          @toggle-collapse="toggleSpanCollapse"
+        />
       </div>
     </template>
   </div>
@@ -84,6 +109,7 @@ import { defineComponent } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
+import SpanBlock from "./SpanBlock.vue";
 
 export default defineComponent({
   name: "TraceTree",
@@ -116,18 +142,14 @@ export default defineComponent({
   emits: ["toggleCollapse"],
   setup(props, { emit }) {
     const { searchObj } = useTraces();
-
     const store = useStore();
-
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
     }
-
     const selectSpan = (spanId: string | null) => {
       searchObj.data.traceDetails.showSpanDetails = true;
       searchObj.data.traceDetails.selectedSpanId = spanId;
     };
-
     return {
       toggleSpanCollapse,
       getImageURL,
@@ -135,6 +157,7 @@ export default defineComponent({
       store,
     };
   },
+  components: { SpanBlock },
 });
 </script>
 

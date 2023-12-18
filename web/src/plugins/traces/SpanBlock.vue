@@ -15,49 +15,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="flex justify-between items-center cursor-pointer span-block relative-position"
-    :style="{
-      width: '100%',
-      height: spanDimensions.height + 'px',
-    }"
-    :class="!isSpanSelected ? 'defocus' : ''"
-    ref="spanBlock"
-    @click="selectSpan"
-  >
+  <div class="flex wrap justify-start items-center">
+    <!-- <q-btn icon="expand_more" dense size="xs" flat style="margin-right: 2px" /> -->
     <div
+      class="flex justify-between items-center cursor-pointer span-block relative-position"
       :style="{
+        height: spanDimensions.height + 'px',
         width: '100%',
-        overflow: 'hidden',
       }"
-      class="cursor-pointer flex items-center no-wrap position-relative"
-      :class="!isSpanSelected ? 'defocus' : ''"
+      :class="defocusSpan && traceDetailsPosition === 'right' ? 'defocus' : ''"
+      ref="spanBlock"
       @click="selectSpan"
     >
       <div
         :style="{
-          width: getWidth + '%',
-          height: spanDimensions.barHeight + 'px',
-          borderRadius: '2px',
-          left: getLeftPosition + '%',
-          position: 'relative',
-          backgroundColor: span.style?.color || '#58508d',
-          zIndex: 1,
+          width: '100%',
+          overflow: 'hidden',
         }"
-      />
-      <div
-        :style="{
-          position: 'absolute',
-          ...getDurationStyle,
-          transition: 'all 0.5s ease',
-          zIndex: 1,
-        }"
-        class="text-caption"
+        class="cursor-pointer flex items-center no-wrap position-relative"
+        :class="
+          defocusSpan && traceDetailsPosition === 'right' ? 'defocus' : ''
+        "
+        @click="selectSpan"
       >
-        {{ formatTimeWithSuffix(span.durationUs) }}
+        <div
+          :style="{
+            height: spanDimensions.barHeight + 'px',
+            width: getWidth + '%',
+            left: getLeftPosition + '%',
+            position: 'relative',
+          }"
+          class="flex justify-start items-center no-wrap"
+          ref="spanMarkerRef"
+        >
+          <q-btn
+            icon="expand_more"
+            dense
+            size="xs"
+            flat
+            style="margin-right: 2px"
+            @click.prevent.stop="toggleSpanDetails()"
+          />
+
+          <div
+            :style="{
+              width: 'calc(100% - 21px)',
+              height: '100%',
+              borderRadius: '2px',
+              backgroundColor: span.style?.color || '#58508d',
+            }"
+          />
+        </div>
+        <div
+          :style="{
+            position: 'absolute',
+            ...getDurationStyle,
+            transition: 'all 0.5s ease',
+            zIndex: 1,
+          }"
+          class="text-caption"
+        >
+          {{ formatTimeWithSuffix(span.durationUs) }}
+        </div>
+        <q-resize-observer debounce="300" @resize="onResize" />
       </div>
-      <q-resize-observer debounce="300" @resize="onResize" />
     </div>
+    <template v-if="isSpanSelected && traceDetailsPosition === 'bottom'">
+      <span-details :span="span"></span-details>
+    </template>
   </div>
 </template>
 
@@ -65,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, ref } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
+import SpanDetails from "./SpanDetails.vue";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -99,14 +125,15 @@ export default defineComponent({
     },
   },
   emits: ["toggleCollapse"],
+  components: { SpanDetails },
   setup(props, { emit }) {
     const { searchObj } = useTraces();
     const spanBlock: any = ref(null);
     const spanBlockWidth = ref(0);
     const onePixelPercent = ref(0);
-    const isSpanSelected = computed(() => {
-      if (!searchObj.data.traceDetails.selectedSpanId) return true;
-      return searchObj.data.traceDetails.selectedSpanId === props.span.spanId;
+    const defocusSpan = computed(() => {
+      if (!searchObj.data.traceDetails.selectedSpanId) return false;
+      return searchObj.data.traceDetails.selectedSpanId !== props.span.spanId;
     });
     const selectSpan = () => {
       searchObj.data.traceDetails.showSpanDetails = true;
@@ -115,6 +142,28 @@ export default defineComponent({
     const toggleSpanCollapse = () => {
       emit("toggleCollapse", props.span.spanId);
     };
+
+    const isSidebarOpen = computed(() => {
+      return searchObj.data.traceDetails.showSpanDetails;
+    });
+
+    const isSpanSelected = computed(() => {
+      return (
+        isSidebarOpen.value &&
+        searchObj.data.traceDetails.selectedSpanId === props.span.spanId
+      );
+    });
+
+    const spanMarkerRef = ref(null);
+
+    const getSpanWidthInPx = computed(() => {
+      return spanMarkerRef.value?.clientWidth > 1;
+    });
+
+    const traceDetailsPosition = computed(() => {
+      return searchObj.data.traceDetails.traceDetailsPosition;
+    });
+
     const getLeftPosition = computed(() => {
       const left =
         props.span.startTimeMs - props.baseTracePosition["startTimeMs"];
@@ -157,7 +206,11 @@ export default defineComponent({
         style.left = getLeftPosition.value * onePercent - labelWidth + "px";
       } else {
         style.left =
-          (getLeftPosition.value + getWidth.value) * onePercent + 10 + "px";
+          (getLeftPosition.value +
+            (Math.floor(getWidth.value) ? getWidth.value : 1)) *
+            onePercent +
+          10 +
+          "px";
       }
       return style;
     });
@@ -170,10 +223,21 @@ export default defineComponent({
       spanBlockWidth.value = spanBlock.value.clientWidth;
     };
 
+    const toggleSpanDetails = () => {
+      console.log(isSpanSelected.value);
+      if (!isSpanSelected.value) {
+        searchObj.data.traceDetails.traceDetailsPosition = "bottom";
+        selectSpan();
+      } else {
+        searchObj.data.traceDetails.traceDetailsPosition = "bottom";
+        searchObj.data.traceDetails.showSpanDetails = false;
+        searchObj.data.traceDetails.selectedSpanId = "";
+      }
+    };
+
     return {
       formatTimeWithSuffix,
       selectSpan,
-      isSpanSelected,
       toggleSpanCollapse,
       getImageURL,
       getLeftPosition,
@@ -182,7 +246,13 @@ export default defineComponent({
       spanBlock,
       onResize,
       onePixelPercent,
+      getSpanWidthInPx,
       getSpanStartTime,
+      spanMarkerRef,
+      toggleSpanDetails,
+      traceDetailsPosition,
+      defocusSpan,
+      isSpanSelected,
     };
   },
 });
