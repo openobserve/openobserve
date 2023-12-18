@@ -652,7 +652,7 @@ export default defineComponent({
                 .fields.y.length == 0
             ) {
               errors.push(
-                "Only one values field is allowed for donut and pie charts"
+                "Add one value field for donut and pie charts"
               );
             }
 
@@ -663,7 +663,7 @@ export default defineComponent({
                 .fields.x.length == 0
             ) {
               errors.push(
-                "Only one label field is allowed for donut and pie charts"
+                "Add one label field for donut and pie charts"
               );
             }
 
@@ -677,7 +677,7 @@ export default defineComponent({
                 .fields.y.length == 0
             ) {
               errors.push(
-                "Only one Y-Axis field should be there for metric charts"
+                "Add one value field for metric charts"
               );
             }
 
@@ -697,7 +697,7 @@ export default defineComponent({
               dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
                 .fields.y.length != 1
             ) {
-              errors.push("Only one value field is allowed for gauge chart");
+              errors.push("Add one value field for gauge chart");
             }
             // gauge can have zero or one label
             if (
@@ -706,7 +706,7 @@ export default defineComponent({
               dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
                 .fields.x.length != 0
             ) {
-              errors.push(`At max only one label field is allowed for gauge chart`);
+              errors.push(`Add one label field for gauge chart`);
             }
 
             break;
