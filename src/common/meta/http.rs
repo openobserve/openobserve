@@ -113,7 +113,7 @@ impl HttpResponse {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use actix_web::http;
 
     use super::*;
