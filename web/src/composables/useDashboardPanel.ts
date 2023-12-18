@@ -176,6 +176,7 @@ const useDashboardPanelData = () => {
       case "pie":
       case "donut":
       case "heatmap":
+      case "gauge":
         return (
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -202,6 +203,7 @@ const useDashboardPanelData = () => {
     switch (dashboardPanelData.data.type) {
       case "pie":
       case "donut":
+      case "gauge":
         return (
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
