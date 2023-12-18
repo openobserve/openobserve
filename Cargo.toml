@@ -76,10 +76,10 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "32c6f68e4fd9926e858344e541418addbc51dbfd", version = "34", features = [
+datafusion = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "45e5537ca43d2c2a6e55b9804073b191b337b9e5", version = "34", features = [
   "simd",
 ] }
-datafusion-expr = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "32c6f68e4fd9926e858344e541418addbc51dbfd", version = "34" }
+datafusion-expr = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "45e5537ca43d2c2a6e55b9804073b191b337b9e5", version = "34" }
 arrow = { version = "49", features = ["simd", "ipc_compression"] }
 arrow-schema = { version = "49", features = ["serde"] }
 parquet = { version = "49", features = ["arrow", "async"] }
