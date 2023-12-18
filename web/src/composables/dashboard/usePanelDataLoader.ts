@@ -65,7 +65,6 @@ export const usePanelDataLoader = (
       )
     : [];
 
-  // console.log("variablesData currentAdHocVariablesData", variablesData.value);
   // console.log(
   //   "variablesData.value currentAdHocVariablesData",
   //   JSON.parse(JSON.stringify(variablesData.value))
