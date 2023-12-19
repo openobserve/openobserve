@@ -52,7 +52,7 @@ pub async fn save(
     alert.name = name.to_string();
     alert.org_id = org_id.to_string();
     alert.stream_type = stream_type;
-    alert.stream_name = stream_name.to_string(); 
+    alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
     if alert.name.is_empty() || alert.stream_name.is_empty() {
@@ -793,7 +793,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
 }
 
 fn process_dest_template(
-    tpl: &String,
+    tpl: &str,
     alert: &Alert,
     rows: &[Map<String, Value>],
     rows_tpl_val: &str,
