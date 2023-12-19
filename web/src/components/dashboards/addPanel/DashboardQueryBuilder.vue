@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            currentDragArea == 'x',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x',
         }"
         @dragover="onDragOver($event, 'x')"
         @drop="
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @dragend="onDragEnd()"
         >
           <div
-            v-if="dragIndex == index && currentDragArea == 'x'"
+            v-if="dragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'"
             class="dragItem"
           >
             &nbsp;
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            currentDragArea == 'y',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y',
         }"
         @dragover="onDragOver($event, 'y')"
         @drop="
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
         >
           <div
-            v-if="dragIndex == index && currentDragArea == 'y'"
+            v-if="dragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y'"
             class="dragItem"
           >
             &nbsp;
@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
             'drop-entered':
               dashboardPanelData.meta.dragAndDrop.dragging &&
-              currentDragArea == 'z',
+              dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z',
           }"
           @dragover="onDragOver($event, 'z')"
           @drop="
@@ -505,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @dragend="onDragEnd()"
           >
             <div
-              v-if="dragIndex == index && currentDragArea == 'z'"
+              v-if="dragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'"
               class="dragItem"
             >
               &nbsp;
@@ -646,7 +646,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.meta.dragAndDrop.dragSource == 'fieldList',
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            currentDragArea == 'f',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'f',
         }"
         @dragover="onDragOver($event, 'f')"
         @drop="
@@ -917,6 +917,7 @@ export default defineComponent({
       isAddXAxisNotAllowed,
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
+      cleanupDraggingFields
     } = useDashboardPanelData();
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -962,8 +963,6 @@ export default defineComponent({
         }
       }
     );
-
-    const currentDragArea = ref("");
 
     const dragIndex = ref(0);
 
@@ -1121,15 +1120,6 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
-    const cleanupDraggingFields = () => {
-      currentDragArea.value = "";
-      dragIndex.value = -1; // targetDragIndex
-      dashboardPanelData.meta.dragAndDrop.dragging = false;
-      dashboardPanelData.meta.dragAndDrop.dragElement = null;
-      dashboardPanelData.meta.dragAndDrop.dragSource = null;
-      dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
-    };
-
     const reorderItems = (
       targetAxis: string,
       sourceIndex: number,
@@ -1185,7 +1175,7 @@ export default defineComponent({
         return;
       }
       dragIndex.value = index != null && index >= 0 ? index : dragIndex.value;
-      currentDragArea.value = area;
+      dashboardPanelData.meta.dragAndDrop.currentDragArea = area;
       e.preventDefault();
     };
 
@@ -1335,7 +1325,6 @@ export default defineComponent({
       onDragStart,
       onDragOver,
       onDragEnter,
-      currentDragArea,
       expansionItems,
       triggerOperatorsWithHistogram,
       xAxisHint,
