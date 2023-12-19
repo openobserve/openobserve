@@ -94,7 +94,8 @@ const getDefaultDashboardPanelData: any = () => ({
     dragAndDrop: {
       dragging: false,
       dragElement: null,
-      dragElementType: null,
+      dragSource: null,
+      dragSourceIndex: null
     },
     errors: {
       queryErrors: [],
