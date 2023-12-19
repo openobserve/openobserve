@@ -276,6 +276,7 @@ import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRende
 import { useLoading } from "@/composables/useLoading";
 import _ from "lodash-es";
 import QueryInspector from "@/components/dashboards/QueryInspector.vue";
+import { provide } from "vue";
 
 export default defineComponent({
   name: "AddPanel",
@@ -1102,6 +1103,32 @@ export default defineComponent({
       // set it as a absolute time
       dateTimePickerRef?.value?.setCustomDate("absolute", selectedDateObj);
     };
+
+    const hoveredSeriesState = ref({
+      hoveredSeriesName: "",
+      panelId: -1,
+      dataIndex: -1,
+      seriesIndex: -1,
+      hoveredTime: null,
+      setHoveredSeriesName: function (name: string) {
+        hoveredSeriesState.value.hoveredSeriesName = name ?? "";
+      },
+      setIndex: function (
+        dataIndex: number,
+        seriesIndex: number,
+        panelId: any,
+        hoveredTime?: any
+      ) {
+        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
+        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
+        hoveredSeriesState.value.panelId = panelId ?? -1;
+        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
+      },
+    });
+
+    // used provide and inject to share data between components
+    // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
+    provide("hoveredSeriesState", hoveredSeriesState);
 
     return {
       t,
