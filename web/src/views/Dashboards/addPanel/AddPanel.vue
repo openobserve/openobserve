@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unit="px"
                   :limits="
                     !dashboardPanelData.layout.showQueryBar
-                      ? [41, 400]
+                      ? [43, 400]
                       : [140, 400]
                   "
                   :disable="!dashboardPanelData.layout.showQueryBar"
