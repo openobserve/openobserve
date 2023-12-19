@@ -451,7 +451,7 @@ export const usePanelDataLoader = (
       ?.filter((it: any) => it?.operator && it?.name && it?.value);
     // console.log("adHocVariables", adHocVariables);
 
-    if (!adHocVariables.length) {
+    if (!adHocVariables?.length) {
       // console.log("No adhoc variables found");
       return { query, metadata };
     }
@@ -508,7 +508,7 @@ export const usePanelDataLoader = (
       case "promql": {
         const errorDetailValue = error.response?.data?.error || error.message;
         const trimmedErrorMessage =
-          errorDetailValue.length > 300
+          errorDetailValue?.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
         state.errorDetail = trimmedErrorMessage;
@@ -520,7 +520,7 @@ export const usePanelDataLoader = (
           error.response?.data.message ||
           error.message;
         const trimmedErrorMessage =
-          errorDetailValue.length > 300
+          errorDetailValue?.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
         state.errorDetail = trimmedErrorMessage;
@@ -555,10 +555,10 @@ export const usePanelDataLoader = (
       const newDynamicVariablesData = getDynamicVariablesData();
 
       if (
-        !newDependentVariablesData.length &&
-        !newDynamicVariablesData.length &&
-        !currentDependentVariablesData.length &&
-        !currentDynamicVariablesData.length
+        !newDependentVariablesData?.length &&
+        !newDynamicVariablesData?.length &&
+        !currentDependentVariablesData?.length &&
+        !currentDynamicVariablesData?.length
       ) {
         // go ahead and bravly load the data
         log("Variables Watcher: no variables needed, returning false...");
@@ -725,9 +725,9 @@ export const usePanelDataLoader = (
     );
 
     if (
-      newDependentVariablesData.length !=
+      newDependentVariablesData?.length !=
         currentDependentVariablesData?.length ||
-      newDynamicVariablesData.length != currentDynamicVariablesData?.length
+      newDynamicVariablesData?.length != currentDynamicVariablesData?.length
     ) {
       updateCurrentDependentVariablesData(newDependentVariablesData);
       updateCurrentDynamicVariablesData(newDynamicVariablesData);
@@ -753,15 +753,15 @@ export const usePanelDataLoader = (
 
     log(
       "Step4: newDependentVariablesData.length",
-      newDependentVariablesData.length
+      newDependentVariablesData?.length
     );
     log(
       "Step4: newDynamicVariablesData.length",
-      newDynamicVariablesData.length
+      newDynamicVariablesData?.length
     );
 
     // execute different scenarios based on the count of variables
-    if (!newDependentVariablesData.length && !newDynamicVariablesData.length) {
+    if (!newDependentVariablesData?.length && !newDynamicVariablesData?.length) {
       // 1. Regular variables  = 0 and Dynamic variables  = 0
       // go ahead and bravly load the data
       log("Step4: 1: Regular variables  = 0 and Dynamic variables  = 0");
@@ -772,8 +772,8 @@ export const usePanelDataLoader = (
 
       return true;
     } else if (
-      newDependentVariablesData.length &&
-      !newDynamicVariablesData.length
+      newDependentVariablesData?.length &&
+      !newDynamicVariablesData?.length
     ) {
       log("Step4: 2: Regular variables >= 1 and Dynamic variables  = 0");
       // 2. Regular variables >= 1 and Dynamic variables  = 0
@@ -797,8 +797,8 @@ export const usePanelDataLoader = (
       log("Step4: 2: regular variables values has changed, returning true");
       return true;
     } else if (
-      !newDependentVariablesData.length &&
-      newDynamicVariablesData.length
+      !newDependentVariablesData?.length &&
+      newDynamicVariablesData?.length
     ) {
       // 3. Regular variables  = 0 and Dynamic variables >= 1
       log("Step4: 3: Regular variables  = 0 and Dynamic variables >= 1");
@@ -818,8 +818,8 @@ export const usePanelDataLoader = (
       log("Step4: 3: dynamic variables values has changed, returning true");
       return true;
     } else if (
-      newDependentVariablesData.length &&
-      newDynamicVariablesData.length
+      newDependentVariablesData?.length &&
+      newDynamicVariablesData?.length
     ) {
       // 4. Regular variables >= 1 and Dynamic variables >= 1
       log("Step4: 4: Regular variables >= 1 and Dynamic variables >= 1");
