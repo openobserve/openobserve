@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.x"
           :key="index"
-          :style="{ marginLeft: getMarginLeft(itemX) }"
+          :style="{ marginLeft: dragIndex == index && currentDragArea == 'x' ? '10px' : '0px' }"
           :draggable="true"
           @dragstart="onFieldDragStart($event, itemX, 'x', index)"
           @drop="onNewDrop($event, 'x', index)"
@@ -267,12 +267,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
           :key="index"
-          :style="{ marginLeft: getMarginLeft(itemY) }"
+          :style="`margin-left: ${dragIndex == index && currentDragArea == 'y' ? '10px' : '0px'}`"
           :draggable="true"
           @dragstart="onFieldDragStart($event, itemY, 'y', index)"
           @drop="onNewDrop($event, 'y', index)"
           @dragenter="onDragEnter($event, 'y', index)"
         >
+
+          <div v-if="dragIndex == index && currentDragArea == 'y'"
+             style="background-color: #8060ff; width: 20px; height: 100%; border-radius: 5px;">
+            &nbsp;
+          </div>
           <div>
             <q-icon
               name="drag_indicator"
@@ -1238,7 +1243,7 @@ export default defineComponent({
         e.preventDefault();
         return;
       }
-      dragIndex.value = index;
+      dragIndex.value = index != null && index >= 0 ? index : dragIndex.value;
       currentDragArea.value = area;
       e.preventDefault();
     };
@@ -1474,6 +1479,7 @@ export default defineComponent({
       // onFieldDrop,
       getHistoramIntervalField,
       getMarginLeft,
+      dragIndex,
     };
   },
 });
