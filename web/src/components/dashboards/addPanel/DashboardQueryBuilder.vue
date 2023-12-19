@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields?.x?.length || 0
           )
         "
+        @dragenter="onDragEnter($event, 'x')"
         data-test="dashboard-x-layout"
       >
         <!-- @dragenter="onDragEnter($event, 'x')" -->
@@ -65,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :draggable="true"
           @dragstart="onFieldDragStart($event, itemX, 'x', index)"
           @drop="onNewDrop($event, 'x', index)"
+          @dragenter="onDragEnter($event, 'x')"
         >
           <!-- @dragover="
               onFieldDragOver(
@@ -255,6 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields?.y?.length || 0
           )
         "
+        @dragenter="onDragEnter($event, 'y')"
         data-test="dashboard-y-layout"
       >
         <q-btn-group
@@ -266,6 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :draggable="true"
           @dragstart="onFieldDragStart($event, itemY, 'y', index)"
           @drop="onNewDrop($event, 'y', index)"
+          @dragenter="onDragEnter($event, 'y')"
         >
           <div
           >
@@ -465,6 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ].fields?.z?.length || 0
             )
           "
+          @dragenter="onDragEnter($event, 'z')"
         >
           <q-btn-group
             class="axis-field q-mr-sm q-my-xs"
@@ -473,8 +478,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields?.z"
             :key="index"
             :draggable="true"
-          @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
-          @drop="onNewDrop($event, 'z', index)"
+            @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
+            @drop="onNewDrop($event, 'z', index)"
+            @dragenter="onDragEnter($event, 'z')"
           >
             <div
               
@@ -611,8 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{
           'drop-target':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            dashboardPanelData.meta.dragAndDrop.dragElementType !=
-              'fieldElement',
+            dashboardPanelData.meta.dragAndDrop.dragSource == 'fieldList',
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             currentDragArea == 'f',
@@ -627,6 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields?.filter?.length || 0
           )
         "
+        @dragenter="onDragEnter($event, 'f')"
         data-test="dashboard-filter-layout"
       >
         <q-btn-group
@@ -936,26 +942,30 @@ export default defineComponent({
     const onNewDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
       console.log("onNewDrop", e, targetAxis, droppedAtIndex);
       // reorder items if source and target are same
-      if(dashboardPanelData.meta.dragAndDrop.dragSource === targetAxis) {
+      if (dashboardPanelData.meta.dragAndDrop.dragSource === targetAxis) {
         // we need to reorder the item
         // Swap the elements in the array
-        const fieldList = dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields[targetAxis];
+        const fieldList =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields[targetAxis];
         const draggedItem = dashboardPanelData.meta.dragAndDrop.dragElement;
-        fieldList.splice(dashboardPanelData.meta.dragAndDrop.dragSourceIndex, 1);
+        fieldList.splice(
+          dashboardPanelData.meta.dragAndDrop.dragSourceIndex,
+          1
+        );
         fieldList.splice(droppedAtIndex, 0, draggedItem);
       } else {
         // move the items  between axis or from the field list
         // check if the source is from axis or field list
-        if(dashboardPanelData.meta.dragAndDrop.dragSource === "fieldList") {
+        if (dashboardPanelData.meta.dragAndDrop.dragSource === "fieldList") {
           // add the item to the target list
-          const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement
-          if(!dragElement) {
-            return
+          const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
+          if (!dragElement) {
+            return;
           }
 
-          switch(targetAxis) {
+          switch (targetAxis) {
             case "x":
               addXAxisItem(dragElement);
               break;
@@ -971,66 +981,27 @@ export default defineComponent({
           }
         } else {
           // move the item from field list to axis
-          const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement
+          const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
           const dragName =
-          dashboardPanelData.meta.stream.selectedStreamFields.find(
-            (item: any) => item?.name === dragElement?.column
-          );
-        const customDragName =
-          dashboardPanelData.meta.stream.customQueryFields.find(
-            (item: any) => item?.name === dragElement?.column
-          );
+            dashboardPanelData.meta.stream.selectedStreamFields.find(
+              (item: any) => item?.name === dragElement?.column
+            );
+          const customDragName =
+            dashboardPanelData.meta.stream.customQueryFields.find(
+              (item: any) => item?.name === dragElement?.column
+            );
 
-        if (dragName || customDragName) {
-          const axisArray = getAxisArray(targetAxis);
-          const duplicateName = axisArray.some(
-            (item: any) => item.column === (dragName || customDragName).name
-          );
+          if (dragName || customDragName) {
+            const axisArray = getAxisArray(targetAxis);
+            const duplicateName = axisArray.some(
+              (item: any) => item.column === (dragName || customDragName).name
+            );
 
-          if (duplicateName) {
-            const errorMessage = `Field '${
-              (dragName || customDragName).name
-            }' already exists in '${targetAxis}' axis.`;
-            $q.notify({
-              type: "negative",
-              message: errorMessage,
-              timeout: 5000,
-            });
-            return;
-          }
-
-          if (targetAxis !== "f") {
-            if (
-              (targetAxis === "x" && isAddXAxisNotAllowed.value) ||
-              (targetAxis === "y" && isAddYAxisNotAllowed.value) ||
-              (targetAxis === "z" && isAddZAxisNotAllowed.value)
-            ) {
-              let maxAllowedAxisFields;
-
-              switch (dashboardPanelData.data.type) {
-                case "pie":
-                case "donut":
-                case "heatmap":
-                  maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
-                  break;
-                case "metric":
-                  maxAllowedAxisFields = targetAxis === "x" ? 0 : 1;
-                  break;
-                case "table":
-                  maxAllowedAxisFields = 0;
-                  break;
-                case "area-stacked":
-                case "stacked":
-                case "h-stacked":
-                  maxAllowedAxisFields = targetAxis === "x" ? 2 :  1;
-                  break; 
-                default:
-                  maxAllowedAxisFields = targetAxis === "x" ? 2 : 0;
-              }
-
-              const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
-
+            if (duplicateName) {
+              const errorMessage = `Field '${
+                (dragName || customDragName).name
+              }' already exists in '${targetAxis}' axis.`;
               $q.notify({
                 type: "negative",
                 message: errorMessage,
@@ -1039,43 +1010,80 @@ export default defineComponent({
               return;
             }
 
-            // Remove from the original axis
-            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource
-            if (dragSource === "x") {
-              removeXAxisItem((dragName || customDragName).name);
-            } else if (dragSource === "y") {
-              removeYAxisItem((dragName || customDragName).name);
-            } else if (dragSource === "z") {
-              removeZAxisItem((dragName || customDragName).name);
+            if (targetAxis !== "f") {
+              if (
+                (targetAxis === "x" && isAddXAxisNotAllowed.value) ||
+                (targetAxis === "y" && isAddYAxisNotAllowed.value) ||
+                (targetAxis === "z" && isAddZAxisNotAllowed.value)
+              ) {
+                let maxAllowedAxisFields;
+
+                switch (dashboardPanelData.data.type) {
+                  case "pie":
+                  case "donut":
+                  case "heatmap":
+                    maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
+                    break;
+                  case "metric":
+                    maxAllowedAxisFields = targetAxis === "x" ? 0 : 1;
+                    break;
+                  case "table":
+                    maxAllowedAxisFields = 0;
+                    break;
+                  case "area-stacked":
+                  case "stacked":
+                  case "h-stacked":
+                    maxAllowedAxisFields = targetAxis === "x" ? 2 : 1;
+                    break;
+                  default:
+                    maxAllowedAxisFields = targetAxis === "x" ? 2 : 0;
+                }
+
+                const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
+
+                $q.notify({
+                  type: "negative",
+                  message: errorMessage,
+                  timeout: 5000,
+                });
+                return;
+              }
+
+              // Remove from the original axis
+              const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
+              if (dragSource === "x") {
+                removeXAxisItem((dragName || customDragName).name);
+              } else if (dragSource === "y") {
+                removeYAxisItem((dragName || customDragName).name);
+              } else if (dragSource === "z") {
+                removeZAxisItem((dragName || customDragName).name);
+              }
+            }
+
+            if (targetAxis === "f") {
+              return;
+            }
+
+            // Add to the new axis
+            if (targetAxis === "x") {
+              addXAxisItem(dragName || customDragName);
+            } else if (targetAxis === "y") {
+              addYAxisItem(dragName || customDragName);
+            } else if (targetAxis === "z") {
+              addZAxisItem(dragName || customDragName);
             }
           }
+          // }
 
-          if (targetAxis === "f") {
-            return;
-          }
-
-          // Add to the new axis
-          if (targetAxis === "x") {
-            addXAxisItem(dragName || customDragName);
-          } else if (targetAxis === "y") {
-            addYAxisItem(dragName || customDragName);
-          } else if (targetAxis === "z") {
-            addZAxisItem(dragName || customDragName);
-          }
+          updateArrayAlias();
         }
-      // }
-
-      updateArrayAlias();
-
-        }
-
       }
-
+      currentDragArea.value = "";
       dashboardPanelData.meta.dragAndDrop.dragging = false;
       dashboardPanelData.meta.dragAndDrop.dragElement = null;
       dashboardPanelData.meta.dragAndDrop.dragSource = null;
       dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
-    }
+    };
 
     const onDrop = (e: any, area: string) => {
       const dragElementType =
@@ -1096,7 +1104,7 @@ export default defineComponent({
         } else if (dragElement && area === "f") {
           addFilteredItem(dragElement?.name);
         }
-        // currentDragArea.value = "";
+        currentDragArea.value = "";
       } else if (dragElementType === "fieldElement") {
         dashboardPanelData.meta.dragAndDrop.dragging = false;
         dashboardPanelData.meta.dragAndDrop.dragElement = null;
@@ -1214,15 +1222,14 @@ export default defineComponent({
     const onDragEnter = (e: any, area: string) => {
       console.log("onDragEnter", area);
       if (
-        dashboardPanelData.meta.dragAndDrop.dragElementType ===
-          "fieldElement" &&
+        dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" &&
         area === "f"
       ) {
         e.preventDefault();
         return;
       }
 
-      // currentDragArea.value = area;
+      currentDragArea.value = area;
       e.preventDefault();
     };
 
