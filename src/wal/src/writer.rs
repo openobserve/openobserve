@@ -28,7 +28,7 @@ use crate::errors::*;
 pub struct Writer {
     path: PathBuf,
     f: File,
-    bytes_written: usize, 
+    bytes_written: usize,
     buffer: Vec<u8>,
 }
 
@@ -37,7 +37,7 @@ impl Writer {
         root_dir: impl Into<PathBuf>,
         org_id: &str,
         stream_type: &str,
-        id: i64,
+        id: u32,
     ) -> Result<Self> {
         let path = super::build_file_path(root_dir, org_id, stream_type, id);
         create_dir_all(path.parent().unwrap()).context(FileOpenSnafu { path: path.clone() })?;
@@ -70,6 +70,10 @@ impl Writer {
 
     pub fn path(&self) -> &PathBuf {
         &self.path
+    }
+
+    pub fn size(&self) -> usize {
+        self.bytes_written
     }
 
     /// write the data to the wal file

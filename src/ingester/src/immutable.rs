@@ -13,34 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod errors;
-pub mod reader;
-pub mod writer;
-
 use std::path::PathBuf;
 
-pub use errors::*;
-pub use reader::Reader;
-pub use writer::Writer;
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 
-const PRE_ALLOCATE_FILE_SIZE: u64 = 1024 * 1024 * 16; // 16MB
-const SOFT_MAX_BUFFER_LEN: usize = 1024 * 128; // 128KB
+use crate::{memtable::MemTable, writer::WriterKey};
 
-type FileTypeIdentifier = [u8; 13];
-const FILE_TYPE_IDENTIFIER: &FileTypeIdentifier = b"OPENOBSERVEV2";
-/// File extension for segment files.
-const FILE_EXTENSION: &str = "wal";
+pub static IMMUTABLES: Lazy<Mutex<Vec<Entry>>> = Lazy::new(|| Mutex::new(Vec::with_capacity(16)));
 
-pub fn build_file_path(
-    root_dir: impl Into<PathBuf>,
-    org_id: &str,
-    stream_type: &str,
-    id: u32,
-) -> PathBuf {
-    let mut path = root_dir.into();
-    path.push(org_id);
-    path.push(stream_type);
-    path.push(id.to_string());
-    path.set_extension(FILE_EXTENSION);
-    path
+#[warn(dead_code)]
+pub struct Entry {
+    key: WriterKey,
+    wal_path: PathBuf,
+    memtable: MemTable,
+}
+
+impl Entry {
+    pub fn new(key: WriterKey, wal_path: PathBuf, memtable: MemTable) -> Self {
+        Self {
+            key,
+            wal_path,
+            memtable,
+        }
+    }
 }

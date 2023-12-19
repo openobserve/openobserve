@@ -399,26 +399,42 @@ pub async fn write_file_arrow(
         //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
         // let inferred_schema = entry.schema.clone();
 
-        let mut decoder = ReaderBuilder::new(Arc::new(entry.schema.clone()))
-            .with_batch_size(batch_size)
-            .build_decoder()
+        // -- call new ingester
+        let writer = ingester::get_writer(&stream.org_id, &stream.stream_type.to_string());
+        writer
+            .write(
+                Arc::new(entry.schema.clone()),
+                ingester::Entry {
+                    stream: Arc::from(stream.stream_name.as_str()),
+                    schema_key: Arc::from("default"),
+                    partition_key: Arc::from("2023/12/18/00"),
+                    data: entry.records.clone(),
+                },
+            )
             .unwrap();
+        // -- end call new ingester
 
-        let _ = decoder.serialize(&entry.records);
-        let batch = decoder.flush().unwrap().unwrap();
-        let rw_file = get_or_create_arrow(
-            thread_id,
-            stream.clone(),
-            partition_time_level,
-            key,
-            CONFIG.common.wal_memory_mode_enabled,
-            Some(entry.schema.clone()),
-        )
-        .await;
-        if stream_file_name.is_empty() {
-            *stream_file_name = rw_file.full_name();
-        }
-        rw_file.write_arrow(batch).await;
+        // let mut decoder = ReaderBuilder::new(Arc::new(entry.schema.clone()))
+        //     .with_batch_size(batch_size)
+        //     .build_decoder()
+        //     .unwrap();
+
+        // let _ = decoder.serialize(&entry.records);
+        // let batch = decoder.flush().unwrap().unwrap();
+        // let rw_file = get_or_create_arrow(
+        //     thread_id,
+        //     stream.clone(),
+        //     partition_time_level,
+        //     key,
+        //     CONFIG.common.wal_memory_mode_enabled,
+        //     Some(entry.schema.clone()),
+        // )
+        // .await;
+        // if stream_file_name.is_empty() {
+        //     *stream_file_name = rw_file.full_name();
+        // }
+        // rw_file.write_arrow(batch).await;
+
         req_stats.size += entry.records.len() as f64 / SIZE_IN_MB;
         req_stats.records += entry.records.len() as i64;
     }

@@ -87,7 +87,7 @@ pub async fn sql(
     in_records_batches: Option<Vec<RecordBatch>>,
     file_type: FileType,
 ) -> Result<HashMap<String, Vec<RecordBatch>>> {
-    if files.is_empty() {
+    if files.is_empty() && in_records_batches.is_none(){
         return Ok(HashMap::new());
     }
 

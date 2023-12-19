@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
 use datafusion::arrow::datatypes::Schema;
@@ -535,7 +537,7 @@ async fn add_valid_record_arrow(
                     .with_metadata(std::collections::HashMap::new()),
                 records: vec![],
             });
-            hour_buf.records.push(loc_value);
+            hour_buf.records.push(Arc::new(loc_value));
             status.successful += 1;
         };
     } else {

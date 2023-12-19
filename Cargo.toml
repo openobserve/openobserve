@@ -76,10 +76,8 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { git = "https://github.com/apache/arrow-datafusion.git", rev = "b648d4e22e82989c65523e62312e1995a1543888", version = "33", features = [
-  "simd",
-] }
-datafusion-expr = { git = "https://github.com/apache/arrow-datafusion.git", rev = "b648d4e22e82989c65523e62312e1995a1543888", version = "33" }
+datafusion = { version = "34", features = ["simd"] }
+datafusion-expr = "34"
 arrow = { version = "49", features = ["simd", "ipc_compression"] }
 arrow-schema = { version = "49", features = ["serde"] }
 parquet = { version = "49", features = ["arrow", "async"] }
@@ -141,7 +139,7 @@ simd-json = "0.13"
 sha256 = "1.4.0"
 sled = "0.34"
 snap = "1"
-sqlparser = { version = "0.39", features = ["serde", "visitor"] }
+sqlparser = { version = "0.40", features = ["serde", "visitor"] }
 sqlx = { version = "0.7", features = [
   "runtime-tokio-rustls",
   "postgres",
@@ -173,6 +171,7 @@ walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"
 memory-stats = "1.1.0"
+ingester = { path = "src/ingester" }
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -196,16 +195,57 @@ license = "AGPL-3.0"
 [workspace.dependencies]
 wal = { path = "src/wal" }
 ingester = { path = "src/ingester" }
-hashbrown = { version = "0.14.3", features = ["serde"] }
-indexmap = { version = "2.0", features = ["serde"] }
-snafu = "0.7.5"
-datafusion = { git = "https://github.com/apache/arrow-datafusion.git", rev = "b648d4e22e82989c65523e62312e1995a1543888", version = "33", features = [
-  "simd",
-] }
-datafusion-expr = { git = "https://github.com/apache/arrow-datafusion.git", rev = "b648d4e22e82989c65523e62312e1995a1543888", version = "33" }
-arrow = { version = "49", features = ["simd", "ipc_compression"] }
-arrow-schema = { version = "49", features = ["serde"] }
-parking_lot = "0.12"
-once_cell = "1.17"
+
+ahash = { version = "0.8", features = ["serde"] }
+actix-web = "4.4"
+anyhow = "1.0"
+argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
+async-trait = "0.1"
+async-recursion = "1.0"
+awc = "3.2"
+aws-config = "0.56.1"
+aws-sdk-dynamodb = "0.30.0"
+base64 = "0.21"
+blake3 = { version = "1.4", features = ["rayon"] }
 bytes = "1.4"
 byteorder = "1.4.3"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+datafusion = { version = "34", features = ["simd"] }
+datafusion-expr = "34"
+arrow = { version = "49", features = ["simd", "ipc_compression"] }
+arrow-schema = { version = "49", features = ["serde"] }
+faststr = "0.2"
+flate2 = { version = "1.0", features = ["zlib"] }
+getrandom = "0.2.11"
+hashlink = "0.8.4"
+hashbrown = { version = "0.14.3", features = ["serde"] }
+hex = "0.4"
+indexmap = { version = "2.0", features = ["serde"] }
+ipnetwork = "0.20"
+itertools = "0.12"
+log = "0.4"
+once_cell = "1.17"
+parking_lot = "0.12"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+simd-json = "0.13"
+sha256 = "1.4.0"
+sled = "0.34"
+snafu = "0.7.5"
+snap = "1"
+sqlparser = { version = "0.40", features = ["serde", "visitor"] }
+sqlx = { version = "0.7", features = [
+  "runtime-tokio-rustls",
+  "postgres",
+  "mysql",
+  "sqlite",
+  "chrono",
+] }
+sysinfo = "0.29"
+thiserror = "1.0"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+url = "2.2"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+zstd = "0.13"

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, collections::HashMap};
+use std::{cmp::max, collections::HashMap, sync::Arc};
 
 use arrow_schema::Field;
 use chrono::Duration;
@@ -350,7 +350,7 @@ pub struct SchemaEvolution {
 
 pub struct SchemaRecords {
     pub schema: Schema,
-    pub records: Vec<json::Value>,
+    pub records: Vec<Arc<json::Value>>,
 }
 
 #[derive(Clone, Copy, Default)]

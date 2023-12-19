@@ -725,3 +725,124 @@ pub async fn search_arrow(
 
     Ok((results, scan_stats))
 }
+
+
+/// search in local WAL, which haven't been sync to object storage
+#[tracing::instrument(name = "service:search:wal:memory:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+pub async fn search_memtable(
+    session_id: &str,
+    sql: Arc<Sql>,
+    stream_type: meta::StreamType,
+    timeout: u64,
+) -> super::SearchResult {
+    let Some(reader) = ingester::get_reader(&sql.org_id, &stream_type.to_string()) else {
+        return Ok((HashMap::new(), ScanStats::new()));
+    };
+    let batches = reader.read(&sql.stream_name, sql.meta.time_range).unwrap_or_default();
+    println!("batches: {:?}", batches.len());
+    
+
+    let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
+        .await
+        .unwrap_or(Schema::empty());
+    let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
+    let partition_time_level =
+        unwrap_partition_time_level(schema_settings.partition_time_level, stream_type);
+        
+    // fetch all schema versions, get latest schema
+    let schema_latest = Arc::new(
+        schema_latest
+            .to_owned()
+            .with_metadata(std::collections::HashMap::new()),
+    );
+
+    let mut tasks = Vec::new();
+    let mut sid = 0;
+    for (mut schema, record_batches) in batches {  
+        // calulate schema diff
+        let mut diff_fields = HashMap::new();
+        let group_fields = schema.fields();
+        for field in group_fields {
+            if let Ok(v) = schema_latest.field_with_name(field.name()) {
+                if v.data_type() != field.data_type() {
+                    diff_fields.insert(v.name().clone(), v.data_type().clone());
+                }
+            }
+        }
+        // add not exists field for wal infered schema
+        let mut new_fields = Vec::new();
+        for field in schema_latest.fields() {
+            if schema.field_with_name(field.name()).is_err() {
+                new_fields.push(field.clone());
+            }
+        }
+        if !new_fields.is_empty() {
+            let new_schema = Schema::new(new_fields);
+            schema = Arc::new(Schema::try_merge(vec![schema.as_ref().clone(),  new_schema ])?);
+        } 
+
+        sid+=1;
+        let sql = sql.clone();
+        let session = meta::search::Session {
+            id: format!("{}-{}",session_id,sid),
+            storage_type: StorageType::Tmpfs,
+            search_type: if !sql.meta.group_by.is_empty() {
+                SearchType::Aggregation
+            } else {
+                SearchType::Normal
+            },
+        };
+        let datafusion_span = info_span!(
+            "service:search:grpc:wal:datafusion",
+            org_id = sql.org_id,
+            stream_name = sql.stream_name,
+            stream_type = ?stream_type
+        );
+
+        let task = tokio::time::timeout(
+            Duration::from_secs(timeout),
+            async move {
+                exec::sql(
+                    &session,
+                    schema,
+                    &diff_fields,
+                    &sql,
+                    &Vec::new(),
+                    Some(record_batches),
+                    FileType::ARROW,
+                )
+                .await
+            }
+            .instrument(datafusion_span),
+        );
+        tasks.push(task);
+    }
+
+    let mut results: HashMap<String, Vec<RecordBatch>> = HashMap::new();
+    let task_results = try_join_all(tasks)
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    for ret in task_results {
+        match ret {
+            Ok(ret) => {
+                for (k, v) in ret {
+                    let v = v
+                        .into_iter()
+                        .filter(|r| r.num_rows() > 0)
+                        .collect::<Vec<_>>();
+                    if !v.is_empty() {
+                        let group = results.entry(k).or_default();
+                        group.extend(v);
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!("datafusion execute error: {}", err);  
+                return Err(super::handle_datafusion_error(err));
+            }
+        };
+    }
+ 
+    let mut scan_stats = ScanStats::new();
+    Ok((results, scan_stats))
+}

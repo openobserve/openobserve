@@ -13,34 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod arcmap;
+pub mod entry;
 pub mod errors;
-pub mod reader;
+pub mod immutable;
+pub mod memtable;
+pub mod partition;
+pub mod rwmap;
+pub mod stream;
 pub mod writer;
 
-use std::path::PathBuf;
-
-pub use errors::*;
-pub use reader::Reader;
-pub use writer::Writer;
-
-const PRE_ALLOCATE_FILE_SIZE: u64 = 1024 * 1024 * 16; // 16MB
-const SOFT_MAX_BUFFER_LEN: usize = 1024 * 128; // 128KB
-
-type FileTypeIdentifier = [u8; 13];
-const FILE_TYPE_IDENTIFIER: &FileTypeIdentifier = b"OPENOBSERVEV2";
-/// File extension for segment files.
-const FILE_EXTENSION: &str = "wal";
-
-pub fn build_file_path(
-    root_dir: impl Into<PathBuf>,
-    org_id: &str,
-    stream_type: &str,
-    id: u32,
-) -> PathBuf {
-    let mut path = root_dir.into();
-    path.push(org_id);
-    path.push(stream_type);
-    path.push(id.to_string());
-    path.set_extension(FILE_EXTENSION);
-    path
-}
+pub use entry::Entry;
+pub use writer::{get_reader, get_writer};

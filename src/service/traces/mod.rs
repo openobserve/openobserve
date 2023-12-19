@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{io::Error, sync::Arc};
 
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
@@ -341,7 +341,7 @@ pub async fn handle_trace_request(
                 });
                 let loc_value: utils::json::Value =
                     utils::json::from_slice(value_str.as_bytes()).unwrap();
-                hour_buf.records.push(loc_value);
+                hour_buf.records.push(Arc::new(loc_value));
 
                 if timestamp < min_ts.try_into().unwrap() {
                     partial_success.rejected_spans += 1;
