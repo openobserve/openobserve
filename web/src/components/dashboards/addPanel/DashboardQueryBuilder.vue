@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @dragend="onDragEnd()"
         >
           <div
-            v-if="dragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'"
+            v-if="dashboardPanelData.meta.dragAndDrop.targetDragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'"
             class="dragItem"
           >
             &nbsp;
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
         >
           <div
-            v-if="dragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y'"
+            v-if="dashboardPanelData.meta.dragAndDrop.targetDragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y'"
             class="dragItem"
           >
             &nbsp;
@@ -505,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @dragend="onDragEnd()"
           >
             <div
-              v-if="dragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'"
+              v-if="dashboardPanelData.meta.dragAndDrop.targetDragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'"
               class="dragItem"
             >
               &nbsp;
@@ -964,8 +964,6 @@ export default defineComponent({
       }
     );
 
-    const dragIndex = ref(0);
-
     const onDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
       console.log("onDrop", e, targetAxis, droppedAtIndex);
       // reorder items if source and target are same
@@ -1174,7 +1172,7 @@ export default defineComponent({
         e.preventDefault();
         return;
       }
-      dragIndex.value = index != null && index >= 0 ? index : dragIndex.value;
+      dashboardPanelData.meta.dragAndDrop.targetDragIndex = index != null && index >= 0 ? index : dashboardPanelData.meta.dragAndDrop.targetDragIndex;
       dashboardPanelData.meta.dragAndDrop.currentDragArea = area;
       e.preventDefault();
     };
@@ -1336,7 +1334,6 @@ export default defineComponent({
       zLabel,
       onFieldDragStart,
       getHistoramIntervalField,
-      dragIndex,
       onDragEnd,
     };
   },
