@@ -190,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :variablesData="variablesData"
                           :width="6"
                           @error="handleChartApiError"
+                          @updated:data-zoom="onDataZoom"
                         />
                         <q-dialog v-model="showViewPanel">
                           <QueryInspector
@@ -1082,6 +1083,26 @@ export default defineComponent({
       errorList.splice(0);
       errorList.push(errorMessage);
     };
+
+    const onDataZoom = (event: any) => {
+      const selectedDateObj = {
+        start: new Date(event.start),
+        end: new Date(event.end),
+      };
+      // Truncate seconds and milliseconds from the dates
+      selectedDateObj.start.setSeconds(0, 0);
+      selectedDateObj.end.setSeconds(0, 0);
+
+      // Compare the truncated dates
+      if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {
+        // Increment the end date by 1 minute
+        selectedDateObj.end.setMinutes(selectedDateObj.end.getMinutes() + 1);
+      }
+
+      // set it as a absolute time
+      dateTimePickerRef?.value?.setCustomDate("absolute", selectedDateObj);
+    };
+
     return {
       t,
       updateDateTime,
@@ -1111,6 +1132,7 @@ export default defineComponent({
       metaDataValue,
       metaData,
       panelTitle,
+      onDataZoom,
     };
   },
   methods: {
