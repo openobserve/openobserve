@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         @dragover="onDragOver($event, 'x')"
         @drop="
-          onNewDrop(
+          onDrop(
             $event,
             'x',
             dashboardPanelData.data.queries[
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
           :draggable="true"
           @dragstart="onFieldDragStart($event, itemX, 'x', index)"
-          @drop="onNewDrop($event, 'x', index)"
+          @drop="onDrop($event, 'x', index)"
           @dragenter="onDragEnter($event, 'x', index)"
           @dragend="onDragEnd()"
         >
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         @dragover="onDragOver($event, 'y')"
         @drop="
-          onNewDrop(
+          onDrop(
             $event,
             'y',
             dashboardPanelData.data.queries[
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="axis-field"
             :draggable="true"
             @dragstart="onFieldDragStart($event, itemY, 'y', index)"
-            @drop="onNewDrop($event, 'y', index)"
+            @drop="onDrop($event, 'y', index)"
             @dragenter="onDragEnter($event, 'y', index)"
           >
             <div>
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           @dragover="onDragOver($event, 'z')"
           @drop="
-            onNewDrop(
+            onDrop(
               $event,
               'z',
               dashboardPanelData.data.queries[
@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="index"
             :draggable="true"
             @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
-            @drop="onNewDrop($event, 'z', index)"
+            @drop="onDrop($event, 'z', index)"
             @dragenter="onDragEnter($event, 'z', index)"
             @dragend="onDragEnd()"
           >
@@ -650,7 +650,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         @dragover="onDragOver($event, 'f')"
         @drop="
-          onNewDrop(
+          onDrop(
             $event,
             'f',
             dashboardPanelData.data.queries[
@@ -967,8 +967,8 @@ export default defineComponent({
 
     const dragIndex = ref(0);
 
-    const onNewDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
-      console.log("onNewDrop", e, targetAxis, droppedAtIndex);
+    const onDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
+      console.log("onDrop", e, targetAxis, droppedAtIndex);
       // reorder items if source and target are same
       if (dashboardPanelData.meta.dragAndDrop.dragSource === targetAxis) {
         // we need to reorder the item
@@ -1331,7 +1331,7 @@ export default defineComponent({
         "Is Not Null",
       ],
       getImageURL,
-      onNewDrop,
+      onDrop,
       onDragStart,
       onDragOver,
       onDragEnter,
