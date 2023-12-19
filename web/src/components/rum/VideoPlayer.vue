@@ -340,11 +340,22 @@ const setupSession = async () => {
   //   lastEventTime = currentTime;
   // });
 
-  let playerWidth = playerContainerRef.value?.clientWidth || 0;
-  let playerHeight =
-    (session.value[0].data.height / session.value[0].data.width) * playerWidth;
+  let sessionWidth: number = 0;
+  let sessionHeight: number = 0;
 
-  if (!session.value[0].data.height) {
+  session.value.every((segment: any) => {
+    if (segment.data.height && segment.data.width) {
+      sessionWidth = segment.data.width;
+      sessionHeight = segment.data.height;
+      return false;
+    }
+    return true;
+  });
+
+  let playerWidth = playerContainerRef.value?.clientWidth || 0;
+  let playerHeight = (sessionHeight / sessionWidth) * playerWidth;
+
+  if (!sessionHeight) {
     playerHeight = playerWidth * 0.5625;
   }
 
@@ -353,9 +364,7 @@ const setupSession = async () => {
     playerHeight > playerContainerRef.value?.clientHeight - 90
   ) {
     playerHeight = playerContainerRef.value?.clientHeight - 90 || 0;
-    playerWidth =
-      (session.value[0].data.width / session.value[0].data.height) *
-      playerHeight;
+    playerWidth = (sessionWidth / sessionHeight) * playerHeight;
   }
 
   if (playerRef.value) {
