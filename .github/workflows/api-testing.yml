@@ -107,7 +107,7 @@ jobs:
         with:
           enable-cache: true
           working-directory: 'tests/api-testing/'
-          version: '0.12.0'
+          version: '0.16.0'
       - name: Run tests
         run: cd tests/api-testing/ && rye pin cpython@3.11.6 && rye sync  && rye run pytest --force-sugar
 
