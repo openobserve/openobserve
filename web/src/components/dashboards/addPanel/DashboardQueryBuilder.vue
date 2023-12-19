@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll"
+        class="axis-container droppable scroll row"
         :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
@@ -53,45 +53,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           )
         "
         @dragenter="onDragEnter($event, 'x', null)"
+        @dragend="onDragEnd()"
         data-test="dashboard-x-layout"
       >
-        <!-- @dragenter="onDragEnter($event, 'x')" -->
-        <!-- @dragleave="onDragLeave($event, 'x')" -->
-        <q-btn-group
-          class="axis-field q-mr-sm q-my-xs"
+      <div
+          class="row q-mr-sm q-my-xs"
           v-for="(itemX, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.x"
           :key="index"
-          :draggable="true"
-          @dragstart="onFieldDragStart($event, itemX, 'x', index)"
-          @drop="onDrop($event, 'x', index)"
-          @dragenter="onDragEnter($event, 'x', index)"
-          @dragend="onDragEnd()"
         >
-          <div
+      <div
             v-if="dashboardPanelData.meta.dragAndDrop.targetDragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'"
             class="dragItem"
           >
             &nbsp;
           </div>
-          <!-- @dragover="
-              onFieldDragOver(
-                $event,
-                'x',
-                index,
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.x
-              )
-            " -->
-          <!-- @dragend="onFieldDragEnd" -->
+        <q-btn-group
+          class="axis-field"
+          :draggable="true"
+          @dragstart="onFieldDragStart($event, itemX, 'x', index)"
+          @drop="onDrop($event, 'x', index)"
+          @dragenter="onDragEnter($event, 'x', index)"
+        >
           <div>
             <q-icon
               name="drag_indicator"
               color="grey-13"
               size="13px"
-              class="q-my-xs"
+              class="cursor-grab q-my-xs"
             />
             <q-btn
               square
@@ -215,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </q-btn-group>
+        </div>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -473,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <span class="layout-separator">:</span>
         <div
-          class="axis-container droppable scroll"
+          class="axis-container droppable scroll row"
           :class="{
             'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
             'drop-entered':
@@ -491,31 +482,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
           @dragenter="onDragEnter($event, 'z', null)"
+          @dragend="onDragEnd()"
         >
+        <div
+          class="row q-mr-sm q-my-xs"
+          v-for="(itemZ, index) in dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields?.z"
+          :key="index"
+        >
+      <div
+            v-if="dashboardPanelData.meta.dragAndDrop.targetDragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'"
+            class="dragItem"
+          >
+            &nbsp;
+          </div>
           <q-btn-group
             class="axis-field q-mr-sm q-my-xs"
-            v-for="(itemZ, index) in dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.z"
-            :key="index"
             :draggable="true"
             @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
             @drop="onDrop($event, 'z', index)"
             @dragenter="onDragEnter($event, 'z', index)"
-            @dragend="onDragEnd()"
           >
-            <div
-              v-if="dashboardPanelData.meta.dragAndDrop.targetDragIndex == index && dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'"
-              class="dragItem"
-            >
-              &nbsp;
-            </div>
             <div>
               <q-icon
                 name="drag_indicator"
                 color="grey-13"
                 size="13px"
-                class="'q-my-xs'"
+                class="cursor-grab q-my-xs"
               />
               <q-btn
                 square
@@ -610,6 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </q-btn-group>
+          </div>
           <div
             class="text-caption text-weight-bold text-center q-py-xs"
             v-if="
@@ -659,6 +654,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           )
         "
         @dragenter="onDragEnter($event, 'f', null)"
+        @dragend="onDragEnd()"
         data-test="dashboard-filter-layout"
       >
         <q-btn-group
