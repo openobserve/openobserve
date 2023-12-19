@@ -106,10 +106,10 @@ jobs:
         uses: eifinger/setup-rye@v1
         with:
           enable-cache: true
-          working-directory: './tests/api-testing/'
+          working-directory: 'tests/api-testing/'
           version: '0.12.0'
       - name: Run tests
-        run: cd ./tests/api-testing/ && rye pin cpython@3.12.0 && rye sync  && rye run pytest --force-sugar
+        run: cd tests/api-testing/ && rye pin cpython@3.12.0 && rye sync  && rye run pytest --force-sugar
 
 
       # Try to test the openapi generator as well
