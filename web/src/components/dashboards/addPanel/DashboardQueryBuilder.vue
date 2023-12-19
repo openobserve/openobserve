@@ -988,7 +988,6 @@ export default defineComponent({
     );
 
     const onDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
-      console.log("onDrop", e, targetAxis, droppedAtIndex);
       // reorder items if source and target are same
       if (dashboardPanelData.meta.dragAndDrop.dragSource === targetAxis) {
         // we need to reorder the item
@@ -1146,13 +1145,11 @@ export default defineComponent({
       sourceIndex: number,
       targetIndex: number
     ) => {
-      console.log("reorderItems", targetAxis, sourceIndex, targetIndex);
 
       const fieldList =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields[targetAxis];
-      console.log("fieldList", JSON.stringify(fieldList));
 
       if (!fieldList) {
         return;
@@ -1162,10 +1159,8 @@ export default defineComponent({
         return;
       }
 
-      console.log("draggedItem", draggedItem);
       fieldList.splice(sourceIndex, 1);
       fieldList.splice(targetIndex, 0, draggedItem);
-      console.log("reorderItems", JSON.stringify(fieldList));
     };
 
     const getAxisArray = (area: string) => {
@@ -1187,7 +1182,6 @@ export default defineComponent({
       }
     };
     const onDragEnter = (e: any, area: string, index: any) => {
-      console.log("onDragEnter", area, index);
       if (
         dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" &&
         area === "f"
@@ -1208,7 +1202,6 @@ export default defineComponent({
     };
 
     const onDragOver = (e: any, area: string) => {
-      console.log("onDragOver", area);
       e.preventDefault();
     };
 

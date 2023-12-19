@@ -512,7 +512,6 @@ export default defineComponent({
     );
 
     const onDrop = (e: any, targetAxis: string) => {
-      console.log("onDrop", e, targetAxis);
       // move the items  between axis or from the field list
       // check if the source is from axis or field list
       if (dashboardPanelData.meta.dragAndDrop.dragSource === "fieldList") {
