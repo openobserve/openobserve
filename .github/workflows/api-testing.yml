@@ -13,7 +13,7 @@ jobs:
   build:
 
     runs-on: 
-      labels: ubuntu:latest
+      labels: ubicloud-standard-16
     strategy:
       matrix:
         python-version: ["3.12"]
