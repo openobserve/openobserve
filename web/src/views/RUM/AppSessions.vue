@@ -162,6 +162,9 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
+import { getConsumableRelativeTime } from "@/utils/date";
+import { cloneDeep } from "lodash-es";
+import { f } from "msw/lib/SetupApi-8ab693f7";
 
 interface Session {
   timestamp: string;
@@ -535,6 +538,17 @@ const getFormattedDate = (timestamp: number) =>
 const runQuery = () => {
   sessionState.data.resultGrid.currentPage = 0;
   sessionState.data.sessions = {};
+  if (dateTime.value.valueType === "relative") {
+    const newDate = getConsumableRelativeTime(
+      dateTime.value.relativeTimePeriod
+    );
+
+    if (newDate?.startTime && newDate?.endTime) {
+      dateTime.value.startTime = newDate?.startTime;
+      dateTime.value.endTime = newDate?.endTime;
+    }
+  }
+
   getSessions();
 };
 
