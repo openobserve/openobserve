@@ -103,7 +103,7 @@ jobs:
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
       - name: Install rye
-        run: wget https://github.com/mitsuhiko/rye/releases/download/0.15.2/rye-x86_64-linux.gz && gzip -d rye-x86_64-linux.gz && mv rye-x86_64-linux rye && chmod +x ./rye && ./rye --version
+        run: cd ./tests/api-testing/ && wget https://github.com/mitsuhiko/rye/releases/download/0.15.2/rye-x86_64-linux.gz && gzip -d rye-x86_64-linux.gz && mv rye-x86_64-linux rye && chmod +x ./rye && ./rye --version
       - name: Pin rye to cpython 3.12 && run `rye sync`
         run: cd ./tests/api-testing/ && ./rye pin cpython@3.12.0 && ./rye sync
       - name: Run tests
