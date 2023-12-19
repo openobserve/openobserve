@@ -6,9 +6,6 @@
     </div>
     <div class="q-pa-md">
       <div class="text-subtitle1 text-bold q-mt-md q-pl-xs">OTLP gRPC</div>
-      <div class="title" data-test="vector-title-text">
-        <b>Note:</b> Not supported in clustered installation of OpenObserve yet.
-      </div>
       <ContentCopy class="q-mt-sm" :content="getOtelGrpcConfig" />
     </div>
   </div>
