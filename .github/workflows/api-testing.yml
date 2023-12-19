@@ -102,13 +102,14 @@ jobs:
       # You can test your matrix by printing the current Python version
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
+      - name: Run API testing
+        uses: sksat/setup-rye@v0.8.0
       - name: Install rye
         run: cd ./tests/api-testing/ && wget https://github.com/mitsuhiko/rye/releases/download/0.15.2/rye-x86_64-linux.gz && gzip -d rye-x86_64-linux.gz && mv rye-x86_64-linux rye && chmod +x ./rye && ./rye --version
-      - name: Pin rye to cpython 3.12 && run `rye sync`
-        run: cd ./tests/api-testing/ && ./rye pin cpython@3.12.0 && ./rye sync
       - name: Run tests
-        run: cd ./tests/api-testing/ && ./rye run pytest --force-sugar
-        
+        run: cd ./tests/api-testing/ && rye pin cpython@3.12.0 && rye sync  && rye run pytest --force-sugar
+
+
       # Try to test the openapi generator as well
       # - name: openapi-generator test
       #   uses: openapi-generators/openapitools-generator-action@v1
