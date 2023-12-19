@@ -209,14 +209,31 @@ pub struct Config {
     pub profiling: Pyroscope,
 }
 
+/// Render the help string and default value for all the available
+/// environment variables in O2.
+pub fn render_help() {
+    let fields = Config::get_help();
+    for (k, v) in fields.iter() {
+        if k.is_empty() {
+            continue;
+        }
+        println!("{:<38}: {} [DEFAULT: {}]", k, v.1.as_deref().unwrap_or(""), &v.0,);
+    }
+}
+
 #[derive(EnvConfig)]
 pub struct Pyroscope {
     #[env_config(
         name = "ZO_PROF_PYROSCOPE_SERVER_URL",
-        default = "http://localhost:4040"
+        default = "http://localhost:4040",
+        help = "Default pyroscope server url"
     )]
     pub pyroscope_server_url: String,
-    #[env_config(name = "ZO_PROF_PYROSCOPE_PROJECT_NAME", default = "openobserve")]
+    #[env_config(
+        name = "ZO_PROF_PYROSCOPE_PROJECT_NAME",
+        default = "openobserve",
+        help = "A uniquely identifiable pyroscope project name"
+    )]
     pub pyroscope_project_name: String,
 }
 

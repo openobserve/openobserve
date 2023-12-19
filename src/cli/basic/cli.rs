@@ -20,7 +20,7 @@ use crate::{
     },
     common::{
         infra,
-        infra::config::{CONFIG, USERS},
+        infra::config::{render_help, CONFIG, USERS},
         meta, migration,
         utils::file::set_permission,
     },
@@ -46,6 +46,8 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 .about("import openobserve data").args(args()),
             clap::Command::new("export")
                 .about("export openobserve data").args(args()),
+            clap::Command::new("print-env-info")
+                .about("print all the supported environment variables supported by O2"),
             clap::Command::new("view")
                 .about("view openobserve data")
                 .arg(
@@ -158,6 +160,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     return Err(anyhow::anyhow!("unsupport reset component: {}", component));
                 }
             }
+        }
+        "print-env-info" => {
+            render_help();
+            return Ok(true);
         }
         "view" => {
             let component = command.get_one::<String>("component").unwrap();
