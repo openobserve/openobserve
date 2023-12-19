@@ -973,57 +973,41 @@ export default defineComponent({
     const currentDragArea = ref("");
 
     const onDrop = (e: any, area: string) => {
+      const dragElementType =
+        dashboardPanelData.meta.dragAndDrop.dragElementType;
+      const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-      if (dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldList") {
-        const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
-
-        dashboardPanelData.meta.dragAndDrop.dragging = false;
-        dashboardPanelData.meta.dragAndDrop.dragElement = null;
-        dashboardPanelData.meta.dragAndDrop.dragElementType = null;
-
-        if (dragItem && area == "x") {
-          addXAxisItem(dragItem);
-        } else if (dragItem && area == "y") {
-          addYAxisItem(dragItem);
-        } else if (dragItem && area == "z") {
-          addZAxisItem(dragItem);
-        } else if (dragItem && area == "f") {
-          addFilteredItem(dragItem?.name);
-        } else {
+      if (dragElementType === "fieldList") {
+        if (dragElement && area === "x") {
+          addXAxisItem(dragElement);
+        } else if (dragElement && area === "y") {
+          addYAxisItem(dragElement);
+        } else if (dragElement && area === "z") {
+          addZAxisItem(dragElement);
+        } else if (dragElement && area === "f") {
+          addFilteredItem(dragElement?.name);
         }
         currentDragArea.value = "";
-      } else if (
-        dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldElement"
-      ) {
-        console.log("dragItem");
-        
-        const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
-
-        dashboardPanelData.meta.dragAndDrop.dragging = false;
-        dashboardPanelData.meta.dragAndDrop.dragElement = null;
-        dashboardPanelData.meta.dragAndDrop.dragElementType = null;
-
+      } else if (dragElementType === "fieldElement") {
         const dragName =
           dashboardPanelData.meta.stream.selectedStreamFields.find(
-            (item: any) => {
-              return item?.name == dragItem?.column;
-            }
+            (item: any) => item?.name === dragElement?.column
+          );
+        const customDragName =
+          dashboardPanelData.meta.stream.customQueryFields.find(
+            (item: any) => item?.name === dragElement?.column
           );
 
-        const customDragName =
-          dashboardPanelData.meta.stream.customQueryFields.find((item: any) => {
-            return item?.name == dragItem?.column;
-          });
-
-        if (dragName) {
+        if (dragName || customDragName) {
           const axisArray = getAxisArray(area);
-
-          const duplicateName = axisArray.some((item: any) => {
-            return item.column === dragName.name;
-          });
+          const duplicateName = axisArray.some(
+            (item: any) => item.column === (dragName || customDragName).name
+          );
 
           if (duplicateName) {
-            const errorMessage = `Field '${dragName.name}' already exists in '${area}' axis.`;
+            const errorMessage = `Field '${
+              (dragName || customDragName).name
+            }' already exists in '${area}' axis.`;
             $q.notify({
               type: "negative",
               message: errorMessage,
@@ -1033,89 +1017,46 @@ export default defineComponent({
           }
 
           if (area !== "f") {
-            if (area === "x" && isAddXAxisNotAllowed.value) {
-              let maxAllowedXAxisFields;
+            if (
+              (area === "x" && isAddXAxisNotAllowed.value) ||
+              (area === "y" && isAddYAxisNotAllowed.value) ||
+              (area === "z" && isAddZAxisNotAllowed.value)
+            ) {
+              let maxAllowedAxisFields;
 
               switch (dashboardPanelData.data.type) {
                 case "pie":
                 case "donut":
                 case "heatmap":
-                  maxAllowedXAxisFields = 1;
+                  maxAllowedAxisFields = area === "x" ? 1 : 0;
                   break;
                 case "metric":
-                  maxAllowedXAxisFields = 0;
+                  maxAllowedAxisFields = area === "x" ? 0 : 1;
                   break;
                 case "table":
+                  maxAllowedAxisFields = 0;
                   break;
                 default:
-                  maxAllowedXAxisFields = 2;
+                  maxAllowedAxisFields = area === "x" ? 2 : 1;
               }
 
-              const errorMessage = `Max ${maxAllowedXAxisFields} field(s) in X-Axis is allowed.`;
+              const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${area.toUpperCase()}-Axis is allowed.`;
 
               $q.notify({
                 type: "negative",
-                message: `${errorMessage}`,
-                timeout: 5000,
-              });
-              return;
-            }
-
-            if (area === "y" && isAddYAxisNotAllowed.value) {
-              let maxAllowedYAxisFields;
-
-              switch (dashboardPanelData.data.type) {
-                case "pie":
-                case "donut":
-                case "metric":
-                case "area-stacked":
-                case "stacked":
-                case "heatmap":
-                case "h-stacked":
-                  maxAllowedYAxisFields = 1;
-                  break;
-                default:
-                  maxAllowedYAxisFields = 0;
-              }
-
-              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in Y-Axis is allowed.`;
-
-              $q.notify({
-                type: "negative",
-                message: ` ${errorMessage}`,
-                timeout: 5000,
-              });
-              return;
-            }
-
-            if (area === "z" && isAddZAxisNotAllowed.value) {
-              let maxAllowedYAxisFields;
-
-              switch (dashboardPanelData.data.type) {
-                case "heatmap":
-                  maxAllowedYAxisFields = 1;
-                  break;
-                default:
-                  maxAllowedYAxisFields = 0;
-              }
-
-              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in Z-Axis is allowed.`;
-
-              $q.notify({
-                type: "negative",
-                message: `${errorMessage}`,
+                message: errorMessage,
                 timeout: 5000,
               });
               return;
             }
 
             // Remove from the original axis
-            if (onLeave.value == "x") {
-              removeXAxisItem(dragName.name);
-            } else if (onLeave.value == "y") {
-              removeYAxisItem(dragName.name);
-            } else if (onLeave.value == "z") {
-              removeZAxisItem(dragName.name);
+            if (onLeave.value === "x") {
+              removeXAxisItem((dragName || customDragName).name);
+            } else if (onLeave.value === "y") {
+              removeYAxisItem((dragName || customDragName).name);
+            } else if (onLeave.value === "z") {
+              removeZAxisItem((dragName || customDragName).name);
             }
           }
 
@@ -1124,134 +1065,18 @@ export default defineComponent({
           }
 
           // Add to the new axis
-          if (area == "x") {
-            addXAxisItem(dragName);
-          } else if (area == "y") {
-            addYAxisItem(dragName);
-          } else if (area == "z") {
-            addZAxisItem(dragName);
-          }
-        } else if (customDragName) {
-          const axisArray = getAxisArray(area);
-
-          const duplicateName = axisArray.some((item: any) => {
-            return item.column === customDragName.name;
-          });
-
-          if (duplicateName) {
-            const errorMessage = `Field '${customDragName.name}' already exists in '${area}' axis.`;
-            $q.notify({
-              type: "negative",
-              message: errorMessage,
-              timeout: 5000,
-            });
-            return;
-          }
-
-          if (area !== "f") {
-            if (area === "x" && isAddXAxisNotAllowed.value) {
-              let maxAllowedXAxisFields;
-
-              switch (dashboardPanelData.data.type) {
-                case "pie":
-                case "donut":
-                case "heatmap":
-                  maxAllowedXAxisFields = 1;
-                  break;
-                case "metric":
-                  maxAllowedXAxisFields = 0;
-                  break;
-                case "table":
-                  break;
-                default:
-                  maxAllowedXAxisFields = 2;
-              }
-
-              const errorMessage = `Max ${maxAllowedXAxisFields} field(s) in X-Axis is allowed.`;
-
-              $q.notify({
-                type: "negative",
-                message: `${errorMessage}`,
-                timeout: 5000,
-              });
-              return;
-            }
-
-            if (area === "y" && isAddYAxisNotAllowed.value) {
-              let maxAllowedYAxisFields;
-
-              switch (dashboardPanelData.data.type) {
-                case "pie":
-                case "donut":
-                case "metric":
-                case "area-stacked":
-                case "stacked":
-                case "heatmap":
-                case "h-stacked":
-                  maxAllowedYAxisFields = 1;
-                  break;
-                default:
-                  maxAllowedYAxisFields = 0;
-              }
-
-              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in Y-Axis is allowed.`;
-
-              $q.notify({
-                type: "negative",
-                message: ` ${errorMessage}`,
-                timeout: 5000,
-              });
-              return;
-            }
-
-            if (area === "z" && isAddZAxisNotAllowed.value) {
-              let maxAllowedYAxisFields;
-
-              switch (dashboardPanelData.data.type) {
-                case "heatmap":
-                  maxAllowedYAxisFields = 1;
-                  break;
-                default:
-                  maxAllowedYAxisFields = 0;
-              }
-
-              const errorMessage = `Max ${maxAllowedYAxisFields} field(s) in Z-Axis is allowed.`;
-
-              $q.notify({
-                type: "negative",
-                message: `${errorMessage}`,
-                timeout: 5000,
-              });
-              return;
-            }
-
-            // Remove from the original axis
-            if (onLeave.value == "x") {
-              removeXAxisItem(customDragName.name);
-            } else if (onLeave.value == "y") {
-              removeYAxisItem(customDragName.name);
-            } else if (onLeave.value == "z") {
-              removeZAxisItem(customDragName.name);
-            }
-          }
-
-          if (area === "f") {
-            return;
-          }
-
-          // Add to the new axis
-          if (area == "x") {
-            addXAxisItem(customDragName);
-          } else if (area == "y") {
-            addYAxisItem(customDragName);
-          } else if (area == "z") {
-            addZAxisItem(customDragName);
+          if (area === "x") {
+            addXAxisItem(dragName || customDragName);
+          } else if (area === "y") {
+            addYAxisItem(dragName || customDragName);
+          } else if (area === "z") {
+            addZAxisItem(dragName || customDragName);
           }
         }
-      updateArrayAlias();
-
-        currentDragArea.value = "";
       }
+
+      updateArrayAlias();
+      currentDragArea.value = "";
     };
 
     const getAxisArray = (area: string) => {
@@ -1331,6 +1156,7 @@ export default defineComponent({
       fieldIndex.value = index;
     };
     const onFieldDrop = (axis: any, index: any) => {
+      console.log("onleave", onLeave.value);
       if (axis != onLeave.value) return;
 
       dashboardPanelData.meta.dragAndDrop.dragging = false;
@@ -1340,8 +1166,7 @@ export default defineComponent({
       // Reset the drag index
       fieldIndex.value = null;
     };
-    const onFieldDragEnd = () => {
-    };
+    const onFieldDragEnd = () => {};
 
     const handler2 = () => {};
 
