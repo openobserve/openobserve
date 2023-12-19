@@ -508,8 +508,16 @@ pub struct DiskCache {
 pub struct Log {
     #[env_config(name = "RUST_LOG", default = "info")]
     pub level: String,
-    #[env_config(name = "ZO_LOG_FILE", default = "")]
-    pub file: String,
+    #[env_config(name = "ZO_LOG_JSON_FORMAT", default = false)]
+    pub json_format: bool,
+    #[env_config(name = "ZO_LOG_FILE_DIR", default = "")]
+    pub file_dir: String,
+    // default is: o2.{hostname}.log
+    #[env_config(name = "ZO_LOG_FILE_NAME_PREFIX", default = "")]
+    pub file_name_prefix: String,
+    // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%SZ
+    #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
+    pub local_time_format: String,
     #[env_config(name = "ZO_EVENTS_ENABLED", default = false)]
     pub events_enabled: bool,
     #[env_config(
