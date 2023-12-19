@@ -102,10 +102,12 @@ jobs:
       # You can test your matrix by printing the current Python version
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
-      - name: Run API testing
-        uses: sksat/setup-rye@v0.8.0
-      - name: Install rye
-        run: cd ./tests/api-testing/ && wget https://github.com/mitsuhiko/rye/releases/download/0.15.2/rye-x86_64-linux.gz && gzip -d rye-x86_64-linux.gz && mv rye-x86_64-linux rye && chmod +x ./rye && ./rye --version
+      - name: Enable caching and define a working directory
+        uses: eifinger/setup-rye@v1
+        with:
+          enable-cache: true
+          working-directory: './tests/api-testing/'
+          version: '0.12.0'
       - name: Run tests
         run: cd ./tests/api-testing/ && rye pin cpython@3.12.0 && rye sync  && rye run pytest --force-sugar
 
