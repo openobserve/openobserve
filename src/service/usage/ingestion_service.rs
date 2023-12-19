@@ -95,7 +95,7 @@ pub async fn ingest(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
     #[test]

@@ -51,17 +51,8 @@ impl RumExtraData {
         })
     }
 
-    pub async fn extractor(
-        req: ServiceRequest,
-        next: Next<impl MessageBody>,
-    ) -> Result<ServiceResponse<impl MessageBody>, ActixErr> {
-        let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
-        let mut data =
-            web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
-        Self::filter_api_keys(&mut data);
-
-        // These are the tags which come in `ootags`
-        let tags: AHashMap<String, serde_json::Value> = match data.get("ootags") {
+    fn filter_tags(data: &AHashMap<String, String>) -> AHashMap<String, serde_json::Value> {
+        match data.get("ootags").or_else(|| data.get("o2tags")) {
             Some(tags) => tags
                 .split(',')
                 .map(|tag| {
@@ -71,7 +62,20 @@ impl RumExtraData {
                 .collect(),
 
             None => AHashMap::default(),
-        };
+        }
+    }
+
+    pub async fn extractor(
+        req: ServiceRequest,
+        next: Next<impl MessageBody>,
+    ) -> Result<ServiceResponse<impl MessageBody>, ActixErr> {
+        let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
+        let mut data =
+            web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+        Self::filter_api_keys(&mut data);
+
+        // These are the tags which come in `ootags` or `o2tags`
+        let tags: AHashMap<String, serde_json::Value> = Self::filter_tags(&data);
 
         let mut user_agent_hashmap: AHashMap<String, serde_json::Value> = data
             .into_inner()
@@ -177,5 +181,30 @@ mod tests {
         assert!(data.contains_key("batch_time"));
         assert!(!data.contains_key("oo-api-key"));
         assert!(!data.contains_key("o2-api-key"));
+    }
+
+    #[test]
+    async fn test_filter_tags() {
+        // Create a mock query string
+        let query_string_oo_tags = "ootags=sdk_version:0.2.9,api:fetch,env:production,service:web-application,version:1.0.1";
+        let query_string_o2_tags = "o2tags=sdk_version:0.2.9,api:fetch,env:production,service:web-application,version:1.0.1";
+
+        for query in &[query_string_oo_tags, query_string_o2_tags] {
+            // Create a mock ServiceRequest with the query string
+            let req = test::TestRequest::with_uri(&format!("/path?{}", query)).to_srv_request();
+
+            // Call the from_query function
+            let query_data =
+                web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+            let data = RumExtraData::filter_tags(&query_data);
+
+            // Assert that the tags are filtered correctly
+            assert!(data.len() > 0);
+            assert!(data.get("sdk_version").unwrap() == "0.2.9");
+            assert!(data.get("api").unwrap() == "fetch");
+            assert!(data.get("env").unwrap() == "production");
+            assert!(data.get("service").unwrap() == "web-application");
+            assert!(data.get("version").unwrap() == "1.0.1");
+        }
     }
 }

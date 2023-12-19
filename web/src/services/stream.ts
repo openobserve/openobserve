@@ -74,6 +74,26 @@ const stream = {
     return http().get(url);
   },
 
+  tracesFieldValues: ({
+    org_identifier,
+    stream_name,
+    fields,
+    size,
+    start_time,
+    end_time,
+    filter,
+    type,
+    keyword,
+  }: any) => {
+    const fieldsString = fields.join(",");
+    let url = `/api/${org_identifier}/${stream_name}/_values?fields=${fieldsString}&size=${size}&start_time=${start_time}&end_time=${end_time}`;
+    if (filter) url = url + `&filter=${filter}`;
+    if (type) url += "&type=" + type;
+    if (keyword) url += "&keyword=" + keyword;
+
+    return http().get(url);
+  },
+
   labelValues: ({
     org_identifier,
     stream_name,

@@ -58,8 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   clickable
                   v-for="(item, i) in searchObj.data.savedViews"
                   :key="'saved-view-' + i"
+                  v-close-popup
                 >
-                  <q-item-section @click.stop="applySavedView(item)">
+                  <q-item-section
+                    @click.stop="applySavedView(item)"
+                    v-close-popup
+                  >
                     <q-item-label>{{ item.view_name }}</q-item-label>
                   </q-item-section>
                   <q-item-section
@@ -67,7 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey" size="xs" />
+                    <q-icon name="delete" color="grey"
+size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -102,58 +107,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="float-left"
           size="32px"
         />
-        <q-select
-          data-test="logs-search-bar-function-dropdown"
-          v-model="functionModel"
-          :options="functionOptions"
-          option-label="name"
-          option-value="function"
-          :placeholder="t('search.functionPlaceholder')"
-          data-cy="index-dropdown"
-          input-debounce="10"
-          use-input
-          hide-selected
-          behavior="default"
-          fill-input
-          dense
-          :loading="false"
-          @filter="filterFn"
-          @new-value="createNewValue"
-          @blur="updateSelectedValue"
-          @update:model-value="populateFunctionImplementation"
-          class="float-left function-dropdown q-mr-sm"
+        <q-btn-group
+          class="q-ml-sm no-outline q-pa-none no-border float-left q-mr-sm"
+          :disable="!searchObj.meta.toggleFunction"
         >
-          <template v-slot:append>
-            <q-icon
-              v-if="functionModel !== null"
-              class="cursor-pointer"
-              name="clear"
-              size="xs"
-              @click.stop.prevent="functionModel = null"
-            />
-          </template>
-          <template #no-option>
-            <q-item>
-              <q-item-section class="text-xs">{{
-                t("search.functionMessage")
-              }}</q-item-section>
-            </q-item>
-          </template>
-        </q-select>
-        <q-btn
-          data-test="logs-search-bar-save-function-btn"
-          :disable="
-            !functionModel ||
-            !searchObj.data.tempFunctionContent ||
-            functionModel.function == searchObj.data.tempFunctionContent
-          "
-          :title="t('search.saveFunctionLabel')"
-          icon="save"
-          icon-right="functions"
-          size="sm"
-          class="q-px-xs q-mr-sm float-left download-logs-btn"
-          @click="saveFunction"
-        ></q-btn>
+          <q-btn-dropdown
+            data-test="logs-search-bar-function-dropdown"
+            v-model="functionModel"
+            auto-close
+            size="12px"
+            icon="save"
+            icon-right="functions"
+            :title="t('search.savedViewsLabel')"
+            split
+            class="no-outline saved-views-dropdown no-border"
+            @click="fnSavedFunctionDialog"
+          >
+            <q-list>
+              <q-item-label header class="q-pa-sm">{{
+                t("search.functionPlaceholder")
+              }}</q-item-label>
+              <q-separator inset></q-separator>
+
+              <div v-if="functionOptions.length">
+                <q-item
+                  class="q-pa-sm saved-view-item"
+                  clickable
+                  v-for="(item, i) in functionOptions"
+                  :key="'saved-view-' + i"
+                  v-close-popup
+                >
+                  <q-item-section
+                    @click.stop="populateFunctionImplementation(item, true)"
+                    v-close-popup
+                  >
+                    <q-item-label>{{ item.name }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </div>
+              <div v-else>
+                <q-item>
+                  <q-item-section>
+                    <q-item-label>{{
+                      t("search.savedFunctionNotFound")
+                    }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </div>
+            </q-list>
+          </q-btn-dropdown>
+        </q-btn-group>
         <q-btn
           data-test="logs-search-bar-reset-function-btn"
           class="q-mr-sm download-logs-btn q-px-sm"
@@ -182,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:timezone-change="updateTimezone"
           />
         </div>
-        <div class="search-time q-pl-sm float-left q-mr-sm">
+        <div class="search-time float-left q-mr-sm">
           <div class="flex">
             <auto-refresh-interval
               class="q-mr-sm q-px-none logs-auto-refresh-interval"
@@ -376,6 +379,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <q-dialog v-model="store.state.savedFunctionDialog">
+      <q-card style="width: 700px; max-width: 80vw">
+        <q-card-section>
+          <div class="text-h6">{{ t("search.functionPlaceholder") }}</div>
+        </q-card-section>
+
+        <q-card-section class="q-pt-none">
+          <span>Update</span>
+          <q-toggle
+            data-test="saved-function-action-toggle"
+            v-bind:disable="functionOptions.length == 0"
+            name="saved_function_action"
+            v-model="isSavedFunctionAction"
+            true-value="create"
+            false-value="update"
+            label=""
+            @change="savedFunctionName = ''"
+          />
+          <span>Create</span>
+          <div v-if="isSavedFunctionAction == 'create'">
+            <q-input
+              data-test="saved-function-name-input"
+              v-model="savedFunctionName"
+              :label="t('search.saveFunctionName')"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[
+                (val) => !!val.trim() || 'This field is required',
+                (val) =>
+                  /^[-A-Za-z0-9/_]+$/.test(val) || 'Input must be alphanumeric',
+              ]"
+              tabindex="0"
+            />
+          </div>
+          <div v-else>
+            <q-select
+              data-test="saved-function-name-select"
+              v-model="savedFunctionSelectedName"
+              :options="functionOptions"
+              option-label="name"
+              option-value="name"
+              :label="t('search.saveFunctionName')"
+              placeholder="Select Function Name"
+              :popup-content-style="{ textTransform: 'capitalize' }"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-sm showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            />
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right" class="bg-white text-teal">
+          <q-btn
+            data-test="saved-function-dialog-cancel-btn"
+            unelevated
+            no-caps
+            class="q-mr-sm text-bold"
+            :label="t('confirmDialog.cancel')"
+            color="secondary"
+            v-close-popup
+          />
+          <q-btn
+            data-test="saved-view-dialog-save-btn"
+            v-if="!saveFunctionLoader"
+            unelevated
+            no-caps
+            :label="t('confirmDialog.ok')"
+            color="primary"
+            class="text-bold"
+            @click="saveFunction"
+          />
+          <q-btn
+            data-test="saved-function-dialog-loading-btn"
+            v-if="saveFunctionLoader"
+            unelevated
+            no-caps
+            :label="t('confirmDialog.loading')"
+            color="primary"
+            class="text-bold"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
     <ConfirmDialog
       title="Delete Saved View"
       message="Are you sure you want to delete saved view?"
@@ -505,6 +601,12 @@ export default defineComponent({
 
     const functionModel: string = ref(null);
     const fnEditorRef: any = ref(null);
+
+    const isSavedFunctionAction: string = ref("create");
+    const savedFunctionName: string = ref("");
+    const savedFunctionSelectedName: string = ref("");
+    const saveFunctionLoader = ref(false);
+
     const confirmDialogVisible: boolean = ref(false);
     let confirmCallback;
     let fnEditorobj: any = null;
@@ -773,12 +875,14 @@ export default defineComponent({
     });
 
     const saveFunction = () => {
+      saveFunctionLoader.value = true;
       let callTransform: Promise<{ data: any }>;
       const content = fnEditorobj.getValue();
-
-      let fnName = functionModel.value;
-      if (typeof functionModel.value == "object") {
-        fnName = functionModel.value.name;
+      let fnName = "";
+      if (isSavedFunctionAction.value == "create") {
+        fnName = savedFunctionName.value;
+      } else {
+        fnName = savedFunctionSelectedName.value.name;
       }
 
       if (content.trim() == "") {
@@ -787,6 +891,7 @@ export default defineComponent({
           message:
             "The function field must contain a value and cannot be left empty.",
         });
+        saveFunctionLoader.value = false;
         return;
       }
 
@@ -796,6 +901,7 @@ export default defineComponent({
           type: "negative",
           message: "Function name is not valid.",
         });
+        saveFunctionLoader.value = false;
         return;
       }
 
@@ -803,9 +909,10 @@ export default defineComponent({
       formData.value.function = content;
       formData.value.transType = 0;
       formData.value.name = fnName;
+      searchObj.data.tempFunctionContent = content;
 
-      const result = functionOptions.value.find((obj) => obj.name === fnName);
-      if (!result) {
+      // const result = functionOptions.value.find((obj) => obj.name === fnName);
+      if (isSavedFunctionAction.value == "create") {
         callTransform = jsTransformService.create(
           store.state.selectedOrganization.identifier,
           formData.value
@@ -813,8 +920,6 @@ export default defineComponent({
 
         callTransform
           .then((res: { data: any }) => {
-            searchObj.data.tempFunctionLoading = false;
-
             $q.notify({
               type: "positive",
               message: res.data.message,
@@ -830,9 +935,14 @@ export default defineComponent({
               transType: 0,
               params: "row",
             });
+            store.dispatch("setSavedFunctionDialog", false);
+            isSavedFunctionAction.value = "create";
+            savedFunctionName.value = "";
+            saveFunctionLoader.value = false;
+            savedFunctionSelectedName.value = "";
           })
           .catch((err) => {
-            searchObj.data.tempFunctionLoading = false;
+            saveFunctionLoader.value = false;
             $q.notify({
               type: "negative",
               message:
@@ -842,7 +952,9 @@ export default defineComponent({
             });
           });
       } else {
+        saveFunctionLoader.value = false;
         showConfirmDialog(() => {
+          saveFunctionLoader.value = true;
           callTransform = jsTransformService.update(
             store.state.selectedOrganization.identifier,
             formData.value
@@ -850,8 +962,6 @@ export default defineComponent({
 
           callTransform
             .then((res: { data: any }) => {
-              searchObj.data.tempFunctionLoading = false;
-
               $q.notify({
                 type: "positive",
                 message: "Function updated successfully.",
@@ -868,9 +978,14 @@ export default defineComponent({
               }
 
               functionOptions.value = searchObj.data.transforms;
+              store.dispatch("setSavedFunctionDialog", false);
+              isSavedFunctionAction.value = "create";
+              savedFunctionName.value = "";
+              saveFunctionLoader.value = false;
+              savedFunctionSelectedName.value = "";
             })
             .catch((err) => {
-              searchObj.data.tempFunctionLoading = false;
+              saveFunctionLoader.value = false;
               $q.notify({
                 type: "negative",
                 message:
@@ -884,13 +999,12 @@ export default defineComponent({
     };
 
     const resetFunctionContent = () => {
-      formData.value.function = "";
       fnEditorobj.setValue("");
-      formData.value.name = "";
-      functionModel.value = "";
-      searchObj.data.tempFunctionLoading = false;
-      searchObj.data.tempFunctionName = "";
-      searchObj.data.tempFunctionContent = "";
+      store.dispatch("setSavedFunctionDialog", false);
+      isSavedFunctionAction.value = "create";
+      savedFunctionName.value = "";
+      saveFunctionLoader.value = false;
+      savedFunctionSelectedName.value = "";
     };
 
     const resetEditorLayout = () => {
@@ -900,10 +1014,35 @@ export default defineComponent({
       }, 100);
     };
 
-    const populateFunctionImplementation = (fnValue) => {
+    const populateFunctionImplementation = (fnValue, flag = false) => {
+      if (flag) {
+        $q.notify({
+          type: "positive",
+          message: `${fnValue.name} function applied successfully.`,
+          timeout: 3000,
+        });
+      }
+      searchObj.meta.toggleFunction = true;
+      searchObj.config.fnSplitterModel = 60;
       fnEditorobj.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
+    };
+
+    const fnSavedFunctionDialog = () => {
+      const content = fnEditorobj.getValue();
+      if (content == "") {
+        $q.notify({
+          type: "negative",
+          message: "No function definition found.",
+        });
+        return;
+      }
+      store.dispatch("setSavedFunctionDialog", true);
+      isSavedFunctionAction.value = "create";
+      savedFunctionName.value = "";
+      saveFunctionLoader.value = false;
+      savedFunctionSelectedName.value = "";
     };
 
     const showConfirmDialog = (callback) => {
@@ -993,10 +1132,13 @@ export default defineComponent({
             searchObj.value = mergeDeep(searchObj, extractedObj);
             await nextTick();
             if (extractedObj.data.tempFunctionContent != "") {
-              populateFunctionImplementation({
-                name: "",
-                function: searchObj.data.tempFunctionContent,
-              });
+              populateFunctionImplementation(
+                {
+                  name: "",
+                  function: searchObj.data.tempFunctionContent,
+                },
+                false
+              );
               searchObj.data.tempFunctionContent =
                 extractedObj.data.tempFunctionContent;
               searchObj.meta.functionEditorPlaceholderFlag = false;
@@ -1340,6 +1482,11 @@ export default defineComponent({
       confirmDelete,
       saveViewLoader,
       savedViewDropdownModel,
+      fnSavedFunctionDialog,
+      isSavedFunctionAction,
+      savedFunctionName,
+      savedFunctionSelectedName,
+      saveFunctionLoader,
     };
   },
   computed: {
@@ -1348,9 +1495,6 @@ export default defineComponent({
     },
     toggleFunction() {
       return this.searchObj.meta.toggleFunction;
-    },
-    selectFunction() {
-      return this.functionModel;
     },
     confirmMessage() {
       return "Are you sure you want to update the function?";
@@ -1414,12 +1558,6 @@ export default defineComponent({
         this.searchObj.config.fnSplitterModel = 60;
       }
       this.resetEditorLayout();
-    },
-    selectFunction(newVal) {
-      if (newVal != "") {
-        this.searchObj.config.fnSplitterModel = 60;
-        this.searchObj.meta.toggleFunction = true;
-      }
     },
     resetFunction(newVal) {
       if (newVal == "" && store.state.savedViewFlag == false) {

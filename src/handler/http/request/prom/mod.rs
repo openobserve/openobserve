@@ -24,9 +24,8 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::time::{parse_milliseconds, parse_str_to_timestamp_micros},
     },
-    service::{metrics, promql},
+    service::{metrics, promql, promql::MetricsQueryRequest},
 };
-use crate::service::promql::MetricsQueryRequest;
 
 /// prometheus remote-write endpoint for metrics
 #[utoipa::path(
@@ -622,9 +621,9 @@ fn validate_metadata_params(
             Ok(parser::Expr::VectorSelector(sel)) => {
                 let err = if sel.name.is_none()
                     && sel
-                    .matchers
-                    .find_matcher_value(meta::prom::NAME_LABEL)
-                    .is_none()
+                        .matchers
+                        .find_matcher_value(meta::prom::NAME_LABEL)
+                        .is_none()
                 {
                     Some("match[] argument must start with a metric name, e.g. `match[]=up`")
                 } else if sel.offset.is_some() {
@@ -727,7 +726,11 @@ fn search_timeout(timeout: Option<String>) -> i64 {
     }
 }
 
-async fn search(org_id: &str, timeout: i64, req: &MetricsQueryRequest) -> Result<HttpResponse, Error> {
+async fn search(
+    org_id: &str,
+    timeout: i64,
+    req: &MetricsQueryRequest,
+) -> Result<HttpResponse, Error> {
     match promql::search::search(org_id, req, timeout).await {
         Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,

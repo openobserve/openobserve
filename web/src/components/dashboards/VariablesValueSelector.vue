@@ -85,16 +85,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-select>
       </div>
+      <div v-else-if="item.type == 'dynamic_filters'">
+        <VariableAdHocValueSelector v-model="item.value" :variableItem="item" />
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { onMounted, watch } from "vue";
+import { getCurrentInstance, onMounted, watch } from "vue";
 import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
+import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -102,14 +106,17 @@ export default defineComponent({
   emits: ["variablesData"],
   components: {
     VariableQueryValueSelector,
+    VariableAdHocValueSelector,
   },
   setup(props: any, { emit }) {
+    const instance = getCurrentInstance();
     const store = useStore();
     // variables data derived from the variables config list
     const variablesData: any = reactive({
       isVariablesLoading: false,
       values: [],
     });
+
     onMounted(() => {
       getVariablesData();
     });
@@ -129,6 +136,7 @@ export default defineComponent({
     );
 
     const emitVariablesData = () => {
+      instance?.proxy?.$forceUpdate();
       emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
     };
 
@@ -144,10 +152,16 @@ export default defineComponent({
       // get old variable values
       let oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
       if (!oldVariableValue.length) {
+        const dynamicVariables =
+          props.variablesConfig?.list
+            ?.filter((it: any) => it.type == "dynamic_filters")
+            ?.map((it: any) => it.name) || [];
         oldVariableValue = Object.keys(props?.initialVariableValues ?? []).map(
           (key: any) => ({
             name: key,
-            value: props.initialVariableValues[key],
+            value: dynamicVariables.includes(key)
+              ? JSON.parse(decodeURIComponent(props.initialVariableValues[key]))
+              : props.initialVariableValues[key],
           })
         );
       }
@@ -164,8 +178,10 @@ export default defineComponent({
             name: it.name,
             label: it.label,
             type: it.type,
-            value: "",
-            isLoading: it.type == "query_values" ? true : false,
+            value: it.type == "dynamic_filters" ? [] : "",
+            isLoading: ["query_values", "dynamic_filters"].includes(it.type)
+              ? true
+              : false,
           };
           variablesData.values.push(obj);
           variablesData.isVariablesLoading = true;
@@ -221,9 +237,7 @@ export default defineComponent({
                       );
 
                     // triggers rerendering in the current component
-                    variablesData.values[index] = JSON.parse(
-                      JSON.stringify(obj)
-                    );
+                    variablesData.values[index] = obj;
 
                     emitVariablesData();
                     return obj;
@@ -234,9 +248,7 @@ export default defineComponent({
                       );
 
                     // triggers rerendering in the current component
-                    variablesData.values[index] = JSON.parse(
-                      JSON.stringify(obj)
-                    );
+                    variablesData.values[index] = obj;
 
                     emitVariablesData();
                     return obj;
@@ -250,7 +262,7 @@ export default defineComponent({
                   );
 
                   // triggers rerendering in the current component
-                  variablesData.values[index] = JSON.parse(JSON.stringify(obj));
+                  variablesData.values[index] = obj;
 
                   emitVariablesData();
                   return obj;
@@ -285,6 +297,87 @@ export default defineComponent({
               return obj;
               // break;
             }
+            case "dynamic_filters": {
+              obj.isLoading = true; // Set loading state
+
+              return streamService
+                .nameList(store.state.selectedOrganization.identifier, "", true)
+                .then((res) => {
+                  obj.isLoading = false; // Reset loading state
+
+                  const fieldsObj: any = {};
+
+                  res.data.list.forEach((item: any) => {
+                    const name = item.name;
+                    const stream_type = item.stream_type;
+
+                    (item.schema || []).forEach((schemaItem: any) => {
+                      const fieldName = schemaItem.name;
+
+                      if (!fieldsObj[fieldName]) {
+                        fieldsObj[fieldName] = [];
+                      }
+
+                      const existingEntry = fieldsObj[fieldName].find(
+                        (entry: any) =>
+                          entry.name === name &&
+                          entry.stream_type === stream_type
+                      );
+
+                      if (!existingEntry) {
+                        fieldsObj[fieldName].push({
+                          name: name,
+                          stream_type: stream_type,
+                        });
+                      }
+                    });
+                  });
+                  const fieldsArray = Object.entries(fieldsObj).map(
+                    ([schemaName, entries]) => ({
+                      name: schemaName,
+                      streams: entries,
+                    })
+                  );
+                  obj.options = fieldsArray;
+
+                  let old = oldVariableValue.find(
+                    (it2: any) => it2.name === it.name
+                  );
+                  if (old) {
+                    obj.value = old.value.map((it2: any) => ({
+                      ...it2,
+                      streams: fieldsArray.find(
+                        (it3: any) => it3.name === it2.name
+                      )?.streams,
+                    }));
+                  } else {
+
+                    obj.value = [];
+                  }
+
+                  variablesData.isVariablesLoading = variablesData.values.some(
+                    (val: { isLoading: any }) => val.isLoading
+                  );
+
+                  // triggers rerendering in the current component
+                  variablesData.values[index] = obj;
+                  emitVariablesData();
+                  return obj;
+                })
+                .catch((error) => {
+                  obj.isLoading = false; // Reset loading state
+                  // Handle error
+                  variablesData.isVariablesLoading = variablesData.values.some(
+                    (val: { isLoading: any }) => val.isLoading
+                  );
+
+                  // triggers rerendering in the current component
+                  variablesData.values[index] = obj;
+
+                  emitVariablesData();
+                  return obj;
+                });
+            }
             default:
               obj.value = it.value;
               return obj;
@@ -292,7 +385,9 @@ export default defineComponent({
         }
       );
 
-      variablesData.isVariablesLoading = false;
+      variablesData.isVariablesLoading = variablesData.values.some(
+        (val: { isLoading: any }) => val.isLoading
+      );
       emitVariablesData();
 
       Promise.all(promise)
@@ -311,4 +406,3 @@ export default defineComponent({
   },
 });
 </script>
- 

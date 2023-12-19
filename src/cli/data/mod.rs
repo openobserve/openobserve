@@ -13,57 +13,68 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::cli::data::cli::Cli;
-
 pub mod cli;
 pub mod export;
 pub mod import;
 
 pub trait Context {
-    fn operator(c: Cli) -> Result<bool, anyhow::Error>;
+    fn operator(c: cli::Cli) -> Result<bool, anyhow::Error>;
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::cli::data::cli::Cli;
-    use crate::cli::data::Context;
-    use crate::cli::data::export::Export;
-    use crate::cli::data::import::Import;
+    use super::*;
 
+    #[test]
     fn test_export_operator() {
         let args = vec![
             "openobserve",
-            "--c", "stream",
-            "--o", "default",
-            "--st", "logs",
-            "--s", "default",
-            "--t", "json",
-            "--f", "day",
-            "--d", "./json",
+            "--c",
+            "stream",
+            "--o",
+            "default",
+            "--st",
+            "logs",
+            "--s",
+            "default",
+            "--t",
+            "json",
+            "--f",
+            "day",
+            "--d",
+            "./json",
         ];
 
-        let cli = Cli::args(args);
+        let cli = cli::Cli::args(args);
 
-        if let Err(err) = Export::operator(cli.clone()) {
+        if let Err(err) = export::Export::operator(cli.clone()) {
             println!("Error: {}", err);
         }
     }
 
+    #[test]
     fn test_import_operator() {
         let args = vec![
             "openobserve",
-            "--c", "stream",
-            "--o", "default",
-            "--st", "logs",
-            "--s", "default",
-            "--t", "json",
-            "--f", "day",
-            "--d", "./json",
+            "--c",
+            "stream",
+            "--o",
+            "default",
+            "--st",
+            "logs",
+            "--s",
+            "default",
+            "--t",
+            "json",
+            "--f",
+            "day",
+            "--d",
+            "./json",
         ];
 
-        let cli = Cli::args(args);
+        let cli = cli::Cli::args(args);
 
-        if let Err(err) = Import::operator(cli.clone()) {
+        if let Err(err) = import::Import::operator(cli.clone()) {
             println!("Error: {}", err);
         }
     }

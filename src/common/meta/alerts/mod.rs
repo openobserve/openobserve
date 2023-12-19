@@ -44,6 +44,8 @@ pub struct Alert {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
     #[serde(default)]
+    pub row_template: String,
+    #[serde(default)]
     pub description: String,
     #[serde(default)]
     pub enabled: bool,
@@ -69,6 +71,7 @@ impl Default for Alert {
             trigger_condition: TriggerCondition::default(),
             destinations: vec![],
             context_attributes: None,
+            row_template: "".to_string(),
             description: "".to_string(),
             enabled: false,
         }
@@ -114,6 +117,8 @@ pub enum AggFunction {
     Min,
     #[serde(rename = "max")]
     Max,
+    #[serde(rename = "count")]
+    Count,
 }
 
 impl ToString for AggFunction {
@@ -122,6 +127,7 @@ impl ToString for AggFunction {
             AggFunction::Avg => "avg".to_string(),
             AggFunction::Min => "min".to_string(),
             AggFunction::Max => "max".to_string(),
+            AggFunction::Count => "count".to_string(),
         }
     }
 }
@@ -133,6 +139,7 @@ impl TryFrom<&str> for AggFunction {
             "avg" => AggFunction::Avg,
             "min" => AggFunction::Min,
             "max" => AggFunction::Max,
+            "count" => AggFunction::Count,
             _ => return Err("invalid aggregation function"),
         })
     }

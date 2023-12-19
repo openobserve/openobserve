@@ -417,39 +417,39 @@ export default defineComponent({
         let selector = "";
 
         // TODO: add aggregator
-        if (field.aggregationFunction) {
-          switch (field.aggregationFunction) {
+        if (field?.aggregationFunction) {
+          switch (field?.aggregationFunction) {
             case "count-distinct":
-              selector += `count(distinct(${field.column}))`;
+              selector += `count(distinct(${field?.column}))`;
               break;
             case "histogram": {
               // if inteval is not null, then use it
               if (field?.args && field?.args?.length && field?.args[0].value) {
-                selector += `${field.aggregationFunction}(${field.column}, '${field.args[0].value}')`;
+                selector += `${field?.aggregationFunction}(${field?.column}, '${field?.args[0]?.value}')`;
               } else {
-                selector += `${field.aggregationFunction}(${field.column})`;
+                selector += `${field?.aggregationFunction}(${field?.column})`;
               }
               break;
             }
             default:
-              selector += `${field.aggregationFunction}(${field.column})`;
+              selector += `${field?.aggregationFunction}(${field?.column})`;
               break;
           }
         } else {
-          selector += `${field.column}`;
+          selector += `${field?.column}`;
         }
-        selector += ` as "${field.alias}"${
+        selector += ` as "${field?.alias}"${
           i == fields.length - 1 ? " " : ", "
         }`;
         return selector;
       });
-      query += array.join("");
+      query += array?.join("");
 
       // now add from stream name
       query += ` FROM "${
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream
+        ].fields?.stream
       }" `;
 
       const filterData = filter?.map((field, i) => {
@@ -459,9 +459,9 @@ export default defineComponent({
             .map((it) => `'${it}'`)
             .join(", ")})`;
         } else if (field.type == "condition" && field.operator != null) {
-          selectFilter += `${field.column} `;
+          selectFilter += `${field?.column} `;
           if (["Is Null", "Is Not Null"].includes(field.operator)) {
-            switch (field.operator) {
+            switch (field?.operator) {
               case "Is Null":
                 selectFilter += `IS NULL`;
                 break;
@@ -477,7 +477,7 @@ export default defineComponent({
               case ">":
               case "<=":
               case ">=":
-                selectFilter += `${field.operator} ${field.value}`;
+                selectFilter += `${field?.operator} ${field?.value}`;
                 break;
               case "Contains":
                 selectFilter += `LIKE '%${field.value}%'`;
@@ -501,10 +501,10 @@ export default defineComponent({
       // add group by statement
       const xAxisAlias = dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.x.map((it: any) => it.alias);
+      ].fields.x.map((it: any) => it?.alias);
       const yAxisAlias = dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.y.map((it: any) => it.alias);
+      ].fields.y.map((it: any) => it?.alias);
 
       if (dashboardPanelData.data.type == "heatmap") {
         query +=
@@ -524,7 +524,7 @@ export default defineComponent({
       fields.forEach((it: any) => {
         // ignore if None is selected or sortBy is not there
         if (it?.sortBy) {
-          orderByArr.push(`${it.alias} ${it.sortBy}`);
+          orderByArr.push(`${it?.alias} ${it?.sortBy}`);
         }
       });
 
@@ -726,6 +726,7 @@ export default defineComponent({
   // overflow: hidden;
   cursor: pointer;
 }
+
 .q-ml-sm:hover {
   background-color: #eaeaeaa5;
   border-radius: 50%;

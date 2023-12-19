@@ -117,12 +117,12 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .q-item {
-  padding: 8px 8px;
+  padding: 3px 8px;
   margin: 0 8px;
   border-radius: 6px;
 
   /* Overriding default height */
-  min-height: 40px;
+  min-height: 30px;
 
   &.q-router-link--active {
     background-color: $primary;

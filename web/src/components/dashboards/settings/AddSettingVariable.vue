@@ -67,7 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></q-input>
               </div>
             </div>
-            <div class="text-body1 text-bold q-mt-lg">
+            <div
+              class="text-body1 text-bold q-mt-lg"
+              v-if="variableData.type !== 'dynamic_filters'"
+            >
               {{ t("dashboard.extraOptions") }}
             </div>
             <div v-if="variableData.type == 'query_values'">
@@ -318,6 +321,10 @@ export default defineComponent({
       {
         label: t("dashboard.custom"),
         value: "custom",
+      },
+      {
+        label: t("dashboard.ad-hoc-variable"),
+        value: "dynamic_filters",
       },
     ]);
 

@@ -56,6 +56,7 @@ const defaultObject = {
     showDetailTab: false,
     showTraceDetails: false,
     sqlMode: false,
+    filterType: "basic",
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
@@ -71,6 +72,7 @@ const defaultObject = {
   },
   data: {
     query: "",
+    advanceFiltersQuery: "",
     parsedQuery: {},
     errorMsg: "",
     errorCode: 0,
@@ -83,6 +85,17 @@ const defaultObject = {
       filterField: "",
       addToFilter: "",
       functions: [],
+      filters: [] as any[],
+      fieldValues: {} as {
+        [key: string | number]: {
+          isLoading: boolean;
+          values: { key: string; count: string }[];
+          selectedValues: string[];
+          size: number;
+          isOpen: boolean;
+          searchKeyword: string;
+        };
+      },
     },
     resultGrid: {
       currentDateTime: new Date(),
