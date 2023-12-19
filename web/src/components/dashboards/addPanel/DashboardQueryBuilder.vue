@@ -978,6 +978,10 @@ export default defineComponent({
       const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
       if (dragElementType === "fieldList") {
+        dashboardPanelData.meta.dragAndDrop.dragging = false;
+        dashboardPanelData.meta.dragAndDrop.dragElement = null;
+        dashboardPanelData.meta.dragAndDrop.dragElementType = null;
+
         if (dragElement && area === "x") {
           addXAxisItem(dragElement);
         } else if (dragElement && area === "y") {
@@ -989,6 +993,10 @@ export default defineComponent({
         }
         currentDragArea.value = "";
       } else if (dragElementType === "fieldElement") {
+        dashboardPanelData.meta.dragAndDrop.dragging = false;
+        dashboardPanelData.meta.dragAndDrop.dragElement = null;
+        dashboardPanelData.meta.dragAndDrop.dragElementType = null;
+        
         const dragName =
           dashboardPanelData.meta.stream.selectedStreamFields.find(
             (item: any) => item?.name === dragElement?.column
