@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields?.x?.length || 0
           )
         "
-        @dragenter="onDragEnter($event, 'x')"
+        @dragenter="onDragEnter($event, 'x', null)"
         data-test="dashboard-x-layout"
       >
         <!-- @dragenter="onDragEnter($event, 'x')" -->
@@ -63,10 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.x"
           :key="index"
+          :style="{ marginLeft: getMarginLeft(itemX) }"
           :draggable="true"
           @dragstart="onFieldDragStart($event, itemX, 'x', index)"
           @drop="onNewDrop($event, 'x', index)"
-          @dragenter="onDragEnter($event, 'x')"
+          @dragenter="onDragEnter($event, 'x', index)"
         >
           <!-- @dragover="
               onFieldDragOver(
@@ -257,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields?.y?.length || 0
           )
         "
-        @dragenter="onDragEnter($event, 'y')"
+        @dragenter="onDragEnter($event, 'y', null)"
         data-test="dashboard-y-layout"
       >
         <q-btn-group
@@ -266,13 +267,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
           :key="index"
+          :style="{ marginLeft: getMarginLeft(itemY) }"
           :draggable="true"
           @dragstart="onFieldDragStart($event, itemY, 'y', index)"
           @drop="onNewDrop($event, 'y', index)"
-          @dragenter="onDragEnter($event, 'y')"
+          @dragenter="onDragEnter($event, 'y', index)"
         >
-          <div
-          >
+          <div>
             <q-icon
               name="drag_indicator"
               color="grey-13"
@@ -469,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ].fields?.z?.length || 0
             )
           "
-          @dragenter="onDragEnter($event, 'z')"
+          @dragenter="onDragEnter($event, 'z', null)"
         >
           <q-btn-group
             class="axis-field q-mr-sm q-my-xs"
@@ -477,14 +478,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.z"
             :key="index"
+            :style="{ marginLeft: getMarginLeft(itemZ) }"
             :draggable="true"
             @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
             @drop="onNewDrop($event, 'z', index)"
-            @dragenter="onDragEnter($event, 'z')"
+            @dragenter="onDragEnter($event, 'z', index)"
           >
-            <div
-              
-            >
+            <div>
               <q-icon
                 name="drag_indicator"
                 color="grey-13"
@@ -632,7 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields?.filter?.length || 0
           )
         "
-        @dragenter="onDragEnter($event, 'f')"
+        @dragenter="onDragEnter($event, 'f', null)"
         data-test="dashboard-filter-layout"
       >
         <q-btn-group
@@ -939,6 +939,8 @@ export default defineComponent({
 
     const currentDragArea = ref("");
 
+    const dragIndex = ref(0);
+
     const onNewDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
       console.log("onNewDrop", e, targetAxis, droppedAtIndex);
       // reorder items if source and target are same
@@ -1007,6 +1009,10 @@ export default defineComponent({
                 message: errorMessage,
                 timeout: 5000,
               });
+              dashboardPanelData.meta.dragAndDrop.dragging = false;
+              dashboardPanelData.meta.dragAndDrop.dragElement = null;
+              dashboardPanelData.meta.dragAndDrop.dragSource = null;
+              dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
               return;
             }
 
@@ -1046,6 +1052,10 @@ export default defineComponent({
                   message: errorMessage,
                   timeout: 5000,
                 });
+                dashboardPanelData.meta.dragAndDrop.dragging = false;
+                dashboardPanelData.meta.dragAndDrop.dragElement = null;
+                dashboardPanelData.meta.dragAndDrop.dragSource = null;
+                dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
                 return;
               }
 
@@ -1172,7 +1182,7 @@ export default defineComponent({
             }
 
             // Remove from the original axis
-            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource
+            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
             if (dragSource === "x") {
               removeXAxisItem((dragName || customDragName).name);
             } else if (dragSource === "y") {
@@ -1219,8 +1229,8 @@ export default defineComponent({
           return [];
       }
     };
-    const onDragEnter = (e: any, area: string) => {
-      console.log("onDragEnter", area);
+    const onDragEnter = (e: any, area: string, index: any) => {
+      console.log("onDragEnter", area, index);
       if (
         dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" &&
         area === "f"
@@ -1228,9 +1238,13 @@ export default defineComponent({
         e.preventDefault();
         return;
       }
-
+      dragIndex.value = index;
       currentDragArea.value = area;
       e.preventDefault();
+    };
+    const getMarginLeft = (items: any) => {
+      console.log("getMarginLeft", dragIndex.value);
+      
     };
 
     const onDragStart = (e: any, item: any) => {
@@ -1273,7 +1287,6 @@ export default defineComponent({
       e.preventDefault();
     };
 
-
     const onFieldDragStart = (
       e: any,
       item: any,
@@ -1294,7 +1307,6 @@ export default defineComponent({
     //   // console.log("onFieldDragOver", fieldDraggedFromAxis.value, axis, index);
     //   // Prevent default behavior to allow the drop
     //   // event.preventDefault();
-
 
     //   currentDragArea.value = axis;
     //   fieldDraggedCurrentIndex.value = index;
@@ -1461,6 +1473,7 @@ export default defineComponent({
       // onFieldDragEnd,
       // onFieldDrop,
       getHistoramIntervalField,
+      getMarginLeft,
     };
   },
 });
