@@ -1,7 +1,3 @@
-import requests
-import pytest
-
-
 def test_e2e_ingestlogs(create_session, base_url):
     """Running an E2E test logs ingestion."""
 
@@ -112,9 +108,8 @@ def test_e2e_vrl(create_session, base_url):
     """Running an E2E test for search log query."""
 
     session = create_session
-    url = base_url
     org_id = "default"
-    stream_name = "newpy-tests"
+    stream_name = "gke_fluentbit"
     access_key = "f="
     headers = {
         "Authorization": f"Basic {access_key}",
@@ -124,7 +119,7 @@ def test_e2e_vrl(create_session, base_url):
     payload = [
         {
             "query": {
-                "sql": 'select * from "gke_fluentbit" ',
+                "sql": f'select * from "{stream_name}" ',
                 "start_time": 1700629279639000,
                 "end_time": 1700630179639000,
                 "from": 0,
@@ -138,7 +133,7 @@ def test_e2e_vrl(create_session, base_url):
     ]
 
     resp_get_allalerts = session.post(
-        f"{base_url}web/logs?stream=gke_fluentbit&period=15m&refresh=0&org_identifier=default",
+        f"{base_url}web/logs?stream={stream_name}&period=15m&refresh=0&org_identifier={org_id}",
         json=payload,
         headers=headers,
     )
@@ -200,13 +195,6 @@ def test_e2e_incorrectstreamesettings(create_session, base_url):
     session = create_session
     url = base_url
     org_id = "default"
-    payload = [
-        {
-            "partition_keys": ["athlete"],
-            "full_text_search_keys": ["athlete"],
-            "data_retention": 180,
-        }
-    ]
     resp_get_streamssettings = session.post(f"{url}api/{org_id}/newpy_tests/settings")
 
     print(resp_get_streamssettings.content)

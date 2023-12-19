@@ -1,4 +1,3 @@
-import json
 import requests
 import pytest
 
@@ -49,7 +48,6 @@ def test_e2e_sendusertokenprod(base_url):
     assert (
         resp_get_usertoken.status_code == 400
     ), f"Get usertoken 200, but got {resp_get_usertoken.status_code} {resp_get_usertoken.content}"
-    resp_get_rumtoken = requests.get(f"{base_url}api/usertoken", headers=headers)
 
 
 def test_e2e_sendusertoken(base_url):
@@ -76,7 +74,6 @@ def test_e2e_sendusertoken(base_url):
     assert (
         resp_get_usertoken.status_code == 200
     ), f"Get usertoken 200, but got {resp_get_usertoken.status_code} {resp_get_usertoken.content}"
-    resp_get_rumtoken = requests.get(f"{base_url}api/usertoken", headers=headers)
 
 
 def test_e2e_useremail(base_url):

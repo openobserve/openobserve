@@ -1,4 +1,3 @@
-import requests
 import pytest
 
 
@@ -97,7 +96,6 @@ def test_e2e_metrics_invalidquery(create_session, base_url):
     """Running an E2E test for metrics query."""
 
     session = create_session
-    url = base_url
     org_id = "default"
 
     resp_metricsquery = session.get(
@@ -114,7 +112,6 @@ def test_e2e_metrics_query(create_session, base_url):
     """Running an E2E test for metrics query."""
 
     session = create_session
-    url = base_url
     org_id = "default"
 
     resp_metricsquery = session.get(

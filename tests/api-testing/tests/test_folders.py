@@ -1,7 +1,3 @@
-import requests
-import pytest
-
-
 def delete_folder(session, base_url, org_id, folder_id):
     resp_delete_folder = session.delete(f"{base_url}api/{org_id}/folders/{folder_id}")
     assert (
@@ -161,16 +157,6 @@ def test_e2e_createdeletedashboard(create_session, base_url):
 #     dashboard_id = resp_create_dashboard.json()["v1"]["dashboardId"]
 # resp_delete_dashboard = session.delete(f"https://alpha1.gke.zinclabs.dev/api/{org_id}/dashboards/{dashboard_id}")
 # assert resp_delete_dashboard.status_code == 200, f"Deleting this dashboard, but got {resp_delete_dashboard.status_code} {resp_delete_dashboard.content}"
-@pytest.fixture
-def session():
-    # Setup session object, if needed
-    session = requests.Session()
-    org_id = "default"
-    url = base_url
-    # create folder a
-    # You can add any necessary setup steps here
-    yield session
-    # Teardown steps, if needed
 
 
 def test_e2e_movedashboard(create_session, base_url):

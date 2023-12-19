@@ -1,6 +1,3 @@
-import requests
-
-
 def test_e2e_folder(create_session, base_url):
     """Running an E2E test for all xfunctions."""
 
@@ -164,12 +161,6 @@ def test_e2e_functionnotfound(create_session, base_url):
     session = create_session
     # Create a function
     org_id = "default"
-    payload = {
-        "name": "randomtextoct10",
-        "function": ".a=190022ee",
-        "params": "row",
-        "transType": 0,
-    }
 
     resp_delete_function = session.delete(
         f"{base_url}api/{org_id}/functions/pytestfunctionsss"

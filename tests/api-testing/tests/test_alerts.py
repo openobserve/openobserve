@@ -1,6 +1,3 @@
-import requests
-import pytest
-
 
 def test_e2e_alerts(create_session, base_url):
     """Running an E2E test for get all the alerts list."""

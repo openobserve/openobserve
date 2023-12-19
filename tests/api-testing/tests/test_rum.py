@@ -1,7 +1,6 @@
 import json
 import requests
 import uuid
-import pytest
 from datetime import datetime, timezone, timedelta
 
 
@@ -27,7 +26,6 @@ def test_e2e_rumtoken(create_session, base_url):
 def test_e2e_invalidrumtoken(create_session, base_url):
     """Running an E2E test for get rum token."""
 
-    session = create_session
     rum_org = "e2e"
     logs_url = f"{base_url}rum/v1/{rum_org}/logs"
     rum_api_token = "rumxJwgUyIx3U"
@@ -93,7 +91,6 @@ def test_e2e_rumingestinglogs(create_session, base_url):
     rum_org = "default"
     logs_url = f"{base_url}rum/v1/{rum_org}/logs"
     ip_address = "182.70.14.246"
-    headers = {"X-Forwarded-For": ip_address, "Content-Type": "application/json"}
     resp_get_rumtoken = session.get(f"{base_url}api/{rum_org}/organizations/rumtoken")
 
     # get rumtoken
@@ -122,7 +119,10 @@ def test_e2e_rumingestinglogs(create_session, base_url):
     logs_payload_json = parse_json(logs_payload)
     logs_payload_json["message"] = unique_test_identifier
 
-    resp_post_rum_logs = requests.post(logs_url, params=params, json=logs_payload_json)
+    ip_headers = {"X-Forwarded-For": ip_address}
+    resp_post_rum_logs = requests.post(
+        logs_url, params=params, json=logs_payload_json, headers=ip_headers
+    )
     expected = 200
     got = resp_post_rum_logs.status_code
 
@@ -160,6 +160,9 @@ def test_e2e_rumingestinglogs(create_session, base_url):
     ), f"Failed to retrieve rum-logs, got = {got}, expected = {expected}, {response_rum_data.content}"
 
     response_payload = response_rum_data.json()
+    assert (
+        len(response_payload["hits"]) > 0
+    ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
     assert (
         response_payload["hits"][0]["message"] == unique_test_identifier
     ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
@@ -201,7 +204,6 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
     """Running an E2E test for rum data ingest."""
     session = create_session
     rum_org = "default"
-    logs_url = f"{base_url}rum/v1/{rum_org}/logs"
     ip_address = "182.70.14.246"
     headers = {"X-Forwarded-For": ip_address, "Content-Type": "application/json"}
     resp_get_rumtoken = session.get(f"{base_url}api/{rum_org}/organizations/rumtoken")
@@ -229,7 +231,7 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
     rumdata_payload_json["type"] = unique_test_identifier
 
     resp_post_rumdata = session.post(
-        rumdata_url, params=params, json=rumdata_payload_json
+        rumdata_url, params=params, json=rumdata_payload_json, headers=headers
     )
     expected = 200
     got = resp_post_rumdata.status_code

@@ -1,4 +1,3 @@
-import requests
 import pytest
 
 
@@ -25,7 +24,7 @@ def test_e2e_ingestkineses(create_session, base_url):
     }
 
     resp_ingestkineses = session.post(
-        f"{url}aws/default/default/_kinesis_firehose", json=payload, headers=headers
+        f"{url}aws/default/{org_id}/_kinesis_firehose", json=payload, headers=headers
     )
 
     print(resp_ingestkineses.content)
@@ -57,7 +56,7 @@ def test_e2e_invalidingestkineses(create_session, base_url):
     }
 
     resp_ingestkineses = session.post(
-        f"{url}aws/default/default/_kinesis_firehose", json=payload, headers=headers
+        f"{url}aws/default/{org_id}/_kinesis_firehose", json=payload, headers=headers
     )
 
     print(resp_ingestkineses.content)
@@ -87,7 +86,7 @@ def test_e2e_incorrertdatakineses(create_session, base_url):
     }
 
     resp_ingestkineses = session.post(
-        f"{url}aws/default/default/_kinesis_firehose", json=payload, headers=headers
+        f"{url}aws/default/{org_id}/_kinesis_firehose", json=payload, headers=headers
     )
 
     print(resp_ingestkineses.content)

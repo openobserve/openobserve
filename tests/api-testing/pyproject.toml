@@ -7,6 +7,7 @@ dependencies = [
     "pytest-sugar>=0.9.7",
     "pytest-pretty>=1.2.0",
     "requests>=2.31.0",
+    "ruff>=0.1.8",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
@@ -18,7 +19,7 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 dev-dependencies = [
-    "black>=23.10.1",
+    "ruff>=0.1.8",
 ]
 
 [tool.hatch.metadata]
