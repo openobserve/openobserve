@@ -661,7 +661,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="layout-name">{{ t("panel.filters") }}</div>
       <span class="layout-separator">:</span>
       <div
-        class="axis-container droppable scroll"
+        class="axis-container droppable scroll row"
         :class="{
           'drop-target':
             dashboardPanelData.meta.dragAndDrop.dragging &&
@@ -882,6 +882,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.filter < 1
+          "
+          style="
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
           "
         >
           {{ t("dashboard.addFieldMessage") }}
