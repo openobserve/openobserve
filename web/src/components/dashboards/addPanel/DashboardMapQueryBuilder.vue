@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'geomap'">
+    <!-- latitude container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.latitude") }}
@@ -32,13 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            currentDragArea == 'latitude',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'latitude',
         }"
-        @dragenter="onDragEnter($event, 'latitude')"
-        @dragleave="onDragLeave($event, 'latitude')"
+        @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'latitude')"
         @drop="onDrop($event, 'latitude')"
-        v-mutation="handler2"
         data-test="dashboard-x-layout"
       >
         <q-btn-group
@@ -48,24 +47,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.latitude
           "
+          :draggable="true"
+          @dragstart="
+            onFieldDragStart(
+              $event,
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.latitude.column,
+              'latitude'
+            )
+          "
         >
-          <div
-            :draggable="true"
-            @dragstart="
-              onFieldDragStart(
-                $event,
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.latitude.column,
-                'latitude'
-              )
-            "
-          >
+          <div>
             <q-icon
               name="drag_indicator"
               color="grey-13"
               size="13px"
-              class="'q-my-xs'"
+              class="'cursor-grab q-my-xs'"
             />
             <q-btn
               square
@@ -114,16 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery &&
                       dashboardPanelData.data.queryType == 'sql'
                     "
-                    :draggable="true"
-                    @dragstart="
-                      onFieldDragStart(
-                        $event,
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields?.latitude.column,
-                        'latitude'
-                      )
-                    "
                   >
                     <SortByBtnGrp
                       :fieldObj="
@@ -163,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
+    <!-- longitude container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.longitude") }}
@@ -179,13 +168,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            currentDragArea == 'longitude',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'longitude',
         }"
-        @dragenter="onDragEnter($event, 'longitude')"
-        @dragleave="onDragLeave($event, 'longitude')"
+        @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'longitude')"
         @drop="onDrop($event, 'longitude')"
-        v-mutation="handler2"
         data-test="dashboard-y-layout"
       >
         <q-btn-group
@@ -195,24 +182,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.longitude
           "
+          :draggable="true"
+          @dragstart="
+            onFieldDragStart(
+              $event,
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.longitude.column,
+              'longitude'
+            )
+          "
         >
-          <div
-            :draggable="true"
-            @dragstart="
-              onFieldDragStart(
-                $event,
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.longitude.column,
-                'longitude'
-              )
-            "
-          >
+          <div>
             <q-icon
               name="drag_indicator"
               color="grey-13"
               size="13px"
-              class="'q-my-xs'"
+              class="'cursor-grab q-my-xs'"
             />
             <q-btn
               square
@@ -261,16 +247,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery &&
                       dashboardPanelData.data.queryType == 'sql'
                     "
-                    :draggable="true"
-                    @dragstart="
-                      onFieldDragStart(
-                        $event,
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields?.longitude.column,
-                        'latitude'
-                      )
-                    "
                   >
                     <SortByBtnGrp
                       :fieldObj="
@@ -310,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
+    <!-- weight container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.weight") }}
@@ -326,13 +303,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            currentDragArea == 'weight',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'weight',
         }"
-        @dragenter="onDragEnter($event, 'weight')"
-        @dragleave="onDragLeave($event, 'weight')"
+        @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'weight')"
         @drop="onDrop($event, 'weight')"
-        v-mutation="handler2"
         data-test="dashboard-y-layout"
       >
         <q-btn-group
@@ -342,24 +317,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.weight
           "
+          :draggable="true"
+          @dragstart="
+            onFieldDragStart(
+              $event,
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.weight.column,
+              'weight'
+            )
+          "
         >
-          <div
-            :draggable="true"
-            @dragstart="
-              onFieldDragStart(
-                $event,
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.weight.column,
-                'weight'
-              )
-            "
-          >
+          <div>
             <q-icon
               name="drag_indicator"
               color="grey-13"
               size="13px"
-              class="'q-my-xs'"
+              class="'cursor-grab q-my-xs'"
             />
             <q-btn
               square
@@ -391,16 +365,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         !dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
                         ].customQuery
-                      "
-                      :draggable="true"
-                      @dragstart="
-                        onFieldDragStart(
-                          $event,
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields?.weight.column,
-                          'weight'
-                        )
                       "
                       class="q-mr-xs"
                       style="width: 160px"
@@ -452,16 +416,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
                       dashboardPanelData.data.queryType == 'sql'
-                    "
-                    :draggable="true"
-                    @dragstart="
-                      onFieldDragStart(
-                        $event,
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields?.weight.column,
-                        'weight'
-                      )
                     "
                   >
                     <SortByBtnGrp
@@ -535,6 +489,7 @@ export default defineComponent({
       addFilteredItem,
       loadFilterItem,
       promqlMode,
+      cleanupDraggingFields,
     } = useDashboardPanelData();
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -556,175 +511,107 @@ export default defineComponent({
       }
     );
 
-    const currentDragArea = ref("");
-
-    const onDrop = (e: any, area: string) => {
-      if (dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldList") {
-        const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
-
-        dashboardPanelData.meta.dragAndDrop.dragging = false;
-        dashboardPanelData.meta.dragAndDrop.dragElement = null;
-        dashboardPanelData.meta.dragAndDrop.dragElementType = null;
-
-        if (dragItem && area == "latitude") {
-          addLatitude(dragItem);
-        } else if (dragItem && area == "longitude") {
-          addLongitude(dragItem);
-        } else if (dragItem && area == "weight") {
-          addWeight(dragItem);
+    const onDrop = (e: any, targetAxis: string) => {
+      console.log("onDrop", e, targetAxis);
+      // move the items  between axis or from the field list
+      // check if the source is from axis or field list
+      if (dashboardPanelData.meta.dragAndDrop.dragSource === "fieldList") {
+        // add the item to the target list
+        const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
+        if (!dragElement) {
+          return;
         }
-        currentDragArea.value = "";
-      } else if (
-        dashboardPanelData.meta.dragAndDrop.dragElementType == "fieldElement"
-      ) {
-        const dragItem: any = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-        dashboardPanelData.meta.dragAndDrop.dragging = false;
-        dashboardPanelData.meta.dragAndDrop.dragElement = null;
-        dashboardPanelData.meta.dragAndDrop.dragElementType = null;
+        switch (targetAxis) {
+          case "latitude":
+            addLatitude(dragElement);
+            break;
+          case "longitude":
+            addLongitude(dragElement);
+            break;
+          case "weight":
+            addWeight(dragElement);
+            break;
+        }
+      } else {
+        // move the item from field list to axis
+        const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
         const dragName =
           dashboardPanelData.meta.stream.selectedStreamFields.find(
-            (item: any) => {
-              return item.name == dragItem;
-            }
+            (item: any) => item?.name === dragElement
+          );
+        const customDragName =
+          dashboardPanelData.meta.stream.customQueryFields.find(
+            (item: any) => item?.name === dragElement
           );
 
-        const customDragName =
-          dashboardPanelData.meta.stream.customQueryFields.find((item: any) => {
-            return item.name == dragItem;
-          });
-
-        if (dragName) {
+        if (dragName || customDragName) {
           const currentQueryField =
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields;
+          if (
+            (targetAxis === "latitude" && currentQueryField.latitude) ||
+            (targetAxis === "longitude" && currentQueryField.longitude) ||
+            (targetAxis === "weight" && currentQueryField.weight)
+          ) {
+            const maxAllowedAxisFields = 1;
 
-          if (area == "latitude" && currentQueryField.latitude) {
+            const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
+
             $q.notify({
               type: "negative",
-              message: "Max 1 field in Latitude is allowed.",
+              message: errorMessage,
               timeout: 5000,
             });
+            cleanupDraggingFields();
             return;
           }
 
-          if (area == "longitude" && currentQueryField.longitude) {
-            $q.notify({
-              type: "negative",
-              message: "Max 1 field in Longitude is allowed.",
-              timeout: 5000,
-            });
-            return;
-          }
-
-          if (area == "weight" && currentQueryField.weight) {
-            $q.notify({
-              type: "negative",
-              message: "Max 1 field in Weight is allowed.",
-              timeout: 5000,
-            });
-            return;
-          }
-
-          if (onLeave.value == "latitude") {
+          // Remove from the original axis
+          const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
+          if (dragSource === "latitude") {
             removeLatitude();
-          } else if (onLeave.value == "longitude") {
+          } else if (dragSource === "longitude") {
             removeLongitude();
-          } else if (onLeave.value == "weight") {
+          } else if (dragSource === "weight") {
             removeWeight();
-          }
-
-          if (area == "latitude") {
-            addLatitude(dragName);
-          } else if (area == "longitude") {
-            addLongitude(dragName);
-          } else if (area == "weight") {
-            addWeight(dragName);
-          }
-        } else if (customDragName) {
-          const currentQueryField =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields;
-
-          if (area == "latitude" && currentQueryField.latitude) {
-            $q.notify({
-              type: "negative",
-              message: "Max 1 field in latitude is allowed.",
-              timeout: 5000,
-            });
-            return;
-          }
-
-          if (area == "longitude" && currentQueryField.longitude) {
-            $q.notify({
-              type: "negative",
-              message: "Max 1 field in longitude is allowed.",
-              timeout: 5000,
-            });
-            return;
-          }
-
-          if (area == "weight" && currentQueryField.weight) {
-            $q.notify({
-              type: "negative",
-              message: "Max 1 field in weight is allowed.",
-              timeout: 5000,
-            });
-            return;
-          }
-
-          if (onLeave.value == "latitude") {
-            removeLatitude();
-          } else if (onLeave.value == "longitude") {
-            removeLongitude();
-          } else if (onLeave.value == "weight") {
-            removeWeight();
-          }
-
-          if (area == "latitude") {
-            addLatitude(customDragName);
-          } else if (area == "longitude") {
-            addLongitude(customDragName);
-          } else if (area == "weight") {
-            addWeight(customDragName);
           }
         }
-        currentDragArea.value = "";
-      }
-    };
 
-    const onDragEnter = (e: any, area: string) => {};
+        // Add to the new axis
+        if (targetAxis === "latitude") {
+          addLatitude(dragName || customDragName);
+        } else if (targetAxis === "longitude") {
+          addLongitude(dragName || customDragName);
+        } else if (targetAxis === "weight") {
+          addWeight(dragName || customDragName);
+        }
+      }
+
+      cleanupDraggingFields();
+    };
 
     const onDragStart = (e: any, item: any) => {
       e.preventDefault();
     };
 
-    const onDragLeave = (e: any, area: string) => {
-      currentDragArea.value = "";
-
-      e.preventDefault();
-    };
-
     const onDragOver = (e: any, area: string) => {
-      currentDragArea.value = area;
       e.preventDefault();
     };
 
-    const onLeave = ref("");
 
     const onFieldDragStart = (e: any, item: any, axis: string) => {
-      onLeave.value = axis;
 
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
-      dashboardPanelData.meta.dragAndDrop.dragElementType = "fieldElement";
+      dashboardPanelData.meta.dragAndDrop.dragSource = axis;
     };
 
-    const handler2 = () => {};
-
+    const onDragEnd = () => {
+      cleanupDraggingFields();
+    };
     const Hint = computed((e: any) => {
       switch (dashboardPanelData.data.type) {
         case "geomap":
@@ -783,11 +670,8 @@ export default defineComponent({
       getImageURL,
       onDrop,
       onDragStart,
-      onDragLeave,
+      onDragEnd,
       onDragOver,
-      onDragEnter,
-      handler2,
-      currentDragArea,
       expansionItems,
       Hint,
       WeightHint,
