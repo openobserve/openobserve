@@ -63,12 +63,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.x"
           :key="index"
-          :style="{ marginLeft: dragIndex == index && currentDragArea == 'x' ? '10px' : '0px' }"
           :draggable="true"
           @dragstart="onFieldDragStart($event, itemX, 'x', index)"
           @drop="onNewDrop($event, 'x', index)"
           @dragenter="onDragEnter($event, 'x', index)"
         >
+          <div
+            v-if="dragIndex == index && currentDragArea == 'x'"
+            class="dragItem"
+          >
+            &nbsp;
+          </div>
           <!-- @dragover="
               onFieldDragOver(
                 $event,
@@ -267,15 +272,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
           :key="index"
-          :style="`margin-left: ${dragIndex == index && currentDragArea == 'y' ? '10px' : '0px'}`"
           :draggable="true"
           @dragstart="onFieldDragStart($event, itemY, 'y', index)"
           @drop="onNewDrop($event, 'y', index)"
           @dragenter="onDragEnter($event, 'y', index)"
         >
-
-          <div v-if="dragIndex == index && currentDragArea == 'y'"
-             style="background-color: #8060ff; width: 20px; height: 100%; border-radius: 5px;">
+          <div
+            v-if="dragIndex == index && currentDragArea == 'y'"
+            class="dragItem"
+          >
             &nbsp;
           </div>
           <div>
@@ -483,12 +488,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.z"
             :key="index"
-            :style="{ marginLeft: getMarginLeft(itemZ) }"
             :draggable="true"
             @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
             @drop="onNewDrop($event, 'z', index)"
             @dragenter="onDragEnter($event, 'z', index)"
           >
+          <div
+            v-if="dragIndex == index && currentDragArea == 'z'"
+            class="dragItem"
+          >
+            &nbsp;
+          </div>
             <div>
               <q-icon
                 name="drag_indicator"
@@ -1247,10 +1257,6 @@ export default defineComponent({
       currentDragArea.value = area;
       e.preventDefault();
     };
-    const getMarginLeft = (items: any) => {
-      console.log("getMarginLeft", dragIndex.value);
-      
-    };
 
     const onDragStart = (e: any, item: any) => {
       e.preventDefault();
@@ -1478,7 +1484,6 @@ export default defineComponent({
       // onFieldDragEnd,
       // onFieldDrop,
       getHistoramIntervalField,
-      getMarginLeft,
       dragIndex,
     };
   },
@@ -1486,6 +1491,12 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.dragItem {
+  background-color: #8060ff;
+  width: 20px;
+  height: 100%;
+  border-radius: 5px;
+}
 .axis-field {
   overflow: hidden;
 }
@@ -1497,9 +1508,6 @@ export default defineComponent({
   border: 0px solid transparent;
 }
 
-//.draggable-item {
-//transition: transform 0.3s ease-in-out;
-//}
 .axis-container {
   flex: 1;
   width: 100%;
