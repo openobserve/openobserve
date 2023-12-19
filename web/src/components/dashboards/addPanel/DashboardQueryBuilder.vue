@@ -1012,7 +1012,7 @@ export default defineComponent({
                 case "pie":
                 case "donut":
                 case "heatmap":
-                  maxAllowedAxisFields = targetAxis === "x" ? 1 : 0;
+                  maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
                   break;
                 case "metric":
                   maxAllowedAxisFields = targetAxis === "x" ? 0 : 1;
@@ -1020,8 +1020,13 @@ export default defineComponent({
                 case "table":
                   maxAllowedAxisFields = 0;
                   break;
+                case "area-stacked":
+                case "stacked":
+                case "h-stacked":
+                  maxAllowedAxisFields = targetAxis === "x" ? 2 :  1;
+                  break; 
                 default:
-                  maxAllowedAxisFields = targetAxis === "x" ? 2 : 1;
+                  maxAllowedAxisFields = targetAxis === "x" ? 2 : 0;
               }
 
               const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
