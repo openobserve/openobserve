@@ -519,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               &nbsp;
             </div>
             <q-btn-group
-              class="axis-field q-mr-sm q-my-xs"
+              class="axis-field"
               :draggable="true"
               @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
               @drop="onDrop($event, 'z', index)"
