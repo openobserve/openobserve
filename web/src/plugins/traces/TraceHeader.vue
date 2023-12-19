@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           top: '0px',
           width: '1px',
           backgroundColor: store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
+          zIndex: '1',
         }"
       ></div>
     </div>

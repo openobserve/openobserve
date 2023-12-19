@@ -125,9 +125,9 @@ const defaultObject = {
       traceId: "",
       spanList: [],
       loading: false,
-      selectedSpanId: null as string | null,
+      selectedSpanId: "" as String | null,
+      expandedSpans: [] as String[],
       showSpanDetails: false,
-      traceDetailsPosition: "right",
     },
   },
 };

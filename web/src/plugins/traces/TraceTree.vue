@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="width: 25%">
           <div
             :style="{
-              height: spanDimensions.textHeight - 8 + 'px',
-              margin: `4px 0px 4px ${
+              height: '100%',
+              margin: `0 0px 0 ${
                 span.hasChildSpans
                   ? span.style.left
                   : parseInt(span.style.left) +
@@ -38,52 +38,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'px'
               }`,
             }"
-            class="flex items-center no-wrap justify-start ellipsis"
+            class="flex items-start justify-start ellipsis"
             :title="span.operationName"
           >
             <div
-              v-if="span.hasChildSpans"
-              :style="{
-                width: spanDimensions.collapseWidth + 'px',
-                height: spanDimensions.collapseHeight + 'px',
-              }"
-              class="flex justify-center items-center collapse-container cursor-pointer"
-              @click.stop="toggleSpanCollapse(span.spanId)"
+              class="flex no-wrap q-pt-sm bg-white full-width"
+              :style="{ height: '30px' }"
             >
-              <q-icon
-                dense
-                round
-                flat
-                name="expand_more"
-                class="collapse-btn"
+              <div
+                v-if="span.hasChildSpans"
                 :style="{
-                  rotate: collapseMapping[span.spanId] ? '0deg' : '270deg',
+                  width: spanDimensions.collapseWidth + 'px',
+                  height: spanDimensions.collapseHeight + 'px',
                 }"
-              />
+                class="q-pt-xs flex justify-center items-center collapse-container cursor-pointer"
+                @click.stop="toggleSpanCollapse(span.spanId)"
+              >
+                <q-icon
+                  dense
+                  round
+                  flat
+                  name="expand_more"
+                  class="collapse-btn"
+                  :style="{
+                    rotate: collapseMapping[span.spanId] ? '0deg' : '270deg',
+                  }"
+                />
+              </div>
+              <div
+                class="ellipsis q-pl-xs cursor-pointer"
+                :style="{
+                  paddingLeft: '4px',
+                  borderLeft: `3px solid ${span.style.color}`,
+                }"
+                @click="selectSpan(span.spanId)"
+              >
+                <q-icon
+                  v-if="span.spanStatus === 'ERROR'"
+                  name="error"
+                  class="text-red-6 q-mr-xs"
+                  title="Error Span"
+                />
+                <span class="text-subtitle2 text-bold q-mr-sm">
+                  {{ span.serviceName }}
+                </span>
+                <span
+                  class="text-body2"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'text-grey-5'
+                      : 'text-blue-grey-9'
+                  "
+                  >{{ span.operationName }}</span
+                >
+              </div>
             </div>
             <div
-              class="ellipsis q-pl-xs cursor-pointer"
               :style="{
-                paddingLeft: '4px',
+                backgroundColor: span.style.backgroundColor,
+                height: `calc(100% - 30px)`,
                 borderLeft: `3px solid ${span.style.color}`,
+                marginLeft: span.hasChildSpans ? '14px' : '0',
+                width: '100%',
               }"
-              @click="selectSpan(span.spanId)"
-            >
-              <span class="text-subtitle2 text-bold q-mr-sm">
-                {{ span.serviceName }}
-              </span>
-              <span
-                class="text-body2"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-grey-5'
-                    : 'text-blue-grey-9'
-                "
-                >{{ span.operationName }}</span
-              >
-            </div>
+            ></div>
           </div>
         </div>
+        <!-- <div style="width: 1px" class="bh"></div> -->
         <span-block
           :span="span"
           :depth="depth"
@@ -96,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :spanDimensions="spanDimensions"
           :isCollapsed="collapseMapping[span.spanId]"
+          :spanData="spanMap[span.spanId]"
           style="width: 75%"
           @toggle-collapse="toggleSpanCollapse"
         />
@@ -138,6 +160,10 @@ export default defineComponent({
       type: Object,
       default: () => {},
     },
+    spanMap: {
+      type: Object,
+      default: () => ({}),
+    },
   },
   emits: ["toggleCollapse"],
   setup(props, { emit }) {
@@ -146,7 +172,7 @@ export default defineComponent({
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
     }
-    const selectSpan = (spanId: string | null) => {
+    const selectSpan = (spanId: string) => {
       searchObj.data.traceDetails.showSpanDetails = true;
       searchObj.data.traceDetails.selectedSpanId = spanId;
     };
@@ -167,7 +193,9 @@ export default defineComponent({
 }
 
 .collapse-btn {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: auto;
+  background-color: #ffffff;
+  opacity: 0.6;
 }
 </style>

@@ -732,15 +732,20 @@ export default defineComponent({
 
         const durationFilter = indexListRef.value.duration.input;
 
+        console.log(durationFilter);
+
+        let filter = searchObj.data.editorValue.trim();
+
         let duration = "";
-        if (durationFilter.max)
+        if (durationFilter.max) {
           duration += ` duration >= ${
             durationFilter.min * 1000
           } AND duration <= ${durationFilter.max * 1000}`;
 
-        const filter = searchObj.data.editorValue.trim()?.length
-          ? searchObj.data.editorValue + " AND" + duration
-          : duration;
+          filter = filter
+            ? searchObj.data.editorValue + " AND" + duration
+            : duration;
+        }
 
         searchService
           .get_traces({
