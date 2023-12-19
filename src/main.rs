@@ -414,7 +414,13 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
         let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
         (BoxMakeWriter::new(non_blocking), _guard)
     } else {
-        let file_appender = tracing_appender::rolling::daily(&CONFIG.log.file_dir, "o2.log");
+        let file_name_prefix = if CONFIG.log.file_name_prefix.is_empty() {
+            format!("o2.{}.log", CONFIG.common.instance_name.as_str())
+        } else {
+            CONFIG.log.file_name_prefix.to_string()
+        };
+        let file_appender =
+            tracing_appender::rolling::daily(&CONFIG.log.file_dir, file_name_prefix);
         let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
         (BoxMakeWriter::new(non_blocking), _guard)
     };
