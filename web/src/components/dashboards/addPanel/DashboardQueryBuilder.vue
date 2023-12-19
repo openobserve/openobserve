@@ -1115,8 +1115,6 @@ export default defineComponent({
               droppedAtIndex
             );
           }
-          // }
-
           updateArrayAlias();
         }
       }
@@ -1159,122 +1157,6 @@ export default defineComponent({
       console.log("reorderItems", JSON.stringify(fieldList));
     };
 
-    const onDrop = (e: any, area: string) => {
-      const dragElementType =
-        dashboardPanelData.meta.dragAndDrop.dragElementType;
-      const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
-
-      if (dragElementType === "fieldList") {
-        dashboardPanelData.meta.dragAndDrop.dragging = false;
-        dashboardPanelData.meta.dragAndDrop.dragElement = null;
-        dashboardPanelData.meta.dragAndDrop.dragElementType = null;
-
-        if (dragElement && area === "x") {
-          addXAxisItem(dragElement);
-        } else if (dragElement && area === "y") {
-          addYAxisItem(dragElement);
-        } else if (dragElement && area === "z") {
-          addZAxisItem(dragElement);
-        } else if (dragElement && area === "f") {
-          addFilteredItem(dragElement?.name);
-        }
-        currentDragArea.value = "";
-      } else if (dragElementType === "fieldElement") {
-        dashboardPanelData.meta.dragAndDrop.dragging = false;
-        dashboardPanelData.meta.dragAndDrop.dragElement = null;
-        dashboardPanelData.meta.dragAndDrop.dragElementType = null;
-
-        const dragName =
-          dashboardPanelData.meta.stream.selectedStreamFields.find(
-            (item: any) => item?.name === dragElement?.column
-          );
-        const customDragName =
-          dashboardPanelData.meta.stream.customQueryFields.find(
-            (item: any) => item?.name === dragElement?.column
-          );
-
-        if (dragName || customDragName) {
-          const axisArray = getAxisArray(area);
-          const duplicateName = axisArray.some(
-            (item: any) => item.column === (dragName || customDragName).name
-          );
-
-          if (duplicateName) {
-            const errorMessage = `Field '${
-              (dragName || customDragName).name
-            }' already exists in '${area}' axis.`;
-            $q.notify({
-              type: "negative",
-              message: errorMessage,
-              timeout: 5000,
-            });
-            return;
-          }
-
-          if (area !== "f") {
-            if (
-              (area === "x" && isAddXAxisNotAllowed.value) ||
-              (area === "y" && isAddYAxisNotAllowed.value) ||
-              (area === "z" && isAddZAxisNotAllowed.value)
-            ) {
-              let maxAllowedAxisFields;
-
-              switch (dashboardPanelData.data.type) {
-                case "pie":
-                case "donut":
-                case "heatmap":
-                  maxAllowedAxisFields = area === "x" ? 1 : 0;
-                  break;
-                case "metric":
-                  maxAllowedAxisFields = area === "x" ? 0 : 1;
-                  break;
-                case "table":
-                  maxAllowedAxisFields = 0;
-                  break;
-                default:
-                  maxAllowedAxisFields = area === "x" ? 2 : 1;
-              }
-
-              const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${area.toUpperCase()}-Axis is allowed.`;
-
-              $q.notify({
-                type: "negative",
-                message: errorMessage,
-                timeout: 5000,
-              });
-              return;
-            }
-
-            // Remove from the original axis
-            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
-            if (dragSource === "x") {
-              removeXAxisItem((dragName || customDragName).name);
-            } else if (dragSource === "y") {
-              removeYAxisItem((dragName || customDragName).name);
-            } else if (dragSource === "z") {
-              removeZAxisItem((dragName || customDragName).name);
-            }
-          }
-
-          if (area === "f") {
-            return;
-          }
-
-          // Add to the new axis
-          if (area === "x") {
-            addXAxisItem(dragName || customDragName);
-          } else if (area === "y") {
-            addYAxisItem(dragName || customDragName);
-          } else if (area === "z") {
-            addZAxisItem(dragName || customDragName);
-          }
-        }
-      }
-
-      updateArrayAlias();
-      // currentDragArea.value = "";
-    };
-
     const getAxisArray = (area: string) => {
       switch (area) {
         case "x":
@@ -1311,39 +1193,8 @@ export default defineComponent({
       e.preventDefault();
     };
 
-    // const fieldDraggedFromAxis = ref("");
-    // const fieldDraggedFromIndex: any = ref(0);
-    // const fieldDraggedCurrentIndex: any = ref(0);
-
-    // NOT NEEDED
-    // const onDragLeave = (e: any, area: string) => {
-    //   console.log("onDragLeave", area);
-
-    //   // the below if condition will prevent event being called in
-    //   // delay between multiple axis drag and drop
-    //   // like after it leavs y, if the value is already entered x
-    //   // leave it and do nothing
-    //   if(currentDragArea.value === area) {
-    //     currentDragArea.value = "";
-    //   }
-
-    //   e.preventDefault();
-    // };
-
-    // COMPLETE
     const onDragOver = (e: any, area: string) => {
       console.log("onDragOver", area);
-
-      // if (
-      //   dashboardPanelData.meta.dragAndDrop.dragElementType ===
-      //     "fieldElement" &&
-      //   area === "f"
-      // ) {
-      //   e.preventDefault();
-      //   return;
-      // }
-
-      // currentDragArea.value = area;
       e.preventDefault();
     };
 
@@ -1353,9 +1204,6 @@ export default defineComponent({
       axis: string,
       index: number
     ) => {
-      // fieldDraggedFromAxis.value = axis;
-      // fieldDraggedFromIndex.value = index;
-
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
       dashboardPanelData.meta.dragAndDrop.dragSource = axis;
@@ -1365,38 +1213,6 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
-
-    // NOT NEEDED
-    // const onFieldDragOver = (event: any, axis: any, index: any, array: any) => {
-    //   // console.log("onFieldDragOver", fieldDraggedFromAxis.value, axis, index);
-    //   // Prevent default behavior to allow the drop
-    //   // event.preventDefault();
-
-    //   currentDragArea.value = axis;
-    //   fieldDraggedCurrentIndex.value = index;
-    //   // // Swap the elements in the array
-    //   // const draggedItem = array[fieldDraggedFromIndex.value];
-    //   // array.splice(fieldDraggedFromIndex.value, 1);
-    //   // array.splice(index, 0, draggedItem);
-    //   // // Update the drag index for next iteration
-    //   // fieldDraggedFromIndex.value = index;
-    // };
-
-    // NOT NEEDED
-    // const onFieldDrop = (axis: any, index: any) => {
-    //   console.log("onleave", fieldDraggedFromAxis.value);
-    //   if (axis != fieldDraggedFromAxis.value) return;
-
-    //   dashboardPanelData.meta.dragAndDrop.dragging = false;
-    //   dashboardPanelData.meta.dragAndDrop.dragElement = null;
-    //   dashboardPanelData.meta.dragAndDrop.dragElementType = null;
-
-    //   // Reset the drag index
-    //   fieldDraggedFromIndex.value = null;
-    // };
-    // const onFieldDragEnd = () => {};
-
-    // const handler2 = () => {};
 
     const xAxisHint = computed((e: any) => {
       switch (dashboardPanelData.data.type) {
@@ -1515,13 +1331,10 @@ export default defineComponent({
         "Is Not Null",
       ],
       getImageURL,
-      onDrop,
       onNewDrop,
       onDragStart,
-      // onDragLeave,
       onDragOver,
       onDragEnter,
-      // handler2,
       currentDragArea,
       expansionItems,
       triggerOperatorsWithHistogram,
@@ -1533,9 +1346,6 @@ export default defineComponent({
       yLabel,
       zLabel,
       onFieldDragStart,
-      // onFieldDragOver,
-      // onFieldDragEnd,
-      // onFieldDrop,
       getHistoramIntervalField,
       dragIndex,
       onDragEnd,
