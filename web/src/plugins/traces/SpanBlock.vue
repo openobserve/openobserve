@@ -15,15 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex wrap justify-start items-center">
+  <div
+    class="flex wrap justify-start items-center bg-white"
+    :class="defocusSpan ? 'defocus' : ''"
+    :style="{
+      zIndex: '2',
+      borderBottom:
+        (isSpanSelected && `2px solid ${span.style.color}`) || 'none',
+    }"
+  >
     <!-- <q-btn icon="expand_more" dense size="xs" flat style="margin-right: 2px" /> -->
     <div
-      class="flex justify-between items-center cursor-pointer span-block relative-position"
+      class="flex justify-between items-end cursor-pointer span-block relative-position bg-white"
       :style="{
         height: spanDimensions.height + 'px',
         width: '100%',
+        paddingBottom: '6px',
       }"
-      :class="defocusSpan && traceDetailsPosition === 'right' ? 'defocus' : ''"
       ref="spanBlock"
       @click="selectSpan"
     >
@@ -33,9 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow: 'hidden',
         }"
         class="cursor-pointer flex items-center no-wrap position-relative"
-        :class="
-          defocusSpan && traceDetailsPosition === 'right' ? 'defocus' : ''
-        "
+        :class="defocusSpan ? 'defocus' : ''"
         @click="selectSpan"
       >
         <div
@@ -48,12 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-start items-center no-wrap"
           ref="spanMarkerRef"
         >
-          <q-btn
-            icon="expand_more"
+          <q-icon
             dense
-            size="xs"
+            round
             flat
-            style="margin-right: 2px"
+            name="expand_more"
+            class="collapse-btn"
+            :style="{
+              rotate: isSpanSelected ? '0deg' : '270deg',
+            }"
             @click.prevent.stop="toggleSpanDetails()"
           />
 
@@ -80,8 +89,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-resize-observer debounce="300" @resize="onResize" />
       </div>
     </div>
-    <template v-if="isSpanSelected && traceDetailsPosition === 'bottom'">
-      <span-details :span="span"></span-details>
+    <template v-if="isSpanSelected">
+      <span-details
+        :style="{
+          borderTop: `2px solid ${span.style.color}`,
+        }"
+        :span="span"
+        :spanData="spanData"
+        :baseTracePosition="baseTracePosition"
+      ></span-details>
     </template>
   </div>
 </template>
@@ -123,6 +139,10 @@ export default defineComponent({
       type: Object,
       default: () => {},
     },
+    spanData: {
+      type: Object,
+      default: () => ({}),
+    },
   },
   emits: ["toggleCollapse"],
   components: { SpanDetails },
@@ -143,14 +163,9 @@ export default defineComponent({
       emit("toggleCollapse", props.span.spanId);
     };
 
-    const isSidebarOpen = computed(() => {
-      return searchObj.data.traceDetails.showSpanDetails;
-    });
-
     const isSpanSelected = computed(() => {
-      return (
-        isSidebarOpen.value &&
-        searchObj.data.traceDetails.selectedSpanId === props.span.spanId
+      return searchObj.data.traceDetails.expandedSpans.includes(
+        props.span.spanId
       );
     });
 
@@ -158,10 +173,6 @@ export default defineComponent({
 
     const getSpanWidthInPx = computed(() => {
       return spanMarkerRef.value?.clientWidth > 1;
-    });
-
-    const traceDetailsPosition = computed(() => {
-      return searchObj.data.traceDetails.traceDetailsPosition;
     });
 
     const getLeftPosition = computed(() => {
@@ -192,7 +203,7 @@ export default defineComponent({
     });
     const getDurationStyle = computed(() => {
       const style: any = {
-        top: "2px",
+        top: "10px",
       };
       const onePercent = Number((spanBlockWidth.value / 100).toFixed(2));
       const labelWidth = 60;
@@ -201,7 +212,7 @@ export default defineComponent({
         spanBlockWidth.value
       ) {
         style.right = 0;
-        style.top = "-8px";
+        style.top = "0";
       } else if (getLeftPosition.value > 50) {
         style.left = getLeftPosition.value * onePercent - labelWidth + "px";
       } else {
@@ -224,14 +235,13 @@ export default defineComponent({
     };
 
     const toggleSpanDetails = () => {
-      console.log(isSpanSelected.value);
       if (!isSpanSelected.value) {
-        searchObj.data.traceDetails.traceDetailsPosition = "bottom";
-        selectSpan();
+        searchObj.data.traceDetails.expandedSpans.push(props.span.spanId);
       } else {
-        searchObj.data.traceDetails.traceDetailsPosition = "bottom";
-        searchObj.data.traceDetails.showSpanDetails = false;
-        searchObj.data.traceDetails.selectedSpanId = "";
+        searchObj.data.traceDetails.expandedSpans =
+          searchObj.data.traceDetails.expandedSpans.filter(
+            (val) => props.span.spanId !== val
+          );
       }
     };
 
@@ -250,7 +260,6 @@ export default defineComponent({
       getSpanStartTime,
       spanMarkerRef,
       toggleSpanDetails,
-      traceDetailsPosition,
       defocusSpan,
       isSpanSelected,
     };
@@ -265,7 +274,7 @@ export default defineComponent({
 
 .collapse-btn {
   background-color: #ffffff;
-  opacity: 0.4;
+  opacity: 0.6;
 }
 
 .collapse-container {

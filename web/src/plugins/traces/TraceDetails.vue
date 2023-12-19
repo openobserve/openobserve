@@ -82,9 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator style="width: 100%" class="q-mb-sm" />
       <div
         :class="
-          isSidebarOpen && traceDetailsPosition === 'right'
-            ? 'histogram-container'
-            : 'histogram-container-full'
+          isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
         "
       >
         <trace-header
@@ -101,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :spans="spanPositionList"
               :baseTracePosition="baseTracePosition"
               :spanDimensions="spanDimensions"
+              :spanMap="spanMap"
               class="trace-tree"
               @toggle-collapse="toggleSpanCollapse"
             />
@@ -108,14 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-separator vertical />
-      <div
-        v-if="
-          isSidebarOpen && selectedSpanId && traceDetailsPosition === 'right'
-        "
-        class="histogram-sidebar"
-      >
+      <div v-if="isSidebarOpen && selectedSpanId" class="histogram-sidebar">
         <trace-details-sidebar
-          :span="spanMap[selectedSpanId]"
+          :span="spanMap[selectedSpanId as string]"
           @close="closeSidebar"
         />
       </div>
@@ -184,12 +178,12 @@ export default defineComponent({
     const store = useStore();
     const traceServiceMap: any = ref({});
     const spanDimensions = {
-      height: 25,
+      height: 30,
       barHeight: 8,
       textHeight: 25,
       gap: 15,
-      collapseHeight: 8,
-      collapseWidth: 8,
+      collapseHeight: "14",
+      collapseWidth: 14,
       connectorPadding: 2,
       paddingLeft: 8,
       hConnectorWidth: 20,
@@ -229,10 +223,6 @@ export default defineComponent({
       { immediate: true }
     );
 
-    const traceDetailsPosition = computed(() => {
-      return searchObj.data.traceDetails.traceDetailsPosition;
-    });
-
     const isSidebarOpen = computed(() => {
       return searchObj.data.traceDetails.showSpanDetails;
     });
@@ -252,7 +242,7 @@ export default defineComponent({
         tics.push({
           value: Number(time.toFixed(2)),
           label: `${formatTimeWithSuffix(time * 1000)}`,
-          left: `${25 * i}%`,
+          left: i === 0 ? "1px" : `${25 * i}%`,
         });
         time += quarterMs;
       }
@@ -293,6 +283,8 @@ export default defineComponent({
         const span = formattedSpanMap[spanList.value[i].span_id];
 
         span.style.color = searchObj.meta.serviceColors[span.serviceName];
+
+        span.style.backgroundColor = adjustOpacity(span.style.color, 0.2);
 
         span.index = i;
 
@@ -335,6 +327,7 @@ export default defineComponent({
         Object.assign(span, {
           style: {
             color: span.style.color,
+            backgroundColor: span.style.backgroundColor,
             top: index * spanDimensions.height + "px",
             left: spanDimensions.gap * depth + "px",
           },
@@ -359,6 +352,19 @@ export default defineComponent({
         return 0;
       }
     };
+
+    function adjustOpacity(hexColor: string, opacity: number) {
+      // Ensure opacity is between 0 and 1
+      opacity = Math.max(0, Math.min(1, opacity));
+
+      // Convert opacity to a hex value
+      const opacityHex = Math.round(opacity * 255)
+        .toString(16)
+        .padStart(2, "0");
+
+      // Append the opacity hex value to the original hex color
+      return hexColor + opacityHex;
+    }
 
     const buildServiceTree = () => {
       const serviceTree: any[] = [];
@@ -428,6 +434,7 @@ export default defineComponent({
         spanId: span.span_id,
         operationName: span.operation_name,
         serviceName: span.service_name,
+        spanStatus: span.span_status,
         spanKind: getSpanKind(span.span_kind.toString()),
         parentId: span.reference_parent_span_id,
         spans: [],
@@ -615,7 +622,6 @@ export default defineComponent({
       traceVisuals,
       getImageURL,
       store,
-      traceDetailsPosition,
     };
   },
 });
