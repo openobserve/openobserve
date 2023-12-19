@@ -95,7 +95,9 @@ const getDefaultDashboardPanelData: any = () => ({
       dragging: false,
       dragElement: null,
       dragSource: null,
-      dragSourceIndex: null
+      dragSourceIndex: null,
+      currentDragArea: null,
+      targetDragIndex: null,
     },
     errors: {
       queryErrors: [],
@@ -118,6 +120,15 @@ let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData() });
 const useDashboardPanelData = () => {
   const store = useStore();
   const $q = useQuasar();
+
+  const cleanupDraggingFields = () => {
+    dashboardPanelData.meta.dragAndDrop.currentDragArea = null;
+    dashboardPanelData.meta.dragAndDrop.targetDragIndex = -1;
+    dashboardPanelData.meta.dragAndDrop.dragging = false;
+    dashboardPanelData.meta.dragAndDrop.dragElement = null;
+    dashboardPanelData.meta.dragAndDrop.dragSource = null;
+    dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
+  };
 
   const addQuery = () => {
     const queryType =
@@ -1055,6 +1066,7 @@ const useDashboardPanelData = () => {
     addQuery,
     removeQuery,
     resetAggregationFunction,
+    cleanupDraggingFields,
   };
 };
 export default useDashboardPanelData;
