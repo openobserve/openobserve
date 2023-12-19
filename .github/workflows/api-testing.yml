@@ -1,0 +1,122 @@
+name: Run integration tests against latest code
+
+on:
+  pull_request:
+
+env:
+  COLUMNS: 150
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_ROOT_USER_PASSWORD: Complexpass#123
+  ZO_BASE_URL: http://localhost:5080/
+
+jobs:
+  build:
+
+    runs-on: 
+      labels: ubuntu:latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: openobserve-ci-test
+      - name: Clone the current repo
+        uses: actions/checkout@v4
+      - name: Print out the repo structure
+        run: ls -al
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2023-10-24
+          components: rustfmt,clippy,llvm-tools
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          cache-directories: 
+            ./target
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v2
+        with:
+          version: "21.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Build frontend code
+        run: cd web && npm install && npm run build
+      - name: Install musl-dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
+          sudo ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
+      - name: Build static binary
+        run: cd openobserve && cargo build --release --features mimalloc  --target x86_64-unknown-linux-musl
+      - run: mkdir -p bin ; cp target/x86_64-unknown-linux-musl/release/openobserve bin/openobserve
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+      - name: Test locations
+        run: ls -al 
+      - name: Build and push to local registry
+        uses: docker/build-push-action@v5
+        with:
+          context: "."
+          file: ./tests/api-testing/ci/Dockerfile.openobserve
+          # push: true
+          outputs: type=docker,dest=/tmp/openobserve.tar
+          # tags: localhost:5000/openobserve/openobserve:latest-amd64
+          tags: openobserve:latest-amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # - name: Inspect
+      #   run: |
+      #     docker buildx imagetools inspect localhost:5000/openobserve/openobserve:latest-amd64
+      - name: Load built image into kind 
+        # run: kind load docker-image localhost:5000/openobserve/openobserve:latest-amd64 --name openobserve-ci-test
+        run: kind load image-archive /tmp/openobserve.tar --name openobserve-ci-test
+      - name: Deploy openobserve
+        # run: kubectl create ns openobserve && kubectl apply -f https://raw.githubusercontent.com/zinclabs/openobserve/main/deploy/k8s/statefulset.yaml
+        run: kubectl create ns openobserve && kubectl apply -f ./tests/api-testing/ci/statefulset.yaml
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Wait for 30s, for the deployment to complete.
+        run: sleep 30s
+        shell: bash
+      - name: Check the services - 1
+        run: kubectl get services --all-namespaces
+      - name: Check the services - 2
+        run: kubectl get pods --all-namespaces
+      - name: Check the logs
+        run: kubectl  logs openobserve-0 -n openobserve
+      - name: Port forward the 5080
+        run: kubectl -n openobserve port-forward svc/openobserve 5080:5080 &
+      # You can test your matrix by printing the current Python version
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Install rye
+        run: wget https://github.com/mitsuhiko/rye/releases/download/0.15.2/rye-x86_64-linux.gz && gzip -d rye-x86_64-linux.gz && mv rye-x86_64-linux rye && chmod +x ./rye && ./rye --version
+      - name: Pin rye to cpython 3.12 && run `rye sync`
+        run: cd ./tests/api-testing/ && ./rye pin cpython@3.12.0 && ./rye sync
+      - name: Run tests
+        run: cd ./tests/api-testing/ && ./rye run pytest --force-sugar
+        
+      # Try to test the openapi generator as well
+      # - name: openapi-generator test
+      #   uses: openapi-generators/openapitools-generator-action@v1
+      #   with:
+      #     generator: python
+      #     openapi-url: http://localhost:5080/api-doc/openapi.json
+      #     generator-tag: v7.0.1
+      #     command-args: '--package-name py-openobserve o ./py-openobserve --additional-properties=useSingleRequestParameter=true,packageVersion=2.0.0'
+          
+
+
