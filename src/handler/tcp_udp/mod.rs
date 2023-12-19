@@ -28,9 +28,21 @@ pub async fn udp_server(socket: UdpSocket) {
     let sender = BROADCASTER.read().await;
     let mut udp_receiver_rx = sender.subscribe();
     loop {
-        let (recv_len, addr) = socket.recv_from(&mut buf_udp).await.unwrap();
+        let (recv_len, addr) = match socket.recv_from(&mut buf_udp).await {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error while reading from UDP socket: {}", e);
+                continue;
+            }
+        };
         let message = BytesMut::from(&buf_udp[..recv_len]);
-        let input_str = String::from_utf8(message.to_vec()).unwrap();
+        let input_str = match String::from_utf8(message.to_vec()) {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error while converting UDP message to UTF8 string: {}", e);
+                continue;
+            }
+        };
         if input_str != STOP_SRV {
             let _ = syslog::ingest(&input_str, addr).await;
         }
@@ -49,13 +61,31 @@ pub async fn tcp_server(listener: TcpListener) {
     let mut tcp_receiver_rx = sender.subscribe();
     let mut buf_tcp = vec![0u8; 1460];
     loop {
-        let (mut stream, _) = listener.accept().await.unwrap();
+        let (mut stream, _) = match listener.accept().await {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error while accepting TCP connection: {}", e);
+                continue;
+            }
+        };
 
         match stream.peer_addr() {
             Ok(addr) => {
-                let len = stream.read(&mut buf_tcp).await.unwrap();
+                let len = match stream.read(&mut buf_tcp).await {
+                    Ok(val) => val,
+                    Err(e) => {
+                        log::error!("Error while reading from TCP stream: {}", e);
+                        continue;
+                    }
+                };
                 let message = BytesMut::from(&buf_tcp[..len]);
-                let input_str = String::from_utf8(message.to_vec()).unwrap();
+                let input_str = match String::from_utf8(message.to_vec()) {
+                    Ok(val) => val,
+                    Err(e) => {
+                        log::error!("Error while converting TCP message to UTF8 string: {}", e);
+                        continue;
+                    }
+                };
                 if input_str != STOP_SRV {
                     let _ = syslog::ingest(&input_str, addr).await;
                 }
