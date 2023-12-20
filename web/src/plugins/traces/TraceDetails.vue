@@ -90,7 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
       </div>
-      <div v-show="isTimelineExpanded" class="col-12" :key="isTimelineExpanded">
+      <div
+        v-show="isTimelineExpanded"
+        class="col-12"
+        :key="isTimelineExpanded.toString()"
+      >
         <ChartRenderer
           v-if="activeVisual === 'timeline'"
           class="trace-details-chart"
