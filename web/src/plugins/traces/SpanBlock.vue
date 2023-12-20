@@ -214,13 +214,13 @@ export default defineComponent({
         style.right = 0;
         style.top = "0";
       } else if (getLeftPosition.value > 50) {
-        style.left = getLeftPosition.value * onePercent - labelWidth + "px";
+        style.left =
+          getLeftPosition.value * onePercent - labelWidth + 10 + "px";
       } else {
         style.left =
           (getLeftPosition.value +
             (Math.floor(getWidth.value) ? getWidth.value : 1)) *
             onePercent +
-          10 +
           "px";
       }
       return style;

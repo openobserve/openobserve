@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-separator style="width: 100%" class="q-mb-sm" />
       <div
+        class="histogram-spans-container"
         :class="
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
         "
@@ -89,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :baseTracePosition="baseTracePosition"
           :splitterWidth="splitterModel"
         />
-        <div class="histogram-spans-container">
+        <div class="relative-position">
           <div
             class="trace-tree-container"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
@@ -242,7 +243,7 @@ export default defineComponent({
         tics.push({
           value: Number(time.toFixed(2)),
           label: `${formatTimeWithSuffix(time * 1000)}`,
-          left: i === 0 ? "1px" : `${25 * i}%`,
+          left: i === 0 ? "-1px" : `${25 * i}%`,
         });
         time += quarterMs;
       }
@@ -650,14 +651,12 @@ $traceChartHeight: 210px;
 .histogram-sidebar {
   width: $sidebarWidth;
   height: calc(100vh - $toolbarHeight - $traceChartHeight - 44px);
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
 }
 
 .histogram-spans-container {
-  height: calc(
-    100vh - $toolbarHeight - $traceHeaderHeight - $traceChartHeight - 44px
-  );
+  height: calc(100vh - $toolbarHeight - $traceChartHeight - 44px);
   overflow-y: auto;
   position: relative;
   overflow-x: hidden;
