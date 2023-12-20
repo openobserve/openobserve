@@ -39,7 +39,9 @@
     "goHome": "Go Home",
     "name": "Name",
     "add": "Add",
-    "details": "Details"
+    "details": "Details",
+    "tags": "Tags",
+    "process": "Process"
   },
   "search": {
     "selectIndex": "Select Stream First",
