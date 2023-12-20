@@ -358,6 +358,22 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.span_details_tab-panels {
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    /* Other styling properties */
+  }
+
+  th,
+  td {
+    border: 1px solid #f0f0f0;
+    text-align: left;
+    padding: 4px 8px !important;
+    font-size: 13px;
+    /* Other styling properties */
+  }
+}
 .attr-text {
   font-size: 12px;
   font-family: monospace;
