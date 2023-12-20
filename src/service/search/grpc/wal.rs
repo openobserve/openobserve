@@ -726,7 +726,6 @@ pub async fn search_arrow(
     Ok((results, scan_stats))
 }
 
-
 /// search in local WAL, which haven't been sync to object storage
 #[tracing::instrument(name = "service:search:wal:memory:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_memtable(
@@ -735,20 +734,41 @@ pub async fn search_memtable(
     stream_type: meta::StreamType,
     timeout: u64,
 ) -> super::SearchResult {
-    let Some(reader) = ingester::get_reader(&sql.org_id, &stream_type.to_string()) else {
+    let Some(reader) = ingester::get_reader(&sql.org_id, &stream_type.to_string()).await else {
         return Ok((HashMap::new(), ScanStats::new()));
     };
-    let batches = reader.read(&sql.stream_name, sql.meta.time_range).unwrap_or_default();
-    println!("batches: {:?}", batches.len());
-    
+    let mut batches = reader
+        .read(&sql.stream_name, sql.meta.time_range)
+        .await
+        .unwrap_or_default();
+    batches.extend(
+        ingester::read_from_immutable(
+            &sql.org_id,
+            &stream_type.to_string(),
+            &sql.stream_name,
+            sql.meta.time_range,
+        )
+        .await
+        .unwrap_or_default(),
+    );
+    if batches.is_empty() {
+        return Ok((HashMap::new(), ScanStats::new()));
+    }
+
+    let mut batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>> = HashMap::with_capacity(2);
+    for (schema, batch) in batches {
+        let entry = batch_groups.entry(schema).or_default();
+        entry.extend(batch);
+    }
 
     let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
         .await
         .unwrap_or(Schema::empty());
-    let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(schema_settings.partition_time_level, stream_type);
-        
+    // let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
+    // let partition_time_level =
+    // unwrap_partition_time_level(schema_settings.partition_time_level,
+    // stream_type);
+
     // fetch all schema versions, get latest schema
     let schema_latest = Arc::new(
         schema_latest
@@ -758,7 +778,7 @@ pub async fn search_memtable(
 
     let mut tasks = Vec::new();
     let mut sid = 0;
-    for (mut schema, record_batches) in batches {  
+    for (mut schema, record_batches) in batch_groups {
         // calulate schema diff
         let mut diff_fields = HashMap::new();
         let group_fields = schema.fields();
@@ -778,13 +798,16 @@ pub async fn search_memtable(
         }
         if !new_fields.is_empty() {
             let new_schema = Schema::new(new_fields);
-            schema = Arc::new(Schema::try_merge(vec![schema.as_ref().clone(),  new_schema ])?);
-        } 
+            schema = Arc::new(Schema::try_merge(vec![
+                schema.as_ref().clone(),
+                new_schema,
+            ])?);
+        }
 
-        sid+=1;
+        sid += 1;
         let sql = sql.clone();
         let session = meta::search::Session {
-            id: format!("{}-{}",session_id,sid),
+            id: format!("{}-{}", session_id, sid),
             storage_type: StorageType::Tmpfs,
             search_type: if !sql.meta.group_by.is_empty() {
                 SearchType::Aggregation
@@ -837,12 +860,12 @@ pub async fn search_memtable(
                 }
             }
             Err(err) => {
-                log::error!("datafusion execute error: {}", err);  
+                log::error!("datafusion execute error: {}", err);
                 return Err(super::handle_datafusion_error(err));
             }
         };
     }
- 
-    let mut scan_stats = ScanStats::new();
+
+    let scan_stats = ScanStats::new();
     Ok((results, scan_stats))
 }

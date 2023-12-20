@@ -31,20 +31,31 @@ impl MemTable {
         }
     }
 
-    pub(crate) fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
-         let mut rw = self.streams.write();
+    pub(crate) async fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
+        let mut rw = self.streams.write().await;
         let partition = rw
             .entry(entry.stream.clone())
             .or_insert_with(|| Stream::new());
-        partition.write(schema, entry)?;
-        Ok(())
+        partition.write(schema, entry).await
     }
 
-    pub(crate) fn read(&self, stream_name:&str, time_range: Option<(i64, i64)>) -> Result<Vec<(Arc<Schema>, Vec<RecordBatch>)>> {
-        let r = self.streams.read();
-         let Some(stream) = r.get(stream_name) else {
+    pub(crate) async fn read(
+        &self,
+        stream_name: &str,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<(Arc<Schema>, Vec<RecordBatch>)>> {
+        let r = self.streams.read().await;
+        let Some(stream) = r.get(stream_name) else {
             return Ok(vec![]);
         };
-        stream.read(time_range)
+        stream.read(time_range).await
+    }
+
+    pub(crate) async fn persist(&self, org_id: &str, stream_type: &str) -> Result<bool> {
+        let r = self.streams.read().await;
+        for (stream_name, stream) in r.iter() {
+            stream.persist(org_id, stream_type, &stream_name).await?;
+        }
+        Ok(true)
     }
 }

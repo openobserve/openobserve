@@ -173,6 +173,9 @@ async fn main() -> Result<(), anyhow::Error> {
     // migrate dashboards
     migration::dashboards::run().await?;
 
+    // ingester init
+    ingester::init().await.expect("ingester init failed");
+
     // init job
     job::init().await.expect("job init failed");
 

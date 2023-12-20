@@ -31,24 +31,38 @@ impl Stream {
         }
     }
 
-    pub(crate) fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
-        let mut rw = self.partitions.write();
+    pub(crate) async fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
+        let mut rw = self.partitions.write().await;
         let partition = rw
             .entry(entry.schema_key.clone())
             .or_insert_with(|| Partition::new(schema));
-        partition.write(entry)?;
-        Ok(())
+        partition.write(entry).await
     }
 
-    pub(crate) fn read(
+    pub(crate) async fn read(
         &self,
-        time_range:Option<(i64, i64)>,
+        time_range: Option<(i64, i64)>,
     ) -> Result<Vec<(Arc<Schema>, Vec<RecordBatch>)>> {
-        let r = self.partitions.read();
+        let r = self.partitions.read().await;
         let mut batches = Vec::with_capacity(r.len());
         for partition in r.values() {
-            batches.push(partition.read(time_range)?);
+            batches.push(partition.read(time_range).await?);
         }
         Ok(batches)
+    }
+
+    pub(crate) async fn persist(
+        &self,
+        org_id: &str,
+        stream_type: &str,
+        stream_name: &str,
+    ) -> Result<()> {
+        let r = self.partitions.read().await;
+        for (schema_key, partition) in r.iter() {
+            partition
+                .persist(org_id, stream_type, stream_name, &schema_key)
+                .await?;
+        }
+        Ok(())
     }
 }

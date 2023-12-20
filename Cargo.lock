@@ -3591,10 +3591,11 @@ dependencies = [
  "hashbrown 0.14.3",
  "indexmap 2.1.0",
  "once_cell",
- "parking_lot 0.12.1",
  "serde",
  "serde_json",
  "snafu 0.7.5",
+ "tokio",
+ "uuid",
  "wal",
 ]
 

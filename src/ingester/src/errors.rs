@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io;
+use std::{io, path::PathBuf};
 
 use snafu::Snafu;
 
@@ -24,11 +24,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     WalError { source: wal::Error },
     Message { message: String },
-    WriteData { source: io::Error },
-    ReadData { source: io::Error },
+    CreateFileError { source: io::Error, path: PathBuf },
+    WriteDataError { source: io::Error },
+    ReadDataError { source: io::Error },
     JSONSerialization { source: serde_json::Error },
     FromUtf8Error { source: std::string::FromUtf8Error },
     NotImplemented,
+    CreateArrowWriterError { source: arrow::error::ArrowError },
+    WriteArrowRecordBatchError { source: arrow::error::ArrowError },
     CreateArrowJsonEncoder { source: arrow::error::ArrowError },
     ArrowJsonEncodeError { source: arrow::error::ArrowError },
 }

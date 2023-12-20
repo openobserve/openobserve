@@ -54,11 +54,9 @@ impl Writer {
 
         f.write_all(super::FILE_TYPE_IDENTIFIER)
             .context(WriteFileTypeSnafu)?;
-        let file_type_bytes_written = super::FILE_TYPE_IDENTIFIER.len();
+        let bytes_written = super::FILE_TYPE_IDENTIFIER.len();
 
         f.sync_all().expect("fsync failure");
-
-        let bytes_written = file_type_bytes_written;
 
         Ok(Self {
             path,

@@ -400,7 +400,7 @@ pub async fn write_file_arrow(
         // let inferred_schema = entry.schema.clone();
 
         // -- call new ingester
-        let writer = ingester::get_writer(&stream.org_id, &stream.stream_type.to_string());
+        let writer = ingester::get_writer(&stream.org_id, &stream.stream_type.to_string()).await;
         writer
             .write(
                 Arc::new(entry.schema.clone()),
@@ -411,6 +411,7 @@ pub async fn write_file_arrow(
                     data: entry.records.clone(),
                 },
             )
+            .await
             .unwrap();
         // -- end call new ingester
 

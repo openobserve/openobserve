@@ -13,29 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{
+    fs::{create_dir_all, OpenOptions},
+    path::PathBuf,
+    sync::Arc,
+};
 
-use arrow::{json::ReaderBuilder, record_batch::RecordBatch};
+use arrow::{ipc::writer::StreamWriter, json::ReaderBuilder, record_batch::RecordBatch};
 use arrow_schema::Schema;
+use chrono::Utc;
 use snafu::ResultExt;
 
-use crate::{entry::Entry, errors::*, rwmap::RwMap};
+use crate::{entry::Entry, errors::*, rwmap::RwMap, ARROW_DIR};
 
-pub(crate)  struct Partition {
+pub(crate) struct Partition {
     schema: Arc<Schema>,
     files: RwMap<Arc<str>, PartitionFile>, // key: hour, val: files
 }
 
 impl Partition {
-    pub(crate)  fn new(schema: Arc<Schema>) -> Self {
+    pub(crate) fn new(schema: Arc<Schema>) -> Self {
         Self {
             schema,
             files: RwMap::default(),
         }
     }
 
-    pub(crate)  fn write(&mut self, entry: Entry) -> Result<()> {
-        let mut rw = self.files.write();
+    pub(crate) async fn write(&mut self, entry: Entry) -> Result<()> {
+        let mut rw = self.files.write().await;
         let partition = rw
             .entry(entry.partition_key.clone())
             .or_insert_with(|| PartitionFile::new());
@@ -43,13 +48,54 @@ impl Partition {
         Ok(())
     }
 
-    pub(crate) fn read(&self, time_range: Option<(i64, i64)>) -> Result<(Arc<Schema>, Vec<RecordBatch>)> {
-        let r = self.files.read();
+    pub(crate) async fn read(
+        &self,
+        time_range: Option<(i64, i64)>,
+    ) -> Result<(Arc<Schema>, Vec<RecordBatch>)> {
+        let r = self.files.read().await;
         let mut batches = Vec::with_capacity(r.len());
         for file in r.values() {
             batches.extend(file.read(time_range)?);
         }
         Ok((self.schema.clone(), batches))
+    }
+
+    pub(crate) async fn persist(
+        &self,
+        org_id: &str,
+        stream_type: &str,
+        stream_name: &str,
+        schema_key: &str,
+    ) -> Result<()> {
+        let thread_id = 0;
+        let r = self.files.read().await;
+        let mut path = PathBuf::from(ARROW_DIR);
+        path.push(org_id);
+        path.push(stream_type);
+        path.push(stream_name);
+        path.push(thread_id.to_string());
+        for (hour, data) in r.iter() {
+            let file_name = Utc::now().timestamp_nanos_opt().unwrap().to_string();
+            let mut path = path.clone();
+            path.push(hour.to_string());
+            path.push(schema_key);
+            path.push(file_name);
+            path.set_extension("arrow");
+            create_dir_all(path.parent().unwrap())
+                .context(CreateFileSnafu { path: path.clone() })?;
+            let f = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&path)
+                .context(CreateFileSnafu { path: path.clone() })?;
+            let mut writer =
+                StreamWriter::try_new(f, &self.schema).context(CreateArrowWriterSnafu)?;
+            for batch in data.data.iter() {
+                writer.write(batch).context(WriteArrowRecordBatchSnafu)?;
+            }
+            writer.finish().context(WriteArrowRecordBatchSnafu)?;
+        }
+        Ok(())
     }
 }
 
@@ -64,7 +110,7 @@ impl PartitionFile {
 
     fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
         let mut decoder = ReaderBuilder::new(schema)
-            .with_batch_size(8192)
+            .with_batch_size(entry.data.len())
             .build_decoder()
             .context(CreateArrowJsonEncoderSnafu)?;
         let _ = decoder.serialize(&entry.data);

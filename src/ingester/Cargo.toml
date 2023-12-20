@@ -6,18 +6,19 @@ license.workspace = true
 
 [dependencies]
 wal.workspace = true
-bytes.workspace = true
-byteorder.workspace = true
-hashbrown.workspace = true
-snafu.workspace = true
-indexmap.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
-parking_lot.workspace = true
-once_cell.workspace = true
+bytes.workspace = true
+byteorder.workspace = true
 chrono.workspace = true
+hashbrown.workspace = true
+indexmap.workspace = true
+once_cell.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+snafu.workspace = true
+tokio.workspace = true
+uuid.workspace = true
 
 [[bin]]
 name = "wal-reader"
