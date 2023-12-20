@@ -12,18 +12,18 @@
           class="q-px-sm"
           style="border-right: 1px solid #cccccc; font-size: 14px"
         >
-          <span>Service: </span>
+          <span class="text-grey-7">Service: </span>
           <span>{{ span.serviceName }}</span>
         </div>
         <div
           class="q-px-sm"
           style="border-right: 1px solid #cccccc; font-size: 14px"
         >
-          <span>Duration: </span>
+          <span class="text-grey-7">Duration: </span>
           <span>{{ getDuration }}</span>
         </div>
         <div class="q-pl-sm" style="font-size: 14px">
-          <span>Start Time: </span>
+          <span class="text-grey-7">Start Time: </span>
           <span>{{ getStartTime }}</span>
         </div>
       </div>
@@ -139,9 +139,10 @@
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
+              font-size: 12px;
             "
           >
-            {{ events }}
+            {{ events.length }}
           </div>
         </div>
         <div v-show="areEventsExpananded" class="q-px-md q-mt-sm">
@@ -215,6 +216,17 @@
           </div>
         </div>
       </div>
+      <div class="text-right flex items-center justify-end">
+        <span class="text-grey-7 q-mr-xs">Span Id: </span
+        ><span class="text-grey-10">{{ span.spanId }}</span>
+        <q-icon
+          class="q-ml-xs text-grey-8 cursor-pointer trace-copy-icon"
+          size="12px"
+          name="content_copy"
+          title="Copy"
+          @click="copySpanId"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -226,7 +238,8 @@ import { computed } from "vue";
 import { ref } from "vue";
 import { useStore } from "vuex";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
-import { date } from "quasar";
+import { date, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 
 const props = defineProps({
   span: {
@@ -250,6 +263,8 @@ const getDuration = computed(() => formatTimeWithSuffix(props.span.durationUs));
 const getStartTime = computed(() => {
   return props.span.startTimeMs - props.baseTracePosition.startTimeMs + "ms";
 });
+
+const $q = useQuasar();
 
 const span_details = new Set([
   "span_id",
@@ -349,6 +364,15 @@ const expandEvent = (index: number) => {
   if (expandedEvents.value[index.toString()])
     delete expandedEvents.value[index.toString()];
   else expandedEvents.value[index.toString()] = true;
+};
+
+const copySpanId = () => {
+  $q.notify({
+    type: "positive",
+    message: "Span ID copied to clipboard",
+    timeout: 2000,
+  });
+  copyToClipboard(props.span.spanId);
 };
 </script>
 
