@@ -379,6 +379,7 @@ export default defineComponent({
       searchObj.data.editorValue = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
         field.selectedValues = [];
+        field.searchKeyword = "";
       });
     };
 
