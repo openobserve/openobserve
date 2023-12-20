@@ -34,4 +34,5 @@ pub enum Error {
     WriteArrowRecordBatchError { source: arrow::error::ArrowError },
     CreateArrowJsonEncoder { source: arrow::error::ArrowError },
     ArrowJsonEncodeError { source: arrow::error::ArrowError },
+    WriteParquetRecordBatchError { source: parquet::errors::ParquetError },
 }

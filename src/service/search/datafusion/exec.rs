@@ -98,14 +98,8 @@ pub async fn sql(
     } else {
         let ctx = prepare_datafusion_context(&session.search_type)?;
 
-        let record_batches = in_records_batches.unwrap();
-        let schema = if let Some(first_batch) = record_batches.first() {
-            first_batch.schema()
-        } else {
-            log::error!("No record batches found");
-            return Ok(HashMap::new());
-        };
-        let mem_table = Arc::new(MemTable::try_new(schema, vec![record_batches])?);
+        let record_batches = in_records_batches.unwrap(); 
+        let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
 
         // Register the MemTable as a table in the DataFusion context
         ctx.register_table("tbl", mem_table)?;

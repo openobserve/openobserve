@@ -214,6 +214,8 @@ datafusion = { version = "34", features = ["simd"] }
 datafusion-expr = "34"
 arrow = { version = "49", features = ["simd", "ipc_compression"] }
 arrow-schema = { version = "49", features = ["serde"] }
+parquet = { version = "49", features = ["arrow", "async"] }
+object_store = { version = "0.8", features = ["aws", "azure", "gcp"] }
 faststr = "0.2"
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
