@@ -642,7 +642,8 @@
     "updateTitle": "Update Alert",
     "start": "start",
     "pause": "Pause",
-    "groupBy": "Group by"
+    "groupBy": "Group by",
+    "row": "Row Template"
   },
   "alert_templates": {
     "header": "Templates",
