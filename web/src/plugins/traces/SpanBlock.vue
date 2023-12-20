@@ -19,12 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex wrap justify-start items-center bg-white"
     :class="defocusSpan ? 'defocus' : ''"
     :style="{
-      zIndex: '2',
+      zIndex: 2,
       borderBottom:
         (isSpanSelected && `2px solid ${span.style.color}`) || 'none',
     }"
   >
-    <!-- <q-btn icon="expand_more" dense size="xs" flat style="margin-right: 2px" /> -->
     <div
       class="flex justify-between items-end cursor-pointer span-block relative-position bg-white"
       :style="{

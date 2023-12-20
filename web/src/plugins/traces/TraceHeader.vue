@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="flex justify-start items-center no-wrap row q-px-sm"
       :style="{
-        width: splitterWidth + '%',
+        width: splitterWidth + 'px',
       }"
     >
       Operation Name
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="flex justify-start items-center no-wrap row relative-position"
       :style="{
-        width: 100 - splitterWidth + '%',
+        width: `calc(100% - ${splitterWidth}px)`,
       }"
     >
       <div class="col-3 text-caption q-pl-xs">
@@ -60,10 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="{
           position: 'absolute',
           left: tick.left,
-          top: '0px',
+          top: '-3px',
           width: '1px',
-          backgroundColor: store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
+          backgroundColor: store.state.theme === 'dark' ? '#3c3c3c' : '#cacaca',
           zIndex: index === 0 ? '5' : '1',
+          height: '26px',
         }"
       ></div>
     </div>
