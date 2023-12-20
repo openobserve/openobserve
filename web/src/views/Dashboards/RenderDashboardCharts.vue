@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
     />
-    <TabList />
+    <TabList class="q-mt-sm" />
     <slot name="before_panels" />
     <div class="displayDiv">
       <grid-layout
