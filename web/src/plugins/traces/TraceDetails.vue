@@ -143,7 +143,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-separator vertical />
-      <div v-if="isSidebarOpen && selectedSpanId" class="histogram-sidebar">
+      <div
+        v-if="isSidebarOpen && selectedSpanId"
+        class="histogram-sidebar"
+        :class="isTimelineExpanded ? '' : 'full'"
+      >
         <trace-details-sidebar
           :span="spanMap[selectedSpanId as string]"
           @close="closeSidebar"
@@ -733,6 +737,10 @@ $traceChartCollapseHeight: 42px;
   height: calc(100vh - $toolbarHeight - $traceChartHeight - 44px);
   overflow-y: auto;
   overflow-x: hidden;
+
+  &.full {
+    height: calc(100vh - $toolbarHeight - 8px - 44px);
+  }
 }
 
 .histogram-spans-container {
