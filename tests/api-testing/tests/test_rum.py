@@ -324,12 +324,12 @@ def test_e2e_rumverifygeodata(create_session, base_url):
 
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    five_min_ago = int((now - timedelta(minutes=5)).timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
 
     json_data = {
         "query": {
             "sql": 'select * from "_rumlog" order by _timestamp desc limit 1 ;',
-            "start_time": five_min_ago,
+            "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
             "size": 150,
@@ -348,7 +348,10 @@ def test_e2e_rumverifygeodata(create_session, base_url):
     ), f"Failed to retrieve rum-logs, got = {got}, expected = {expected}, {response_rum_data.content}"
 
     response_payload = response_rum_data.json()
+    
+    assert len(response_payload["hits"]) > 0, "No results found in rum-logs"
+    logs_exist = any([x for x in response_payload["hits"] if x["message"] == unique_test_identifier])
     assert (
-        response_payload["hits"][0]["message"] == unique_test_identifier
+        logs_exist
     ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
-    # assert response_payload["hits"][0].get("geo_info_country") is not None
+    assert response_payload["hits"][0].get("geo_info_country") is not None
