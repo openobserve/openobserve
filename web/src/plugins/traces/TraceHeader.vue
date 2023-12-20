@@ -23,7 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? '1px solid #3c3c3c'
           : '1px solid #ececec',
     }"
-    class="flex justify-start items-center header-bg"
+    style="top: 0; z-index: 999; position: sticky"
+    class="flex justify-start items-center header-bg bg-grey-2"
   >
     <div
       class="flex justify-start items-center no-wrap row q-px-sm"
@@ -62,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           top: '0px',
           width: '1px',
           backgroundColor: store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
-          zIndex: '1',
+          zIndex: index === 0 ? '5' : '1',
         }"
       ></div>
     </div>
