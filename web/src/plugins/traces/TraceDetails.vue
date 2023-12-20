@@ -41,13 +41,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn v-close-popup="true" round flat icon="cancel" size="md" />
       </div>
       <q-separator style="width: 100%" />
-      <div class="col-12 flex justify-between items-end q-px-sm q-pt-sm">
-        <div class="text-subtitle2 text-bold">
-          {{
-            activeVisual === "timeline" ? "Trace Timeline" : "Trace Service Map"
-          }}
-        </div>
+      <div class="col-12 flex justify-between items-end q-pr-sm q-pt-sm">
         <div
+          class="trace-chart-btn flex items-center no-wrap cursor-pointer q-mb-sm"
+          @click="toggleTimeline"
+        >
+          <q-icon
+            name="expand_more"
+            :class="!isTimelineExpanded ? 'rotate-270' : ''"
+            size="22px"
+            class="cursor-pointer text-grey-10"
+          />
+          <div class="text-subtitle2 text-bold">
+            {{
+              activeVisual === "timeline"
+                ? "Trace Timeline"
+                : "Trace Service Map"
+            }}
+          </div>
+        </div>
+
+        <div
+          v-if="isTimelineExpanded"
           class="rounded-borders"
           style="border: 1px solid #cacaca; padding: 2px"
         >
@@ -67,24 +82,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
       </div>
-      <div class="col-12" v-if="activeVisual === 'timeline'">
-        <ChartRenderer
-          class="trace-details-chart"
-          id="trace_details_gantt_chart"
-          :data="ChartData"
-          @updated:chart="updateChart"
-          style="height: 200px"
-        />
-      </div>
-      <div class="col-12" v-else>
-        <ChartRenderer :data="traceServiceMap" style="height: 200px" />
-      </div>
+      <template v-if="isTimelineExpanded">
+        <div class="col-12" v-if="activeVisual === 'timeline'">
+          <ChartRenderer
+            class="trace-details-chart"
+            id="trace_details_gantt_chart"
+            :data="ChartData"
+            @updated:chart="updateChart"
+            style="height: 200px"
+          />
+        </div>
+        <div class="col-12" v-else>
+          <ChartRenderer :data="traceServiceMap" style="height: 200px" />
+        </div>
+      </template>
       <q-separator style="width: 100%" class="q-mb-sm" />
       <div
         class="histogram-spans-container"
-        :class="
-          isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
-        "
+        :class="[
+          isSidebarOpen ? 'histogram-container' : 'histogram-container-full',
+          isTimelineExpanded ? '' : 'full',
+        ]"
       >
         <trace-header
           :baseTracePosition="baseTracePosition"
@@ -233,6 +251,8 @@ export default defineComponent({
     const spanList: any = computed(() => {
       return searchObj.data.traceDetails.spanList;
     });
+
+    const isTimelineExpanded = ref(false);
 
     onMounted(() => {
       buildTracesTree();
@@ -648,6 +668,10 @@ export default defineComponent({
       document.body.classList.remove("no-select");
     };
 
+    const toggleTimeline = () => {
+      isTimelineExpanded.value = !isTimelineExpanded.value;
+    };
+
     return {
       traceTree,
       collapseMapping,
@@ -674,6 +698,8 @@ export default defineComponent({
       store,
       leftWidth,
       startResize,
+      isTimelineExpanded,
+      toggleTimeline,
     };
   },
 });
@@ -685,6 +711,9 @@ $seperatorWidth: 2px;
 $toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
 $traceChartHeight: 210px;
+
+$traceChartCollapseHeight: 42px;
+
 .toolbar {
   height: $toolbarHeight;
 }
@@ -711,10 +740,31 @@ $traceChartHeight: 210px;
   overflow-y: auto;
   position: relative;
   overflow-x: hidden;
+
+  &.full {
+    height: calc(100vh - $toolbarHeight - 8px - 44px);
+  }
 }
 
 .trace-tree-container {
   overflow: auto;
+}
+
+.trace-chart-btn {
+  cursor: pointer;
+  padding-right: 8px;
+  border-radius: 2px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+
+  &:hover {
+    background-color: rgba($primary, 0.9);
+    color: #ffffff;
+
+    .q-icon {
+      color: #ffffff !important;
+    }
+  }
 }
 </style>
 <style lang="scss">
