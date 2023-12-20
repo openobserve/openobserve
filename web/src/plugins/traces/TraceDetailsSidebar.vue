@@ -30,18 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="closeSidebar"
     ></q-btn>
   </div>
-  <div class="q-pb-sm">
+  <div class="q-pb-sm q-pt-xs flex">
     <div
       :title="span.operation_name"
-      class="q-px-sm q-pb-none text-subtitle1 ellipsis non-selectable"
+      class="q-px-sm q-pb-none ellipsis non-selectable"
+      style="font-size: 14px"
     >
-      <span>Operation Name: </span>{{ span.operation_name }}
+      <span class="text-grey-9">Operation Name: </span>{{ span.operation_name }}
     </div>
     <div
-      class="q-px-sm text-caption ellipsis non-selectable"
+      class="q-px-sm ellipsis non-selectable"
       :title="span.service_name"
+      style="font-size: 14px"
     >
-      <span>Service Name: </span> {{ span.service_name }}
+      <span class="text-grey-9">Service Name: </span> {{ span.service_name }}
     </div>
   </div>
   <q-tabs
