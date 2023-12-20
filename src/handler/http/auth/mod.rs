@@ -20,31 +20,31 @@ use actix_web::{
     web, Error,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::ldap::service::client::LdapUser;
 
+#[cfg(not(feature = "enterprise"))]
+use crate::common::meta::user::DBUser;
 use crate::{
     common::{
         infra::config::CONFIG,
         meta::{
             ingestion::INGESTION_EP,
             proxy::QueryParamProxyURL,
-            user::{DBUser, UserRole},
+            user::{TokenValidationResponse, UserRole},
         },
         utils::{
-            auth::{get_hash, is_root_user},
+            auth::{get_hash, is_root_user, AuthExtractor},
             base64,
         },
     },
     service::{db, users},
 };
+
 pub mod token;
 
 pub async fn validator(
     req: ServiceRequest,
-    credentials: BasicAuth,
+    user_id: &str,
+    password: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path = match req
         .request()
@@ -54,15 +54,9 @@ pub async fn validator(
         Some(path) => path,
         None => req.request().path(),
     };
-    match validate_credentials(
-        credentials.user_id(),
-        credentials.password().unwrap_or_default().trim(),
-        path,
-    )
-    .await
-    {
+    match validate_credentials(user_id, password.trim(), path).await {
         Ok(res) => {
-            if res {
+            if res.is_valid {
                 // / Hack for prometheus, need support POST and check the header
                 let mut req = req;
                 if req.method().eq(&Method::POST) && !req.headers().contains_key("content-type") {
@@ -71,6 +65,11 @@ pub async fn validator(
                         header::HeaderValue::from_static("application/x-www-form-urlencoded"),
                     );
                 }
+
+                req.headers_mut().insert(
+                    header::HeaderName::from_static("user_id"),
+                    header::HeaderValue::from_str(&res.user_email).unwrap(),
+                );
                 Ok(req)
             } else {
                 Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -97,13 +96,7 @@ pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
     path: &str,
-) -> Result<bool, Error> {
-    #[cfg(feature = "enterprise")]
-    if O2_CONFIG.ldap.ldap_enabled {
-        log::info!("LDAP authentication enabled");
-        return validate_user(user_id, user_password).await;
-    }
-
+) -> Result<TokenValidationResponse, Error> {
     let user;
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last() {
@@ -116,7 +109,10 @@ pub async fn validate_credentials(
     if is_root_user(user_id) {
         user = users::get_user(None, user_id).await;
         if user.is_none() {
-            return Ok(false);
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_string(),
+            });
         }
     } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
@@ -142,19 +138,28 @@ pub async fn validate_credentials(
     };
 
     if user.is_none() {
-        return Ok(false);
+        return Ok(TokenValidationResponse {
+            is_valid: false,
+            user_email: "".to_string(),
+        });
     }
     let user = user.unwrap();
 
     if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
         && user.token.eq(&user_password)
     {
-        return Ok(true);
+        return Ok(TokenValidationResponse {
+            is_valid: true,
+            user_email: user.email,
+        });
     }
 
     let in_pass = get_hash(user_password, &user.salt);
     if !user.password.eq(&in_pass) {
-        return Ok(false);
+        return Ok(TokenValidationResponse {
+            is_valid: false,
+            user_email: "".to_string(),
+        });
     }
     if !path.contains("/user")
         || (path.contains("/user")
@@ -162,22 +167,29 @@ pub async fn validate_credentials(
                 || user.role.eq(&UserRole::Root)
                 || user.email.eq(user_id)))
     {
-        Ok(true)
+        Ok(TokenValidationResponse {
+            is_valid: true,
+            user_email: user.email,
+        })
     } else {
         Err(ErrorForbidden("Not allowed"))
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
 async fn validate_user_from_db(
     db_user: Result<DBUser, anyhow::Error>,
     user_password: &str,
-) -> Result<bool, Error> {
+) -> Result<TokenValidationResponse, Error> {
     // let db_user = db::user::get_db_user(user_id).await;
     match db_user {
         Ok(user) => {
             let in_pass = get_hash(user_password, &user.salt);
             if user.password.eq(&in_pass) {
-                Ok(true)
+                Ok(TokenValidationResponse {
+                    is_valid: true,
+                    user_email: user.email,
+                })
             } else {
                 Err(ErrorForbidden("Not allowed"))
             }
@@ -186,80 +198,21 @@ async fn validate_user_from_db(
     }
 }
 
-/// Validate the incoming user from the ldap, if ldap is enabled
 #[cfg(feature = "enterprise")]
-async fn validate_user_from_ldap(user_id: &str, user_password: &str) -> Result<bool, Error> {
-    use o2_enterprise::errors::O2EnterpriseError;
+pub async fn validate_user(
+    _user_id: &str,
+    _user_password: &str,
+) -> Result<TokenValidationResponse, Error> {
+    use actix_web::error::ErrorNotFound;
 
-    let ldap_user_res: Result<LdapUser, O2EnterpriseError> =
-        o2_enterprise::enterprise::ldap::service::auth::get_user_from_ldap(user_id, user_password)
-            .await;
-
-    match ldap_user_res {
-        Ok(ldap_user) => {
-            for group in ldap_user.groups {
-                let hierarchy = group.split(',').collect::<Vec<_>>();
-                let org = hierarchy[1].split('=').last().unwrap();
-                let role = if group.contains("admin") {
-                    crate::common::meta::user::UserRole::Admin
-                } else {
-                    crate::common::meta::user::UserRole::Member
-                };
-                log::info!("Orgs retrieved from the ldap server: {:?}", org);
-
-                // Check if the user exists in the database
-                let user_exists = db::user::check_user_exists_by_email(user_id).await;
-                if !user_exists {
-                    log::info!("User does not exist in the database");
-                    log::warn!("Email is replaced using user_id, beware, in ldap.");
-                    // create the user
-                    let _ = users::post_user(
-                        org,
-                        crate::common::meta::user::UserRequest {
-                            // email: ldap_user.attributes.email.clone(),
-                            email: user_id.to_string(),
-                            password: "ldap+pass".to_owned(),
-                            role,
-                            first_name: ldap_user.attributes.firstname.clone(),
-                            last_name: ldap_user.attributes.lastname.clone(),
-                            is_ldap: true,
-                        },
-                    )
-                    .await
-                    .unwrap();
-                } else {
-                    log::info!("User exists in the database, should have sync'd the org now");
-                    let root_user = crate::common::infra::config::ROOT_USER.clone();
-                    let initiating_user = root_user.get("root").unwrap().clone();
-                    let _ = users::add_user_to_org(org, user_id, role, &initiating_user.email)
-                        .await
-                        .unwrap();
-                }
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            }
-            Ok(true)
-        }
-        Err(_) => Ok(false),
-    }
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, Error> {
-    let db_user = db::user::get_db_user(user_id).await;
-    let is_ldap_user = match db_user.as_ref() {
-        Ok(user) => user.is_ldap,
-        Err(_) => true,
-    };
-
-    if O2_CONFIG.ldap.ldap_enabled && is_ldap_user {
-        validate_user_from_ldap(user_id, user_password).await
-    } else {
-        validate_user_from_db(db_user, user_password).await
-    }
+    Err(ErrorNotFound("Not supported in enterprise version"))
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, Error> {
+pub async fn validate_user(
+    user_id: &str,
+    user_password: &str,
+) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
     validate_user_from_db(db_user, user_password).await
 }
@@ -288,7 +241,7 @@ pub async fn validator_aws(
 
                 match validate_credentials(&creds[0], &creds[1], path).await {
                     Ok(res) => {
-                        if res {
+                        if res.is_valid {
                             Ok(req)
                         } else {
                             Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -326,7 +279,7 @@ pub async fn validator_gcp(
 
             match validate_credentials(&creds[0], &creds[1], path).await {
                 Ok(res) => {
-                    if res {
+                    if res.is_valid {
                         Ok(req)
                     } else {
                         Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -356,7 +309,7 @@ pub async fn validator_proxy_url(
 
     match validate_credentials(&creds[0], &creds[1], path).await {
         Ok(res) => {
-            if res {
+            if res.is_valid {
                 Ok(req)
             } else {
                 Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -406,6 +359,31 @@ pub async fn validator_rum(
     }
 }
 
+pub async fn oo_validator(
+    req: ServiceRequest,
+    auth_header: AuthExtractor,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    if auth_header.auth.starts_with("Basic") {
+        let decoded = base64::decode(auth_header.auth.strip_prefix("Basic").unwrap().trim())
+            .expect("Failed to decode base64 string");
+        let credentials = String::from_utf8(decoded.into())
+            .map_err(|_| ())
+            .expect("Failed to decode base64 string");
+        let parts: Vec<&str> = credentials.split(':').collect();
+        if parts.len() != 2 {
+            return Err((ErrorUnauthorized("Unauthorized Access"), req));
+        }
+        let (username, password) = (parts[0], parts[1]);
+        let username = username.to_owned();
+        let password = password.to_owned();
+        validator(req, &username, &password).await
+    } else if auth_header.auth.starts_with("Bearer") {
+        token::token_validator(req, &auth_header.auth).await
+    } else {
+        Err((ErrorUnauthorized("Unauthorized Access"), req))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,7 +400,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
-                is_ldap: false,
+                is_external: false,
             },
         )
         .await;
@@ -434,7 +412,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Member,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
-                is_ldap: false,
+                is_external: false,
             },
         )
         .await;
@@ -444,28 +422,38 @@ mod tests {
             validate_credentials("root@example.com", pwd, "default/_bulk")
                 .await
                 .unwrap()
+                .is_valid
         );
         assert!(
             !validate_credentials("", pwd, "default/_bulk")
                 .await
                 .unwrap()
+                .is_valid
         );
-        assert!(!validate_credentials("", pwd, "/").await.unwrap());
+        assert!(!validate_credentials("", pwd, "/").await.unwrap().is_valid);
         assert!(
             !validate_credentials("user1@example.com", pwd, "/")
                 .await
                 .unwrap()
+                .is_valid
         );
         assert!(
             validate_credentials("user1@example.com", pwd, "default/user")
                 .await
                 .unwrap()
+                .is_valid
         );
         assert!(
             !validate_credentials("user1@example.com", "x", "default/user")
                 .await
                 .unwrap()
+                .is_valid
         );
-        assert!(validate_user("root@example.com", pwd).await.unwrap());
+        assert!(
+            validate_user("root@example.com", pwd)
+                .await
+                .unwrap()
+                .is_valid
+        );
     }
 }

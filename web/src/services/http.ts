@@ -23,7 +23,7 @@ const http = ({ headers } = {} as any) => {
     baseURL: store.state.API_ENDPOINT,
     headers: {
       Authorization:
-        config.isCloud == "true"
+        (config.isCloud == "true" || config.isEnterprise == "true")
           ? "Bearer " + localStorage.getItem("token")
           : localStorage.getItem("token") || "",
       ...headers,

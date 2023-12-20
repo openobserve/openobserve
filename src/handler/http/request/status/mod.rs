@@ -13,27 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    borrow::Cow,
-    io::{Error, ErrorKind},
-};
+use std::io::Error;
+#[cfg(feature = "enterprise")]
+use std::io::ErrorKind;
 
-use actix_web::{get, http::header, web, HttpRequest, HttpResponse};
+use actix_web::{get, HttpResponse};
+#[cfg(feature = "enterprise")]
+use actix_web::{http::header, web, HttpRequest};
 use ahash::AHashMap as HashMap;
 use datafusion::arrow::datatypes::{Field, Schema};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::dex::{
-    meta::LoginData,
-    service::{
-        auth as dex_auth,
-        auth::{exchange_code, get_jwks},
-    },
+use o2_enterprise::enterprise::dex::service::{
+    auth as dex_auth,
+    auth::{exchange_code, get_jwks},
 };
-use openidconnect::{
-    core::{CoreClient, CoreProviderMetadata},
-    reqwest::async_http_client,
-    AuthorizationCode, ClientId, ClientSecret, IssuerUrl, OAuth2TokenResponse, RedirectUrl,
-};
+#[cfg(feature = "enterprise")]
 use regex::bytes::Regex;
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -188,7 +182,13 @@ fn get_stream_schema_status() -> (usize, usize, usize) {
 pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
     use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
-    use crate::{common::utils::jwt::verify_decode_token, service::users};
+    use crate::{
+        common::{
+            meta::user::{DBUser, UserOrg},
+            utils::jwt::verify_decode_token,
+        },
+        service::users,
+    };
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
@@ -218,52 +218,79 @@ pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
                     let dec_token = res.1.unwrap();
                     let groups = dec_token.claims.get("groups").unwrap().as_array().unwrap();
                     let name = dec_token.claims.get("name").unwrap().as_str().unwrap();
+                    let user_email = res.0.user_email.to_owned();
+                    let mut source_orgs: Vec<UserOrg> = vec![];
                     for group in groups {
                         let test = parse_dn(group.as_str().unwrap()).unwrap();
-                        let user_email = res.0.user_email.to_owned();
 
                         let role = if test.0.contains("admin") {
                             crate::common::meta::user::UserRole::Admin
                         } else {
                             crate::common::meta::user::UserRole::Member
                         };
-                        // Check if the user exists in the database
-                        let user_exists = db::user::check_user_exists_by_email(&user_email).await;
-                        if !user_exists {
-                            log::info!("User does not exist in the database");
-                            log::warn!("Email is replaced using user_id, beware, in ldap.");
-                            // create the user
-                            let _ = users::post_user(
-                                &test.1,
-                                crate::common::meta::user::UserRequest {
-                                    email: user_email,
-                                    password: "dex+pass".to_owned(),
-                                    role,
-                                    first_name: name.to_owned(),
-                                    last_name: name.to_owned(),
-                                    is_ldap: true,
-                                },
-                            )
-                            .await
-                            .unwrap();
-                        } else {
-                            log::info!(
-                                "User exists in the database, should have sync'd the org now"
-                            );
-                            let root_user = crate::common::infra::config::ROOT_USER.clone();
-                            let initiating_user = root_user.get("root").unwrap().clone();
-                            let _ = users::add_user_to_org(
-                                &test.1,
-                                &user_email,
-                                role,
-                                &initiating_user.email,
-                            )
-                            .await
-                            .unwrap();
-                        }
+                        source_orgs.push(UserOrg {
+                            role,
+                            name: test.1,
+                            ..UserOrg::default()
+                        });
                     }
+                    // Check if the user exists in the database
+                    let db_user = db::user::get_user_by_email(&user_email).await;
+                    let updated_db_user = if db_user.is_none() {
+                        log::info!("User does not exist in the database");
+                        DBUser {
+                            email: user_email.to_owned(),
+                            first_name: name.to_owned(),
+                            last_name: "".to_owned(),
+                            password: "".to_owned(),
+                            salt: "".to_owned(),
+                            organizations: source_orgs,
+                            is_external: true,
+                        }
+                    } else {
+                        log::info!("User exists in the database perform check for role change");
+                        let existing_db_user = db_user.unwrap();
+                        let mut existing_orgs = existing_db_user.organizations;
+
+                        // Find and remove users from cache
+                        for org in existing_orgs.iter() {
+                            if !source_orgs.iter().any(|src_org| src_org.name == org.name) {
+                                USERS.remove(&format!("{}/{}", org.name, user_email));
+                            }
+                        }
+
+                        // 1. Remove organizations not in source_orgs
+                        existing_orgs.retain(|org| {
+                            source_orgs.iter().any(|src_org| src_org.name == org.name)
+                        });
+                        // 2. Update roles for existing organizations
+                        for org in existing_orgs.iter_mut() {
+                            if let Some(src_org) =
+                                source_orgs.iter().find(|src_org| src_org.name == org.name)
+                            {
+                                org.role = src_org.role.clone();
+                            }
+                        }
+                        // 3. Add new organizations from source_orgs
+                        for src_org in source_orgs {
+                            if !existing_orgs.iter().any(|org| org.name == src_org.name) {
+                                existing_orgs.push(src_org.clone());
+                            }
+                        }
+
+                        DBUser {
+                            email: user_email.to_owned(),
+                            first_name: name.to_owned(),
+                            last_name: "".to_owned(),
+                            password: existing_db_user.password,
+                            salt: existing_db_user.salt,
+                            organizations: existing_orgs,
+                            is_external: true,
+                        }
+                    };
+                    let _ = users::update_db_user(updated_db_user).await;
                 }
-                Err(_) => todo!(),
+                Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
             }
 
             Ok(HttpResponse::Found()
@@ -285,6 +312,7 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(login_data.url))
 }
 
+#[cfg(feature = "enterprise")]
 fn parse_dn(dn: &str) -> Option<(String, String)> {
     let re = Regex::new(r"cn=(?P<role>[^,]+),ou=(?P<team>[^,]+)").unwrap();
 
