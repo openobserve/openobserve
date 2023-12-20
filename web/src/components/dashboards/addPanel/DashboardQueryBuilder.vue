@@ -893,7 +893,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <DashboardMapQueryBuilder />
-  <DashboardGeoMapQueryBuilder v-if="dashboardPanelData.data.type == 'maps'"></DashboardGeoMapQueryBuilder>
+  <DashboardGeoMapQueryBuilder/>
   <DashboardSankeyChartBuilder />
 </template>
 

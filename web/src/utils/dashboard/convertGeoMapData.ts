@@ -21,6 +21,8 @@
  * @return {Object} - the option object for rendering the map chart
  */
 export const convertGeoMapData = (panelSchema: any, mapData: any) => {
+    console.log("convertGeoMapData", panelSchema, mapData);
+    
   //if no latitude and longitude than return it
   if (
     !panelSchema.queries[0]?.fields?.latitude ||

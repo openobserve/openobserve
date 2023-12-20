@@ -94,6 +94,8 @@ export const convertPanelData = (
       };
     }
     case "maps": {
+      console.log("maps", panelSchema.type);
+      
       return {
         chartType: panelSchema.type,
         ...convertGeoMapData(panelSchema, data),
