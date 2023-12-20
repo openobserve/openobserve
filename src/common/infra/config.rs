@@ -217,7 +217,12 @@ pub fn render_help() {
         if k.is_empty() {
             continue;
         }
-        println!("{:<38}: {} [DEFAULT: {}]", k, v.1.as_deref().unwrap_or(""), &v.0,);
+        println!(
+            "{:<38}: {} [DEFAULT: {}]",
+            k,
+            v.1.as_deref().unwrap_or(""),
+            &v.0,
+        );
     }
 }
 
@@ -239,29 +244,57 @@ pub struct Pyroscope {
 
 #[derive(EnvConfig)]
 pub struct Auth {
-    #[env_config(name = "ZO_ROOT_USER_EMAIL")]
+    #[env_config(name = "ZO_ROOT_USER_EMAIL", help = "Email of first/super admin user")]
     pub root_user_email: String,
-    #[env_config(name = "ZO_ROOT_USER_PASSWORD")]
+    #[env_config(
+        name = "ZO_ROOT_USER_PASSWORD",
+        help = "Password for first/super admin user"
+    )]
     pub root_user_password: String,
 }
 
 #[derive(EnvConfig)]
 pub struct Http {
-    #[env_config(name = "ZO_HTTP_PORT", default = 5080)]
+    #[env_config(
+        name = "ZO_HTTP_PORT",
+        default = 5080,
+        help = "openobserve server listen HTTP port"
+    )]
     pub port: u16,
-    #[env_config(name = "ZO_HTTP_ADDR", default = "")]
+    #[env_config(
+        name = "ZO_HTTP_ADDR",
+        default = "",
+        help = "openobserve server listen HTTP ip address"
+    )]
     pub addr: String,
-    #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
+    #[env_config(
+        name = "ZO_HTTP_IPV6_ENABLED",
+        default = false,
+        help = "enable ipv6 support for HTTP"
+    )]
     pub ipv6_enabled: bool,
 }
 
 #[derive(EnvConfig)]
 pub struct Grpc {
-    #[env_config(name = "ZO_GRPC_PORT", default = 5081)]
+    #[env_config(
+        name = "ZO_GRPC_PORT",
+        default = 5081,
+        help = "openobserve server listen gRPC port"
+    )]
     pub port: u16,
-    #[env_config(name = "ZO_GRPC_ADDR", default = "")]
+    #[env_config(
+        name = "ZO_GRPC_ADDR",
+        default = "",
+        help = "openobserve server listen gRPC ip address"
+    )]
     pub addr: String,
-    #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "organization")]
+    #[env_config(
+        name = "ZO_GRPC_ORG_HEADER_KEY",
+        default = "organization",
+        help = "header key for sending organization 
+    information for traces using OTLP over grpc"
+    )]
     pub org_header_key: String,
     #[env_config(name = "ZO_GRPC_STREAM_HEADER_KEY", default = "stream-name")]
     pub stream_header_key: String,
@@ -279,7 +312,11 @@ pub struct TCP {
 
 #[derive(EnvConfig)]
 pub struct Route {
-    #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
+    #[env_config(
+        name = "ZO_ROUTE_TIMEOUT",
+        default = 600,
+        help = "timeout for router node."
+    )]
     pub timeout: u64,
     // zo1-openobserve-ingester.ziox-dev.svc.cluster.local
     #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
@@ -290,10 +327,21 @@ pub struct Route {
 pub struct Common {
     #[env_config(name = "ZO_APP_NAME", default = "openobserve")]
     pub app_name: String,
-    #[env_config(name = "ZO_LOCAL_MODE", default = true)]
+    #[env_config(
+        name = "ZO_LOCAL_MODE",
+        default = true,
+        help = "If local mode is set to true ,OpenObserve becomes single node deployment, 
+        false indicates cluster mode deployment which supports multiple nodes with different roles. 
+        For local mode one needs to configure sled db, for cluster mode one needs to config etcd."
+    )]
     pub local_mode: bool,
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
-    #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
+    #[env_config(
+        name = "ZO_LOCAL_MODE_STORAGE",
+        default = "disk",
+        help = "disk or s3, Applicable only for local mode , by default local disk is used as 
+        storage, we also support s3 in local mode."
+    )]
     pub local_mode_storage: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
@@ -302,23 +350,49 @@ pub struct Common {
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
-    #[env_config(name = "ZO_NODE_ROLE", default = "all")]
+    #[env_config(
+        name = "ZO_NODE_ROLE",
+        default = "all",
+        help = "Possible values are : all, ingester, querier, router, compactor, alertmanager, 
+        A single node can have multiple roles id desired. Specify roles separated by comma. e.g. compactor,alertmanager"
+    )]
     pub node_role: String,
     #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]
     pub cluster_name: String,
-    #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
+    #[env_config(
+        name = "ZO_INSTANCE_NAME",
+        default = "",
+        help = "in the cluster mode, each node has a instance name, 
+    default is instance hostname."
+    )]
     pub instance_name: String,
     #[env_config(name = "ZO_INGESTER_SIDECAR_ENABLED", default = false)]
     pub ingester_sidecar_enabled: bool,
     #[env_config(name = "ZO_INGESTER_SIDECAR_QUERIER", default = false)]
     pub ingester_sidecar_querier: bool,
-    #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
+    #[env_config(
+        name = "ZO_DATA_DIR",
+        default = "./data/openobserve/",
+        help = "On-disk data directory, where openobserve stores everything."
+    )]
     pub data_dir: String,
-    #[env_config(name = "ZO_DATA_WAL_DIR", default = "")] // ./data/openobserve/wal/
+    #[env_config(
+        name = "ZO_DATA_WAL_DIR",
+        default = "",
+        help = "local WAL data directory."
+    )] // ./data/openobserve/wal/
     pub data_wal_dir: String,
-    #[env_config(name = "ZO_DATA_STREAM_DIR", default = "")] // ./data/openobserve/stream/
+    #[env_config(
+        name = "ZO_DATA_STREAM_DIR",
+        default = "",
+        help = "streams local data storage directory ,applicable only for local mode."
+    )] // ./data/openobserve/stream/
     pub data_stream_dir: String,
-    #[env_config(name = "ZO_DATA_DB_DIR", default = "")] // ./data/openobserve/db/
+    #[env_config(
+        name = "ZO_DATA_DB_DIR",
+        default = "",
+        help = "metadata database local storage directory."
+    )] // ./data/openobserve/db/
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
