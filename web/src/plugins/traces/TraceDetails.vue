@@ -90,20 +90,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
       </div>
-      <template v-if="isTimelineExpanded">
-        <div class="col-12" v-if="activeVisual === 'timeline'">
-          <ChartRenderer
-            class="trace-details-chart"
-            id="trace_details_gantt_chart"
-            :data="ChartData"
-            @updated:chart="updateChart"
-            style="height: 200px"
-          />
-        </div>
-        <div class="col-12" v-else>
-          <ChartRenderer :data="traceServiceMap" style="height: 200px" />
-        </div>
-      </template>
+      <div v-show="isTimelineExpanded" class="col-12" :key="isTimelineExpanded">
+        <ChartRenderer
+          v-if="activeVisual === 'timeline'"
+          class="trace-details-chart"
+          id="trace_details_gantt_chart"
+          :data="ChartData"
+          @updated:chart="updateChart"
+          style="height: 200px"
+        />
+        <ChartRenderer v-else :data="traceServiceMap" style="height: 200px" />
+      </div>
       <q-separator style="width: 100%" class="q-mb-sm" />
       <div
         class="histogram-spans-container"
@@ -116,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :baseTracePosition="baseTracePosition"
           :splitterWidth="leftWidth"
         />
-        <div class="relative-position">
+        <div class="relative-position full-height">
           <div
             class="trace-tree-container"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
