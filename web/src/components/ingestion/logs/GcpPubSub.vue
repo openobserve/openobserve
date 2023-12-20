@@ -15,26 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tabContent q-ma-md">
-    <div class="tabContent__head">
-      <div class="copy_action">
-        <q-btn
-          data-test="gcpLogs-copy-btn"
-          flat
-          round
-          size="0.5rem"
-          padding="0.6rem"
-          color="grey"
-          icon="content_copy"
-          @click="$emit('copy-to-clipboard-fn', gcpContent)"
-        />
-      </div>
-    </div>
-    <pre ref="gcpContent" data-test="vector-content-text">
-URL: {{ endpoint.url }}/gcp/{{ currOrgIdentifier }}/default/_sub?API-Key={{
-        accessKey
-      }}</pre
-    >
+  <div class="q-ma-md">
+    <CopyContent class="q-mt-sm" :content="content" />
   </div>
 </template>
 
@@ -42,9 +24,9 @@ URL: {{ endpoint.url }}/gcp/{{ currOrgIdentifier }}/default/_sub?API-Key={{
 import { defineComponent, ref, type Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL, b64EncodeUnicode } from "../../../utils/zincutils";
-import type { Endpoint } from "@/ts/interfaces";
-import { computed } from "vue";
+import { getImageURL } from "../../../utils/zincutils";
+import CopyContent from "@/components/CopyContent.vue";
+
 export default defineComponent({
   name: "GcpPubSub",
   props: {
@@ -55,6 +37,7 @@ export default defineComponent({
       type: String,
     },
   },
+  components: { CopyContent },
   setup(props) {
     const store = useStore();
     const endpoint: any = ref({
@@ -72,18 +55,13 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-    const accessKey = computed(() => {
-      return b64EncodeUnicode(
-        `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
-      );
-    });
-    const gcpContent = ref(null);
+    
+    const content = `URL: ${endpoint.value.url}/gcp/${store.state.selectedOrganization.identifier}/default/_sub?API-Key=[BASIC_PASSCODE]`;
     return {
       store,
       config,
       endpoint,
-      gcpContent,
-      accessKey,
+      content,
       getImageURL,
     };
   },

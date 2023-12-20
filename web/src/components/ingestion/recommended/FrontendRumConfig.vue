@@ -29,7 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <br />
       <div class="text-subtitle1 q-mt-xs" v-html="npmStep2"></div>
-      <copy-content :content="initConfiguration"></copy-content>
+      <CopyContent
+        :key="displayConfiguration"
+        :content="initConfiguration"
+        :displayContent="displayConfiguration"
+      ></CopyContent>
     </div>
     <div v-else class="q-mt-xs">
       {{ t("ingestion.generateRUMTokenMessage") }}
@@ -38,10 +42,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUpdated } from "vue";
+import { defineComponent, ref, onMounted, onUpdated, onActivated } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { getImageURL } from "../../../utils/zincutils";
+import { getImageURL, maskText } from "../../../utils/zincutils";
 import CopyContent from "../../CopyContent.vue";
 
 export default defineComponent({
@@ -121,6 +125,7 @@ openobserveRum.setUser({
 
 openobserveRum.startSessionReplayRecording();`;
     const initConfiguration = ref(defaultConfig);
+    const displayConfiguration = ref(defaultConfig);
 
     onMounted(() => {
       if (store.state.organizationData.rumToken) {
@@ -134,14 +139,13 @@ openobserveRum.startSessionReplayRecording();`;
       }
     });
 
+    onActivated(() => {
+      replaceStaticValues();
+    });
+
     const replaceStaticValues = () => {
       rumToken.value = store.state.organizationData.rumToken.rum_token;
       let configData = defaultConfig;
-      configData = configData.replace(
-        /<OPENOBSERVE_CLIENT_TOKEN>/g,
-        rumToken.value
-      );
-
       configData = configData.replace(
         /<OPENOBSERVE_SITE>/g,
         store.state.API_ENDPOINT.replace("https://", "")
@@ -160,7 +164,15 @@ openobserveRum.startSessionReplayRecording();`;
         configData = configData.replace(/<INSECUREHTTP>/g, "true");
       }
 
-      initConfiguration.value = configData;
+      initConfiguration.value = configData.replace(
+        /<OPENOBSERVE_CLIENT_TOKEN>/g,
+        rumToken.value
+      );
+
+      displayConfiguration.value = configData.replace(
+        /<OPENOBSERVE_CLIENT_TOKEN>/g,
+        maskText(rumToken.value)
+      );
     };
 
     return {
@@ -171,6 +183,7 @@ openobserveRum.startSessionReplayRecording();`;
       npmStep1,
       npmStep2,
       initConfiguration,
+      displayConfiguration,
       replaceStaticValues,
     };
   },

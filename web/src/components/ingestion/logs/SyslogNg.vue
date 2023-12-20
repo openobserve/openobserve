@@ -16,39 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="tabContent q-ma-md">
-      <div class="tabContent__head">
-        <div class="copy_action">
-          <q-btn
-            data-test="fluentd-copy-btn"
-            flat
-            round
-            size="0.5rem"
-            padding="0.6rem"
-            color="grey"
-            icon="content_copy"
-            @click="$emit('copy-to-clipboard-fn', syslogNgContent)"
-          />
-        </div>
-      </div>
-      <pre ref="syslogNgContent" data-test="syslog-ng-content-text">
-destination d_openobserve_http {
-    openobserve-log(
-        url("{{ endpoint.url }}")
-        organization("{{ currOrgIdentifier }}")
-        stream("syslog-ng")
-        user("{{ currUserEmail }}")
-        password("{{ store.state.organizationData.organizationPasscode }}")
-    );
-};
-
-
-log {
-    source(src);
-    destination(d_openobserve_http);
-    flags(flow-control);
-};</pre
-      >
+    <div class="q-ma-md">
+      <CopyContent class="q-mt-sm" :content="content" />
     </div>
     <div style="margin-left: 20px;" >
       Check further documentation at
@@ -65,7 +34,7 @@ import { defineComponent, ref, type Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getImageURL } from "../../../utils/zincutils";
-import type { Endpoint } from "@/ts/interfaces";
+import CopyContent from "@/components/CopyContent.vue";
 export default defineComponent({
   name: "SyslogNg",
   props: {
@@ -76,6 +45,7 @@ export default defineComponent({
       type: String,
     },
   },
+  components: { CopyContent },
   setup() {
     const store = useStore();
     const endpoint: any = ref({
@@ -93,12 +63,27 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-    const syslogNgContent = ref(null);
+    const content = `destination d_openobserve_http {
+    openobserve-log(
+        url("${endpoint.value.url}")
+        organization("${store.state.selectedOrganization.identifier}")
+        stream("syslog-ng")
+        user("[EMAIL]")
+        password("[PASSCODE]")
+    );
+};
+
+
+log {
+    source(src);
+    destination(d_openobserve_http);
+    flags(flow-control);
+};`;
     return {
       store,
       config,
       endpoint,
-      syslogNgContent,
+      content,
       getImageURL,
     };
   },
