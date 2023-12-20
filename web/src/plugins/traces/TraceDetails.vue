@@ -33,9 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-h6 q-mr-lg">
             {{ traceTree[0]["operationName"] }}
           </div>
-          <div class="q-pb-xs q-mr-lg">
-            Trace ID: {{ spanList[0]["trace_id"] }}
+          <div class="q-pb-xs q-mr-lg flex items-center">
+            <div>Trace ID: {{ spanList[0]["trace_id"] }}</div>
+            <q-icon
+              class="q-ml-xs text-grey-8 cursor-pointer trace-copy-icon"
+              size="12px"
+              name="content_copy"
+              title="Copy"
+              @click="copyTraceId"
+            />
           </div>
+
           <div class="q-pb-xs">Spans: {{ spanList.length }}</div>
         </div>
         <q-btn v-close-popup="true" round flat icon="cancel" size="md" />
@@ -167,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, type Ref, onMounted, watch } from "vue";
-import { cloneDeep, range } from "lodash";
+import { cloneDeep } from "lodash";
 import SpanRenderer from "./SpanRenderer.vue";
 import useTraces from "@/composables/useTraces";
 import { computed } from "vue";
@@ -175,7 +183,6 @@ import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceHeader from "./TraceHeader.vue";
 import { useStore } from "vuex";
-import { duration } from "moment";
 import D3Chart from "@/components/D3Chart.vue";
 import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
@@ -186,6 +193,7 @@ import {
 } from "@/utils/traces/convertTraceData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { throttle } from "lodash";
+import { copyToClipboard, useQuasar } from "quasar";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -232,6 +240,8 @@ export default defineComponent({
       dotConnectorHeight: 6,
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
+
+    const $q = useQuasar();
 
     const traceVisuals = [
       { label: "Timeline", value: "timeline", icon: TraceTimelineIcon },
@@ -676,6 +686,15 @@ export default defineComponent({
       isTimelineExpanded.value = !isTimelineExpanded.value;
     };
 
+    const copyTraceId = () => {
+      $q.notify({
+        type: "positive",
+        message: "Trace ID copied to clipboard",
+        timeout: 2000,
+      });
+      copyToClipboard(spanList.value[0]["trace_id"]);
+    };
+
     return {
       traceTree,
       collapseMapping,
@@ -704,6 +723,8 @@ export default defineComponent({
       startResize,
       isTimelineExpanded,
       toggleTimeline,
+      copyToClipboard,
+      copyTraceId,
     };
   },
 });
@@ -810,5 +831,13 @@ $traceChartCollapseHeight: 42px;
   -moz-user-select: none !important;
   -webkit-user-select: none !important;
   -ms-user-select: none !important;
+}
+
+.trace-copy-icon {
+  &:hover {
+    &.q-icon {
+      text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
+    }
+  }
 }
 </style>
