@@ -170,10 +170,6 @@ export default defineComponent({
 
     const spanMarkerRef = ref(null);
 
-    const getSpanWidthInPx = computed(() => {
-      return spanMarkerRef.value?.clientWidth > 1;
-    });
-
     const getLeftPosition = computed(() => {
       const left =
         props.span.startTimeMs - props.baseTracePosition["startTimeMs"];
@@ -255,7 +251,6 @@ export default defineComponent({
       spanBlock,
       onResize,
       onePixelPercent,
-      getSpanWidthInPx,
       getSpanStartTime,
       spanMarkerRef,
       toggleSpanDetails,
