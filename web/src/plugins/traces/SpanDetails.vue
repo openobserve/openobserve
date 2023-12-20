@@ -66,8 +66,10 @@
             <tbody>
               <template v-for="(val, key) in tags" :key="key">
                 <tr>
-                  <td class="q-py-xs q-px-sm">{{ key }}</td>
-                  <td class="q-py-xs q-px-sm">{{ val }}</td>
+                  <td class="q-py-xs q-px-sm text-grey-9">{{ key }}</td>
+                  <td class="q-py-xs q-px-sm text-primary">
+                    {{ val }}
+                  </td>
                 </tr>
               </template>
             </tbody>
@@ -108,8 +110,10 @@
             <tbody>
               <template v-for="(val, key) in processes" :key="key">
                 <tr>
-                  <td class="q-py-xs q-px-sm">{{ key }}</td>
-                  <td class="q-py-xs q-px-sm">{{ val }}</td>
+                  <td class="q-py-xs q-px-sm text-grey-9">{{ key }}</td>
+                  <td class="q-py-xs q-px-sm text-primary">
+                    {{ val }}
+                  </td>
                 </tr>
               </template>
             </tbody>
