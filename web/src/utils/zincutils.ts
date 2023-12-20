@@ -286,11 +286,7 @@ export const getPath = () => {
   return config.isCloud == "true" ? cloudPath : path;
 };
 
-export const routeGuard = async (
-  to: any,
-  from: any,
-  next: any
-) => {
+export const routeGuard = async (to: any, from: any, next: any) => {
   if (to.path.indexOf("/ingestion") == -1) {
     const local_organization: any = useLocalOrganization();
     const $q = useQuasar();
@@ -302,7 +298,7 @@ export const routeGuard = async (
           $q.notify({
             type: "warning",
             message:
-            "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
+              "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
             timeout: 5000,
           });
           next({ path: "/ingestion" });
@@ -555,3 +551,18 @@ export const mergeDeep = (target: any, source: any) => {
 export function getUUID() {
   return uuidv4();
 }
+
+export const maskText = (text: string) => {
+  const visibleChars = 4; // Number of characters to keep visible at the beginning and end
+  const maskedChars = text.length - visibleChars * 2;
+
+  if (maskedChars > 0) {
+    const maskedText =
+      text.substring(0, visibleChars) +
+      "*".repeat(maskedChars) +
+      text.slice(-visibleChars);
+    return maskedText;
+  } else {
+    return "*".repeat(text.length); // If the text is too short, mask all characters
+  }
+};

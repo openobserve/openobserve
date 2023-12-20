@@ -211,7 +211,7 @@ import AddUser from "@/components/users/add.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { getImageURL, verifyOrganizationStatus, maskText } from "@/utils/zincutils";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
@@ -329,7 +329,7 @@ export default defineComponent({
 
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
-              email: data.email,
+              email: maskText(data.email),
               first_name: data.first_name,
               last_name: data.last_name,
               role: data.role,
