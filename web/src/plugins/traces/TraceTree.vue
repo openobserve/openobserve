@@ -15,7 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pl-xs q-pt-sm">
+  <div class="q-pt-sm position-relative">
+    <div
+      :style="{
+        width: '1px',
+        left: '25%',
+        backgroundColor: store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
+        zIndex: 5,
+      }"
+      class="absolute full-height"
+    />
     <template v-for="span in spans as any[]" :key="span.spanId">
       <div
         :style="{
@@ -104,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></div>
           </div>
         </div>
-        <!-- <div style="width: 1px" class="bh"></div> -->
+
         <span-block
           :span="span"
           :depth="depth"

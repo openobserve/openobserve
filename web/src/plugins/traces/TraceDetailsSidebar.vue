@@ -437,7 +437,7 @@ export default defineComponent({
 }
 .span_details_tab-panels {
   height: calc(100% - 130px);
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
 }
 
