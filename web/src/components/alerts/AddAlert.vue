@@ -268,6 +268,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <div>
+          <q-input
+            data-test="add-alert-row-input"
+            v-model="formData.row_template"
+            :label="t('alerts.row')"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            tabindex="0"
+            style="width: 550px"
+          />
+        </div>
+
         <div class="flex justify-start q-mt-lg">
           <q-btn
             data-test="add-alert-cancel-btn"
