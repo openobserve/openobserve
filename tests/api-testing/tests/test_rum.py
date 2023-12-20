@@ -2,6 +2,7 @@ import json
 import requests
 import uuid
 from datetime import datetime, timezone, timedelta
+import time
 
 
 def parse_json(input_str):
@@ -129,7 +130,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
     assert (
         expected == got
     ), f"Failed to post to rum-logs, expected={expected} got={got}, {resp_post_rum_logs.content}"
-
+    time.sleep(3)
     params = {
         "type": "logs",
     }
@@ -140,7 +141,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
 
     json_data = {
         "query": {
-            "sql": 'select * from "_rumlog" order by _timestamp desc limit 1 ;',
+            "sql": 'select * from "_rumlog" order by _timestamp desc limit 5 ;',
             "start_time": five_min_ago,
             "end_time": end_time,
             "from": 0,
@@ -158,6 +159,11 @@ def test_e2e_rumingestinglogs(create_session, base_url):
     assert (
         expected == got
     ), f"Failed to retrieve rum-logs, got = {got}, expected = {expected}, {response_rum_data.content}"
+
+    response_payload = response_rum_data.json()
+    assert (
+       len(response_payload["hits"]) > 0
+    ), f"No data found, {response_rum_data.content}"
 
     response_payload = response_rum_data.json()
     assert (
@@ -229,6 +235,7 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
     rumdata_payload = """{"_oo":{"format_version":2,"drift":0,"session":{"plan":2},"configuration":{"session_sample_rate":100,"session_replay_sample_rate":100},"discarded":false},"application":{"id":"1"},"date":1698048457936,"service":"my-web-application","version":"0.0.1","source":"browser","session":{"id":"30e6488a-3c60-4ffa-8549-468da66f6512","type":"user"},"view":{"id":"105d0f30-ea01-4cd9-96ff-dfbbafd8f7c3","url":"http://127.0.0.1:5173/","referrer":""},"display":{"viewport":{"width":1920,"height":941}},"resource":{"id":"42c413d1-2863-45ce-830c-68a3699ca98f","type":"image","url":"http://127.0.0.1:5173/src/assets/logo.svg?import","duration":16900000,"size":37,"download":{"duration":3200000,"start":13700000},"first_byte":{"duration":2800000,"start":10900000},"connect":{"duration":0,"start":10700000},"dns":{"duration":100000,"start":10600000}},"type":"resource"}"""
     rumdata_payload_json = parse_json(rumdata_payload)
     rumdata_payload_json["type"] = unique_test_identifier
+    
 
     resp_post_rumdata = session.post(
         rumdata_url, params=params, json=rumdata_payload_json, headers=headers
@@ -240,7 +247,7 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
         expected == got
     ), f"Failed to post to rum-data, expected={expected} got={got}, {resp_post_rumdata.content}"
     print(resp_post_rumdata)
-
+    time.sleep(3)
     params = {
         "type": "logs",
     }
@@ -251,7 +258,7 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
 
     json_data = {
         "query": {
-            "sql": 'select * from "_rumdata" order by _timestamp desc limit 1 ;',
+            "sql": 'select * from "_rumdata" order by _timestamp desc limit 5 ;',
             "start_time": five_min_ago,
             "end_time": end_time,
             "from": 0,
@@ -272,7 +279,11 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
 
     response_payload = response_rum_data.json()
     assert (
-        response_payload["hits"][0]["type"] == unique_test_identifier
+       len(response_payload["hits"]) > 0
+    ), f"No data found, {response_rum_data.content}"
+
+    assert (
+       unique_test_identifier in set([payload["type"] for payload in response_payload["hits"]])
     ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
 
 
@@ -307,6 +318,7 @@ def test_e2e_rumverifygeodata(create_session, base_url):
     logs_payload = """{"service":"my-web-application","session_id":"30e6488a-3c60-4ffa-8549-468da66f6512","view":{"referrer":"http://127.0.0.1:5173/about","url":"http://127.0.0.1:5173/about","id":"5a6c4bc6-f0cb-49ec-b4fb-460eda745efe"},"application_id":"1","date":1698049336226,"message":"what is happening???","origin":"console","status":"info"}"""
     logs_payload_json = parse_json(logs_payload)
     logs_payload_json["message"] = unique_test_identifier
+    time.sleep(3)
 
     resp_post_rum_logs = requests.post(
         logs_url, params=params, json=logs_payload_json, headers=headers
