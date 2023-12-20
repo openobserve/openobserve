@@ -18,6 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
     <div ref="chartPanelRef" style="height: 100%; position: relative">
       <div v-if="!errorDetail" style="height: 100%; width: 100%">
+      <GeoJSONMapRenderer
+        v-if="panelSchema.type == 'maps'"
+        :data="
+          panelData.chartType == 'maps'
+            ? panelData
+            : { options: { backgroundColor: 'transparent' } }
+        "
+      ></GeoJSONMapRenderer>
         <GeoMapRenderer
           v-if="panelSchema.type == 'geomap'"
           :data="
@@ -31,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="
             panelData.chartType == 'table'
               ? panelData
-              : { options: { backgroundColor: 'transparent' } }
+              : { options: {  backgroundColor: 'transparent'  } }
           "
           @row-click="onChartClick"
           ref="tableRendererRef"
@@ -160,6 +168,12 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
+import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
+import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
+import GeoJSONMapRenderer from "@/components/dashboards/panels/GeoJSONMapRenderer.vue";
+import HTMLRenderer from "./panels/HTMLRenderer.vue";
+import MarkdownRenderer from "./panels/MarkdownRenderer.vue";
 import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 
@@ -188,7 +202,7 @@ export default defineComponent({
   components: {
     ChartRenderer,
     TableRenderer,
-    GeoMapRenderer,
+    GeoMapRenderer, GeoJSONMapRenderer,
     HTMLRenderer,
     MarkdownRenderer,
   },
