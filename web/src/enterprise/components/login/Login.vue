@@ -27,7 +27,7 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { getUserInfo, getDecodedUserInfo, getPath } from "@/utils/zincutils";
-
+import config from "../../../aws-exports";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
@@ -52,7 +52,7 @@ export default defineComponent({
      * redirect user to the page where user was redirected from
      */
     const getDefaultOrganization = () => {
-      organizationsService.list(0, 1000, "id", false, "").then((res: any) => {
+      organizationsService.os_list(0, 1000, "id", false, "").then((res: any) => {
         const localOrg: any = useLocalOrganization();
         if (
           localOrg.value != null &&
@@ -89,7 +89,7 @@ export default defineComponent({
 
             if (
               (selectedOrg.value == "" &&
-                data.type == "default" &&
+                (data.type == "default" || data.id == '1') &&
                 store.state.userInfo.email == data.UserObj.email) ||
               res.data.data.length == 1
             ) {
@@ -163,7 +163,7 @@ export default defineComponent({
     const d = new Date();
     this.userInfo =
       sessionUserInfo !== null ? JSON.parse(sessionUserInfo) : null;
-    if (this.userInfo !== null && this.userInfo.hasOwnProperty("pgdata")) {
+    if (this.userInfo !== null && (this.userInfo.hasOwnProperty("pgdata")) || config.isEnterprise === "true") {
       this.store.dispatch("login", {
         loginState: true,
         userInfo: this.userInfo,

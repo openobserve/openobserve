@@ -397,8 +397,17 @@ pub struct Common {
         help = "Control the redirection of a user to ingestion page in case there is no stream found."
     )]
     pub restricted_routes_on_empty_data: bool,
+    // Cert generation related env vars
+    #[env_config(name = "ZO_CERTS_BASE_PATH", default = "./data/openobserve/certs/")]
+    pub certs_base_dir: String,
     #[env_config(name = "ZO_ENABLE_JWT_AUTH", default = false)]
     pub enable_jwt_auth: bool,
+    // Cert generation related env vars
+    #[env_config(name = "ZO_JWT_KEY_BITS", default = 4096)]
+    pub key_bits: usize,
+    // Cert generation related env vars
+    #[env_config(name = "ZO_JWT_TTL", default = 30)] // in minutes
+    pub token_ttl: i64,
 }
 
 #[derive(EnvConfig)]
@@ -792,6 +801,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "Default scrape interval can not be set to lesser than 5s ."
         ));
     }
+
+    if cfg.common.certs_base_dir.is_empty() {
+        cfg.common.certs_base_dir = format!("{}certs/", cfg.common.data_dir);
+    }
+    if !cfg.common.certs_base_dir.ends_with('/') {
+        cfg.common.certs_base_dir = format!("{}/", cfg.common.certs_base_dir);
+    }
+
     Ok(())
 }
 

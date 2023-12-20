@@ -31,7 +31,7 @@ export default function (store: any) {
   let { parentRoutes, homeChildRoutes } = userRoutes();
 
   let envRoutes: any;
-  if (config.isCloud == "true") {
+  if (config.isCloud == "true" || config.isEnterprise == "true") {
     envRoutes = userCloudRoutes();
   } else {
     envRoutes = useOSRoutes();
