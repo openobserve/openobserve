@@ -648,6 +648,20 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.queryType = "";
         break;
+      case "maps":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter = [];
+        break;
       case "sankey":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
