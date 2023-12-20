@@ -98,7 +98,7 @@ pub async fn sql(
     } else {
         let ctx = prepare_datafusion_context(&session.search_type)?;
 
-        let record_batches = in_records_batches.unwrap(); 
+        let record_batches = in_records_batches.unwrap();
         let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
 
         // Register the MemTable as a table in the DataFusion context

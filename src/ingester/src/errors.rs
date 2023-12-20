@@ -22,17 +22,42 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
-    WalError { source: wal::Error },
-    Message { message: String },
-    CreateFileError { source: io::Error, path: PathBuf },
-    WriteDataError { source: io::Error },
-    ReadDataError { source: io::Error },
-    JSONSerialization { source: serde_json::Error },
-    FromUtf8Error { source: std::string::FromUtf8Error },
+    WalError {
+        source: wal::Error,
+    },
+    Message {
+        message: String,
+    },
+    CreateFileError {
+        source: io::Error,
+        path: PathBuf,
+    },
+    WriteDataError {
+        source: io::Error,
+    },
+    ReadDataError {
+        source: io::Error,
+    },
+    JSONSerialization {
+        source: serde_json::Error,
+    },
+    FromUtf8Error {
+        source: std::string::FromUtf8Error,
+    },
     NotImplemented,
-    CreateArrowWriterError { source: arrow::error::ArrowError },
-    WriteArrowRecordBatchError { source: arrow::error::ArrowError },
-    CreateArrowJsonEncoder { source: arrow::error::ArrowError },
-    ArrowJsonEncodeError { source: arrow::error::ArrowError },
-    WriteParquetRecordBatchError { source: parquet::errors::ParquetError },
+    CreateArrowWriterError {
+        source: arrow::error::ArrowError,
+    },
+    WriteArrowRecordBatchError {
+        source: arrow::error::ArrowError,
+    },
+    CreateArrowJsonEncoder {
+        source: arrow::error::ArrowError,
+    },
+    ArrowJsonEncodeError {
+        source: arrow::error::ArrowError,
+    },
+    WriteParquetRecordBatchError {
+        source: parquet::errors::ParquetError,
+    },
 }

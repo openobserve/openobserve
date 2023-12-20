@@ -17,11 +17,11 @@ pub mod entry;
 pub mod errors;
 pub mod immutable;
 pub mod memtable;
+pub mod parquet;
 pub mod partition;
 pub mod rwmap;
 pub mod stream;
 pub mod writer;
-pub mod parquet;
 
 pub use entry::Entry;
 pub use immutable::read_from_immutable;

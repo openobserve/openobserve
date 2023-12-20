@@ -1,4 +1,4 @@
-use std::{sync::Arc, fs::File};
+use std::{fs::File, sync::Arc};
 
 use arrow_schema::Schema;
 use itertools::chain;

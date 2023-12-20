@@ -141,7 +141,7 @@ pub async fn search_parquet(
     }
 
     let mut tasks = Vec::new();
-    let single_group = files_group.len() == 1;
+    let is_single_group = files_group.len() == 1;
     for (ver, files) in files_group {
         // get schema of the file
         let file_data = tmpfs::get(&files.first().unwrap().key).unwrap();
@@ -179,9 +179,9 @@ pub async fn search_parquet(
         }
         let schema = Arc::new(inferred_schema);
         let sql = sql.clone();
-        let session = if single_group {
+        let session = if is_single_group {
             meta::search::Session {
-                id: session_id.to_string(),
+                id: format!("{session_id}-parquet-0"),
                 storage_type: StorageType::Tmpfs,
                 search_type: if !sql.meta.group_by.is_empty() {
                     SearchType::Aggregation
@@ -326,7 +326,7 @@ pub async fn search_memtable(
     );
 
     let mut tasks = Vec::new();
-    let mut sid = 0;
+    let mut ver = 0;
     for (mut schema, record_batches) in batch_groups {
         // calulate schema diff
         let mut diff_fields = HashMap::new();
@@ -353,10 +353,9 @@ pub async fn search_memtable(
             ])?);
         }
 
-        sid += 1;
         let sql = sql.clone();
         let session = meta::search::Session {
-            id: format!("{}-mem-{}", session_id, sid),
+            id: format!("{session_id}-mem-{ver}"),
             storage_type: StorageType::Tmpfs,
             search_type: if !sql.meta.group_by.is_empty() {
                 SearchType::Aggregation
@@ -364,6 +363,8 @@ pub async fn search_memtable(
                 SearchType::Normal
             },
         };
+        ver += 1;
+
         let datafusion_span = info_span!(
             "service:search:grpc:wal:mem:datafusion",
             org_id = sql.org_id,
