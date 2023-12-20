@@ -88,22 +88,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <trace-header
           :baseTracePosition="baseTracePosition"
-          :splitterWidth="splitterModel"
+          :splitterWidth="leftWidth"
         />
         <div class="relative-position">
           <div
             class="trace-tree-container"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
           >
-            <trace-tree
-              :collapseMapping="collapseMapping"
-              :spans="spanPositionList"
-              :baseTracePosition="baseTracePosition"
-              :spanDimensions="spanDimensions"
-              :spanMap="spanMap"
-              class="trace-tree"
-              @toggle-collapse="toggleSpanCollapse"
-            />
+            <div class="q-pt-sm position-relative">
+              <div
+                :style="{
+                  width: '1px',
+                  left: `${leftWidth}px`,
+                  backgroundColor:
+                    store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
+                  zIndex: 999,
+                  top: '-28px',
+                  height: 'calc(100% + 30px) !important',
+                  cursor: 'col-resize',
+                }"
+                class="absolute full-height"
+                @mousedown="startResize"
+              />
+              <trace-tree
+                :collapseMapping="collapseMapping"
+                :spans="spanPositionList"
+                :baseTracePosition="baseTracePosition"
+                :spanDimensions="spanDimensions"
+                :spanMap="spanMap"
+                :leftWidth="leftWidth"
+                class="trace-tree"
+                @toggle-collapse="toggleSpanCollapse"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -146,6 +163,7 @@ import {
   convertTraceServiceMapData,
 } from "@/utils/traces/convertTraceData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
+import { throttle } from "lodash";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -205,6 +223,12 @@ export default defineComponent({
     });
 
     const ChartData: any = ref({});
+
+    const leftWidth: Ref<number> = ref(250);
+    const initialX: Ref<number> = ref(0);
+    const initialWidth: Ref<number> = ref(0);
+
+    const throttledResizing = ref<any>(null);
 
     const spanList: any = computed(() => {
       return searchObj.data.traceDetails.spanList;
@@ -599,6 +623,31 @@ export default defineComponent({
         ],
       },
     ];
+
+    onMounted(() => {
+      throttledResizing.value = throttle(resizing, 50);
+    });
+
+    const startResize = (event: any) => {
+      initialX.value = event.clientX;
+      initialWidth.value = leftWidth.value;
+
+      window.addEventListener("mousemove", throttledResizing.value);
+      window.addEventListener("mouseup", stopResize);
+      document.body.classList.add("no-select");
+    };
+
+    const resizing = (event: any) => {
+      const deltaX = event.clientX - initialX.value;
+      leftWidth.value = initialWidth.value + deltaX;
+    };
+
+    const stopResize = () => {
+      window.removeEventListener("mousemove", throttledResizing.value);
+      window.removeEventListener("mouseup", stopResize);
+      document.body.classList.remove("no-select");
+    };
+
     return {
       traceTree,
       collapseMapping,
@@ -623,6 +672,8 @@ export default defineComponent({
       traceVisuals,
       getImageURL,
       store,
+      leftWidth,
+      startResize,
     };
   },
 });
@@ -694,5 +745,12 @@ $traceChartHeight: 210px;
       font-size: 15px;
     }
   }
+}
+
+.no-select {
+  user-select: none !important;
+  -moz-user-select: none !important;
+  -webkit-user-select: none !important;
+  -ms-user-select: none !important;
 }
 </style>
