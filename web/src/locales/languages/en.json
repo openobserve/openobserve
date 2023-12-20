@@ -505,6 +505,7 @@
     "stackedLabel": "Stacked",
     "heatmapLabel": "Heatmap",
     "geomapLabel": "GeoMap",
+    "worldmapLabel": "Maps",
     "hstackedLabel": "H-Stacked",
     "pieLabel": "Pie",
     "donutLabel": "Donut",
