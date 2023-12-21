@@ -183,7 +183,8 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
             .wrap(cors)
             .service(status::zo_config)
             .service(status::callback)
-            .service(status::dex_login),
+            .service(status::dex_login)
+            .service(status::refresh_token_with_dex),
     );
 }
 

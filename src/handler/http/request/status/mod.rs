@@ -27,7 +27,7 @@ use {
     actix_web::{cookie::Cookie, http::header, web, HttpRequest},
     o2_enterprise::enterprise::{
         common::infra::config::O2_CONFIG,
-        dex::service::auth::{exchange_code, get_dex_login, get_jwks},
+        dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
     },
     std::io::ErrorKind,
 };
@@ -258,4 +258,37 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
     let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.to_owned().into()).await;
 
     Ok(HttpResponse::Ok().json(login_data.url))
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/dex_refresh")]
+async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
+    let token = if let Some(cookie) = req.cookie("refresh_token") {
+        cookie.value().to_string()
+    } else {
+        return HttpResponse::Unauthorized().finish();
+    };
+
+    // Exchange the refresh token for a new access token
+
+    match refresh_token(&token).await {
+        Ok(token_response) => {
+            // Set the new access token in the cookie
+            let mut access_token_cookie = Cookie::new(ACCESS_TOKEN, token_response);
+            access_token_cookie.set_http_only(true);
+            access_token_cookie.set_secure(true);
+            access_token_cookie.set_path("/");
+            access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+
+            HttpResponse::Ok().cookie(access_token_cookie).finish()
+        }
+        Err(_) => {
+            let access_cookie = Cookie::new(ACCESS_TOKEN, "");
+            let refresh_cookie = Cookie::new(REFRESH_TOKEN, "");
+            let mut response = HttpResponse::Unauthorized().finish();
+            response.add_removal_cookie(&access_cookie).unwrap();
+            response.add_removal_cookie(&refresh_cookie).unwrap();
+            response
+        }
+    }
 }

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{dev::ServiceRequest, error::ErrorForbidden, Error};
+use actix_web::{dev::ServiceRequest, Error};
 #[cfg(feature = "enterprise")]
 use actix_web::{
     error::ErrorUnauthorized,
@@ -58,7 +58,7 @@ pub async fn token_validator(
                 Err((ErrorUnauthorized("Unauthorized Access"), req))
             }
         }
-        Err(err) => Err((ErrorForbidden(err), req)),
+        Err(err) => Err((ErrorUnauthorized(err), req)),
     }
 }
 
