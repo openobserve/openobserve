@@ -36,6 +36,7 @@
     "@sentry/tracing": "^7.17.4",
     "@sentry/vite-plugin": "^2.7.1",
     "@sentry/vue": "^7.73.0",
+    "@types/axios": "^0.14.0",
     "d3-hierarchy": "^3.1.2",
     "d3-selection": "^3.0.0",
     "date-fns-tz": "^2.0.0",

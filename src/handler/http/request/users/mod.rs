@@ -178,7 +178,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 #[post("/login")]
 pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
     let mut resp = SignInResponse::default();
-    match crate::handler::http::auth::validate_user(&auth.name, &auth.password).await {
+    match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
                 resp.status = true;

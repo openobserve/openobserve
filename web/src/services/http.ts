@@ -14,11 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import store from "../stores";
+import type { AxiosInstance } from 'axios';
 import axios from "axios";
 import config from "../aws-exports";
 
 const http = ({ headers } = {} as any) => {
-  let instance;
+  let instance: AxiosInstance;
   if (config.isEnterprise == "false" || !config.isEnterprise) {
     headers = {
       Authorization:

@@ -29,7 +29,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use super::{
-    auth::{validator_aws, validator_gcp, validator_proxy_url, validator_rum},
+    auth::validator::{validator_aws, validator_gcp, validator_proxy_url, validator_rum},
     request::{
         dashboards::{folders::*, *},
         enrichment_table, functions, kv, logs, metrics, organization, prom, rum, search, status,
@@ -193,7 +193,9 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
 
     cfg.service(
         web::scope("/api")
-            .wrap(HttpAuthentication::with_fn(super::auth::oo_validator))
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::oo_validator,
+            ))
             .wrap(cors.clone())
             .service(status::cache_status)
             .service(users::list)
