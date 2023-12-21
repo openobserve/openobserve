@@ -20,6 +20,7 @@ import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
 import streamService from "@/services/stream";
 import { useQuasar } from "quasar";
+import { useStore } from "vuex";
 
 const useLocalStorage = (
   key: string,
@@ -287,7 +288,12 @@ export const getPath = () => {
 };
 
 export const routeGuard = async (to: any, from: any, next: any) => {
-  if (to.path.indexOf("/ingestion") == -1) {
+  const store = useStore();
+  if (
+    to.path.indexOf("/ingestion") == -1 &&
+    store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
+    store.state.zoConfig.restricted_routes_on_empty_data == true
+  ) {
     const local_organization: any = useLocalOrganization();
     const $q = useQuasar();
 

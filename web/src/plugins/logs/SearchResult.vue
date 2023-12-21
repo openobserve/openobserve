@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !searchObj.meta.sqlMode &&
           searchObj.data.stream.streamType !== 'enrichment_tables'
         "
-        style="max-height: 150px"
+        style="max-height: 100px"
         @updated:dataZoom="onChartUpdate"
       />
       <q-virtual-scroll
