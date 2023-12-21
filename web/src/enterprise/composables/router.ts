@@ -23,14 +23,15 @@ import {
   getLogoutURL,
 } from "@/utils/zincutils";
 
+import authService from "@/services/auth";
+import config from "@/aws-exports";
 import Organizations from "@/enterprise/components/organizations/Organization.vue";
-
 import Billing from "@/enterprise/components/billings/Billing.vue";
 import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
 import { routeGuard } from "@/utils/zincutils";
-import { getAuthorizationCode } from '../../services/auth_dex';
+
 
 const useEnvRoutes = () => {
   const parentRoutes = [
@@ -38,17 +39,23 @@ const useEnvRoutes = () => {
       path: "/login",
       component: Login,
       beforeEnter: async (to: any, from: any, next: any) => {
-        try {
-          const url = await getAuthorizationCode();
-          if (url) {
-            window.location.href = url;
-          } else {
-            next(); // Proceed with the navigation if URL is not available
+        debugger;
+        if (config.isEnterprise == "true" || config.isEnterprise) {
+          try {
+            const url = await authService.get_dex_login();
+            if (url) {
+              window.location.href = url;
+            } else {
+              next();
+            }
+          } catch (error) {
+            console.error("Error during redirection:", error);
+            next(false);
           }
-        } catch (error) {
-          console.error("Error during redirection:", error);
-          next(false); // Optionally handle the error case, e.g., redirect to an error page
+        } else {
+          window.location.href = getLoginURL();
         }
+
       },
     },
     {
