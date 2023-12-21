@@ -802,13 +802,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
-    if cfg.common.certs_base_dir.is_empty() {
-        cfg.common.certs_base_dir = format!("{}certs/", cfg.common.data_dir);
-    }
-    if !cfg.common.certs_base_dir.ends_with('/') {
-        cfg.common.certs_base_dir = format!("{}/", cfg.common.certs_base_dir);
-    }
-
     Ok(())
 }
 
