@@ -97,11 +97,13 @@ http-auth-basic = "0.3"
 indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"
 itertools = "0.12"
+jsonwebtoken = "9.2.0"
 log = "0.4"
 maxminddb = "0.23.0"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell = "1.17"
+openidconnect = "3.4.0"
 opentelemetry = { version = "0.18", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.11", features = [
   "http-proto",
@@ -171,6 +173,7 @@ walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"
 memory-stats = "1.1.0"
+
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
