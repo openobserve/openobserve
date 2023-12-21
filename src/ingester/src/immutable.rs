@@ -18,8 +18,14 @@ use std::{path::PathBuf, sync::Arc};
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 use once_cell::sync::Lazy;
+use snafu::ResultExt;
 
-use crate::{errors::Result, memtable::MemTable, rwmap::RwIndexMap, writer::WriterKey};
+use crate::{
+    errors::{DeleteFileSnafu, RenameFileSnafu, Result, WriteDataSnafu},
+    memtable::MemTable,
+    rwmap::RwIndexMap,
+    writer::WriterKey,
+};
 
 pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Immutable>> = Lazy::new(RwIndexMap::default);
 
@@ -53,12 +59,35 @@ impl Immutable {
     pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<()> {
         println!("persisting entry: {:?}, wal: {:?}", self.key, wal_path);
         // 1. dump memtable to disk
-        self.memtable
+        let paths = self
+            .memtable
             .persist(&self.key.org_id, &self.key.stream_type)
             .await?;
-        // 2. create a done file
-        // 2. delete wal file
-        // 3. remove entry from IMMUTABLES
+        println!("write par files done, you can try to crash it now, wait for 3 secs");
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        // 2. create a lock file
+        let done_path = wal_path.with_extension("lock");
+        let lock_data = paths
+            .iter()
+            .map(|p| p.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("\n");
+        std::fs::write(&done_path, lock_data.as_bytes()).context(WriteDataSnafu)?;
+        println!("write lock file done, you can try to crash it now, wait for 3 secs");
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        // 3. delete wal file
+        std::fs::remove_file(wal_path).context(DeleteFileSnafu { path: wal_path })?;
+        println!("remove wal file done, you can try to crash it now, wait for 3 secs");
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        // 4. rename the tmp files to parquet files
+        for path in paths {
+            let parquet_path = path.with_extension("parquet");
+            std::fs::rename(&path, &parquet_path).context(RenameFileSnafu { path: &path })?;
+        }
+        println!("rename par files done, you can try to crash it now, wait for 3 secs");
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        // 5. delete the lock file
+        std::fs::remove_file(&done_path).context(DeleteFileSnafu { path: &done_path })?;
         Ok(())
     }
 }
@@ -69,10 +98,12 @@ pub(crate) async fn persist() -> Result<()> {
         return Ok(());
     };
     let path = path.clone();
+    // persist entry to local disk
     immutable.persist(&path).await?;
     drop(r);
 
     println!("persisted entry: {:?}", path);
+    // remove entry from IMMUTABLES
     IMMUTABLES.write().await.remove(&path);
     Ok(())
 }

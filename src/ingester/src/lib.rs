@@ -13,15 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod entry;
+mod entry;
 pub mod errors;
-pub mod immutable;
-pub mod memtable;
-pub mod parquet;
-pub mod partition;
-pub mod rwmap;
-pub mod stream;
-pub mod writer;
+mod immutable;
+mod memtable;
+mod parquet;
+mod partition;
+mod rwmap;
+mod stream;
+mod wal;
+mod writer;
 
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
@@ -30,14 +31,16 @@ pub use writer::{get_reader, get_writer};
 
 // TODO: make this configurable
 const WAL_DIR: &str = "./data/wal";
-const ARROW_DIR: &str = "./data/openobserve/wal/files";
-const WAL_FILE_MAX_SIZE: usize = 1024 * 1024 * 32; // 128MB
+const PARQUET_DIR: &str = "./data/openobserve/wal/files";
+const WAL_FILE_MAX_SIZE: usize = 1024 * 1024 * 12; // 128MB
 const WAL_FILE_ROTATION_INTERVAL: i64 = 600; // 10 minutes
 
 pub async fn init() -> errors::Result<()> {
-    // load from disk
+    // check uncompleted parquet files, need delete those files
+    wal::check_uncompleted_parquet_files().await?;
 
-    // replay wal
+    // replay wal files to create immutable
+    wal::replay_wal_files().await?;
 
     // start a job to dump immutable data to disk
     tokio::task::spawn(async move {
@@ -54,3 +57,4 @@ pub async fn init() -> errors::Result<()> {
 
     Ok(())
 }
+

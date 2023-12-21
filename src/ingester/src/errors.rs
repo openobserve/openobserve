@@ -28,7 +28,27 @@ pub enum Error {
     Message {
         message: String,
     },
+    OpenFileError {
+        source: io::Error,
+        path: PathBuf,
+    },
+    OpenDirError {
+        source: io::Error,
+        path: PathBuf,
+    },
     CreateFileError {
+        source: io::Error,
+        path: PathBuf,
+    },
+    DeleteFileError {
+        source: io::Error,
+        path: PathBuf,
+    },
+    RenameFileError {
+        source: io::Error,
+        path: PathBuf,
+    },
+    ReadFileError {
         source: io::Error,
         path: PathBuf,
     },

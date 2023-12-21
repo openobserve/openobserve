@@ -252,5 +252,6 @@ tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 url = "2.2"
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
+walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"

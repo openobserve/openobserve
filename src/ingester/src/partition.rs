@@ -29,7 +29,7 @@ use crate::{
     errors::*,
     parquet::{new_parquet_writer, FileMeta},
     rwmap::RwMap,
-    ARROW_DIR,
+    PARQUET_DIR,
 };
 
 pub(crate) struct Partition {
@@ -72,10 +72,11 @@ impl Partition {
         stream_type: &str,
         stream_name: &str,
         schema_key: &str,
-    ) -> Result<()> {
+    ) -> Result<Vec<PathBuf>> {
         let thread_id = 0;
         let r = self.files.read().await;
-        let mut path = PathBuf::from(ARROW_DIR);
+        let mut paths = Vec::with_capacity(r.len());
+        let mut path = PathBuf::from(PARQUET_DIR);
         path.push(org_id);
         path.push(stream_type);
         path.push(stream_name);
@@ -86,7 +87,7 @@ impl Partition {
             path.push(hour.to_string());
             path.push(schema_key);
             path.push(file_name);
-            path.set_extension("parquet");
+            path.set_extension("par");
             create_dir_all(path.parent().unwrap())
                 .context(CreateFileSnafu { path: path.clone() })?;
             let mut f = OpenOptions::new()
@@ -106,8 +107,9 @@ impl Partition {
                 writer.write(batch).context(WriteParquetRecordBatchSnafu)?;
             }
             writer.close().context(WriteParquetRecordBatchSnafu)?;
+            paths.push(path);
         }
-        Ok(())
+        Ok(paths)
     }
 }
 

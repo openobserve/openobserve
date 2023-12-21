@@ -458,6 +458,7 @@ async fn get_file_list(
     // lock theses files
     let files = files
         .iter()
+        .filter(|f| f.ends_with(".parquet"))
         .map(|f| {
             f.strip_prefix(&wal_dir)
                 .unwrap()

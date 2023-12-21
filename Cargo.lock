@@ -3580,6 +3580,7 @@ dependencies = [
  "hashbrown 0.14.3",
  "indexmap 2.1.0",
  "itertools 0.12.0",
+ "log",
  "once_cell",
  "parquet",
  "serde",
@@ -3588,6 +3589,7 @@ dependencies = [
  "tokio",
  "uuid",
  "wal",
+ "walkdir",
 ]
 
 [[package]]

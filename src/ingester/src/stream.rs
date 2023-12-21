@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
@@ -56,13 +56,16 @@ impl Stream {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
-    ) -> Result<()> {
+    ) -> Result<Vec<PathBuf>> {
+        let mut paths = Vec::new();
         let r = self.partitions.read().await;
         for (schema_key, partition) in r.iter() {
-            partition
-                .persist(org_id, stream_type, stream_name, &schema_key)
-                .await?;
+            paths.extend(
+                partition
+                    .persist(org_id, stream_type, stream_name, &schema_key)
+                    .await?,
+            );
         }
-        Ok(())
+        Ok(paths)
     }
 }

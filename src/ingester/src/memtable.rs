@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
@@ -51,11 +51,12 @@ impl MemTable {
         stream.read(time_range).await
     }
 
-    pub(crate) async fn persist(&self, org_id: &str, stream_type: &str) -> Result<bool> {
+    pub(crate) async fn persist(&self, org_id: &str, stream_type: &str) -> Result<Vec<PathBuf>> {
+        let mut paths = Vec::new();
         let r = self.streams.read().await;
         for (stream_name, stream) in r.iter() {
-            stream.persist(org_id, stream_type, &stream_name).await?;
+            paths.extend(stream.persist(org_id, stream_type, &stream_name).await?);
         }
-        Ok(true)
+        Ok(paths)
     }
 }
