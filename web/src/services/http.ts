@@ -59,7 +59,6 @@ const http = ({ headers } = {} as any) => {
                 error.response.data["error"] || "Invalid credentials"
               )
             );
-
             if ((config.isCloud == "true") && !error.request.responseURL.includes("/auth/login")) {
               store.dispatch("logout");
               localStorage.clear();
@@ -72,7 +71,6 @@ const http = ({ headers } = {} as any) => {
               return instance.get('/config/dex_refresh').then(() => {
                 return instance(error.config);
               }).catch(refreshError => {
-                // Handle failed refresh (e.g., logout the user, clear tokens)
                 store.dispatch('logout');
                 localStorage.clear();
                 sessionStorage.clear();
