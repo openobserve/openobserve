@@ -65,7 +65,7 @@
               <q-select
                 data-test="add-alert-stream-select"
                 v-model="aggregationData.group_by[index]"
-                :options="columns"
+                :options="filteredFields"
                 color="input-border"
                 bg-color="input-bg"
                 class="showLabelOnTop no-case q-py-none q-mb-sm"
@@ -77,6 +77,8 @@
                 hide-selected
                 placeholder="Select column"
                 fill-input
+                :input-debounce="400"
+                @filter="filterColumns"
                 :rules="[(val: any) => !!val || 'Field is required!']"
                 style="width: 200px; border: 1px solid rgba(0, 0, 0, 0.05)"
                 @update:model-value="updateTrigger"
@@ -137,7 +139,7 @@
             <q-select
               data-test="add-alert-stream-select"
               v-model="aggregationData.having.column"
-              :options="getNumericColumns"
+              :options="filteredNumericColumns"
               color="input-border"
               bg-color="input-bg"
               class="showLabelOnTop no-case q-py-none"
@@ -149,6 +151,7 @@
               hide-selected
               fill-input
               :rules="[(val: any) => !!val || 'Field is required!']"
+              @filter="filterNumericColumns"
               style="width: 250px; border: 1px solid rgba(0, 0, 0, 0.05)"
               @update:model-value="updateTrigger"
             />
@@ -290,7 +293,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, type Ref } from "vue";
 import FieldsInput from "./FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import QueryEditor from "@/components/QueryEditor.vue";
@@ -332,6 +335,19 @@ const aggFunctions = ["avg", "max", "min", "count"];
 const _isAggregationEnabled = ref(props.isAggregationEnabled);
 
 const aggregationData = ref(props.aggregation);
+
+const filteredFields = ref(props.columns);
+
+const getNumericColumns = computed(() => {
+  return props.columns.filter((column: any) => {
+    return (
+      column.type !== "Utf8" &&
+      column.value !== store.state.zoConfig.timestamp_column
+    );
+  });
+});
+
+const filteredNumericColumns = ref(getNumericColumns.value);
 
 watch(
   () => props.isAggregationEnabled,
@@ -382,15 +398,6 @@ const deleteGroupByColumn = (index: number) => {
   emits("update:aggregation", aggregationDataCopy);
 };
 
-const getNumericColumns = computed(() => {
-  return props.columns.filter((column: any) => {
-    return (
-      column.type !== "Utf8" &&
-      column.value !== store.state.zoConfig.timestamp_column
-    );
-  });
-});
-
 const updateAggregation = () => {
   if (!props.aggregation) {
     aggregationData.value = {
@@ -405,6 +412,34 @@ const updateAggregation = () => {
   }
   emits("update:aggregation", aggregationData.value);
   emits("update:isAggregationEnabled", _isAggregationEnabled.value);
+};
+
+const filterColumns = (val: string, update: Function) => {
+  if (val === "") {
+    update(() => {
+      filteredFields.value = [...props.columns];
+    });
+  }
+  update(() => {
+    const value = val.toLowerCase();
+    filteredFields.value = props.columns.filter(
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+    );
+  });
+};
+
+const filterNumericColumns = (val: string, update: Function) => {
+  if (val === "") {
+    update(() => {
+      filteredNumericColumns.value = [...getNumericColumns.value];
+    });
+  }
+  update(() => {
+    const value = val.toLowerCase();
+    filteredNumericColumns.value = getNumericColumns.value.filter(
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+    );
+  });
 };
 </script>
 
