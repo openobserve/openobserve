@@ -44,6 +44,22 @@ use crate::common::{
 pub mod openapi;
 pub mod ui;
 
+#[cfg(feature = "enterprise")]
+fn get_cors() -> Rc<Cors> {
+    let cors = Cors::default()
+        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
+        .allowed_headers(vec![
+            header::AUTHORIZATION,
+            header::ACCEPT,
+            header::CONTENT_TYPE,
+        ])
+        .allow_any_origin()
+        .supports_credentials()
+        .max_age(3600);
+    Rc::new(cors)
+}
+
+#[cfg(not(feature = "enterprise"))]
 fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
         .send_wildcard()
@@ -100,7 +116,6 @@ async fn proxy(
 pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
     cfg.service(status::healthz);
-
     cfg.service(
         web::scope("/auth")
             .wrap(cors)

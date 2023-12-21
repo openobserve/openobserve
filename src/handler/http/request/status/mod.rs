@@ -14,23 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::io::Error;
-#[cfg(feature = "enterprise")]
-use std::io::ErrorKind;
 
 use actix_web::{get, HttpResponse};
-#[cfg(feature = "enterprise")]
-use actix_web::{http::header, web, HttpRequest};
 use ahash::AHashMap as HashMap;
 use datafusion::arrow::datatypes::{Field, Schema};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::dex::service::{
-    auth as dex_auth,
-    auth::{exchange_code, get_jwks},
-};
-#[cfg(feature = "enterprise")]
-use regex::bytes::Regex;
 use serde::Serialize;
 use utoipa::ToSchema;
+#[cfg(feature = "enterprise")]
+use {
+    crate::common::utils::jwt::{process_token, verify_decode_token},
+    crate::handler::http::auth::{ACCESS_TOKEN, PKCE_STATE_ORG, REFRESH_TOKEN},
+    actix_web::{cookie::Cookie, http::header, web, HttpRequest},
+    o2_enterprise::enterprise::{
+        common::infra::config::O2_CONFIG,
+        dex::service::auth::{exchange_code, get_dex_login, get_jwks},
+    },
+    std::io::ErrorKind,
+};
 
 use crate::{
     common::{
@@ -62,6 +62,7 @@ struct ConfigResponse<'a> {
     syslog_enabled: bool,
     data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
+    dex_enabled: bool,
 }
 
 /// Healthz
@@ -81,6 +82,11 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
 
 #[get("")]
 pub async fn zo_config() -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    let dex_enabled = O2_CONFIG.dex.dex_enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let dex_enabled = false;
+
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
         instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
@@ -99,6 +105,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: CONFIG.compact.data_retention_days,
         restricted_routes_on_empty_data: CONFIG.common.restricted_routes_on_empty_data,
+        dex_enabled,
     }))
 }
 
@@ -182,16 +189,6 @@ fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/callback")]
 pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
-
-    use crate::{
-        common::{
-            meta::user::{DBUser, UserOrg},
-            utils::jwt::verify_decode_token,
-        },
-        service::users,
-    };
-
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
         Some(code) => code,
@@ -200,9 +197,16 @@ pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
         }
     };
 
-    // TODO Validate state from db
-    let state = match query.get("state") {
-        Some(code) => code,
+    match query.get("state") {
+        Some(code) => match crate::service::kv::get(PKCE_STATE_ORG, code).await {
+            Ok(_) => {
+                let _ = crate::service::kv::delete(PKCE_STATE_ORG, code).await;
+            }
+            Err(_) => {
+                return Err(Error::new(ErrorKind::Other, "invalid state in request"));
+            }
+        },
+
         None => {
             return Err(Error::new(ErrorKind::Other, "no state in request"));
         }
@@ -216,87 +220,26 @@ pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
                 verify_decode_token(&token, &keys, &O2_CONFIG.dex.client_id, true).await;
 
             match token_ver {
-                Ok(res) => {
-                    let dec_token = res.1.unwrap();
-                    let groups = dec_token.claims.get("groups").unwrap().as_array().unwrap();
-                    let name = dec_token.claims.get("name").unwrap().as_str().unwrap();
-                    let user_email = res.0.user_email.to_owned();
-                    let mut source_orgs: Vec<UserOrg> = vec![];
-                    for group in groups {
-                        let test = parse_dn(group.as_str().unwrap()).unwrap();
-
-                        let role = if test.0.contains("admin") {
-                            crate::common::meta::user::UserRole::Admin
-                        } else {
-                            crate::common::meta::user::UserRole::Member
-                        };
-                        source_orgs.push(UserOrg {
-                            role,
-                            name: test.1,
-                            ..UserOrg::default()
-                        });
-                    }
-                    // Check if the user exists in the database
-                    let db_user = db::user::get_user_by_email(&user_email).await;
-                    let updated_db_user = if db_user.is_none() {
-                        log::info!("User does not exist in the database");
-                        DBUser {
-                            email: user_email.to_owned(),
-                            first_name: name.to_owned(),
-                            last_name: "".to_owned(),
-                            password: "".to_owned(),
-                            salt: "".to_owned(),
-                            organizations: source_orgs,
-                            is_external: true,
-                        }
-                    } else {
-                        log::info!("User exists in the database perform check for role change");
-                        let existing_db_user = db_user.unwrap();
-                        let mut existing_orgs = existing_db_user.organizations;
-
-                        // Find and remove users from cache
-                        for org in existing_orgs.iter() {
-                            if !source_orgs.iter().any(|src_org| src_org.name == org.name) {
-                                USERS.remove(&format!("{}/{}", org.name, user_email));
-                            }
-                        }
-
-                        // 1. Remove organizations not in source_orgs
-                        existing_orgs.retain(|org| {
-                            source_orgs.iter().any(|src_org| src_org.name == org.name)
-                        });
-                        // 2. Update roles for existing organizations
-                        for org in existing_orgs.iter_mut() {
-                            if let Some(src_org) =
-                                source_orgs.iter().find(|src_org| src_org.name == org.name)
-                            {
-                                org.role = src_org.role.clone();
-                            }
-                        }
-                        // 3. Add new organizations from source_orgs
-                        for src_org in source_orgs {
-                            if !existing_orgs.iter().any(|org| org.name == src_org.name) {
-                                existing_orgs.push(src_org.clone());
-                            }
-                        }
-
-                        DBUser {
-                            email: user_email.to_owned(),
-                            first_name: name.to_owned(),
-                            last_name: "".to_owned(),
-                            password: existing_db_user.password,
-                            salt: existing_db_user.salt,
-                            organizations: existing_orgs,
-                            is_external: true,
-                        }
-                    };
-                    let _ = users::update_db_user(updated_db_user).await;
-                }
+                Ok(res) => process_token(res).await,
                 Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
             }
 
+            let mut access_token_cookie = Cookie::new(ACCESS_TOKEN, token);
+            access_token_cookie.set_http_only(true);
+            access_token_cookie.set_secure(true);
+            access_token_cookie.set_path("/");
+            access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+
+            let mut refresh_token_cookie = Cookie::new(REFRESH_TOKEN, login_data.refresh_token);
+            refresh_token_cookie.set_http_only(true);
+            refresh_token_cookie.set_secure(true);
+            refresh_token_cookie.set_path("/");
+            refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
+                .cookie(access_token_cookie)
+                .cookie(refresh_token_cookie)
                 .finish())
         }
         Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
@@ -308,19 +251,11 @@ pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
 pub async fn dex_login() -> Result<HttpResponse, Error> {
     use o2_enterprise::enterprise::dex::meta::PreLoginData;
 
-    let login_data: PreLoginData = dex_auth::get_dex_login();
+    use crate::handler::http::auth::PKCE_STATE_ORG;
+
+    let login_data: PreLoginData = get_dex_login();
     let state = login_data.state;
+    let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.to_owned().into()).await;
 
     Ok(HttpResponse::Ok().json(login_data.url))
-}
-
-#[cfg(feature = "enterprise")]
-fn parse_dn(dn: &str) -> Option<(String, String)> {
-    let re = Regex::new(r"cn=(?P<role>[^,]+),ou=(?P<team>[^,]+)").unwrap();
-
-    re.captures(dn.as_bytes()).map(|caps| {
-        let role = String::from_utf8_lossy(caps.name("role").unwrap().as_bytes()).to_string();
-        let team = String::from_utf8_lossy(caps.name("team").unwrap().as_bytes()).to_string();
-        (role, team)
-    })
 }

@@ -18,17 +18,28 @@ import axios from "axios";
 import config from "../aws-exports";
 
 const http = ({ headers } = {} as any) => {
-  const instance = axios.create({
-    // timeout: 10000,
-    baseURL: store.state.API_ENDPOINT,
-    headers: {
+  let instance;
+  if (config.isEnterprise == "false" || !config.isEnterprise) {
+    headers = {
       Authorization:
-        (config.isCloud == "true" || config.isEnterprise == "true")
+        (config.isCloud == "true")
           ? "Bearer " + localStorage.getItem("token")
           : localStorage.getItem("token") || "",
       ...headers,
-    },
-  });
+    };
+    instance = axios.create({
+      // timeout: 10000,
+      baseURL: store.state.API_ENDPOINT,
+      headers,
+    });
+  } else {
+    instance = axios.create({
+      // timeout: 10000,
+      baseURL: store.state.API_ENDPOINT,
+      withCredentials: config.isEnterprise,
+      headers,
+    });
+  }
 
   instance.interceptors.response.use(
     function (response) {
