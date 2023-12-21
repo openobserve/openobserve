@@ -79,14 +79,14 @@ import {
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
+import { getDashboard } from "@/utils/commons.ts";
 import {
   parseDuration,
   generateDurationLabel,
   getDurationObjectFromParams,
   getQueryParamsForDuration,
 } from "@/utils/date";
-import { toRaw, unref, reactive } from "vue";
+import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/web_vitals.json";
