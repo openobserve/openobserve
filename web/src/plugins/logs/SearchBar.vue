@@ -1158,6 +1158,16 @@ export default defineComponent({
               searchObj.data.tempFunctionContent =
                 extractedObj.data.tempFunctionContent;
               searchObj.meta.functionEditorPlaceholderFlag = false;
+            } else {
+              populateFunctionImplementation(
+                {
+                  name: "",
+                  function: "",
+                },
+                false
+              );
+              searchObj.data.tempFunctionContent = "";
+              searchObj.meta.functionEditorPlaceholderFlag = true;
             }
             dateTimeRef.value.setSavedDate(searchObj.data.datetime);
             if (searchObj.meta.refreshInterval != "0") {
