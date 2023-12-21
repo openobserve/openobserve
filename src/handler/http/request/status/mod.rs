@@ -23,7 +23,7 @@ use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::jwt::{process_token, verify_decode_token},
-    crate::handler::http::auth::{ACCESS_TOKEN, PKCE_STATE_ORG, REFRESH_TOKEN},
+    crate::handler::http::auth::validator::{ACCESS_TOKEN, PKCE_STATE_ORG, REFRESH_TOKEN},
     actix_web::{cookie::Cookie, http::header, web, HttpRequest},
     o2_enterprise::enterprise::{
         common::infra::config::O2_CONFIG,
@@ -249,9 +249,7 @@ pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
 #[cfg(feature = "enterprise")]
 #[get("/dex_login")]
 pub async fn dex_login() -> Result<HttpResponse, Error> {
-    use o2_enterprise::enterprise::dex::meta::PreLoginData;
-
-    use crate::handler::http::auth::PKCE_STATE_ORG;
+    use o2_enterprise::enterprise::dex::meta::auth::PreLoginData;
 
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state;
