@@ -397,17 +397,6 @@ pub struct Common {
         help = "Control the redirection of a user to ingestion page in case there is no stream found."
     )]
     pub restricted_routes_on_empty_data: bool,
-    // Cert generation related env vars
-    #[env_config(name = "ZO_CERTS_BASE_PATH", default = "./data/openobserve/certs/")]
-    pub certs_base_dir: String,
-    #[env_config(name = "ZO_ENABLE_JWT_AUTH", default = false)]
-    pub enable_jwt_auth: bool,
-    // Cert generation related env vars
-    #[env_config(name = "ZO_JWT_KEY_BITS", default = 4096)]
-    pub key_bits: usize,
-    // Cert generation related env vars
-    #[env_config(name = "ZO_JWT_TTL", default = 30)] // in minutes
-    pub token_ttl: i64,
 }
 
 #[derive(EnvConfig)]

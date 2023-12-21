@@ -67,5 +67,7 @@ pub async fn token_validator(
     req: ServiceRequest,
     _token: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    use actix_web::error::ErrorForbidden;
+
     Err((ErrorForbidden("Not Supported"), req))
 }
