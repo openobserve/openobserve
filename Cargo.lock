@@ -2266,7 +2266,7 @@ checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.39",
+ "syn 2.0.41",
 ]
 
 [[package]]
@@ -3779,7 +3779,7 @@ dependencies = [
  "base64 0.21.5",
  "js-sys",
  "pem",
- "ring 0.17.5",
+ "ring 0.17.7",
  "serde",
  "serde_json",
  "simple_asn1",
@@ -6475,7 +6475,7 @@ dependencies = [
  "darling",
  "proc-macro2",
  "quote",
- "syn 2.0.39",
+ "syn 2.0.41",
 ]
 
 [[package]]
