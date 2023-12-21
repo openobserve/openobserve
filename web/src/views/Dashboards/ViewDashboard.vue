@@ -374,9 +374,9 @@ export default defineComponent({
         urlSearchParams.delete("period");
         urlSearchParams.set(
           "from",
-          currentTimeObj?.value?.start_time.getTime()
+          currentTimeObj?.value?.start_time?.getTime()
         );
-        urlSearchParams.set("to", currentTimeObj?.value?.end_time.getTime());
+        urlSearchParams.set("to", currentTimeObj?.value?.end_time?.getTime());
       }
 
       copyToClipboard(urlObj?.href)
