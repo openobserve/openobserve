@@ -674,6 +674,7 @@ export default defineComponent({
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
+      this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
     }
 
     this.formData.is_real_time = this.formData.is_real_time.toString();
