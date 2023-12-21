@@ -383,7 +383,7 @@ const updateTab = () => {
 };
 
 defineExpose({
-  selectedTab: tab.value,
+  tab,
 });
 
 const addGroupByColumn = () => {

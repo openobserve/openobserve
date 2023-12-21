@@ -759,6 +759,10 @@ export default defineComponent({
           payload.query_condition.aggregation = null;
         }
 
+        if (this.scheduledAlertRef.tab === "sql") {
+          payload.query_condition.conditions = [];
+        }
+
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
           payload.stream_name,

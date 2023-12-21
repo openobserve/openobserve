@@ -347,7 +347,7 @@ export default defineComponent({
           alerts.value = res.data.list;
           alertsRows.value = alerts.value.map((data: any) => {
             let conditions = "--";
-            if (data.query_condition.conditions) {
+            if (data.query_condition.conditions?.length) {
               conditions = data.query_condition.conditions
                 .map((condition: any) => {
                   return `${condition.column} ${condition.operator} ${condition.value}`;
