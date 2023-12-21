@@ -133,7 +133,7 @@ export default defineComponent({
       type: String,
       required: true,
     },
-    currentTimeObj: {
+    selectedDateForViewPanel: {
       type: Object,
     },
     initialVariableValues: {
@@ -152,11 +152,7 @@ export default defineComponent({
     const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
       useDashboardPanelData();
     // default selected date will be absolute time
-    const selectedDate = ref({
-      startTime: props?.currentTimeObj?.start_time,
-      endTime: props?.currentTimeObj?.end_time,
-      valueType: "absolute",
-    });
+    const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);
     const errorData: any = reactive({
       errors: [],
