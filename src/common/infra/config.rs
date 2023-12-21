@@ -778,7 +778,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "Default scrape interval can not be set to lesser than 5s ."
         ));
     }
-
     Ok(())
 }
 
