@@ -181,7 +181,8 @@ pub async fn search_parquet(
         let sql = sql.clone();
         let session = if is_single_group {
             meta::search::Session {
-                id: format!("{session_id}-parquet-0"),
+                // here must be session_id, because the files set within this prefix
+                id: session_id.to_string(),
                 storage_type: StorageType::Tmpfs,
                 search_type: if !sql.meta.group_by.is_empty() {
                     SearchType::Aggregation
