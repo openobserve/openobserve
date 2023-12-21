@@ -1158,6 +1158,16 @@ export default defineComponent({
               searchObj.data.tempFunctionContent =
                 extractedObj.data.tempFunctionContent;
               searchObj.meta.functionEditorPlaceholderFlag = false;
+            } else {
+              populateFunctionImplementation(
+                {
+                  name: "",
+                  function: "",
+                },
+                false
+              );
+              searchObj.data.tempFunctionContent = "";
+              searchObj.meta.functionEditorPlaceholderFlag = true;
             }
             dateTimeRef.value.setSavedDate(searchObj.data.datetime);
             if (searchObj.meta.refreshInterval != "0") {
@@ -1462,7 +1472,7 @@ export default defineComponent({
         )
         .join("&");
 
-      let shareURL = window.location.origin + router.currentRoute.value.path;
+      let shareURL = window.location.origin + window.location.pathname;
 
       if (queryString != "") {
         shareURL += "?" + queryString;
