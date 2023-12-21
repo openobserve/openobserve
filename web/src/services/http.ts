@@ -59,11 +59,28 @@ const http = ({ headers } = {} as any) => {
                 error.response.data["error"] || "Invalid credentials"
               )
             );
-            if (!error.request.responseURL.includes("/auth/login")) {
+
+            if ((config.isCloud == "true") && !error.request.responseURL.includes("/auth/login")) {
               store.dispatch("logout");
               localStorage.clear();
               sessionStorage.clear();
               window.location.reload();
+            }
+            // Check if the failing request is not the login or refresh token request
+            else if ((config.isEnterprise == "true") && !error.config.url.includes('/config/dex_login') && !error.config.url.includes('/config/dex_refresh')) {
+              // Call refresh token API
+              return instance.get('/config/dex_refresh').then(() => {
+                return instance(error.config);
+              }).catch(refreshError => {
+                // Handle failed refresh (e.g., logout the user, clear tokens)
+                store.dispatch('logout');
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.reload();
+                return Promise.reject(refreshError);
+              });
+            } else {
+              console.log(JSON.stringify(error.response.data["error"] || "Invalid credentials"));
             }
             break;
           case 404:
