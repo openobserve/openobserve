@@ -1462,7 +1462,7 @@ export default defineComponent({
         )
         .join("&");
 
-      let shareURL = window.location.origin + router.currentRoute.value.path;
+      let shareURL = window.location.origin + window.location.pathname;
 
       if (queryString != "") {
         shareURL += "?" + queryString;
