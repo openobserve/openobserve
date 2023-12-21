@@ -240,3 +240,9 @@ pub struct TokenValidationResponse {
     pub is_valid: bool,
     pub user_email: String,
 }
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct RoleOrg {
+    pub role: UserRole,
+    pub org: String,
+}

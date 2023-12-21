@@ -240,7 +240,7 @@ pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
     let key = "/user/";
     let mut ret = db.list_values(key).await.unwrap();
     ret.retain(|item| {
-        let user: DBUser = serde_json::from_slice(&item).unwrap();
+        let user: DBUser = serde_json::from_slice(item).unwrap();
         user.email.eq(email)
     });
     if !ret.is_empty() {

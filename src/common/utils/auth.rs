@@ -68,9 +68,7 @@ impl FromRequest for UserEmail {
                 }));
             }
         }
-        ready(Err(actix_web::error::ErrorUnauthorized(
-            "No Bearer token found",
-        )))
+        ready(Err(actix_web::error::ErrorUnauthorized("No user found")))
     }
 }
 
@@ -89,9 +87,14 @@ impl FromRequest for AuthExtractor {
                     auth: auth_str.to_owned(),
                 }));
             }
+        } else if let Some(cookie) = req.cookie("access_token") {
+            let access_token = cookie.value().to_string();
+            return ready(Ok(AuthExtractor {
+                auth: format!("Bearer {}", access_token),
+            }));
         }
         ready(Err(actix_web::error::ErrorUnauthorized(
-            "Authorization header found",
+            "Unauthorized Access",
         )))
     }
 }
