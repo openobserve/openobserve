@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :viewOnly="false"
       :dashboardData="currentDashboardData.data"
       :currentTimeObj="currentTimeObj"
+      :selectedDateForViewPanel="selectedDate"
       @onDeletePanel="onDeletePanel"
       @updated:data-zoom="onDataZoom"
     />
@@ -150,7 +151,6 @@ export default defineComponent({
       Object.assign(variablesData, data);
       const variableObj = {};
       data.values.forEach((variable) => {
-
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
             (item: any) => item.name && item.operator && item.value

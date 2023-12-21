@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card style="min-width: 95vw; min-height: 90vh">
         <ViewPanel
           :panelId="viewPanelId"
-          :currentTimeObj="currentTimeObj"
+          :selectedDateForViewPanel="selectedDateForViewPanel"
           :initialVariableValues="variablesData"
           @close-panel="() => (showViewPanel = false)"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
@@ -116,6 +116,7 @@ export default defineComponent({
     "dashboardData",
     "currentTimeObj",
     "initialVariableValues",
+    "selectedDateForViewPanel",
   ],
   components: {
     GridLayout: VueGridLayout.GridLayout,
