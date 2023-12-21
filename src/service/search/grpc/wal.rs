@@ -327,8 +327,7 @@ pub async fn search_memtable(
     );
 
     let mut tasks = Vec::new();
-    let mut ver = 0;
-    for (mut schema, record_batches) in batch_groups {
+    for (ver, (mut schema, record_batches)) in batch_groups.into_iter().enumerate() {
         // calulate schema diff
         let mut diff_fields = HashMap::new();
         let group_fields = schema.fields();
@@ -364,7 +363,6 @@ pub async fn search_memtable(
                 SearchType::Normal
             },
         };
-        ver += 1;
 
         let datafusion_span = info_span!(
             "service:search:grpc:wal:mem:datafusion",

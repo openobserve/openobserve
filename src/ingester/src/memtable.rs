@@ -33,9 +33,7 @@ impl MemTable {
 
     pub(crate) async fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
         let mut rw = self.streams.write().await;
-        let partition = rw
-            .entry(entry.stream.clone())
-            .or_insert_with(|| Stream::new());
+        let partition = rw.entry(entry.stream.clone()).or_insert(Stream::new());
         partition.write(schema, entry).await
     }
 
@@ -55,7 +53,7 @@ impl MemTable {
         let mut paths = Vec::new();
         let r = self.streams.read().await;
         for (stream_name, stream) in r.iter() {
-            paths.extend(stream.persist(org_id, stream_type, &stream_name).await?);
+            paths.extend(stream.persist(org_id, stream_type, stream_name).await?);
         }
         Ok(paths)
     }

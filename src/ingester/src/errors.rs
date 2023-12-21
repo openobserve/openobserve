@@ -65,6 +65,9 @@ pub enum Error {
         source: std::string::FromUtf8Error,
     },
     NotImplemented,
+    InferJsonSchemaError {
+        source: arrow::error::ArrowError,
+    },
     CreateArrowWriterError {
         source: arrow::error::ArrowError,
     },

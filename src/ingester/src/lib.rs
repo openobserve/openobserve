@@ -57,4 +57,3 @@ pub async fn init() -> errors::Result<()> {
 
     Ok(())
 }
-

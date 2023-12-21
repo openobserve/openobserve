@@ -31,7 +31,7 @@ use crate::{
         infra::{
             cluster,
             config::{CONFIG, SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
-            wal::{get_or_create, get_or_create_arrow},
+            wal::get_or_create,
         },
         meta::{
             alerts::Alert,
@@ -365,17 +365,17 @@ pub async fn write_file(
 
 pub async fn write_file_arrow(
     buf: &AHashMap<String, SchemaRecords>,
-    thread_id: usize,
+    _thread_id: usize,
     stream: &StreamParams,
-    stream_file_name: &mut String,
-    partition_time_level: Option<PartitionTimeLevel>,
+    _stream_file_name: &mut str,
+    _partition_time_level: Option<PartitionTimeLevel>,
 ) -> RequestStats {
     let mut req_stats = RequestStats::default();
-    for (key, entry) in buf {
+    for (_key, entry) in buf {
         if entry.records.is_empty() {
             continue;
         }
-        let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(entry.records.len());
+        let _batch_size = arrow::util::bit_util::round_upto_multiple_of_64(entry.records.len());
         // let value = &entry.records.first().unwrap();
         // let first_record = json::to_string(value).unwrap();
 

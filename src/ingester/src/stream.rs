@@ -35,7 +35,7 @@ impl Stream {
         let mut rw = self.partitions.write().await;
         let partition = rw
             .entry(entry.schema_key.clone())
-            .or_insert_with(|| Partition::new(schema));
+            .or_insert(Partition::new(schema));
         partition.write(entry).await
     }
 
@@ -62,7 +62,7 @@ impl Stream {
         for (schema_key, partition) in r.iter() {
             paths.extend(
                 partition
-                    .persist(org_id, stream_type, stream_name, &schema_key)
+                    .persist(org_id, stream_type, stream_name, schema_key)
                     .await?,
             );
         }

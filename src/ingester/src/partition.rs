@@ -49,7 +49,7 @@ impl Partition {
         let mut rw = self.files.write().await;
         let partition = rw
             .entry(entry.partition_key.clone())
-            .or_insert_with(|| PartitionFile::new());
+            .or_insert(PartitionFile::new());
         partition.write(self.schema.clone(), entry)?;
         Ok(())
     }

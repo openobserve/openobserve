@@ -44,9 +44,7 @@ pub struct Writer {
 pub async fn get_writer(org_id: &str, stream_type: &str) -> Arc<Writer> {
     let key = WriterKey::new(org_id, stream_type);
     let mut rw = WRITERS.write().await;
-    let w = rw
-        .entry(key.clone())
-        .or_insert_with(|| Arc::new(Writer::new(key)));
+    let w = rw.entry(key.clone()).or_insert(Arc::new(Writer::new(key)));
     w.clone()
 }
 
@@ -74,37 +72,38 @@ impl Writer {
 
     pub async fn write(&self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
         let data = entry.into_bytes()?;
-        if self.check_threshold(data.len()).await {
+        println!("write: {}", data.len());
+        let mut wal = self.wal.lock().await;
+        if self.check_threshold(wal.size(), data.len()).await {
             // rotation wal
-            let mut wal = self.wal.lock().await;
             let id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             println!("wal rotation: {}", id);
-            let new_wal_writer =
+            let new_wal =
                 WalWriter::new(super::WAL_DIR, &self.key.org_id, &self.key.stream_type, id)
                     .context(WalSnafu)?;
-            let old_wal_writer = std::mem::replace(&mut *wal, new_wal_writer);
+            let old_wal = std::mem::replace(&mut *wal, new_wal);
+
             // rotation memtable
-            let mut memtable = self.memtable.write().await;
-            let new_mem_table = MemTable::new();
-            let old_mem_table = std::mem::replace(&mut *memtable, new_mem_table);
+            let mut mem = self.memtable.write().await;
+            let new_mem = MemTable::new();
+            let old_mem = std::mem::replace(&mut *mem, new_mem);
             // update created_at
             self.created_at
                 .store(Utc::now().timestamp_micros(), Ordering::Relaxed);
-            drop(wal);
-            drop(memtable);
+            drop(mem);
 
             let key = self.key.clone();
-            let path = old_wal_writer.path().clone();
+            let path = old_wal.path().clone();
             tokio::task::spawn(async move {
                 IMMUTABLES
                     .write()
                     .await
-                    .insert(path, immutable::Immutable::new(key, old_mem_table));
+                    .insert(path, immutable::Immutable::new(key, old_mem));
             });
         }
 
         // write into wal
-        self.wal.lock().await.write(&data).context(WalSnafu)?;
+        wal.write(&data).context(WalSnafu)?;
 
         // write into memtable
         self.memtable.write().await.write(schema, entry).await?;
@@ -121,10 +120,9 @@ impl Writer {
     }
 
     /// Check if the wal file size is over the threshold or the file is too old
-    async fn check_threshold(&self, data_size: usize) -> bool {
-        let wal_size = self.wal.lock().await.size();
-        wal_size > 0
-            && (wal_size + data_size > super::WAL_FILE_MAX_SIZE
+    async fn check_threshold(&self, written_size: usize, data_size: usize) -> bool {
+        written_size > 0
+            && (written_size + data_size > super::WAL_FILE_MAX_SIZE
                 || self.created_at.load(Ordering::Relaxed)
                     + Duration::seconds(super::WAL_FILE_ROTATION_INTERVAL)
                         .num_microseconds()

@@ -1,3 +1,18 @@
+// Copyright 2023 Zinc Labs Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use std::{fs::File, sync::Arc};
 
 use arrow_schema::Schema;
@@ -12,7 +27,6 @@ use parquet::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
@@ -24,22 +38,6 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
         _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string()),
-        "".split(',').filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        }),
-    )
-    .collect()
-});
-
-const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
-pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    chain(
-        _DEFAULT_DISTINCT_FIELDS.iter().map(|s| s.to_string()),
         "".split(',').filter_map(|s| {
             let s = s.trim();
             if s.is_empty() {

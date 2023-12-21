@@ -16,18 +16,14 @@
 use std::{
     fs::{create_dir_all, File},
     io::{BufRead, BufReader},
-    path::{Path, PathBuf},
+    path::PathBuf,
+    sync::Arc,
 };
 
+use arrow::json::reader::infer_json_schema_from_iterator;
 use snafu::ResultExt;
 
-use crate::{
-    errors::{
-        DeleteFileSnafu, OpenDirSnafu, OpenFileSnafu, ReadDataSnafu, ReadFileSnafu,
-        RenameFileSnafu, Result,
-    },
-    PARQUET_DIR, WAL_DIR,
-};
+use crate::{errors::*, immutable, memtable, writer::WriterKey, PARQUET_DIR, WAL_DIR};
 
 // check uncompleted parquet files
 // the wal file process have 4 steps:
@@ -69,7 +65,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
             std::fs::remove_file(&wal_file).context(DeleteFileSnafu { path: wal_file })?;
         }
         // read all the .par files
-        let mut file = File::open(&lock_file).context(OpenFileSnafu { path: lock_file })?;
+        let mut file = File::open(lock_file).context(OpenFileSnafu { path: lock_file })?;
         let mut par_files = Vec::new();
         for line in BufReader::new(&mut file).lines() {
             let line = line.context(ReadFileSnafu { path: lock_file })?;
@@ -87,7 +83,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
         }
         // delete the .lock file
         log::warn!("delete lock file: {:?}", lock_file);
-        std::fs::remove_file(&lock_file).context(DeleteFileSnafu {
+        std::fs::remove_file(lock_file).context(DeleteFileSnafu {
             path: lock_file.clone(),
         })?;
     }
@@ -101,17 +97,90 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     let par_files = scan_files(parquet_dir, "par");
     for par_file in par_files.iter() {
         log::warn!("delete uncompleted par file: {:?}", par_file);
-        std::fs::remove_file(&par_file).context(DeleteFileSnafu { path: par_file })?;
+        std::fs::remove_file(par_file).context(DeleteFileSnafu { path: par_file })?;
     }
     Ok(())
 }
 
 // replay wal files to create immutable
 pub(crate) async fn replay_wal_files() -> Result<()> {
+    let wal_dir = PathBuf::from(WAL_DIR);
+    create_dir_all(&wal_dir).context(OpenDirSnafu {
+        path: wal_dir.clone(),
+    })?;
+    let wal_files = scan_files(wal_dir, "wal");
+    if wal_files.is_empty() {
+        return Ok(());
+    }
+    for wal_file in wal_files.iter() {
+        log::warn!("starting replay wal file: {:?}", wal_file);
+        let stream_type = wal_file
+            .parent()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
+        let org_id = wal_file
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
+        let key = WriterKey::new(org_id, stream_type);
+        let mut memtable = memtable::MemTable::new();
+        let mut reader = wal::Reader::from_path(wal_file).context(WalSnafu)?;
+        let mut total = 0;
+        let mut i = 0;
+        loop {
+            if i > 0 && i % 100 == 0 {
+                log::warn!(
+                    "replay wal file: {:?}, entries: {}, records: {}",
+                    wal_file,
+                    i,
+                    total
+                );
+            }
+            let entry = match reader.read_entry() {
+                Ok(entry) => entry,
+                Err(wal::Error::UnableToReadData { source }) => {
+                    log::error!("Unable to read entry from: {}, skip the entry", source);
+                    continue;
+                }
+                Err(e) => {
+                    return Err(Error::WalError { source: e });
+                }
+            };
+            let Some(entry) = entry else {
+                break;
+            };
+            let entry = super::Entry::from_bytes(&entry)?;
+            i += 1;
+            total += entry.data.len();
+            let schema = infer_json_schema_from_iterator(entry.data.iter().cloned().map(Ok))
+                .context(InferJsonSchemaSnafu)?;
+            memtable.write(Arc::new(schema), entry).await?;
+        }
+        log::warn!(
+            "replay wal file: {:?}, entries: {}, records: {}",
+            wal_file,
+            i,
+            total
+        );
+
+        immutable::IMMUTABLES.write().await.insert(
+            wal_file.to_owned(),
+            immutable::Immutable::new(key, memtable),
+        );
+    }
+
     Ok(())
 }
 
-pub fn scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Vec<PathBuf> {
+fn scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Vec<PathBuf> {
     walkdir::WalkDir::new(root_dir.into())
         .into_iter()
         .filter_map(|entry| {
