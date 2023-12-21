@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="title q-pl-md q-pt-md" data-test="vector-title-text">
-      <b>OTLP gRPC</b> <br /><b>Note:</b> Not supported in clustered
-      installation of OpenObserve yet.
+      <b>OTLP gRPC</b>
     </div>
     <div class="q-ma-md">
       <CopyContent class="q-mt-sm" :content="copyGRPCTracesContent" />
