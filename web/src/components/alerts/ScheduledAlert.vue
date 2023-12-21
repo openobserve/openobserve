@@ -86,6 +86,7 @@
               <q-btn
                 :icon="outlinedDelete"
                 class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
+                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
                 padding="xs"
                 unelevated
                 size="sm"
@@ -100,6 +101,7 @@
           <q-btn
             icon="add"
             class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
+            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="xs"
             unelevated
             size="sm"
@@ -240,10 +242,10 @@
               style="
                 min-width: 90px;
                 margin-left: 0 !important;
-                background: #f2f2f2;
                 height: 40px;
                 font-weight: normal;
               "
+              :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
               class="flex justify-center items-center"
             >
               {{ t("alerts.times") }}
@@ -278,10 +280,10 @@
             style="
               min-width: 90px;
               margin-left: 0 !important;
-              background: #f2f2f2;
               height: 40px;
               font-weight: normal;
             "
+            :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
             class="flex justify-center items-center"
           >
             {{ t("alerts.minutes") }}
@@ -472,6 +474,12 @@ const filterNumericColumns = (val: string, update: Function) => {
     width: 500px !important;
     height: 100px !important;
     border: 1px solid $border-color;
+  }
+
+  .q-btn {
+    &.icon-dark {
+      filter: none !important;
+    }
   }
 }
 </style>

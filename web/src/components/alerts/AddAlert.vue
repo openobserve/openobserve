@@ -196,6 +196,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   height: 40px;
                 "
                 class="flex justify-center items-center"
+                :class="
+                  store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+                "
               >
                 {{ t("alerts.minutes") }}
               </div>
@@ -848,6 +851,10 @@ export default defineComponent({
 .threshould-input {
   .q-field--filled .q-field__control {
     background-color: transparent !important;
+  }
+
+  .q-field--dark .q-field__control {
+    background-color: rgba(255, 255, 255, 0.07) !important;
   }
 }
 </style>
