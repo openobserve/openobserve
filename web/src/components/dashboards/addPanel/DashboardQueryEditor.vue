@@ -288,6 +288,12 @@ export default defineComponent({
         ].fields.weight,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
+        ].fields.name,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
         ].fields.source,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -306,8 +312,10 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery
         ) {
-          if (dashboardPanelData.data.type == "geomap" || dashboardPanelData.data.type == "maps") {
+          if (dashboardPanelData.data.type == "geomap") {
             query = geoMapChart();
+          } else if (dashboardPanelData.data.type == "maps") {
+            query = mapChart();
           } else if (dashboardPanelData.data.type == "sankey") {
             query = sankeyChartQuery();
           } else {
@@ -435,6 +443,31 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].config.limit ?? 0;
       query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
+      return query;
+    };
+
+    const mapChart = () => {
+      const { name, value } =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields;
+
+      let query = "";
+
+      if (name && value) {
+        query = `SELECT ${name.column} as "${name.alias}", ${
+          value.column
+        } as "${value.alias}" FROM "${
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream
+        }"`;
+
+        if (name) {
+          query += ` GROUP BY ${name.alias}`;
+        }
+      }
 
       return query;
     };

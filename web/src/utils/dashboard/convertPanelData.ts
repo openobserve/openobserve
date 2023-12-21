@@ -94,11 +94,11 @@ export const convertPanelData = (
       };
     }
     case "maps": {
-      console.log("maps", panelSchema.type);
+      console.log("maps", panelSchema.type, data);
       
       return {
         chartType: panelSchema.type,
-        ...convertGeoMapData(panelSchema, data),
+        ...convertGeoMapData(panelSchema),
       };
     }
     case "sankey": {
@@ -112,7 +112,7 @@ export const convertPanelData = (
     }
     default: {
       console.log("No Chart Type found, skipping");
-      break;
+      break; 
     }
   }
 };
