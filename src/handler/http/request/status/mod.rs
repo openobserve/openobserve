@@ -50,6 +50,7 @@ struct ConfigResponse<'a> {
     timestamp_column: String,
     syslog_enabled: bool,
     data_retention_days: i64,
+    restricted_routes_on_empty_data: bool,
 }
 
 /// Healthz
@@ -86,6 +87,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         timestamp_column: CONFIG.common.column_timestamp.clone(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: CONFIG.compact.data_retention_days,
+        restricted_routes_on_empty_data: CONFIG.common.restricted_routes_on_empty_data,
     }))
 }
 

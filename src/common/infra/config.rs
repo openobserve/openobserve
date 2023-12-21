@@ -390,6 +390,13 @@ pub struct Common {
     pub memory_circuit_breaker_enable: bool,
     #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 100)]
     pub memory_circuit_breaker_ratio: usize,
+
+    #[env_config(
+        name = "ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA",
+        default = true,
+        help = "Control the redirection of a user to ingestion page in case there is no stream found."
+    )]
+    pub restricted_routes_on_empty_data: bool,
 }
 
 #[derive(EnvConfig)]
