@@ -96,9 +96,9 @@ volumes:
 
 ![Logs](./screenshots/logs.webp)
 
-### Traces (Opentelemetry Supported)
+### Traces (OpenTelemetry Supported)
 
-![Traces using Opentelemetry](./screenshots/traces.webp)
+![Traces using OpenTelemetry](./screenshots/traces.webp)
 
 ### Visualizations and Dashboards
 
