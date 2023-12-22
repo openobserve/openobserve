@@ -41,7 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="span.operationName"
         >
           <div
-            class="flex no-wrap q-pt-sm bg-white full-width"
+            class="flex no-wrap q-pt-sm full-width"
+            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
             :style="{ height: '30px' }"
           >
             <div
