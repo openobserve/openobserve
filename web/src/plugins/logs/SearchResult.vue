@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           height:
             !searchObj.meta.showHistogram || searchObj.meta.sqlMode
               ? 'calc(100% - 0px)'
-              : 'calc(100% - 150px)',
+              : 'calc(100% - 100px)',
         }"
       >
         <template v-slot:before>

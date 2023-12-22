@@ -39,7 +39,7 @@ const useEnvRoutes = () => {
       path: "/login",
       component: Login,
       beforeEnter: async (to: any, from: any, next: any) => {
-        if (config.isEnterprise == "true" || config.isEnterprise) {
+        if (config.isEnterprise == "true") {
           try {
             const url = await authService.get_dex_login();
             if (url) {
