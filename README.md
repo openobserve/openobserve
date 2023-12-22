@@ -2,7 +2,7 @@
   <a href="https://openobserve.ai"><img src="https://openobserve.ai/img/logo/logo_horizontal.svg" alt="OpenObserve"></a>
 </p>
 <p align="center">
-    <em>🚀 Elevate your data management to new heights with OpenObserve! Simplify your implementation process by 10x 🌟, slash storage costs by a staggering 140x 💰, and enjoy blazing-fast 🏎️ performance at a petabyte scale 🌌. OpenObserve is a robust alternative to Elasticsearch/Splunk/Datadog, and perfect for managing logs, metrics, and traces with ease and efficiency.</em>
+    <em>🚀 10x easier, 🚀 140x lower storage cost, 🚀 high performance, 🚀 petabyte scale - Elasticsearch/Splunk/Datadog alternative for 🚀 (logs, metrics, traces).</em>
 </p>
 <p align="center">
 <a href="https://github.com/openobserve/openobserve" target="_blank">
