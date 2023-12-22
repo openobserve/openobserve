@@ -173,7 +173,9 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
     } else {
         crate::common::meta::user::UserRole::Member
     };
-
+    if org.is_empty() {
+        org = &O2_CONFIG.dex.default_org;
+    }
     Some(RoleOrg {
         role,
         org: org.to_owned(),
