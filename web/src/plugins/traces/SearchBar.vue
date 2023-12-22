@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <q-btn
+          v-if="searchObj.meta.filterType === 'basic'"
           label="Reset Filters"
           no-caps
           size="sm"
@@ -379,6 +380,7 @@ export default defineComponent({
       searchObj.data.editorValue = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
         field.selectedValues = [];
+        field.searchKeyword = "";
       });
     };
 

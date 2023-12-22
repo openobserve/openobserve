@@ -79,11 +79,15 @@
             style="min-width: 250px"
           />
         </div>
-        <div class="q-ml-none" style="margin-bottom: 12px">
+        <div
+          class="q-ml-none alerts-condition-action"
+          style="margin-bottom: 12px"
+        >
           <q-btn
             :data-test="`add-destination-header-${field['key']}-delete-btn`"
             :icon="outlinedDelete"
             class="q-ml-xs iconHoverBtn"
+            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="sm"
             unelevated
             size="sm"
@@ -99,6 +103,7 @@
             v-if="index === fields.length - 1"
             icon="add"
             class="q-ml-xs iconHoverBtn"
+            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="sm"
             unelevated
             size="sm"
@@ -118,6 +123,7 @@
 import { defineProps, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { useStore } from "vuex";
 
 const props = defineProps({
   fields: {
@@ -144,6 +150,8 @@ var triggerOperators: any = ref([
 const emits = defineEmits(["add", "remove"]);
 
 const filteredFields = ref(props.streamFields);
+
+const store = useStore();
 
 const { t } = useI18n();
 
@@ -175,6 +183,14 @@ const filterColumns = (val: string, update: Function) => {
   .q-icon {
     margin-right: 4px !important;
     font-size: 15px !important;
+  }
+}
+
+.alerts-condition-action {
+  .q-btn {
+    &.icon-dark {
+      filter: none !important;
+    }
   }
 }
 </style>
