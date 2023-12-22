@@ -41,7 +41,7 @@ https://github.com/openobserve/openobserve/assets/4242188/77c71e8c-23f6-4123-b42
 - **Logs, Metrics, Traces**: Comprehensive support for various data types.
 - **OpenTelemetry Support**: Full compatibility with OTLP for logs, metrics, and traces.
 - **Real User Monitoring (RUM)**: Includes performance tracking, error logging, and session replay.
-- **Alerts & Dashboards**: Features 14 different chart types for comprehensive data visualization.
+- **Alerts & Dashboards**: Features over 14 different chart types for comprehensive data visualization.
 - **Advanced Ingest and Query Functions**: Aid in enrichment, redaction, log reduction, and compliance, like redacting sensitive data from logs.
 - **Advanced Embedded GUI**: Intuitive and user-friendly interface.
 - **SQL and PromQL Support**: Query logs and traces with SQL, and metrics with SQL and PromQL.
@@ -52,7 +52,7 @@ https://github.com/openobserve/openobserve/assets/4242188/77c71e8c-23f6-4123-b42
 - **Built-in Authentication**: Secure and ready to use.
 - **Ease of Operation**: Designed for simplicity and efficiency.
 - **Seamless Upgrades**: Hassle-free updates.
-- **Multilingual UI**: Supports 11 languages, including English, Turkish, German, and more.
+- **Multilingual UI**: Supports 11 languages, including English, Spanish, German, French, Chinese, and more.
 
 For a full list of features, check the [documentation](https://openobserve.ai/docs/#project-status-features-and-roadmap).
 
@@ -100,7 +100,7 @@ volumes:
 
 ![Traces using Opentelemetry](./screenshots/traces.webp)
 
-### Visualization and Dashboard
+### Visualizations and Dashboards
 
 ![Dashboard](./screenshots/dashboard.png)
 
