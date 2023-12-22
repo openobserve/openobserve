@@ -327,7 +327,7 @@ const tab = ref(props.query_type || "custom");
 
 const store = useStore();
 
-const aggFunctions = ["avg", "max", "min"];
+const aggFunctions = ["avg", "max", "min", "count"];
 
 const _isAggregationEnabled = ref(props.isAggregationEnabled);
 

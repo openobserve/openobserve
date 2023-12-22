@@ -386,13 +386,17 @@ pub struct Common {
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
-    // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%S
-    #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
-    pub log_local_time_format: String,
     #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLE", default = false)]
     pub memory_circuit_breaker_enable: bool,
     #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 100)]
     pub memory_circuit_breaker_ratio: usize,
+
+    #[env_config(
+        name = "ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA",
+        default = true,
+        help = "Control the redirection of a user to ingestion page in case there is no stream found."
+    )]
+    pub restricted_routes_on_empty_data: bool,
 }
 
 #[derive(EnvConfig)]
@@ -513,8 +517,16 @@ pub struct DiskCache {
 pub struct Log {
     #[env_config(name = "RUST_LOG", default = "info")]
     pub level: String,
-    #[env_config(name = "ZO_LOG_FILE", default = "")]
-    pub file: String,
+    #[env_config(name = "ZO_LOG_JSON_FORMAT", default = false)]
+    pub json_format: bool,
+    #[env_config(name = "ZO_LOG_FILE_DIR", default = "")]
+    pub file_dir: String,
+    // default is: o2.{hostname}.log
+    #[env_config(name = "ZO_LOG_FILE_NAME_PREFIX", default = "")]
+    pub file_name_prefix: String,
+    // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%SZ
+    #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
+    pub local_time_format: String,
     #[env_config(name = "ZO_EVENTS_ENABLED", default = false)]
     pub events_enabled: bool,
     #[env_config(
@@ -559,7 +571,7 @@ pub struct Etcd {
     pub domain_name: String,
     #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
-    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 30)]
+    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 10)]
     pub node_heartbeat_ttl: i64,
 }
 

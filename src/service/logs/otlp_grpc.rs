@@ -509,7 +509,7 @@ pub async fn handle_grpc_request(
 }
 
 #[cfg(test)]
-pub mod test {
+mod tests {
 
     use opentelemetry_proto::tonic::{
         collector::logs::v1::ExportLogsServiceRequest,

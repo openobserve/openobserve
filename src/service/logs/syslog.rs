@@ -305,7 +305,7 @@ fn message_to_value(message: Message<&str>) -> json::Value {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::net::{IpAddr, Ipv4Addr};
 
     use super::*;

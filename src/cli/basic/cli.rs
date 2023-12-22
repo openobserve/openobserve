@@ -13,13 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::cli::data::{Context, export, import};
-use crate::cli::data::cli::args;
-use crate::cli::data::cli::Cli;
-use crate::common::{infra, meta, migration};
-use crate::common::infra::config::{CONFIG, USERS};
-use crate::common::utils::file::set_permission;
-use crate::service::{compact, db, file_list, users};
+use crate::{
+    cli::data::{
+        cli::{args, Cli},
+        export, import, Context,
+    },
+    common::{
+        infra,
+        infra::config::{CONFIG, USERS},
+        meta, migration,
+        utils::file::set_permission,
+    },
+    service::{compact, db, file_list, users},
+};
 
 pub async fn cli() -> Result<bool, anyhow::Error> {
     let app = clap::Command::new("openobserve")
@@ -120,7 +126,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             is_ldap: false,
                         },
                     )
-                        .await?;
+                    .await?;
                 }
                 "user" => {
                     db::user::reset().await?;

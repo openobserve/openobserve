@@ -15,28 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tabContent q-ma-md">
-    <div class="tabContent__head">
-      <div class="copy_action">
-        <q-btn
-          data-test="curl-copy-btn"
-          flat
-          round
-          size="0.5rem"
-          padding="0.6rem"
-          color="grey"
-          icon="content_copy"
-          @click="$emit('copy-to-clipboard-fn', content)"
-        />
-      </div>
-    </div>
-    <pre ref="content" data-test="curl-content-text">
-curl -u {{ currUserEmail }}:{{
-        store.state.organizationData.organizationPasscode
-      }} -k {{ endpoint.url }}/api/{{
-        currOrgIdentifier
-      }}/default/_json -d '[{"level":"info","job":"test","log":"test message for openobserve"}]'</pre
-    >
+  <div class="q-ma-md">
+    <CopyContent class="q-mt-sm" :content="content" />
   </div>
 </template>
 
@@ -45,8 +25,8 @@ import { defineComponent, ref } from "vue";
 import type { Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL } from "../../../utils/zincutils";
-import type { Endpoint } from "@/ts/interfaces/";
+import { getImageURL, maskText } from "../../../utils/zincutils";
+import CopyContent from "@/components/CopyContent.vue";
 export default defineComponent({
   name: "curl-mechanism",
   props: {
@@ -57,6 +37,7 @@ export default defineComponent({
       type: String,
     },
   },
+  components: { CopyContent },
   setup() {
     const store = useStore();
     const endpoint: any = ref({
@@ -77,13 +58,15 @@ export default defineComponent({
       tls: url.protocol === "https:" ? "On" : "Off",
     };
 
-    const content = ref(null);
+    const content = `curl -u [EMAIL]:[PASSCODE] -k ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json -d '[{"level":"info","job":"test","log":"test message for openobserve"}]'`;
+
     return {
       store,
       config,
       endpoint,
-      content,
       getImageURL,
+      maskText,
+      content,
     };
   },
 });

@@ -38,7 +38,10 @@
     "events": "Events",
     "goHome": "Go Home",
     "name": "Name",
-    "add": "Add"
+    "add": "Add",
+    "details": "Details",
+    "tags": "Tags",
+    "process": "Process"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -65,9 +68,11 @@
     "toggleFunctionLabel": "Function",
     "labelWrap": "Wrap Content",
     "messageWrapContent": "Wrap Table Content",
-    "functionPlaceholder": "Select or create a function",
+    "functionPlaceholder": "Saved Functions",
     "functionMessage": "Press Tab/Enter button to apply new function name.",
     "saveFunctionLabel": "Save Function",
+    "saveFunctionName": "Function Name",
+    "savedFunctionNotFound": "Function not found!",
     "exportLogs": "Export logs",
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
@@ -416,6 +421,7 @@
     "extraOptions": "Options",
     "nameOfVariable": "Name",
     "labelOfVariable": "Label (optional)",
+    "adhoclabelOfVariable": "Label",
     "ValueOfVariable": "Value",
     "DefaultValue": "Default value (optional)",
     "typeOfVariable": "Type of variable",
@@ -500,6 +506,7 @@
     "queryValues": "Query Values",
     "constant": "Constant",
     "textbox": "Textbox",
+    "ad-hoc-variable": "Dynamic Filters",
     "newFolder": "New Folder",
     "updateFolder": "Update Folder"
   },
@@ -638,7 +645,8 @@
     "updateTitle": "Update Alert",
     "start": "start",
     "pause": "Pause",
-    "groupBy": "Group by"
+    "groupBy": "Group by",
+    "row": "Row Template"
   },
   "alert_templates": {
     "header": "Templates",

@@ -16,28 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="tabContent q-ma-md">
-      <div class="tabContent__head">
-        <div class="copy_action">
-          <q-btn
-            data-test="traces-copy-btn"
-            flat
-            round
-            size="0.5rem"
-            padding="0.6rem"
-            color="grey"
-            icon="content_copy"
-            @click="$emit('copy-to-clipboard-fn', copyTracesContent)"
-          />
-        </div>
-      </div>
-      <pre ref="copyTracesContent" data-test="traces-content-text">
-remote_write:
-  - url: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/api/v1/write
-    basic_auth:
-      username: {{ currUserEmail }}
-      password: {{ store.state.organizationData.organizationPasscode }}</pre
-      >
+    <div class="q-ma-md">
+      <CopyContent class="q-mt-sm" :content="content" />
     </div>
     <div>
       <a
@@ -59,8 +39,8 @@ import { defineComponent, ref, type Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getImageURL, b64EncodeUnicode } from "../../../utils/zincutils";
-import type { Endpoint } from "@/ts/interfaces";
-import { computed } from "vue";
+import CopyContent from "@/components/CopyContent.vue";
+
 export default defineComponent({
   name: "traces-otlp",
   props: {
@@ -71,6 +51,7 @@ export default defineComponent({
       type: String,
     },
   },
+  components: { CopyContent },
   setup(props) {
     const store = useStore();
     const endpoint: any = ref({
@@ -88,18 +69,16 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-    const accessKey = computed(() => {
-      return b64EncodeUnicode(
-        `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
-      );
-    });
-    const copyTracesContent = ref(null);
+    const content = `remote_write:
+  - url: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/prometheus/api/v1/write
+    basic_auth:
+      username: [EMAIL]
+      password: [PASSCODE]`;
     return {
       store,
       config,
       endpoint,
-      copyTracesContent,
-      accessKey,
+      content,
       getImageURL,
     };
   },

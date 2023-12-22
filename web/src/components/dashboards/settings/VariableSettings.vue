@@ -152,6 +152,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "type",
+        field: "type",
+        label: t("dashboard.type"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "actions",
         field: "actions",
         label: t("dashboard.actions"),
@@ -160,6 +167,29 @@ export default defineComponent({
         style: "width: 110px",
       },
     ]);
+
+    const variableTypes = ref([
+      {
+        label: t("dashboard.queryValues"),
+        value: 'query_values'
+      },
+      {
+        label: t("dashboard.constant"),
+        value: 'constant'
+      },
+      {
+        label: t("dashboard.textbox"),
+        value: 'textbox'
+      },
+      {
+        label: t("dashboard.custom"),
+        value: 'custom'
+      },
+      {
+        label: t("dashboard.ad-hoc-variable"),
+        value: 'dynamic_filters'
+      }
+    ])
 
     onMounted(async () => {
       await getDashboardData();
@@ -170,23 +200,16 @@ export default defineComponent({
     });
 
     const getDashboardData = async () => {
-      const data = JSON.parse(
-        JSON.stringify(
-          await getDashboard(
-            store,
-            route.query.dashboard,
-            route.query.folder ?? "default"
-          )
-        )
-      )?.variables?.list;
-      dashboardVariableData.data = (data || []).map(
-        (it: any, index: number) => {
-          return {
-            "#": index < 9 ? `0${index + 1}` : index + 1,
-            name: it.name,
-          };
+      const data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard, route.query.folder ?? "default")))?.variables?.list
+
+      dashboardVariableData.data = (data || []).map((it:any, index:number) => {
+
+        return {
+          "#": index < 9 ? `0${index + 1}` : index + 1,
+          name: it.name,
+          type: variableTypes.value.find((type: any) => type.value === it.type)?.label,
         }
-      );
+      });
     };
 
     const addVariables = () => {
@@ -252,6 +275,7 @@ export default defineComponent({
       editVariableFn,
       selectedVariable,
       handleSaveVariable,
+      variableTypes
     };
   },
 });

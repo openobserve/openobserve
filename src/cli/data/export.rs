@@ -13,21 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-use std::fs::{self};
-use std::fs::File;
-use std::path::Path;
+use std::{
+    collections::HashMap,
+    fs::{self, File},
+    path::Path,
+};
 
 use actix_web::web::Query;
 use ahash::AHashMap;
 
-use crate::cli::data::cli::Cli;
-use crate::cli::data::Context;
-use crate::common::infra::config::CONFIG;
-use crate::common::meta::search::Request;
-use crate::common::meta::StreamType;
-use crate::common::utils::http::get_stream_type_from_request;
-use crate::service::search as SearchService;
+use crate::{
+    cli::data::{cli::Cli, Context},
+    common::{
+        infra::config::CONFIG,
+        meta::{search::Request, StreamType},
+        utils::http::get_stream_type_from_request,
+    },
+    service::search as SearchService,
+};
 
 pub struct Export {}
 
@@ -72,7 +75,11 @@ impl Context for Export {
                     }
                     let path = Path::new(c.data.as_str());
                     fs::create_dir_all(path)?;
-                    let file = File::create(path.join(format!("{}.{}", chrono::Local::now().timestamp_micros(), c.file_type)))?;
+                    let file = File::create(path.join(format!(
+                        "{}.{}",
+                        chrono::Local::now().timestamp_micros(),
+                        c.file_type
+                    )))?;
                     serde_json::to_writer_pretty(file, &res.hits)?;
                     Ok(true)
                 }

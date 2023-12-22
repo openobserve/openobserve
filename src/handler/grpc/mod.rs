@@ -204,7 +204,7 @@ impl From<Vec<json::Value>> for cluster_rpc::UsageData {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::collections::HashMap;
 
     use super::*;
