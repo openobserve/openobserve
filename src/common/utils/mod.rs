@@ -23,6 +23,7 @@ pub mod functions;
 pub mod hasher;
 pub mod http;
 pub mod json;
+pub mod jwt;
 pub mod rand;
 pub mod schema;
 pub mod schema_ext;

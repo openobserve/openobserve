@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+use futures::future::{ready, Ready};
 
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
@@ -50,6 +52,53 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
     }
 }
 
+pub struct UserEmail {
+    pub user_id: String,
+}
+
+impl FromRequest for UserEmail {
+    type Error = Error;
+    type Future = Ready<Result<Self, Error>>;
+
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        if let Some(auth_header) = req.headers().get("user_id") {
+            if let Ok(user_str) = auth_header.to_str() {
+                return ready(Ok(UserEmail {
+                    user_id: user_str.to_owned(),
+                }));
+            }
+        }
+        ready(Err(actix_web::error::ErrorUnauthorized("No user found")))
+    }
+}
+
+pub struct AuthExtractor {
+    pub auth: String,
+}
+
+impl FromRequest for AuthExtractor {
+    type Error = Error;
+    type Future = Ready<Result<Self, Error>>;
+
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        if let Some(auth_header) = req.headers().get("Authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                }));
+            }
+        } else if let Some(cookie) = req.cookie("access_token") {
+            let access_token = cookie.value().to_string();
+            return ready(Ok(AuthExtractor {
+                auth: format!("Bearer {}", access_token),
+            }));
+        }
+        ready(Err(actix_web::error::ErrorUnauthorized(
+            "Unauthorized Access",
+        )))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -74,7 +123,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
-                is_ldap: false,
+                is_external: false,
             },
         )
         .await;

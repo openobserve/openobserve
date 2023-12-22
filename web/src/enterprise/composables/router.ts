@@ -23,21 +23,38 @@ import {
   getLogoutURL,
 } from "@/utils/zincutils";
 
+import authService from "@/services/auth";
+import config from "@/aws-exports";
 import Organizations from "@/enterprise/components/organizations/Organization.vue";
-
 import Billing from "@/enterprise/components/billings/Billing.vue";
 import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
 import { routeGuard } from "@/utils/zincutils";
 
+
 const useEnvRoutes = () => {
   const parentRoutes = [
     {
       path: "/login",
       component: Login,
-      beforeEnter(to: any, from: any, next: any) {
-        window.location.href = getLoginURL();
+      beforeEnter: async (to: any, from: any, next: any) => {
+        if (config.isEnterprise == "true" || config.isEnterprise) {
+          try {
+            const url = await authService.get_dex_login();
+            if (url) {
+              window.location.href = url;
+            } else {
+              next();
+            }
+          } catch (error) {
+            console.error("Error during redirection:", error);
+            next(false);
+          }
+        } else {
+          window.location.href = getLoginURL();
+        }
+
       },
     },
     {
@@ -46,7 +63,6 @@ const useEnvRoutes = () => {
         useLocalToken("", true);
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
-
         window.location.href = getLogoutURL();
       },
     },

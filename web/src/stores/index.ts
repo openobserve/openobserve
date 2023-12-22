@@ -74,6 +74,7 @@ export default createStore({
       if (payload) {
         state.loggedIn = payload.loginState;
         state.userInfo = payload.userInfo;
+        
       }
     },
     logout(state) {
