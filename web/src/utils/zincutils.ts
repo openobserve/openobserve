@@ -91,15 +91,16 @@ export const getUserInfo = (loginString: string) => {
     const tokens = loginString.substring(1).split("&");
     for (const token of tokens) {
       const propArr = token.split("=");
-      if (propArr[0] == "id_token" || propArr[0] == "access_token") {
+      if (propArr[0] == "id_token") {
         decToken = getDecodedAccessToken(propArr[1]);
         const encodedSessionData = b64EncodeUnicode(JSON.stringify(decToken));
 
         useLocalUserInfo(encodedSessionData);
-      }
-      if (propArr[0] == "id_token" || propArr[0] == "access_token") {
         useLocalToken(propArr[1]);
       }
+      // if (propArr[0] == "access_token") {
+      //   useLocalToken(propArr[1]);
+      // }
     }
 
     return decToken;

@@ -20,7 +20,7 @@ import config from "../aws-exports";
 
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
-  if (config.isEnterprise == "false" || !config.isEnterprise) {
+  if (config.isEnterprise == "false") {
     headers = {
       Authorization:
         (config.isCloud == "true")

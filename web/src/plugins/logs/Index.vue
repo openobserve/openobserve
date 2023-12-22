@@ -617,8 +617,11 @@ export default defineComponent({
       this.searchResultRef.reDrawChart();
     },
     refreshHistogram() {
-      this.searchObj.meta.histogramDirtyFlag = false;
-      this.refreshHistogramChart();
+      if (this.searchObj.meta.histogramDirtyFlag == true) {
+        this.searchObj.meta.histogramDirtyFlag = false;
+        this.this.handleRunQuery();
+        this.refreshHistogramChart();
+      }
     },
   },
 });
