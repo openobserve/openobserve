@@ -38,7 +38,10 @@
     "events": "Events",
     "goHome": "Go Home",
     "name": "Name",
-    "add": "Add"
+    "add": "Add",
+    "details": "Details",
+    "tags": "Tags",
+    "process": "Process"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -642,7 +645,8 @@
     "updateTitle": "Update Alert",
     "start": "start",
     "pause": "Pause",
-    "groupBy": "Group by"
+    "groupBy": "Group by",
+    "row": "Row Template"
   },
   "alert_templates": {
     "header": "Templates",

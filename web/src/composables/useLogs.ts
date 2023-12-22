@@ -328,7 +328,7 @@ const useLogs = () => {
     }
   };
 
-  const updateUrlQueryParams = () => {
+  const generateURLQuery = (isShareLink: boolean = false) => {
     const date = searchObj.data.datetime;
 
     const query: any = {};
@@ -338,7 +338,12 @@ const useLogs = () => {
     }
 
     if (date.type == "relative") {
-      query["period"] = date.relativeTimePeriod;
+      if (isShareLink) {
+        query["from"] = date.startTime;
+        query["to"] = date.endTime;
+      } else {
+        query["period"] = date.relativeTimePeriod;
+      }
     } else {
       query["from"] = date.startTime;
       query["to"] = date.endTime;
@@ -351,8 +356,22 @@ const useLogs = () => {
       query["query"] = b64EncodeUnicode(searchObj.data.query);
     }
 
+    if (
+      searchObj.meta.toggleFunction &&
+      searchObj.data.tempFunctionContent != ""
+    ) {
+      query["functionContent"] = b64EncodeUnicode(
+        searchObj.data.tempFunctionContent
+      );
+    }
+
     query["org_identifier"] = store.state.selectedOrganization.identifier;
-    query["timezone"] = store.state.timezone;
+    // query["timezone"] = store.state.timezone;
+    return query;
+  };
+
+  const updateUrlQueryParams = () => {
+    const query = generateURLQuery(false);
 
     router.push({ query });
   };
@@ -1133,6 +1152,13 @@ const useLogs = () => {
     }
     useLocalTimezone(queryParams.timezone);
 
+    if (queryParams.functionContent) {
+      searchObj.data.tempFunctionContent =
+        b64DecodeUnicode(queryParams.functionContent) || "";
+      searchObj.meta.functionEditorPlaceholderFlag = false;
+      searchObj.meta.toggleFunction = true;
+    }
+
     router.push({
       query: {
         ...queryParams,
@@ -1267,6 +1293,7 @@ const useLogs = () => {
     evaluateWrapContentFlag,
     getSavedViews,
     onStreamChange,
+    generateURLQuery,
   };
 };
 

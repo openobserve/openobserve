@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unit="px"
                   :limits="
                     !dashboardPanelData.layout.showQueryBar
-                      ? [41, 400]
+                      ? [43, 400]
                       : [140, 400]
                   "
                   :disable="!dashboardPanelData.layout.showQueryBar"
@@ -190,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :variablesData="variablesData"
                           :width="6"
                           @error="handleChartApiError"
+                          @updated:data-zoom="onDataZoom"
                         />
                         <q-dialog v-model="showViewPanel">
                           <QueryInspector
@@ -275,6 +276,7 @@ import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRende
 import { useLoading } from "@/composables/useLoading";
 import _ from "lodash-es";
 import QueryInspector from "@/components/dashboards/QueryInspector.vue";
+import { provide } from "vue";
 
 export default defineComponent({
   name: "AddPanel",
@@ -1082,6 +1084,52 @@ export default defineComponent({
       errorList.splice(0);
       errorList.push(errorMessage);
     };
+
+    const onDataZoom = (event: any) => {
+      const selectedDateObj = {
+        start: new Date(event.start),
+        end: new Date(event.end),
+      };
+      // Truncate seconds and milliseconds from the dates
+      selectedDateObj.start.setSeconds(0, 0);
+      selectedDateObj.end.setSeconds(0, 0);
+
+      // Compare the truncated dates
+      if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {
+        // Increment the end date by 1 minute
+        selectedDateObj.end.setMinutes(selectedDateObj.end.getMinutes() + 1);
+      }
+
+      // set it as a absolute time
+      dateTimePickerRef?.value?.setCustomDate("absolute", selectedDateObj);
+    };
+
+    const hoveredSeriesState = ref({
+      hoveredSeriesName: "",
+      panelId: -1,
+      dataIndex: -1,
+      seriesIndex: -1,
+      hoveredTime: null,
+      setHoveredSeriesName: function (name: string) {
+        hoveredSeriesState.value.hoveredSeriesName = name ?? "";
+      },
+      setIndex: function (
+        dataIndex: number,
+        seriesIndex: number,
+        panelId: any,
+        hoveredTime?: any
+      ) {
+        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
+        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
+        hoveredSeriesState.value.panelId = panelId ?? -1;
+        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
+      },
+    });
+
+    // used provide and inject to share data between components
+    // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
+    provide("hoveredSeriesState", hoveredSeriesState);
+
     return {
       t,
       updateDateTime,
@@ -1111,6 +1159,7 @@ export default defineComponent({
       metaDataValue,
       metaData,
       panelTitle,
+      onDataZoom,
     };
   },
   methods: {

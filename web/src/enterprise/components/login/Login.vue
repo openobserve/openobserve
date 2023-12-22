@@ -33,6 +33,7 @@ import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import moment from "moment";
+import { openobserveRum } from "@openobserve/browser-rum";
 
 export default defineComponent({
   name: "PageLoginCallback",
@@ -211,6 +212,11 @@ export default defineComponent({
               },
               { originalTimestamp: moment.utc().format() }
             );
+
+            openobserveRum.setUser({
+              name: this.userInfo.given_name + " " + this.userInfo.family_name,
+              email: this.userInfo.email,
+            });
             //analytics
           });
         } else {
@@ -232,6 +238,11 @@ export default defineComponent({
             },
             { originalTimestamp: moment.utc().format() }
           );
+
+          openobserveRum.setUser({
+            name: this.userInfo.given_name + " " + this.userInfo.family_name,
+            email: this.userInfo.email,
+          });
           //analytics
 
           this.getDefaultOrganization();

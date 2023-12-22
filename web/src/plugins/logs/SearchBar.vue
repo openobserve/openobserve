@@ -71,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey"
-size="xs" />
+                    <q-icon name="delete"
+color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -169,6 +169,14 @@ size="xs" />
           icon="download"
           :title="t('search.exportLogs')"
           @click="downloadLogs"
+        ></q-btn>
+        <q-btn
+          data-test="logs-search-bar-share-link-btn"
+          class="q-mr-sm download-logs-btn q-px-sm"
+          size="sm"
+          icon="share"
+          :title="t('search.shareLink')"
+          @click="shareLink"
         ></q-btn>
         <div class="float-left">
           <date-time
@@ -491,14 +499,12 @@ import {
   nextTick,
   watch,
   toRaw,
-  onBeforeUnmount,
-  onUnmounted,
   onActivated,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import { useQuasar, copyToClipboard } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
@@ -516,7 +522,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import stream from "@/services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { mergeDeep } from "@/utils/zincutils";
+import { mergeDeep, b64DecodeUnicode } from "@/utils/zincutils";
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
@@ -593,6 +599,7 @@ export default defineComponent({
       getQueryData,
       getStreams,
       updateUrlQueryParams,
+      generateURLQuery,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -864,6 +871,15 @@ export default defineComponent({
     onMounted(async () => {
       initFunctionEditor();
 
+      if (router.currentRoute.value.query.functionContent) {
+        searchObj.meta.toggleFunction = true;
+        fnEditorobj.setValue(
+          b64DecodeUnicode(router.currentRoute.value.query.functionContent)
+        );
+        fnEditorobj.layout();
+        searchObj.config.fnSplitterModel = 60;
+      }
+      
       window.addEventListener("click", () => {
         fnEditorobj.layout();
         // queryEditorRef.value.resetEditorLayout();
@@ -1142,6 +1158,16 @@ export default defineComponent({
               searchObj.data.tempFunctionContent =
                 extractedObj.data.tempFunctionContent;
               searchObj.meta.functionEditorPlaceholderFlag = false;
+            } else {
+              populateFunctionImplementation(
+                {
+                  name: "",
+                  function: "",
+                },
+                false
+              );
+              searchObj.data.tempFunctionContent = "";
+              searchObj.meta.functionEditorPlaceholderFlag = true;
             }
             dateTimeRef.value.setSavedDate(searchObj.data.datetime);
             if (searchObj.meta.refreshInterval != "0") {
@@ -1437,6 +1463,38 @@ export default defineComponent({
       }
     };
 
+    const shareLink = () => {
+      const queryObj = generateURLQuery(true);
+      const queryString = Object.entries(queryObj)
+        .map(
+          ([key, value]) =>
+            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+        )
+        .join("&");
+
+      let shareURL = window.location.origin + window.location.pathname;
+
+      if (queryString != "") {
+        shareURL += "?" + queryString;
+      }
+
+      copyToClipboard(shareURL)
+        .then(() => {
+          $q.notify({
+            type: "positive",
+            message: "Link Copied Successfully!",
+            timeout: 5000,
+          });
+        })
+        .catch(() => {
+          $q.notify({
+            type: "negative",
+            message: "Error while copy link.",
+            timeout: 5000,
+          });
+        });
+    };
+
     return {
       t,
       store,
@@ -1487,6 +1545,7 @@ export default defineComponent({
       savedFunctionName,
       savedFunctionSelectedName,
       saveFunctionLoader,
+      shareLink,
     };
   },
   computed: {

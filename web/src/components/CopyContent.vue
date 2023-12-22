@@ -27,12 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             padding="0.6rem"
             icon="content_copy"
             color="grey"
-            @click="copyToClipboardFn(content)"
+            @click="copyToClipboardFn()"
           />
         </div>
       </div>
     </div>
-    <pre data-test="rum-content-text">{{ displayContent || content }}</pre>
+    <pre data-test="rum-content-text">{{ computedContent }}</pre>
   </div>
 </template>
 
@@ -40,7 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import { useQuasar, copyToClipboard } from "quasar";
+import { maskText, b64EncodeUnicode } from "../utils/zincutils";
 
 export default defineComponent({
   name: "CopyContent",
@@ -55,10 +57,34 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
+    const store = useStore();
     const { t } = useI18n();
     const q = useQuasar();
+    const email = ref(store.state.userInfo.email);
+    const passcode = ref(store.state.organizationData.organizationPasscode);
+    const basicPasscode = ref();
 
-    const copyToClipboardFn = (content: any) => {
+    const replaceValues = (data: string, isMask: boolean = false) => {
+      email.value = store.state.userInfo.email;
+      passcode.value = store.state.organizationData.organizationPasscode;
+      basicPasscode.value = b64EncodeUnicode(
+        `${store.state.userInfo.email}:${store.state.organizationData.organizationPasscode}`
+      );
+      if (isMask) {
+        return data
+          .replaceAll("[EMAIL]", maskText(email.value))
+          .replaceAll("[PASSCODE]", maskText(passcode.value))
+          .replaceAll("[BASIC_PASSCODE]", maskText(basicPasscode.value));
+      } else {
+        return data
+          .replaceAll("[EMAIL]", email.value)
+          .replaceAll("[PASSCODE]", passcode.value)
+          .replaceAll("[BASIC_PASSCODE]", basicPasscode.value);
+      }
+    };
+
+    const copyToClipboardFn = () => {
+      const content = replaceValues(props.content, false);
       copyToClipboard(content)
         .then(() => {
           q.notify({
@@ -76,10 +102,33 @@ export default defineComponent({
         });
     };
 
+    const displayData = ref(props.displayContent || props.content);
+    const computedContent = ref();
+    computedContent.value = replaceValues(displayData.value, true);
+
+    const refreshData = () => {
+      computedContent.value = replaceValues(displayData.value, true);
+    };
+
     return {
       t,
+      store,
       copyToClipboardFn,
+      displayData,
+      replaceValues,
+      computedContent,
+      refreshData,
     };
+  },
+  computed: {
+    computedData() {
+      return this.store.state.organizationData.organizationPasscode;
+    },
+  },
+  watch: {
+    computedData() {
+      this.refreshData();
+    },
   },
 });
 </script>

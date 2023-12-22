@@ -614,6 +614,7 @@ export default defineComponent({
     },
     fullSQLMode(newVal) {
       this.setQuery(newVal);
+      this.searchResultRef.reDrawChart();
     },
     refreshHistogram() {
       this.searchObj.meta.histogramDirtyFlag = false;

@@ -6,9 +6,6 @@
     </div>
     <div class="q-pa-md">
       <div class="text-subtitle1 text-bold q-mt-md q-pl-xs">OTLP gRPC</div>
-      <div class="title" data-test="vector-title-text">
-        <b>Note:</b> Not supported in clustered installation of OpenObserve yet.
-      </div>
       <ContentCopy class="q-mt-sm" :content="getOtelGrpcConfig" />
     </div>
   </div>
@@ -61,7 +58,7 @@ const getOtelGrpcConfig = computed(() => {
   otlp/openobserve:
       endpoint: ${endpoint.value.host}:5081
       headers:
-        Authorization: "Basic ${accessKey.value}"
+        Authorization: "Basic [BASIC_PASSCODE]"
         organization: ${props.currOrgIdentifier}
         stream-name: default
       tls:
@@ -73,7 +70,7 @@ const getOtelHttpConfig = computed(() => {
   otlphttp/openobserve:
     endpoint: ${endpoint.value.url}/api/${props.currOrgIdentifier}/
     headers:
-      Authorization: Basic ${accessKey.value}
+      Authorization: Basic [BASIC_PASSCODE]
       stream-name: default`;
 });
 </script>

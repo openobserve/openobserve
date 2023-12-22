@@ -17,22 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="relative-position q-pt-sm" :style="{ height: '100%' }">
     <template v-if="spans?.length">
-      <template v-for="span in spans as any[]" :key="span.spanId">
-        <span-block
-          :span="span"
-          :depth="depth"
-          :baseTracePosition="baseTracePosition"
-          :styleObj="{
-            position: 'absolute',
-            top: span.style.top,
-            left: span.style.left,
-            height: '60px',
-          }"
-          :spanDimensions="spanDimensions"
-          :isCollapsed="collapseMapping[span.spanId]"
-          @toggle-collapse="toggleSpanCollapse"
-        />
-      </template>
+      <template v-for="span in spans as any[]" :key="span.spanId"> </template>
     </template>
   </div>
 </template>

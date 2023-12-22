@@ -19,51 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="title q-pl-md q-pt-md" data-test="vector-title-text">
       <b>OTLP HTTP</b>
     </div>
-    <div class="tabContent q-ma-md">
-      <div class="tabContent__head">
-        <div class="copy_action">
-          <q-btn
-            data-test="traces-copy-btn"
-            flat
-            round
-            color="grey"
-            icon="content_copy"
-            @click="$emit('copy-to-clipboard-fn', copyHTTPTracesContent)"
-          />
-        </div>
-      </div>
-      <pre ref="copyHTTPTracesContent" data-test="traces-http-content-text">
-HTTP Endpoint: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/v1/traces
-Authorization: Basic {{ accessKey }}</pre
-      >
+    <div class="q-ma-md">
+      <CopyContent class="q-mt-sm" :content="copyHTTPTracesContent" />
     </div>
 
     <div class="title q-pl-md q-pt-md" data-test="vector-title-text">
-      <b>OTLP gRPC</b> <br /><b>Note:</b> Not supported in clustered
-      installation of OpenObserve yet.
+      <b>OTLP gRPC</b>
     </div>
-    <div class="tabContent q-ma-md">
-      <div class="tabContent__head">
-        <div class="copy_action">
-          <q-btn
-            data-test="traces-copy-btn"
-            flat
-            round
-            color="grey"
-            icon="content_copy"
-            @click="$emit('copy-to-clipboard-fn', copyGRPCTracesContent)"
-          />
-        </div>
-      </div>
-      <pre ref="copyGRPCTracesContent" data-test="traces-grpc-content-text">
-endpoint: {{ endpoint.host }}
-headers: 
-  Authorization: "Basic {{ accessKey }}"
-  organization: {{ currOrgIdentifier }}
-  stream-name: default
-tls:
-  insecure: {{ endpoint.protocol == "https" ? false : true }}</pre
-      >
+    <div class="q-ma-md">
+      <CopyContent class="q-mt-sm" :content="copyGRPCTracesContent" />
     </div>
   </div>
 </template>
@@ -72,9 +36,9 @@ tls:
 import { defineComponent, ref, type Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL, b64EncodeUnicode } from "../../../utils/zincutils";
-import type { Endpoint } from "@/ts/interfaces";
-import { computed } from "vue";
+import { getImageURL } from "../../../utils/zincutils";
+import CopyContent from "@/components/CopyContent.vue";
+
 export default defineComponent({
   name: "traces-otlp",
   props: {
@@ -85,6 +49,7 @@ export default defineComponent({
       type: String,
     },
   },
+  components: { CopyContent },
   setup(props) {
     const store = useStore();
     const endpoint: any = ref({
@@ -102,20 +67,22 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-    const accessKey = computed(() => {
-      return b64EncodeUnicode(
-        `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
-      );
-    });
-    const copyHTTPTracesContent = ref(null);
-    const copyGRPCTracesContent = ref(null);
+
+    const copyHTTPTracesContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/v1/traces
+Authorization: Basic [BASIC_PASSCODE]`;
+    const copyGRPCTracesContent = `endpoint: ${endpoint.value.host}
+headers: 
+  Authorization: "Basic [BASIC_PASSCODE]"
+  organization: ${store.state.selectedOrganization.identifier}
+  stream-name: default
+tls:
+  insecure: ${endpoint.value.protocol == "https" ? false : true }`;
     return {
       store,
       config,
       endpoint,
       copyHTTPTracesContent,
       copyGRPCTracesContent,
-      accessKey,
       getImageURL,
     };
   },
