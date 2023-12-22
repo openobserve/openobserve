@@ -36,6 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :name="index"
         @click.stop
         content-class="tab_content"
+        @mouseenter="() => hoveredTabIndex = index"
+        @mouseleave="hoveredTabIndex = -1"
       >
         <div class="full-width row justify-between no-wrap">
           <span
@@ -47,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="tab.name"
             >{{ tab.name }}</span
           >
-          <div>
+          <div v-if="hoveredTabIndex === index">
             <q-icon
               v-if="index"
               :name="outlinedEdit"
@@ -122,6 +124,7 @@ export default defineComponent({
     const selectedTab = ref(0);
     const selectedTabIdToDelete: any = ref(null);
     const confirmDeleteTabDialog = ref(false);
+    const hoveredTabIndex = ref(-1);
 
     const tabs = ref([
       {
@@ -191,6 +194,7 @@ export default defineComponent({
       confirmDeleteTabDialog,
       selectedTabIdToDelete,
       deleteTab,
+      hoveredTabIndex,
     };
   },
 });
