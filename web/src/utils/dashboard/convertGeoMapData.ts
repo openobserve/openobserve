@@ -21,7 +21,7 @@
  * @return {Object} - the option object for rendering the map chart
  */
 export const convertGeoMapData = (panelSchema: any) => {
-  console.log("convertGeoMapData", panelSchema, mapData);
+  // console.log("convertGeoMapData", panelSchema, mapData);
   const mapData = [
     { name: "Alabama", value: 4822023 },
     { name: "Alaska", value: 731449 },

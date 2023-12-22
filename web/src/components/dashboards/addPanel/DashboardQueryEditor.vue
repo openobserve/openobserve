@@ -456,9 +456,22 @@ export default defineComponent({
       let query = "";
 
       if (name && value) {
-        query = `SELECT ${name.column} as "${name.alias}", ${
-          value.column
-        } as "${value.alias}" FROM "${
+        query = `SELECT ${name.column} as "${name.alias}", `;
+
+        if (value?.aggregationFunction) {
+          switch (value.aggregationFunction) {
+            case "count-distinct":
+              query += `count(distinct(${value.column})) as "${value.alias}"`;
+              break;
+            default:
+              query += `${value.aggregationFunction}(${value.column}) as "${value.alias}"`;
+              break;
+          }
+        } else {
+          query += `${value.column} as "${value.alias}"`;
+        }
+
+        query += ` FROM "${
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.stream

@@ -207,11 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               color="primary"
               size="sm"
-              :label="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value?.column
-              "
+              :label="valueLabel"
               :data-test="`dashboard-y-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
@@ -228,10 +224,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }-menu`"
               >
                 <div>
+                  <div class="row q-mb-sm" style="align-items: center">
+                    <div
+                      v-if="
+                        !dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      class="q-mr-xs"
+                      style="width: 160px"
+                    >
+                      <q-select
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.value.aggregationFunction
+                        "
+                        :options="triggerOperators"
+                        dense
+                        filled
+                        emit-value
+                        map-options
+                        :label="t('common.aggregation')"
+                        data-test="dashboard-y-item-dropdown"
+                      >
+                        <template v-slot:append>
+                          <q-icon
+                            name="close"
+                            size="small"
+                            @click.stop.prevent="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.value.aggregationFunction = null
+                            "
+                            class="cursor-pointer"
+                          />
+                        </template>
+                      </q-select>
+                    </div>
+                  </div>
                   <q-input
                     dense
                     filled
-                    label="Label"
+                    :label="t('common.label')"
                     data-test="dashboard-y-item-input"
                     v-model="
                       dashboardPanelData.data.queries[
@@ -314,7 +349,6 @@ export default defineComponent({
       addMapValue,
       removeMapName,
       removeMapValue,
-      addFilteredItem,
       loadFilterItem,
       promqlMode,
       cleanupDraggingFields,
@@ -455,11 +489,20 @@ export default defineComponent({
       }
     };
 
+    const valueLabel = computed(() => {
+      const valueField =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value;
+      return commonBtnLabel(valueField);
+    });
+
     return {
       t,
       dashboardPanelData,
       removeMapName,
       removeMapValue,
+      valueLabel,
       loadFilterItem,
       triggerOperators,
       pagination: ref({
