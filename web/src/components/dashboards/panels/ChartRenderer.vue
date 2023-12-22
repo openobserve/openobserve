@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="chart-renderer"
     ref="chartRef"
     id="chart1"
-    @mouseenter="
+    @mouseover="
       () => {
         // if hoveredSeriesState is not null then set panelId
         if (hoveredSeriesState)
