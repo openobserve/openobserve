@@ -20,6 +20,11 @@ const auth = {
   sign_in_user: (payload: any) => {
     return http().post(`/auth/login`, payload);
   },
-};
+
+  get_dex_login: async () => {
+    const res = await http().get("/config/dex_login");
+    return res.data;
+  }
+}
 
 export default auth;

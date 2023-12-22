@@ -16,12 +16,12 @@
 use std::io::Error;
 
 use actix_web::{delete, get, http, post, put, web, HttpResponse};
-use actix_web_httpauth::extractors::basic::BasicAuth;
 
 use crate::{
     common::{
         meta,
         meta::user::{SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest},
+        utils::auth::UserEmail,
     },
     service::users,
 };
@@ -95,7 +95,7 @@ pub async fn save(
 pub async fn update(
     params: web::Path<(String, String)>,
     user: web::Json<UpdateUser>,
-    credentials: BasicAuth,
+    user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let email_id = email_id.trim().to_string();
@@ -108,8 +108,8 @@ pub async fn update(
             )),
         );
     }
-    let initiator_id = credentials.user_id();
-    let self_update = credentials.user_id().eq(&email_id);
+    let initiator_id = &user_email.user_id;
+    let self_update = user_email.user_id.eq(&email_id);
     users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
 }
 
@@ -134,12 +134,12 @@ pub async fn update(
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
     role: web::Json<UserOrgRole>,
-    credentials: BasicAuth,
+    user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let role = role.into_inner().role;
-    let initiator_id = credentials.user_id();
-    users::add_user_to_org(&org_id, &email_id, role, initiator_id).await
+    let initiator_id = user_email.user_id;
+    users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
 }
 
 /// RemoveUserFromOrganization
@@ -178,9 +178,9 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 #[post("/login")]
 pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
     let mut resp = SignInResponse::default();
-    match crate::handler::http::auth::validate_user(&auth.name, &auth.password).await {
+    match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
-            if v {
+            if v.is_valid {
                 resp.status = true;
             } else {
                 resp.status = false;

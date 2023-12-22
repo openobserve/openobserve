@@ -31,7 +31,7 @@ export default function (store: any) {
   let { parentRoutes, homeChildRoutes } = userRoutes();
 
   let envRoutes: any;
-  if (config.isCloud == "true") {
+  if (config.isCloud == "true" || config.isEnterprise == "true") {
     envRoutes = userCloudRoutes();
   } else {
     envRoutes = useOSRoutes();
@@ -66,6 +66,9 @@ export default function (store: any) {
     const isAuthenticated = store.state.loggedIn;
 
     if (!isAuthenticated) {
+      if (to.path == "/cb") {
+        next();
+      }
       const sessionUserInfo = getDecodedUserInfo();
 
       const localStorageToken: any = useLocalToken();

@@ -30,7 +30,7 @@ pub struct UserRequest {
     pub role: UserRole,
     /// Is the user created via ldap flow.
     #[serde(default)]
-    pub is_ldap: bool,
+    pub is_external: bool,
 }
 
 impl UserRequest {
@@ -41,7 +41,7 @@ impl UserRequest {
         org: String,
         token: String,
         rum_token: String,
-        is_ldap: bool,
+        is_external: bool,
     ) -> DBUser {
         DBUser {
             email: self.email.clone(),
@@ -55,7 +55,7 @@ impl UserRequest {
                 rum_token: Some(rum_token),
                 role: self.role.clone(),
             }],
-            is_ldap,
+            is_external,
         }
     }
 }
@@ -72,7 +72,7 @@ pub struct DBUser {
     pub salt: String,
     pub organizations: Vec<UserOrg>,
     #[serde(default)]
-    pub is_ldap: bool,
+    pub is_external: bool,
 }
 
 impl DBUser {
@@ -98,7 +98,7 @@ impl DBUser {
             token: org.token.clone(),
             rum_token: org.rum_token.clone(),
             salt: local.salt,
-            is_ldap: false,
+            is_external: self.is_external,
         })
     }
 
@@ -118,7 +118,7 @@ impl DBUser {
                     token: org.token,
                     rum_token: org.rum_token,
                     salt: self.salt.clone(),
-                    is_ldap: false,
+                    is_external: self.is_external,
                 })
             }
             ret_val
@@ -142,7 +142,7 @@ pub struct User {
     pub role: UserRole,
     pub org: String,
     /// Is the user authenticated and created via LDAP
-    pub is_ldap: bool,
+    pub is_external: bool,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema)]
@@ -169,6 +169,8 @@ pub struct UserOrgRole {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Eq, PartialEq, Default)]
 pub struct UpdateUser {
+    #[serde(default)]
+    pub change_password: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -213,7 +215,7 @@ pub struct UserResponse {
     pub last_name: String,
     pub role: UserRole,
     #[serde(default)]
-    pub is_ldap: bool,
+    pub is_external: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -231,4 +233,16 @@ pub struct SignInUser {
 pub struct SignInResponse {
     pub status: bool,
     pub message: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct TokenValidationResponse {
+    pub is_valid: bool,
+    pub user_email: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct RoleOrg {
+    pub role: UserRole,
+    pub org: String,
 }
