@@ -65,7 +65,7 @@
               <q-select
                 data-test="add-alert-stream-select"
                 v-model="aggregationData.group_by[index]"
-                :options="columns"
+                :options="filteredFields"
                 color="input-border"
                 bg-color="input-bg"
                 class="showLabelOnTop no-case q-py-none q-mb-sm"
@@ -77,6 +77,8 @@
                 hide-selected
                 placeholder="Select column"
                 fill-input
+                :input-debounce="400"
+                @filter="filterColumns"
                 :rules="[(val: any) => !!val || 'Field is required!']"
                 style="width: 200px; border: 1px solid rgba(0, 0, 0, 0.05)"
                 @update:model-value="updateTrigger"
@@ -84,6 +86,7 @@
               <q-btn
                 :icon="outlinedDelete"
                 class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
+                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
                 padding="xs"
                 unelevated
                 size="sm"
@@ -98,6 +101,7 @@
           <q-btn
             icon="add"
             class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
+            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="xs"
             unelevated
             size="sm"
@@ -137,7 +141,7 @@
             <q-select
               data-test="add-alert-stream-select"
               v-model="aggregationData.having.column"
-              :options="getNumericColumns"
+              :options="filteredNumericColumns"
               color="input-border"
               bg-color="input-bg"
               class="showLabelOnTop no-case q-py-none"
@@ -149,6 +153,7 @@
               hide-selected
               fill-input
               :rules="[(val: any) => !!val || 'Field is required!']"
+              @filter="filterNumericColumns"
               style="width: 250px; border: 1px solid rgba(0, 0, 0, 0.05)"
               @update:model-value="updateTrigger"
             />
@@ -237,10 +242,10 @@
               style="
                 min-width: 90px;
                 margin-left: 0 !important;
-                background: #f2f2f2;
                 height: 40px;
                 font-weight: normal;
               "
+              :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
               class="flex justify-center items-center"
             >
               {{ t("alerts.times") }}
@@ -275,10 +280,10 @@
             style="
               min-width: 90px;
               margin-left: 0 !important;
-              background: #f2f2f2;
               height: 40px;
               font-weight: normal;
             "
+            :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
             class="flex justify-center items-center"
           >
             {{ t("alerts.minutes") }}
@@ -290,7 +295,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, type Ref } from "vue";
 import FieldsInput from "./FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import QueryEditor from "@/components/QueryEditor.vue";
@@ -333,6 +338,19 @@ const _isAggregationEnabled = ref(props.isAggregationEnabled);
 
 const aggregationData = ref(props.aggregation);
 
+const filteredFields = ref(props.columns);
+
+const getNumericColumns = computed(() => {
+  return props.columns.filter((column: any) => {
+    return (
+      column.type !== "Utf8" &&
+      column.value !== store.state.zoConfig.timestamp_column
+    );
+  });
+});
+
+const filteredNumericColumns = ref(getNumericColumns.value);
+
 watch(
   () => props.isAggregationEnabled,
   (val) => {
@@ -367,7 +385,7 @@ const updateTab = () => {
 };
 
 defineExpose({
-  selectedTab: tab.value,
+  tab,
 });
 
 const addGroupByColumn = () => {
@@ -381,15 +399,6 @@ const deleteGroupByColumn = (index: number) => {
   aggregationDataCopy.group_by.splice(index, 1);
   emits("update:aggregation", aggregationDataCopy);
 };
-
-const getNumericColumns = computed(() => {
-  return props.columns.filter((column: any) => {
-    return (
-      column.type !== "Utf8" &&
-      column.value !== store.state.zoConfig.timestamp_column
-    );
-  });
-});
 
 const updateAggregation = () => {
   if (!props.aggregation) {
@@ -405,6 +414,34 @@ const updateAggregation = () => {
   }
   emits("update:aggregation", aggregationData.value);
   emits("update:isAggregationEnabled", _isAggregationEnabled.value);
+};
+
+const filterColumns = (val: string, update: Function) => {
+  if (val === "") {
+    update(() => {
+      filteredFields.value = [...props.columns];
+    });
+  }
+  update(() => {
+    const value = val.toLowerCase();
+    filteredFields.value = props.columns.filter(
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+    );
+  });
+};
+
+const filterNumericColumns = (val: string, update: Function) => {
+  if (val === "") {
+    update(() => {
+      filteredNumericColumns.value = [...getNumericColumns.value];
+    });
+  }
+  update(() => {
+    const value = val.toLowerCase();
+    filteredNumericColumns.value = getNumericColumns.value.filter(
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+    );
+  });
 };
 </script>
 
@@ -437,6 +474,12 @@ const updateAggregation = () => {
     width: 500px !important;
     height: 100px !important;
     border: 1px solid $border-color;
+  }
+
+  .q-btn {
+    &.icon-dark {
+      filter: none !important;
+    }
   }
 }
 </style>

@@ -19,10 +19,10 @@ phases:
       - echo "Building for commit - $GIT_HASH"
 
       # install buildx
-      - wget -nv https://github.com/docker/buildx/releases/download/v0.10.4/buildx-v0.10.4.linux-arm64
-      - chmod +x buildx-v0.10.4.linux-arm64
+      - wget -nv https://github.com/docker/buildx/releases/download/v0.12.0/buildx-v0.12.0.linux-arm64
+      - chmod +x buildx-v0.12.0.linux-arm64
       - mkdir -p ~/.docker/cli-plugins
-      - mv buildx-v0.10.4.linux-arm64 ~/.docker/cli-plugins/docker-buildx
+      - mv buildx-v0.12.0.linux-arm64 ~/.docker/cli-plugins/docker-buildx
       - docker buildx install
 
       # build for sccache image

@@ -1,5 +1,5 @@
 <template>
-  <div class="col-12 q-py-sm">
+  <div class="col-12 q-py-sm variables-input">
     <template v-if="!variables.length">
       <q-btn
         label="Add Variable"
@@ -59,6 +59,7 @@
             :data-test="`add-destination-header-${variable['key']}-delete-btn`"
             :icon="outlinedDelete"
             class="q-ml-xs iconHoverBtn"
+            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="sm"
             unelevated
             size="sm"
@@ -72,6 +73,7 @@
             v-if="index === variables.length - 1"
             icon="add"
             class="q-ml-xs iconHoverBtn"
+            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="sm"
             unelevated
             size="sm"
@@ -90,6 +92,7 @@
 import { defineProps } from "vue";
 import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { useStore } from "vuex";
 
 const props = defineProps({
   variables: {
@@ -99,6 +102,8 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["add:variable", "remove:variable"]);
+
+const store = useStore();
 
 const { t } = useI18n();
 
@@ -116,6 +121,14 @@ const addVariable = () => {
   .q-icon {
     margin-right: 4px !important;
     font-size: 15px !important;
+  }
+}
+
+.variables-input {
+  .q-btn {
+    &.icon-dark {
+      filter: none !important;
+    }
   }
 }
 </style>
