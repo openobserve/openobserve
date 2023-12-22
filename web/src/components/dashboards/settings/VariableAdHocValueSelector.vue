@@ -38,7 +38,7 @@ export default defineComponent({
     emits: ['update:modelValue'],
     setup(props: any, { emit }) {
         const store = useStore();
-        const operatorOptions = ['=', '!=', '<', '>', '<=', '>='];
+        const operatorOptions = ['=', '!='];
         const options = toRef(props.variableItem, 'options');
         const { modelValue: adhocVariables } = toRefs(props)
         const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } = useSelectAutoComplete(options, 'name');
