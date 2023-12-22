@@ -118,25 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </table>
     </q-tab-panel>
     <q-tab-panel name="attributes">
-      <table class="q-my-sm">
-        <tbody>
-          <template v-for="(val, key) in spanDetails.attrs" :key="key">
-            <tr>
-              <td
-                class="q-py-xs q-px-sm"
-                :class="
-                  store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
-                "
-              >
-                {{ key }}
-              </td>
-              <td class="q-py-xs q-px-sm">
-                {{ val }}
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+      <pre class="attr-text">{{
+        JSON.stringify(spanDetails.attrs, null, 2)
+      }}</pre>
     </q-tab-panel>
     <q-tab-panel name="events">
       <q-virtual-scroll
