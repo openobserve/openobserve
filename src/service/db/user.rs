@@ -215,7 +215,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 pub async fn root_user_exists() -> bool {
     let db = infra_db::get_db().await;
     let key = "/user/";
-    let mut ret = db.list_values(key).await.unwrap();
+    let mut ret = db.list_values(key).await.unwrap_or_default();
     ret.retain(|item| {
         let user: DBUser = json::from_slice(item).unwrap();
         user.organizations

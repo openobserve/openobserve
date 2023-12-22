@@ -67,11 +67,22 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 pub async fn save(
     org_id: web::Path<String>,
     user: web::Json<UserRequest>,
+    user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+    let initiator_id = user_email.user_id;
     let mut user = user.into_inner();
     user.email = user.email.trim().to_string();
-    users::post_user(&org_id, user).await
+    if user.role.eq(&meta::user::UserRole::Root) {
+        return Ok(
+            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Not allowed".to_string(),
+            )),
+        );
+    }
+
+    users::post_user(&org_id, user, &initiator_id).await
 }
 
 /// UpdateUser
@@ -160,9 +171,13 @@ pub async fn add_user_to_org(
     )
 )]
 #[delete("/{org_id}/users/{email_id}")]
-pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn delete(
+    path: web::Path<(String, String)>,
+    user_email: UserEmail,
+) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = path.into_inner();
-    users::remove_user_from_org(&org_id, &email_id).await
+    let initiator_id = user_email.user_id;
+    users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
 }
 
 /// AuthenticateUser
