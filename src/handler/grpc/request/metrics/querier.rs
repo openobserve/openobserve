@@ -24,7 +24,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::{
         infra::{
-            config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
+            config::{CONFIG, FILE_EXT_JSON},
             errors, metrics, wal,
         },
         meta::{self, stream::PartitionTimeLevel, StreamType},
@@ -115,22 +115,9 @@ impl Metrics for Querier {
             }
         };
 
-        let pattern = format!("{wal_dir}/files/{org_id}/metrics/{org_id}/",);
-        let json_files = scan_files(&pattern);
+        let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/");
+        let files = scan_files(&pattern, "parquet");
 
-        let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/",);
-        let arrow_files = scan_files(&pattern);
-
-        let mut eligible_arrow_files = vec![];
-
-        for file in arrow_files {
-            if file.as_str().ends_with(FILE_EXT_ARROW) && !wal::should_exclude_file(&file).await {
-                eligible_arrow_files.push(file);
-            }
-        }
-
-        let mut files = json_files;
-        files.extend(eligible_arrow_files);
         if files.is_empty() {
             return Ok(Response::new(resp));
         }

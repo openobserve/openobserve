@@ -30,8 +30,11 @@ pub async fn run(prefix: &str) -> Result<(), anyhow::Error> {
     }
 
     // move files from wal for disk
-    if let Err(e) = files::disk::move_files_to_storage().await {
-        log::error!("Error moving disk files to remote: {}", e);
+    if let Err(e) = files::json::move_files_to_storage().await {
+        log::error!("Error moving disk json files to remote: {}", e);
+    }
+    if let Err(e) = files::parquet::move_files_to_storage().await {
+        log::error!("Error moving disk parquet files to remote: {}", e);
     }
 
     // move file_list from wal for disk
@@ -107,8 +110,11 @@ pub async fn run_for_deleted() -> Result<(), anyhow::Error> {
     }
 
     // move files from wal for disk
-    if let Err(e) = files::disk::move_files_to_storage().await {
-        log::error!("Error moving disk files to remote: {}", e);
+    if let Err(e) = files::json::move_files_to_storage().await {
+        log::error!("Error moving disk json files to remote: {}", e);
+    }
+    if let Err(e) = files::parquet::move_files_to_storage().await {
+        log::error!("Error moving disk parquet files to remote: {}", e);
     }
 
     // move file_list from wal for disk

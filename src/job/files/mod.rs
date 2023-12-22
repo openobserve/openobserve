@@ -23,16 +23,16 @@ use crate::common::{
 };
 
 pub mod broadcast;
-pub mod disk;
-pub mod memory;
+pub mod json;
+pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) || CONFIG.common.ingester_sidecar_querier {
         return Ok(()); // not an ingester, no need to init job
     }
 
-    tokio::task::spawn(async move { disk::run().await });
-    tokio::task::spawn(async move { memory::run().await });
+    tokio::task::spawn(async move { json::run().await });
+    tokio::task::spawn(async move { parquet::run().await });
     tokio::task::spawn(async move { broadcast::run().await });
 
     Ok(())
