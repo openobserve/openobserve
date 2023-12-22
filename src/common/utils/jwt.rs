@@ -7,7 +7,7 @@ use {
         },
         service::{db, users},
     },
-    o2_enterprise::enterprise::common::infra::config::{DEX_GROUP_REGEX, O2_CONFIG},
+    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
 };
 #[cfg(feature = "enterprise")]
 use {
@@ -154,23 +154,28 @@ pub async fn process_token(
 
 #[cfg(feature = "enterprise")]
 fn parse_dn(dn: &str) -> Option<RoleOrg> {
-    DEX_GROUP_REGEX.captures(dn.as_bytes()).map(|caps| {
-        let role =
-            String::from_utf8_lossy(caps.name(&O2_CONFIG.dex.role_attribute).unwrap().as_bytes())
-                .to_string();
-        let org = String::from_utf8_lossy(
-            caps.name(&O2_CONFIG.dex.group_attribute)
-                .unwrap()
-                .as_bytes(),
-        )
-        .to_string();
+    let mut org = "";
+    let mut role = "";
 
-        let role = if role.contains("admin") {
-            crate::common::meta::user::UserRole::Admin
-        } else {
-            crate::common::meta::user::UserRole::Member
-        };
+    for part in dn.split(',') {
+        let parts: Vec<&str> = part.split('=').collect();
+        if parts.len() == 2 {
+            if parts[0].eq(&O2_CONFIG.dex.group_attribute) && org.is_empty() {
+                org = parts[1];
+            }
+            if parts[0].eq(&O2_CONFIG.dex.role_attribute) && role.is_empty() {
+                role = parts[1];
+            }
+        }
+    }
+    let role = if role.contains("admin") {
+        crate::common::meta::user::UserRole::Admin
+    } else {
+        crate::common::meta::user::UserRole::Member
+    };
 
-        RoleOrg { role, org }
+    Some(RoleOrg {
+        role,
+        org: org.to_owned(),
     })
 }
