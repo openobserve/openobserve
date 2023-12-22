@@ -72,13 +72,18 @@ export const convertSQLData = (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    const data =
+    let data =
       searchQueryData[0]?.filter((item: any) => {
         return (
           xAxisKeys.every((key: any) => item[key] != null) &&
           yAxisKeys.every((key: any) => item[key] != null)
         );
       }) || [];
+
+    // if h-bar or h-stacked need to reverse data due proper view when asc or desc is used
+    if (["h-bar", "h-stacked"].includes(panelSchema.type)) {
+      data = data.reverse();
+    }
 
     // if data is not there use {} as a default value
     const keys = Object.keys((data.length && data[0]) || {}); // Assuming there's at least one object
