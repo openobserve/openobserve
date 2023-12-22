@@ -52,59 +52,63 @@ export default defineComponent({
      * redirect user to the page where user was redirected from
      */
     const getDefaultOrganization = () => {
-      organizationsService.os_list(0, 1000, "id", false, "").then((res: any) => {
-        const localOrg: any = useLocalOrganization();
-        if (
-          localOrg.value != null &&
-          localOrg.value.user_email !== store.state.userInfo.email
-        ) {
-          localOrg.value = null;
-          useLocalOrganization("");
-        }
-
-        store.dispatch("setOrganizations", res.data.data);
-        orgOptions.value = res.data.data.map(
-          (data: {
-            id: any;
-            name: any;
-            type: any;
-            identifier: any;
-            UserObj: any;
-          }) => {
-            let optiondata: any = {
-              label: data.name,
-              id: data.id,
-              identifier: data.identifier,
-              user_email: store.state.userInfo.email,
-              ingest_threshold: data.ingest_threshold,
-              search_threshold: data.search_threshold,
-              subscription_type: data.hasOwnProperty("CustomerBillingObj")
-                ? data.CustomerBillingObj.subscription_type
-                : "",
-              status: data.status,
-              note: data.hasOwnProperty("CustomerBillingObj")
-                ? data.CustomerBillingObj.note
-                : "",
-            };
-
-            if (
-              (selectedOrg.value == "" &&
-                (data.type == "default" || data.id == '1') &&
-                store.state.userInfo.email == data.UserObj.email) ||
-              res.data.data.length == 1
-            ) {
-              selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
-              useLocalOrganization(selectedOrg.value);
-              store.dispatch("setSelectedOrganization", selectedOrg.value);
-            }
-            return optiondata;
+      organizationsService
+        .os_list(0, 1000, "id", false, "")
+        .then((res: any) => {
+          const localOrg: any = useLocalOrganization();
+          if (
+            localOrg.value != null &&
+            localOrg.value.user_email !== store.state.userInfo.email
+          ) {
+            localOrg.value = null;
+            useLocalOrganization("");
           }
-        );
 
-        const redirectURI = window.sessionStorage.getItem("redirectURI");
-        window.sessionStorage.removeItem("redirectURI");
-        redirectUser(redirectURI);
-      });
+          store.dispatch("setOrganizations", res.data.data);
+          orgOptions.value = res.data.data.map(
+            (data: {
+              id: any;
+              name: any;
+              type: any;
+              identifier: any;
+              UserObj: any;
+            }) => {
+              let optiondata: any = {
+                label: data.name,
+                id: data.id,
+                identifier: data.identifier,
+                user_email: store.state.userInfo.email,
+                ingest_threshold: data.ingest_threshold,
+                search_threshold: data.search_threshold,
+                subscription_type: data.hasOwnProperty("CustomerBillingObj")
+                  ? data.CustomerBillingObj.subscription_type
+                  : "",
+                status: data.status,
+                note: data.hasOwnProperty("CustomerBillingObj")
+                  ? data.CustomerBillingObj.note
+                  : "",
+              };
+
+              if (
+                (selectedOrg.value == "" &&
+                  (data.type == "default" || data.id == "1") &&
+                  store.state.userInfo.email == data.UserObj.email) ||
+                res.data.data.length == 1
+              ) {
+                selectedOrg.value = localOrg.value
+                  ? localOrg.value
+                  : optiondata;
+                useLocalOrganization(selectedOrg.value);
+                store.dispatch("setSelectedOrganization", selectedOrg.value);
+              }
+              return optiondata;
+            }
+          );
+
+          const redirectURI = window.sessionStorage.getItem("redirectURI");
+          window.sessionStorage.removeItem("redirectURI");
+          redirectUser(redirectURI);
+        });
     };
 
     /**
@@ -163,7 +167,10 @@ export default defineComponent({
     const d = new Date();
     this.userInfo =
       sessionUserInfo !== null ? JSON.parse(sessionUserInfo) : null;
-    if (this.userInfo !== null && (this.userInfo.hasOwnProperty("pgdata")) || config.isEnterprise === "true") {
+    if (
+      (this.userInfo !== null && this.userInfo.hasOwnProperty("pgdata")) ||
+      config.isEnterprise === "true"
+    ) {
       this.store.dispatch("login", {
         loginState: true,
         userInfo: this.userInfo,

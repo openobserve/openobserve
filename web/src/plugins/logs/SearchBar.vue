@@ -102,7 +102,7 @@ color="grey" size="xs" />
         <q-toggle
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.toggleFunction"
-          icon="functions"
+          :icon="'img:' + getImageURL('images/common/function.svg')"
           title="Toggle Function Editor"
           class="float-left"
           size="32px"
@@ -117,7 +117,7 @@ color="grey" size="xs" />
             auto-close
             size="12px"
             icon="save"
-            icon-right="functions"
+            :icon-right="'img:' + getImageURL('images/common/function.svg')"
             :title="t('search.savedViewsLabel')"
             split
             class="no-outline saved-views-dropdown no-border"
@@ -522,7 +522,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import stream from "@/services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { mergeDeep, b64DecodeUnicode } from "@/utils/zincutils";
+import { mergeDeep, b64DecodeUnicode, getImageURL } from "@/utils/zincutils";
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
@@ -1546,6 +1546,7 @@ export default defineComponent({
       savedFunctionSelectedName,
       saveFunctionLoader,
       shareLink,
+      getImageURL,
     };
   },
   computed: {

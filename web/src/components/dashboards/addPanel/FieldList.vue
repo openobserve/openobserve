@@ -850,7 +850,7 @@ export default defineComponent({
 
   &.q-manual-focusable--focused > .q-focus-helper,
   &--active {
-    background-color: $selected-list-bg !important;
+    // background-color: $selected-list-bg !important;
   }
 
   &.q-manual-focusable--focused > .q-focus-helper,
