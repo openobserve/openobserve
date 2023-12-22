@@ -29,7 +29,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use super::{
-    auth::{validator, validator_aws, validator_gcp, validator_proxy_url, validator_rum},
+    auth::validator::{validator_aws, validator_gcp, validator_proxy_url, validator_rum},
     request::{
         dashboards::{folders::*, *},
         enrichment_table, functions, kv, logs, metrics, organization, prom, rum, search, status,
@@ -44,6 +44,22 @@ use crate::common::{
 pub mod openapi;
 pub mod ui;
 
+#[cfg(feature = "enterprise")]
+fn get_cors() -> Rc<Cors> {
+    let cors = Cors::default()
+        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
+        .allowed_headers(vec![
+            header::AUTHORIZATION,
+            header::ACCEPT,
+            header::CONTENT_TYPE,
+        ])
+        .allow_any_origin()
+        .supports_credentials()
+        .max_age(3600);
+    Rc::new(cors)
+}
+
+#[cfg(not(feature = "enterprise"))]
 fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
         .send_wildcard()
@@ -159,16 +175,28 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
 
 pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
+    #[cfg(not(feature = "enterprise"))]
     cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
+    #[cfg(feature = "enterprise")]
+    cfg.service(
+        web::scope("/config")
+            .wrap(cors)
+            .service(status::zo_config)
+            .service(status::callback)
+            .service(status::dex_login)
+            .service(status::refresh_token_with_dex),
+    );
 }
 
 pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
-    let auth = HttpAuthentication::basic(validator);
+
     cfg.service(
         web::scope("/api")
-            .wrap(auth)
-            .wrap(cors)
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::oo_validator,
+            ))
+            .wrap(cors.clone())
             .service(status::cache_status)
             .service(users::list)
             .service(users::save)
