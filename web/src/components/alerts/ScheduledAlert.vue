@@ -113,127 +113,190 @@
           />
         </div>
       </div>
-      <div class="flex justify-start items-center q-mb-md">
+      <div class="flex justify-start items-center q-mb-xs">
         <div class="text-bold" style="width: 180px">
           {{ t("alerts.threshold") + " *" }}
         </div>
-        <template v-if="_isAggregationEnabled && aggregationData">
-          <div class="threshould-input q-mr-xs">
-            <q-select
-              data-test="add-alert-stream-select"
-              v-model="aggregationData.function"
-              :options="aggFunctions"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop no-case q-py-none"
-              filled
-              borderless
-              dense
-              use-input
-              hide-selected
-              fill-input
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              style="width: 88px; border: 1px solid rgba(0, 0, 0, 0.05)"
-              @update:model-value="updateTrigger"
-            />
-          </div>
-          <div class="threshould-input q-mr-xs">
-            <q-select
-              data-test="add-alert-stream-select"
-              v-model="aggregationData.having.column"
-              :options="filteredNumericColumns"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop no-case q-py-none"
-              filled
-              borderless
-              dense
-              use-input
-              emit-value
-              hide-selected
-              fill-input
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              @filter="filterNumericColumns"
-              style="width: 250px; border: 1px solid rgba(0, 0, 0, 0.05)"
-              @update:model-value="updateTrigger"
-            />
-          </div>
-          <div class="threshould-input q-mr-xs">
-            <q-select
-              data-test="add-alert-stream-select"
-              v-model="aggregationData.having.operator"
-              :options="triggerOperators"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop no-case q-py-none"
-              filled
-              borderless
-              dense
-              use-input
-              hide-selected
-              fill-input
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              style="width: 88px; border: 1px solid rgba(0, 0, 0, 0.05)"
-              @update:model-value="updateTrigger"
-            />
-          </div>
-          <div
-            class="flex items-center"
-            style="border: 1px solid rgba(0, 0, 0, 0.05)"
-          >
-            <div
-              style="width: 150px; margin-left: 0 !important"
-              class="silence-notification-input"
-            >
-              <q-input
-                data-test="add-alert-delay-input"
-                v-model="aggregationData.having.value"
-                type="number"
-                dense
-                filled
-                min="0"
-                style="background: none"
-                placeholder="Value"
-                @update:model-value="updateTrigger"
-              />
+        <div style="min-height: 58px">
+          <template v-if="_isAggregationEnabled && aggregationData">
+            <div class="flex justify-start items-center">
+              <div class="threshould-input q-mr-xs">
+                <q-select
+                  data-test="add-alert-stream-select"
+                  v-model="aggregationData.function"
+                  :options="aggFunctions"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop no-case q-py-none"
+                  filled
+                  borderless
+                  dense
+                  use-input
+                  hide-selected
+                  fill-input
+                  style="width: 88px; border: 1px solid rgba(0, 0, 0, 0.05)"
+                  @update:model-value="updateTrigger"
+                />
+              </div>
+              <div class="threshould-input q-mr-xs">
+                <q-select
+                  data-test="add-alert-stream-select"
+                  v-model="aggregationData.having.column"
+                  :options="filteredNumericColumns"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop no-case q-py-none"
+                  filled
+                  borderless
+                  dense
+                  use-input
+                  emit-value
+                  hide-selected
+                  fill-input
+                  @filter="filterNumericColumns"
+                  style="width: 250px; border: 1px solid rgba(0, 0, 0, 0.05)"
+                  @update:model-value="updateTrigger"
+                />
+              </div>
+              <div class="threshould-input q-mr-xs">
+                <q-select
+                  data-test="add-alert-stream-select"
+                  v-model="aggregationData.having.operator"
+                  :options="triggerOperators"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop no-case q-py-none"
+                  filled
+                  borderless
+                  dense
+                  use-input
+                  hide-selected
+                  fill-input
+                  style="width: 88px; border: 1px solid rgba(0, 0, 0, 0.05)"
+                  @update:model-value="updateTrigger"
+                />
+              </div>
+              <div
+                class="flex items-center"
+                style="border: 1px solid rgba(0, 0, 0, 0.05)"
+              >
+                <div
+                  style="width: 150px; margin-left: 0 !important"
+                  class="silence-notification-input"
+                >
+                  <q-input
+                    data-test="add-alert-delay-input"
+                    v-model="aggregationData.having.value"
+                    type="number"
+                    dense
+                    filled
+                    min="0"
+                    style="background: none"
+                    placeholder="Value"
+                    @update:model-value="updateTrigger"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        </template>
-        <template v-else>
-          <div class="threshould-input">
-            <q-select
-              data-test="add-alert-stream-select"
-              v-model="triggerData.operator"
-              :options="triggerOperators"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop no-case q-py-none"
-              filled
-              borderless
-              dense
-              use-input
-              hide-selected
-              fill-input
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              style="width: 88px; border: 1px solid rgba(0, 0, 0, 0.05)"
-              @update:model-value="updateTrigger"
-            />
-          </div>
+            <div
+              v-if="
+                !aggregationData.function ||
+                !aggregationData.having.column ||
+                !aggregationData.having.operator ||
+                !aggregationData.having.value.toString().trim().length
+              "
+              class="text-red-8 q-pt-xs"
+              style="font-size: 11px; line-height: 12px"
+            >
+              Field is required!
+            </div>
+          </template>
+          <template v-else>
+            <div class="flex justify-start items-center">
+              <div class="threshould-input">
+                <q-select
+                  data-test="add-alert-stream-select"
+                  v-model="triggerData.operator"
+                  :options="triggerOperators"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop no-case q-py-none"
+                  filled
+                  borderless
+                  dense
+                  use-input
+                  hide-selected
+                  fill-input
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  style="width: 88px; border: 1px solid rgba(0, 0, 0, 0.05)"
+                  @update:model-value="updateTrigger"
+                />
+              </div>
+              <div
+                class="flex items-center"
+                style="border: 1px solid rgba(0, 0, 0, 0.05); border-left: none"
+              >
+                <div
+                  style="width: 89px; margin-left: 0 !important"
+                  class="silence-notification-input"
+                >
+                  <q-input
+                    data-test="add-alert-delay-input"
+                    v-model="triggerData.threshold"
+                    type="number"
+                    dense
+                    filled
+                    min="0"
+                    style="background: none"
+                    @update:model-value="updateTrigger"
+                  />
+                </div>
+                <div
+                  style="
+                    min-width: 90px;
+                    margin-left: 0 !important;
+                    height: 40px;
+                    font-weight: normal;
+                  "
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+                  "
+                  class="flex justify-center items-center"
+                >
+                  {{ t("alerts.times") }}
+                </div>
+              </div>
+            </div>
+            <div
+              v-if="!triggerData.operator || !Number(triggerData.threshold)"
+              class="text-red-8 q-pt-xs"
+              style="font-size: 11px; line-height: 12px"
+            >
+              Field is required!
+            </div>
+          </template>
+        </div>
+      </div>
+      <div class="flex items-center q-mr-sm">
+        <div class="text-bold" style="width: 180px">
+          {{ t("alerts.period") + " *" }}
+        </div>
+        <div style="min-height: 58px">
           <div
-            class="flex items-center"
-            style="border: 1px solid rgba(0, 0, 0, 0.05); border-left: none"
+            class="flex items-center q-mr-sm"
+            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
           >
             <div
-              style="width: 89px; margin-left: 0 !important"
+              style="width: 87px; margin-left: 0 !important"
               class="silence-notification-input"
             >
               <q-input
                 data-test="add-alert-delay-input"
-                v-model="triggerData.threshold"
+                v-model="triggerData.period"
                 type="number"
                 dense
                 filled
-                min="0"
+                min="1"
                 style="background: none"
                 @update:model-value="updateTrigger"
               />
@@ -248,45 +311,15 @@
               :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
               class="flex justify-center items-center"
             >
-              {{ t("alerts.times") }}
+              {{ t("alerts.minutes") }}
             </div>
           </div>
-        </template>
-      </div>
-      <div class="flex items-center q-mr-sm">
-        <div class="text-bold" style="width: 180px">
-          {{ t("alerts.period") + " *" }}
-        </div>
-        <div
-          class="flex items-center q-mr-sm"
-          style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
-        >
           <div
-            style="width: 87px; margin-left: 0 !important"
-            class="silence-notification-input"
+            v-if="!Number(triggerData.period)"
+            class="text-red-8 q-pt-xs"
+            style="font-size: 11px; line-height: 12px"
           >
-            <q-input
-              data-test="add-alert-delay-input"
-              v-model="triggerData.period"
-              type="number"
-              dense
-              filled
-              min="1"
-              style="background: none"
-              @update:model-value="updateTrigger"
-            />
-          </div>
-          <div
-            style="
-              min-width: 90px;
-              margin-left: 0 !important;
-              height: 40px;
-              font-weight: normal;
-            "
-            :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
-            class="flex justify-center items-center"
-          >
-            {{ t("alerts.minutes") }}
+            Field is required!
           </div>
         </div>
       </div>
