@@ -409,6 +409,7 @@ pub async fn write_file_arrow(
                     schema_key: Arc::from("default"),
                     partition_key: Arc::from("2023/12/18/00"),
                     data: entry.records.clone(),
+                    data_size: 0,
                 },
             )
             .await

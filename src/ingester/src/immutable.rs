@@ -15,12 +15,12 @@
 
 use std::{path::PathBuf, sync::Arc};
 
-use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 
 use crate::{
+    entry::RecordBatchEntry,
     errors::{DeleteFileSnafu, RenameFileSnafu, Result, WriteDataSnafu},
     memtable::MemTable,
     rwmap::RwIndexMap,
@@ -40,7 +40,7 @@ pub async fn read_from_immutable(
     stream_type: &str,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
-) -> Result<Vec<(Arc<Schema>, Vec<RecordBatch>)>> {
+) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
     let r = IMMUTABLES.read().await;
     let mut batches = Vec::with_capacity(r.len());
     for (_, i) in r.iter() {

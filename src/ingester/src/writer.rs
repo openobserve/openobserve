@@ -18,7 +18,6 @@ use std::sync::{
     Arc,
 };
 
-use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use once_cell::sync::Lazy;
@@ -27,7 +26,12 @@ use tokio::sync::{Mutex, RwLock};
 use wal::Writer as WalWriter;
 
 use crate::{
-    entry::Entry, errors::*, immutable, immutable::IMMUTABLES, memtable::MemTable, rwmap::RwMap,
+    entry::{Entry, RecordBatchEntry},
+    errors::*,
+    immutable,
+    immutable::IMMUTABLES,
+    memtable::MemTable,
+    rwmap::RwMap,
 };
 
 static WRITERS: Lazy<RwMap<WriterKey, Arc<Writer>>> = Lazy::new(RwMap::default);
@@ -70,11 +74,10 @@ impl Writer {
         }
     }
 
-    pub async fn write(&self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
-        let data = entry.into_bytes()?;
-        println!("write: {}", data.len());
+    pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry) -> Result<()> {
+        let entry_bytes = entry.into_bytes()?;
         let mut wal = self.wal.lock().await;
-        if self.check_threshold(wal.size(), data.len()).await {
+        if self.check_threshold(wal.size(), entry_bytes.len()).await {
             // rotation wal
             let id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             println!("wal rotation: {}", id);
@@ -103,7 +106,7 @@ impl Writer {
         }
 
         // write into wal
-        wal.write(&data).context(WalSnafu)?;
+        wal.write(&entry_bytes).context(WalSnafu)?;
 
         // write into memtable
         self.memtable.write().await.write(schema, entry).await?;
@@ -114,7 +117,7 @@ impl Writer {
         &self,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
-    ) -> Result<Vec<(Arc<Schema>, Vec<RecordBatch>)>> {
+    ) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
         let memtable = self.memtable.read().await;
         memtable.read(stream_name, time_range).await
     }

@@ -15,10 +15,14 @@
 
 use std::{path::PathBuf, sync::Arc};
 
-use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 
-use crate::{entry::Entry, errors::Result, rwmap::RwMap, stream::Stream};
+use crate::{
+    entry::{Entry, RecordBatchEntry},
+    errors::Result,
+    rwmap::RwMap,
+    stream::Stream,
+};
 
 pub(crate) struct MemTable {
     streams: RwMap<Arc<str>, Stream>, // key: schema name, val: stream
@@ -41,7 +45,7 @@ impl MemTable {
         &self,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
-    ) -> Result<Vec<(Arc<Schema>, Vec<RecordBatch>)>> {
+    ) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
         let r = self.streams.read().await;
         let Some(stream) = r.get(stream_name) else {
             return Ok(vec![]);

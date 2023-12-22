@@ -18,25 +18,29 @@ use std::{
     sync::Arc,
 };
 
+use arrow::{array::Int64Array, record_batch::RecordBatch};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use snafu::ResultExt;
 
-use crate::errors::*;
+use crate::{errors::*, COL_TIMESTAMP};
 
 pub struct Entry {
     pub stream: Arc<str>,
     pub schema_key: Arc<str>,
     pub partition_key: Arc<str>, // 2023/12/18/00/country=US/state=CA
     pub data: Vec<Arc<serde_json::Value>>,
+    pub data_size: usize,
 }
 
 impl Entry {
-    pub fn into_bytes(&self) -> Result<Vec<u8>> {
+    pub fn into_bytes(&mut self) -> Result<Vec<u8>> {
         let mut buf = Vec::with_capacity(4096);
         let stream = self.stream.as_bytes();
         let schema_key = self.schema_key.as_bytes();
         let partition_key = self.partition_key.as_bytes();
         let data = serde_json::to_vec(&self.data).context(JSONSerializationSnafu)?;
+        let data_size = data.len();
+        self.data_size = data_size; // reset data size
         buf.write_u16::<BigEndian>(stream.len() as u16)
             .context(WriteDataSnafu)?;
         buf.extend_from_slice(stream);
@@ -46,7 +50,7 @@ impl Entry {
         buf.write_u16::<BigEndian>(partition_key.len() as u16)
             .context(WriteDataSnafu)?;
         buf.extend_from_slice(partition_key);
-        buf.write_u32::<BigEndian>(data.len() as u32)
+        buf.write_u32::<BigEndian>(data_size as u32)
             .context(WriteDataSnafu)?;
         buf.extend_from_slice(&data);
         Ok(buf)
@@ -77,6 +81,42 @@ impl Entry {
             schema_key: schema_key.into(),
             partition_key: partition_key.into(),
             data,
+            data_size: data_len as usize,
+        })
+    }
+}
+
+pub struct RecordBatchEntry {
+    pub data: RecordBatch,
+    pub data_size: usize,
+    pub min_ts: i64,
+    pub max_ts: i64,
+}
+
+impl RecordBatchEntry {
+    pub fn new(data: RecordBatch, data_size: usize) -> Arc<RecordBatchEntry> {
+        let (min_ts, max_ts) = match data.column_by_name(COL_TIMESTAMP) {
+            None => (0, 0),
+            Some(v) => {
+                let v = v.as_any().downcast_ref::<Int64Array>().unwrap();
+                let mut min_v = v.value(0);
+                let mut max_v = v.value(0);
+                for v in v.values() {
+                    if &min_v > v {
+                        min_v = *v;
+                    }
+                    if &max_v < v {
+                        max_v = *v;
+                    }
+                }
+                (min_v, max_v)
+            }
+        };
+        Arc::new(Self {
+            data,
+            data_size,
+            min_ts,
+            max_ts,
         })
     }
 }

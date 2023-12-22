@@ -292,6 +292,8 @@ pub async fn search_memtable(
     // unwrap_partition_time_level(schema_settings.partition_time_level,
     // stream_type);
 
+    let mut scan_stats = ScanStats::new();
+
     let Some(reader) = ingester::get_reader(&sql.org_id, &stream_type.to_string()).await else {
         return Ok((HashMap::new(), ScanStats::new()));
     };
@@ -309,14 +311,26 @@ pub async fn search_memtable(
         .await
         .unwrap_or_default(),
     );
-    if batches.is_empty() {
+    scan_stats.files = batches.len() as i64;
+    if scan_stats.files == 0 {
         return Ok((HashMap::new(), ScanStats::new()));
     }
 
     let mut batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>> = HashMap::with_capacity(2);
     for (schema, batch) in batches {
         let entry = batch_groups.entry(schema).or_default();
-        entry.extend(batch);
+        scan_stats.original_size += batch.iter().map(|r| r.data_size).sum::<usize>() as i64;
+        entry.extend(batch.into_iter().map(|r| r.data.clone()));
+    }
+
+    log::info!(
+        "[session_id {session_id}] wal->mem->search: load files {}, scan_size {}",
+        scan_stats.files,
+        scan_stats.original_size
+    );
+
+    if CONFIG.common.memory_circuit_breaker_enable {
+        super::check_memory_circuit_breaker(&scan_stats)?;
     }
 
     // fetch all schema versions, get latest schema
@@ -415,7 +429,6 @@ pub async fn search_memtable(
         };
     }
 
-    let scan_stats = ScanStats::new();
     Ok((results, scan_stats))
 }
 
@@ -448,7 +461,7 @@ async fn get_file_list(
         "{}/files/{}/{stream_type}/{}/",
         wal_dir, &sql.org_id, &sql.stream_name
     );
-    let files = scan_files(&pattern,"parquet");
+    let files = scan_files(&pattern, "parquet");
     if files.is_empty() {
         return Ok(vec![]);
     }

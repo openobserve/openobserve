@@ -15,17 +15,18 @@
 
 use std::{
     fs::{create_dir_all, OpenOptions},
+    io::Write,
     path::PathBuf,
     sync::Arc,
 };
 
-use arrow::{json::ReaderBuilder, record_batch::RecordBatch};
+use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
 use chrono::Utc;
 use snafu::ResultExt;
 
 use crate::{
-    entry::Entry,
+    entry::{Entry, RecordBatchEntry},
     errors::*,
     parquet::{new_parquet_writer, FileMeta},
     rwmap::RwMap,
@@ -57,7 +58,7 @@ impl Partition {
     pub(crate) async fn read(
         &self,
         time_range: Option<(i64, i64)>,
-    ) -> Result<(Arc<Schema>, Vec<RecordBatch>)> {
+    ) -> Result<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)> {
         let r = self.files.read().await;
         let mut batches = Vec::with_capacity(r.len());
         for file in r.values() {
@@ -90,23 +91,36 @@ impl Partition {
             path.set_extension("par");
             create_dir_all(path.parent().unwrap())
                 .context(CreateFileSnafu { path: path.clone() })?;
+
+            let mut file_meta = FileMeta::default();
+            data.data.iter().for_each(|r| {
+                file_meta.original_size += r.data_size as i64;
+                file_meta.records += r.data.num_rows() as i64;
+                if file_meta.min_ts == 0 || file_meta.min_ts > r.min_ts {
+                    file_meta.min_ts = r.min_ts;
+                }
+                if file_meta.max_ts < r.max_ts {
+                    file_meta.max_ts = r.max_ts;
+                }
+            });
+            // write into parquet buf
+            let mut buf_parquet = Vec::new();
+            let mut writer = new_parquet_writer(&mut buf_parquet, &self.schema, &[], &file_meta);
+            for batch in data.data.iter() {
+                writer
+                    .write(&batch.data)
+                    .context(WriteParquetRecordBatchSnafu)?;
+            }
+            writer.close().context(WriteParquetRecordBatchSnafu)?;
+            // write into local file
             let mut f = OpenOptions::new()
                 .create(true)
                 .write(true)
                 .open(&path)
                 .context(CreateFileSnafu { path: path.clone() })?;
-            let file_meta = FileMeta {
-                min_ts: 0,
-                max_ts: 0,
-                records: data.data.iter().map(|b| b.num_rows()).sum::<usize>() as i64,
-                original_size: 0,
-                compressed_size: 0,
-            };
-            let mut writer = new_parquet_writer(&mut f, &self.schema, &[], &file_meta);
-            for batch in data.data.iter() {
-                writer.write(batch).context(WriteParquetRecordBatchSnafu)?;
-            }
-            writer.close().context(WriteParquetRecordBatchSnafu)?;
+            f.write_all(&buf_parquet)
+                .context(WriteFileSnafu { path: path.clone() })?;
+
             paths.push(path);
         }
         Ok(paths)
@@ -114,7 +128,7 @@ impl Partition {
 }
 
 struct PartitionFile {
-    data: Vec<RecordBatch>,
+    data: Vec<Arc<RecordBatchEntry>>,
 }
 
 impl PartitionFile {
@@ -124,23 +138,25 @@ impl PartitionFile {
 
     fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
         let mut decoder = ReaderBuilder::new(schema)
-            .with_batch_size(8192)
+            .with_batch_size(entry.data.len())
             .build_decoder()
             .context(CreateArrowJsonEncoderSnafu)?;
         let _ = decoder.serialize(&entry.data);
         let batch = decoder.flush().context(ArrowJsonEncodeSnafu)?;
         if let Some(batch) = batch {
             println!(
-                "columns: {}, rows: {}",
+                "columns: {}, rows: {}, size: {}",
                 batch.num_columns(),
-                batch.num_rows()
+                batch.num_rows(),
+                entry.data_size,
             );
-            self.data.push(batch);
+            self.data
+                .push(RecordBatchEntry::new(batch, entry.data_size));
         }
         Ok(())
     }
 
-    fn read(&self, _time_range: Option<(i64, i64)>) -> Result<Vec<RecordBatch>> {
+    fn read(&self, _time_range: Option<(i64, i64)>) -> Result<Vec<Arc<RecordBatchEntry>>> {
         Ok(self.data.clone())
     }
 }

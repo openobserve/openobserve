@@ -15,10 +15,14 @@
 
 use std::{path::PathBuf, sync::Arc};
 
-use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 
-use crate::{entry::Entry, errors::*, partition::Partition, rwmap::RwMap};
+use crate::{
+    entry::{Entry, RecordBatchEntry},
+    errors::*,
+    partition::Partition,
+    rwmap::RwMap,
+};
 
 pub(crate) struct Stream {
     partitions: RwMap<Arc<str>, Partition>, // key: schema version hash, val: partitions
@@ -42,7 +46,7 @@ impl Stream {
     pub(crate) async fn read(
         &self,
         time_range: Option<(i64, i64)>,
-    ) -> Result<Vec<(Arc<Schema>, Vec<RecordBatch>)>> {
+    ) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
         let r = self.partitions.read().await;
         let mut batches = Vec::with_capacity(r.len());
         for partition in r.values() {

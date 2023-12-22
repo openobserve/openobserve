@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::File, sync::Arc};
+use std::sync::Arc;
 
 use arrow_schema::Schema;
 use itertools::chain;
@@ -76,11 +76,11 @@ pub struct FileMeta {
 }
 
 pub(crate) fn new_parquet_writer<'a>(
-    f: &'a mut File,
+    buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
     bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
-) -> ArrowWriter<&'a mut File> {
+) -> ArrowWriter<&'a mut Vec<u8>> {
     let sort_column_id = schema
         .index_of("_timestamp")
         .expect("Not found timestamp field");
@@ -138,5 +138,5 @@ pub(crate) fn new_parquet_writer<'a>(
         }
     }
     let writer_props = writer_props.build();
-    ArrowWriter::try_new(f, schema.clone(), Some(writer_props)).unwrap()
+    ArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }

@@ -52,6 +52,10 @@ pub enum Error {
         source: io::Error,
         path: PathBuf,
     },
+    WriteFileError {
+        source: io::Error,
+        path: PathBuf,
+    },
     WriteDataError {
         source: io::Error,
     },

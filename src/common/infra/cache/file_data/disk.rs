@@ -62,7 +62,7 @@ impl FileData {
 
     async fn load(&mut self) -> Result<(), anyhow::Error> {
         let wal_dir = Path::new(&self.root_dir).canonicalize().unwrap();
-        let files = scan_files(&self.root_dir,"parquet");
+        let files = scan_files(&self.root_dir, "parquet");
         for file in files {
             let local_path = Path::new(&file).canonicalize().unwrap();
             let file_key = local_path
