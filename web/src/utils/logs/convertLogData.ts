@@ -60,6 +60,8 @@ export const convertLogData = (
       axisLine: {
         show: true,
       },
+      // yaxis interval(it will show three values: 0, mid, max value)
+      interval: Math.max(...y) / 2,
     },
     toolbox: {
       orient: "vertical",
