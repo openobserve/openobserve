@@ -181,6 +181,7 @@ mod tests {
                 last_name: "".to_owned(),
                 is_external: false,
             },
+            user_id,
         )
         .await;
         assert!(resp.is_ok());
