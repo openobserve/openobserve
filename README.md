@@ -61,7 +61,7 @@ For a full list of features, check the [documentation](https://openobserve.ai/do
 ### 🐳 Docker:
 ```bash
 docker run -d \
-      --name openobserve
+      --name openobserve \
       -v $PWD/data:/data \
       -p 5080:5080 \
       -e ZO_ROOT_USER_EMAIL="root@example.com" \
