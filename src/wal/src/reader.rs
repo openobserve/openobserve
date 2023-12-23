@@ -42,7 +42,6 @@ impl Reader<BufReader<File>> {
         f.read_exact(&mut buf).context(UnableToReadArraySnafu {
             length: super::FILE_TYPE_IDENTIFIER.len(),
         })?;
-        println!("{:?}", String::from_utf8_lossy(&buf));
         ensure!(
             &buf == super::FILE_TYPE_IDENTIFIER,
             FileIdentifierMismatchSnafu,

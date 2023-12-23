@@ -61,7 +61,7 @@ use crate::{
         },
         utils::{flatten, json},
     },
-    service::{schema::filter_schema_null_fields, search::sql::Sql},
+    service::{schema::format_schema, search::sql::Sql},
 };
 
 const AGGREGATE_UDF_LIST: [&str; 7] = [
@@ -590,7 +590,7 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>,
             tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
         }
     }
-    filter_schema_null_fields(&mut schema); // fix schema
+    let schema = format_schema(&schema); // fix schema
     Ok((Arc::new(schema), work_dir))
 }
 
@@ -1186,9 +1186,9 @@ fn apply_query_fn(
                 .collect();
 
             let value_iter = rows_val.iter().map(Ok);
-            let mut inferred_schema =
+            let inferred_schema =
                 arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap();
-            filter_schema_null_fields(&mut inferred_schema);
+            let inferred_schema = format_schema(&inferred_schema);
             let mut decoder =
                 arrow::json::ReaderBuilder::new(Arc::new(inferred_schema)).build_decoder()?;
 

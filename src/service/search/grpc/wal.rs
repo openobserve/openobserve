@@ -44,7 +44,7 @@ use crate::{
     },
     service::{
         db,
-        schema::filter_schema_null_fields,
+        schema::format_schema,
         search::{
             datafusion::{exec, storage::StorageType},
             sql::Sql,
@@ -149,8 +149,7 @@ pub async fn search_parquet(
         let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
-        let mut inferred_schema = arrow_reader.schema().as_ref().clone();
-        filter_schema_null_fields(&mut inferred_schema);
+        let mut inferred_schema = format_schema(arrow_reader.schema());
         // calulate schema diff
         let mut diff_fields = HashMap::new();
         let group_fields = inferred_schema.fields();

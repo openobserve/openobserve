@@ -123,6 +123,7 @@ pub async fn schema_evolution(
                         }
                         final_fields.push(field);
                     }
+                    final_fields.sort_by(|a, b| a.name().cmp(b.name()));
                     let final_schema = Schema::new(final_fields.to_vec()).with_metadata(metadata);
                     db::schema::set(
                         org_id,
@@ -208,6 +209,7 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
             }
         }
     }
+    merged_fields.sort_by(|a, b| a.name().cmp(b.name()));
     let merged = Schema::new_with_metadata(merged_fields, merged_metadata);
     Ok(merged)
 }
@@ -289,8 +291,8 @@ pub async fn check_for_schema(
     }
 
     let mut schema_reader = BufReader::new(val_str.as_bytes());
-    let mut inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
-    filter_schema_null_fields(&mut inferred_schema);
+    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
+    let inferred_schema = format_schema(&inferred_schema);
 
     if schema.fields.eq(&inferred_schema.fields) {
         // return (true, None, schema.fields().to_vec());
@@ -687,23 +689,9 @@ fn get_schema_changes(
             }
         }
     }
-    // let mut rec_schema = Schema::empty();
-    // if !field_datatype_delta.is_empty() {
-    // update data type
-    // match try_merge(vec![
-    // schema.clone(),
-    // Arc::into_inner(inferred_schema.clone().into()).unwrap(),
-    // ]) {
-    // Err(e) => {
-    // log::error!("get_schema_changes: schema merge failed err: {:?}", e);
-    // }
-    // Ok(merged) => {
-    // rec_schema = merged;
-    // }
-    // }
-    // }
 
-    let final_fields: Vec<Field> = merged_fields.drain().map(|(_key, value)| value).collect();
+    let mut final_fields: Vec<Field> = merged_fields.drain().map(|(_key, value)| value).collect();
+    final_fields.sort_by(|a, b| a.name().cmp(b.name()));
     (
         field_datatype_delta,
         is_schema_changed,
@@ -760,8 +748,8 @@ pub async fn add_stream_schema(
     let mut local_file = file;
     local_file.seek(SeekFrom::Start(0)).unwrap();
     let mut schema_reader = BufReader::new(local_file);
-    let mut inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
-    filter_schema_null_fields(&mut inferred_schema);
+    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
+    let inferred_schema = format_schema(&inferred_schema);
 
     let existing_schema = stream_schema_map.get(&stream_name.to_string());
     let mut metadata = match existing_schema {
@@ -831,26 +819,20 @@ pub async fn set_schema_metadata(
     .await
 }
 
-pub fn filter_schema_null_fields(schema: &mut Schema) {
-    let fields = schema.fields();
-    if fields
+pub fn format_schema(schema: &Schema) -> Schema {
+    let mut fields: Vec<Field> = schema
+        .fields()
         .iter()
-        .filter(|f| f.data_type() == &DataType::Null)
-        .count()
-        > 0
-    {
-        let fields = fields
-            .iter()
-            .filter_map(|f| {
-                if f.data_type() == &DataType::Null {
-                    None
-                } else {
-                    Some(f.as_ref().to_owned())
-                }
-            })
-            .collect::<Vec<_>>();
-        *schema = Schema::new(fields.to_vec());
-    }
+        .filter_map(|f| {
+            if f.data_type() == &DataType::Null {
+                None
+            } else {
+                Some(f.as_ref().to_owned())
+            }
+        })
+        .collect();
+    fields.sort_by(|a, b| a.name().cmp(b.name()));
+    Schema::new(fields.to_vec())
 }
 
 #[cfg(test)]

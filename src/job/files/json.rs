@@ -37,7 +37,7 @@ use crate::{
     },
     service::{
         db,
-        schema::{filter_schema_null_fields, schema_evolution},
+        schema::{format_schema, schema_evolution},
         search::datafusion::new_parquet_writer,
         stream::get_stream_setting_bloom_filter_fields,
         usage::report_compression_stats,
@@ -228,10 +228,9 @@ async fn upload_file(
     let mut schema_reader = BufReader::new(&file);
     let inferred_schema =
         match infer_json_schema_from_seekable(&mut schema_reader, None, stream_type) {
-            Ok(mut inferred_schema) => {
+            Ok(inferred_schema) => {
                 drop(schema_reader);
-                filter_schema_null_fields(&mut inferred_schema);
-                inferred_schema
+                format_schema(&inferred_schema)
             }
             Err(err) => {
                 // File has some corrupt json data....ignore such data & move rest of the

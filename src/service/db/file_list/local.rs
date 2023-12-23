@@ -58,7 +58,6 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
         StreamParams::new("", "", StreamType::Filelist),
         None,
         &date_key,
-        false,
     )
     .await;
     file.write(write_buf.as_ref()).await;

@@ -30,7 +30,7 @@ use crate::{
     common::{
         infra::{
             cluster,
-            config::{CONFIG, SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
+            config::{SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
             wal::get_or_create,
         },
         meta::{
@@ -47,9 +47,7 @@ use crate::{
             schema::infer_json_schema,
         },
     },
-    service::{
-        db, format_partition_key, schema::filter_schema_null_fields, stream::stream_settings,
-    },
+    service::{db, format_partition_key, schema::format_schema, stream::stream_settings},
 };
 
 pub mod grpc;
@@ -307,8 +305,8 @@ pub async fn chk_schema_by_record(
     }
 
     let mut schema_reader = BufReader::new(record_val.as_bytes());
-    let mut inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
-    filter_schema_null_fields(&mut inferred_schema);
+    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
+    let inferred_schema = format_schema(&inferred_schema);
     let inferred_schema = inferred_schema.with_metadata(schema.metadata().clone());
     stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
     db::schema::set(
@@ -345,14 +343,7 @@ pub async fn write_file(
             write_buf.put(row.as_bytes());
             write_buf.put("\n".as_bytes());
         }
-        let file = get_or_create(
-            thread_id,
-            stream.clone(),
-            partition_time_level,
-            key,
-            CONFIG.common.wal_memory_mode_enabled,
-        )
-        .await;
+        let file = get_or_create(thread_id, stream.clone(), partition_time_level, key).await;
         if stream_file_name.is_empty() {
             *stream_file_name = file.full_name();
         }
@@ -467,14 +458,7 @@ pub async fn write_file_arrow_new(
 
         let _ = decoder.serialize(entry);
         let batch = decoder.flush().unwrap().unwrap();
-        let rw_file = get_or_create(
-            thread_id,
-            stream.clone(),
-            partition_time_level,
-            key,
-            CONFIG.common.wal_memory_mode_enabled,
-        )
-        .await;
+        let rw_file = get_or_create(thread_id, stream.clone(), partition_time_level, key).await;
         if stream_file_name.is_empty() {
             *stream_file_name = rw_file.full_name();
         }
