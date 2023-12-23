@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM public.ecr.aws/docker/library/node:18.12.1-bullseye as webBuilder
+FROM public.ecr.aws/docker/library/node:18.19.0-bullseye as webBuilder
 WORKDIR /web
 COPY ./web /web/
 

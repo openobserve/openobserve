@@ -164,8 +164,6 @@ import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
-import { cloneDeep } from "lodash-es";
-import { f } from "msw/lib/SetupApi-8ab693f7";
 
 interface Session {
   timestamp: string;

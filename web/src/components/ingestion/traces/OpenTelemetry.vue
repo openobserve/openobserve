@@ -20,7 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <b>OTLP HTTP</b>
     </div>
     <div class="q-ma-md">
-      <CopyContent class="q-mt-sm" :content="copyHTTPTracesContent" />
+      <CopyContent
+        class="q-mt-sm"
+        :content="copyHTTPTracesContentURL"
+        :displayContent="'HTTP Endpoint: ' + copyHTTPTracesContentURL"
+      />
+      <CopyContent
+        class="q-mt-sm"
+        :content="copyHTTPTracesContentPasscode"
+        :displayContent="'Authorization: ' + copyHTTPTracesContentPasscode"
+      />
     </div>
 
     <div class="title q-pl-md q-pt-md" data-test="vector-title-text">
@@ -68,20 +77,21 @@ export default defineComponent({
       tls: url.protocol === "https:" ? "On" : "Off",
     };
 
-    const copyHTTPTracesContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/v1/traces
-Authorization: Basic [BASIC_PASSCODE]`;
+    const copyHTTPTracesContentURL = `${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/v1/traces`;
+    const copyHTTPTracesContentPasscode = `Basic [BASIC_PASSCODE]`;
     const copyGRPCTracesContent = `endpoint: ${endpoint.value.host}
 headers: 
   Authorization: "Basic [BASIC_PASSCODE]"
   organization: ${store.state.selectedOrganization.identifier}
   stream-name: default
 tls:
-  insecure: ${endpoint.value.protocol == "https" ? false : true }`;
+  insecure: ${endpoint.value.protocol == "https" ? false : true}`;
     return {
       store,
       config,
       endpoint,
-      copyHTTPTracesContent,
+      copyHTTPTracesContentURL,
+      copyHTTPTracesContentPasscode,
       copyGRPCTracesContent,
       getImageURL,
     };
