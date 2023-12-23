@@ -39,34 +39,52 @@ use crate::{
     service::db,
 };
 
-pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {
-    let existing_user = if is_root_user(&usr_req.email) {
-        db::user::get(None, &usr_req.email).await
+pub async fn post_user(
+    org_id: &str,
+    usr_req: UserRequest,
+    initiator_id: &str,
+) -> Result<HttpResponse, Error> {
+    if is_root_user(initiator_id)
+        || db::user::get(Some(org_id), initiator_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .role
+            .eq(&UserRole::Admin)
+    {
+        let existing_user = if is_root_user(&usr_req.email) {
+            db::user::get(None, &usr_req.email).await
+        } else {
+            db::user::get(Some(org_id), &usr_req.email).await
+        };
+        if existing_user.is_err() {
+            let salt = Uuid::new_v4().to_string();
+            let password = get_hash(&usr_req.password, &salt);
+            let token = generate_random_string(16);
+            let rum_token = format!("rum{}", generate_random_string(16));
+            let user = usr_req.to_new_dbuser(
+                password,
+                salt,
+                org_id.replace(' ', "_"),
+                token,
+                rum_token,
+                usr_req.is_external,
+            );
+            db::user::set(user).await.unwrap();
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "User saved successfully".to_string(),
+            )))
+        } else {
+            Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Unable to process your request".to_string(),
+            )))
+        }
     } else {
-        db::user::get(Some(org_id), &usr_req.email).await
-    };
-    if existing_user.is_err() {
-        let salt = Uuid::new_v4().to_string();
-        let password = get_hash(&usr_req.password, &salt);
-        let token = generate_random_string(16);
-        let rum_token = format!("rum{}", generate_random_string(16));
-        let user = usr_req.to_new_dbuser(
-            password,
-            salt,
-            org_id.replace(' ', "_"),
-            token,
-            rum_token,
-            usr_req.is_external,
-        );
-        db::user::set(user).await.unwrap();
-        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "User saved successfully".to_string(),
-        )))
-    } else {
-        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Unable to process your request".to_string(),
+        Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            StatusCode::UNAUTHORIZED.into(),
+            "Not Allowed".to_string(),
         )))
     }
 }
@@ -365,38 +383,57 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))
 }
 
-pub async fn remove_user_from_org(org_id: &str, email_id: &str) -> Result<HttpResponse, Error> {
-    let ret_user = db::user::get_db_user(email_id).await;
-    match ret_user {
-        Ok(mut user) => {
-            if !user.organizations.is_empty() {
-                let mut orgs = user.clone().organizations;
-                if orgs.len() == 1 {
-                    let _ = db::user::delete(email_id).await;
-                } else {
-                    orgs.retain(|x| !x.name.eq(&org_id.to_string()));
-                    user.organizations = orgs;
-                    let resp = db::user::set(user).await;
-                    // special case as we cache flattened user struct
-                    if resp.is_ok() {
-                        USERS.remove(&format!("{org_id}/{email_id}"));
+pub async fn remove_user_from_org(
+    org_id: &str,
+    email_id: &str,
+    initiator_id: &str,
+) -> Result<HttpResponse, Error> {
+    let initiating_user = if is_root_user(initiator_id) {
+        ROOT_USER.get("root").unwrap().clone()
+    } else {
+        db::user::get(Some(org_id), initiator_id)
+            .await
+            .unwrap()
+            .unwrap()
+    };
+    if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
+        let ret_user = db::user::get_db_user(email_id).await;
+        match ret_user {
+            Ok(mut user) => {
+                if !user.organizations.is_empty() {
+                    let mut orgs = user.clone().organizations;
+                    if orgs.len() == 1 {
+                        let _ = db::user::delete(email_id).await;
+                    } else {
+                        orgs.retain(|x| !x.name.eq(&org_id.to_string()));
+                        user.organizations = orgs;
+                        let resp = db::user::set(user).await;
+                        // special case as we cache flattened user struct
+                        if resp.is_ok() {
+                            USERS.remove(&format!("{org_id}/{email_id}"));
+                        }
                     }
+                    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                        http::StatusCode::OK.into(),
+                        "User removed from organization".to_string(),
+                    )))
+                } else {
+                    Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                        StatusCode::NOT_FOUND.into(),
+                        "User for the organization not found".to_string(),
+                    )))
                 }
-                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK.into(),
-                    "User removed from organization".to_string(),
-                )))
-            } else {
-                Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                    StatusCode::NOT_FOUND.into(),
-                    "User for the organization not found".to_string(),
-                )))
             }
+            Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                StatusCode::NOT_FOUND.into(),
+                "User for the organization not found".to_string(),
+            ))),
         }
-        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            "User for the organization not found".to_string(),
-        ))),
+    } else {
+        Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            StatusCode::UNAUTHORIZED.into(),
+            "Not Allowed".to_string(),
+        )))
     }
 }
 
@@ -435,6 +472,23 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
             (true, local_orgs.first().unwrap().clone())
         }
     }
+}
+
+pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
+    let salt = Uuid::new_v4().to_string();
+    let password = get_hash(&usr_req.password, &salt);
+    let token = generate_random_string(16);
+    let rum_token = format!("rum{}", generate_random_string(16));
+    let user = usr_req.to_new_dbuser(
+        password,
+        salt,
+        org_id.replace(' ', "_"),
+        token,
+        rum_token,
+        usr_req.is_external,
+    );
+    db::user::set(user).await.unwrap();
+    Ok(())
 }
 
 #[cfg(test)]
@@ -481,52 +535,29 @@ mod tests {
     #[actix_web::test]
     async fn test_post_user() {
         infra_db::create_table().await.unwrap();
+        set_up().await;
+
         let resp = post_user(
             "dummy",
             UserRequest {
-                email: "admin@zo.dev".to_string(),
+                email: "user@zo.dev".to_string(),
                 password: "pass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Admin,
-                first_name: "admin".to_owned(),
+                first_name: "user".to_owned(),
                 last_name: "".to_owned(),
                 is_external: false,
             },
+            "admin@zo.dev",
         )
         .await;
+        println!("resp: {:?}", resp);
         assert!(resp.is_ok());
     }
 
     #[actix_web::test]
     async fn test_user() {
         infra_db::create_table().await.unwrap();
-        let _ = post_user(
-            "test_org",
-            UserRequest {
-                email: "user2@example.com".to_string(),
-                password: "pass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Admin,
-                first_name: "admin".to_owned(),
-                last_name: "".to_owned(),
-                is_external: false,
-            },
-        )
-        .await;
-
-        USERS.insert(
-            "dummy/admin@zo.dev".to_string(),
-            User {
-                email: "admin@zo.dev".to_string(),
-                password: "pass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Admin,
-                salt: String::new(),
-                token: "token".to_string(),
-                rum_token: Some("rum_token".to_string()),
-                first_name: "admin".to_owned(),
-                last_name: "".to_owned(),
-                org: "dummy".to_string(),
-                is_external: false,
-            },
-        );
+        set_up().await;
 
         let resp = update_user(
             "dummy",
@@ -576,7 +607,7 @@ mod tests {
 
         assert!(resp.is_ok());
 
-        let resp = remove_user_from_org("dummy", "user2@example.com").await;
+        let resp = remove_user_from_org("dummy", "user2@example.com", "admin@zo.dev").await;
 
         assert!(resp.is_ok());
     }
