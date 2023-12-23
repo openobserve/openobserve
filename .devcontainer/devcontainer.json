@@ -3,14 +3,14 @@
 {
 	"name": "Debian",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	// "image": "mcr.microsoft.com/devcontainers/base:bullseye",
+	// "image": "mcr.microsoft.com/devcontainers/base:bookworm",
 	"build": {
 		"dockerfile": "Dockerfile"
 		// Update 'VARIANT' to pick a Node version: 16, 14, 12.
-		// Append -bullseye or -buster to pin to an OS version.
-		// Use -bullseye variants on local arm64/Apple Silicon.
+		// Append -bookworm or -buster to pin to an OS version.
+		// Use -bookworm variants on local arm64/Apple Silicon.
 		// "args": {
-		// 	"VARIANT": "bullseye"
+		// 	"VARIANT": "bookworm"
 		// }
 	},
 	"features": {

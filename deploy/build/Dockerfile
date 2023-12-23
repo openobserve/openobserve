@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
-FROM public.ecr.aws/docker/library/node:18.19.0-bullseye as webBuilder
+FROM public.ecr.aws/docker/library/node:18.19.0-bookworm as webBuilder
 WORKDIR /web
 COPY ./web /web/
 
 RUN npm install
 RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
-# FROM public.ecr.aws/docker/library/rust:bullseye as builder
-FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
+# FROM public.ecr.aws/docker/library/rust:bookworm as builder
+FROM public.ecr.aws/zinclabs/rust:bookworm-sccache as builder
 
 # RUN rustup toolchain install nightly-2023-10-24
 # RUN rustup default nightly-2023-10-24
@@ -22,7 +22,7 @@ COPY --from=webBuilder /web/dist web/dist
 RUN cargo build --release
 
 # FROM gcr.io/distroless/cc as runtime
-FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
+FROM public.ecr.aws/debian/debian:bookworm-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 RUN update-ca-certificates
