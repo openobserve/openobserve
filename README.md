@@ -61,7 +61,7 @@ For a full list of features, check the [documentation](https://openobserve.ai/do
 ### 🐳 Docker:
 ```bash
 docker run -d \
-      --name openobserve
+      --name openobserve \
       -v $PWD/data:/data \
       -p 5080:5080 \
       -e ZO_ROOT_USER_EMAIL="root@example.com" \
@@ -86,6 +86,10 @@ volumes:
   data:
 ```
 
+For other ways to quickly install OpenObserve or use OpenObserve cloud, check [quickstart documentation](https://openobserve.ai/docs/quickstart).
+
+For installing OpenObserve in HA mode, check [HA deployment documentation](https://openobserve.ai/docs/ha_deployment/).
+
 ## 📷 Screenshots
 
 ### Home
@@ -94,33 +98,49 @@ volumes:
 
 ### Logs
 
-![Logs](./screenshots/logs.webp)
+![Logs](./screenshots/logs.png)
 
-### Traces (OpenTelemetry Supported)
+### Traces (OpenTelemetry)
 
-![Traces using OpenTelemetry](./screenshots/traces.webp)
+Trace details page
+![Traces using OpenTelemetry](./screenshots/traces.png)
+
+Golden metrics based on traces
+![Traces golden metrics](./screenshots/traces-overall.png)
 
 ### Visualizations and Dashboards
 
 ![Dashboard](./screenshots/dashboard.png)
+![Dashboard](./screenshots/dashboard2.png)
+![Create panel](./screenshots/create-panel.png)
+![Map](./screenshots/map.png)
+
+### Front end monitoring
+
+Performance analytics
+![Performance](./screenshots/performance.png)
+
+Session replay
+![Session replay](./screenshots/session-replay.png)
+
+Error tracking
+![Error tracking](./screenshots/error-tracking.png)
+
 
 ### Alerts
 
-#### Real-Time Alerts
+![Alerts](./screenshots/alerts.png)
 
-![Alerts Realtime](./screenshots/alert_realtime.jpg)
-
-#### Scheduled Alerts
-
-![Alerts Scheduled](./screenshots/alert_scheduled.jpg)
 
 ### Streams
 
-![Streams](./screenshots/zo_streams.png)
+![Streams](./screenshots/streams.png)
 
 ### Ingestion
 
-![Ingestion](./screenshots/ingestion.webp)
+![Ingestion](./screenshots/ingestion1.png)
+
+![Ingestion](./screenshots/ingestion2.png)
 
 ## ⚖️ License
 
