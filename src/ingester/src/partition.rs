@@ -143,7 +143,7 @@ impl PartitionFile {
             .context(CreateArrowJsonEncoderSnafu)?;
         let _ = decoder.serialize(&entry.data);
         let batch = decoder.flush().context(ArrowJsonEncodeSnafu)?;
-        if let Some(batch) = batch { 
+        if let Some(batch) = batch {
             self.data
                 .push(RecordBatchEntry::new(batch, entry.data_size));
         }

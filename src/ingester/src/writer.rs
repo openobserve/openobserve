@@ -62,7 +62,6 @@ pub async fn get_reader(org_id: &str, stream_type: &str) -> Option<Arc<Writer>> 
 
 impl Writer {
     pub(crate) fn new(key: WriterKey) -> Self {
-        println!("new writer: {:?}", key);
         let next_seq = AtomicU32::new(1);
         let wal_id = next_seq.fetch_add(1, Ordering::SeqCst);
         Self {
@@ -83,7 +82,7 @@ impl Writer {
         if self.check_threshold(wal.size(), entry_bytes.len()).await {
             // rotation wal
             let id = self.next_seq.fetch_add(1, Ordering::SeqCst);
-             let new_wal =
+            let new_wal =
                 WalWriter::new(super::WAL_DIR, &self.key.org_id, &self.key.stream_type, id)
                     .context(WalSnafu)?;
             let old_wal = std::mem::replace(&mut *wal, new_wal);
