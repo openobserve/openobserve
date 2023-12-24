@@ -125,6 +125,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             last_name: "".to_owned(),
                             is_external: false,
                         },
+                        &CONFIG.auth.root_user_email.clone(),
                     )
                     .await?;
                 }
