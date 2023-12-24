@@ -115,7 +115,7 @@ mod tests {
     #[actix_web::test]
     async fn test_is_root_user2() {
         infra_db::create_table().await.unwrap();
-        let _ = users::post_user(
+        let _ = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {
                 email: "root@example.com".to_string(),

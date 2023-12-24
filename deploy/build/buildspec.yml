@@ -26,11 +26,11 @@ phases:
       - docker buildx install
 
       # build for sccache image
-      # - docker build -t public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64 -f deploy/build/Dockerfile.sccache.amd64 .
-      # - docker push public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64
+      # - docker build -t public.ecr.aws/zinclabs/rust:bookworm-sccache-amd64 -f deploy/build/Dockerfile.sccache.amd64 .
+      # - docker push public.ecr.aws/zinclabs/rust:bookworm-sccache-amd64
 
       # build openobserve
-      - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
+      - docker pull public.ecr.aws/zinclabs/rust:bookworm-sccache
       # - docker build -t openobserve:latest-amd64 -f deploy/build/Dockerfile.amd64 .
       - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI -t openobserve:latest-amd64 -f deploy/build/Dockerfile.amd64 .
       - docker tag openobserve:latest-amd64 public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
