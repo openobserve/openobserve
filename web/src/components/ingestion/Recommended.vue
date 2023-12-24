@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          label="Traces (OpenTelelmetry)"
+          label="Traces (OpenTelemetry)"
           content-class="tab_content"
         />
         <q-route-tab
