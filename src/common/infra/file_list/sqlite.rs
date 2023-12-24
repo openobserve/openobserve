@@ -871,5 +871,5 @@ pub async fn create_table_index(client: &Pool<Sqlite>) -> Result<()> {
 
 /// set file list inited flag
 pub fn set_initialised() {
-    FILE_LIST_INITED.store(true, std::sync::atomic::Ordering::Relaxed);
+    FILE_LIST_INITED.store(true, std::sync::atomic::Ordering::Release);
 }

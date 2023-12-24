@@ -653,7 +653,7 @@ pub fn generate_filter_from_quick_text(
         if op == &SqlOperator::And
             || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
         {
-            let entry = filters.entry(k.as_str()).or_insert(vec![]);
+            let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
             entry.push(v.as_str());
         } else {
             filters.clear();

@@ -400,7 +400,7 @@ pub async fn traces_json(
 
                     let rec_schema = traces_schema_map.get(traces_stream_name).unwrap();
 
-                    let hour_buf = data_buf.entry(hour_key).or_insert(SchemaRecords {
+                    let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
                         schema: rec_schema
                             .clone()
                             .with_metadata(std::collections::HashMap::new()),

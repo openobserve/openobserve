@@ -471,7 +471,7 @@ impl super::FileList for DynamoFileList {
         let mut stats = HashMap::new();
         for (file, meta) in resp {
             let (stream_key, _date_key, _file_name) = super::parse_file_key_columns(&file)?;
-            let stream_stats = stats.entry(stream_key).or_insert(StreamStats::default());
+            let stream_stats = stats.entry(stream_key).or_insert_with(StreamStats::default);
             stream_stats.add_file_meta(&meta);
         }
 

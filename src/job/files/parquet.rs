@@ -13,20 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    fs,
-    io::{Cursor, Read},
-    path::Path,
-};
+use std::{fs, io::Read, path::Path};
 
-use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::{sync::Semaphore, task, time};
 
 use crate::{
     common::{
         infra::{cluster, config::CONFIG, metrics, storage, wal},
         meta::{common::FileMeta, StreamType},
-        utils::file::scan_files,
+        utils::{file::scan_files, parquet::read_metadata},
     },
     service::{db, usage::report_compression_stats},
 };
@@ -212,34 +207,11 @@ async fn upload_file(
         .inc_by(file_size);
 
     // write metadata
-    // TODO use a better way to get the file meta
-    let mut file_meta = FileMeta {
-        min_ts: 0,
-        max_ts: 0,
-        records: 0,
-        original_size: 0,
-        compressed_size: file_size as i64,
-    };
-
     let mut buf_parquet: Vec<u8> = Vec::new();
     file.read_to_end(&mut buf_parquet)?;
     let buf_parquet = bytes::Bytes::from(buf_parquet);
-
-    let schema_reader = Cursor::new(buf_parquet.clone());
-    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
-    if let Some(metadata) = arrow_reader.metadata().file_metadata().key_value_metadata() {
-        for kv in metadata {
-            match kv.key.as_str() {
-                "min_ts" => file_meta.min_ts = kv.value.as_ref().unwrap().parse().unwrap(),
-                "max_ts" => file_meta.max_ts = kv.value.as_ref().unwrap().parse().unwrap(),
-                "records" => file_meta.records = kv.value.as_ref().unwrap().parse().unwrap(),
-                "original_size" => {
-                    file_meta.original_size = kv.value.as_ref().unwrap().parse().unwrap()
-                }
-                _ => {}
-            }
-        }
-    }
+    let mut file_meta = read_metadata(&buf_parquet).await?;
+    file_meta.compressed_size = file_size as i64;
 
     // TODO ?
     // schema_evolution(

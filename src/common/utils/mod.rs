@@ -27,6 +27,7 @@ pub mod rand;
 pub mod schema;
 pub mod schema_ext;
 pub mod str;
+pub mod parquet;
 pub mod stream;
 pub mod time;
 pub mod zo_logger;

@@ -431,7 +431,7 @@ impl SqliteDbChannel {
                         }
                     }
                     DbEvent::Shutdown => {
-                        DB_SHUTDOWN.store(true, std::sync::atomic::Ordering::Relaxed);
+                        DB_SHUTDOWN.store(true, std::sync::atomic::Ordering::Release);
                         break;
                     }
                 }

@@ -253,7 +253,7 @@ pub async fn cache_all() -> Result<(), anyhow::Error> {
     for prefix in prefixes {
         cache(&prefix, false).await?;
     }
-    LOADED_ALL_FILES.store(true, atomic::Ordering::Relaxed);
+    LOADED_ALL_FILES.store(true, atomic::Ordering::Release);
     Ok(())
 }
 

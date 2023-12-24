@@ -154,7 +154,7 @@ pub async fn ingest(
 
             stream_data_map
                 .entry(stream_name.clone())
-                .or_insert(BulkStreamData {
+                .or_insert_with(|| BulkStreamData {
                     data: AHashMap::new(),
                 });
         } else {

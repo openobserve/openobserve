@@ -40,7 +40,10 @@ use crate::{
             search::SearchType,
             stream::{PartitionTimeLevel, ScanStats},
         },
-        utils::file::{get_file_contents, get_file_meta, scan_files},
+        utils::{
+            file::{get_file_contents, get_file_meta, scan_files},
+            parquet::read_metadata,
+        },
     },
     service::{
         db,
@@ -90,9 +93,11 @@ pub async fn search_parquet(
                 files.retain(|x| x != file);
             }
             Ok(file_data) => {
-                scan_stats.original_size += file_data.len() as i64;
+                let file_data = file_data.into();
+                let parquet_meta = read_metadata(&file_data).await.unwrap_or_default();
+                scan_stats.original_size += parquet_meta.original_size;
                 let file_name = format!("/{work_dir}/{}", file.key);
-                tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
+                tmpfs::set(&file_name, file_data).expect("tmpfs set success");
             }
         }
     }

@@ -229,7 +229,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         // update status
         let stream_status = stream_status_map
             .entry(stream_name.clone())
-            .or_insert(StreamStatus::new(&stream_name));
+            .or_insert_with(|| StreamStatus::new(&stream_name));
         stream_status.status.successful += 1;
     }
     let time = start.elapsed().as_secs_f64();

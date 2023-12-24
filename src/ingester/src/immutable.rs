@@ -57,14 +57,11 @@ impl Immutable {
     }
 
     pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<()> {
-        println!("persisting entry: {:?}, wal: {:?}", self.key, wal_path);
         // 1. dump memtable to disk
         let paths = self
             .memtable
             .persist(&self.key.org_id, &self.key.stream_type)
             .await?;
-        println!("write par files done, you can try to crash it now, wait for 3 secs");
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         // 2. create a lock file
         let done_path = wal_path.with_extension("lock");
         let lock_data = paths
@@ -73,19 +70,13 @@ impl Immutable {
             .collect::<Vec<_>>()
             .join("\n");
         std::fs::write(&done_path, lock_data.as_bytes()).context(WriteDataSnafu)?;
-        println!("write lock file done, you can try to crash it now, wait for 3 secs");
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         // 3. delete wal file
         std::fs::remove_file(wal_path).context(DeleteFileSnafu { path: wal_path })?;
-        println!("remove wal file done, you can try to crash it now, wait for 3 secs");
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         // 4. rename the tmp files to parquet files
         for path in paths {
             let parquet_path = path.with_extension("parquet");
             std::fs::rename(&path, &parquet_path).context(RenameFileSnafu { path: &path })?;
         }
-        println!("rename par files done, you can try to crash it now, wait for 3 secs");
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         // 5. delete the lock file
         std::fs::remove_file(&done_path).context(DeleteFileSnafu { path: &done_path })?;
         Ok(())
@@ -93,17 +84,18 @@ impl Immutable {
 }
 
 pub(crate) async fn persist() -> Result<()> {
-    let r = IMMUTABLES.read().await;
-    let Some((path, immutable)) = r.first() else {
-        return Ok(());
-    };
-    let path = path.clone();
-    // persist entry to local disk
-    immutable.persist(&path).await?;
-    drop(r);
+    loop {
+        let r = IMMUTABLES.read().await;
+        let Some((path, immutable)) = r.first() else {
+            break;
+        };
+        let path = path.clone();
+        // persist entry to local disk
+        immutable.persist(&path).await?;
+        drop(r);
 
-    println!("persisted entry: {:?}", path);
-    // remove entry from IMMUTABLES
-    IMMUTABLES.write().await.remove(&path);
+        // remove entry from IMMUTABLES
+        IMMUTABLES.write().await.remove(&path);
+    }
     Ok(())
 }

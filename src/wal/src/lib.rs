@@ -23,7 +23,7 @@ pub use errors::*;
 pub use reader::Reader;
 pub use writer::Writer;
 
-const PRE_ALLOCATE_FILE_SIZE: u64 = 1024 * 1024 * 16; // 16MB
+const PRE_ALLOCATE_FILE_SIZE: u64 = 1024 * 1024 * 32; // 32MB
 const SOFT_MAX_BUFFER_LEN: usize = 1024 * 128; // 128KB
 
 type FileTypeIdentifier = [u8; 13];

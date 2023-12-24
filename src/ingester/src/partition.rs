@@ -50,7 +50,7 @@ impl Partition {
         let mut rw = self.files.write().await;
         let partition = rw
             .entry(entry.partition_key.clone())
-            .or_insert(PartitionFile::new());
+            .or_insert_with(PartitionFile::new);
         partition.write(self.schema.clone(), entry)?;
         Ok(())
     }
@@ -143,13 +143,7 @@ impl PartitionFile {
             .context(CreateArrowJsonEncoderSnafu)?;
         let _ = decoder.serialize(&entry.data);
         let batch = decoder.flush().context(ArrowJsonEncodeSnafu)?;
-        if let Some(batch) = batch {
-            println!(
-                "columns: {}, rows: {}, size: {}",
-                batch.num_columns(),
-                batch.num_rows(),
-                entry.data_size,
-            );
+        if let Some(batch) = batch { 
             self.data
                 .push(RecordBatchEntry::new(batch, entry.data_size));
         }

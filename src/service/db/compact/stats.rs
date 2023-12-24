@@ -43,7 +43,7 @@ pub async fn get_offset() -> (i64, String) {
 
 pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
     if !CONFIG.common.meta_store_external {
-        LOCAL_OFFSET.store(offset, atomic::Ordering::Relaxed);
+        LOCAL_OFFSET.store(offset, atomic::Ordering::Release);
         return Ok(());
     }
 

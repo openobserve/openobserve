@@ -128,7 +128,6 @@ async fn main() -> Result<(), anyhow::Error> {
         );
         if !CONFIG.log.file.is_empty() {
             let target = std::fs::OpenOptions::new()
-                .write(true)
                 .create(true)
                 .append(true)
                 .open(&CONFIG.log.file)

@@ -531,7 +531,7 @@ async fn add_valid_record_arrow(
                 // End check for alert trigger
             }
             let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
-            let hour_buf = buf.entry(hour_key).or_insert(SchemaRecords {
+            let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
                 schema: rec_schema
                     .clone()
                     .with_metadata(std::collections::HashMap::new()),

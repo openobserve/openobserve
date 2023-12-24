@@ -39,7 +39,7 @@ impl Stream {
         let mut rw = self.partitions.write().await;
         let partition = rw
             .entry(entry.schema_key.clone())
-            .or_insert(Partition::new(schema));
+            .or_insert_with(|| Partition::new(schema));
         partition.write(entry).await
     }
 

@@ -48,7 +48,9 @@ pub struct Writer {
 pub async fn get_writer(org_id: &str, stream_type: &str) -> Arc<Writer> {
     let key = WriterKey::new(org_id, stream_type);
     let mut rw = WRITERS.write().await;
-    let w = rw.entry(key.clone()).or_insert(Arc::new(Writer::new(key)));
+    let w = rw
+        .entry(key.clone())
+        .or_insert_with(|| Arc::new(Writer::new(key)));
     w.clone()
 }
 
@@ -60,6 +62,7 @@ pub async fn get_reader(org_id: &str, stream_type: &str) -> Option<Arc<Writer>> 
 
 impl Writer {
     pub(crate) fn new(key: WriterKey) -> Self {
+        println!("new writer: {:?}", key);
         let next_seq = AtomicU32::new(1);
         let wal_id = next_seq.fetch_add(1, Ordering::SeqCst);
         Self {
@@ -80,8 +83,7 @@ impl Writer {
         if self.check_threshold(wal.size(), entry_bytes.len()).await {
             // rotation wal
             let id = self.next_seq.fetch_add(1, Ordering::SeqCst);
-            println!("wal rotation: {}", id);
-            let new_wal =
+             let new_wal =
                 WalWriter::new(super::WAL_DIR, &self.key.org_id, &self.key.stream_type, id)
                     .context(WalSnafu)?;
             let old_wal = std::mem::replace(&mut *wal, new_wal);
@@ -92,7 +94,7 @@ impl Writer {
             let old_mem = std::mem::replace(&mut *mem, new_mem);
             // update created_at
             self.created_at
-                .store(Utc::now().timestamp_micros(), Ordering::Relaxed);
+                .store(Utc::now().timestamp_micros(), Ordering::Release);
             drop(mem);
 
             let key = self.key.clone();

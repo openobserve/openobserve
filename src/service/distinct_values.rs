@@ -113,7 +113,7 @@ impl DistinctValues {
     async fn write(&self, org_id: &str, data: Vec<DvItem>) -> Result<()> {
         let mut group_items: FxIndexMap<DvItem, u32> = FxIndexMap::default();
         for item in data {
-            let count = group_items.entry(item).or_insert(0);
+            let count = group_items.entry(item).or_default();
             *count += 1;
         }
         for (item, count) in group_items {
@@ -198,12 +198,12 @@ fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
                 if let Err(e) = CHANNEL.flush().await {
                     log::error!("flush error: {}", e);
                 }
-                CHANNEL.shutdown.store(true, Ordering::Relaxed);
+                CHANNEL.shutdown.store(true, Ordering::Release);
                 break;
             }
             let mut mem_table = CHANNEL.mem_table.write().await;
             let entry = mem_table.entry(event.org_id).or_default();
-            let field_entry = entry.entry(event.item).or_insert(0);
+            let field_entry = entry.entry(event.item).or_default();
             *field_entry += event.count;
         }
         log::info!("[distinct_values] event loop exit");
