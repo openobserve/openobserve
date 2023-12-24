@@ -9,8 +9,8 @@ RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 # FROM public.ecr.aws/docker/library/rust:bullseye as builder
 FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
 
-# RUN rustup toolchain install nightly-2023-10-24
-# RUN rustup default nightly-2023-10-24
+# RUN rustup toolchain install nightly-2023-12-24
+# RUN rustup default nightly-2023-12-24
 # RUN rustup target add x86_64-unknown-linux-gnu
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 RUN rustc --version && sccache --version

@@ -300,7 +300,7 @@ async fn merge_files(
     stream_type: StreamType,
     schema: Arc<Schema>,
     prefix: &str,
-    files_with_size: &Vec<FileKey>,
+    files_with_size: &[FileKey],
 ) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
     if files_with_size.len() <= 1 {
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
