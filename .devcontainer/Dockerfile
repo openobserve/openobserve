@@ -1,4 +1,4 @@
-# FROM mcr.microsoft.com/devcontainers/base:bullseye
+# FROM mcr.microsoft.com/devcontainers/base:bookworm
 FROM public.ecr.aws/docker/library/rust:buster
 
 RUN apt-get update
