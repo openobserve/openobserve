@@ -468,7 +468,7 @@ pub async fn merge(
     offset: usize,
     limit: usize,
     sql: &str,
-    batches: &Vec<Vec<RecordBatch>>,
+    batches: &[Vec<RecordBatch>],
 ) -> Result<Vec<RecordBatch>> {
     if batches.is_empty() {
         return Ok(vec![]);
@@ -665,7 +665,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     let mut sel_fields_has_star = false;
     let mut last_is_as = false;
     let mut last_is_distinct = false;
-    for (_, field) in fields.iter().enumerate() {
+    for field in fields.iter() {
         let field = if last_is_distinct {
             last_is_distinct = false;
             format!("DISTINCT {}", field.trim())

@@ -399,7 +399,6 @@ impl RwFile {
         } else if use_arrow {
             let file_path = format!("{dir_path}{file_name}");
             let file = std::fs::OpenOptions::new()
-                .write(true)
                 .create(true)
                 .append(true)
                 .open(file_path)
@@ -409,7 +408,6 @@ impl RwFile {
             (None, None, Some(RwLock::new(writer)))
         } else {
             let f = OpenOptions::new()
-                .write(true)
                 .create(true)
                 .append(true)
                 .open(&file_path)
