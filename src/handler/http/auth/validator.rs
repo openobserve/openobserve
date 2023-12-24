@@ -404,6 +404,7 @@ mod tests {
                 last_name: "".to_owned(),
                 is_external: false,
             },
+            "root@example.com",
         )
         .await;
         let _ = users::post_user(
@@ -416,6 +417,7 @@ mod tests {
                 last_name: "".to_owned(),
                 is_external: false,
             },
+            "root@example.com",
         )
         .await;
 
