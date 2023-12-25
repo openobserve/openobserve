@@ -56,7 +56,9 @@ pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 
 pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
-pub const GEO_IP_ENRICHMENT_TABLE: &str = "geoip";
+pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
+pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
+pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
@@ -180,7 +182,10 @@ pub static LOCAL_SCHEMA_LOCKER: Lazy<Arc<RwAHashMap<String, tokio::sync::RwLock<
 pub static MAXMIND_DB_CLIENT: Lazy<Arc<TRwLock<Option<MaxmindClient>>>> =
     Lazy::new(|| Arc::new(TRwLock::new(None)));
 
-pub static GEOIP_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
+pub static GEOIP_CITY_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
+    Lazy::new(|| Arc::new(RwLock::new(None)));
+
+pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
 
 #[derive(EnvConfig)]
@@ -379,10 +384,23 @@ pub struct Common {
     pub mmdb_geolite_citydb_url: String,
 
     #[env_config(
+        name = "ZO_MMDB_GEOLITE_ASNDB_URL",
+        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-ASN.mmdb"
+    )]
+    pub mmdb_geolite_asndb_url: String,
+
+    #[env_config(
         name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
         default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.sha256"
     )]
     pub mmdb_geolite_citydb_sha256_url: String,
+
+    #[env_config(
+        name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
+        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-ASN.sha256"
+    )]
+    pub mmdb_geolite_asndb_sha256_url: String,
+
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
