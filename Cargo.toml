@@ -101,6 +101,7 @@ jsonwebtoken = "9.2.0"
 log = "0.4"
 maxminddb = "0.23.0"
 memchr = "2.5"
+memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell = "1.17"
 openidconnect = "3.4.0"
@@ -160,6 +161,7 @@ tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tonic = { version = "0.8", features = ["prost", "gzip"] }
 tracing = { version = "0.1.40", features = ["attributes"] }
+tracing-appender = "0.2.3"
 tracing-opentelemetry = "0.18"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 uaparser = "0.6.1"
@@ -172,9 +174,7 @@ vrl = { version = "0.8.1", features = ["value", "compiler", "test"] }
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"
-memory-stats = "1.1.0"
-tracing-appender = "0.2.3"
-
+ingester = { path = "src/ingester" }
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
