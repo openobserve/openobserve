@@ -383,7 +383,7 @@ pub async fn logs_json_handler(
     // write to file
     let mut stream_file_name = "".to_string();
     let mut req_stats = write_file(
-        &buf,
+        buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::Logs),
         &mut stream_file_name,

@@ -19,6 +19,7 @@ use std::sync::{
 };
 
 use ahash::AHashMap;
+use arrow_schema::{DataType, Field, Schema};
 use config::{meta::stream::StreamType, FxIndexMap, CONFIG};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -30,7 +31,7 @@ use tokio::{
 use crate::{
     common::{
         infra::errors::{Error, Result},
-        meta::stream::StreamParams,
+        meta::stream::{SchemaRecords, StreamParams},
         utils::json,
     },
     service::{ingestion, stream::unwrap_partition_time_level},
@@ -141,7 +142,7 @@ impl DistinctValues {
                 stream_name: STREAM_NAME.into(),
                 stream_type: StreamType::Metadata,
             };
-            let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+            let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
             for (item, count) in items {
                 let mut data = json::to_value(item).unwrap();
                 let data = data.as_object_mut().unwrap();
@@ -157,11 +158,15 @@ impl DistinctValues {
                     data,
                     None,
                 );
-                let line_str = json::to_string(&data).unwrap();
-                let hour_buf = buf.entry(hour_key).or_default();
-                hour_buf.push(line_str);
+                let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                    schema: schema(),
+                    records: vec![],
+                });
+                hour_buf
+                    .records
+                    .push(Arc::new(json::Value::Object(data.to_owned())));
             }
-            _ = ingestion::write_file(&buf, 0, &stream_params, &mut stream_file_name, None).await;
+            _ = ingestion::write_file(buf, 0, &stream_params, &mut stream_file_name, None).await;
         }
         Ok(())
     }
@@ -227,4 +232,8 @@ pub async fn write(org_id: &str, data: Vec<DvItem>) -> Result<()> {
 pub async fn close() -> Result<()> {
     CHANNEL.stop().await?;
     Ok(())
+}
+
+fn schema() -> Schema {
+    Schema::new(vec![Field::new("stream_type", DataType::Utf8, false)])
 }

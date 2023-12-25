@@ -200,7 +200,7 @@ pub async fn ingest(
     // write to file
     let mut stream_file_name = "".to_string();
     let mut req_stats =
-        write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
+        write_file(buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     if stream_file_name.is_empty() {
         return Ok(IngestionResponse::new(
@@ -255,7 +255,6 @@ pub async fn ingest(
 
     drop(runtime);
     drop(stream_schema_map);
-    drop(buf);
     drop(stream_vrl_map);
     drop(stream_params);
     drop(stream_alerts_map);

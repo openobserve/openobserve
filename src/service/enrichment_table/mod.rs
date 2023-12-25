@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{io::Error, sync::Arc};
 
 use actix_multipart::Multipart;
 use actix_web::{
@@ -33,7 +33,7 @@ use crate::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            stream::{PartitionTimeLevel, StreamParams},
+            stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
             usage::UsageType,
         },
         utils::json,
@@ -58,7 +58,7 @@ pub async fn save_enrichment_data(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let mut hour_key = String::new();
-    let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
     let stream_name = &format_stream_name(table_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -158,7 +158,7 @@ pub async fn save_enrichment_data(
                         None,
                     );
                 }
-                records.push(value_str);
+                records.push(Arc::new(json::Value::Object(json_record)));
             }
         }
     }
@@ -172,10 +172,16 @@ pub async fn save_enrichment_data(
         );
     }
 
-    buf.insert(hour_key.clone(), records.clone());
+    buf.insert(
+        hour_key,
+        SchemaRecords {
+            schema: stream_schema_map.get(stream_name).unwrap().clone(),
+            records,
+        },
+    );
     let mut stream_file_name = "".to_string();
     let mut req_stats = write_file(
-        &buf,
+        buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::EnrichmentTables),
         &mut stream_file_name,

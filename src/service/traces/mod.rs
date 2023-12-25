@@ -349,7 +349,7 @@ pub async fn handle_trace_request(
 
     let mut traces_file_name = "".to_string();
     let mut req_stats = write_file(
-        &data_buf,
+        data_buf,
         thread_id,
         &StreamParams::new(org_id, traces_stream_name, StreamType::Traces),
         &mut traces_file_name,

@@ -323,7 +323,7 @@ pub fn init_functions_runtime() -> Runtime {
 }
 
 pub async fn write_file(
-    buf: &AHashMap<String, SchemaRecords>,
+    buf: AHashMap<String, SchemaRecords>,
     thread_id: usize,
     stream: &StreamParams,
     _stream_file_name: &mut str,
@@ -334,6 +334,7 @@ pub async fn write_file(
         if entry.records.is_empty() {
             continue;
         }
+        let entry_records = entry.records.len();
 
         // -- call new ingester
         println!("stream: {}, key: {}", stream.stream_name, _key);
@@ -342,12 +343,12 @@ pub async fn write_file(
         writer
             .write(
                 thread_id,
-                Arc::new(entry.schema.clone()),
+                Arc::new(entry.schema),
                 ingester::Entry {
                     stream: Arc::from(stream.stream_name.as_str()),
                     schema_key: Arc::from("default"),
                     partition_key: Arc::from(_key.as_str()),
-                    data: entry.records.clone(),
+                    data: entry.records,
                     data_size: 0,
                 },
             )
@@ -355,8 +356,9 @@ pub async fn write_file(
             .unwrap();
         // -- end call new ingester
 
-        req_stats.size += entry.records.len() as f64 / SIZE_IN_MB;
-        req_stats.records += entry.records.len() as i64;
+        // TODO ingest original data size
+        req_stats.size += entry_records as f64 / SIZE_IN_MB;
+        req_stats.records += entry_records as i64;
     }
     req_stats
 }

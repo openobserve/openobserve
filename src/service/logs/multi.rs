@@ -213,7 +213,7 @@ async fn ingest_inner(
     let mut stream_file_name = "".to_string();
 
     let mut req_stats = write_file(
-        &buf,
+        buf,
         thread_id,
         &stream_params,
         &mut stream_file_name,
