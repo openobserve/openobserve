@@ -398,27 +398,36 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 )));
             }
         };
-        let mut sources: Vec<json::Value> = match program {
-            Some(program) => json_rows
-                .into_iter()
-                .filter(|v| !v.is_empty())
-                .filter_map(|hit| {
-                    let ret_val = crate::service::ingestion::apply_vrl_fn(
-                        &mut runtime,
-                        &VRLResultResolver {
-                            program: program.program.clone(),
-                            fields: program.fields.clone(),
-                        },
-                        &json::Value::Object(hit.clone()),
-                    );
-                    (!ret_val.is_null()).then_some(flatten::flatten(&ret_val).unwrap_or(ret_val))
-                })
-                .collect(),
-            None => json_rows
+        let mut sources: Vec<json::Value> = if query_fn.is_empty() {
+            json_rows
                 .into_iter()
                 .filter(|v| !v.is_empty())
                 .map(json::Value::Object)
-                .collect(),
+                .collect()
+        } else {
+            match program {
+                Some(program) => json_rows
+                    .into_iter()
+                    .filter(|v| !v.is_empty())
+                    .filter_map(|hit| {
+                        let ret_val = crate::service::ingestion::apply_vrl_fn(
+                            &mut runtime,
+                            &VRLResultResolver {
+                                program: program.program.clone(),
+                                fields: program.fields.clone(),
+                            },
+                            &json::Value::Object(hit.clone()),
+                        );
+                        (!ret_val.is_null())
+                            .then_some(flatten::flatten(&ret_val).unwrap_or(ret_val))
+                    })
+                    .collect(),
+                None => json_rows
+                    .into_iter()
+                    .filter(|v| !v.is_empty())
+                    .map(json::Value::Object)
+                    .collect(),
+            }
         };
         // handle query type: json, metrics, table
         if query_type == "table" {
