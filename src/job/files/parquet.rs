@@ -15,11 +15,12 @@
 
 use std::{fs, io::Read, path::Path};
 
+use config::CONFIG;
 use tokio::{sync::Semaphore, task, time};
 
 use crate::{
     common::{
-        infra::{cluster, config::CONFIG, metrics, storage, wal},
+        infra::{cluster, metrics, storage, wal},
         meta::{common::FileMeta, StreamType},
         utils::{file::scan_files, parquet::read_metadata},
     },

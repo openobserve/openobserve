@@ -15,6 +15,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use config::CONFIG;
 use once_cell::sync::Lazy;
 use reqwest::Client;
 
@@ -23,7 +24,6 @@ use crate::{
     common::{
         infra::{
             cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-            config::CONFIG,
             db as infra_db, dist_lock,
         },
         meta::{

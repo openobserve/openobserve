@@ -18,14 +18,12 @@ use std::io::{BufRead, BufReader};
 use actix_web::{http, web};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
+use config::{CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
     common::{
-        infra::{
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
+        infra::metrics,
         meta::{
             alerts::Alert,
             ingestion::{IngestionResponse, StreamStatus},

@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::CONFIG;
 use tokio::time;
 
-use crate::common::{infra::config::CONFIG, meta::telemetry::Telemetry};
+use crate::common::meta::telemetry::Telemetry;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(

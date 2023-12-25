@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{Duration, Utc};
+use config::CONFIG;
 
 use crate::{
     common::{
         infra::{
             cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-            config::{CONFIG, TRIGGERS},
+            config::TRIGGERS,
             dist_lock,
         },
         meta::{alerts::triggers::Trigger, StreamType},

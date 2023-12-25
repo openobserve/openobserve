@@ -21,12 +21,12 @@ use std::{
 use async_trait::async_trait;
 use aws_sdk_dynamodb::{operation::query::QueryOutput, types::*};
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use config::CONFIG;
 use tokio_stream::StreamExt;
 
 use super::parse_file_key_columns;
 use crate::common::{
     infra::{
-        config::CONFIG,
         db::dynamo::get_db_client,
         errors::{Error, Result},
     },

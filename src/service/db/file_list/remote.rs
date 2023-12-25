@@ -21,13 +21,14 @@ use std::{
 
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use config::CONFIG;
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
 use tokio::{sync::RwLock, time};
 
 use crate::{
     common::{
-        infra::{cache::stats, config::CONFIG, file_list as infra_file_list, storage},
+        infra::{cache::stats, file_list as infra_file_list, storage},
         meta::common::FileKey,
         utils::json,
     },

@@ -18,16 +18,13 @@ use std::io::{BufRead, BufReader};
 use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
+use config::{CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
 use crate::{
     common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
+        infra::{cluster, metrics},
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver},

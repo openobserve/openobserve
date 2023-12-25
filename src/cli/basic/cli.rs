@@ -13,17 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::CONFIG;
+
 use crate::{
     cli::data::{
         cli::{args, Cli},
         export, import, Context,
     },
-    common::{
-        infra,
-        infra::config::{CONFIG, USERS},
-        meta, migration,
-        utils::file::set_permission,
-    },
+    common::{infra, infra::config::USERS, meta, migration, utils::file::set_permission},
     service::{compact, db, file_list, users},
 };
 

@@ -18,10 +18,10 @@ use std::collections::{HashMap, HashSet};
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
+use config::CONFIG;
 
 use crate::{
     common::{
-        infra::config::CONFIG,
         meta::{
             alerts::{
                 destinations::{DestinationWithTemplate, HTTPType},

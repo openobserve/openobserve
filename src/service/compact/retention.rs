@@ -19,13 +19,13 @@ use std::{
 };
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use config::{is_local_disk_storage, CONFIG};
 
 use crate::{
     common::{
         infra::{
             cache,
             cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-            config::{is_local_disk_storage, CONFIG},
             dist_lock, file_list as infra_file_list, ider, storage,
         },
         meta::{

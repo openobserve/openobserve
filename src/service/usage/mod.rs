@@ -17,15 +17,13 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use chrono::{Datelike, Timelike, Utc};
+use config::{CONFIG, SIZE_IN_MB};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use crate::{
     common::{
-        infra::{
-            config::{CONFIG, SIZE_IN_MB},
-            metrics,
-        },
+        infra::metrics,
         meta::{
             usage::{
                 AggregatedData, GroupKey, RequestStats, UsageData, UsageEvent, UsageType,

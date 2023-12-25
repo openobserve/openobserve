@@ -27,14 +27,12 @@ use std::{
 use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
 use chrono::{Local, Utc};
+use config::CONFIG;
 use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
     common::{
-        infra::{
-            self, cluster,
-            config::{CONFIG, VERSION},
-        },
+        infra::{self, cluster, config::VERSION},
         meta, migration,
         utils::zo_logger,
     },

@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use ahash::AHashMap as HashMap;
+use config::{is_local_disk_storage, CONFIG};
 use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
 use futures::future::try_join_all;
 use tokio::{sync::Semaphore, time::Duration};
@@ -25,7 +26,6 @@ use crate::{
     common::{
         infra::{
             cache::file_data,
-            config::{is_local_disk_storage, CONFIG},
             errors::{Error, ErrorCodes},
         },
         meta::{

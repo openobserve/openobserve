@@ -16,15 +16,12 @@
 use std::path::Path;
 
 use ahash::HashMap;
+use config::{cluster::Role, CONFIG};
 use tokio::time;
 
 use crate::{
     common::{
-        infra::{
-            cache, cluster,
-            config::{CONFIG, USERS},
-            metrics,
-        },
+        infra::{cache, cluster, config::USERS, metrics},
         meta::StreamType,
         utils::file::scan_files,
     },
@@ -118,27 +115,27 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
             for node in nodes.unwrap() {
                 if cluster::is_ingester(&node.role) {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[cluster::Role::Ingester.to_string().as_str()])
+                        .with_label_values(&[Role::Ingester.to_string().as_str()])
                         .inc();
                 }
                 if cluster::is_querier(&node.role) {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[cluster::Role::Querier.to_string().as_str()])
+                        .with_label_values(&[Role::Querier.to_string().as_str()])
                         .inc();
                 }
                 if cluster::is_compactor(&node.role) {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[cluster::Role::Compactor.to_string().as_str()])
+                        .with_label_values(&[Role::Compactor.to_string().as_str()])
                         .inc();
                 }
                 if cluster::is_router(&node.role) {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[cluster::Role::Router.to_string().as_str()])
+                        .with_label_values(&[Role::Router.to_string().as_str()])
                         .inc();
                 }
                 if cluster::is_alert_manager(&node.role) {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[cluster::Role::AlertManager.to_string().as_str()])
+                        .with_label_values(&[Role::AlertManager.to_string().as_str()])
                         .inc();
                 }
             }

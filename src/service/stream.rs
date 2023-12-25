@@ -16,17 +16,12 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{http, http::StatusCode, HttpResponse};
+use config::{is_local_disk_storage, CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
     common::{
-        infra::{
-            cache::stats,
-            config::{
-                is_local_disk_storage, CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
-                STREAM_SCHEMAS,
-            },
-        },
+        infra::{cache::stats, config::STREAM_SCHEMAS},
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,

@@ -17,12 +17,12 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
+use config::CONFIG;
 use datafusion::arrow::datatypes::Schema;
 
 use super::ingestion::TriggerAlertData;
 use crate::{
     common::{
-        infra::config::CONFIG,
         meta::{
             alerts::Alert,
             ingestion::RecordStatus,

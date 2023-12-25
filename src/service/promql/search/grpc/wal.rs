@@ -16,6 +16,7 @@
 use std::{collections::HashMap, io::Cursor, sync::Arc};
 
 use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
+use config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON};
 use datafusion::{
     arrow::datatypes::Schema,
     common::FileType,
@@ -33,7 +34,6 @@ use crate::{
         infra::{
             cache::tmpfs,
             cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
-            config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON},
         },
         meta::{
             search::{SearchType, Session as SearchSession},

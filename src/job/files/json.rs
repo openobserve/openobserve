@@ -21,12 +21,13 @@ use std::{
 };
 
 use arrow_schema::Schema;
+use config::CONFIG;
 use datafusion::arrow::json::ReaderBuilder;
 use tokio::{sync::Semaphore, task, time};
 
 use crate::{
     common::{
-        infra::{cluster, config::CONFIG, metrics, storage, wal},
+        infra::{cluster, metrics, storage, wal},
         meta::{common::FileMeta, StreamType},
         utils::{
             file::scan_files,

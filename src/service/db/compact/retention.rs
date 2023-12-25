@@ -15,12 +15,10 @@
 
 use std::sync::Arc;
 
+use config::RwHashSet;
 use once_cell::sync::Lazy;
 
-use crate::common::{
-    infra::{config::RwHashSet, db as infra_db},
-    meta::StreamType,
-};
+use crate::common::{infra::db as infra_db, meta::StreamType};
 
 static CACHE: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
 

@@ -14,11 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ahash::HashMap;
+use config::FxIndexMap;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
 
-use crate::{common::infra::config::FxIndexMap, service::metrics::prom::prometheus as proto};
+use crate::service::metrics::prom::prometheus as proto;
 
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";

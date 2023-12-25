@@ -15,6 +15,10 @@
 
 use std::{str::FromStr, sync::Arc};
 
+use config::{
+    BLOOM_FILTER_DEFAULT_FIELDS, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
+    PARQUET_PAGE_SIZE, SQL_FULL_TEXT_SEARCH_FIELDS,
+};
 use datafusion::arrow::datatypes::Schema;
 use parquet::{
     arrow::ArrowWriter,
@@ -24,13 +28,7 @@ use parquet::{
     schema::types::ColumnPath,
 };
 
-use crate::common::{
-    infra::config::{
-        BLOOM_FILTER_DEFAULT_FIELDS, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
-        PARQUET_PAGE_SIZE, SQL_FULL_TEXT_SEARCH_FIELDS,
-    },
-    meta::{common::FileMeta, functions::ZoFunction},
-};
+use crate::common::meta::{common::FileMeta, functions::ZoFunction};
 
 mod date_format_udf;
 pub mod exec;

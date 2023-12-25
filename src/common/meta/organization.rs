@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::CONFIG;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::{alerts::Alert, functions::Transform, stream::Stream};
-use crate::common::infra::config::CONFIG;
 
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";

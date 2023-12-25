@@ -17,13 +17,11 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use aws_sdk_dynamodb::types::AttributeValue;
+use config::CONFIG;
 use once_cell::sync::Lazy;
 
 use crate::common::{
-    infra::{
-        config::CONFIG,
-        errors::{Error, Result},
-    },
+    infra::errors::{Error, Result},
     meta::{
         common::{FileKey, FileMeta},
         meta_store::MetaStore,

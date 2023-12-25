@@ -19,16 +19,14 @@ use actix_web::http;
 use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
+use config::{CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
 use vrl::compiler::runtime::Runtime;
 
 use crate::{
     common::{
-        infra::{
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
+        infra::metrics,
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver},

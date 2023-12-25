@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::DateTime;
+use config::CONFIG;
 use regex::Regex;
 use serde::Serialize;
 use sqlparser::{
@@ -24,8 +25,6 @@ use sqlparser::{
     },
     parser::Parser,
 };
-
-use crate::common::infra::config::CONFIG;
 
 /// parsed sql
 #[derive(Clone, Debug, Serialize)]

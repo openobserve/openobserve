@@ -21,13 +21,14 @@ use std::{
 use ahash::AHashMap;
 use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use config::CONFIG;
 use tokio::sync::{RwLock, Semaphore};
 
 use crate::{
     common::{
         infra::{
             cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-            config::{CONFIG, STREAM_SCHEMAS},
+            config::STREAM_SCHEMAS,
             dist_lock, ider, storage,
         },
         meta::common::FileKey,

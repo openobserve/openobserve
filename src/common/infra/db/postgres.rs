@@ -18,6 +18,7 @@ use std::{str::FromStr, sync::Arc};
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
+use config::CONFIG;
 use once_cell::sync::Lazy;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
@@ -25,7 +26,7 @@ use sqlx::{
 };
 use tokio::sync::mpsc;
 
-use crate::common::infra::{config::CONFIG, errors::*};
+use crate::common::infra::errors::*;
 
 pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
 

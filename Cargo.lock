@@ -2044,6 +2044,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "config"
+version = "0.1.0"
+dependencies = [
+ "ahash 0.8.6",
+ "anyhow",
+ "byteorder",
+ "bytes",
+ "dashmap",
+ "dotenv_config",
+ "dotenvy",
+ "indexmap 2.1.0",
+ "itertools 0.12.0",
+ "once_cell",
+ "reqwest",
+ "segment",
+ "serde",
+ "sysinfo",
+ "tokio",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4758,6 +4779,7 @@ dependencies = [
  "chrono",
  "clap 4.4.11",
  "cloudevents-sdk",
+ "config",
  "csv",
  "dashmap",
  "datafusion",

@@ -20,6 +20,7 @@ use std::{
 
 use ahash::AHashMap;
 use chrono::Duration;
+use config::{CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS};
 use datafusion::arrow::datatypes::{DataType, Schema};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -27,10 +28,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{
-        infra::{
-            config::{CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS},
-            errors::{Error, ErrorCodes},
-        },
+        infra::errors::{Error, ErrorCodes},
         meta::{
             common::FileKey,
             sql::{Sql as MetaSql, SqlOperator},

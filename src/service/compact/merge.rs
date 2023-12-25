@@ -18,15 +18,12 @@ use std::{collections::HashMap, io::Write, sync::Arc};
 use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
 use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use config::{CONFIG, FILE_EXT_PARQUET};
 use tokio::{sync::Semaphore, task::JoinHandle};
 
 use crate::{
     common::{
-        infra::{
-            cache,
-            config::{CONFIG, FILE_EXT_PARQUET},
-            file_list as infra_file_list, ider, metrics, storage,
-        },
+        infra::{cache, file_list as infra_file_list, ider, metrics, storage},
         meta::{
             common::{FileKey, FileMeta},
             stream::StreamStats,

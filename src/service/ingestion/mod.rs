@@ -20,6 +20,7 @@ use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
+use config::SIZE_IN_MB;
 use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
@@ -30,7 +31,7 @@ use crate::{
     common::{
         infra::{
             cluster,
-            config::{SIZE_IN_MB, STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
+            config::{STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
             wal::get_or_create,
         },
         meta::{

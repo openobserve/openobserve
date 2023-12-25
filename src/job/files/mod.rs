@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::{CONFIG, FILE_EXT_PARQUET};
+
 use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, FILE_EXT_PARQUET},
-        ider,
-    },
+    infra::{cluster, ider},
     meta::StreamType,
 };
 

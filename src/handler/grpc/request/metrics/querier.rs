@@ -17,16 +17,14 @@ use std::time::UNIX_EPOCH;
 
 use arrow_schema::Schema;
 use chrono::DateTime;
+use config::{CONFIG, FILE_EXT_JSON};
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
-        infra::{
-            config::{CONFIG, FILE_EXT_JSON},
-            errors, metrics, wal,
-        },
+        infra::{errors, metrics, wal},
         meta::{self, stream::PartitionTimeLevel, StreamType},
         utils::file::{get_file_contents, get_file_meta, scan_files},
     },

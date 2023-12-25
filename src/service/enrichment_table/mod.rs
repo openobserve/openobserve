@@ -23,16 +23,13 @@ use actix_web::{
 use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::Utc;
+use config::CONFIG;
 use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 
 use crate::{
     common::{
-        infra::{
-            cache::stats,
-            cluster,
-            config::{CONFIG, STREAM_SCHEMAS},
-        },
+        infra::{cache::stats, cluster, config::STREAM_SCHEMAS},
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,

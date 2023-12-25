@@ -16,6 +16,7 @@
 use std::{str::FromStr, sync::Arc};
 
 use ahash::AHashMap as HashMap;
+use config::{CONFIG, PARQUET_BATCH_SIZE};
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
@@ -49,10 +50,7 @@ use super::{
 };
 use crate::{
     common::{
-        infra::{
-            cache::tmpfs,
-            config::{CONFIG, PARQUET_BATCH_SIZE},
-        },
+        infra::cache::tmpfs,
         meta::{
             common::{FileKey, FileMeta},
             functions::VRLResultResolver,

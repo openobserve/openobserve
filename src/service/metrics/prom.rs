@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, TimeZone, Utc};
+use config::{FxIndexMap, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -27,7 +28,7 @@ use crate::{
         infra::{
             cache::stats,
             cluster::{self, LOCAL_NODE_UUID},
-            config::{FxIndexMap, CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+            config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
             errors::{Error, Result},
             metrics,
         },

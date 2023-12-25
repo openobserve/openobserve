@@ -17,6 +17,7 @@ use std::{cmp::min, io::Cursor, sync::Arc};
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
+use config::CONFIG;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -26,9 +27,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::{
         infra::{
-            cluster,
-            config::CONFIG,
-            dist_lock,
+            cluster, dist_lock,
             errors::{Error, ErrorCodes},
         },
         meta::{

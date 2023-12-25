@@ -24,6 +24,7 @@ use std::{
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
+use config::CONFIG;
 use etcd_client::{
     Certificate, DeleteOptions, EventType, GetOptions, Identity, SortOrder, SortTarget, TlsOptions,
 };
@@ -35,7 +36,6 @@ use tokio::{
 
 use crate::common::infra::{
     cluster,
-    config::CONFIG,
     db::{Event, EventData},
     errors::*,
 };

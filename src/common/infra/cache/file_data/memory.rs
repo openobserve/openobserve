@@ -19,14 +19,12 @@ use std::{
 };
 
 use bytes::Bytes;
+use config::{RwHashMap, CONFIG};
 use hashlink::lru_cache::LruCache;
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
-use crate::common::infra::{
-    config::{RwHashMap, CONFIG},
-    metrics, storage,
-};
+use crate::common::infra::{metrics, storage};
 
 static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
 static DATA: Lazy<RwHashMap<String, Bytes>> = Lazy::new(Default::default);

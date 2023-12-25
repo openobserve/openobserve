@@ -13,15 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::{RwHashMap, RwHashSet, CONFIG};
 use dashmap::{DashMap, DashSet};
 use once_cell::sync::Lazy;
 
 use crate::common::{
-    infra::{
-        cache, cluster,
-        config::{RwHashMap, RwHashSet, CONFIG},
-        file_list,
-    },
+    infra::{cache, cluster, file_list},
     meta::common::FileMeta,
 };
 

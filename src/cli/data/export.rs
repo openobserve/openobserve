@@ -25,7 +25,6 @@ use ahash::AHashMap;
 use crate::{
     cli::data::{cli::Cli, Context},
     common::{
-        infra::config::CONFIG,
         meta::{search::Request, StreamType},
         utils::http::get_stream_type_from_request,
     },
@@ -52,7 +51,7 @@ impl Context for Export {
             query_type: "".to_owned(),
             start_time: c.start_time,
             end_time: c.end_time,
-            sort_by: Some(format!("{} ASC", CONFIG.common.column_timestamp)),
+            sort_by: Some(format!("{} ASC", config::CONFIG.common.column_timestamp)),
             track_total_hits: false,
             query_context: None,
             uses_zo_fn: false,

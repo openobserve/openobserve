@@ -22,6 +22,7 @@ use std::{
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
+use config::{FxIndexMap, CONFIG};
 use once_cell::sync::Lazy;
 use sqlx::{
     sqlite::{
@@ -37,7 +38,6 @@ use tokio::{
 
 use crate::common::infra::{
     cluster,
-    config::{FxIndexMap, CONFIG},
     db::{
         DbEvent, DbEventFileList, DbEventFileListDeleted, DbEventMeta, DbEventStreamStats, Event,
         EventData,

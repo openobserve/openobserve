@@ -15,7 +15,9 @@
 
 use std::sync::atomic;
 
-use crate::common::infra::{config::CONFIG, db as infra_db};
+use config::CONFIG;
+
+use crate::common::infra::db as infra_db;
 
 static LOCAL_OFFSET: atomic::AtomicI64 = atomic::AtomicI64::new(0);
 

@@ -15,11 +15,12 @@
 
 use std::{fs, path::Path};
 
+use config::CONFIG;
 use tokio::time;
 
 use crate::{
     common::{
-        infra::{cluster, config::CONFIG, storage, wal},
+        infra::{cluster, storage, wal},
         meta::{stream::StreamParams, StreamType},
         utils::file::scan_files,
     },

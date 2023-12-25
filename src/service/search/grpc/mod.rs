@@ -21,6 +21,7 @@ use ::datafusion::{
     error::DataFusionError,
 };
 use ahash::AHashMap as HashMap;
+use config::CONFIG;
 use futures::future::try_join_all;
 use tracing::{info_span, Instrument};
 
@@ -29,7 +30,6 @@ use crate::{
     common::{
         infra::{
             cluster,
-            config::CONFIG,
             errors::{Error, ErrorCodes},
         },
         meta::{common::FileKey, stream::ScanStats, StreamType},

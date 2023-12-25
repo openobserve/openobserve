@@ -16,15 +16,13 @@
 use std::sync::Arc;
 
 use cloudevents::{Event, EventBuilder, EventBuilderV10};
+use config::CONFIG;
 use log::{Metadata, Record};
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use tokio::sync::{broadcast, RwLock};
 
-use crate::common::{
-    infra::{config::CONFIG, ider::generate},
-    utils::json,
-};
+use crate::common::{infra::ider::generate, utils::json};
 
 pub static EVENT_SENDER: Lazy<broadcast::Sender<Event>> = Lazy::new(|| {
     let (tx, _) = broadcast::channel(1024);

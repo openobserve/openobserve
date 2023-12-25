@@ -15,11 +15,12 @@
 
 use std::io::{BufRead, BufReader};
 
+use config::CONFIG;
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use crate::common::{
-    infra::{config::CONFIG, file_list as infra_file_list, wal},
+    infra::{file_list as infra_file_list, wal},
     meta::{
         common::{FileKey, FileMeta},
         stream::StreamParams,

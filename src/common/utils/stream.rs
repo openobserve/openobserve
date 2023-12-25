@@ -19,6 +19,7 @@ use std::{
 };
 
 use actix_web::HttpResponse;
+use config::{CONFIG, FILE_EXT_JSON};
 use datafusion::{
     arrow::{datatypes::Schema, json as arrow_json, record_batch::RecordBatch},
     datasource::MemTable,
@@ -26,7 +27,6 @@ use datafusion::{
 };
 
 use crate::common::{
-    infra::config::{CONFIG, FILE_EXT_JSON},
     meta::{common::FileMeta, StreamType},
     utils::json,
 };

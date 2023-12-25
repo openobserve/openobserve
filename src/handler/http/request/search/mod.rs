@@ -19,13 +19,11 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
 use chrono::Duration;
+use config::{CONFIG, DISTINCT_FIELDS};
 
 use crate::{
     common::{
-        infra::{
-            config::{CONFIG, DISTINCT_FIELDS},
-            errors, metrics,
-        },
+        infra::{errors, metrics},
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,

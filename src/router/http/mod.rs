@@ -15,12 +15,10 @@
 
 use std::time::Duration;
 
+use ::config::{cluster::Role, CONFIG};
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
-use crate::common::{
-    infra::{cluster, config::CONFIG},
-    utils::rand::get_rand_element,
-};
+use crate::common::{infra::cluster, utils::rand::get_rand_element};
 
 const QUERIER_ROUTES: [&str; 13] = [
     "/summary",
@@ -169,14 +167,14 @@ fn get_url(path: &str) -> URLDetails {
     let is_querier_path = check_querier_route(path);
 
     let nodes = if is_querier_path {
-        node_type = cluster::Role::Querier;
+        node_type = Role::Querier;
         cluster::get_cached_online_querier_nodes()
     } else {
-        node_type = cluster::Role::Ingester;
+        node_type = Role::Ingester;
         cluster::get_cached_online_ingester_nodes()
     };
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
-        if node_type == cluster::Role::Ingester && !CONFIG.route.ingester_srv_url.is_empty() {
+        if node_type == Role::Ingester && !CONFIG.route.ingester_srv_url.is_empty() {
             return URLDetails {
                 is_error: false,
                 value: format!(

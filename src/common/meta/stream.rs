@@ -17,13 +17,13 @@ use std::{cmp::max, collections::HashMap, sync::Arc};
 
 use arrow_schema::Field;
 use chrono::Duration;
+use config::CONFIG;
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use utoipa::ToSchema;
 
 use super::prom::Metadata;
 use crate::common::{
-    infra::config::CONFIG,
     meta::{common::FileMeta, usage::Stats, StreamType},
     utils::json,
 };

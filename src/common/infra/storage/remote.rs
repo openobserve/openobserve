@@ -17,6 +17,7 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use config::CONFIG;
 use futures::stream::BoxStream;
 use object_store::{
     limit::LimitStore, path::Path, Error, GetOptions, GetResult, ListResult, MultipartId,
@@ -25,7 +26,6 @@ use object_store::{
 use tokio::io::AsyncWrite;
 
 use crate::common::infra::{
-    config::CONFIG,
     metrics,
     storage::{format_key, CONCURRENT_REQUESTS},
 };

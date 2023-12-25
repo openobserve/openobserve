@@ -17,6 +17,7 @@
 
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
+use config::{CONFIG, MMDB_CITY_FILE_NAME};
 use maxminddb::{
     geoip2::{City, ConnectionType, Isp},
     MaxMindDBError, Reader,
@@ -24,8 +25,6 @@ use maxminddb::{
 use serde::{Deserialize, Serialize};
 use vector_enrichment::{Case, Condition, IndexHandle, Table};
 use vrl::value::Value;
-
-use crate::common::infra::config::{CONFIG, MMDB_CITY_FILE_NAME};
 
 // MaxMind GeoIP database files have a type field we can use to recognize
 // specific products. If we encounter one of these two types, we look for

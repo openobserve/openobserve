@@ -15,15 +15,16 @@
 
 use std::sync::Arc;
 
+use config::{
+    cluster::{Node, NodeStatus},
+    CONFIG,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::{mpsc, RwLock};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
 use crate::{
-    common::{
-        infra::{cluster, config::CONFIG},
-        meta::common::FileKey,
-    },
+    common::{infra::cluster, meta::common::FileKey},
     handler::grpc::cluster_rpc,
 };
 
@@ -44,8 +45,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
     } else {
         cluster::get_cached_nodes(|node| {
             node.scheduled
-                && (node.status == cluster::NodeStatus::Prepare
-                    || node.status == cluster::NodeStatus::Online)
+                && (node.status == NodeStatus::Prepare || node.status == NodeStatus::Online)
                 && (cluster::is_querier(&node.role) || cluster::is_compactor(&node.role))
         })
         .unwrap()
@@ -115,7 +115,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
 }
 
 async fn send_to_node(
-    node: cluster::Node,
+    node: Node,
     rx: &mut mpsc::UnboundedReceiver<Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
     loop {
@@ -131,7 +131,7 @@ async fn send_to_node(
                     return Ok(());
                 }
                 Some(v) => {
-                    if v.status == cluster::NodeStatus::Online {
+                    if v.status == NodeStatus::Online {
                         break;
                     }
                 }

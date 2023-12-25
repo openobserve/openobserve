@@ -18,12 +18,10 @@ use std::io::Error;
 use actix_multipart::Multipart;
 use actix_web::{post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
+use config::{CONFIG, SIZE_IN_MB};
 
 use crate::{
-    common::{
-        infra::config::{CONFIG, SIZE_IN_MB},
-        meta::http::HttpResponse as MetaHttpResponse,
-    },
+    common::meta::http::HttpResponse as MetaHttpResponse,
     service::enrichment_table::save_enrichment_data,
 };
 

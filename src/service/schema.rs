@@ -21,6 +21,7 @@ use std::{
 };
 
 use ahash::AHashMap;
+use config::CONFIG;
 use datafusion::arrow::{
     datatypes::{DataType, Field, Schema},
     error::ArrowError,
@@ -29,10 +30,7 @@ use itertools::Itertools;
 
 use crate::{
     common::{
-        infra::{
-            config::{CONFIG, LOCAL_SCHEMA_LOCKER},
-            db::etcd,
-        },
+        infra::{config::LOCAL_SCHEMA_LOCKER, db::etcd},
         meta::{
             ingestion::StreamSchemaChk, prom::METADATA_LABEL, stream::SchemaEvolution, StreamType,
         },

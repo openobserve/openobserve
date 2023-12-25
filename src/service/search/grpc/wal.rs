@@ -17,6 +17,7 @@ use std::{io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
 use ahash::AHashMap as HashMap;
 use chrono::DateTime;
+use config::CONFIG;
 use datafusion::{
     arrow::{datatypes::Schema, record_batch::RecordBatch},
     common::FileType,
@@ -30,7 +31,6 @@ use crate::{
     common::{
         infra::{
             cache::tmpfs,
-            config::CONFIG,
             errors::{Error, ErrorCodes},
             wal,
         },

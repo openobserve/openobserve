@@ -15,10 +15,11 @@
 
 use std::collections::HashMap;
 
+use config::GEO_IP_ENRICHMENT_TABLE;
 use vector_enrichment::{Table, TableRegistry};
 
 use crate::common::{
-    infra::config::{ENRICHMENT_TABLES, GEOIP_TABLE, GEO_IP_ENRICHMENT_TABLE},
+    infra::config::{ENRICHMENT_TABLES, GEOIP_TABLE},
     meta::{functions::VRLCompilerConfig, organization::DEFAULT_ORG},
 };
 
