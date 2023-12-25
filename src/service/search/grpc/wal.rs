@@ -96,15 +96,29 @@ pub async fn search_parquet(
                 let file_data = file_data.into();
                 let parquet_meta = read_metadata(&file_data).await.unwrap_or_default();
                 scan_stats.original_size += parquet_meta.original_size;
-                let file_name = format!("/{work_dir}/{}", file.key);
-                tmpfs::set(&file_name, file_data).expect("tmpfs set success");
+                if let Some((min_ts, max_ts)) = sql.meta.time_range {
+                    if parquet_meta.min_ts <= max_ts && parquet_meta.max_ts >= min_ts {
+                        let file_name = format!("/{work_dir}/{}", file.key);
+                        tmpfs::set(&file_name, file_data).expect("tmpfs set success");
+                    } else {
+                        log::debug!(
+                            "[session_id {session_id}] skip wal file: {} time_range: [{},{}]",
+                            &file.key,
+                            parquet_meta.min_ts,
+                            parquet_meta.max_ts
+                        );
+                        files.retain(|x| x != file);
+                    }
+                }
             }
         }
     }
 
+    // release all files
+    wal::release_files(&lock_files).await;
+
     scan_stats.files = files.len() as i64;
     if scan_stats.files == 0 {
-        wal::release_files(&lock_files).await;
         tmpfs::delete(session_id, true).unwrap();
         return Ok((HashMap::new(), scan_stats));
     }
@@ -264,16 +278,12 @@ pub async fn search_parquet(
                     "[session_id {session_id}] datafusion execute error: {}",
                     err
                 );
-                // release all files
-                wal::release_files(&lock_files).await;
                 tmpfs::delete(session_id, true).unwrap();
                 return Err(super::handle_datafusion_error(err));
             }
         };
     }
 
-    // release all files
-    wal::release_files(&lock_files).await;
     // clear tmpfs
     tmpfs::delete(session_id, true).unwrap();
 
@@ -315,7 +325,7 @@ pub async fn search_memtable(
         .await
         .unwrap_or_default(),
     );
-    scan_stats.files = batches.len() as i64;
+    scan_stats.files = batches.iter().map(|(_, k)| k.len()).sum::<usize>() as i64;
     if scan_stats.files == 0 {
         return Ok((HashMap::new(), ScanStats::new()));
     }

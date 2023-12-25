@@ -391,6 +391,7 @@ pub async fn write_file_arrow(
         // let inferred_schema = entry.schema.clone();
 
         // -- call new ingester
+        println!("stream: {}, key: {}", stream.stream_name, _key);
         let writer = ingester::get_writer(&stream.org_id, &stream.stream_type.to_string()).await;
         writer
             .write(
@@ -398,7 +399,7 @@ pub async fn write_file_arrow(
                 ingester::Entry {
                     stream: Arc::from(stream.stream_name.as_str()),
                     schema_key: Arc::from("default"),
-                    partition_key: Arc::from("2023/12/18/00"),
+                    partition_key: Arc::from(_key.as_str()),
                     data: entry.records.clone(),
                     data_size: 0,
                 },
