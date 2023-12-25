@@ -125,10 +125,6 @@ async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
     let agent_running = agent.start().expect("Failed to start pyroscope agent");
 
-    if cli::cli().await? {
-        return Ok(());
-    }
-
     let _guard: Option<WorkerGuard> = if CONFIG.log.events_enabled {
         let logger = zo_logger::ZoLogger {
             sender: zo_logger::EVENT_SENDER.clone(),
@@ -145,6 +141,10 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         Some(setup_logs())
     };
+
+    if cli::cli().await? {
+        return Ok(());
+    }
 
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
