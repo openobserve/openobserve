@@ -26,6 +26,7 @@ use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use vector_enrichment::TableRegistry;
 
 use crate::{
     common::{
@@ -34,6 +35,7 @@ use crate::{
             errors::{Error, ErrorCodes},
         },
         meta::{
+            functions::VRLResultResolver,
             search,
             stream::{PartitionTimeLevel, ScanStats, StreamParams},
         },
@@ -133,7 +135,7 @@ async fn get_file_list(
     skip(req),
     fields(session_id = req.job.as_ref().unwrap().session_id, org_id = req.org_id)
 )]
-async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
+async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let session_id = req.job.as_ref().unwrap().session_id.clone();
 
@@ -184,6 +186,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
     );
+    // set this value to null & use it later on results ,
+    // this being to avoid performance impact of query fn being applied during query
+    // execution
+    let query_fn = req.query.as_ref().unwrap().query_fn.clone();
+    req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // make cluster request
     let mut tasks = Vec::new();
@@ -368,6 +375,18 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         Some(batches) => batches,
         None => &empty_vec,
     };
+
+    // compile vrl function & apply the same before sending the response
+    let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+    let program = match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
+        Ok(program) => {
+            let registry = program.config.get_custom::<TableRegistry>().unwrap();
+            registry.finish_load();
+            Some(program)
+        }
+        Err(_) => None,
+    };
+
     if !batches_query.is_empty() {
         let schema = batches_query[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = batches_query.iter().collect();
@@ -379,12 +398,28 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 )));
             }
         };
-        let mut sources: Vec<json::Value> = json_rows
-            .into_iter()
-            .filter(|v| !v.is_empty())
-            .map(json::Value::Object)
-            .collect();
-
+        let mut sources: Vec<json::Value> = match program {
+            Some(program) => json_rows
+                .into_iter()
+                .filter(|v| !v.is_empty())
+                .filter_map(|hit| {
+                    let ret_val = crate::service::ingestion::apply_vrl_fn(
+                        &mut runtime,
+                        &VRLResultResolver {
+                            program: program.program.clone(),
+                            fields: program.fields.clone(),
+                        },
+                        &json::Value::Object(hit.clone()),
+                    );
+                    (!ret_val.is_null()).then_some(flatten::flatten(&ret_val).unwrap_or(ret_val))
+                })
+                .collect(),
+            None => json_rows
+                .into_iter()
+                .filter(|v| !v.is_empty())
+                .map(json::Value::Object)
+                .collect(),
+        };
         // handle query type: json, metrics, table
         if query_type == "table" {
             (result.columns, sources) = handle_table_response(schema, sources);

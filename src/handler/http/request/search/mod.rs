@@ -23,7 +23,10 @@ use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
 
 use crate::{
     common::{
-        infra::{errors, metrics},
+        infra::{
+            config::{STREAM_SCHEMAS},
+            errors, metrics,
+        }, 
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
@@ -671,7 +674,19 @@ async fn values_v1(
         timeout,
     };
 
+    // skip fields which arent part of the schema
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
+    let schema = if let Some(schema) = STREAM_SCHEMAS.get(&key) {
+        schema.value().last().unwrap().clone()
+    } else {
+        arrow_schema::Schema::empty()
+    };
+
     for field in &fields {
+        // skip values for field which aren't part of the schema
+        if schema.field_with_name(field).is_err() {
+            continue;
+        }
         req.aggs.insert(
                 field.clone(),
                 format!(
