@@ -150,7 +150,15 @@ impl PartitionFile {
         Ok(())
     }
 
-    fn read(&self, _time_range: Option<(i64, i64)>) -> Result<Vec<Arc<RecordBatchEntry>>> {
-        Ok(self.data.clone())
+    fn read(&self, time_range: Option<(i64, i64)>) -> Result<Vec<Arc<RecordBatchEntry>>> {
+        match time_range {
+            None | Some((0, 0)) => Ok(self.data.clone()),
+            Some((min_ts, max_ts)) => Ok(self
+                .data
+                .iter()
+                .filter(|r| r.min_ts <= max_ts && r.max_ts >= min_ts)
+                .cloned()
+                .collect()),
+        }
     }
 }
