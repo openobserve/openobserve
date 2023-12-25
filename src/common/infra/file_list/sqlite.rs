@@ -18,6 +18,10 @@ use std::sync::atomic::AtomicBool;
 use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
+use config::{
+    meta::stream::{FileKey, FileMeta, StreamType},
+    utils::parquet::parse_file_key_columns,
+};
 use sqlx::{Executor, Pool, QueryBuilder, Row, Sqlite};
 
 use crate::common::{
@@ -28,11 +32,7 @@ use crate::common::{
         },
         errors::{Error, Result},
     },
-    meta::{
-        common::{FileKey, FileMeta},
-        stream::{PartitionTimeLevel, StreamStats},
-        StreamType,
-    },
+    meta::stream::{PartitionTimeLevel, StreamStats},
 };
 
 /// Table file_list inited flag
@@ -162,7 +162,7 @@ impl super::FileList for SqliteFileList {
 
     async fn get(&self, file: &str) -> Result<FileMeta> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
@@ -179,7 +179,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
     async fn contains(&self, file: &str) -> Result<bool> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
         let ret = sqlx::query(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
@@ -435,7 +435,8 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
 }
 
 pub async fn add(client: &Pool<Sqlite>, file: &str, meta: &FileMeta) -> Result<()> {
-    let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+    let (stream_key, date_key, file_name) =
+        parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
     match  sqlx::query(
             r#"
@@ -474,7 +475,7 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
         );
         query_builder.push_values(files, |mut b, item| {
             let (stream_key, date_key, file_name) =
-                super::parse_file_key_columns(&item.key).expect("parse file key failed");
+                parse_file_key_columns(&item.key).expect("parse file key failed");
             let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
             b.push_bind(org_id)
                 .push_bind(stream_key)
@@ -532,7 +533,8 @@ pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()>
         let pool = client.clone();
         let mut ids = Vec::with_capacity(files.len());
         for file in files {
-            let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+            let (stream_key, date_key, file_name) =
+                parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
             let ret: Option<i64> = sqlx::query_scalar(
                 r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
             )
@@ -571,7 +573,7 @@ pub async fn batch_add_deleted(
         );
         query_builder.push_values(files, |mut b, item: &String| {
             let (stream_key, date_key, file_name) =
-                super::parse_file_key_columns(item).expect("parse file key failed");
+                parse_file_key_columns(item).expect("parse file key failed");
             b.push_bind(org_id)
                 .push_bind(stream_key)
                 .push_bind(date_key)
@@ -599,7 +601,8 @@ pub async fn batch_remove_deleted(client: &Pool<Sqlite>, files: &[String]) -> Re
         let pool = client.clone();
         let mut ids = Vec::with_capacity(files.len());
         for file in files {
-            let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+            let (stream_key, date_key, file_name) =
+                parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
             let ret: Option<i64> = sqlx::query_scalar(
                 r#"SELECT id FROM file_list_deleted WHERE stream = $1 AND date = $2 AND file = $3;"#,
             )

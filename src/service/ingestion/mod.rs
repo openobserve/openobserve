@@ -16,11 +16,9 @@
 use std::{collections::BTreeMap, io::BufReader, sync::Arc};
 
 use ahash::AHashMap;
-use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
-use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
-use config::SIZE_IN_MB;
+use config::{meta::stream::StreamType, SIZE_IN_MB};
 use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
@@ -32,19 +30,17 @@ use crate::{
         infra::{
             cluster,
             config::{STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
-            wal::get_or_create,
         },
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
             stream::{PartitionTimeLevel, PartitioningDetails, SchemaRecords, StreamParams},
             usage::RequestStats,
-            StreamType,
         },
         utils::{
             flatten,
             functions::get_vrl_compiler_config,
-            json::{self, Map, Value},
+            json::{Map, Value},
             schema::infer_json_schema,
         },
     },
@@ -327,37 +323,8 @@ pub fn init_functions_runtime() -> Runtime {
 }
 
 pub async fn write_file(
-    buf: &AHashMap<String, Vec<String>>,
-    thread_id: usize,
-    stream: &StreamParams,
-    stream_file_name: &mut String,
-    partition_time_level: Option<PartitionTimeLevel>,
-) -> RequestStats {
-    let mut write_buf = BytesMut::new();
-    let mut req_stats = RequestStats::default();
-    for (key, entry) in buf {
-        if entry.is_empty() {
-            continue;
-        }
-        write_buf.clear();
-        for row in entry {
-            write_buf.put(row.as_bytes());
-            write_buf.put("\n".as_bytes());
-        }
-        let file = get_or_create(thread_id, stream.clone(), partition_time_level, key).await;
-        if stream_file_name.is_empty() {
-            *stream_file_name = file.full_name();
-        }
-        file.write(write_buf.as_ref()).await;
-        req_stats.size += write_buf.len() as f64 / SIZE_IN_MB;
-        req_stats.records += entry.len() as i64;
-    }
-    req_stats
-}
-
-pub async fn write_file_arrow(
     buf: &AHashMap<String, SchemaRecords>,
-    _thread_id: usize,
+    thread_id: usize,
     stream: &StreamParams,
     _stream_file_name: &mut str,
     _partition_time_level: Option<PartitionTimeLevel>,
@@ -367,35 +334,14 @@ pub async fn write_file_arrow(
         if entry.records.is_empty() {
             continue;
         }
-        let _batch_size = arrow::util::bit_util::round_upto_multiple_of_64(entry.records.len());
-        // let value = &entry.records.first().unwrap();
-        // let first_record = json::to_string(value).unwrap();
-
-        // let mut schema_reader = BufReader::new(first_record.as_bytes());
-        // let inferred_schema =
-        //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
-        // let inferred_schema = entry.schema.clone();
-
-        // let mut schema_reader = BufReader::new(first_record.as_bytes());
-        // let inferred_schema =
-        //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
-        // let inferred_schema = entry.schema.clone();
-
-        // let mut schema_reader = BufReader::new(first_record.as_bytes());
-        // let inferred_schema =
-        //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
-        // let inferred_schema = entry.schema.clone();
-
-        // let mut schema_reader = BufReader::new(first_record.as_bytes());
-        // let inferred_schema =
-        //     infer_json_schema(&mut schema_reader, None, StreamType::Logs).unwrap();
-        // let inferred_schema = entry.schema.clone();
 
         // -- call new ingester
         println!("stream: {}, key: {}", stream.stream_name, _key);
-        let writer = ingester::get_writer(&stream.org_id, &stream.stream_type.to_string()).await;
+        let writer =
+            ingester::get_writer(thread_id, &stream.org_id, &stream.stream_type.to_string()).await;
         writer
             .write(
+                thread_id,
                 Arc::new(entry.schema.clone()),
                 ingester::Entry {
                     stream: Arc::from(stream.stream_name.as_str()),
@@ -409,64 +355,8 @@ pub async fn write_file_arrow(
             .unwrap();
         // -- end call new ingester
 
-        // let mut decoder = ReaderBuilder::new(Arc::new(entry.schema.clone()))
-        //     .with_batch_size(batch_size)
-        //     .build_decoder()
-        //     .unwrap();
-
-        // let _ = decoder.serialize(&entry.records);
-        // let batch = decoder.flush().unwrap().unwrap();
-        // let rw_file = get_or_create_arrow(
-        //     thread_id,
-        //     stream.clone(),
-        //     partition_time_level,
-        //     key,
-        //     CONFIG.common.wal_memory_mode_enabled,
-        //     Some(entry.schema.clone()),
-        // )
-        // .await;
-        // if stream_file_name.is_empty() {
-        //     *stream_file_name = rw_file.full_name();
-        // }
-        // rw_file.write_arrow(batch).await;
-
         req_stats.size += entry.records.len() as f64 / SIZE_IN_MB;
         req_stats.records += entry.records.len() as i64;
-    }
-    req_stats
-}
-
-pub async fn write_file_arrow_new(
-    buf: &AHashMap<String, Vec<json::Value>>,
-    thread_id: usize,
-    stream: &StreamParams,
-    stream_file_name: &mut String,
-    partition_time_level: Option<PartitionTimeLevel>,
-) -> RequestStats {
-    let mut req_stats = RequestStats::default();
-    for (key, entry) in buf {
-        if entry.is_empty() {
-            continue;
-        }
-        let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(entry.len());
-
-        let inferred_schema =
-            arrow::json::reader::infer_json_schema_from_iterator(entry.iter().map(Ok)).unwrap();
-
-        let mut decoder = ReaderBuilder::new(Arc::new(inferred_schema.clone()))
-            .with_batch_size(batch_size)
-            .build_decoder()
-            .unwrap();
-
-        let _ = decoder.serialize(entry);
-        let batch = decoder.flush().unwrap().unwrap();
-        let rw_file = get_or_create(thread_id, stream.clone(), partition_time_level, key).await;
-        if stream_file_name.is_empty() {
-            *stream_file_name = rw_file.full_name();
-        }
-        rw_file.write_arrow(batch).await;
-        req_stats.size += entry.len() as f64 / SIZE_IN_MB;
-        req_stats.records += entry.len() as i64;
     }
     req_stats
 }

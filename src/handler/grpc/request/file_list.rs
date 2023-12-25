@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::stream::StreamType;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -20,7 +21,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::{
         infra::{file_list as infra_file_list, metrics},
-        meta::{stream::PartitionTimeLevel, StreamType},
+        meta::stream::PartitionTimeLevel,
     },
     handler::grpc::cluster_rpc::{
         filelist_server::Filelist, EmptyRequest, FileKey, FileList, FileListQueryRequest,

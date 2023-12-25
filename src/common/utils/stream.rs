@@ -19,17 +19,17 @@ use std::{
 };
 
 use actix_web::HttpResponse;
-use config::{CONFIG, FILE_EXT_JSON};
+use config::{
+    meta::stream::{FileMeta, StreamType},
+    CONFIG, FILE_EXT_JSON,
+};
 use datafusion::{
     arrow::{datatypes::Schema, json as arrow_json, record_batch::RecordBatch},
     datasource::MemTable,
     prelude::SessionContext,
 };
 
-use crate::common::{
-    meta::{common::FileMeta, StreamType},
-    utils::json,
-};
+use crate::common::utils::json;
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {

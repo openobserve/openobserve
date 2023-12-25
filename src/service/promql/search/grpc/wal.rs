@@ -16,7 +16,7 @@
 use std::{collections::HashMap, io::Cursor, sync::Arc};
 
 use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
-use config::{CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON};
+use config::{meta::stream::StreamType, CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON};
 use datafusion::{
     arrow::datatypes::Schema,
     common::FileType,
@@ -38,7 +38,6 @@ use crate::{
         meta::{
             search::{SearchType, Session as SearchSession},
             stream::ScanStats,
-            StreamType,
         },
     },
     handler::grpc::cluster_rpc,

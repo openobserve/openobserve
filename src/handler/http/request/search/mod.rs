@@ -19,7 +19,7 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
 use chrono::Duration;
-use config::{CONFIG, DISTINCT_FIELDS};
+use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
 
 use crate::{
     common::{
@@ -28,7 +28,6 @@ use crate::{
             self,
             http::HttpResponse as MetaHttpResponse,
             usage::{RequestStats, UsageType},
-            StreamType,
         },
         utils::{base64, functions, http::get_stream_type_from_request, json},
     },

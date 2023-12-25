@@ -38,7 +38,18 @@ use crate::{
     rwmap::RwMap,
 };
 
-static WRITERS: Lazy<RwMap<WriterKey, Arc<Writer>>> = Lazy::new(RwMap::default);
+static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
+    let writer_num = if CONFIG.common.feature_per_thread_lock {
+        CONFIG.limit.http_worker_num
+    } else {
+        1
+    };
+    let mut writers = Vec::with_capacity(writer_num);
+    for _ in 0..writer_num {
+        writers.push(RwMap::default());
+    }
+    writers
+});
 
 pub struct Writer {
     key: WriterKey,
@@ -49,28 +60,48 @@ pub struct Writer {
 }
 
 /// Get a writer for a given org_id and stream_type
-pub async fn get_writer(org_id: &str, stream_type: &str) -> Arc<Writer> {
+pub async fn get_writer(thread_id: usize, org_id: &str, stream_type: &str) -> Arc<Writer> {
     let key = WriterKey::new(org_id, stream_type);
-    let mut rw = WRITERS.write().await;
+    let mut rw = WRITERS[thread_id].write().await;
     let w = rw
         .entry(key.clone())
-        .or_insert_with(|| Arc::new(Writer::new(key)));
+        .or_insert_with(|| Arc::new(Writer::new(thread_id, key)));
     w.clone()
 }
 
-// Get a reader for a given org_id and stream_type
-pub async fn get_reader(org_id: &str, stream_type: &str) -> Option<Arc<Writer>> {
+pub async fn read_from_memtable(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+    time_range: Option<(i64, i64)>,
+) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
     let key = WriterKey::new(org_id, stream_type);
-    WRITERS.read().await.get(&key).cloned()
+    let writer_num = if CONFIG.common.feature_per_thread_lock {
+        CONFIG.limit.http_worker_num
+    } else {
+        1
+    };
+    let mut batches = Vec::with_capacity(writer_num);
+    for i in 0..writer_num {
+        let w = WRITERS[i].read().await;
+        let Some(r) = w.get(&key) else {
+            continue;
+        };
+        if let Ok(batch) = r.read(stream_name, time_range).await {
+            batches.extend(batch);
+        }
+    }
+    Ok(batches)
 }
 
 impl Writer {
-    pub(crate) fn new(key: WriterKey) -> Self {
+    pub(crate) fn new(thread_id: usize, key: WriterKey) -> Self {
         let now = Utc::now().timestamp_micros();
         let next_seq = AtomicU64::new(now as u64);
         let wal_id = next_seq.fetch_add(1, Ordering::SeqCst);
-        let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir);
-        let wal_dir = wal_dir.join("logs");
+        let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
+            .join("logs")
+            .join(thread_id.to_string());
         Self {
             key: key.clone(),
             wal: Arc::new(Mutex::new(
@@ -89,14 +120,20 @@ impl Writer {
         }
     }
 
-    pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry) -> Result<()> {
+    pub async fn write(
+        &self,
+        thread_id: usize,
+        schema: Arc<Schema>,
+        mut entry: Entry,
+    ) -> Result<()> {
         let entry_bytes = entry.into_bytes()?;
         let mut wal = self.wal.lock().await;
         if self.check_threshold(wal.size(), entry_bytes.len()).await {
             // rotation wal
             let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
-            let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir);
-            let wal_dir = wal_dir.join("logs");
+            let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
+                .join("logs")
+                .join(thread_id.to_string());
             let new_wal = WalWriter::new(
                 wal_dir,
                 &self.key.org_id,

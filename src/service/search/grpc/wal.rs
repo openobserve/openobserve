@@ -17,7 +17,11 @@ use std::{io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
 use ahash::AHashMap as HashMap;
 use chrono::DateTime;
-use config::CONFIG;
+use config::{
+    meta::stream::{FileKey, StreamType},
+    utils::parquet::read_metadata,
+    CONFIG,
+};
 use datafusion::{
     arrow::{datatypes::Schema, record_batch::RecordBatch},
     common::FileType,
@@ -36,14 +40,10 @@ use crate::{
         },
         meta::{
             self,
-            common::FileKey,
             search::SearchType,
             stream::{PartitionTimeLevel, ScanStats},
         },
-        utils::{
-            file::{get_file_contents, get_file_meta, scan_files},
-            parquet::read_metadata,
-        },
+        utils::file::{get_file_contents, get_file_meta, scan_files},
     },
     service::{
         db,
@@ -61,7 +61,7 @@ use crate::{
 pub async fn search_parquet(
     session_id: &str,
     sql: Arc<Sql>,
-    stream_type: meta::StreamType,
+    stream_type: StreamType,
     timeout: u64,
 ) -> super::SearchResult {
     let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
@@ -295,7 +295,7 @@ pub async fn search_parquet(
 pub async fn search_memtable(
     session_id: &str,
     sql: Arc<Sql>,
-    stream_type: meta::StreamType,
+    stream_type: StreamType,
     timeout: u64,
 ) -> super::SearchResult {
     let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
@@ -308,13 +308,14 @@ pub async fn search_memtable(
 
     let mut scan_stats = ScanStats::new();
 
-    let Some(reader) = ingester::get_reader(&sql.org_id, &stream_type.to_string()).await else {
-        return Ok((HashMap::new(), ScanStats::new()));
-    };
-    let mut batches = reader
-        .read(&sql.stream_name, sql.meta.time_range)
-        .await
-        .unwrap_or_default();
+    let mut batches = ingester::read_from_memtable(
+        &sql.org_id,
+        &stream_type.to_string(),
+        &sql.stream_name,
+        sql.meta.time_range,
+    )
+    .await
+    .unwrap_or_default();
     batches.extend(
         ingester::read_from_immutable(
             &sql.org_id,
@@ -452,7 +453,7 @@ pub async fn search_memtable(
 async fn get_file_list(
     session_id: &str,
     sql: &Sql,
-    stream_type: meta::StreamType,
+    stream_type: StreamType,
     partition_time_level: &PartitionTimeLevel,
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {

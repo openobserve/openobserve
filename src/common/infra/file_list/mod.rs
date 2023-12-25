@@ -17,16 +17,17 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use aws_sdk_dynamodb::types::AttributeValue;
-use config::CONFIG;
+use config::{
+    meta::stream::{FileKey, FileMeta, StreamType},
+    CONFIG,
+};
 use once_cell::sync::Lazy;
 
 use crate::common::{
-    infra::errors::{Error, Result},
+    infra::errors::Result,
     meta::{
-        common::{FileKey, FileMeta},
         meta_store::MetaStore,
         stream::{PartitionTimeLevel, StreamStats},
-        StreamType,
     },
 };
 
@@ -253,26 +254,6 @@ pub async fn is_empty() -> bool {
 #[inline]
 pub async fn clear() -> Result<()> {
     CLIENT.clear().await
-}
-
-/// parse file key to get stream_key, date_key, file_name
-pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String)> {
-    // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
-    let columns = key.splitn(9, '/').collect::<Vec<&str>>();
-    if columns.len() < 9 {
-        return Err(Error::Message(format!(
-            "[file_list] Invalid file path: {}",
-            key
-        )));
-    }
-    // let _ = columns[0].to_string(); // files/
-    let stream_key = format!("{}/{}/{}", columns[1], columns[2], columns[3]);
-    let date_key = format!(
-        "{}/{}/{}/{}",
-        columns[4], columns[5], columns[6], columns[7]
-    );
-    let file_name = columns[8].to_string();
-    Ok((stream_key, date_key, file_name))
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]

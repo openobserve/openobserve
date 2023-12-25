@@ -18,17 +18,17 @@ use std::{collections::HashMap, io::Write, sync::Arc};
 use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
 use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use config::{CONFIG, FILE_EXT_PARQUET};
+use config::{
+    meta::stream::{FileKey, FileMeta, StreamType},
+    utils::parquet::parse_file_key_columns,
+    CONFIG, FILE_EXT_PARQUET,
+};
 use tokio::{sync::Semaphore, task::JoinHandle};
 
 use crate::{
     common::{
         infra::{cache, file_list as infra_file_list, ider, metrics, storage},
-        meta::{
-            common::{FileKey, FileMeta},
-            stream::StreamStats,
-            StreamType,
-        },
+        meta::stream::StreamStats,
         utils::json,
     },
     service::{db, file_list, search::datafusion, stream},
@@ -518,8 +518,7 @@ async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(),
 
 async fn write_file_list_s3(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
     // write new data into file_list
-    let (_stream_key, date_key, _file_name) =
-        infra_file_list::parse_file_key_columns(&events.first().unwrap().key)?;
+    let (_stream_key, date_key, _file_name) = parse_file_key_columns(&events.first().unwrap().key)?;
     // upload the new file_list to storage
     let new_file_list_key = format!("file_list/{}/{}.json.zst", date_key, ider::generate());
     let mut buf = zstd::Encoder::new(Vec::new(), 3)?;

@@ -16,13 +16,15 @@
 use std::path::Path;
 
 use ahash::HashMap;
-use config::{cluster::Role, CONFIG};
+use config::{
+    meta::{cluster::Role, stream::StreamType},
+    CONFIG,
+};
 use tokio::time;
 
 use crate::{
     common::{
         infra::{cache, cluster, config::USERS, metrics},
-        meta::StreamType,
         utils::file::scan_files,
     },
     service::db,

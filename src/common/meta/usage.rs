@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::SIZE_IN_MB;
+use config::{
+    meta::stream::{FileMeta, StreamType},
+    SIZE_IN_MB,
+};
 use serde::{Deserialize, Serialize};
-
-use super::{common::FileMeta, StreamType};
 
 pub const USAGE_STREAM: &str = "usage";
 pub const STATS_STREAM: &str = "stats";

@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::stream::StreamType;
+
 use super::db;
-use crate::common::meta::{alerts::triggers::Trigger, StreamType};
+use crate::common::meta::alerts::triggers::Trigger;
 
 pub async fn save(
     org_id: &str,

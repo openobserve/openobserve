@@ -264,6 +264,7 @@ thiserror = "1.0"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 url = "2.2"
+utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }

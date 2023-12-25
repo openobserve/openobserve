@@ -19,7 +19,7 @@ use ahash::HashMap;
 use arrow::{ipc::writer::StreamWriter, record_batch::RecordBatch};
 use arrow_schema::Schema;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
-use config::{RwAHashSet, CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON};
+use config::{meta::stream::StreamType, RwAHashSet, CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON};
 use once_cell::sync::Lazy;
 use tokio::{
     fs::{create_dir_all, File, OpenOptions},
@@ -29,10 +29,7 @@ use tokio::{
 
 use crate::common::{
     infra::{ider, metrics},
-    meta::{
-        stream::{PartitionTimeLevel, StreamParams},
-        StreamType,
-    },
+    meta::stream::{PartitionTimeLevel, StreamParams},
     utils::asynchronism::file::get_file_contents,
 };
 

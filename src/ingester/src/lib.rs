@@ -17,7 +17,6 @@ mod entry;
 pub mod errors;
 mod immutable;
 mod memtable;
-mod parquet;
 mod partition;
 mod rwmap;
 mod stream;
@@ -27,7 +26,7 @@ mod writer;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use tokio::time;
-pub use writer::{get_reader, get_writer};
+pub use writer::{get_writer, read_from_memtable};
 
 pub async fn init() -> errors::Result<()> {
     // check uncompleted parquet files, need delete those files

@@ -16,17 +16,17 @@
 use std::sync::Arc;
 
 use config::{
-    cluster::{Node, NodeStatus},
+    meta::{
+        cluster::{Node, NodeStatus},
+        stream::FileKey,
+    },
     CONFIG,
 };
 use once_cell::sync::Lazy;
 use tokio::sync::{mpsc, RwLock};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
-use crate::{
-    common::{infra::cluster, meta::common::FileKey},
-    handler::grpc::cluster_rpc,
-};
+use crate::{common::infra::cluster, handler::grpc::cluster_rpc};
 
 static EVENTS: Lazy<RwLock<ahash::AHashMap<String, EventChannel>>> =
     Lazy::new(|| RwLock::new(ahash::AHashMap::new()));

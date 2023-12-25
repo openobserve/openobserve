@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{Duration, Utc};
-use config::CONFIG;
+use config::{meta::stream::StreamType, CONFIG};
 
 use crate::{
     common::{
@@ -23,7 +23,7 @@ use crate::{
             config::TRIGGERS,
             dist_lock,
         },
-        meta::{alerts::triggers::Trigger, StreamType},
+        meta::alerts::triggers::Trigger,
     },
     service::db,
 };

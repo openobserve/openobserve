@@ -19,7 +19,7 @@ use std::sync::{
 };
 
 use ahash::AHashMap;
-use config::{FxIndexMap, CONFIG};
+use config::{meta::stream::StreamType, FxIndexMap, CONFIG};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -30,7 +30,7 @@ use tokio::{
 use crate::{
     common::{
         infra::errors::{Error, Result},
-        meta::{stream::StreamParams, StreamType},
+        meta::stream::StreamParams,
         utils::json,
     },
     service::{ingestion, stream::unwrap_partition_time_level},

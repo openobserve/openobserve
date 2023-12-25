@@ -16,7 +16,11 @@
 use std::sync::Arc;
 
 use ahash::AHashMap as HashMap;
-use config::{is_local_disk_storage, CONFIG};
+use config::{
+    is_local_disk_storage,
+    meta::stream::{FileKey, StreamType},
+    CONFIG,
+};
 use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
 use futures::future::try_join_all;
 use tokio::{sync::Semaphore, time::Duration};
@@ -30,7 +34,6 @@ use crate::{
         },
         meta::{
             self,
-            common::FileKey,
             search::SearchType,
             stream::{PartitionTimeLevel, ScanStats},
         },
@@ -51,7 +54,7 @@ pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
     file_list: &[FileKey],
-    stream_type: meta::StreamType,
+    stream_type: StreamType,
     timeout: u64,
 ) -> super::SearchResult {
     // fetch all schema versions, group files by version
@@ -258,7 +261,7 @@ pub async fn search(
 async fn get_file_list(
     session_id: &str,
     sql: &Sql,
-    stream_type: meta::StreamType,
+    stream_type: StreamType,
     time_level: PartitionTimeLevel,
 ) -> Result<Vec<FileKey>, Error> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();

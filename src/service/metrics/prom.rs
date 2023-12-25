@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, TimeZone, Utc};
-use config::{FxIndexMap, CONFIG};
+use config::{meta::stream::StreamType, FxIndexMap, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -39,7 +39,6 @@ use crate::{
             search,
             stream::{PartitioningDetails, StreamParams},
             usage::UsageType,
-            StreamType,
         },
         utils::{json, time::parse_i64_to_timestamp_micros},
     },

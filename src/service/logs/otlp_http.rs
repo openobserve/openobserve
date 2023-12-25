@@ -18,7 +18,7 @@ use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
-use config::{CONFIG, DISTINCT_FIELDS};
+use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -35,7 +35,6 @@ use crate::{
             ingestion::StreamStatus,
             stream::{SchemaRecords, StreamParams},
             usage::UsageType,
-            StreamType,
         },
         utils::{flatten, json},
     },
@@ -45,7 +44,7 @@ use crate::{
         ingestion::{
             evaluate_trigger,
             otlp_json::{get_int_value, get_val_for_attr},
-            write_file_arrow, TriggerAlertData,
+            write_file, TriggerAlertData,
         },
         schema::stream_schema_exists,
         usage::report_request_usage_stats,
@@ -383,7 +382,7 @@ pub async fn logs_json_handler(
 
     // write to file
     let mut stream_file_name = "".to_string();
-    let mut req_stats = write_file_arrow(
+    let mut req_stats = write_file(
         &buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::Logs),

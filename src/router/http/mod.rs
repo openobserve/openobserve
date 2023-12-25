@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use ::config::{cluster::Role, CONFIG};
+use ::config::{meta::cluster::Role, CONFIG};
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
 use crate::common::{infra::cluster, utils::rand::get_rand_element};

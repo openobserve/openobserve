@@ -18,7 +18,7 @@ use std::{io::Error, sync::Arc};
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
-use config::{CONFIG, DISTINCT_FIELDS};
+use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
@@ -34,14 +34,13 @@ use crate::{
                 Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanRefType,
             },
             usage::UsageType,
-            StreamType,
         },
         utils,
         utils::{flatten, hasher::get_fields_key_xxh3, json},
     },
     service::{
         db, distinct_values, format_partition_key, format_stream_name,
-        ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file_arrow, TriggerAlertData},
+        ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file, TriggerAlertData},
         schema::{check_for_schema, stream_schema_exists},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -412,7 +411,7 @@ pub async fn traces_json(
     }
 
     let mut traces_file_name = "".to_string();
-    let mut req_stats = write_file_arrow(
+    let mut req_stats = write_file(
         &data_buf,
         thread_id,
         &StreamParams::new(org_id, traces_stream_name, StreamType::Traces),

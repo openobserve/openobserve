@@ -15,3 +15,4 @@
 
 pub(crate) mod cgroup;
 pub(crate) mod file;
+pub mod parquet;

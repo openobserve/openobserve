@@ -18,8 +18,50 @@ use std::collections::HashMap;
 use aws_sdk_dynamodb::types::AttributeValue;
 use byteorder::{ByteOrder, LittleEndian};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-use crate::common::infra::file_list::parse_file_key_columns;
+use crate::utils::parquet::parse_file_key_columns;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum StreamType {
+    #[default]
+    Logs,
+    Metrics,
+    Traces,
+    #[serde(rename = "enrichment_tables")]
+    EnrichmentTables,
+    #[serde(rename = "file_list")]
+    Filelist,
+    Metadata,
+}
+
+impl From<&str> for StreamType {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "logs" => StreamType::Logs,
+            "metrics" => StreamType::Metrics,
+            "traces" => StreamType::Traces,
+            "enrichment_tables" => StreamType::EnrichmentTables,
+            "file_list" => StreamType::Filelist,
+            "metadata" => StreamType::Metadata,
+            _ => StreamType::Logs,
+        }
+    }
+}
+
+impl std::fmt::Display for StreamType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            StreamType::Logs => write!(f, "logs"),
+            StreamType::Metrics => write!(f, "metrics"),
+            StreamType::Traces => write!(f, "traces"),
+            StreamType::EnrichmentTables => write!(f, "enrichment_tables"),
+            StreamType::Filelist => write!(f, "file_list"),
+            StreamType::Metadata => write!(f, "metadata"),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileKey {

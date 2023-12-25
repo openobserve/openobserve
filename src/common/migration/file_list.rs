@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
+use config::{
+    meta::stream::{FileKey, StreamType},
+    CONFIG,
+};
 
 use crate::{
     common::{
         infra::file_list as infra_file_list,
-        meta::{common::FileKey, stream::PartitionTimeLevel, StreamType},
+        meta::stream::PartitionTimeLevel,
         utils::{file::get_file_meta, time::BASE_TIME},
     },
     job::{file_list, files},

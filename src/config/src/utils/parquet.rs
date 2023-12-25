@@ -13,76 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{io::Cursor, sync::Arc};
 
 use arrow_schema::Schema;
-use itertools::chain;
-use once_cell::sync::Lazy;
 use parquet::{
-    arrow::ArrowWriter,
+    arrow::{ArrowWriter, ParquetRecordBatchStreamBuilder},
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
     format::SortingColumn,
     schema::types::ColumnPath,
 };
-use serde::{Deserialize, Serialize};
 
-pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
-pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
-pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
+use crate::{config::*, meta::stream::FileMeta};
 
-const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
-    ["log", "message", "msg", "content", "data", "events", "json"];
-pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    chain(
-        _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
-            .iter()
-            .map(|s| s.to_string()),
-        "".split(',').filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        }),
-    )
-    .collect()
-});
-
-const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
-pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    chain(
-        _DEFAULT_BLOOM_FILTER_FIELDS.iter().map(|s| s.to_string()),
-        "".split(',').filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        }),
-    )
-    .collect()
-});
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct FileMeta {
-    pub min_ts: i64, // microseconds
-    pub max_ts: i64, // microseconds
-    pub records: i64,
-    pub original_size: i64,
-    pub compressed_size: i64,
-}
-
-pub(crate) fn new_parquet_writer<'a>(
+pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
     bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
 ) -> ArrowWriter<&'a mut Vec<u8>> {
     let sort_column_id = schema
-        .index_of("_timestamp")
+        .index_of(&CONFIG.common.column_timestamp)
         .expect("Not found timestamp field");
     let mut writer_props = WriterProperties::builder()
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
@@ -95,11 +46,11 @@ pub(crate) fn new_parquet_writer<'a>(
             [SortingColumn::new(sort_column_id as i32, false, false)].to_vec(),
         ))
         .set_column_dictionary_enabled(
-            ColumnPath::from(vec!["_timestamp".to_string()]),
+            ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
             false,
         )
         .set_column_encoding(
-            ColumnPath::from(vec!["_timestamp".to_string()]),
+            ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
             Encoding::DELTA_BINARY_PACKED,
         )
         .set_key_value_metadata(Some(vec![
@@ -123,20 +74,58 @@ pub(crate) fn new_parquet_writer<'a>(
     } else {
         num_rows
     };
-
-    let fields = if bloom_filter_fields.is_empty() {
-        BLOOM_FILTER_DEFAULT_FIELDS.as_slice()
-    } else {
-        bloom_filter_fields
-    };
-    for field in fields.iter() {
-        writer_props = writer_props
-            .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
-        if metadata.records > 0 {
+    if CONFIG.common.bloom_filter_enabled {
+        let fields = if bloom_filter_fields.is_empty() {
+            BLOOM_FILTER_DEFAULT_FIELDS.as_slice()
+        } else {
+            bloom_filter_fields
+        };
+        for field in fields.iter() {
             writer_props = writer_props
-                .set_column_bloom_filter_ndv(ColumnPath::from(vec![field.to_string()]), num_rows);
+                .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
+            if metadata.records > 0 {
+                writer_props = writer_props.set_column_bloom_filter_ndv(
+                    ColumnPath::from(vec![field.to_string()]),
+                    num_rows,
+                );
+            }
         }
     }
     let writer_props = writer_props.build();
     ArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
+}
+
+/// parse file key to get stream_key, date_key, file_name
+pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), anyhow::Error> {
+    // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
+    let columns = key.splitn(9, '/').collect::<Vec<&str>>();
+    if columns.len() < 9 {
+        return Err(anyhow::anyhow!("[file_list] Invalid file path: {}", key));
+    }
+    // let _ = columns[0].to_string(); // files/
+    let stream_key = format!("{}/{}/{}", columns[1], columns[2], columns[3]);
+    let date_key = format!(
+        "{}/{}/{}/{}",
+        columns[4], columns[5], columns[6], columns[7]
+    );
+    let file_name = columns[8].to_string();
+    Ok((stream_key, date_key, file_name))
+}
+
+pub async fn read_metadata(data: &bytes::Bytes) -> Result<FileMeta, anyhow::Error> {
+    let mut meta = FileMeta::default();
+    let schema_reader = Cursor::new(data.clone());
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+    if let Some(metadata) = arrow_reader.metadata().file_metadata().key_value_metadata() {
+        for kv in metadata {
+            match kv.key.as_str() {
+                "min_ts" => meta.min_ts = kv.value.as_ref().unwrap().parse().unwrap(),
+                "max_ts" => meta.max_ts = kv.value.as_ref().unwrap().parse().unwrap(),
+                "records" => meta.records = kv.value.as_ref().unwrap().parse().unwrap(),
+                "original_size" => meta.original_size = kv.value.as_ref().unwrap().parse().unwrap(),
+                _ => {}
+            }
+        }
+    }
+    Ok(meta)
 }

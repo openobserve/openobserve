@@ -17,7 +17,7 @@ use std::time::UNIX_EPOCH;
 
 use arrow_schema::Schema;
 use chrono::DateTime;
-use config::{CONFIG, FILE_EXT_JSON};
+use config::{meta::stream::StreamType, CONFIG, FILE_EXT_JSON};
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -25,7 +25,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::{
         infra::{errors, metrics, wal},
-        meta::{self, stream::PartitionTimeLevel, StreamType},
+        meta::{self, stream::PartitionTimeLevel},
         utils::file::{get_file_contents, get_file_meta, scan_files},
     },
     handler::grpc::{
@@ -58,7 +58,7 @@ impl Metrics for Querier {
 
         let req: &MetricsQueryRequest = req.get_ref();
         let org_id = &req.org_id;
-        let stream_type = meta::StreamType::Metrics.to_string();
+        let stream_type = StreamType::Metrics.to_string();
         let result = SearchService::grpc::search(req).await.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME

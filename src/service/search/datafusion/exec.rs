@@ -16,7 +16,11 @@
 use std::{str::FromStr, sync::Arc};
 
 use ahash::AHashMap as HashMap;
-use config::{CONFIG, PARQUET_BATCH_SIZE};
+use config::{
+    meta::stream::{FileKey, FileMeta},
+    utils::parquet::new_parquet_writer,
+    CONFIG, PARQUET_BATCH_SIZE,
+};
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
@@ -52,7 +56,6 @@ use crate::{
     common::{
         infra::cache::tmpfs,
         meta::{
-            common::{FileKey, FileMeta},
             functions::VRLResultResolver,
             search::{SearchType, Session as SearchSession},
             sql,
@@ -919,7 +922,7 @@ pub async fn convert_parquet_file(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
     let file_meta = FileMeta::default();
-    let mut writer = super::new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
+    let mut writer = new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -993,7 +996,7 @@ pub async fn merge_parquet_files(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
 
-    let mut writer = super::new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
+    let mut writer = new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }

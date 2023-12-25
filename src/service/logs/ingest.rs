@@ -19,7 +19,7 @@ use actix_web::http;
 use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
-use config::{CONFIG, DISTINCT_FIELDS};
+use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
 use vrl::compiler::runtime::Runtime;
@@ -37,13 +37,12 @@ use crate::{
             },
             stream::{SchemaRecords, StreamParams},
             usage::UsageType,
-            StreamType,
         },
         utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
     service::{
         distinct_values, get_formatted_stream_name,
-        ingestion::{evaluate_trigger, is_ingestion_allowed, write_file_arrow, TriggerAlertData},
+        ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
         logs::StreamMeta,
         usage::report_request_usage_stats,
     },
@@ -201,7 +200,7 @@ pub async fn ingest(
     // write to file
     let mut stream_file_name = "".to_string();
     let mut req_stats =
-        write_file_arrow(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
+        write_file(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
 
     if stream_file_name.is_empty() {
         return Ok(IngestionResponse::new(

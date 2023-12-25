@@ -15,14 +15,17 @@
 
 use std::{fs, io::Read, path::Path};
 
-use config::CONFIG;
+use config::{
+    meta::stream::{FileMeta, StreamType},
+    utils::parquet::read_metadata,
+    CONFIG,
+};
 use tokio::{sync::Semaphore, task, time};
 
 use crate::{
     common::{
         infra::{cluster, metrics, storage, wal},
-        meta::{common::FileMeta, StreamType},
-        utils::{file::scan_files, parquet::read_metadata},
+        utils::file::scan_files,
     },
     service::{db, usage::report_compression_stats},
 };
@@ -71,7 +74,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         // 2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
         // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
-        let stream_type: StreamType = StreamType::from(columns[2]);
+        let stream_type = StreamType::from(columns[2]);
         let stream_name = columns[3].to_string();
         let mut file_name = columns[4].to_string();
 

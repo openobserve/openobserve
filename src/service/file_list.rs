@@ -15,7 +15,13 @@
 
 use std::io::Write;
 
-use config::{cluster::Node, CONFIG};
+use config::{
+    meta::{
+        cluster::Node,
+        stream::{FileKey, FileMeta, StreamType},
+    },
+    CONFIG,
+};
 use futures::future::try_join_all;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -27,11 +33,7 @@ use crate::{
             errors::{Error, ErrorCodes},
             file_list, ider, storage,
         },
-        meta::{
-            common::{FileKey, FileMeta},
-            stream::{PartitionTimeLevel, ScanStats},
-            StreamType,
-        },
+        meta::stream::{PartitionTimeLevel, ScanStats},
         utils::{file::get_file_meta as util_get_file_meta, json},
     },
     handler::grpc::cluster_rpc,

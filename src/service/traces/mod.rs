@@ -19,7 +19,7 @@ use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
-use config::{CONFIG, DISTINCT_FIELDS};
+use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -39,13 +39,12 @@ use crate::{
             stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
             traces::{Event, Span, SpanRefType},
             usage::UsageType,
-            StreamType,
         },
         utils::{self, flatten, hasher::get_fields_key_xxh3, json},
     },
     service::{
         db, distinct_values, format_partition_key, format_stream_name,
-        ingestion::{evaluate_trigger, grpc::get_val, write_file_arrow, TriggerAlertData},
+        ingestion::{evaluate_trigger, grpc::get_val, write_file, TriggerAlertData},
         schema::{check_for_schema, stream_schema_exists},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -349,7 +348,7 @@ pub async fn handle_trace_request(
     }
 
     let mut traces_file_name = "".to_string();
-    let mut req_stats = write_file_arrow(
+    let mut req_stats = write_file(
         &data_buf,
         thread_id,
         &StreamParams::new(org_id, traces_stream_name, StreamType::Traces),

@@ -18,7 +18,7 @@ use std::io::{BufRead, BufReader};
 use actix_web::{http, web};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
-use config::{CONFIG, DISTINCT_FIELDS};
+use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
@@ -29,13 +29,12 @@ use crate::{
             ingestion::{IngestionResponse, StreamStatus},
             stream::{SchemaRecords, StreamParams},
             usage::UsageType,
-            StreamType,
         },
         utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
     service::{
         distinct_values, get_formatted_stream_name,
-        ingestion::{evaluate_trigger, is_ingestion_allowed, write_file_arrow, TriggerAlertData},
+        ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
         logs::StreamMeta,
         usage::report_request_usage_stats,
     },
@@ -213,7 +212,7 @@ async fn ingest_inner(
     // write to file
     let mut stream_file_name = "".to_string();
 
-    let mut req_stats = write_file_arrow(
+    let mut req_stats = write_file(
         &buf,
         thread_id,
         &stream_params,

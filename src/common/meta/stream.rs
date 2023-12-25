@@ -17,16 +17,16 @@ use std::{cmp::max, collections::HashMap, sync::Arc};
 
 use arrow_schema::Field;
 use chrono::Duration;
-use config::CONFIG;
+use config::{
+    meta::stream::{FileMeta, StreamType},
+    CONFIG,
+};
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use utoipa::ToSchema;
 
 use super::prom::Metadata;
-use crate::common::{
-    meta::{common::FileMeta, usage::Stats, StreamType},
-    utils::json,
-};
+use crate::common::{meta::usage::Stats, utils::json};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {

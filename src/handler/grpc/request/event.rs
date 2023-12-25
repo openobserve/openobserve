@@ -13,15 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::stream::FileKey;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{
-        infra::{file_list as infra_file_list, metrics},
-        meta::common::FileKey,
-    },
+    common::infra::{file_list as infra_file_list, metrics},
     handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList},
 };
 

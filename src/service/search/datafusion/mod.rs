@@ -13,22 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::str::FromStr;
 
-use config::{
-    BLOOM_FILTER_DEFAULT_FIELDS, CONFIG, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
-    PARQUET_PAGE_SIZE, SQL_FULL_TEXT_SEARCH_FIELDS,
-};
-use datafusion::arrow::datatypes::Schema;
-use parquet::{
-    arrow::ArrowWriter,
-    basic::{Compression, Encoding},
-    file::{metadata::KeyValue, properties::WriterProperties},
-    format::SortingColumn,
-    schema::types::ColumnPath,
-};
-
-use crate::common::meta::{common::FileMeta, functions::ZoFunction};
+use crate::common::meta::functions::ZoFunction;
 
 mod date_format_udf;
 pub mod exec;
@@ -93,72 +80,3 @@ pub const DEFAULT_FUNCTIONS: [ZoFunction; 6] = [
         text: "re_not_match(field, 'pattern')",
     },
 ];
-
-pub fn new_parquet_writer<'a>(
-    buf: &'a mut Vec<u8>,
-    schema: &'a Arc<Schema>,
-    bloom_filter_fields: &'a [String],
-    metadata: &'a FileMeta,
-) -> ArrowWriter<&'a mut Vec<u8>> {
-    let sort_column_id = schema
-        .index_of(&CONFIG.common.column_timestamp)
-        .expect("Not found timestamp field");
-    let mut writer_props = WriterProperties::builder()
-        .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
-        .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
-        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
-        .set_compression(Compression::ZSTD(Default::default()))
-        .set_dictionary_enabled(true)
-        .set_encoding(Encoding::PLAIN)
-        .set_sorting_columns(Some(
-            [SortingColumn::new(sort_column_id as i32, false, false)].to_vec(),
-        ))
-        .set_column_dictionary_enabled(
-            ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
-            false,
-        )
-        .set_column_encoding(
-            ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
-            Encoding::DELTA_BINARY_PACKED,
-        )
-        .set_key_value_metadata(Some(vec![
-            KeyValue::new("min_ts".to_string(), metadata.min_ts.to_string()),
-            KeyValue::new("max_ts".to_string(), metadata.max_ts.to_string()),
-            KeyValue::new("records".to_string(), metadata.records.to_string()),
-            KeyValue::new(
-                "original_size".to_string(),
-                metadata.original_size.to_string(),
-            ),
-        ]));
-    for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-        writer_props = writer_props
-            .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
-    }
-    // Bloom filter stored by row_group, so if the num_rows can limit to
-    // PARQUET_MAX_ROW_GROUP_SIZE,
-    let num_rows = metadata.records as u64;
-    let num_rows = if num_rows > PARQUET_MAX_ROW_GROUP_SIZE as u64 {
-        PARQUET_MAX_ROW_GROUP_SIZE as u64
-    } else {
-        num_rows
-    };
-    if CONFIG.common.bloom_filter_enabled {
-        let fields = if bloom_filter_fields.is_empty() {
-            BLOOM_FILTER_DEFAULT_FIELDS.as_slice()
-        } else {
-            bloom_filter_fields
-        };
-        for field in fields.iter() {
-            writer_props = writer_props
-                .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
-            if metadata.records > 0 {
-                writer_props = writer_props.set_column_bloom_filter_ndv(
-                    ColumnPath::from(vec![field.to_string()]),
-                    num_rows,
-                );
-            }
-        }
-    }
-    let writer_props = writer_props.build();
-    ArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
-}

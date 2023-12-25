@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
+use config::{meta::stream::StreamType, CONFIG};
 use utoipa::{
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
     Modify, OpenApi,
@@ -117,7 +117,7 @@ use crate::{common::meta, handler::http::request};
     components(
         schemas(
             meta::http::HttpResponse,
-            meta::StreamType,
+            StreamType,
             meta::stream::Stream,
             meta::stream::StreamStats,
             meta::stream::StreamProperty,

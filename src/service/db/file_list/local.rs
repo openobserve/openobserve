@@ -15,17 +15,17 @@
 
 use std::io::{BufRead, BufReader};
 
-use config::CONFIG;
+use config::{
+    meta::stream::{FileKey, FileMeta, StreamType},
+    utils::parquet::parse_file_key_columns,
+    CONFIG,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use crate::common::{
     infra::{file_list as infra_file_list, wal},
-    meta::{
-        common::{FileKey, FileMeta},
-        stream::StreamParams,
-        StreamType,
-    },
+    meta::stream::StreamParams,
     utils::{asynchronism::file::get_file_contents, file::scan_files, json},
 };
 
@@ -34,7 +34,7 @@ pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
     Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
 
 pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(), anyhow::Error> {
-    let (_stream_key, date_key, _file_name) = infra_file_list::parse_file_key_columns(key)?;
+    let (_stream_key, date_key, _file_name) = parse_file_key_columns(key)?;
     let file_data = FileKey::new(key, meta.clone().unwrap_or_default(), deleted);
 
     // write into file_list storage

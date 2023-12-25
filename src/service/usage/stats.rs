@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use config::CONFIG;
+use config::{meta::stream::StreamType, CONFIG};
 use once_cell::sync::Lazy;
 use reqwest::Client;
 
@@ -92,9 +92,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             timeout: 0,
         };
         // do search
-        match SearchService::search("", &CONFIG.common.usage_org, meta::StreamType::Logs, &req)
-            .await
-        {
+        match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, &req).await {
             Ok(res) => {
                 if !res.hits.is_empty() {
                     match report_stats(res.hits, &org_id, last_query_ts, current_ts).await {
@@ -163,7 +161,7 @@ async fn get_last_stats(
         encoding: meta::search::RequestEncoding::Empty,
         timeout: 0,
     };
-    match SearchService::search("", &CONFIG.common.usage_org, meta::StreamType::Logs, &req).await {
+    match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, &req).await {
         Ok(res) => Ok(res.hits),
         Err(err) => match &err {
             crate::common::infra::errors::Error::ErrorCode(

@@ -17,7 +17,10 @@ use std::{cmp::min, io::Cursor, sync::Arc};
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
-use config::CONFIG;
+use config::{
+    meta::stream::{FileKey, StreamType},
+    CONFIG,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -31,10 +34,8 @@ use crate::{
             errors::{Error, ErrorCodes},
         },
         meta::{
-            common::FileKey,
             search,
             stream::{PartitionTimeLevel, ScanStats, StreamParams},
-            StreamType,
         },
         utils::{flatten, json, str::find},
     },

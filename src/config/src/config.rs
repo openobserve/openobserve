@@ -24,7 +24,10 @@ use once_cell::sync::Lazy;
 use reqwest::Client;
 use sysinfo::{DiskExt, SystemExt};
 
-use crate::utils::{cgroup, file::get_file_meta};
+use crate::{
+    meta::cluster,
+    utils::{cgroup, file::get_file_meta},
+};
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
@@ -655,16 +658,16 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // HACK for tracing, always disable tracing except ingester and querier
-    let local_node_role: Vec<super::cluster::Role> = cfg
+    let local_node_role: Vec<cluster::Role> = cfg
         .common
         .node_role
         .clone()
         .split(',')
         .map(|s| s.parse().unwrap())
         .collect();
-    if !local_node_role.contains(&super::cluster::Role::All)
-        && !local_node_role.contains(&super::cluster::Role::Ingester)
-        && !local_node_role.contains(&super::cluster::Role::Querier)
+    if !local_node_role.contains(&cluster::Role::All)
+        && !local_node_role.contains(&cluster::Role::Ingester)
+        && !local_node_role.contains(&cluster::Role::Querier)
     {
         cfg.common.tracing_enabled = false;
     }

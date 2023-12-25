@@ -21,7 +21,7 @@ use std::{
 
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use config::CONFIG;
+use config::{meta::stream::FileKey, CONFIG};
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
 use tokio::{sync::RwLock, time};
@@ -29,7 +29,6 @@ use tokio::{sync::RwLock, time};
 use crate::{
     common::{
         infra::{cache::stats, file_list as infra_file_list, storage},
-        meta::common::FileKey,
         utils::json,
     },
     service::db,

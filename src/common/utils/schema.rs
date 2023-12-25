@@ -19,13 +19,14 @@ use std::{
     sync::Arc,
 };
 
+use config::meta::stream::StreamType;
 use datafusion::arrow::{
     datatypes::{DataType, Field, Schema},
     error::ArrowError,
     json::reader,
 };
 
-use crate::common::{meta::StreamType, utils::json::Value};
+use crate::common::utils::json::Value;
 
 pub fn infer_json_schema<R: BufRead>(
     reader: R,

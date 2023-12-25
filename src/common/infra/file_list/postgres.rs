@@ -16,6 +16,10 @@
 use ahash::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
+use config::{
+    meta::stream::{FileKey, FileMeta, StreamType},
+    utils::parquet::parse_file_key_columns,
+};
 use sqlx::{Executor, Postgres, QueryBuilder, Row};
 
 use crate::common::{
@@ -23,11 +27,7 @@ use crate::common::{
         db::postgres::CLIENT,
         errors::{Error, Result},
     },
-    meta::{
-        common::{FileKey, FileMeta},
-        stream::{PartitionTimeLevel, StreamStats},
-        StreamType,
-    },
+    meta::stream::{PartitionTimeLevel, StreamStats},
 };
 
 pub struct PostgresFileList {}
@@ -64,7 +64,7 @@ impl super::FileList for PostgresFileList {
 
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         match  sqlx::query(
             r#"
@@ -97,7 +97,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
 
     async fn remove(&self, file: &str) -> Result<()> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
         sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
             .bind(stream_key)
             .bind(date_key)
@@ -120,7 +120,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
-                    super::parse_file_key_columns(&item.key).expect("parse file key failed");
+                    parse_file_key_columns(&item.key).expect("parse file key failed");
                 let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
                 b.push_bind(org_id)
                     .push_bind(stream_key)
@@ -181,7 +181,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             let pool = CLIENT.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
-                let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+                let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
                 let ret: Option<i64> = sqlx::query_scalar(
                     r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
                 )
@@ -225,7 +225,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
-                    super::parse_file_key_columns(item).expect("parse file key failed");
+                    parse_file_key_columns(item).expect("parse file key failed");
                 b.push_bind(org_id)
                     .push_bind(stream_key)
                     .push_bind(date_key)
@@ -259,7 +259,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             let pool = CLIENT.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
-                let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+                let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
                 let ret: Option<i64> = sqlx::query_scalar(
                     r#"SELECT id FROM file_list_deleted WHERE stream = $1 AND date = $2 AND file = $3;"#,
                 )
@@ -290,7 +290,7 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
 
     async fn get(&self, file: &str) -> Result<FileMeta> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
@@ -307,7 +307,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
     async fn contains(&self, file: &str) -> Result<bool> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
         let ret = sqlx::query(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size

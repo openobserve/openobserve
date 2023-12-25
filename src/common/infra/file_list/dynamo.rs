@@ -21,20 +21,19 @@ use std::{
 use async_trait::async_trait;
 use aws_sdk_dynamodb::{operation::query::QueryOutput, types::*};
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use config::CONFIG;
+use config::{
+    meta::stream::{FileKey, FileMeta, StreamType},
+    utils::parquet::parse_file_key_columns,
+    CONFIG,
+};
 use tokio_stream::StreamExt;
 
-use super::parse_file_key_columns;
 use crate::common::{
     infra::{
         db::dynamo::get_db_client,
         errors::{Error, Result},
     },
-    meta::{
-        common::{FileKey, FileMeta},
-        stream::{PartitionTimeLevel, StreamStats},
-        StreamType,
-    },
+    meta::stream::{PartitionTimeLevel, StreamStats},
     utils::time::BASE_TIME,
 };
 
@@ -79,7 +78,7 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         let file_name = format!("{date_key}/{file_name}");
         let client = get_db_client().await.clone();
@@ -112,7 +111,7 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
         let file_name = format!("{date_key}/{file_name}");
         let mut key = HashMap::new();
         key.insert("stream".to_string(), AttributeValue::S(stream_key));
@@ -156,7 +155,7 @@ impl super::FileList for DynamoFileList {
         for batch in files.chunks(25) {
             let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
             for file in batch {
-                let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+                let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
                 let file_name = format!("{date_key}/{file_name}");
                 let mut key = HashMap::new();
                 key.insert("stream".to_string(), AttributeValue::S(stream_key));
@@ -219,7 +218,7 @@ impl super::FileList for DynamoFileList {
         for batch in files.chunks(25) {
             let mut reqs: Vec<WriteRequest> = Vec::with_capacity(batch.len());
             for file in batch {
-                let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+                let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
                 let file_name = format!("{date_key}/{file_name}");
                 let mut key = HashMap::new();
                 key.insert("stream".to_string(), AttributeValue::S(stream_key));
@@ -239,7 +238,7 @@ impl super::FileList for DynamoFileList {
     }
 
     async fn get(&self, file: &str) -> Result<FileMeta> {
-        let (stream_key, date_key, file_name) = super::parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
         let file_name = format!("{date_key}/{file_name}");
 
         let client = get_db_client().await.clone();
@@ -470,7 +469,7 @@ impl super::FileList for DynamoFileList {
         // calculate stats
         let mut stats = HashMap::new();
         for (file, meta) in resp {
-            let (stream_key, _date_key, _file_name) = super::parse_file_key_columns(&file)?;
+            let (stream_key, _date_key, _file_name) = parse_file_key_columns(&file)?;
             let stream_stats = stats.entry(stream_key).or_insert_with(StreamStats::default);
             stream_stats.add_file_meta(&meta);
         }

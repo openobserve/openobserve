@@ -23,7 +23,7 @@ use actix_web::{
 use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::Utc;
-use config::CONFIG;
+use config::{meta::stream::StreamType, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 
@@ -35,7 +35,6 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             stream::{PartitionTimeLevel, StreamParams},
             usage::UsageType,
-            StreamType,
         },
         utils::json,
     },

@@ -23,13 +23,12 @@ use std::{
 use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
 use chrono::Utc;
-use config::CONFIG;
+use config::{meta::stream::FileMeta, utils::parquet::new_parquet_writer, CONFIG};
 use snafu::ResultExt;
 
 use crate::{
     entry::{Entry, RecordBatchEntry},
     errors::*,
-    parquet::{new_parquet_writer, FileMeta},
     rwmap::RwMap,
 };
 

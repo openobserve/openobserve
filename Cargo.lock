@@ -2049,19 +2049,24 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.6",
  "anyhow",
+ "arrow-schema",
+ "aws-sdk-dynamodb",
  "byteorder",
  "bytes",
+ "chrono",
  "dashmap",
  "dotenv_config",
  "dotenvy",
  "indexmap 2.1.0",
  "itertools 0.12.0",
  "once_cell",
+ "parquet",
  "reqwest",
  "segment",
  "serde",
  "sysinfo",
  "tokio",
+ "utoipa",
 ]
 
 [[package]]

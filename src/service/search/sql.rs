@@ -20,7 +20,10 @@ use std::{
 
 use ahash::AHashMap;
 use chrono::Duration;
-use config::{CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS};
+use config::{
+    meta::stream::{FileKey, StreamType},
+    CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
+};
 use datafusion::arrow::datatypes::{DataType, Schema};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -30,10 +33,8 @@ use crate::{
     common::{
         infra::errors::{Error, ErrorCodes},
         meta::{
-            common::FileKey,
             sql::{Sql as MetaSql, SqlOperator},
             stream::StreamParams,
-            StreamType,
         },
         utils::str::find,
     },
@@ -111,7 +112,7 @@ impl Sql {
         let req_query = req.query.as_ref().unwrap();
         let mut req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
-        let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
+        let stream_type = StreamType::from(req.stream_type.as_str());
 
         // parse sql
         let mut origin_sql = req_query.sql.clone();

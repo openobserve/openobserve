@@ -15,13 +15,13 @@
 
 use std::{fs, path::Path};
 
-use config::CONFIG;
+use config::{meta::stream::StreamType, CONFIG};
 use tokio::time;
 
 use crate::{
     common::{
         infra::{cluster, storage, wal},
-        meta::{stream::StreamParams, StreamType},
+        meta::stream::StreamParams,
         utils::file::scan_files,
     },
     service::db,

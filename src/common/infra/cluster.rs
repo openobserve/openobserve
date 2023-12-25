@@ -16,7 +16,7 @@
 use std::{net::IpAddr, sync::Arc};
 
 use config::{
-    cluster::{Node, NodeStatus, Role},
+    meta::cluster::{Node, NodeStatus, Role},
     RwHashMap, CONFIG, INSTANCE_ID,
 };
 use etcd_client::PutOptions;

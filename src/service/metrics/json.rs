@@ -18,7 +18,7 @@ use std::{collections::HashMap, io::BufReader};
 use actix_web::{http, web};
 use ahash::AHashMap;
 use anyhow::{anyhow, Result};
-use config::CONFIG;
+use config::{meta::stream::StreamType, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use vrl::compiler::runtime::Runtime;
 
@@ -31,7 +31,6 @@ use crate::{
             prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
             stream::{PartitioningDetails, StreamParams},
             usage::UsageType,
-            StreamType,
         },
         utils::{flatten, json, schema::infer_json_schema, time},
     },

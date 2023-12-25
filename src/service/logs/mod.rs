@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
-use config::CONFIG;
+use config::{meta::stream::StreamType, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 
 use super::ingestion::TriggerAlertData;
@@ -27,7 +27,6 @@ use crate::{
             alerts::Alert,
             ingestion::RecordStatus,
             stream::{PartitionTimeLevel, SchemaRecords},
-            StreamType,
         },
         utils::{
             self,

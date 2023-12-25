@@ -48,8 +48,7 @@ use crate::{errors::*, immutable, memtable, writer::WriterKey};
 //    continue step 5
 pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     // 1. get all .lock files
-    let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir);
-    let wal_dir = wal_dir.join("logs");
+    let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("logs");
     // create wal dir if not exists
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
@@ -91,8 +90,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     }
 
     // 4. delete all the .par files
-    let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir);
-    let parquet_dir = wal_dir.join("files");
+    let parquet_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("files");
     // create wal dir if not exists
     create_dir_all(&parquet_dir).context(OpenDirSnafu {
         path: parquet_dir.clone(),
@@ -107,8 +105,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
 
 // replay wal files to create immutable
 pub(crate) async fn replay_wal_files() -> Result<()> {
-    let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir);
-    let wal_dir = wal_dir.join("logs");
+    let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("logs");
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
     })?;

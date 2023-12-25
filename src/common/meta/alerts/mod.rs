@@ -14,10 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ahash::HashMap;
+use config::meta::stream::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::StreamType;
 use crate::common::utils::json::Value;
 
 pub mod destinations;
