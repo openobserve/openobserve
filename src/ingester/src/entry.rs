@@ -20,9 +20,10 @@ use std::{
 
 use arrow::{array::Int64Array, record_batch::RecordBatch};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use config::CONFIG;
 use snafu::ResultExt;
 
-use crate::{errors::*, COL_TIMESTAMP};
+use crate::errors::*;
 
 pub struct Entry {
     pub stream: Arc<str>,
@@ -95,7 +96,7 @@ pub struct RecordBatchEntry {
 
 impl RecordBatchEntry {
     pub fn new(data: RecordBatch, data_size: usize) -> Arc<RecordBatchEntry> {
-        let (min_ts, max_ts) = match data.column_by_name(COL_TIMESTAMP) {
+        let (min_ts, max_ts) = match data.column_by_name(&CONFIG.common.column_timestamp) {
             None => (0, 0),
             Some(v) => {
                 let v = v.as_any().downcast_ref::<Int64Array>().unwrap();

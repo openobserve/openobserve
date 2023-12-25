@@ -23,6 +23,7 @@ use std::{
 use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
 use chrono::Utc;
+use config::CONFIG;
 use snafu::ResultExt;
 
 use crate::{
@@ -30,7 +31,6 @@ use crate::{
     errors::*,
     parquet::{new_parquet_writer, FileMeta},
     rwmap::RwMap,
-    PARQUET_DIR,
 };
 
 pub(crate) struct Partition {
@@ -77,7 +77,8 @@ impl Partition {
         let thread_id = 0;
         let r = self.files.read().await;
         let mut paths = Vec::with_capacity(r.len());
-        let mut path = PathBuf::from(PARQUET_DIR);
+        let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
+        path.push("files");
         path.push(org_id);
         path.push(stream_type);
         path.push(stream_name);

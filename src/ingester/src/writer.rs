@@ -13,13 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{
-    atomic::{AtomicI64, AtomicU32, Ordering},
-    Arc,
+use std::{
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicI64, AtomicU64, Ordering},
+        Arc,
+    },
 };
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
+use config::CONFIG;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, RwLock};
@@ -40,7 +44,7 @@ pub struct Writer {
     key: WriterKey,
     wal: Arc<Mutex<WalWriter>>,
     memtable: Arc<RwLock<MemTable>>,
-    next_seq: AtomicU32,
+    next_seq: AtomicU64,
     created_at: AtomicI64,
 }
 
@@ -62,17 +66,26 @@ pub async fn get_reader(org_id: &str, stream_type: &str) -> Option<Arc<Writer>> 
 
 impl Writer {
     pub(crate) fn new(key: WriterKey) -> Self {
-        let next_seq = AtomicU32::new(1);
+        let now = Utc::now().timestamp_micros();
+        let next_seq = AtomicU64::new(now as u64);
         let wal_id = next_seq.fetch_add(1, Ordering::SeqCst);
+        let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir);
+        let wal_dir = wal_dir.join("logs");
         Self {
             key: key.clone(),
             wal: Arc::new(Mutex::new(
-                WalWriter::new(super::WAL_DIR, &key.org_id, &key.stream_type, wal_id)
-                    .expect("wal file create error"),
+                WalWriter::new(
+                    wal_dir,
+                    &key.org_id,
+                    &key.stream_type,
+                    wal_id,
+                    CONFIG.limit.max_file_size_on_disk,
+                )
+                .expect("wal file create error"),
             )),
             memtable: Arc::new(RwLock::new(MemTable::new())),
             next_seq,
-            created_at: AtomicI64::new(Utc::now().timestamp_micros()),
+            created_at: AtomicI64::new(now),
         }
     }
 
@@ -81,10 +94,17 @@ impl Writer {
         let mut wal = self.wal.lock().await;
         if self.check_threshold(wal.size(), entry_bytes.len()).await {
             // rotation wal
-            let id = self.next_seq.fetch_add(1, Ordering::SeqCst);
-            let new_wal =
-                WalWriter::new(super::WAL_DIR, &self.key.org_id, &self.key.stream_type, id)
-                    .context(WalSnafu)?;
+            let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
+            let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir);
+            let wal_dir = wal_dir.join("logs");
+            let new_wal = WalWriter::new(
+                wal_dir,
+                &self.key.org_id,
+                &self.key.stream_type,
+                wal_id,
+                CONFIG.limit.max_file_size_on_disk,
+            )
+            .context(WalSnafu)?;
             let old_wal = std::mem::replace(&mut *wal, new_wal);
 
             // rotation memtable
@@ -126,9 +146,9 @@ impl Writer {
     /// Check if the wal file size is over the threshold or the file is too old
     async fn check_threshold(&self, written_size: usize, data_size: usize) -> bool {
         written_size > 0
-            && (written_size + data_size > super::WAL_FILE_MAX_SIZE
+            && (written_size + data_size > CONFIG.limit.max_file_size_on_disk as usize
                 || self.created_at.load(Ordering::Relaxed)
-                    + Duration::seconds(super::WAL_FILE_ROTATION_INTERVAL)
+                    + Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
                         .num_microseconds()
                         .unwrap()
                     <= Utc::now().timestamp_micros())

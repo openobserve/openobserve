@@ -29,13 +29,6 @@ pub use immutable::read_from_immutable;
 use tokio::time;
 pub use writer::{get_reader, get_writer};
 
-// TODO: make this configurable
-const WAL_DIR: &str = "./data/wal";
-const PARQUET_DIR: &str = "./data/openobserve/wal/files";
-const WAL_FILE_MAX_SIZE: usize = 1024 * 1024 * 32; // 32MB
-const WAL_FILE_ROTATION_INTERVAL: i64 = 600; // 10 minutes
-const COL_TIMESTAMP: &str = "_timestamp";
-
 pub async fn init() -> errors::Result<()> {
     // check uncompleted parquet files, need delete those files
     wal::check_uncompleted_parquet_files().await?;

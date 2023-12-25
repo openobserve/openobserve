@@ -37,7 +37,8 @@ impl Writer {
         root_dir: impl Into<PathBuf>,
         org_id: &str,
         stream_type: &str,
-        id: u32,
+        id: u64,
+        init_size: u64,
     ) -> Result<Self> {
         let path = super::build_file_path(root_dir, org_id, stream_type, id);
         create_dir_all(path.parent().unwrap()).context(FileOpenSnafu { path: path.clone() })?;
@@ -47,10 +48,12 @@ impl Writer {
             .open(&path)
             .context(FileOpenSnafu { path: path.clone() })?;
 
-        f.set_len(super::PRE_ALLOCATE_FILE_SIZE)
-            .context(FileWriteSnafu { path: path.clone() })?;
-        f.seek(SeekFrom::Start(0))
-            .context(FileReadSnafu { path: path.clone() })?;
+        if init_size > 0 {
+            f.set_len(init_size)
+                .context(FileWriteSnafu { path: path.clone() })?;
+            f.seek(SeekFrom::Start(0))
+                .context(FileReadSnafu { path: path.clone() })?;
+        }
 
         f.write_all(super::FILE_TYPE_IDENTIFIER)
             .context(WriteFileTypeSnafu)?;
