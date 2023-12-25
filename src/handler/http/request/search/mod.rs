@@ -23,7 +23,7 @@ use chrono::Duration;
 use crate::{
     common::{
         infra::{
-            config::{CONFIG, DISTINCT_FIELDS},
+            config::{CONFIG, DISTINCT_FIELDS, STREAM_SCHEMAS},
             errors, metrics,
         },
         meta::{
@@ -674,7 +674,19 @@ async fn values_v1(
         timeout,
     };
 
+    // skip fields which arent part of the schema
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
+    let schema = if let Some(schema) = STREAM_SCHEMAS.get(&key) {
+        schema.value().last().unwrap().clone()
+    } else {
+        arrow_schema::Schema::empty()
+    };
+
     for field in &fields {
+        // skip values for field which aren't part of the schema
+        if schema.field_with_name(field).is_err() {
+            continue;
+        }
         req.aggs.insert(
                 field.clone(),
                 format!(
