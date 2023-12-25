@@ -55,7 +55,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
-        let _ = users::post_user(
+        let _ = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {
                 email: CONFIG.auth.root_user_email.clone(),
@@ -63,7 +63,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
-                is_ldap: false,
+                is_external: false,
             },
         )
         .await;

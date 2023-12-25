@@ -27,7 +27,9 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::DEFAULT_ORG,
-            user::{UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole},
+            user::{
+                DBUser, UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole,
+            },
         },
         utils::{
             auth::{get_hash, is_root_user},
@@ -37,36 +39,74 @@ use crate::{
     service::db,
 };
 
-pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {
-    let existing_user = if is_root_user(&usr_req.email) {
-        db::user::get(None, &usr_req.email).await
+pub async fn post_user(
+    org_id: &str,
+    usr_req: UserRequest,
+    initiator_id: &str,
+) -> Result<HttpResponse, Error> {
+    if is_root_user(initiator_id)
+        || db::user::get(Some(org_id), initiator_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .role
+            .eq(&UserRole::Admin)
+    {
+        let existing_user = if is_root_user(&usr_req.email) {
+            db::user::get(None, &usr_req.email).await
+        } else {
+            db::user::get(Some(org_id), &usr_req.email).await
+        };
+        if existing_user.is_err() {
+            let salt = Uuid::new_v4().to_string();
+            let password = get_hash(&usr_req.password, &salt);
+            let token = generate_random_string(16);
+            let rum_token = format!("rum{}", generate_random_string(16));
+            let user = usr_req.to_new_dbuser(
+                password,
+                salt,
+                org_id.replace(' ', "_"),
+                token,
+                rum_token,
+                usr_req.is_external,
+            );
+            db::user::set(user).await.unwrap();
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "User saved successfully".to_string(),
+            )))
+        } else {
+            Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Unable to process your request".to_string(),
+            )))
+        }
     } else {
-        db::user::get(Some(org_id), &usr_req.email).await
-    };
-    if existing_user.is_err() {
-        let salt = Uuid::new_v4().to_string();
-        let password = get_hash(&usr_req.password, &salt);
-        let token = generate_random_string(16);
-        let rum_token = format!("rum{}", generate_random_string(16));
-        let user = usr_req.to_new_dbuser(
-            password,
-            salt,
-            org_id.replace(' ', "_"),
-            token,
-            rum_token,
-            usr_req.is_ldap,
-        );
-        db::user::set(user).await.unwrap();
-        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "User saved successfully".to_string(),
-        )))
-    } else {
-        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Unable to process your request".to_string(),
+        Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            StatusCode::UNAUTHORIZED.into(),
+            "Not Allowed".to_string(),
         )))
     }
+}
+
+pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
+    if db_user.password.is_empty() {
+        let salt = Uuid::new_v4().to_string();
+        let password = get_hash(&db_user.password, &salt);
+        db_user.password = password;
+        db_user.salt = salt;
+    }
+    for org in &mut db_user.organizations {
+        if org.token.is_empty() {
+            let token = generate_random_string(16);
+            org.token = token;
+        };
+        if org.rum_token.is_none() {
+            let rum_token = format!("rum{}", generate_random_string(16));
+            org.rum_token = Some(rum_token);
+        };
+    }
+    db::user::set(db_user).await
 }
 
 pub async fn update_user(
@@ -91,6 +131,13 @@ pub async fn update_user(
         let mut message = "";
         match existing_user.unwrap() {
             Some(local_user) => {
+                if local_user.is_external {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        "Updates not allowed in OpenObserve, please update with source system"
+                            .to_string(),
+                    )));
+                }
                 if !self_update {
                     if is_root_user(initiator_id) {
                         allow_password_update = true
@@ -124,21 +171,26 @@ pub async fn update_user(
                     }
                 } else if self_update && user.old_password.is_none() {
                     message = "Please provide existing password"
-                } else if !self_update && allow_password_update && user.new_password.is_some() {
+                } else if !self_update
+                    && allow_password_update
+                    && user.new_password.is_some()
+                    && !local_user.is_external
+                {
                     new_user.password = get_hash(&user.new_password.unwrap(), &local_user.salt);
                     is_updated = true;
                 } else {
                     message = "You are not authorised to change the password"
                 }
-                if user.first_name.is_some() {
+                if user.first_name.is_some() && !local_user.is_external {
                     new_user.first_name = user.first_name.unwrap();
                     is_updated = true;
                 }
-                if user.last_name.is_some() {
+                if user.last_name.is_some() && !local_user.is_external {
                     new_user.last_name = user.last_name.unwrap();
                     is_updated = true;
                 }
                 if user.role.is_some()
+                    && !local_user.is_external
                     && (!self_update
                         || (local_user.role.eq(&UserRole::Admin)
                             || local_user.role.eq(&UserRole::Root)))
@@ -323,7 +375,7 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
                 role: user.value().role.clone(),
                 first_name: user.value().first_name.clone(),
                 last_name: user.value().last_name.clone(),
-                is_ldap: user.value().is_ldap,
+                is_external: user.value().is_external,
             })
         }
     }
@@ -331,38 +383,57 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))
 }
 
-pub async fn remove_user_from_org(org_id: &str, email_id: &str) -> Result<HttpResponse, Error> {
-    let ret_user = db::user::get_db_user(email_id).await;
-    match ret_user {
-        Ok(mut user) => {
-            if !user.organizations.is_empty() {
-                let mut orgs = user.clone().organizations;
-                if orgs.len() == 1 {
-                    let _ = db::user::delete(email_id).await;
-                } else {
-                    orgs.retain(|x| !x.name.eq(&org_id.to_string()));
-                    user.organizations = orgs;
-                    let resp = db::user::set(user).await;
-                    // special case as we cache flattened user struct
-                    if resp.is_ok() {
-                        USERS.remove(&format!("{org_id}/{email_id}"));
+pub async fn remove_user_from_org(
+    org_id: &str,
+    email_id: &str,
+    initiator_id: &str,
+) -> Result<HttpResponse, Error> {
+    let initiating_user = if is_root_user(initiator_id) {
+        ROOT_USER.get("root").unwrap().clone()
+    } else {
+        db::user::get(Some(org_id), initiator_id)
+            .await
+            .unwrap()
+            .unwrap()
+    };
+    if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
+        let ret_user = db::user::get_db_user(email_id).await;
+        match ret_user {
+            Ok(mut user) => {
+                if !user.organizations.is_empty() {
+                    let mut orgs = user.clone().organizations;
+                    if orgs.len() == 1 {
+                        let _ = db::user::delete(email_id).await;
+                    } else {
+                        orgs.retain(|x| !x.name.eq(&org_id.to_string()));
+                        user.organizations = orgs;
+                        let resp = db::user::set(user).await;
+                        // special case as we cache flattened user struct
+                        if resp.is_ok() {
+                            USERS.remove(&format!("{org_id}/{email_id}"));
+                        }
                     }
+                    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                        http::StatusCode::OK.into(),
+                        "User removed from organization".to_string(),
+                    )))
+                } else {
+                    Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                        StatusCode::NOT_FOUND.into(),
+                        "User for the organization not found".to_string(),
+                    )))
                 }
-                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK.into(),
-                    "User removed from organization".to_string(),
-                )))
-            } else {
-                Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                    StatusCode::NOT_FOUND.into(),
-                    "User for the organization not found".to_string(),
-                )))
             }
+            Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                StatusCode::NOT_FOUND.into(),
+                "User for the organization not found".to_string(),
+            ))),
         }
-        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            "User for the organization not found".to_string(),
-        ))),
+    } else {
+        Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            StatusCode::UNAUTHORIZED.into(),
+            "Not Allowed".to_string(),
+        )))
     }
 }
 
@@ -403,6 +474,23 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
     }
 }
 
+pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
+    let salt = Uuid::new_v4().to_string();
+    let password = get_hash(&usr_req.password, &salt);
+    let token = generate_random_string(16);
+    let rum_token = format!("rum{}", generate_random_string(16));
+    let user = usr_req.to_new_dbuser(
+        password,
+        salt,
+        org_id.replace(' ', "_"),
+        token,
+        rum_token,
+        usr_req.is_external,
+    );
+    db::user::set(user).await.unwrap();
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421,7 +509,7 @@ mod tests {
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
                 org: "dummy".to_string(),
-                is_ldap: false,
+                is_external: false,
             },
         );
     }
@@ -447,52 +535,29 @@ mod tests {
     #[actix_web::test]
     async fn test_post_user() {
         infra_db::create_table().await.unwrap();
+        set_up().await;
+
         let resp = post_user(
             "dummy",
             UserRequest {
-                email: "admin@zo.dev".to_string(),
+                email: "user@zo.dev".to_string(),
                 password: "pass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Admin,
-                first_name: "admin".to_owned(),
+                first_name: "user".to_owned(),
                 last_name: "".to_owned(),
-                is_ldap: false,
+                is_external: false,
             },
+            "admin@zo.dev",
         )
         .await;
+        println!("resp: {:?}", resp);
         assert!(resp.is_ok());
     }
 
     #[actix_web::test]
     async fn test_user() {
         infra_db::create_table().await.unwrap();
-        let _ = post_user(
-            "test_org",
-            UserRequest {
-                email: "user2@example.com".to_string(),
-                password: "pass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Admin,
-                first_name: "admin".to_owned(),
-                last_name: "".to_owned(),
-                is_ldap: false,
-            },
-        )
-        .await;
-
-        USERS.insert(
-            "dummy/admin@zo.dev".to_string(),
-            User {
-                email: "admin@zo.dev".to_string(),
-                password: "pass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Admin,
-                salt: String::new(),
-                token: "token".to_string(),
-                rum_token: Some("rum_token".to_string()),
-                first_name: "admin".to_owned(),
-                last_name: "".to_owned(),
-                org: "dummy".to_string(),
-                is_ldap: false,
-            },
-        );
+        set_up().await;
 
         let resp = update_user(
             "dummy",
@@ -506,6 +571,7 @@ mod tests {
                 old_password: Some("pass".to_string()),
                 new_password: Some("new_pass".to_string()),
                 role: Some(crate::common::meta::user::UserRole::Member),
+                change_password: false,
             },
         )
         .await;
@@ -524,6 +590,7 @@ mod tests {
                 old_password: None,
                 new_password: None,
                 role: Some(crate::common::meta::user::UserRole::Admin),
+                change_password: false,
             },
         )
         .await;
@@ -540,7 +607,7 @@ mod tests {
 
         assert!(resp.is_ok());
 
-        let resp = remove_user_from_org("dummy", "user2@example.com").await;
+        let resp = remove_user_from_org("dummy", "user2@example.com", "admin@zo.dev").await;
 
         assert!(resp.is_ok());
     }

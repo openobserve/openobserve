@@ -20,6 +20,7 @@ import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
 import streamService from "@/services/stream";
 import { useQuasar } from "quasar";
+import { useStore } from "vuex";
 
 const useLocalStorage = (
   key: string,
@@ -95,10 +96,11 @@ export const getUserInfo = (loginString: string) => {
         const encodedSessionData = b64EncodeUnicode(JSON.stringify(decToken));
 
         useLocalUserInfo(encodedSessionData);
-      }
-      if (propArr[0] == "id_token") {
         useLocalToken(propArr[1]);
       }
+      // if (propArr[0] == "access_token") {
+      //   useLocalToken(propArr[1]);
+      // }
     }
 
     return decToken;
@@ -280,18 +282,19 @@ export const getPath = () => {
     window.location.origin == "http://localhost:8081"
       ? "/"
       : pos > -1
-      ? window.location.pathname.slice(0, pos + 5)
-      : "";
+        ? window.location.pathname.slice(0, pos + 5)
+        : "";
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };
 
-export const routeGuard = async (
-  to: any,
-  from: any,
-  next: any
-) => {
-  if (to.path.indexOf("/ingestion") == -1) {
+export const routeGuard = async (to: any, from: any, next: any) => {
+  const store = useStore();
+  if (
+    to.path.indexOf("/ingestion") == -1 &&
+    store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
+    store.state.zoConfig.restricted_routes_on_empty_data == true
+  ) {
     const local_organization: any = useLocalOrganization();
     const $q = useQuasar();
 
@@ -302,7 +305,7 @@ export const routeGuard = async (
           $q.notify({
             type: "warning",
             message:
-            "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
+              "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
             timeout: 5000,
           });
           next({ path: "/ingestion" });
@@ -555,3 +558,18 @@ export const mergeDeep = (target: any, source: any) => {
 export function getUUID() {
   return uuidv4();
 }
+
+export const maskText = (text: string) => {
+  const visibleChars = 4; // Number of characters to keep visible at the beginning and end
+  const maskedChars = text.length - visibleChars * 2;
+
+  if (maskedChars > 0) {
+    const maskedText =
+      text.substring(0, visibleChars) +
+      "*".repeat(maskedChars) +
+      text.slice(-visibleChars);
+    return maskedText;
+  } else {
+    return "*".repeat(text.length); // If the text is too short, mask all characters
+  }
+};

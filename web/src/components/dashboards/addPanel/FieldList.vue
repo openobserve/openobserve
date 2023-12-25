@@ -154,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @dragleave="onDragLeave"
               @dragover="onDragOver"
               @drop="onDrop"
+              @dragend="onDragEnd"
               :style="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
@@ -405,7 +406,12 @@ export default defineComponent({
       addLatitude,
       addLongitude,
       addWeight,
+      cleanupDraggingFields
     } = useDashboardPanelData();
+
+    const onDragEnd = () => {
+      cleanupDraggingFields();
+    };
 
     const metricsIconMapping: any = {
       Summary: "description",
@@ -571,6 +577,8 @@ export default defineComponent({
     const onDragStart = (e: any, item: any) => {
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
+      dashboardPanelData.meta.dragAndDrop.dragSource = "fieldList";
+      dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
     };
 
     const onDragLeave = (e: any) => {
@@ -585,6 +593,8 @@ export default defineComponent({
     const onDrop = (e: any) => {
       dashboardPanelData.meta.dragAndDrop.dragging = false;
       dashboardPanelData.meta.dragAndDrop.dragElement = null;
+      dashboardPanelData.meta.dragAndDrop.dragSource = null;
+      dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
     };
 
     const filterStreamFn = (val: string, update: any) => {
@@ -625,6 +635,7 @@ export default defineComponent({
       streamDataLoading,
       metricsIconMapping,
       selectedMetricTypeIcon,
+      onDragEnd
     };
   },
 });
@@ -839,7 +850,7 @@ export default defineComponent({
 
   &.q-manual-focusable--focused > .q-focus-helper,
   &--active {
-    background-color: $selected-list-bg !important;
+    // background-color: $selected-list-bg !important;
   }
 
   &.q-manual-focusable--focused > .q-focus-helper,

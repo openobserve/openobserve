@@ -196,6 +196,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   height: 40px;
                 "
                 class="flex justify-center items-center"
+                :class="
+                  store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+                "
               >
                 {{ t("alerts.minutes") }}
               </div>
@@ -256,6 +259,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-alert-description-input"
             v-model="formData.description"
             :label="t('alerts.description')"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            tabindex="0"
+            style="width: 550px"
+          />
+        </div>
+
+        <div>
+          <q-input
+            data-test="add-alert-row-input"
+            v-model="formData.row_template"
+            :label="t('alerts.row')"
             color="input-border"
             bg-color="input-bg"
             class="showLabelOnTop"
@@ -654,6 +674,7 @@ export default defineComponent({
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
+      this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
     }
 
     this.formData.is_real_time = this.formData.is_real_time.toString();
@@ -742,6 +763,10 @@ export default defineComponent({
           payload.query_condition.aggregation = null;
         }
 
+        if (this.scheduledAlertRef.tab === "sql") {
+          payload.query_condition.conditions = [];
+        }
+
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
           payload.stream_name,
@@ -827,6 +852,10 @@ export default defineComponent({
 .threshould-input {
   .q-field--filled .q-field__control {
     background-color: transparent !important;
+  }
+
+  .q-field--dark .q-field__control {
+    background-color: rgba(255, 255, 255, 0.07) !important;
   }
 }
 </style>

@@ -79,6 +79,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ExportDashboard
           :dashboardId="currentDashboardData.data?.dashboardId"
         />
+        <q-btn
+          class="q-ml-sm"
+          outline
+          padding="xs"
+          no-caps
+          icon="share"
+          title="share link"
+          @click="shareLink"
+        ></q-btn>
       </div>
     </div>
     <q-separator></q-separator>
@@ -88,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :viewOnly="false"
       :dashboardData="currentDashboardData.data"
       :currentTimeObj="currentTimeObj"
+      :selectedDateForViewPanel="selectedDate"
       @onDeletePanel="onDeletePanel"
       @updated:data-zoom="onDataZoom"
     />
@@ -120,7 +130,7 @@ import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue";
 import ExportDashboard from "../../components/dashboards/ExportDashboard.vue";
 import DashboardSettings from "./DashboardSettings.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
-import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
+import { copyToClipboard, useQuasar } from "quasar";
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -137,6 +147,7 @@ export default defineComponent({
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
+    const $q = useQuasar();
     const currentDashboardData = reactive({
       data: {},
     });
@@ -149,8 +160,22 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
       const variableObj = {};
-      data.values.forEach((v) => {
-        variableObj[`var-${v.name}`] = v.value;
+      data.values.forEach((variable) => {
+        if (variable.type === "dynamic_filters") {
+          const filters = (variable.value || []).filter(
+            (item: any) => item.name && item.operator && item.value
+          );
+          const encodedFilters = filters.map((item: any) => ({
+            name: item.name,
+            operator: item.operator,
+            value: item.value,
+          }));
+          variableObj[`var-${variable.name}`] = encodeURIComponent(
+            JSON.stringify(encodedFilters)
+          );
+        } else {
+          variableObj[`var-${variable.name}`] = variable.value;
+        }
       });
       router.replace({
         query: {
@@ -340,6 +365,37 @@ export default defineComponent({
       await loadDashboard();
     };
 
+    const shareLink = () => {
+      const urlObj = new URL(window.location.href);
+      const urlSearchParams = urlObj?.searchParams;
+
+      // if relative time period, convert to absolute time
+      if (urlSearchParams?.has("period")) {
+        urlSearchParams.delete("period");
+        urlSearchParams.set(
+          "from",
+          currentTimeObj?.value?.start_time?.getTime()
+        );
+        urlSearchParams.set("to", currentTimeObj?.value?.end_time?.getTime());
+      }
+
+      copyToClipboard(urlObj?.href)
+        .then(() => {
+          $q.notify({
+            type: "positive",
+            message: "Link Copied Successfully!",
+            timeout: 5000,
+          });
+        })
+        .catch(() => {
+          $q.notify({
+            type: "negative",
+            message: "Error while copy link.",
+            timeout: 5000,
+          });
+        });
+    };
+
     return {
       currentDashboardData,
       goBackToDashboardList,
@@ -363,6 +419,7 @@ export default defineComponent({
       initialVariableValues,
       getQueryParamsForDuration,
       onDataZoom,
+      shareLink,
     };
   },
 });

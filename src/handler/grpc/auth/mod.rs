@@ -107,7 +107,7 @@ mod tests {
                 token: "token".to_string(),
                 rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
-                is_ldap: false,
+                is_external: false,
             },
         );
 
@@ -136,7 +136,7 @@ mod tests {
                 token: "token".to_string(),
                 rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
-                is_ldap: false,
+                is_external: false,
             },
         );
 
@@ -163,7 +163,7 @@ mod tests {
                 token: "token".to_string(),
                 rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
-                is_ldap: false,
+                is_external: false,
             },
         );
         let mut request = tonic::Request::new(());

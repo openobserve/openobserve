@@ -435,7 +435,7 @@ async fn _get_stream_stats(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
     use super::*;

@@ -14,21 +14,33 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import store from "../stores";
+import type { AxiosInstance } from 'axios';
 import axios from "axios";
 import config from "../aws-exports";
 
 const http = ({ headers } = {} as any) => {
-  const instance = axios.create({
-    // timeout: 10000,
-    baseURL: store.state.API_ENDPOINT,
-    headers: {
+  let instance: AxiosInstance;
+  if (config.isEnterprise == "false") {
+    headers = {
       Authorization:
-        config.isCloud == "true"
+        (config.isCloud == "true")
           ? "Bearer " + localStorage.getItem("token")
           : localStorage.getItem("token") || "",
       ...headers,
-    },
-  });
+    };
+    instance = axios.create({
+      // timeout: 10000,
+      baseURL: store.state.API_ENDPOINT,
+      headers,
+    });
+  } else {
+    instance = axios.create({
+      // timeout: 10000,
+      baseURL: store.state.API_ENDPOINT,
+      withCredentials: config.isEnterprise,
+      headers,
+    });
+  }
 
   instance.interceptors.response.use(
     function (response) {
@@ -48,11 +60,26 @@ const http = ({ headers } = {} as any) => {
                 error.response.data["error"] || "Invalid credentials"
               )
             );
-            if (!error.request.responseURL.includes("/auth/login")) {
+            if ((config.isCloud == "true") && !error.request.responseURL.includes("/auth/login")) {
               store.dispatch("logout");
               localStorage.clear();
               sessionStorage.clear();
               window.location.reload();
+            }
+            // Check if the failing request is not the login or refresh token request
+            else if ((config.isEnterprise == "true") && !error.config.url.includes('/config/dex_login') && !error.config.url.includes('/config/dex_refresh')) {
+              // Call refresh token API
+              return instance.get('/config/dex_refresh').then(() => {
+                return instance(error.config);
+              }).catch(refreshError => {
+                store.dispatch('logout');
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.reload();
+                return Promise.reject(refreshError);
+              });
+            } else {
+              console.log(JSON.stringify(error.response.data["error"] || "Invalid credentials"));
             }
             break;
           case 404:

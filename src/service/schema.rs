@@ -836,7 +836,7 @@ pub fn format_schema(schema: &Schema) -> Schema {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use ahash::AHashMap;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
 

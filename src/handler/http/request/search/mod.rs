@@ -503,6 +503,7 @@ pub async fn around(
         ("stream_name" = String, Path, description = "stream_name name"),
         ("fields" = String, Query, description = "fields, split by comma"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b"),
+        ("keyword" = Option<String>, Query, description = "keyword, eg: abc"),
         ("size" = i64, Query, description = "size"), // topN
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
@@ -563,6 +564,10 @@ pub async fn values(
                     )
                     .await;
                 }
+            } else {
+                // no filter
+                return values_v2(&org_id, stream_type, &stream_name, &fields[0], None, &query)
+                    .await;
             }
         } else {
             // no filter
@@ -783,10 +788,17 @@ async fn values_v2(
         stream_type, stream_name, field
     );
     if let Some((key, val)) = filter {
+        let val = val.split(',').collect::<Vec<_>>().join("','");
         query_sql = format!(
-            "{} AND filter_name ='{}' AND filter_value='{}'",
+            "{} AND filter_name='{}' AND filter_value IN ('{}')",
             query_sql, key, val
         );
+    }
+    if let Some(val) = query.get("keyword") {
+        let val = val.trim();
+        if !val.is_empty() {
+            query_sql = format!("{} AND field_value ILIKE '%{}%'", query_sql, val);
+        }
     }
 
     let size = query

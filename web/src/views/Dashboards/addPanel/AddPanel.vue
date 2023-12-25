@@ -34,6 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="flex q-gutter-sm">
+        <q-btn
+          outline
+          padding="sm"
+          class="q-mr-sm"
+          no-caps
+          icon="info_outline"
+          @click="showViewPanel = true"
+        >
+          <q-tooltip anchor="center left" self="center right"
+            >Query Inspector
+          </q-tooltip>
+        </q-btn>
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
@@ -127,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unit="px"
                   :limits="
                     !dashboardPanelData.layout.showQueryBar
-                      ? [41, 400]
+                      ? [43, 400]
                       : [140, 400]
                   "
                   :disable="!dashboardPanelData.layout.showQueryBar"
@@ -171,13 +183,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <div style="flex: 1">
                         <PanelSchemaRenderer
+                          @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
                           :panelSchema="chartData"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
                           :variablesData="variablesData"
                           :width="6"
                           @error="handleChartApiError"
+                          @updated:data-zoom="onDataZoom"
                         />
+                        <q-dialog v-model="showViewPanel">
+                          <QueryInspector
+                            :metaData="metaData"
+                            :data="panelTitle"
+                          ></QueryInspector>
+                        </q-dialog>
                       </div>
                       <DashboardErrorsComponent :errors="errorData" />
                     </div>
@@ -255,9 +275,13 @@ import VariablesValueSelector from "../../../components/dashboards/VariablesValu
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import { useLoading } from "@/composables/useLoading";
 import _ from "lodash-es";
+import QueryInspector from "@/components/dashboards/QueryInspector.vue";
+import { provide } from "vue";
 
 export default defineComponent({
   name: "AddPanel",
+  props: ["metaData"],
+
   components: {
     ChartSelection,
     FieldList,
@@ -269,8 +293,9 @@ export default defineComponent({
     VariablesValueSelector,
     PanelSchemaRenderer,
     DashboardQueryEditor,
+    QueryInspector,
   },
-  setup() {
+  setup(props) {
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref({});
@@ -292,6 +317,12 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
+    const metaData = ref(null);
+    const showViewPanel = ref(false);
+    const metaDataValue = (metadata: any) => {
+      metaData.value = metadata;
+    };
+
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
     };
@@ -526,6 +557,9 @@ export default defineComponent({
         next();
       }
     });
+    const panelTitle = computed(() => {
+      return { title: dashboardPanelData.data.title };
+    });
 
     //validate the data
     const isValid = (onlyChart = false) => {
@@ -620,7 +654,7 @@ export default defineComponent({
                 .fields.y.length == 0
             ) {
               errors.push(
-                "Only one values field is allowed for donut and pie charts"
+                "Add one value field for donut and pie charts"
               );
             }
 
@@ -631,7 +665,7 @@ export default defineComponent({
                 .fields.x.length == 0
             ) {
               errors.push(
-                "Only one label field is allowed for donut and pie charts"
+                "Add one label field for donut and pie charts"
               );
             }
 
@@ -645,7 +679,7 @@ export default defineComponent({
                 .fields.y.length == 0
             ) {
               errors.push(
-                "Only one Y-Axis field should be there for metric charts"
+                "Add one value field for metric charts"
               );
             }
 
@@ -656,6 +690,25 @@ export default defineComponent({
               errors.push(
                 `${currentXLabel.value} field is not allowed for Metric chart`
               );
+            }
+
+            break;
+          }
+          case "gauge": {
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.y.length != 1
+            ) {
+              errors.push("Add one value field for gauge chart");
+            }
+            // gauge can have zero or one label
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.x.length != 1 &&
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.x.length != 0
+            ) {
+              errors.push(`Add one label field for gauge chart`);
             }
 
             break;
@@ -1031,6 +1084,52 @@ export default defineComponent({
       errorList.splice(0);
       errorList.push(errorMessage);
     };
+
+    const onDataZoom = (event: any) => {
+      const selectedDateObj = {
+        start: new Date(event.start),
+        end: new Date(event.end),
+      };
+      // Truncate seconds and milliseconds from the dates
+      selectedDateObj.start.setSeconds(0, 0);
+      selectedDateObj.end.setSeconds(0, 0);
+
+      // Compare the truncated dates
+      if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {
+        // Increment the end date by 1 minute
+        selectedDateObj.end.setMinutes(selectedDateObj.end.getMinutes() + 1);
+      }
+
+      // set it as a absolute time
+      dateTimePickerRef?.value?.setCustomDate("absolute", selectedDateObj);
+    };
+
+    const hoveredSeriesState = ref({
+      hoveredSeriesName: "",
+      panelId: -1,
+      dataIndex: -1,
+      seriesIndex: -1,
+      hoveredTime: null,
+      setHoveredSeriesName: function (name: string) {
+        hoveredSeriesState.value.hoveredSeriesName = name ?? "";
+      },
+      setIndex: function (
+        dataIndex: number,
+        seriesIndex: number,
+        panelId: any,
+        hoveredTime?: any
+      ) {
+        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
+        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
+        hoveredSeriesState.value.panelId = panelId ?? -1;
+        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
+      },
+    });
+
+    // used provide and inject to share data between components
+    // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
+    provide("hoveredSeriesState", hoveredSeriesState);
+
     return {
       t,
       updateDateTime,
@@ -1056,6 +1155,11 @@ export default defineComponent({
       isOutDated,
       store,
       dateTimePickerRef,
+      showViewPanel,
+      metaDataValue,
+      metaData,
+      panelTitle,
+      onDataZoom,
     };
   },
   methods: {

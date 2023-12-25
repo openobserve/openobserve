@@ -329,7 +329,7 @@ fn remove_stream_fn_from_cache(key: &str, fn_name: &str) {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[actix_web::test]

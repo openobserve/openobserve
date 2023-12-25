@@ -24,7 +24,7 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::time::{parse_milliseconds, parse_str_to_timestamp_micros},
     },
-    service::{metrics, promql},
+    service::{metrics, promql, promql::MetricsQueryRequest},
 };
 
 /// prometheus remote-write endpoint for metrics
@@ -153,48 +153,16 @@ async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpRespon
         },
     };
     let end = start;
+    let timeout = search_timeout(req.timeout);
 
-    let timeout = match req.timeout {
-        None => 0,
-        Some(v) => match parse_milliseconds(&v) {
-            Ok(v) => (v / 1000) as i64, // seconds
-            Err(e) => {
-                log::error!("parse timeout error: {}", e);
-                0
-            }
-        },
-    };
-
-    let req = promql::MetricsQueryRequest {
+    let req = MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
         start,
         end,
         step: 300_000_000, // 5m
     };
 
-    match promql::search::search(org_id, &req, timeout).await {
-        Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
-            status: promql::Status::Success,
-            data: Some(promql::QueryResult {
-                result_type: data.get_type().to_string(),
-                result: data,
-            }),
-            error_type: None,
-            error: None,
-        })),
-        Err(err) => {
-            let err = match err {
-                errors::Error::ErrorCode(code) => code.get_error_detail(),
-                _ => err.to_string(),
-            };
-            Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                status: promql::Status::Error,
-                data: None,
-                error_type: Some("bad_data".to_string()),
-                error: Some(err),
-            }))
-        }
-    }
+    search(org_id, timeout, &req).await
 }
 
 /// prometheus range queries
@@ -328,46 +296,16 @@ async fn query_range(
     if step < promql::micros(promql::MINIMAL_INTERVAL) {
         step = promql::micros(promql::MINIMAL_INTERVAL);
     }
-    let timeout = match req.timeout {
-        None => 0,
-        Some(v) => match parse_milliseconds(&v) {
-            Ok(v) => (v / 1000) as i64, // seconds
-            Err(e) => {
-                log::error!("parse timeout error: {}", e);
-                0
-            }
-        },
-    };
 
-    let req = promql::MetricsQueryRequest {
+    let timeout = search_timeout(req.timeout);
+
+    let req = MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
         start,
         end,
         step,
     };
-    match promql::search::search(org_id, &req, timeout).await {
-        Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
-            status: promql::Status::Success,
-            data: Some(promql::QueryResult {
-                result_type: data.get_type().to_string(),
-                result: data,
-            }),
-            error_type: None,
-            error: None,
-        })),
-        Err(err) => {
-            let err = match err {
-                errors::Error::ErrorCode(code) => code.get_error_detail(),
-                _ => err.to_string(),
-            };
-            Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                status: promql::Status::Error,
-                data: None,
-                error_type: Some("bad_data".to_string()),
-                error: Some(err),
-            }))
-        }
-    }
+    search(org_id, timeout, &req).await
 }
 
 /// prometheus query metric metadata
@@ -773,4 +711,47 @@ fn format_query(_org_id: &str, query: &str) -> Result<HttpResponse, Error> {
         }
     };
     Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(expr.prettify())))
+}
+
+fn search_timeout(timeout: Option<String>) -> i64 {
+    match timeout {
+        None => 0,
+        Some(v) => match parse_milliseconds(&v) {
+            Ok(v) => (v / 1000) as i64, // seconds
+            Err(e) => {
+                log::error!("parse timeout error: {}", e);
+                0
+            }
+        },
+    }
+}
+
+async fn search(
+    org_id: &str,
+    timeout: i64,
+    req: &MetricsQueryRequest,
+) -> Result<HttpResponse, Error> {
+    match promql::search::search(org_id, req, timeout).await {
+        Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
+            status: promql::Status::Success,
+            data: Some(promql::QueryResult {
+                result_type: data.get_type().to_string(),
+                result: data,
+            }),
+            error_type: None,
+            error: None,
+        })),
+        Err(err) => {
+            let err = match err {
+                errors::Error::ErrorCode(code) => code.get_error_detail(),
+                _ => err.to_string(),
+            };
+            Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
+                status: promql::Status::Error,
+                data: None,
+                error_type: Some("bad_data".to_string()),
+                error: Some(err),
+            }))
+        }
+    }
 }

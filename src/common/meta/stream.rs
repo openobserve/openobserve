@@ -392,7 +392,7 @@ pub struct StreamDeleteFields {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]

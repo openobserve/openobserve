@@ -30,18 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="closeSidebar"
     ></q-btn>
   </div>
-  <div class="q-pb-sm">
+  <div class="q-pb-sm q-pt-xs flex">
     <div
       :title="span.operation_name"
-      class="q-px-sm q-pb-none text-subtitle1 ellipsis non-selectable"
+      class="q-px-sm q-pb-none ellipsis non-selectable"
+      style="font-size: 14px"
     >
-      {{ span.operation_name }}
+      <span class="text-grey-9">Operation Name: </span>{{ span.operation_name }}
     </div>
     <div
-      class="q-px-sm text-caption ellipsis non-selectable"
+      class="q-px-sm ellipsis non-selectable"
       :title="span.service_name"
+      style="font-size: 14px"
     >
-      {{ span.service_name }}
+      <span class="text-grey-9">Service Name: </span> {{ span.service_name }}
     </div>
   </div>
   <q-tabs
@@ -52,7 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-tab
       name="tags"
-      :label="t('common.attributes')"
+      :label="t('common.tags')"
+      style="text-transform: capitalize"
+    />
+    <q-tab
+      name="process"
+      :label="t('common.process')"
       style="text-transform: capitalize"
     />
     <q-tab
@@ -60,16 +67,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('common.events')"
       style="text-transform: capitalize"
     />
+    <q-tab
+      name="attributes"
+      :label="t('common.attributes')"
+      style="text-transform: capitalize"
+    />
   </q-tabs>
   <q-separator style="width: 100%" />
   <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
     <q-tab-panel name="tags">
-      <div v-for="key in Object.keys(spanDetails.attrs)" :key="key">
-        <div class="row q-py-xs q-px-sm border-bottom">
-          <span class="attr-text q-pr-sm text-bold">{{ key }}:</span>
-          <span class="attr-text">{{ spanDetails.attrs[key] }}</span>
-        </div>
-      </div>
+      <table class="q-my-sm">
+        <tbody>
+          <template v-for="(val, key) in tags" :key="key">
+            <tr>
+              <td class="q-py-xs q-px-sm text-grey-9">{{ key }}</td>
+              <td class="q-py-xs q-px-sm text-primary">
+                {{ val }}
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </q-tab-panel>
+    <q-tab-panel name="process">
+      <table class="q-my-sm">
+        <tbody>
+          <template v-for="(val, key) in processes" :key="key">
+            <tr>
+              <td class="q-py-xs q-px-sm text-grey-9">{{ key }}</td>
+              <td class="q-py-xs q-px-sm text-primary">
+                {{ val }}
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </q-tab-panel>
+    <q-tab-panel name="attributes">
+      <table class="q-my-sm">
+        <tbody>
+          <template v-for="(val, key) in spanDetails.attrs" :key="key">
+            <tr>
+              <td class="q-py-xs q-px-sm text-grey-9">{{ key }}</td>
+              <td class="q-py-xs q-px-sm text-primary">
+                {{ val }}
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
     </q-tab-panel>
     <q-tab-panel name="events">
       <q-virtual-scroll
@@ -147,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { cloneDeep } from "lodash-es";
 import { date, type QTableProps } from "quasar";
-import { defineComponent, onBeforeMount, ref, watch } from "vue";
+import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -163,6 +209,8 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const activeTab = ref("tags");
+    const tags: Ref<{ [key: string]: string }> = ref({});
+    const processes: Ref<{ [key: string]: string }> = ref({});
     const closeSidebar = () => {
       emit("close");
     };
@@ -258,6 +306,40 @@ export default defineComponent({
       return spanDetails;
     };
 
+    const span_details = new Set([
+      "span_id",
+      "trace_id",
+      "operation_name",
+      store.state.zoConfig.timestamp_column,
+      "start_time",
+      "end_time",
+      "duration",
+      "busy_ns",
+      "idle_ns",
+      "events",
+    ]);
+
+    watch(
+      () => props.span,
+      () => {
+        Object.keys(props.span).forEach((key: string) => {
+          if (!span_details.has(key)) {
+            tags.value[key] = props.span[key];
+          }
+        });
+
+        processes.value["service_name"] = props.span["service_name"];
+        processes.value["service_service_instance"] =
+          props.span["service_service_instance"];
+        processes.value["service_service_version"] =
+          props.span["service_service_version"];
+      },
+      {
+        deep: true,
+        immediate: true,
+      }
+    );
+
     return {
       t,
       activeTab,
@@ -268,12 +350,30 @@ export default defineComponent({
       pagination,
       spanDetails,
       store,
+      tags,
+      processes,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
+.span_details_tab-panels {
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    /* Other styling properties */
+  }
+
+  th,
+  td {
+    border: 1px solid #f0f0f0;
+    text-align: left;
+    padding: 4px 8px !important;
+    font-size: 13px;
+    /* Other styling properties */
+  }
+}
 .attr-text {
   font-size: 12px;
   font-family: monospace;
@@ -429,8 +529,8 @@ export default defineComponent({
   }
 }
 .span_details_tab-panels {
-  height: calc(100% - 130px);
-  overflow-y: scroll;
+  height: calc(100% - 102px);
+  overflow-y: auto;
   overflow-x: hidden;
 }
 

@@ -179,8 +179,9 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
-                is_ldap: false,
+                is_external: false,
             },
+            user_id,
         )
         .await;
         assert!(resp.is_ok());

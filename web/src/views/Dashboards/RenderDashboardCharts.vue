@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card style="min-width: 95vw; min-height: 90vh">
         <ViewPanel
           :panelId="viewPanelId"
-          :currentTimeObj="currentTimeObj"
-          :initialVariableValues="initialVariableValues"
+          :selectedDateForViewPanel="selectedDateForViewPanel"
+          :initialVariableValues="variablesData"
           @close-panel="() => (showViewPanel = false)"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
         />
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, provide, ref } from "vue";
+import { defineComponent, provide, ref, toRaw } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -116,6 +116,7 @@ export default defineComponent({
     "dashboardData",
     "currentTimeObj",
     "initialVariableValues",
+    "selectedDateForViewPanel",
   ],
   components: {
     GridLayout: VueGridLayout.GridLayout,
@@ -141,7 +142,7 @@ export default defineComponent({
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
-      emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
+      emit("variablesData", variablesData);
     };
 
     const hoveredSeriesState = ref({

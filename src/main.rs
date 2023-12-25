@@ -15,7 +15,6 @@
 
 use std::{
     collections::HashMap,
-    io::Write,
     net::SocketAddr,
     str::FromStr,
     sync::{
@@ -27,16 +26,17 @@ use std::{
 
 use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use chrono::Local;
+use chrono::{Local, Utc};
 use log::LevelFilter;
 use openobserve::{
+    cli::basic::cli,
     common::{
         infra::{
             self, cluster,
-            config::{CONFIG, USERS, VERSION},
+            config::{CONFIG, VERSION},
         },
         meta, migration,
-        utils::{file::set_permission, zo_logger},
+        utils::zo_logger,
     },
     handler::{
         grpc::{
@@ -59,7 +59,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{compact, db, distinct_values, file_list, users},
+    service::{db, distinct_values},
 };
 use opentelemetry::{
     sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
@@ -77,7 +77,8 @@ use pyroscope::PyroscopeAgent;
 use pyroscope_pprofrs::{pprof_backend, PprofConfig};
 use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
-use tracing_subscriber::{prelude::*, Registry};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::Registry;
 use uaparser::UserAgentParser;
 
 #[cfg(feature = "mimalloc")]
@@ -93,6 +94,25 @@ static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
     "/ua_regex/regexes.yaml"
 ));
 
+use tracing_subscriber::{
+    self,
+    filter::LevelFilter as TracingLevelFilter,
+    fmt::{format::Writer, time::FormatTime, Layer},
+    prelude::*,
+    EnvFilter,
+};
+struct CustomTimeFormat;
+
+impl FormatTime for CustomTimeFormat {
+    fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
+        if CONFIG.log.local_time_format.is_empty() {
+            write!(w, "{}", Utc::now().to_rfc3339())
+        } else {
+            write!(w, "{}", Local::now().format(&CONFIG.log.local_time_format))
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
@@ -107,11 +127,11 @@ async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
     let agent_running = agent.start().expect("Failed to start pyroscope agent");
 
-    if cli().await? {
+    if cli::cli().await? {
         return Ok(());
     }
 
-    if CONFIG.log.events_enabled {
+    let _guard: Option<WorkerGuard> = if CONFIG.log.events_enabled {
         let logger = zo_logger::ZoLogger {
             sender: zo_logger::EVENT_SENDER.clone(),
         };
@@ -120,34 +140,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 LevelFilter::from_str(&CONFIG.log.level).unwrap_or(LevelFilter::Info),
             )
         })?;
+        None
     } else if CONFIG.common.tracing_enabled {
         enable_tracing()?;
+        None
     } else {
-        let mut log_builder = env_logger::Builder::from_env(
-            env_logger::Env::new().default_filter_or(&CONFIG.log.level),
-        );
-        if !CONFIG.log.file.is_empty() {
-            let target = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&CONFIG.log.file)
-                .unwrap_or_else(|_| panic!("open log file [{}] error", CONFIG.log.file));
-            log_builder.target(env_logger::Target::Pipe(Box::new(target)));
-        }
-        if !CONFIG.common.log_local_time_format.trim().is_empty() {
-            log_builder.format(|buf, record| {
-                writeln!(
-                    buf,
-                    "[{} {} {}] {}",
-                    Local::now().format(CONFIG.common.log_local_time_format.as_str()),
-                    CONFIG.common.app_name,
-                    record.level(),
-                    record.args()
-                )
-            });
-        }
-        log_builder.init();
-    }
+        Some(setup_logs())
+    };
 
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
@@ -410,6 +409,50 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Setup the tracing related components
+pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
+    use tracing_subscriber::fmt::writer::BoxMakeWriter;
+
+    let (writer, guard) = if CONFIG.log.file_dir.is_empty() {
+        let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
+        (BoxMakeWriter::new(non_blocking), _guard)
+    } else {
+        let file_name_prefix = if CONFIG.log.file_name_prefix.is_empty() {
+            format!("o2.{}.log", CONFIG.common.instance_name.as_str())
+        } else {
+            CONFIG.log.file_name_prefix.to_string()
+        };
+        let file_appender =
+            tracing_appender::rolling::daily(&CONFIG.log.file_dir, file_name_prefix);
+        let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+        (BoxMakeWriter::new(non_blocking), _guard)
+    };
+    let layer = if CONFIG.log.json_format {
+        Layer::default()
+            .with_writer(writer)
+            .with_timer(CustomTimeFormat)
+            .with_ansi(false)
+            .json()
+            .boxed()
+    } else {
+        Layer::default()
+            .with_writer(writer)
+            .with_timer(CustomTimeFormat)
+            .with_ansi(false)
+            .boxed()
+    };
+
+    tracing_subscriber::registry()
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(TracingLevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .with(layer)
+        .init();
+    guard
+}
+
 fn enable_tracing() -> Result<(), anyhow::Error> {
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
     let mut headers = HashMap::new();
@@ -432,204 +475,19 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
         ])))
         .install_batch(opentelemetry::runtime::Tokio)?;
 
+    let layer = if CONFIG.log.json_format {
+        tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .json()
+            .boxed()
+    } else {
+        tracing_subscriber::fmt::layer().with_ansi(false).boxed()
+    };
+
     Registry::default()
         .with(tracing_subscriber::EnvFilter::new(&CONFIG.log.level))
-        .with(tracing_subscriber::fmt::layer())
+        .with(layer)
         .with(tracing_opentelemetry::layer().with_tracer(tracer))
         .init();
     Ok(())
-}
-
-async fn cli() -> Result<bool, anyhow::Error> {
-    let app = clap::Command::new("openobserve")
-        .version(env!("GIT_VERSION"))
-        .about(clap::crate_description!())
-        .subcommands(&[
-            clap::Command::new("reset")
-                .about("reset openobserve data")
-                .arg(
-                    clap::Arg::new("component")
-                        .short('c')
-                        .long("component")
-                        .help(
-                            "reset data of the component: root, user, alert, dashboard, function, stream-stats",
-                        ),
-                ),
-            clap::Command::new("view")
-                .about("view openobserve data")
-                .arg(
-                    clap::Arg::new("component")
-                        .short('c')
-                        .long("component")
-                        .help("view data of the component: version, user"),
-                ),
-            clap::Command::new("init-dir")
-                .about("init openobserve data dir")
-                .arg(
-                    clap::Arg::new("path")
-                        .short('p')
-                        .long("path")
-                        .help("init this path as data root dir"),
-                ),
-            clap::Command::new("migrate-file-list")
-                .about("migrate file-list from s3 to dynamo db")
-                .arg(
-                    clap::Arg::new("prefix")
-                        .short('p')
-                        .long("prefix")
-                        .value_name("prefix")
-                        .required(false)
-                        .help("only migrate specified prefix, default is all"),
-                ),
-            clap::Command::new("migrate-file-list-from-dynamo")
-                .about("migrate file-list from dynamo to dynamo db"),
-            clap::Command::new("migrate-meta").about("migrate meta"),
-            clap::Command::new("migrate-dashboards").about("migrate-dashboards"),
-            clap::Command::new("delete-parquet")
-                .about("delete parquet files from s3 and file_list")
-                .arg(
-                    clap::Arg::new("file")
-                        .short('f')
-                        .long("file")
-                        .value_name("file")
-                        .help("the parquet file name"),
-                ),
-        ])
-        .get_matches();
-
-    if app.subcommand().is_none() {
-        return Ok(false);
-    }
-
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
-
-    let (name, command) = app.subcommand().unwrap();
-    if name == "init-dir" {
-        match command.get_one::<String>("path") {
-            Some(path) => {
-                set_permission(path, 0o777)?;
-                println!("init dir {} succeeded", path);
-            }
-            None => {
-                return Err(anyhow::anyhow!("please set data path"));
-            }
-        }
-        return Ok(true);
-    }
-
-    // init infra, create data dir & tables
-    infra::init().await.expect("infra init failed");
-    match name {
-        "reset" => {
-            let component = command.get_one::<String>("component").unwrap();
-            match component.as_str() {
-                "root" => {
-                    let _ = users::post_user(
-                        meta::organization::DEFAULT_ORG,
-                        meta::user::UserRequest {
-                            email: CONFIG.auth.root_user_email.clone(),
-                            password: CONFIG.auth.root_user_password.clone(),
-                            role: meta::user::UserRole::Root,
-                            first_name: "root".to_owned(),
-                            last_name: "".to_owned(),
-                            is_ldap: false,
-                        },
-                    )
-                    .await?;
-                }
-                "user" => {
-                    db::user::reset().await?;
-                }
-                "alert" => {
-                    db::alerts::reset().await?;
-                }
-                "dashboard" => {
-                    db::dashboards::reset().await?;
-                }
-                "function" => {
-                    db::functions::reset().await?;
-                }
-                "stream-stats" => {
-                    // reset stream stats update offset
-                    db::compact::stats::set_offset(0, None).await?;
-                    // reset stream stats table data
-                    infra::file_list::reset_stream_stats().await?;
-                    infra::file_list::set_initialised().await?;
-                    // load stream list
-                    db::schema::cache().await?;
-                    // update stats from file list
-                    compact::stats::update_stats_from_file_list()
-                        .await
-                        .expect("file list remote calculate stats failed");
-                }
-                _ => {
-                    return Err(anyhow::anyhow!("unsupport reset component: {}", component));
-                }
-            }
-        }
-        "view" => {
-            let component = command.get_one::<String>("component").unwrap();
-            match component.as_str() {
-                "version" => {
-                    println!("version: {}", db::version::get().await?);
-                }
-                "user" => {
-                    db::user::cache().await?;
-                    let mut id = 0;
-                    for user in USERS.iter() {
-                        id += 1;
-                        println!("{id}\t{:?}\n{:?}", user.key(), user.value());
-                    }
-                }
-                _ => {
-                    return Err(anyhow::anyhow!("unsupport reset component: {component}"));
-                }
-            }
-        }
-        "migrate-file-list" => {
-            let prefix = match command.get_one::<String>("prefix") {
-                Some(prefix) => prefix.to_string(),
-                None => "".to_string(),
-            };
-            println!("Running migration file_list with prefix: {}", prefix);
-            migration::file_list::run(&prefix).await?;
-            println!("Running migration file_list_deleted");
-            migration::file_list::run_for_deleted().await?;
-        }
-        "migrate-file-list-from-dynamo" => {
-            println!("Running migration from DynamoDB");
-            migration::file_list::run_for_dynamo().await?
-        }
-        "migrate-meta" => {
-            println!("Running migration");
-            migration::meta::run().await?
-        }
-        "migrate-dashboards" => {
-            println!("Running migration dashboard");
-            migration::dashboards::run().await?
-        }
-        "delete-parquet" => {
-            let file = command.get_one::<String>("file").unwrap();
-            match file_list::delete_parquet_file(file, true).await {
-                Ok(_) => {
-                    println!("delete parquet file {} succeeded", file);
-                }
-                Err(e) => {
-                    println!("delete parquet file {} failed, error: {}", file, e);
-                }
-            }
-        }
-        _ => {
-            return Err(anyhow::anyhow!("unsupport sub command: {name}"));
-        }
-    }
-
-    // flush db
-    let db = infra::db::get_db().await;
-    if let Err(e) = db.close().await {
-        log::error!("waiting for db close failed, error: {}", e);
-    }
-
-    println!("command {name} execute succeeded");
-    Ok(true)
 }

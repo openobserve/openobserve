@@ -1,6 +1,7 @@
 import { onActivated, onMounted } from "vue";
 import { useStore } from "vuex";
 import organizationService from "@/services/organizations";
+import { getImageURL } from "@/utils/zincutils";
 
 const MainLayoutOpenSourceMixin = {
   setup() {
@@ -14,7 +15,7 @@ const MainLayoutOpenSourceMixin = {
     const leftNavigationLinks = (linksList: any, t: any) => {
       linksList.value.splice(5, 0, {
         title: t("menu.function"),
-        icon: "functions",
+        icon: "img:" + getImageURL("images/common/function.svg"),
         link: "/functions",
       });
 

@@ -20,6 +20,17 @@ use ahash::AHashMap as HashMap;
 use datafusion::arrow::datatypes::{Field, Schema};
 use serde::Serialize;
 use utoipa::ToSchema;
+#[cfg(feature = "enterprise")]
+use {
+    crate::common::utils::jwt::{process_token, verify_decode_token},
+    crate::handler::http::auth::validator::{ACCESS_TOKEN, PKCE_STATE_ORG, REFRESH_TOKEN},
+    actix_web::{cookie::Cookie, http::header, web, HttpRequest},
+    o2_enterprise::enterprise::{
+        common::infra::config::O2_CONFIG,
+        dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
+    },
+    std::io::ErrorKind,
+};
 
 use crate::{
     common::{
@@ -50,6 +61,8 @@ struct ConfigResponse<'a> {
     timestamp_column: String,
     syslog_enabled: bool,
     data_retention_days: i64,
+    restricted_routes_on_empty_data: bool,
+    dex_enabled: bool,
 }
 
 /// Healthz
@@ -69,6 +82,11 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
 
 #[get("")]
 pub async fn zo_config() -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    let dex_enabled = O2_CONFIG.dex.dex_enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let dex_enabled = false;
+
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
         instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
@@ -86,6 +104,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         timestamp_column: CONFIG.common.column_timestamp.clone(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: CONFIG.compact.data_retention_days,
+        restricted_routes_on_empty_data: CONFIG.common.restricted_routes_on_empty_data,
+        dex_enabled,
     }))
 }
 
@@ -164,4 +184,109 @@ fn get_stream_schema_status() -> (usize, usize, usize) {
         }
     }
     (stream_num, stream_schema_num, mem_size)
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/callback")]
+pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let code = match query.get("code") {
+        Some(code) => code,
+        None => {
+            return Err(Error::new(ErrorKind::Other, "no code in request"));
+        }
+    };
+
+    match query.get("state") {
+        Some(code) => match crate::service::kv::get(PKCE_STATE_ORG, code).await {
+            Ok(_) => {
+                let _ = crate::service::kv::delete(PKCE_STATE_ORG, code).await;
+            }
+            Err(_) => {
+                return Err(Error::new(ErrorKind::Other, "invalid state in request"));
+            }
+        },
+
+        None => {
+            return Err(Error::new(ErrorKind::Other, "no state in request"));
+        }
+    };
+
+    match exchange_code(code).await {
+        Ok(login_data) => {
+            let token = login_data.access_token;
+            let keys = get_jwks().await;
+            let token_ver =
+                verify_decode_token(&token, &keys, &O2_CONFIG.dex.client_id, true).await;
+
+            match token_ver {
+                Ok(res) => process_token(res).await,
+                Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
+            }
+
+            let mut access_token_cookie = Cookie::new(ACCESS_TOKEN, token);
+            access_token_cookie.set_http_only(true);
+            access_token_cookie.set_secure(true);
+            access_token_cookie.set_path("/");
+            access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+
+            let mut refresh_token_cookie = Cookie::new(REFRESH_TOKEN, login_data.refresh_token);
+            refresh_token_cookie.set_http_only(true);
+            refresh_token_cookie.set_secure(true);
+            refresh_token_cookie.set_path("/");
+            refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+
+            Ok(HttpResponse::Found()
+                .append_header((header::LOCATION, login_data.url))
+                .cookie(access_token_cookie)
+                .cookie(refresh_token_cookie)
+                .finish())
+        }
+        Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/dex_login")]
+pub async fn dex_login() -> Result<HttpResponse, Error> {
+    use o2_enterprise::enterprise::dex::meta::auth::PreLoginData;
+
+    let login_data: PreLoginData = get_dex_login();
+    let state = login_data.state;
+    let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.to_owned().into()).await;
+
+    Ok(HttpResponse::Ok().json(login_data.url))
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/dex_refresh")]
+async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
+    let token = if let Some(cookie) = req.cookie("refresh_token") {
+        cookie.value().to_string()
+    } else {
+        return HttpResponse::Unauthorized().finish();
+    };
+
+    // Exchange the refresh token for a new access token
+
+    match refresh_token(&token).await {
+        Ok(token_response) => {
+            // Set the new access token in the cookie
+            let mut access_token_cookie = Cookie::new(ACCESS_TOKEN, token_response);
+            access_token_cookie.set_http_only(true);
+            access_token_cookie.set_secure(true);
+            access_token_cookie.set_path("/");
+            access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+
+            HttpResponse::Ok().cookie(access_token_cookie).finish()
+        }
+        Err(_) => {
+            let access_cookie = Cookie::new(ACCESS_TOKEN, "");
+            let refresh_cookie = Cookie::new(REFRESH_TOKEN, "");
+            let mut response = HttpResponse::Unauthorized().finish();
+            response.add_removal_cookie(&access_cookie).unwrap();
+            response.add_removal_cookie(&refresh_cookie).unwrap();
+            response
+        }
+    }
 }

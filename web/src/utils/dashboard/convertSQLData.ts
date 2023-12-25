@@ -72,13 +72,18 @@ export const convertSQLData = (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    const data =
+    let data =
       searchQueryData[0]?.filter((item: any) => {
         return (
           xAxisKeys.every((key: any) => item[key] != null) &&
           yAxisKeys.every((key: any) => item[key] != null)
         );
       }) || [];
+
+    // if h-bar or h-stacked need to reverse data due proper view when asc or desc is used
+    if (["h-bar", "h-stacked"].includes(panelSchema.type)) {
+      data = data.reverse();
+    }
 
     // if data is not there use {} as a default value
     const keys = Object.keys((data.length && data[0]) || {}); // Assuming there's at least one object
@@ -235,7 +240,11 @@ export const convertSQLData = (
       },
       formatter: function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
-        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+        if (
+          hoveredSeriesState?.value &&
+          hoveredSeriesState?.value?.panelId != panelSchema.id
+        )
+          return "";
         if (name.length == 0) return "";
 
         // get the current series index from name
@@ -375,10 +384,10 @@ export const convertSQLData = (
       tooltip: {
         show: false,
       },
-      itemSize:0,
-      itemGap:0,
+      itemSize: 0,
+      itemGap: 0,
       // it is used to hide toolbox buttons
-      bottom:"100%",
+      bottom: "100%",
       feature: {
         dataZoom: {
           yAxisIndex: "none",
@@ -488,7 +497,11 @@ export const convertSQLData = (
       } else {
         options.tooltip.formatter = function (name: any) {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+          if (
+            hoveredSeriesState?.value &&
+            hoveredSeriesState?.value?.panelId != panelSchema.id
+          )
+            return "";
           if (name.length == 0) return "";
 
           // get the current series index from name
@@ -610,7 +623,11 @@ export const convertSQLData = (
             : "rgba(255,255,255,1)",
         formatter: function (name: any) {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+          if (
+            hoveredSeriesState?.value &&
+            hoveredSeriesState?.value?.panelId != panelSchema.id
+          )
+            return "";
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
               name.value,
@@ -654,7 +671,11 @@ export const convertSQLData = (
             : "rgba(255,255,255,1)",
         formatter: function (name: any) {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+          if (
+            hoveredSeriesState?.value &&
+            hoveredSeriesState?.value?.panelId != panelSchema.id
+          )
+            return "";
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
               name.value,
@@ -817,7 +838,11 @@ export const convertSQLData = (
             : "rgba(255,255,255,1)",
         formatter: (params: any) => {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+          if (
+            hoveredSeriesState?.value &&
+            hoveredSeriesState?.value?.panelId != panelSchema.id
+          )
+            return "";
           // we have value[1] which return yaxis index
           // it is used to get y axis data
           return `${
@@ -1078,7 +1103,8 @@ export const convertSQLData = (
 
           data: [
             {
-              name: JSON.stringify(xAxisValue[index] || ""),
+              // gauge name may have or may not have
+              name: xAxisValue[index] ?? "",
               value: it,
               detail: {
                 formatter: function (value: any) {
@@ -1170,7 +1196,11 @@ export const convertSQLData = (
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
-        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+        if (
+          hoveredSeriesState?.value &&
+          hoveredSeriesState?.value?.panelId != panelSchema.id
+        )
+          return "";
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
@@ -1286,7 +1316,11 @@ export const convertSQLData = (
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
-        if (hoveredSeriesState?.value?.panelId != panelSchema.id) return "";
+        if (
+          hoveredSeriesState?.value &&
+          hoveredSeriesState?.value?.panelId != panelSchema.id
+        )
+          return "";
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
@@ -1360,6 +1394,9 @@ export const convertSQLData = (
       options.yAxis = options.series.length ? options.yAxis : {};
     }
   }
+
+  // allowed to zoom, only if timeseries
+  options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
   return {
     options,

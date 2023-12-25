@@ -67,12 +67,14 @@ export default createStore({
     savedViewDialog: false,
     refreshIntervalID: 0,
     savedViewFlag: false,
+    savedFunctionDialog: false,
   },
   mutations: {
     login(state, payload) {
       if (payload) {
         state.loggedIn = payload.loginState;
         state.userInfo = payload.userInfo;
+        
       }
     },
     logout(state) {
@@ -163,6 +165,9 @@ export default createStore({
     setSavedViewFlag(state, payload) {
       state.savedViewFlag = payload;
     },
+    setSavedFunctionDialog(state, payload) {
+      state.savedFunctionDialog = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -251,6 +256,9 @@ export default createStore({
     },
     setSavedViewFlag(context, payload) {
       context.commit("setSavedViewFlag", payload);
+    },
+    setSavedFunctionDialog(context, payload) {
+      context.commit("setSavedFunctionDialog", payload);
     },
   },
   modules: {},

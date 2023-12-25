@@ -155,7 +155,7 @@ impl DistinctValues {
                 let hour_key = ingestion::get_wal_time_key(
                     timestamp,
                     &vec![],
-                    unwrap_partition_time_level(None, StreamType::Logs),
+                    unwrap_partition_time_level(None, StreamType::Metadata),
                     data,
                     None,
                 );
