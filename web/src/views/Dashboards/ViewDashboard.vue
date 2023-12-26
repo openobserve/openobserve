@@ -17,80 +17,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-md" :key="store.state.selectedOrganization.identifier">
-    <div class="flex justify-between items-center q-pa-sm">
-      <div class="flex">
-        <q-btn
-          no-caps
-          @click="goBackToDashboardList"
-          padding="xs"
-          outline
-          icon="arrow_back_ios_new"
-        />
-        <span class="q-table__title q-mx-md q-mt-xs">{{
-          currentDashboardData.data.title
-        }}</span>
+  <q-page class=""  :key="store.state.selectedOrganization.identifier">
+    <div style="position: sticky; top: 57px; z-index:50" :class="store.state.theme === 'light' ? 'bg-white' : 'dark-mode'">
+      <div class="flex justify-between items-center q-pa-xs" >
+        <div class="flex">
+          <q-btn
+            no-caps
+            @click="goBackToDashboardList"
+            padding="xs"
+            outline
+            icon="arrow_back_ios_new"
+          />
+          <span class="q-table__title q-mx-md q-mt-xs">{{
+            currentDashboardData.data.title
+          }}</span>
+        </div>
+        <div class="flex">
+          <q-btn
+            outline
+            padding="xs"
+            no-caps
+            icon="add"
+            @click="addPanelData"
+            data-test="dashboard-panel-add"
+          >
+            <q-tooltip>{{ t("panel.add") }}</q-tooltip>
+          </q-btn>
+          <q-btn
+            outline
+            padding="xs"
+            class="q-ml-sm"
+            no-caps
+            icon="settings"
+            @click="openSettingsDialog"
+          >
+            <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
+          </q-btn>
+          <!-- <DateTimePicker 
+            class="q-ml-sm"
+            ref="refDateTime"
+            v-model="selectedDate"
+          /> -->
+          <DateTimePickerDashboard
+            ref="dateTimePicker"
+            class="q-ml-sm"
+            v-model="selectedDate"
+          />
+          <AutoRefreshInterval
+            v-model="refreshInterval"
+            trigger
+            @trigger="refreshData"
+          />
+          <q-btn
+            class="q-ml-sm"
+            outline
+            padding="xs"
+            no-caps
+            icon="refresh"
+            @click="refreshData"
+          >
+          </q-btn>
+          <ExportDashboard
+            :dashboardId="currentDashboardData.data?.dashboardId"
+          />
+          <q-btn
+            class="q-ml-sm"
+            outline
+            padding="xs"
+            no-caps
+            icon="share"
+            title="share link"
+            @click="shareLink"
+          ></q-btn>
+        </div>
       </div>
-      <div class="flex">
-        <q-btn
-          outline
-          padding="xs"
-          no-caps
-          icon="add"
-          @click="addPanelData"
-          data-test="dashboard-panel-add"
-        >
-          <q-tooltip>{{ t("panel.add") }}</q-tooltip>
-        </q-btn>
-        <q-btn
-          outline
-          padding="xs"
-          class="q-ml-sm"
-          no-caps
-          icon="settings"
-          @click="openSettingsDialog"
-        >
-          <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
-        </q-btn>
-        <!-- <DateTimePicker 
-          class="q-ml-sm"
-          ref="refDateTime"
-          v-model="selectedDate"
-        /> -->
-        <DateTimePickerDashboard
-          ref="dateTimePicker"
-          class="q-ml-sm"
-          v-model="selectedDate"
-        />
-        <AutoRefreshInterval
-          v-model="refreshInterval"
-          trigger
-          @trigger="refreshData"
-        />
-        <q-btn
-          class="q-ml-sm"
-          outline
-          padding="xs"
-          no-caps
-          icon="refresh"
-          @click="refreshData"
-        >
-        </q-btn>
-        <ExportDashboard
-          :dashboardId="currentDashboardData.data?.dashboardId"
-        />
-        <q-btn
-          class="q-ml-sm"
-          outline
-          padding="xs"
-          no-caps
-          icon="share"
-          title="share link"
-          @click="shareLink"
-        ></q-btn>
-      </div>
+      <q-separator ></q-separator>
     </div>
-    <q-separator></q-separator>
+
     <RenderDashboardCharts
       @variablesData="variablesDataUpdated"
       :initialVariableValues="initialVariableValues"
@@ -431,5 +434,13 @@ export default defineComponent({
     border-bottom: 1px solid $border-color;
     justify-content: flex-end;
   }
+}
+
+.dark-mode {
+  background-color: $dark-page;
+}
+
+.bg-white {
+  background-color: $white;
 }
 </style>

@@ -903,7 +903,7 @@ export default defineComponent({
 .q-list {
   &.leftNavList {
     padding-bottom: 0px;
-    padding-top: 0px;
+    padding-top: 5px;
 
     .q-item {
       margin-bottom: 5px;
