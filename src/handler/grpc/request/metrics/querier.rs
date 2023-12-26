@@ -13,20 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::UNIX_EPOCH;
-
-use arrow_schema::Schema;
-use chrono::DateTime;
-use config::{meta::stream::StreamType, CONFIG, FILE_EXT_JSON};
+use arrow::ipc::writer::StreamWriter;
+use config::{meta::stream::StreamType, utils::parquet::read_metadata, CONFIG};
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
-        infra::{errors, metrics, wal},
-        meta::{self, stream::PartitionTimeLevel},
-        utils::file::{get_file_contents, get_file_meta, scan_files},
+        infra::{errors, ider, metrics, wal},
+        utils::{
+            file::{get_file_contents, scan_files},
+            schema_ext::SchemaExt,
+        },
     },
     handler::grpc::{
         cluster_rpc::{
@@ -35,11 +34,7 @@ use crate::{
         },
         request::MetadataMap,
     },
-    service::{
-        db,
-        promql::search as SearchService,
-        stream::{stream_settings, unwrap_partition_time_level},
-    },
+    service::promql::search as SearchService,
 };
 
 pub struct Querier;
@@ -98,6 +93,52 @@ impl Metrics for Querier {
         let stream_name = &req.get_ref().stream_name;
         let mut resp = MetricsWalFileResponse::default();
 
+        // get memtable records
+        let mut mem_data = ingester::read_from_memtable(
+            org_id,
+            StreamType::Metrics.to_string().as_str(),
+            stream_name,
+            Some((start_time, end_time)),
+        )
+        .await
+        .unwrap_or_default();
+
+        // get immutable records
+        mem_data.extend(
+            ingester::read_from_immutable(
+                org_id,
+                StreamType::Metrics.to_string().as_str(),
+                stream_name,
+                Some((start_time, end_time)),
+            )
+            .await
+            .unwrap_or_default(),
+        );
+
+        // write memory data into arrow files
+        let mut arrow_files = vec![];
+        for (schema, batches) in mem_data {
+            let mut size = 0;
+            let mut body = Vec::new();
+            let mut writer = StreamWriter::try_new(&mut body, &schema).unwrap();
+            for batch in batches {
+                size += batch.data_size;
+                writer.write(&batch.data).unwrap();
+            }
+            writer.finish().unwrap();
+            drop(writer);
+
+            let name = format!("{}.arrow", ider::generate());
+            let schema_key = schema.hash_key();
+            arrow_files.push(MetricsWalFile {
+                name,
+                schema_key,
+                body,
+                size: size as i64,
+            });
+        }
+
+        // get parquet files
         let wal_dir = match std::path::Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
             Ok(path) => {
                 let mut path = path.to_str().unwrap().to_string();
@@ -116,17 +157,9 @@ impl Metrics for Querier {
         let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/");
         let files = scan_files(&pattern, "parquet");
 
-        if files.is_empty() {
+        if arrow_files.is_empty() && files.is_empty() {
             return Ok(Response::new(resp));
         }
-
-        // get schema settings
-        let schema_latest = db::schema::get(org_id, stream_name, StreamType::Metrics)
-            .await
-            .unwrap_or(Schema::empty());
-        let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(schema_settings.partition_time_level, StreamType::Metrics);
 
         // lock theses files
         let files = files
@@ -143,128 +176,41 @@ impl Metrics for Querier {
         wal::lock_files(&files).await;
 
         for file in files.iter() {
-            // check wal file created time, we can skip files which created time > end_time
-            let file_columns = file.split('/').collect::<Vec<&str>>();
-            let file_time_start = format!(
-                "{}-{}-{}T{}:00:00Z",
-                file_columns[5], file_columns[6], file_columns[7], file_columns[8]
-            );
-            let mut file_time_start = match DateTime::parse_from_rfc3339(&file_time_start) {
-                Ok(v) => v.timestamp_micros(),
-                Err(_) => 0,
-            };
-            let mut file_time_end = format!(
-                "{}-{}-{}T{}:59:59Z",
-                file_columns[5], file_columns[6], file_columns[7], file_columns[8]
-            );
-            if file_columns[8] == "00" && partition_time_level.eq(&PartitionTimeLevel::Daily) {
-                file_time_end = format!(
-                    "{}-{}-{}T23:59:59Z",
-                    file_columns[5], file_columns[6], file_columns[7]
-                );
-            }
-            let mut file_time_end = match DateTime::parse_from_rfc3339(&file_time_end) {
-                Ok(v) => v.timestamp_micros(),
-                Err(_) => 0,
-            };
-
             let source_file = wal_dir.to_string() + "/" + file;
-            if start_time > 0 || end_time > 0 {
-                // check wal file created time, we can skip files which created time > end_time
-                let file_meta = match get_file_meta(&source_file) {
-                    Ok(meta) => meta,
-                    Err(err) => {
-                        log::error!("failed to get file meta: {}, {}", file, err);
-                        continue;
-                    }
-                };
-                let file_modified = file_meta
-                    .modified()
-                    .unwrap_or(UNIX_EPOCH)
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_micros() as i64;
-                let file_created = file_meta
-                    .created()
-                    .unwrap_or(UNIX_EPOCH)
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_micros() as i64;
-                let file_created = (file_created as i64)
-                    - chrono::Duration::hours(CONFIG.limit.ingest_allowed_upto)
-                        .num_microseconds()
-                        .unwrap_or_default();
-                if file_created > 0 && file_time_start == 0 {
-                    file_time_start = file_created;
-                }
-                if file_modified < file_time_end || file_time_end == 0 {
-                    file_time_end = file_modified;
-                }
-                if (start_time > 0 && file_time_end < start_time)
-                    || (end_time > 0 && file_time_start > end_time)
-                {
-                    log::debug!(
-                        "skip wal file: {} time_range: [{},{}]",
-                        file,
-                        file_created,
-                        file_modified
-                    );
-                    continue;
-                }
+            let Ok(body) = get_file_contents(&source_file) else {
+                continue;
+            };
+            let body = bytes::Bytes::from(body);
+            let parquet_meta = read_metadata(&body).await.unwrap_or_default();
+            if (start_time > 0 && parquet_meta.max_ts < start_time)
+                || (end_time > 0 && parquet_meta.min_ts > end_time)
+            {
+                log::debug!(
+                    "skip wal file: {} time_range: [{},{}]",
+                    file,
+                    parquet_meta.min_ts,
+                    parquet_meta.max_ts
+                );
+                continue;
             }
-            if let Ok(body) = get_file_contents(&source_file) {
-                let data = if file.ends_with(FILE_EXT_JSON) {
-                    let mut file_data = body;
-                    // check json file is complete
-                    if !file_data.ends_with(b"\n") {
-                        if let Ok(s) = String::from_utf8(file_data.clone()) {
-                            if let Some(last_line) = s.lines().last() {
-                                if serde_json::from_str::<serde_json::Value>(last_line).is_err() {
-                                    // remove last line
-                                    // filter by stream name if data is for metrics
-                                    file_data =
-                                        file_data[..file_data.len() - last_line.len()].to_vec();
-                                }
-                            }
-                        }
-                    }
 
-                    let metric_key = format!("\"{}\":\"{}\"", meta::prom::NAME_LABEL, &stream_name);
-                    if let Ok(s) = String::from_utf8(file_data) {
-                        let filtered_lines: Vec<&str> = s
-                            .lines()
-                            .filter(|line| line.contains(&metric_key))
-                            .collect();
-
-                        // Convert the filtered lines back to a single String
-                        let filtered_content = filtered_lines.join("\n");
-
-                        // Convert the String back to a Vec<u8>
-                        filtered_content.into_bytes()
-                    } else {
-                        continue;
-                    }
-                } else {
-                    body
-                };
-
-                let columns = file.split('/').collect::<Vec<&str>>();
-
-                let len = columns.len();
-
-                let name = columns[len - 1];
-                let schema = columns[len - 2];
-
-                resp.files.push(MetricsWalFile {
-                    name: name.to_string(),
-                    body: data,
-                    schema: schema.to_string(),
-                });
-            }
+            let columns = file.split('/').collect::<Vec<&str>>();
+            let len = columns.len();
+            let name = columns[len - 1].to_string();
+            let schema_key = columns[len - 2].to_string();
+            resp.files.push(MetricsWalFile {
+                name,
+                schema_key,
+                body: body.to_vec(),
+                size: parquet_meta.original_size,
+            });
         }
 
         // release all files
         wal::release_files(&files).await;
+
+        // append arrow files
+        resp.files.extend(arrow_files);
 
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME

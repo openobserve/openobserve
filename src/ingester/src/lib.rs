@@ -42,7 +42,7 @@ pub async fn init() -> errors::Result<()> {
         interval.tick().await; // the first tick is immediate
         loop {
             if let Err(e) = immutable::persist().await {
-                println!("persist error: {}", e);
+                log::error!("persist error: {}", e);
             }
             interval.tick().await;
         }

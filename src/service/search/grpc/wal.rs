@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{io::Cursor, path::Path, sync::Arc};
 
 use ahash::AHashMap as HashMap;
-use chrono::DateTime;
 use config::{
     meta::stream::{FileKey, StreamType},
     utils::parquet::read_metadata,
@@ -43,7 +42,7 @@ use crate::{
             search::SearchType,
             stream::{PartitionTimeLevel, ScanStats},
         },
-        utils::file::{get_file_contents, get_file_meta, scan_files},
+        utils::file::{get_file_contents, scan_files},
     },
     service::{
         db,
@@ -451,10 +450,10 @@ pub async fn search_memtable(
 /// searched
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
-    session_id: &str,
+    _session_id: &str,
     sql: &Sql,
     stream_type: StreamType,
-    partition_time_level: &PartitionTimeLevel,
+    _partition_time_level: &PartitionTimeLevel,
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
         Ok(path) => {
@@ -497,81 +496,7 @@ async fn get_file_list(
     wal::lock_files(&files).await;
 
     let mut result = Vec::with_capacity(files.len());
-    let time_range = sql.meta.time_range.unwrap_or((0, 0));
     for file in files.iter() {
-        if time_range != (0, 0) {
-            // check wal file created time, we can skip files which created time > end_time
-            let file_columns = file.split('/').collect::<Vec<&str>>();
-            let file_time_start = format!(
-                "{}-{}-{}T{}:00:00Z",
-                file_columns[5], file_columns[6], file_columns[7], file_columns[8]
-            );
-            let mut file_time_start = match DateTime::parse_from_rfc3339(&file_time_start) {
-                Ok(v) => v.timestamp_micros(),
-                Err(_) => 0,
-            };
-            let mut file_time_end = format!(
-                "{}-{}-{}T{}:59:59Z",
-                file_columns[5], file_columns[6], file_columns[7], file_columns[8]
-            );
-            if file_columns[8] == "00" && partition_time_level.eq(&PartitionTimeLevel::Daily) {
-                file_time_end = format!(
-                    "{}-{}-{}T23:59:59Z",
-                    file_columns[5], file_columns[6], file_columns[7]
-                );
-            }
-            let mut file_time_end = match DateTime::parse_from_rfc3339(&file_time_end) {
-                Ok(v) => v.timestamp_micros(),
-                Err(_) => 0,
-            };
-
-            let source_file = wal_dir.to_string() + "/" + file.as_str();
-            let file_meta = match get_file_meta(&source_file) {
-                Ok(meta) => meta,
-                Err(_) => {
-                    log::error!(
-                        "[session_id {session_id}] skip wal file: {} get file meta error",
-                        file
-                    );
-                    wal::release_files(&[file.clone()]).await;
-                    continue;
-                }
-            };
-            let file_modified = file_meta
-                .modified()
-                .unwrap_or(UNIX_EPOCH)
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_micros() as i64;
-            let file_created = file_meta
-                .created()
-                .unwrap_or(UNIX_EPOCH)
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_micros() as i64;
-            let file_created = (file_created as i64)
-                - chrono::Duration::hours(CONFIG.limit.ingest_allowed_upto)
-                    .num_microseconds()
-                    .unwrap_or_default();
-            if file_created > 0 && file_time_start == 0 {
-                file_time_start = file_created;
-            }
-            if file_modified < file_time_end || file_time_end == 0 {
-                file_time_end = file_modified;
-            }
-            if (time_range.0 > 0 && file_time_end < time_range.0)
-                || (time_range.1 > 0 && file_time_start > time_range.1)
-            {
-                log::debug!(
-                    "[session_id {session_id}] skip wal file: {} time_range: [{},{}]",
-                    file,
-                    file_created,
-                    file_modified
-                );
-                wal::release_files(&[file.clone()]).await;
-                continue;
-            }
-        }
         let file_key = FileKey::from_file_name(file);
         if sql.match_source(&file_key, false, true, stream_type).await {
             result.push(file_key);

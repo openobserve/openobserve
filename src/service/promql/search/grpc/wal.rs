@@ -16,7 +16,7 @@
 use std::{collections::HashMap, io::Cursor, sync::Arc};
 
 use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
-use config::{meta::stream::StreamType, CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON};
+use config::{meta::stream::StreamType, CONFIG, FILE_EXT_PARQUET};
 use datafusion::{
     arrow::datatypes::Schema,
     common::FileType,
@@ -73,9 +73,9 @@ pub(crate) async fn create_context(
     }
 
     let mut num_arrow_files = 0;
-    let mut num_json_files = 0;
+    let mut num_parquet_files = 0;
     let mut arrow_scan_stats = ScanStats::new();
-    let mut json_scan_stats = ScanStats::new();
+    let mut parquet_scan_stats = ScanStats::new();
 
     let metadata = HashMap::new();
     let mut record_batches_meta: HashMap<String, (Schema, Vec<RecordBatch>)> = HashMap::new();
@@ -85,14 +85,14 @@ pub(crate) async fn create_context(
     for file in files {
         let file_name = format!("/{work_dir}/{}", file.name);
 
-        if file.name.ends_with(FILE_EXT_JSON) {
-            num_json_files += 1;
-            json_scan_stats.original_size += file.body.len() as i64;
+        if file.name.ends_with(FILE_EXT_PARQUET) {
+            num_parquet_files += 1;
+            parquet_scan_stats.original_size += file.size;
             tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
-        } else if file.name.ends_with(FILE_EXT_ARROW) {
+        } else {
             num_arrow_files += 1;
             let record_batch_meta = record_batches_meta
-                .entry(file.schema)
+                .entry(file.schema_key)
                 .or_insert_with(|| (Schema::empty().with_metadata(metadata.clone()), Vec::new()));
 
             let buf_reader = Cursor::new(file.body.clone());
@@ -115,12 +115,12 @@ pub(crate) async fn create_context(
     }
 
     arrow_scan_stats.files = num_arrow_files;
-    json_scan_stats.files = num_json_files;
+    parquet_scan_stats.files = num_parquet_files;
 
     log::info!(
-        "promql->wal->search: load files json :{} , scan_size {} , arrow :{} , scan_size {}",
-        json_scan_stats.files,
-        json_scan_stats.original_size,
+        "promql->wal->search: load files: parquet {}, scan_size {}, arrow {}, scan_size {}",
+        parquet_scan_stats.files,
+        parquet_scan_stats.original_size,
         arrow_scan_stats.files,
         arrow_scan_stats.original_size
     );
@@ -181,8 +181,15 @@ pub(crate) async fn create_context(
         search_type: SearchType::Normal,
     };
 
-    let ctx = register_table(&session, schema.clone(), stream_name, &[], FileType::JSON).await?;
-    resp.push((ctx, schema, json_scan_stats));
+    let ctx = register_table(
+        &session,
+        schema.clone(),
+        stream_name,
+        &[],
+        FileType::PARQUET,
+    )
+    .await?;
+    resp.push((ctx, schema, parquet_scan_stats));
     Ok(resp)
 }
 
