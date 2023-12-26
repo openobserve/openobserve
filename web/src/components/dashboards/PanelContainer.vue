@@ -33,8 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-space />
         <q-icon
-          v-if="dependentAdHocVariable"
+          v-if="!viewOnly && showFullScreenBtn"
           name="info_outline"
+          style="cursor: pointer"
+          ><q-tooltip anchor="bottom right" self="top right" max-width="220px">
+            {{ props.data.description }}
+          </q-tooltip></q-icon
+        >
+        <q-icon
+          v-if="dependentAdHocVariable"
+          name="warning"
           style="cursor: pointer"
           @click="showViewPanel = true"
         >
