@@ -56,13 +56,17 @@ export default defineComponent({
             await nextTick();
             await nextTick();
             await nextTick();
-            const theme = store.state.theme === 'dark' ? 'dark' : 'light';
-            chart = echarts.init(chartRef.value, theme);
+            // const theme = store.state.theme === 'dark' ? 'dark' : 'light';
+            chart = echarts.init(chartRef.value);
             echarts.registerMap('world', map);
+            console.log("onMounted props.data.options", props.data.options);
+            
             chart.setOption(props?.data?.options || {}, true);
             window.addEventListener("resize", windowResizeEventCallback);
         });
         onUnmounted(() => {
+            console.log("onUnMounted", props.data.options);
+
             window.removeEventListener("resize", windowResizeEventCallback);
         });
         watch(() => props.data.options, async () => {
