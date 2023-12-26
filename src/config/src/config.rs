@@ -37,7 +37,9 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<AHashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<AHashSet<K>>;
 
 pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
-pub const GEO_IP_ENRICHMENT_TABLE: &str = "geoip";
+pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
+pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
+pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
@@ -244,6 +246,10 @@ pub struct Common {
     pub data_cache_dir: String,
     #[env_config(name = "ZO_BASE_URI", default = "")]
     pub base_uri: String,
+    #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
+    pub wal_memory_mode_enabled: bool,
+    #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
+    pub wal_line_mode_enabled: bool,
     #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
     pub column_timestamp: String,
     #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = true)]
@@ -309,18 +315,26 @@ pub struct Common {
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION", default = "86400")] // Everyday to test
     pub mmdb_update_duration: u64,
-
     #[env_config(
         name = "ZO_MMDB_GEOLITE_CITYDB_URL",
-        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.mmdb"
+        default = "https://geoip.zinclabs.dev/GeoLite2-City.mmdb"
     )]
     pub mmdb_geolite_citydb_url: String,
-
+    #[env_config(
+        name = "ZO_MMDB_GEOLITE_ASNDB_URL",
+        default = "https://geoip.zinclabs.dev/GeoLite2-ASN.mmdb"
+    )]
+    pub mmdb_geolite_asndb_url: String,
     #[env_config(
         name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
-        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.sha256"
+        default = "https://geoip.zinclabs.dev/GeoLite2-City.sha256"
     )]
     pub mmdb_geolite_citydb_sha256_url: String,
+    #[env_config(
+        name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
+        default = "https://geoip.zinclabs.dev/GeoLite2-ASN.sha256"
+    )]
+    pub mmdb_geolite_asndb_sha256_url: String,
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
@@ -328,7 +342,6 @@ pub struct Common {
     pub memory_circuit_breaker_enable: bool,
     #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 100)]
     pub memory_circuit_breaker_ratio: usize,
-
     #[env_config(
         name = "ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA",
         default = true,
