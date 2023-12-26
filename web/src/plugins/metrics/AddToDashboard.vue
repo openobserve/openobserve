@@ -10,8 +10,9 @@
           </div>
           <div class="col-auto">
             <q-btn v-close-popup="true"
-round flat
-icon="cancel" />
+              data-test="schema-cancel"
+              round flat
+              icon="cancel" />
           </div>
         </div>
       </q-card-section>
@@ -22,6 +23,7 @@ icon="cancel" />
           :label="t('dashboard.newDashboard')"
           outlined
           dense
+          data-test="new-dashboard-toggle"
         ></q-toggle>
       </q-card-section>
       <q-card-section>
@@ -41,6 +43,7 @@ icon="cancel" />
               dense
               :rules="[(val) => !!val.trim() || 'Dashboard name required']"
               :lazy-rules="true"
+              data-test="new-dashboard-name"
             ></q-input>
             <span>&nbsp;</span>
             <q-input
@@ -53,6 +56,7 @@ icon="cancel" />
               outlined
               filled
               dense
+              data-test="new-dashboard-description"
             ></q-input>
             <q-input
               v-model.trim="panelTitle"
@@ -66,6 +70,7 @@ icon="cancel" />
               dense
               :rules="[(val) => !!val.trim() || 'Panel title required']"
               :lazy-rules="true"
+              data-test="new-dashboard-panel-title"
             />
             <span>&nbsp;</span>
           </template>
@@ -110,6 +115,7 @@ icon="cancel" />
               dense
               :rules="[(val) => !!val.trim() || 'Panel Title required']"
               :lazy-rules="true"
+              data-test="new-dashboard-panel-title"
             />
             <span>&nbsp;</span>
           </template>

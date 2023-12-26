@@ -75,12 +75,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inline-label
             vertical
             v-model="activeFolderId"
+            data-test="dashboards-tabs"
           >
             <q-tab
               v-for="(tab, index) in store.state.organizationData.folders"
               :key="tab.folderId"
               :name="tab.folderId"
               content-class="tab_content full-width"
+              data-test="dashboard-tab-content"
             >
               <div class="full-width row justify-between no-wrap">
                 <span
@@ -99,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-ml-sm"
                     @click.stop="editFolder(tab.folderId)"
                     style="cursor: pointer; justify-self: end"
+                    data-test="edit-folder-icon"
                   />
                   <q-icon
                     v-if="index"
@@ -106,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-ml-sm"
                     @click.stop="showDeleteFolderDialogFn(tab.folderId)"
                     style="cursor: pointer; justify-self: end"
+                    data-test="delete-folder-icon"
                   />
                 </div>
               </div>
@@ -122,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               :label="t('dashboard.newFolderBtnLabel')"
               @click.stop="addFolder"
+              data-test="new-folder-btn"
             />
           </div>
         </div>
@@ -158,6 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 round
                 flat
                 @click.stop="showMoveDashboardPanel(props.row.id)"
+                data-test="dashboard-move-to-another-folder"
               ></q-btn>
               <q-btn
                 v-if="props.row.actions == 'true'"
@@ -170,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 round
                 flat
                 @click.stop="duplicateDashboard(props.row.id)"
+                data-test="dashboard-duplicate"
               ></q-btn>
               <q-btn
                 v-if="props.row.actions == 'true'"
