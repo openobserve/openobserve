@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="restart_alt"
           class="q-pr-sm q-pl-xs reset-filters q-ml-md"
           @click="resetFilters()"
-        ></q-btn>
+        />
       </div>
       <div class="float-right col-auto">
         <div class="float-left">
