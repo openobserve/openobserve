@@ -506,7 +506,7 @@
     "queryValues": "Query Values",
     "constant": "Constant",
     "textbox": "Textbox",
-    "ad-hoc-variable": "Dynamic Filters",
+    "ad-hoc-variable": "Dynamic variables",
     "newFolder": "New Folder",
     "updateFolder": "Update Folder"
   },
