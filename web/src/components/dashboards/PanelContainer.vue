@@ -36,7 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!viewOnly && showFullScreenBtn"
           name="info_outline"
           style="cursor: pointer"
-          ><q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          >
+          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
             {{ props.data.description }}
           </q-tooltip></q-icon
         >
