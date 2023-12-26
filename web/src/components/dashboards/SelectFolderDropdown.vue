@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-btn
       class="q-mb-md text-bold"
-      data-test="dashboard-add"
+      data-test="dashboard-folder-move-new-add"
       label="+"
       text-color="light-text"
       padding="sm md"

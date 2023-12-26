@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" data-test="folder-cancel"/>
+          <q-btn v-close-popup="true" round flat icon="cancel" data-test="dashboard-folder-cancel"/>
         </div>
       </div>
     </q-card-section>
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
-          data-test="dashboard-folder-name"
+          data-test="dashboard-folder-add-name"
           stack-label
           outlined
           filled
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.typeDesc')"
           color="input-border"
           bg-color="input-bg"
-          data-test="dashboard-folder-description"
+          data-test="dashboard-folder-add-description"
           class="q-py-md showLabelOnTop"
           stack-label
           outlined
@@ -70,10 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             text-color="light-text"
             padding="sm md"
             no-caps
-            data-test="dashboard-add-cancel"
+            data-test="dashboard-folder-add-cancel"
           />
           <q-btn
-            data-test="dashboard-add-save"
+            data-test="dashboard-folder-add-save"
             :disable="folderData.name.trim() === ''"
             :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"

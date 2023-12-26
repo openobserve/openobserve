@@ -75,14 +75,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inline-label
             vertical
             v-model="activeFolderId"
-            data-test="dashboards-tabs"
+            data-test="dashboards-folder-tabs"
           >
             <q-tab
               v-for="(tab, index) in store.state.organizationData.folders"
               :key="tab.folderId"
               :name="tab.folderId"
               content-class="tab_content full-width"
-              data-test="dashboard-tab-content"
+              :data-test="`dashboard-folder-tab-${tab.folderId}`"
             >
               <div class="full-width row justify-between no-wrap">
                 <span
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-ml-sm"
                     @click.stop="editFolder(tab.folderId)"
                     style="cursor: pointer; justify-self: end"
-                    data-test="edit-folder-icon"
+                    data-test="dashboard-edit-folder-icon"
                   />
                   <q-icon
                     v-if="index"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-ml-sm"
                     @click.stop="showDeleteFolderDialogFn(tab.folderId)"
                     style="cursor: pointer; justify-self: end"
-                    data-test="delete-folder-icon"
+                    data-test="dashboard-delete-folder-icon"
                   />
                 </div>
               </div>
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               :label="t('dashboard.newFolderBtnLabel')"
               @click.stop="addFolder"
-              data-test="new-folder-btn"
+              data-test="dashboard-new-folder-btn"
             />
           </div>
         </div>

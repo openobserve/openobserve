@@ -10,7 +10,7 @@
           </div>
           <div class="col-auto">
             <q-btn v-close-popup="true"
-              data-test="schema-cancel"
+              data-test="metrics-schema-cancel"
               round flat
               icon="cancel" />
           </div>
@@ -43,7 +43,7 @@
               dense
               :rules="[(val) => !!val.trim() || 'Dashboard name required']"
               :lazy-rules="true"
-              data-test="new-dashboard-name"
+              data-test="metrics-new-dashboard-name"
             ></q-input>
             <span>&nbsp;</span>
             <q-input
@@ -56,7 +56,7 @@
               outlined
               filled
               dense
-              data-test="new-dashboard-description"
+              data-test="metrics-new-dashboard-description"
             ></q-input>
             <q-input
               v-model.trim="panelTitle"
@@ -70,7 +70,7 @@
               dense
               :rules="[(val) => !!val.trim() || 'Panel title required']"
               :lazy-rules="true"
-              data-test="new-dashboard-panel-title"
+              data-test="metrics-new-dashboard-panel-title"
             />
             <span>&nbsp;</span>
           </template>
@@ -115,14 +115,14 @@
               dense
               :rules="[(val) => !!val.trim() || 'Panel Title required']"
               :lazy-rules="true"
-              data-test="new-dashboard-panel-title"
+              data-test="metrics-new-dashboard-panel-title"
             />
             <span>&nbsp;</span>
           </template>
           <div class="q-mt-lg text-center">
             <q-btn
               v-close-popup="true"
-              data-test="schema-cancel-button"
+              data-test="metrics-schema-cancel-button"
               class="q-mb-md text-bold"
               :label="t('metrics.cancel')"
               text-color="light-text"
@@ -130,7 +130,7 @@
               no-caps
             />
             <q-btn
-              data-test="schema-update-settings-button"
+              data-test="metrics-schema-update-settings-button"
               :label="t('metrics.add')"
               class="q-mb-md text-bold no-border q-ml-md"
               color="secondary"
