@@ -33,9 +33,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-space />
         <q-icon
-          v-if="dependentAdHocVariable"
+          v-if="!viewOnly && showFullScreenBtn && props.data.description != ''"
           name="info_outline"
           style="cursor: pointer"
+          >
+          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+            {{ props.data.description }}
+          </q-tooltip></q-icon
+        >
+        <q-btn
+          v-if="!viewOnly && showFullScreenBtn"
+          icon="fullscreen"
+          flat
+          size="sm"
+          padding="1px"
+          @click="onPanelModifyClick('ViewPanel')"
+          title="Full screen"
+        />
+        <q-btn
+          v-if="dependentAdHocVariable"
+          :icon="outlinedWarning"
+          flat
+          size="xs"
+          padding="2px"
           @click="showViewPanel = true"
         >
           <q-tooltip anchor="bottom right" self="top right" max-width="220px">
@@ -43,16 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             present in the query's stream. Open Query Inspector to see all the
             details of the variables and queries executed to render this panel
           </q-tooltip>
-        </q-icon>
-        <q-btn
-          v-if="!viewOnly && showFullScreenBtn"
-          icon="fullscreen"
-          flat
-          size="md"
-          padding="none"
-          @click="onPanelModifyClick('ViewPanel')"
-          title="Full screen"
-        />
+        </q-btn>
         <q-btn-dropdown dense flat label="" no-caps v-if="!viewOnly">
           <q-list dense>
             <q-item
@@ -119,6 +130,7 @@ import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import QueryInspector from "@/components/dashboards/QueryInspector.vue";
+import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "PanelContainer",
@@ -238,6 +250,7 @@ export default defineComponent({
       onEditPanel,
       onDuplicatePanel,
       showFullScreenBtn,
+      outlinedWarning,
       store,
       metaDataValue,
       metaData,
