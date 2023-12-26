@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use ahash::AHashMap;
-use config::{RwAHashMap, RwHashMap};
+use config::{RwAHashMap, RwAHashSet, RwHashMap};
 use dashmap::DashMap;
 use datafusion::arrow::datatypes::Schema;
 use once_cell::sync::Lazy;
@@ -79,3 +79,7 @@ pub static MAXMIND_DB_CLIENT: Lazy<Arc<tokio::sync::RwLock<Option<MaxmindClient>
 
 pub static GEOIP_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
+
+// SEARCHING_FILES for searching files, in use, should not move to s3
+pub static SEARCHING_FILES: Lazy<RwAHashSet<String>> =
+    Lazy::new(|| tokio::sync::RwLock::new(Default::default()));
